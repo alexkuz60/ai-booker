@@ -109,8 +109,8 @@ function TreeItem({ node, depth = 0, selected, onSelect }: {
 const MOCK_TRACKS = [
   { id: "narrator-1", label: "Диктор 1", color: "hsl(var(--primary))", type: "narrator" },
   { id: "narrator-2", label: "Диктор 2", color: "hsl(var(--accent))", type: "narrator" },
-  { id: "ambience", label: "Атмосфера", color: "hsl(142 50% 45%)", type: "atmosphere" },
-  { id: "sfx", label: "SFX", color: "hsl(280 50% 55%)", type: "sfx" },
+  { id: "ambience", label: "Атмосфера", color: "hsl(175 45% 45%)", type: "atmosphere" },
+  { id: "sfx", label: "SFX", color: "hsl(220 50% 55%)", type: "sfx" },
 ];
 
 function TimelineRuler({ zoom, duration }: { zoom: number; duration: number }) {

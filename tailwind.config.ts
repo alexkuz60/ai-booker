@@ -61,11 +61,11 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
-        amber: {
-          glow: "hsl(var(--amber-glow))",
+        cyan: {
+          glow: "hsl(var(--cyan-glow))",
         },
-        warm: {
-          surface: "hsl(var(--warm-surface))",
+        cool: {
+          surface: "hsl(var(--cool-surface))",
         },
       },
       borderRadius: {
