@@ -1,8 +1,9 @@
-import { Home, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen } from "lucide-react";
+import { Home, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen, LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 import {
   Sidebar,
@@ -27,6 +28,7 @@ const mainNav = [
 ];
 
 export function AppSidebar() {
+  const { signOut } = useAuth();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
@@ -149,6 +151,21 @@ export function AppSidebar() {
                   </span>
                 )}
               </NavLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          {/* Logout */}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={signOut}
+              tooltip={collapsed ? (lang === "ru" ? "Выход" : "Logout") : undefined}
+              className="hover:bg-destructive/20 hover:text-destructive"
+            >
+              <LogOut className="h-4 w-4" />
+              {!collapsed && (
+                <span className="font-body text-sm">
+                  {lang === "ru" ? "Выход" : "Logout"}
+                </span>
+              )}
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
