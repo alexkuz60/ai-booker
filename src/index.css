@@ -16,7 +16,7 @@
     --popover-foreground: 200 15% 90%;
 
     --primary: 195 70% 50%;
-    --primary-foreground: 210 15% 8%;
+    --primary-foreground: 200 15% 95%;
 
     --secondary: 210 10% 18%;
     --secondary-foreground: 200 12% 75%;
@@ -25,7 +25,7 @@
     --muted-foreground: 210 10% 50%;
 
     --accent: 195 70% 50%;
-    --accent-foreground: 210 15% 8%;
+    --accent-foreground: 200 15% 95%;
 
     --destructive: 0 65% 50%;
     --destructive-foreground: 200 15% 90%;
@@ -39,7 +39,7 @@
     --sidebar-background: 210 12% 10%;
     --sidebar-foreground: 200 12% 75%;
     --sidebar-primary: 195 70% 50%;
-    --sidebar-primary-foreground: 210 15% 8%;
+    --sidebar-primary-foreground: 200 15% 95%;
     --sidebar-accent: 210 10% 16%;
     --sidebar-accent-foreground: 200 12% 75%;
     --sidebar-border: 210 10% 18%;
