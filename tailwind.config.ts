@@ -13,8 +13,8 @@ export default {
       },
     },
     fontFamily: {
-      display: ['Playfair Display', 'Georgia', 'serif'],
-      body: ['Source Sans 3', 'system-ui', 'sans-serif'],
+      display: ['Space Grotesk', 'system-ui', 'sans-serif'],
+      body: ['Inter', 'system-ui', 'sans-serif'],
     },
     extend: {
       colors: {
