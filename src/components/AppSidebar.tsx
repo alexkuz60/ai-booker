@@ -44,7 +44,7 @@ export function AppSidebar() {
       {/* Logo */}
       <SidebarHeader className="px-3 py-4">
         <div className="flex items-center gap-2.5 overflow-hidden">
-          <div className="h-8 w-8 min-w-[2rem] rounded-md gradient-amber flex items-center justify-center shadow-warm">
+          <div className="h-8 w-8 min-w-[2rem] rounded-md gradient-cyan flex items-center justify-center shadow-cool">
             <AudioWaveform className="h-4 w-4 text-primary-foreground" />
           </div>
           {!collapsed && (
