@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AppLayout } from "@/components/AppLayout";
 import Home from "./pages/Home";
+import Parser from "./pages/Parser";
 import Studio from "./pages/Studio";
 import Narrators from "./pages/Narrators";
 import Profile from "./pages/Profile";
@@ -23,6 +24,7 @@ const App = () => (
           <AppLayout>
             <Routes>
               <Route path="/" element={<Home />} />
+              <Route path="/parser" element={<Parser />} />
               <Route path="/studio" element={<Studio />} />
               <Route path="/narrators" element={<Narrators />} />
               <Route path="/profile" element={<Profile />} />
