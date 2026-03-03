@@ -56,6 +56,52 @@
     --font-display: 'Playfair Display', Georgia, serif;
     --font-body: 'Source Sans 3', system-ui, sans-serif;
   }
+
+  .light {
+    --background: 40 20% 96%;
+    --foreground: 30 10% 12%;
+
+    --card: 40 15% 93%;
+    --card-foreground: 30 10% 12%;
+
+    --popover: 40 15% 93%;
+    --popover-foreground: 30 10% 12%;
+
+    --primary: 36 80% 45%;
+    --primary-foreground: 40 20% 98%;
+
+    --secondary: 35 10% 88%;
+    --secondary-foreground: 30 10% 30%;
+
+    --muted: 35 8% 90%;
+    --muted-foreground: 30 8% 45%;
+
+    --accent: 36 80% 45%;
+    --accent-foreground: 40 20% 98%;
+
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 40 20% 98%;
+
+    --border: 35 10% 85%;
+    --input: 35 10% 85%;
+    --ring: 36 80% 45%;
+
+    --sidebar-background: 40 15% 94%;
+    --sidebar-foreground: 30 8% 35%;
+    --sidebar-primary: 36 80% 45%;
+    --sidebar-primary-foreground: 40 20% 98%;
+    --sidebar-accent: 35 10% 90%;
+    --sidebar-accent-foreground: 30 8% 35%;
+    --sidebar-border: 35 10% 87%;
+    --sidebar-ring: 36 80% 45%;
+
+    --amber-glow: 36 90% 50%;
+    --warm-surface: 40 12% 91%;
+    --text-dim: 30 8% 55%;
+    --gradient-amber: linear-gradient(135deg, hsl(36, 80%, 45%), hsl(28, 85%, 38%));
+    --shadow-warm: 0 8px 32px -8px hsla(36, 80%, 45%, 0.15);
+    --shadow-deep: 0 16px 48px -12px hsla(0, 0%, 0%, 0.1);
+  }
 }
 
 @layer base {
