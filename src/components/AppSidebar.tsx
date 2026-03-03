@@ -1,4 +1,4 @@
-import { Home, Mic2, AudioWaveform, User, Sun, Moon, Globe } from "lucide-react";
+import { Home, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useTheme } from "next-themes";
@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 
 const mainNav = [
   { title: "Главная", titleEn: "Home", url: "/", icon: Home },
+  { title: "Парсер", titleEn: "Parser", url: "/parser", icon: BookOpen },
   { title: "Студия", titleEn: "Studio", url: "/studio", icon: AudioWaveform },
   { title: "Дикторы", titleEn: "Narrators", url: "/narrators", icon: Mic2 },
 ];
