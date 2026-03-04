@@ -715,17 +715,21 @@ export default function Parser() {
     const isSelected = selectedIdx === idx;
     const status = result?.status || "pending";
 
+    const indent = entry.partTitle ? "pl-8" : "pl-4";
+
     return (
       <button
         key={idx}
-        onClick={() => setSelectedIdx(idx)}
-        className={`w-full flex items-center gap-2 px-4 py-1.5 text-left text-xs transition-colors ${
+        onClick={() => {
+          setSelectedIdx(idx);
+          if (status === "pending") analyzeChapter(idx);
+        }}
+        className={`w-full flex items-center gap-2 ${indent} pr-4 py-1.5 text-left text-xs transition-colors ${
           isSelected
             ? "bg-primary/10 text-primary border-r-2 border-primary"
             : "text-foreground/70 hover:bg-muted/40 hover:text-foreground"
         }`}
       >
-        {/* Status indicator */}
         <span className="flex-shrink-0">
           {status === "done" ? (
             <CheckCircle2 className="h-3 w-3 text-green-500" />
