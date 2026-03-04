@@ -370,7 +370,7 @@ const Studio = () => {
             </div>
 
           {!timelineCollapsed && (
-            <div className="flex-1 flex min-h-0">
+            <div className="flex-1 flex min-h-0 overflow-hidden">
               <div className="w-28 shrink-0 border-r border-border flex flex-col">
                 <div className="h-6 border-b border-border" />
                 {MOCK_TRACKS.map((track) => (
