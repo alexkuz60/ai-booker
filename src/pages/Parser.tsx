@@ -147,6 +147,7 @@ const ACTIVE_BOOK_KEY = "parser-active-book";
 export default function Parser() {
   const { user } = useAuth();
   const { isRu } = useLanguage();
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // If we have an active book in session, start in "extracting_toc" to avoid flashing library
