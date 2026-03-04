@@ -1,15 +1,24 @@
 import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, FileText, BookOpen, ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2, Zap, Edit2, Layers } from "lucide-react";
+import {
+  Upload, FileText, BookOpen, ChevronDown, ChevronRight, Loader2,
+  AlertCircle, CheckCircle2, Zap, Layers, PlayCircle, FolderOpen
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { extractOutline, extractTextByPageRange, extractTextFromPdf, flattenTocWithRanges, type TocEntry } from "@/lib/pdf-extract";
+import {
+  extractOutline, extractTextByPageRange, extractTextFromPdf,
+  flattenTocWithRanges, type TocEntry
+} from "@/lib/pdf-extract";
+
+// ─── Types ───────────────────────────────────────────────────
 
 interface Scene {
   scene_number: number;
@@ -49,6 +58,8 @@ interface TocChapter {
   sectionType: SectionType;
 }
 
+// ─── Classification ──────────────────────────────────────────
+
 const SECTION_PATTERNS: { type: SectionType; patterns: RegExp[] }[] = [
   {
     type: "preface",
@@ -74,9 +85,7 @@ const SECTION_PATTERNS: { type: SectionType; patterns: RegExp[] }[] = [
   },
   {
     type: "appendix",
-    patterns: [
-      /приложен/i, /дополнен/i, /appendix/i, /supplement/i,
-    ],
+    patterns: [/приложен/i, /дополнен/i, /appendix/i, /supplement/i],
   },
 ];
 
@@ -87,15 +96,13 @@ function classifySection(title: string): SectionType {
   return "content";
 }
 
-const SECTION_LABELS: Record<SectionType, { label: string; icon: string }> = {
-  content: { label: "Контент", icon: "📖" },
-  preface: { label: "Предисловие", icon: "📝" },
-  afterword: { label: "Послесловие", icon: "📜" },
-  endnotes: { label: "Примечания / Ссылки", icon: "🔗" },
-  appendix: { label: "Приложения", icon: "📎" },
+const SECTION_ICONS: Record<SectionType, string> = {
+  content: "📖",
+  preface: "📝",
+  afterword: "📜",
+  endnotes: "🔗",
+  appendix: "📎",
 };
-
-type Step = "upload" | "extracting_toc" | "review_toc" | "analyzing" | "done" | "error";
 
 const SCENE_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   action: { label: "Экшн", color: "bg-red-500/20 text-red-400 border-red-500/30" },
@@ -106,13 +113,10 @@ const SCENE_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   mixed: { label: "Смешанный", color: "bg-muted text-muted-foreground border-border" },
 };
 
-const STEPS_INFO = [
-  { key: "upload", label: "Загрузка PDF" },
-  { key: "extracting_toc", label: "Извлечение оглавления" },
-  { key: "review_toc", label: "Проверка структуры" },
-  { key: "analyzing", label: "AI-анализ глав" },
-  { key: "done", label: "Готово" },
-];
+type Step = "upload" | "extracting_toc" | "workspace" | "error";
+
+// Analysis status per chapter
+type ChapterStatus = "pending" | "analyzing" | "done" | "error";
 
 export default function Parser() {
   const { user } = useAuth();
@@ -120,37 +124,29 @@ export default function Parser() {
 
   const [step, setStep] = useState<Step>("upload");
   const [fileName, setFileName] = useState("");
-  const [structure, setStructure] = useState<BookStructure | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
-  const [expandedParts, setExpandedParts] = useState<Set<number>>(new Set());
-  const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
   const [bookId, setBookId] = useState<string | null>(null);
 
-  // TOC review state
+  // TOC state
   const [tocEntries, setTocEntries] = useState<TocChapter[]>([]);
-  const [hasToc, setHasToc] = useState(false);
   const [pdfRef, setPdfRef] = useState<any>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [file, setFile] = useState<File | null>(null);
 
-  // Parallel analysis progress
-  const [analysisProgress, setAnalysisProgress] = useState({ done: 0, total: 0 });
+  // Workspace state
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [chapterResults, setChapterResults] = useState<Map<number, { scenes: Scene[]; status: ChapterStatus }>>(new Map());
+  const [expandedParts, setExpandedParts] = useState<Set<string>>(new Set());
 
-  const togglePart = (n: number) => {
+  const togglePart = (key: string) => {
     setExpandedParts(prev => {
-      const next = new Set(prev);
-      next.has(n) ? next.delete(n) : next.add(n);
-      return next;
-    });
-  };
-
-  const toggleChapter = (key: string) => {
-    setExpandedChapters(prev => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
     });
   };
+
+  // ─── File Upload & TOC Extraction ──────────────────────────
 
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -168,21 +164,17 @@ export default function Parser() {
     setFileName(f.name);
     setFile(f);
     setStep("extracting_toc");
-    setStructure(null);
     setErrorMsg("");
 
     try {
-      // 1. Try to extract TOC from PDF outline/bookmarks
       const { outline, pdf } = await extractOutline(f);
       setPdfRef(pdf);
       setTotalPages(pdf.numPages);
 
+      let chapters: TocChapter[] = [];
+
       if (outline.length > 0) {
-        // Found TOC — build chapter list with page ranges
         const flat = flattenTocWithRanges(outline, pdf.numPages);
-        
-        // Detect parts (level 0) and chapters (level 1+)
-        const chapters: TocChapter[] = [];
         let currentPart = "";
         for (const entry of flat) {
           if (entry.level === 0 && entry.children.length > 0) {
@@ -198,8 +190,6 @@ export default function Parser() {
             });
           }
         }
-
-        // If no clear part/chapter distinction, treat all as chapters
         if (chapters.length === 0) {
           for (const entry of flat) {
             chapters.push({
@@ -211,18 +201,44 @@ export default function Parser() {
             });
           }
         }
-
-        setTocEntries(chapters);
-        setHasToc(true);
-        setStep("review_toc");
         toast.success(`Найдено оглавление: ${chapters.length} элементов`);
       } else {
-        // No TOC found — fallback to full text LLM analysis
-        setHasToc(false);
-        setStep("analyzing");
-        toast.info("Оглавление не найдено. Запускаем AI-анализ всего текста...");
-        await runFullTextAnalysis(f, pdf, user.id);
+        // No TOC — create a single "full book" entry for fallback
+        toast.info("Оглавление не найдено. Книга загружена как один блок.");
+        chapters = [{
+          title: f.name.replace('.pdf', ''),
+          startPage: 1,
+          endPage: pdf.numPages,
+          level: 0,
+          sectionType: "content",
+        }];
       }
+
+      setTocEntries(chapters);
+
+      // Create book record
+      const filePath = `${user.id}/${Date.now()}_${f.name}`;
+      await supabase.storage.from('book-uploads').upload(filePath, f);
+      const { data: book, error: bookErr } = await supabase
+        .from('books')
+        .insert({
+          user_id: user.id,
+          title: f.name.replace('.pdf', ''),
+          file_name: f.name,
+          file_path: filePath,
+          status: 'uploaded',
+        })
+        .select('id')
+        .single();
+      if (bookErr) throw bookErr;
+      setBookId(book.id);
+
+      // Init status map
+      const initMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
+      chapters.forEach((_, i) => initMap.set(i, { scenes: [], status: "pending" }));
+      setChapterResults(initMap);
+
+      setStep("workspace");
     } catch (err: any) {
       console.error("Parser error:", err);
       setErrorMsg(err.message || "Unknown error");
@@ -233,76 +249,31 @@ export default function Parser() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [user]);
 
-  const runFullTextAnalysis = async (f: File, pdf: any, userId: string) => {
-    const text = await extractTextFromPdf(f);
-    if (text.trim().length < 100) {
-      throw new Error("Не удалось извлечь достаточно текста из PDF.");
-    }
+  // ─── Single Chapter Analysis ───────────────────────────────
 
-    // Upload & create book record
-    const filePath = `${userId}/${Date.now()}_${f.name}`;
-    await supabase.storage.from('book-uploads').upload(filePath, f);
+  const analyzeChapter = async (idx: number) => {
+    if (!pdfRef || !user) return;
+    const entry = tocEntries[idx];
+    if (!entry) return;
 
-    const { data: book, error: bookErr } = await supabase
-      .from('books')
-      .insert({
-        user_id: userId,
-        title: f.name.replace('.pdf', ''),
-        file_name: f.name,
-        file_path: filePath,
-        raw_text: text.slice(0, 500000),
-        status: 'analyzing',
-      })
-      .select('id')
-      .single();
-    if (bookErr) throw bookErr;
-    setBookId(book.id);
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('api_keys')
-      .eq('id', userId)
-      .single();
-    const apiKeys = (profile?.api_keys as Record<string, string>) || {};
-    const userKey = apiKeys.openai || apiKeys.gemini || null;
-
-    const { data: fnData, error: fnError } = await supabase.functions.invoke('parse-book-structure', {
-      body: { text, user_api_key: userKey, mode: "full" },
+    setChapterResults(prev => {
+      const next = new Map(prev);
+      next.set(idx, { scenes: [], status: "analyzing" });
+      return next;
     });
-    if (fnError) throw new Error(fnError.message);
-    if (fnData.error) throw new Error(fnData.error);
-
-    const result = fnData.structure as BookStructure;
-    setStructure(result);
-    await saveStructureToDb(book.id, result);
-    setStep("done");
-    toast.success("Структура книги проанализирована!");
-  };
-
-  const runParallelChapterAnalysis = async () => {
-    if (!user || !file || !pdfRef) return;
-
-    setStep("analyzing");
-    setAnalysisProgress({ done: 0, total: tocEntries.length });
 
     try {
-      // Upload & create book record
-      const filePath = `${user.id}/${Date.now()}_${file.name}`;
-      await supabase.storage.from('book-uploads').upload(filePath, file);
+      const text = await extractTextByPageRange(pdfRef, entry.startPage, entry.endPage);
 
-      const { data: book, error: bookErr } = await supabase
-        .from('books')
-        .insert({
-          user_id: user.id,
-          title: file.name.replace('.pdf', ''),
-          file_name: file.name,
-          file_path: filePath,
-          status: 'analyzing',
-        })
-        .select('id')
-        .single();
-      if (bookErr) throw bookErr;
-      setBookId(book.id);
+      if (text.trim().length < 50) {
+        setChapterResults(prev => {
+          const next = new Map(prev);
+          next.set(idx, { scenes: [], status: "done" });
+          return next;
+        });
+        toast.info(`"${entry.title}" — недостаточно текста для анализа`);
+        return;
+      }
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -312,184 +283,34 @@ export default function Parser() {
       const apiKeys = (profile?.api_keys as Record<string, string>) || {};
       const userKey = apiKeys.openai || apiKeys.gemini || null;
 
-      // Group chapters by part
-      const partsMap = new Map<string, TocChapter[]>();
-      for (const ch of tocEntries) {
-        const key = ch.partTitle || "__default__";
-        if (!partsMap.has(key)) partsMap.set(key, []);
-        partsMap.get(key)!.push(ch);
-      }
+      const { data: fnData, error: fnError } = await supabase.functions.invoke('parse-book-structure', {
+        body: { text, user_api_key: userKey, mode: "chapter", chapter_title: entry.title },
+      });
 
-      // Analyze chapters in parallel (batches of 3 to avoid rate limits)
-      const allChapters: { partTitle?: string; chapter: Chapter; chapterIdx: number }[] = [];
-      let globalIdx = 0;
+      if (fnError || fnData?.error) throw new Error(fnError?.message || fnData?.error);
 
-      const batchSize = 3;
-      const allEntries = [...tocEntries];
-      
-      for (let batchStart = 0; batchStart < allEntries.length; batchStart += batchSize) {
-        const batch = allEntries.slice(batchStart, batchStart + batchSize);
-        
-        const promises = batch.map(async (entry) => {
-          const text = await extractTextByPageRange(pdfRef, entry.startPage, entry.endPage);
-          
-          if (text.trim().length < 50) {
-            return {
-              partTitle: entry.partTitle,
-              chapter: {
-                chapter_number: 0,
-                title: entry.title,
-                scenes: [],
-              },
-            };
-          }
+      const scenes: Scene[] = fnData.structure?.scenes || [];
 
-          const { data: fnData, error: fnError } = await supabase.functions.invoke('parse-book-structure', {
-            body: {
-              text,
-              user_api_key: userKey,
-              mode: "chapter",
-              chapter_title: entry.title,
-            },
-          });
+      setChapterResults(prev => {
+        const next = new Map(prev);
+        next.set(idx, { scenes, status: "done" });
+        return next;
+      });
 
-          if (fnError || fnData?.error) {
-            console.error(`Chapter analysis failed for "${entry.title}":`, fnError?.message || fnData?.error);
-            return {
-              partTitle: entry.partTitle,
-              chapter: {
-                chapter_number: 0,
-                title: entry.title,
-                scenes: [],
-              },
-            };
-          }
-
-          return {
-            partTitle: entry.partTitle,
-            chapter: {
-              chapter_number: 0,
-              title: entry.title,
-              scenes: fnData.structure.scenes || [],
-            },
-          };
-        });
-
-        const results = await Promise.all(promises);
-        for (const r of results) {
-          globalIdx++;
-          r.chapter.chapter_number = globalIdx;
-          allChapters.push({ ...r, chapterIdx: globalIdx });
-        }
-        setAnalysisProgress({ done: Math.min(batchStart + batchSize, allEntries.length), total: allEntries.length });
-      }
-
-      // Build final structure
-      const partTitles = [...new Set(tocEntries.map(e => e.partTitle).filter(Boolean))];
-      
-      let bookStructure: BookStructure;
-      if (partTitles.length > 0) {
-        const parts: Part[] = partTitles.map((pTitle, pIdx) => ({
-          part_number: pIdx + 1,
-          title: pTitle!,
-          chapters: allChapters
-            .filter(c => c.partTitle === pTitle)
-            .map(c => c.chapter),
-        }));
-        // Add chapters without parts
-        const orphanChapters = allChapters.filter(c => !c.partTitle).map(c => c.chapter);
-        if (orphanChapters.length > 0) {
-          parts.push({ part_number: parts.length + 1, title: "Без раздела", chapters: orphanChapters });
-        }
-        bookStructure = {
-          book_title: file.name.replace('.pdf', ''),
-          parts,
-        };
-      } else {
-        bookStructure = {
-          book_title: file.name.replace('.pdf', ''),
-          chapters: allChapters.map(c => c.chapter),
-        };
-      }
-
-      setStructure(bookStructure);
-      await saveStructureToDb(book.id, bookStructure);
-
-      await supabase.from('books').update({
-        title: bookStructure.book_title,
-        status: 'parsed',
-        updated_at: new Date().toISOString(),
-      }).eq('id', book.id);
-
-      setStep("done");
-      if (bookStructure.parts?.length) {
-        setExpandedParts(new Set([1]));
-      }
-      toast.success("Структура книги успешно проанализирована!");
-    } catch (err: any) {
-      console.error("Parser error:", err);
-      setErrorMsg(err.message || "Unknown error");
-      setStep("error");
-      toast.error("Ошибка: " + (err.message || ""));
-    }
-  };
-
-  const saveStructureToDb = async (bookIdVal: string, struct: BookStructure) => {
-    if (struct.parts) {
-      for (const part of struct.parts) {
-        const { data: partRow } = await supabase
-          .from('book_parts')
-          .insert({
-            book_id: bookIdVal,
-            part_number: part.part_number,
-            title: part.title,
-          })
-          .select('id')
-          .single();
-
-        if (partRow) {
-          for (const ch of part.chapters) {
-            const { data: chRow } = await supabase
-              .from('book_chapters')
-              .insert({
-                book_id: bookIdVal,
-                part_id: partRow.id,
-                chapter_number: ch.chapter_number,
-                title: ch.title,
-              })
-              .select('id')
-              .single();
-
-            if (chRow && ch.scenes) {
-              for (const sc of ch.scenes) {
-                await supabase.from('book_scenes').insert({
-                  chapter_id: chRow.id,
-                  scene_number: sc.scene_number,
-                  title: sc.title,
-                  content: sc.content_preview || '',
-                  scene_type: sc.scene_type,
-                  mood: sc.mood,
-                  bpm: sc.bpm,
-                });
-              }
-            }
-          }
-        }
-      }
-    } else if (struct.chapters) {
-      for (const ch of struct.chapters) {
+      // Save to DB
+      if (bookId) {
         const { data: chRow } = await supabase
           .from('book_chapters')
           .insert({
-            book_id: bookIdVal,
-            chapter_number: ch.chapter_number,
-            title: ch.title,
+            book_id: bookId,
+            chapter_number: idx + 1,
+            title: entry.title,
           })
           .select('id')
           .single();
 
-        if (chRow && ch.scenes) {
-          for (const sc of ch.scenes) {
+        if (chRow) {
+          for (const sc of scenes) {
             await supabase.from('book_scenes').insert({
               chapter_id: chRow.id,
               scene_number: sc.scene_number,
@@ -502,29 +323,65 @@ export default function Parser() {
           }
         }
       }
+
+      toast.success(`Глава "${entry.title}" проанализирована: ${scenes.length} сцен`);
+    } catch (err: any) {
+      console.error(`Chapter analysis failed for "${entry.title}":`, err);
+      setChapterResults(prev => {
+        const next = new Map(prev);
+        next.set(idx, { scenes: [], status: "error" });
+        return next;
+      });
+      toast.error(`Ошибка анализа: ${entry.title}`);
     }
   };
+
+  // ─── Reset ─────────────────────────────────────────────────
 
   const handleReset = () => {
     setStep("upload");
     setFileName("");
-    setStructure(null);
     setErrorMsg("");
     setBookId(null);
     setTocEntries([]);
-    setHasToc(false);
     setPdfRef(null);
     setFile(null);
-    setAnalysisProgress({ done: 0, total: 0 });
+    setSelectedIdx(null);
+    setChapterResults(new Map());
+    setExpandedParts(new Set());
   };
 
-  const currentStepIdx = STEPS_INFO.findIndex(s => s.key === step);
+  // ─── Helpers ───────────────────────────────────────────────
 
-  // Flatten chapters for display
-  const allChapters = structure?.parts
-    ? structure.parts.flatMap(p => p.chapters)
-    : structure?.chapters || [];
-  const totalScenes = allChapters.reduce((a, c) => a + (c.scenes?.length || 0), 0);
+  const selectedEntry = selectedIdx !== null ? tocEntries[selectedIdx] : null;
+  const selectedResult = selectedIdx !== null ? chapterResults.get(selectedIdx) : null;
+
+  const contentEntries = tocEntries.filter(e => e.sectionType === "content");
+  const supplementaryEntries = tocEntries.filter(e => e.sectionType !== "content");
+
+  const analyzedCount = Array.from(chapterResults.values()).filter(r => r.status === "done").length;
+  const totalScenes = Array.from(chapterResults.values()).reduce((a, r) => a + r.scenes.length, 0);
+
+  // Group content entries by part
+  const partGroups: { title: string; indices: number[] }[] = [];
+  const partlessIndices: number[] = [];
+  const partMap = new Map<string, number[]>();
+
+  tocEntries.forEach((entry, idx) => {
+    if (entry.sectionType !== "content") return;
+    const key = entry.partTitle || "";
+    if (key) {
+      if (!partMap.has(key)) {
+        partMap.set(key, []);
+        partGroups.push({ title: key, indices: partMap.get(key)! });
+      }
+      partMap.get(key)!.push(idx);
+    } else {
+      partlessIndices.push(idx);
+    }
+  });
+
+  // ─── Render ────────────────────────────────────────────────
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col h-full">
@@ -537,51 +394,26 @@ export default function Parser() {
           </p>
         </div>
         {step !== "upload" && (
-          <Button variant="outline" size="sm" onClick={handleReset}>
-            Новый файл
-          </Button>
+          <div className="flex items-center gap-3">
+            {step === "workspace" && (
+              <div className="text-xs text-muted-foreground">
+                {analyzedCount}/{tocEntries.length} глав • {totalScenes} сцен
+              </div>
+            )}
+            <Button variant="outline" size="sm" onClick={handleReset}>
+              Новый файл
+            </Button>
+          </div>
         )}
       </div>
 
-      {/* Steps indicator */}
-      <div className="px-6 py-3 border-b border-border">
-        <div className="flex items-center gap-2">
-          {STEPS_INFO.map((s, i) => {
-            const isActive = i === currentStepIdx;
-            const isDone = i < currentStepIdx || step === "done";
-            const isError = step === "error" && i === currentStepIdx;
-            return (
-              <div key={s.key} className="flex items-center gap-2">
-                {i > 0 && <div className={`w-8 h-px ${isDone ? 'bg-primary' : 'bg-border'}`} />}
-                <div className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
-                  isError ? 'text-destructive' :
-                  isDone ? 'text-primary' :
-                  isActive ? 'text-foreground' : 'text-muted-foreground'
-                }`}>
-                  {isDone && !isActive ? (
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  ) : isError ? (
-                    <AlertCircle className="h-3.5 w-3.5" />
-                  ) : isActive && (step === "extracting_toc" || step === "analyzing") ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <div className={`h-2 w-2 rounded-full ${isActive ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
-                  )}
-                  <span className="hidden sm:inline">{s.label}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Content */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
           {/* Upload */}
           {step === "upload" && (
             <motion.div key="upload" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-              className="flex-1 flex items-center justify-center min-h-[400px]">
+              className="flex-1 flex items-center justify-center h-full">
               <Card className="w-full max-w-md cursor-pointer border-dashed border-2 hover:border-primary/50 transition-colors"
                 onClick={() => fileInputRef.current?.click()}>
                 <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
@@ -592,7 +424,7 @@ export default function Parser() {
                     <p className="font-display font-semibold text-lg text-foreground">Загрузите PDF книги</p>
                     <p className="text-sm text-muted-foreground mt-1">Максимум 20 МБ • PDF формат</p>
                   </div>
-                  <Button variant="hero" size="lg">
+                  <Button variant="outline" size="lg">
                     <Upload className="h-4 w-4 mr-2" />
                     Выбрать файл
                   </Button>
@@ -605,7 +437,7 @@ export default function Parser() {
           {/* Extracting TOC */}
           {step === "extracting_toc" && (
             <motion.div key="extracting_toc" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-              className="flex items-center justify-center min-h-[400px]">
+              className="flex items-center justify-center h-full">
               <Card className="w-full max-w-md">
                 <CardContent className="py-10 flex flex-col items-center gap-4">
                   <FileText className="h-8 w-8 text-primary" />
@@ -619,109 +451,15 @@ export default function Parser() {
             </motion.div>
           )}
 
-          {/* Review TOC */}
-          {step === "review_toc" && (
-            <motion.div key="review_toc" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-              className="space-y-4 max-w-3xl mx-auto">
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl gradient-cyan flex items-center justify-center shadow-cool">
-                        <Layers className="h-5 w-5 text-primary-foreground" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-xl">Структура из оглавления PDF</CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                          {tocEntries.filter(e => e.sectionType === "content").length} глав
-                          {tocEntries.filter(e => e.sectionType !== "content").length > 0 && (
-                            <> • {tocEntries.filter(e => e.sectionType !== "content").length} доп. секций</>
-                          )}
-                          {" "}• {totalPages} страниц
-                        </p>
-                      </div>
-                    </div>
-                    <Button variant="hero" onClick={runParallelChapterAnalysis}>
-                      <Zap className="h-4 w-4 mr-2" />
-                      Анализировать
-                    </Button>
-                  </div>
-                </CardHeader>
-              </Card>
-
-              {/* Supplementary: preface */}
-              {renderTocSection("preface")}
-
-              {/* Main content grouped by parts */}
-              {(() => {
-                const contentEntries = tocEntries.filter(e => e.sectionType === "content");
-                const parts = [...new Set(contentEntries.map(e => e.partTitle).filter(Boolean))];
-                if (parts.length > 0) {
-                  return parts.map((partTitle, pi) => (
-                    <Card key={`part-${pi}`}>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base text-primary">{partTitle}</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-1.5">
-                        {contentEntries.filter(e => e.partTitle === partTitle).map((entry, i) => renderTocEntry(entry, i))}
-                      </CardContent>
-                    </Card>
-                  ));
-                }
-                return contentEntries.length > 0 ? (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">📖 Основной контент</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-1.5">
-                      {contentEntries.map((entry, i) => renderTocEntry(entry, i))}
-                    </CardContent>
-                  </Card>
-                ) : null;
-              })()}
-
-              {/* Supplementary: afterword, endnotes, appendix */}
-              {renderTocSection("afterword")}
-              {renderTocSection("endnotes")}
-              {renderTocSection("appendix")}
-            </motion.div>
-          )}
-
-          {/* Analyzing */}
-          {step === "analyzing" && (
-            <motion.div key="analyzing" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-              className="flex items-center justify-center min-h-[400px]">
-              <Card className="w-full max-w-md">
-                <CardContent className="py-10 flex flex-col items-center gap-4">
-                  <div className="h-16 w-16 rounded-2xl gradient-cyan flex items-center justify-center shadow-cool animate-pulse">
-                    <Zap className="h-8 w-8 text-primary-foreground" />
-                  </div>
-                  <div className="text-center">
-                    <p className="font-display font-semibold text-lg">The Architect</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {analysisProgress.total > 0
-                        ? `Анализ глав: ${analysisProgress.done} / ${analysisProgress.total}`
-                        : "AI анализирует структуру книги..."}
-                    </p>
-                  </div>
-                  {analysisProgress.total > 0 && (
-                    <Progress value={(analysisProgress.done / analysisProgress.total) * 100} className="h-2 w-full max-w-xs" />
-                  )}
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-
           {/* Error */}
           {step === "error" && (
             <motion.div key="error" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-              className="flex items-center justify-center min-h-[400px]">
+              className="flex items-center justify-center h-full">
               <Card className="w-full max-w-md border-destructive/30">
                 <CardContent className="py-10 flex flex-col items-center gap-4">
                   <AlertCircle className="h-12 w-12 text-destructive" />
                   <div className="text-center">
-                    <p className="font-display font-semibold text-lg">Ошибка анализа</p>
+                    <p className="font-display font-semibold text-lg">Ошибка</p>
                     <p className="text-sm text-muted-foreground mt-2 max-w-sm">{errorMsg}</p>
                   </div>
                   <Button variant="outline" onClick={handleReset}>Попробовать снова</Button>
@@ -730,62 +468,219 @@ export default function Parser() {
             </motion.div>
           )}
 
-          {/* Results */}
-          {step === "done" && structure && (
-            <motion.div key="done" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-              className="space-y-4 max-w-3xl mx-auto">
-              {/* Book header */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl gradient-cyan flex items-center justify-center shadow-cool">
-                      <BookOpen className="h-5 w-5 text-primary-foreground" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-xl">{structure.book_title}</CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        {structure.parts ? `${structure.parts.length} частей • ` : ""}
-                        {allChapters.length} глав • {totalScenes} сцен
-                      </p>
+          {/* ═══ WORKSPACE: Split Panel ═══ */}
+          {step === "workspace" && (
+            <motion.div key="workspace" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="flex h-full">
+
+              {/* ── Left Sidebar: Navigator ── */}
+              <div className="w-72 min-w-[260px] border-r border-border flex flex-col bg-card/50">
+                <div className="px-4 py-3 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-primary" />
+                    <span className="font-display font-semibold text-sm text-foreground truncate">
+                      {fileName.replace('.pdf', '')}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    {totalPages} стр. • {contentEntries.length} глав
+                    {supplementaryEntries.length > 0 && ` • ${supplementaryEntries.length} доп.`}
+                  </p>
+                </div>
+
+                <ScrollArea className="flex-1">
+                  <div className="py-2">
+                    {/* Preface sections */}
+                    {renderNavSection("preface")}
+
+                    {/* Parts with chapters */}
+                    {partGroups.map((group) => (
+                      <div key={group.title}>
+                        <button
+                          onClick={() => togglePart(group.title)}
+                          className="w-full flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-primary hover:bg-muted/30 transition-colors"
+                        >
+                          {expandedParts.has(group.title) ? (
+                            <ChevronDown className="h-3 w-3" />
+                          ) : (
+                            <ChevronRight className="h-3 w-3" />
+                          )}
+                          <FolderOpen className="h-3 w-3" />
+                          <span className="truncate">{group.title}</span>
+                        </button>
+                        {expandedParts.has(group.title) && (
+                          <div className="ml-2">
+                            {group.indices.map(idx => renderNavItem(idx))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Chapters without parts */}
+                    {partlessIndices.map(idx => renderNavItem(idx))}
+
+                    {/* Supplementary sections */}
+                    {renderNavSection("afterword")}
+                    {renderNavSection("endnotes")}
+                    {renderNavSection("appendix")}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              {/* ── Right Panel: Chapter Detail ── */}
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {selectedIdx === null ? (
+                  <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                    <div className="text-center space-y-3">
+                      <Layers className="h-12 w-12 mx-auto opacity-30" />
+                      <p className="text-sm">Выберите главу для анализа</p>
                     </div>
                   </div>
-                </CardHeader>
-              </Card>
-
-              {/* Parts / Chapters */}
-              {structure.parts ? (
-                structure.parts.map((part) => (
-                  <Collapsible key={part.part_number} open={expandedParts.has(part.part_number)}
-                    onOpenChange={() => togglePart(part.part_number)}>
-                    <Card>
-                      <CollapsibleTrigger asChild>
-                        <CardHeader className="cursor-pointer hover:bg-muted/30 transition-colors pb-3">
-                          <div className="flex items-center gap-3">
-                            {expandedParts.has(part.part_number)
-                              ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                              : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                            <div>
-                              <CardTitle className="text-lg text-primary">
-                                {part.title}
-                              </CardTitle>
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                {part.chapters.length} глав
-                              </p>
+                ) : selectedEntry && (
+                  <ScrollArea className="flex-1">
+                    <div className="p-6 max-w-3xl mx-auto space-y-4">
+                      {/* Chapter header */}
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-xl gradient-cyan flex items-center justify-center shadow-cool">
+                                <FileText className="h-5 w-5 text-primary-foreground" />
+                              </div>
+                              <div>
+                                <CardTitle className="text-lg">{selectedEntry.title}</CardTitle>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  Стр. {selectedEntry.startPage}–{selectedEntry.endPage}
+                                  {selectedEntry.partTitle && ` • ${selectedEntry.partTitle}`}
+                                </p>
+                              </div>
                             </div>
+
+                            {/* Analyze button */}
+                            {selectedResult?.status === "pending" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => analyzeChapter(selectedIdx)}
+                                className="gap-2"
+                              >
+                                <PlayCircle className="h-4 w-4" />
+                                Анализировать
+                              </Button>
+                            )}
+                            {selectedResult?.status === "done" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => analyzeChapter(selectedIdx)}
+                                className="gap-2 text-muted-foreground"
+                              >
+                                <Zap className="h-4 w-4" />
+                                Повторить
+                              </Button>
+                            )}
+                            {selectedResult?.status === "error" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => analyzeChapter(selectedIdx)}
+                                className="gap-2 border-destructive/30 text-destructive"
+                              >
+                                <AlertCircle className="h-4 w-4" />
+                                Повторить
+                              </Button>
+                            )}
                           </div>
                         </CardHeader>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <CardContent className="pt-0 space-y-3">
-                          {part.chapters.map((ch) => renderChapter(ch, `${part.part_number}-${ch.chapter_number}`))}
-                        </CardContent>
-                      </CollapsibleContent>
-                    </Card>
-                  </Collapsible>
-                ))
-              ) : (
-                structure.chapters?.map((ch) => renderChapter(ch, `${ch.chapter_number}`))
-              )}
+                      </Card>
+
+                      {/* Analyzing state */}
+                      {selectedResult?.status === "analyzing" && (
+                        <Card>
+                          <CardContent className="py-8 flex flex-col items-center gap-4">
+                            <div className="h-14 w-14 rounded-2xl gradient-cyan flex items-center justify-center shadow-cool animate-pulse">
+                              <Zap className="h-7 w-7 text-primary-foreground" />
+                            </div>
+                            <div className="text-center">
+                              <p className="font-display font-semibold">The Architect</p>
+                              <p className="text-sm text-muted-foreground mt-1">Анализируем сцены...</p>
+                            </div>
+                            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {/* Pending state */}
+                      {selectedResult?.status === "pending" && (
+                        <Card className="border-dashed">
+                          <CardContent className="py-8 flex flex-col items-center gap-3 text-muted-foreground">
+                            <PlayCircle className="h-10 w-10 opacity-30" />
+                            <p className="text-sm">
+                              Нажмите «Анализировать» для AI-декомпозиции на сцены
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {/* Error state */}
+                      {selectedResult?.status === "error" && (
+                        <Card className="border-destructive/30">
+                          <CardContent className="py-6 flex flex-col items-center gap-3">
+                            <AlertCircle className="h-8 w-8 text-destructive" />
+                            <p className="text-sm text-muted-foreground">Ошибка при анализе. Попробуйте снова.</p>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {/* Scenes list */}
+                      {selectedResult?.status === "done" && selectedResult.scenes.length > 0 && (
+                        <div className="space-y-2">
+                          <h3 className="text-sm font-semibold text-muted-foreground px-1">
+                            {selectedResult.scenes.length} сцен
+                          </h3>
+                          {selectedResult.scenes.map((sc) => {
+                            const typeInfo = SCENE_TYPE_LABELS[sc.scene_type] || SCENE_TYPE_LABELS.mixed;
+                            return (
+                              <Card key={sc.scene_number}>
+                                <CardContent className="py-3 px-4 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium">
+                                      Сцена {sc.scene_number}: {sc.title}
+                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                      <Badge variant="outline" className={`text-[10px] ${typeInfo.color}`}>
+                                        {typeInfo.label}
+                                      </Badge>
+                                      <Badge variant="outline" className="text-[10px]">{sc.mood}</Badge>
+                                      <Badge variant="outline" className="text-[10px] font-mono">
+                                        {sc.bpm} BPM
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                  {sc.content_preview && (
+                                    <p className="text-xs text-muted-foreground line-clamp-2">
+                                      {sc.content_preview}
+                                    </p>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Done but empty */}
+                      {selectedResult?.status === "done" && selectedResult.scenes.length === 0 && (
+                        <Card className="border-dashed">
+                          <CardContent className="py-6 flex flex-col items-center gap-2 text-muted-foreground">
+                            <p className="text-sm italic">Сцены не определены (мало текста или нестандартная структура)</p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  </ScrollArea>
+                )}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -793,87 +688,59 @@ export default function Parser() {
     </motion.div>
   );
 
-  function renderTocEntry(entry: TocChapter, i: number) {
-    const sectionInfo = SECTION_LABELS[entry.sectionType];
+  // ─── Nav Sidebar Helpers ───────────────────────────────────
+
+  function renderNavItem(idx: number) {
+    const entry = tocEntries[idx];
+    const result = chapterResults.get(idx);
+    const isSelected = selectedIdx === idx;
+    const status = result?.status || "pending";
+
     return (
-      <div key={i} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
-        <div className="flex items-center gap-2">
-          {entry.sectionType !== "content" && (
-            <span className="text-xs">{sectionInfo.icon}</span>
+      <button
+        key={idx}
+        onClick={() => setSelectedIdx(idx)}
+        className={`w-full flex items-center gap-2 px-4 py-1.5 text-left text-xs transition-colors ${
+          isSelected
+            ? "bg-primary/10 text-primary border-r-2 border-primary"
+            : "text-foreground/70 hover:bg-muted/40 hover:text-foreground"
+        }`}
+      >
+        {/* Status indicator */}
+        <span className="flex-shrink-0">
+          {status === "done" ? (
+            <CheckCircle2 className="h-3 w-3 text-green-500" />
+          ) : status === "analyzing" ? (
+            <Loader2 className="h-3 w-3 animate-spin text-primary" />
+          ) : status === "error" ? (
+            <AlertCircle className="h-3 w-3 text-destructive" />
+          ) : (
+            <div className="h-3 w-3 rounded-full border border-border" />
           )}
-          <span className="text-sm font-medium">{entry.title}</span>
-        </div>
-        <Badge variant="outline" className="text-[10px] font-mono">
-          стр. {entry.startPage}–{entry.endPage}
-        </Badge>
-      </div>
+        </span>
+        <span className="truncate flex-1">{entry.title}</span>
+        <span className="text-[10px] text-muted-foreground font-mono flex-shrink-0">
+          {entry.startPage}
+        </span>
+      </button>
     );
   }
 
-  function renderTocSection(type: SectionType) {
-    const entries = tocEntries.filter(e => e.sectionType === type);
+  function renderNavSection(type: SectionType) {
+    const entries = tocEntries
+      .map((e, i) => ({ entry: e, idx: i }))
+      .filter(({ entry }) => entry.sectionType === type);
     if (entries.length === 0) return null;
-    const info = SECTION_LABELS[type];
-    return (
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base text-muted-foreground">
-            {info.icon} {info.label}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-1.5">
-          {entries.map((entry, i) => renderTocEntry(entry, i))}
-        </CardContent>
-      </Card>
-    );
-  }
 
-  function renderChapter(ch: Chapter, key: string) {
     return (
-      <Collapsible key={key} open={expandedChapters.has(key)} onOpenChange={() => toggleChapter(key)}>
-        <Card>
-          <CollapsibleTrigger asChild>
-            <CardHeader className="cursor-pointer hover:bg-muted/30 transition-colors pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {expandedChapters.has(key)
-                    ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                  <div>
-                    <CardTitle className="text-base">{ch.title}</CardTitle>
-                    <p className="text-xs text-muted-foreground mt-0.5">{ch.scenes?.length || 0} сцен</p>
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <CardContent className="pt-0 space-y-2">
-              {ch.scenes?.map((sc) => {
-                const typeInfo = SCENE_TYPE_LABELS[sc.scene_type] || SCENE_TYPE_LABELS.mixed;
-                return (
-                  <div key={sc.scene_number} className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Сцена {sc.scene_number}: {sc.title}</span>
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant="outline" className={`text-[10px] ${typeInfo.color}`}>{typeInfo.label}</Badge>
-                        <Badge variant="outline" className="text-[10px]">{sc.mood}</Badge>
-                        <Badge variant="outline" className="text-[10px] font-mono">{sc.bpm} BPM</Badge>
-                      </div>
-                    </div>
-                    {sc.content_preview && (
-                      <p className="text-xs text-muted-foreground line-clamp-2">{sc.content_preview}</p>
-                    )}
-                  </div>
-                );
-              })}
-              {(!ch.scenes || ch.scenes.length === 0) && (
-                <p className="text-xs text-muted-foreground italic py-2">Сцены не определены</p>
-              )}
-            </CardContent>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
+      <>
+        <div className="px-4 py-1 mt-2">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {SECTION_ICONS[type]} {type === "preface" ? "Вступление" : type === "afterword" ? "Послесловие" : type === "endnotes" ? "Примечания" : "Приложения"}
+          </span>
+        </div>
+        {entries.map(({ idx }) => renderNavItem(idx))}
+      </>
     );
   }
 }
