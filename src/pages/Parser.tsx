@@ -1365,6 +1365,12 @@ export default function Parser() {
               <Clapperboard className="h-3 w-3" />
             </button>
           )}
+        </button>
+        {isExpanded && directChildren.length > 0 && (
+          <div>
+            {directChildren.map(childIdx => renderNavItem(childIdx, depth + 1))}
+          </div>
+        )}
       </div>
     );
   }
