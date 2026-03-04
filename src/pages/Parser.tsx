@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload, FileText, BookOpen, ChevronDown, ChevronRight, Loader2,
   AlertCircle, CheckCircle2, Zap, Layers, PlayCircle, FolderOpen,
-  Library, Trash2, ArrowLeft, Clock
+  Library, Trash2, ArrowLeft, Clock, Clapperboard
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +28,7 @@ import {
   extractOutline, extractTextByPageRange, extractTextFromPdf,
   flattenTocWithRanges, type TocEntry
 } from "@/lib/pdf-extract";
+import { saveStudioChapter } from "@/lib/studioChapter";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -145,6 +147,7 @@ const ACTIVE_BOOK_KEY = "parser-active-book";
 export default function Parser() {
   const { user } = useAuth();
   const { isRu } = useLanguage();
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // If we have an active book in session, start in "extracting_toc" to avoid flashing library
@@ -820,6 +823,41 @@ export default function Parser() {
   const analyzedCount = Array.from(chapterResults.values()).filter(r => r.status === "done").length;
   const totalScenes = Array.from(chapterResults.values()).reduce((a, r) => a + r.scenes.length, 0);
 
+  // Check if a chapter (and all its nested children) are fully analyzed
+  const isChapterFullyDone = (idx: number): boolean => {
+    const entry = tocEntries[idx];
+    const result = chapterResults.get(idx);
+    if (!result || result.status !== "done" || result.scenes.length === 0) return false;
+    // Check children
+    for (let i = idx + 1; i < tocEntries.length; i++) {
+      if (tocEntries[i].level <= entry.level) break;
+      if (tocEntries[i].sectionType !== entry.sectionType) break;
+      const childResult = chapterResults.get(i);
+      if (!childResult || childResult.status !== "done" || childResult.scenes.length === 0) return false;
+    }
+    return true;
+  };
+
+  const sendToStudio = (idx: number) => {
+    const entry = tocEntries[idx];
+    const result = chapterResults.get(idx);
+    if (!result) return;
+    // Collect scenes from this chapter and all nested children
+    const allScenes = [...result.scenes];
+    for (let i = idx + 1; i < tocEntries.length; i++) {
+      if (tocEntries[i].level <= entry.level) break;
+      if (tocEntries[i].sectionType !== entry.sectionType) break;
+      const childResult = chapterResults.get(i);
+      if (childResult) allScenes.push(...childResult.scenes);
+    }
+    saveStudioChapter({
+      chapterTitle: entry.title,
+      bookTitle: fileName.replace('.pdf', ''),
+      scenes: allScenes,
+    });
+    navigate("/studio");
+  };
+
   // Group content entries by part
   const partGroups: { title: string; indices: number[] }[] = [];
   const partlessIndices: number[] = [];
@@ -1318,6 +1356,15 @@ export default function Parser() {
           <span className="text-[10px] text-muted-foreground font-mono flex-shrink-0">
             {entry.startPage}
           </span>
+          {isChapterFullyDone(idx) && (
+            <button
+              title={isRu ? "В студию!" : "To Studio!"}
+              onClick={(e) => { e.stopPropagation(); sendToStudio(idx); }}
+              className="flex-shrink-0 ml-1 p-0.5 rounded hover:bg-primary/20 text-primary transition-colors"
+            >
+              <Clapperboard className="h-3 w-3" />
+            </button>
+          )}
         </button>
         {isExpanded && directChildren.length > 0 && (
           <div>
