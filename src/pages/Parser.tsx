@@ -315,7 +315,7 @@ export default function Parser() {
       // Restore PDF reference for future analysis
       let restoredPdf: any = null;
       let restoredTotalPages = 0;
-      let tocFromPdf: TocChapter[] = [];
+      let tocFromPdf: { startPage: number; endPage: number; level: number }[] = [];
 
       if (pdfBlob) {
         try {
