@@ -256,8 +256,8 @@ const Studio = () => {
         </p>
       </div>
 
-      <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">
-        <ResizablePanel defaultSize={55} minSize={30}>
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className={cn("flex-1 min-h-0", timelineCollapsed ? "" : "")}>
           <ResizablePanelGroup direction="horizontal" className="h-full">
             {/* Left: Chapter navigator */}
             <ResizablePanel defaultSize={30} minSize={15} maxSize={50}>
@@ -321,21 +321,11 @@ const Studio = () => {
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>
-        </ResizablePanel>
-
-        <ResizableHandle withHandle />
+        </div>
 
         {/* BOTTOM: Multitrack Timeline */}
-        <ResizablePanel
-          ref={timelinePanelRef}
-          defaultSize={timelineCollapsed ? 0 : timelineSize}
-          minSize={0}
-          collapsible
-          collapsedSize={0}
-          onResize={handleTimelineResize}
-        >
-          <div className="h-full flex flex-col bg-background">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
+        <div className="flex flex-col bg-background border-t border-border" style={timelineCollapsed ? undefined : { height: `${timelineSize}px` }}>
+          <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
               <button
                 onClick={toggleTimeline}
                 className="flex items-center gap-1.5 hover:text-foreground transition-colors"
