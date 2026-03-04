@@ -1,8 +1,9 @@
-import { Home, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen, LogOut } from "lucide-react";
+import { Home, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen, LogOut, Shield } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useLanguage } from "@/hooks/useLanguage";
 
 import {
@@ -29,6 +30,7 @@ const mainNav = [
 
 export function AppSidebar() {
   const { signOut } = useAuth();
+  const { isAdmin } = useUserRole();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
@@ -130,6 +132,30 @@ export function AppSidebar() {
               )}
             </SidebarMenuButton>
           </SidebarMenuItem>
+
+          {/* Admin Panel - only for admins */}
+          {isAdmin && (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={isActive("/admin")}
+                tooltip={collapsed ? (isRu ? "Админ-панель" : "Admin Panel") : undefined}
+              >
+                <NavLink
+                  to="/admin"
+                  className="hover:bg-accent/50"
+                  activeClassName="bg-accent text-accent-foreground"
+                >
+                  <Shield className="h-4 w-4" />
+                  {!collapsed && (
+                    <span className="font-body text-sm">
+                      {isRu ? "Админ-панель" : "Admin Panel"}
+                    </span>
+                  )}
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
 
           {/* Profile */}
           <SidebarMenuItem>
