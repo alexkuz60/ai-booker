@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { ChevronRight, ChevronDown, ChevronUp, Mic2, Wind, Volume2, Plus, ZoomIn, ZoomOut, Clapperboard, Users } from "lucide-react";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -123,7 +123,7 @@ function ChapterNavigator({
           {chapter.bookTitle}
         </p>
       </div>
-      <ScrollArea className="flex-1 min-h-0">
+      <ScrollArea type="always" className="flex-1 min-h-0">
         <div className="py-2 px-1">
           <Collapsible open={chapterOpen} onOpenChange={setChapterOpen}>
             <CollapsibleTrigger asChild>
@@ -216,9 +216,29 @@ const Studio = () => {
   const [timelineCollapsed, setTimelineCollapsed] = useState(() => {
     try { return localStorage.getItem("studio-timeline-collapsed") === "true"; } catch { return false; }
   });
+  const clampTimelineSize = useCallback((size: number) => {
+    const max = Math.max(160, Math.floor(window.innerHeight * 0.55));
+    return Math.min(max, Math.max(120, size));
+  }, []);
+
   const [timelineSize, setTimelineSize] = useState(() => {
-    try { return Number(localStorage.getItem("studio-timeline-size")) || 250; } catch { return 250; }
+    try {
+      const persisted = Number(localStorage.getItem("studio-timeline-size"));
+      if (!Number.isFinite(persisted) || persisted <= 0) return 250;
+      const max = Math.max(160, Math.floor(window.innerHeight * 0.55));
+      return Math.min(max, Math.max(120, persisted));
+    } catch {
+      return 250;
+    }
   });
+
+  useEffect(() => {
+    const onResize = () => {
+      setTimelineSize((prev) => clampTimelineSize(prev));
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [clampTimelineSize]);
 
   const toggleTimeline = useCallback(() => {
     setTimelineCollapsed(prev => {
@@ -233,7 +253,7 @@ const Studio = () => {
     const startY = e.clientY;
     const startSize = timelineSize;
     const onMouseMove = (ev: MouseEvent) => {
-      const newSize = Math.max(100, startSize + (startY - ev.clientY));
+      const newSize = clampTimelineSize(startSize + (startY - ev.clientY));
       setTimelineSize(newSize);
       localStorage.setItem("studio-timeline-size", String(newSize));
     };
@@ -243,13 +263,13 @@ const Studio = () => {
     };
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
-  }, [timelineSize]);
+  }, [timelineSize, clampTimelineSize]);
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex-1 flex flex-col h-full min-h-0 overflow-hidden"
+      className="flex flex-col h-[calc(100vh-3rem)] min-h-0 overflow-hidden"
     >
       {/* Header */}
       <div className="px-6 py-3 border-b border-border shrink-0">
