@@ -206,6 +206,10 @@ export default function Parser() {
   const [chapterResults, setChapterResults] = useState<Map<number, { scenes: Scene[]; status: ChapterStatus }>>(new Map());
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
+  // Progressive analysis status
+  const [analysisLog, setAnalysisLog] = useState<string[]>([]);
+  const analysisTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const toggleNode = (key: string) => {
     setExpandedNodes(prev => {
       const next = new Set(prev);
@@ -655,16 +659,23 @@ export default function Parser() {
     if (!entry) return;
 
     userStartedAnalysis.current = true;
+    setAnalysisLog([]);
+    if (analysisTimerRef.current) clearInterval(analysisTimerRef.current);
+
     setChapterResults(prev => {
       const next = new Map(prev);
       next.set(idx, { scenes: [], status: "analyzing" });
       return next;
     });
 
-    try {
-      const text = await extractTextByPageRange(pdfRef, entry.startPage, entry.endPage);
+    const addLog = (msg: string) => setAnalysisLog(prev => [...prev, msg]);
 
-      if (text.trim().length < 50) {
+    try {
+      addLog(isRu ? `📖 Извлечение текста главы «${entry.title}»...` : `📖 Extracting chapter text "${entry.title}"...`);
+      const text = await extractTextByPageRange(pdfRef, entry.startPage, entry.endPage);
+      const charCount = text.trim().length;
+
+      if (charCount < 50) {
         setChapterResults(prev => {
           const next = new Map(prev);
           next.set(idx, { scenes: [], status: "done" });
@@ -674,6 +685,48 @@ export default function Parser() {
         return;
       }
 
+      addLog(isRu
+        ? `📝 Текст извлечён: ${charCount.toLocaleString()} символов (${entry.startPage}–${entry.endPage} стр.)`
+        : `📝 Text extracted: ${charCount.toLocaleString()} chars (pages ${entry.startPage}–${entry.endPage})`);
+
+      // Simulated progressive stages while AI works
+      const stages = isRu ? [
+        "🔍 Очистка текста от артефактов...",
+        "🧠 Анализ структуры повествования...",
+        "🎭 Определение границ сцен...",
+        "📊 Классификация типов сцен...",
+        "🎵 Вычисление темпа повествования (BPM)...",
+        "💭 Анализ настроения и эмоционального тона...",
+        "✍️ Формирование заголовков сцен...",
+        "📐 Верификация полноты текста сцен...",
+        "🔗 Проверка целостности декомпозиции...",
+        "⏳ Финализация структуры...",
+        "🔄 AI обрабатывает большой объём текста, ожидаем ответ...",
+        "⏳ Генерация продолжается...",
+      ] : [
+        "🔍 Cleaning text artifacts...",
+        "🧠 Analyzing narrative structure...",
+        "🎭 Detecting scene boundaries...",
+        "📊 Classifying scene types...",
+        "🎵 Computing narrative tempo (BPM)...",
+        "💭 Analyzing mood and emotional tone...",
+        "✍️ Generating scene titles...",
+        "📐 Verifying scene text completeness...",
+        "🔗 Checking decomposition integrity...",
+        "⏳ Finalizing structure...",
+        "🔄 AI processing large text volume, awaiting response...",
+        "⏳ Generation continues...",
+      ];
+
+      let stageIdx = 0;
+      const interval = Math.max(2500, Math.min(5000, charCount / 20));
+      analysisTimerRef.current = setInterval(() => {
+        if (stageIdx < stages.length) {
+          addLog(stages[stageIdx]);
+          stageIdx++;
+        }
+      }, interval);
+
       // Pick the right API key based on model provider
       let userKey: string | null = null;
       const modelEntry = getModelRegistryEntry(selectedModel);
@@ -681,19 +734,55 @@ export default function Parser() {
         userKey = userApiKeys[modelEntry.apiKeyField] || null;
       }
 
-      const { data: fnData, error: fnError } = await supabase.functions.invoke('parse-book-structure', {
-        body: {
-          text,
-          user_api_key: userKey,
-          user_model: selectedModel,
-          provider: modelEntry?.provider || 'lovable',
-          mode: "chapter",
-          chapter_title: entry.title,
-          openrouter_api_key: userApiKeys['openrouter'] || null,
-        },
-      });
+      addLog(isRu ? `🚀 Запрос к AI модели ${selectedModel.split('/').pop()}...` : `🚀 Calling AI model ${selectedModel.split('/').pop()}...`);
 
-      if (fnError || fnData?.error) throw new Error(fnError?.message || fnData?.error);
+      // Use direct fetch with extended timeout (3 min) instead of supabase.functions.invoke
+      // which has a short default timeout causing "Failed to send a request" errors on large chapters
+      const abortCtrl = new AbortController();
+      const timeoutId = setTimeout(() => abortCtrl.abort(), 180_000);
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const session = (await supabase.auth.getSession()).data.session;
+
+      let fnData: any;
+      try {
+        const resp = await fetch(`${supabaseUrl}/functions/v1/parse-book-structure`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token || supabaseKey}`,
+            'apikey': supabaseKey,
+          },
+          body: JSON.stringify({
+            text,
+            user_api_key: userKey,
+            user_model: selectedModel,
+            provider: modelEntry?.provider || 'lovable',
+            mode: "chapter",
+            chapter_title: entry.title,
+            openrouter_api_key: userApiKeys['openrouter'] || null,
+          }),
+          signal: abortCtrl.signal,
+        });
+        clearTimeout(timeoutId);
+        if (!resp.ok) {
+          const errBody = await resp.text();
+          let errMsg: string;
+          try { errMsg = JSON.parse(errBody).error; } catch { errMsg = errBody; }
+          throw new Error(errMsg || `HTTP ${resp.status}`);
+        }
+        fnData = await resp.json();
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        if (fetchErr.name === 'AbortError') {
+          throw new Error(isRu ? 'Timeout: анализ занял более 3 минут' : 'Timeout: analysis took more than 3 minutes');
+        }
+        throw fetchErr;
+      }
+
+      if (analysisTimerRef.current) { clearInterval(analysisTimerRef.current); analysisTimerRef.current = null; }
+
+      if (fnData?.error) throw new Error(fnData.error);
 
       const rawScenes = fnData.structure?.scenes || [];
       const scenes: Scene[] = rawScenes.map((s: any) => ({
@@ -701,6 +790,17 @@ export default function Parser() {
         content: s.content || s.content_preview || '',
         content_preview: (s.content || s.content_preview || '').slice(0, 200),
       }));
+
+      // Log each detected scene
+      addLog(isRu ? `✅ AI вернул ${scenes.length} сцен:` : `✅ AI returned ${scenes.length} scenes:`);
+      scenes.forEach((sc, i) => {
+        const dur = Math.round((sc.content?.length || 0) / 15);
+        addLog(isRu
+          ? `  🎬 Сцена ${i + 1}: «${sc.title}» — ${sc.scene_type}, ${sc.mood}, ${sc.bpm} bpm, ~${dur}с`
+          : `  🎬 Scene ${i + 1}: "${sc.title}" — ${sc.scene_type}, ${sc.mood}, ${sc.bpm} bpm, ~${dur}s`);
+      });
+
+      addLog(isRu ? "💾 Сохранение результатов в базу данных..." : "💾 Saving results to database...");
 
       setChapterResults(prev => {
         const next = new Map(prev);
@@ -760,9 +860,12 @@ export default function Parser() {
         }
       }
 
+      addLog(isRu ? `🎉 Глава «${entry.title}» успешно проанализирована!` : `🎉 Chapter "${entry.title}" analyzed successfully!`);
       toast.success(`Глава "${entry.title}" проанализирована: ${scenes.length} сцен`);
     } catch (err: any) {
+      if (analysisTimerRef.current) { clearInterval(analysisTimerRef.current); analysisTimerRef.current = null; }
       console.error(`Chapter analysis failed for "${entry.title}":`, err);
+      addLog(`❌ ${isRu ? "Ошибка" : "Error"}: ${err?.message || "Unknown error"}`);
       const errMsg = err?.message || "";
       let userError: string;
       if (/402|payment|credits/i.test(errMsg)) {
@@ -1236,15 +1339,32 @@ export default function Parser() {
 
                           {selectedResult?.status === "analyzing" && (
                             <Card>
-                              <CardContent className="py-8 flex flex-col items-center gap-4">
-                                <div className="h-14 w-14 rounded-2xl gradient-cyan flex items-center justify-center shadow-cool animate-pulse">
-                                  <Zap className="h-7 w-7 text-primary-foreground" />
+                              <CardContent className="py-4 space-y-2">
+                                <div className="flex items-center gap-3 mb-3">
+                                  <div className="h-10 w-10 rounded-xl gradient-cyan flex items-center justify-center shadow-cool animate-pulse shrink-0">
+                                    <Zap className="h-5 w-5 text-primary-foreground" />
+                                  </div>
+                                  <div>
+                                    <p className="font-display font-semibold text-sm">The Architect</p>
+                                    <p className="text-xs text-muted-foreground">{isRu ? "Декомпозиция главы на сцены" : "Decomposing chapter into scenes"}</p>
+                                  </div>
+                                  <Loader2 className="h-4 w-4 animate-spin text-primary ml-auto shrink-0" />
                                 </div>
-                                <div className="text-center">
-                                  <p className="font-display font-semibold">The Architect</p>
-                                  <p className="text-sm text-muted-foreground mt-1">Анализируем сцены...</p>
-                                </div>
-                                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                <ScrollArea className="max-h-[300px]">
+                                  <div className="space-y-1 font-mono text-xs">
+                                    {analysisLog.map((line, i) => (
+                                      <motion.div
+                                        key={i}
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className={line.startsWith("  ") ? "pl-4 text-muted-foreground" : "text-foreground"}
+                                      >
+                                        {line}
+                                      </motion.div>
+                                    ))}
+                                  </div>
+                                </ScrollArea>
                               </CardContent>
                             </Card>
                           )}
@@ -1260,9 +1380,20 @@ export default function Parser() {
 
                           {selectedResult?.status === "error" && (
                             <Card className="border-destructive/30">
-                              <CardContent className="py-6 flex flex-col items-center gap-3">
-                                <AlertCircle className="h-8 w-8 text-destructive" />
-                                <p className="text-sm text-muted-foreground">Ошибка при анализе. Попробуйте снова.</p>
+                              <CardContent className="py-4 space-y-2">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+                                  <p className="text-sm text-muted-foreground">{isRu ? "Ошибка при анализе. Попробуйте снова." : "Analysis failed. Try again."}</p>
+                                </div>
+                                {analysisLog.length > 0 && (
+                                  <ScrollArea className="max-h-[200px]">
+                                    <div className="space-y-1 font-mono text-xs text-muted-foreground">
+                                      {analysisLog.map((line, i) => (
+                                        <div key={i} className={line.startsWith("❌") ? "text-destructive" : ""}>{line}</div>
+                                      ))}
+                                    </div>
+                                  </ScrollArea>
+                                )}
                               </CardContent>
                             </Card>
                           )}
