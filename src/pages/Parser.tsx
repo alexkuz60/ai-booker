@@ -147,7 +147,10 @@ export default function Parser() {
   const { isRu } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [step, setStep] = useState<Step>("library");
+  // If we have an active book in session, start in "extracting_toc" to avoid flashing library
+  const [step, setStep] = useState<Step>(() =>
+    sessionStorage.getItem(ACTIVE_BOOK_KEY) ? "extracting_toc" : "library"
+  );
   const [books, setBooks] = useState<BookRecord[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(true);
   const [fileName, setFileName] = useState("");
@@ -613,6 +616,7 @@ export default function Parser() {
     const entry = tocEntries[idx];
     if (!entry) return;
 
+    userStartedAnalysis.current = true;
     setChapterResults(prev => {
       const next = new Map(prev);
       next.set(idx, { scenes: [], status: "analyzing" });
@@ -743,9 +747,12 @@ export default function Parser() {
   // ─── Background Prefetch: auto-analyze next 1–3 chapters ───
 
   const prefetchingRef = useRef(false);
+  const userStartedAnalysis = useRef(false);
 
   useEffect(() => {
     if (prefetchingRef.current) return;
+    // Only prefetch after user has explicitly triggered analysis (not on restore)
+    if (!userStartedAnalysis.current) return;
     // Find indices that are "done" — prefetch next pending ones
     const doneIndices = Array.from(chapterResults.entries())
       .filter(([, r]) => r.status === "done")
@@ -791,6 +798,7 @@ export default function Parser() {
     setChapterResults(new Map());
     setExpandedNodes(new Set());
     prefetchingRef.current = false;
+    userStartedAnalysis.current = false;
   };
 
   // ─── Helpers ───────────────────────────────────────────────
