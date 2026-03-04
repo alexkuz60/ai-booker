@@ -25,6 +25,15 @@ const SCENE_TYPE_COLORS: Record<string, string> = {
   mixed: "bg-muted text-muted-foreground border-border",
 };
 
+const SCENE_TYPE_RU: Record<string, string> = {
+  action: "действие",
+  dialogue: "диалог",
+  lyrical_digression: "лир. отступление",
+  description: "описание",
+  inner_monologue: "внутр. монолог",
+  mixed: "смешанный",
+};
+
 // ─── Timeline components ────────────────────────────────────
 const MOCK_TRACKS = [
   { id: "narrator-1", label: "Диктор 1", color: "hsl(var(--primary))", type: "narrator" },
@@ -151,7 +160,7 @@ function ChapterNavigator({
                       )}
                     >
                       <span className={cn("px-1.5 py-0.5 rounded text-[10px] border shrink-0", colorClass)}>
-                        {scene.scene_type}
+                        {isRu ? (SCENE_TYPE_RU[scene.scene_type] || scene.scene_type) : scene.scene_type}
                       </span>
                       <span className="truncate flex-1">{scene.title}</span>
                       <span className="text-[11px] text-muted-foreground font-mono shrink-0">
@@ -254,7 +263,7 @@ const Studio = () => {
       </div>
 
       <div className="flex-1 flex flex-col min-h-0">
-        <div className={cn("flex-1 min-h-0", timelineCollapsed ? "" : "")}>
+        <div className="flex-1 min-h-0 overflow-hidden">
           <ResizablePanelGroup direction="horizontal" className="h-full">
             {/* Left: Chapter navigator */}
             <ResizablePanel defaultSize={30} minSize={15} maxSize={50}>
