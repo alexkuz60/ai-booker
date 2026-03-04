@@ -833,6 +833,7 @@ export default function Parser() {
     } catch (err: any) {
       if (analysisTimerRef.current) { clearInterval(analysisTimerRef.current); analysisTimerRef.current = null; }
       console.error(`Chapter analysis failed for "${entry.title}":`, err);
+      addLog(`❌ ${isRu ? "Ошибка" : "Error"}: ${err?.message || "Unknown error"}`);
       const errMsg = err?.message || "";
       let userError: string;
       if (/402|payment|credits/i.test(errMsg)) {
