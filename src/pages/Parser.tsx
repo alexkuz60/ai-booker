@@ -113,7 +113,7 @@ const SECTION_ICONS: Record<SectionType, string> = {
   endnotes: "🔗",
   appendix: "📎",
 };
-import { t, tSceneType, tMood, tSection } from "@/pages/parser/i18n";
+import { t, tSceneType, tMood, tSection, tSceneTitle } from "@/pages/parser/i18n";
 import { useLanguage } from "@/hooks/useLanguage";
 
 const SCENE_TYPE_COLORS: Record<string, string> = {
