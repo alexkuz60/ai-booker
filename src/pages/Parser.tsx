@@ -140,6 +140,7 @@ interface BookRecord {
 }
 
 const NAV_WIDTH_KEY = "parser-nav-width";
+const ACTIVE_BOOK_KEY = "parser-active-book";
 
 export default function Parser() {
   const { user } = useAuth();
