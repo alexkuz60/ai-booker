@@ -693,7 +693,12 @@ export default function Parser() {
 
       if (fnError || fnData?.error) throw new Error(fnError?.message || fnData?.error);
 
-      const scenes: Scene[] = fnData.structure?.scenes || [];
+      const rawScenes = fnData.structure?.scenes || [];
+      const scenes: Scene[] = rawScenes.map((s: any) => ({
+        ...s,
+        content: s.content || s.content_preview || '',
+        content_preview: (s.content || s.content_preview || '').slice(0, 200),
+      }));
 
       setChapterResults(prev => {
         const next = new Map(prev);
