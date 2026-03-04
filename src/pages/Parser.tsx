@@ -716,6 +716,9 @@ export default function Parser() {
 
     const existingChId = chapterIdMap.get(idx);
 
+    // Determine which scenes need enrichment (no scene_type or scene_type is empty)
+    const needsEnrichment = (sc: Scene) => !sc.scene_type || sc.scene_type === '' || sc.scene_type === 'pending';
+
     // Check if we already have scenes (resume scenario)
     const existingResult = chapterResults.get(idx);
     let scenes: Scene[] = existingResult?.scenes || [];
