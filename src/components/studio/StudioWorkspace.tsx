@@ -6,6 +6,7 @@ interface StudioWorkspaceProps {
   isRu: boolean;
   selectedSceneId?: string | null;
   selectedSceneContent?: string | null;
+  onSegmented?: (sceneId: string) => void;
 }
 
 export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent }: StudioWorkspaceProps) {
