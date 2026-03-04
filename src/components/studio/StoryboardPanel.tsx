@@ -133,7 +133,7 @@ export function StoryboardPanel({
   }, [sceneId, loadSegments]);
 
   // Run AI segmentation
-  const runAnalysis = async () => {
+  const runAnalysis = useCallback(async () => {
     if (!sceneId || !sceneContent) return;
     setAnalyzing(true);
     try {
@@ -142,13 +142,21 @@ export function StoryboardPanel({
       });
       if (error) throw error;
       setSegments(data.segments || []);
+      onSegmented?.(sceneId);
       toast.success(isRu ? "Раскадровка готова" : "Storyboard ready");
     } catch (err: any) {
       console.error("Segmentation failed:", err);
       toast.error(isRu ? "Ошибка анализа" : "Analysis failed");
     }
     setAnalyzing(false);
-  };
+  }, [sceneId, sceneContent, isRu, onSegmented]);
+
+  // Auto-trigger analysis when scene has no segments and content is available
+  useEffect(() => {
+    if (loaded && segments.length === 0 && sceneContent && sceneId && !analyzing) {
+      runAnalysis();
+    }
+  }, [loaded, segments.length, sceneContent, sceneId]);
 
   // ── No scene selected ──
   if (!sceneId) {
