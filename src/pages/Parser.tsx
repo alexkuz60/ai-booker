@@ -489,20 +489,22 @@ export default function Parser() {
         return;
       }
 
-      // Only send user API key for non-Lovable models
+      // Pick the right API key based on model provider
       let userKey: string | null = null;
-      if (!isLovableModel(selectedModel)) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('api_keys')
-          .eq('id', user.id)
-          .single();
-        const apiKeys = (profile?.api_keys as Record<string, string>) || {};
-        userKey = apiKeys.openai || apiKeys.gemini || null;
+      const modelEntry = getModelRegistryEntry(selectedModel);
+      if (modelEntry?.apiKeyField) {
+        userKey = userApiKeys[modelEntry.apiKeyField] || null;
       }
 
       const { data: fnData, error: fnError } = await supabase.functions.invoke('parse-book-structure', {
-        body: { text, user_api_key: userKey, user_model: selectedModel, mode: "chapter", chapter_title: entry.title },
+        body: {
+          text,
+          user_api_key: userKey,
+          user_model: selectedModel,
+          provider: modelEntry?.provider || 'lovable',
+          mode: "chapter",
+          chapter_title: entry.title,
+        },
       });
 
       if (fnError || fnData?.error) throw new Error(fnError?.message || fnData?.error);

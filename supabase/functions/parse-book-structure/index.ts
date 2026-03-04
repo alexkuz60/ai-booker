@@ -112,6 +112,50 @@ const chapterScenesTool = {
   },
 };
 
+// ─── ProxyAPI model mapping ───
+const PROXYAPI_MODEL_MAP: Record<string, string> = {
+  'proxyapi/gpt-5': 'gpt-5',
+  'proxyapi/gpt-5-mini': 'gpt-5-mini',
+  'proxyapi/gpt-5.2': 'gpt-5.2',
+  'proxyapi/gpt-4o': 'gpt-4o',
+  'proxyapi/gpt-4o-mini': 'gpt-4o-mini',
+  'proxyapi/claude-sonnet-4': 'claude-sonnet-4-20250514',
+  'proxyapi/claude-opus-4': 'claude-opus-4-20250514',
+  'proxyapi/claude-3-5-sonnet': 'claude-3-5-sonnet-20241022',
+  'proxyapi/gemini-2.5-pro': 'gemini-2.5-pro-preview-06-05',
+  'proxyapi/gemini-2.5-flash': 'gemini-2.5-flash-preview-05-20',
+};
+
+// ─── Endpoint routing ───
+function getEndpointAndModel(provider: string, userModel: string, userApiKey: string | null) {
+  if (provider === 'proxyapi' && userApiKey) {
+    const realModel = PROXYAPI_MODEL_MAP[userModel] || userModel.replace('proxyapi/', '');
+    return {
+      endpoint: 'https://api.proxyapi.ru/openai/v1/chat/completions',
+      model: realModel,
+      apiKey: userApiKey,
+    };
+  }
+
+  if (provider === 'openrouter' && userApiKey) {
+    // OpenRouter model IDs: strip 'openrouter/' prefix
+    const realModel = userModel.replace('openrouter/', '');
+    return {
+      endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+      model: realModel,
+      apiKey: userApiKey,
+    };
+  }
+
+  // Default: Lovable AI gateway
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  return {
+    endpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions',
+    model: userModel || 'google/gemini-3-flash-preview',
+    apiKey: LOVABLE_API_KEY || '',
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -119,8 +163,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { text, user_api_key, user_model, mode, chapter_title } = body;
-    // mode: "full" (default) | "chapter" (single chapter analysis)
+    const { text, user_api_key, user_model, provider, mode, chapter_title } = body;
 
     if (!text || text.trim().length < 50) {
       return new Response(
@@ -131,8 +174,11 @@ serve(async (req) => {
 
     const truncatedText = text.slice(0, 100000);
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    const apiKey = user_api_key || LOVABLE_API_KEY;
+    const { endpoint, model, apiKey } = getEndpointAndModel(
+      provider || 'lovable',
+      user_model || 'google/gemini-3-flash-preview',
+      user_api_key || null
+    );
 
     if (!apiKey) {
       return new Response(
@@ -140,13 +186,6 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const isLovableAI = !user_api_key;
-    const endpoint = isLovableAI
-      ? "https://ai.gateway.lovable.dev/v1/chat/completions"
-      : "https://api.openai.com/v1/chat/completions";
-
-    const model = user_model || (isLovableAI ? "google/gemini-3-flash-preview" : "gpt-5");
 
     const isChapterMode = mode === "chapter";
     const systemPrompt = isChapterMode ? SYSTEM_PROMPT_CHAPTER : SYSTEM_PROMPT_FULL;
@@ -156,21 +195,30 @@ serve(async (req) => {
     const tools = isChapterMode ? [chapterScenesTool] : [fullStructureTool];
     const toolName = isChapterMode ? "suggest_scenes" : "suggest_structure";
 
+    const requestBody: Record<string, unknown> = {
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
+      ],
+      tools,
+      tool_choice: { type: "function", function: { name: toolName } },
+    };
+
+    // OpenRouter requires extra headers
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    };
+    if (provider === 'openrouter') {
+      headers["HTTP-Referer"] = "https://booker-studio.lovable.app";
+      headers["X-Title"] = "BookerStudio Parser";
+    }
+
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContent },
-        ],
-        tools,
-        tool_choice: { type: "function", function: { name: toolName } },
-      }),
+      headers,
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
