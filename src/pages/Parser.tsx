@@ -593,12 +593,29 @@ export default function Parser() {
       toast.success(`Глава "${entry.title}" проанализирована: ${scenes.length} сцен`);
     } catch (err: any) {
       console.error(`Chapter analysis failed for "${entry.title}":`, err);
+      const errMsg = err?.message || "";
+      let userError: string;
+      if (/402|payment|credits/i.test(errMsg)) {
+        userError = t("errPayment", isRu);
+      } else if (/429|rate.?limit/i.test(errMsg)) {
+        userError = t("errRateLimit", isRu);
+      } else if (/timeout|timed?\s?out|abort/i.test(errMsg)) {
+        userError = t("errTimeout", isRu);
+      } else if (/structured|tool_calls/i.test(errMsg)) {
+        userError = t("errNoStructure", isRu);
+      } else if (/api.?key|no.*key|not configured/i.test(errMsg)) {
+        userError = t("errNoApiKey", isRu);
+      } else if (/fetch|network|dns|econnrefused/i.test(errMsg)) {
+        userError = t("errNetwork", isRu);
+      } else {
+        userError = `${t("errChapterFailed", isRu)}: ${errMsg || entry.title}`;
+      }
       setChapterResults(prev => {
         const next = new Map(prev);
         next.set(idx, { scenes: [], status: "error" });
         return next;
       });
-      toast.error(`Ошибка анализа: ${entry.title}`);
+      toast.error(userError, { duration: 8000 });
     }
   };
 
