@@ -258,6 +258,79 @@ export type Database = {
         }
         Relationships: []
       }
+      scene_segments: {
+        Row: {
+          created_at: string
+          id: string
+          metadata: Json | null
+          scene_id: string
+          segment_number: number
+          segment_type: Database["public"]["Enums"]["segment_type"]
+          speaker: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          scene_id: string
+          segment_number?: number
+          segment_type?: Database["public"]["Enums"]["segment_type"]
+          speaker?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          scene_id?: string
+          segment_number?: number
+          segment_type?: Database["public"]["Enums"]["segment_type"]
+          speaker?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scene_segments_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "book_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      segment_phrases: {
+        Row: {
+          created_at: string
+          id: string
+          metadata: Json | null
+          phrase_number: number
+          segment_id: string
+          text: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          phrase_number?: number
+          segment_id: string
+          text?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          phrase_number?: number
+          segment_id?: string
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "segment_phrases_segment_id_fkey"
+            columns: ["segment_id"]
+            isOneToOne: false
+            referencedRelation: "scene_segments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -319,6 +392,14 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
+      segment_type:
+        | "epigraph"
+        | "narrator"
+        | "first_person"
+        | "inner_thought"
+        | "dialogue"
+        | "lyric"
+        | "footnote"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -447,6 +528,15 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
+      segment_type: [
+        "epigraph",
+        "narrator",
+        "first_person",
+        "inner_thought",
+        "dialogue",
+        "lyric",
+        "footnote",
+      ],
     },
   },
 } as const
