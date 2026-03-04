@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { ChevronRight, ChevronDown, ChevronUp, Mic2, Wind, Volume2, Plus, ZoomIn, ZoomOut, Clapperboard, Users } from "lucide-react";
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -207,36 +207,33 @@ const Studio = () => {
     try { return localStorage.getItem("studio-timeline-collapsed") === "true"; } catch { return false; }
   });
   const [timelineSize, setTimelineSize] = useState(() => {
-    try { return Number(localStorage.getItem("studio-timeline-size")) || 45; } catch { return 45; }
+    try { return Number(localStorage.getItem("studio-timeline-size")) || 250; } catch { return 250; }
   });
-  const timelinePanelRef = useRef<any>(null);
 
   const toggleTimeline = useCallback(() => {
     setTimelineCollapsed(prev => {
       const next = !prev;
       localStorage.setItem("studio-timeline-collapsed", String(next));
-      if (next) {
-        timelinePanelRef.current?.collapse();
-      } else {
-        timelinePanelRef.current?.expand();
-      }
       return next;
     });
   }, []);
 
-  const handleTimelineResize = useCallback((size: number) => {
-    if (size > 0) {
-      setTimelineSize(size);
-      localStorage.setItem("studio-timeline-size", String(size));
-      if (timelineCollapsed) {
-        setTimelineCollapsed(false);
-        localStorage.setItem("studio-timeline-collapsed", "false");
-      }
-    } else {
-      setTimelineCollapsed(true);
-      localStorage.setItem("studio-timeline-collapsed", "true");
-    }
-  }, [timelineCollapsed]);
+  const handleTimelineMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startSize = timelineSize;
+    const onMouseMove = (ev: MouseEvent) => {
+      const newSize = Math.max(100, startSize + (startY - ev.clientY));
+      setTimelineSize(newSize);
+      localStorage.setItem("studio-timeline-size", String(newSize));
+    };
+    const onMouseUp = () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }, [timelineSize]);
 
   return (
     <motion.div
