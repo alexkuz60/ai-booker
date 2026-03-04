@@ -1,9 +1,10 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload, FileText, BookOpen, ChevronDown, ChevronRight, Loader2,
   AlertCircle, CheckCircle2, Zap, Layers, PlayCircle, FolderOpen
 } from "lucide-react";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -114,9 +115,9 @@ const SCENE_TYPE_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 type Step = "upload" | "extracting_toc" | "workspace" | "error";
-
-// Analysis status per chapter
 type ChapterStatus = "pending" | "analyzing" | "done" | "error";
+
+const NAV_WIDTH_KEY = "parser-nav-width";
 
 export default function Parser() {
   const { user } = useAuth();
@@ -336,6 +337,40 @@ export default function Parser() {
     }
   };
 
+  // ─── Background Prefetch: auto-analyze next 1–3 chapters ───
+
+  const prefetchingRef = useRef(false);
+
+  useEffect(() => {
+    if (prefetchingRef.current) return;
+    // Find indices that are "done" — prefetch next pending ones
+    const doneIndices = Array.from(chapterResults.entries())
+      .filter(([, r]) => r.status === "done")
+      .map(([i]) => i);
+    if (doneIndices.length === 0) return;
+
+    const maxDone = Math.max(...doneIndices);
+    const nextPending: number[] = [];
+    for (let i = maxDone + 1; i < tocEntries.length && nextPending.length < 3; i++) {
+      const r = chapterResults.get(i);
+      if (r && r.status === "pending" && tocEntries[i].sectionType === "content") {
+        nextPending.push(i);
+      }
+    }
+    if (nextPending.length === 0) return;
+
+    prefetchingRef.current = true;
+    (async () => {
+      for (const idx of nextPending) {
+        const current = chapterResults.get(idx);
+        if (current?.status === "pending") {
+          await analyzeChapter(idx);
+        }
+      }
+      prefetchingRef.current = false;
+    })();
+  }, [chapterResults, tocEntries]);
+
   // ─── Reset ─────────────────────────────────────────────────
 
   const handleReset = () => {
@@ -349,6 +384,7 @@ export default function Parser() {
     setSelectedIdx(null);
     setChapterResults(new Map());
     setExpandedParts(new Set());
+    prefetchingRef.current = false;
   };
 
   // ─── Helpers ───────────────────────────────────────────────
@@ -473,214 +509,197 @@ export default function Parser() {
             <motion.div key="workspace" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="flex h-full">
 
-              {/* ── Left Sidebar: Navigator ── */}
-              <div className="w-72 min-w-[260px] border-r border-border flex flex-col bg-card/50">
-                <div className="px-4 py-3 border-b border-border">
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="h-4 w-4 text-primary" />
-                    <span className="font-display font-semibold text-sm text-foreground truncate">
-                      {fileName.replace('.pdf', '')}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    {totalPages} стр. • {contentEntries.length} глав
-                    {supplementaryEntries.length > 0 && ` • ${supplementaryEntries.length} доп.`}
-                  </p>
-                </div>
-
-                <ScrollArea className="flex-1">
-                  <div className="py-2">
-                    {/* Preface sections */}
-                    {renderNavSection("preface")}
-
-                    {/* Parts with chapters */}
-                    {partGroups.map((group) => (
-                      <div key={group.title}>
-                        <button
-                          onClick={() => togglePart(group.title)}
-                          className="w-full flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-primary hover:bg-muted/30 transition-colors"
-                        >
-                          {expandedParts.has(group.title) ? (
-                            <ChevronDown className="h-3 w-3" />
-                          ) : (
-                            <ChevronRight className="h-3 w-3" />
-                          )}
-                          <FolderOpen className="h-3 w-3" />
-                          <span className="truncate">{group.title}</span>
-                        </button>
-                        {expandedParts.has(group.title) && (
-                          <div className="ml-2">
-                            {group.indices.map(idx => renderNavItem(idx))}
-                          </div>
-                        )}
+              <ResizablePanelGroup
+                direction="horizontal"
+                autoSaveId={NAV_WIDTH_KEY}
+              >
+                {/* ── Left Panel: Navigator ── */}
+                <ResizablePanel defaultSize={22} minSize={14} maxSize={45}>
+                  <div className="flex flex-col h-full bg-card/50">
+                    <div className="px-4 py-3 border-b border-border">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="h-4 w-4 text-primary" />
+                        <span className="font-display font-semibold text-sm text-foreground truncate">
+                          {fileName.replace('.pdf', '')}
+                        </span>
                       </div>
-                    ))}
-
-                    {/* Chapters without parts */}
-                    {partlessIndices.map(idx => renderNavItem(idx))}
-
-                    {/* Supplementary sections */}
-                    {renderNavSection("afterword")}
-                    {renderNavSection("endnotes")}
-                    {renderNavSection("appendix")}
-                  </div>
-                </ScrollArea>
-              </div>
-
-              {/* ── Right Panel: Chapter Detail ── */}
-              <div className="flex-1 flex flex-col overflow-hidden">
-                {selectedIdx === null ? (
-                  <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                    <div className="text-center space-y-3">
-                      <Layers className="h-12 w-12 mx-auto opacity-30" />
-                      <p className="text-sm">Выберите главу для анализа</p>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        {totalPages} стр. • {contentEntries.length} глав
+                        {supplementaryEntries.length > 0 && ` • ${supplementaryEntries.length} доп.`}
+                      </p>
                     </div>
-                  </div>
-                ) : selectedEntry && (
-                  <ScrollArea className="flex-1">
-                    <div className="p-6 max-w-3xl mx-auto space-y-4">
-                      {/* Chapter header */}
-                      <Card>
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 rounded-xl gradient-cyan flex items-center justify-center shadow-cool">
-                                <FileText className="h-5 w-5 text-primary-foreground" />
-                              </div>
-                              <div>
-                                <CardTitle className="text-lg">{selectedEntry.title}</CardTitle>
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                  Стр. {selectedEntry.startPage}–{selectedEntry.endPage}
-                                  {selectedEntry.partTitle && ` • ${selectedEntry.partTitle}`}
-                                </p>
-                              </div>
-                            </div>
 
-                            {/* Analyze button */}
-                            {selectedResult?.status === "pending" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => analyzeChapter(selectedIdx)}
-                                className="gap-2"
-                              >
-                                <PlayCircle className="h-4 w-4" />
-                                Анализировать
-                              </Button>
-                            )}
-                            {selectedResult?.status === "done" && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => analyzeChapter(selectedIdx)}
-                                className="gap-2 text-muted-foreground"
-                              >
-                                <Zap className="h-4 w-4" />
-                                Повторить
-                              </Button>
-                            )}
-                            {selectedResult?.status === "error" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => analyzeChapter(selectedIdx)}
-                                className="gap-2 border-destructive/30 text-destructive"
-                              >
-                                <AlertCircle className="h-4 w-4" />
-                                Повторить
-                              </Button>
+                    <ScrollArea className="flex-1">
+                      <div className="py-2">
+                        {renderNavSection("preface")}
+
+                        {partGroups.map((group) => (
+                          <div key={group.title}>
+                            <button
+                              onClick={() => togglePart(group.title)}
+                              className="w-full flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-primary hover:bg-muted/30 transition-colors"
+                            >
+                              {expandedParts.has(group.title) ? (
+                                <ChevronDown className="h-3 w-3" />
+                              ) : (
+                                <ChevronRight className="h-3 w-3" />
+                              )}
+                              <FolderOpen className="h-3 w-3" />
+                              <span className="truncate">{group.title}</span>
+                            </button>
+                            {expandedParts.has(group.title) && (
+                              <div className="ml-2">
+                                {group.indices.map(idx => renderNavItem(idx))}
+                              </div>
                             )}
                           </div>
-                        </CardHeader>
-                      </Card>
+                        ))}
 
-                      {/* Analyzing state */}
-                      {selectedResult?.status === "analyzing" && (
-                        <Card>
-                          <CardContent className="py-8 flex flex-col items-center gap-4">
-                            <div className="h-14 w-14 rounded-2xl gradient-cyan flex items-center justify-center shadow-cool animate-pulse">
-                              <Zap className="h-7 w-7 text-primary-foreground" />
-                            </div>
-                            <div className="text-center">
-                              <p className="font-display font-semibold">The Architect</p>
-                              <p className="text-sm text-muted-foreground mt-1">Анализируем сцены...</p>
-                            </div>
-                            <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                          </CardContent>
-                        </Card>
-                      )}
+                        {partlessIndices.map(idx => renderNavItem(idx))}
 
-                      {/* Pending state */}
-                      {selectedResult?.status === "pending" && (
-                        <Card className="border-dashed">
-                          <CardContent className="py-8 flex flex-col items-center gap-3 text-muted-foreground">
-                            <PlayCircle className="h-10 w-10 opacity-30" />
-                            <p className="text-sm">
-                              Нажмите «Анализировать» для AI-декомпозиции на сцены
-                            </p>
-                          </CardContent>
-                        </Card>
-                      )}
+                        {renderNavSection("afterword")}
+                        {renderNavSection("endnotes")}
+                        {renderNavSection("appendix")}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                </ResizablePanel>
 
-                      {/* Error state */}
-                      {selectedResult?.status === "error" && (
-                        <Card className="border-destructive/30">
-                          <CardContent className="py-6 flex flex-col items-center gap-3">
-                            <AlertCircle className="h-8 w-8 text-destructive" />
-                            <p className="text-sm text-muted-foreground">Ошибка при анализе. Попробуйте снова.</p>
-                          </CardContent>
-                        </Card>
-                      )}
+                <ResizableHandle withHandle />
 
-                      {/* Scenes list */}
-                      {selectedResult?.status === "done" && selectedResult.scenes.length > 0 && (
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-muted-foreground px-1">
-                            {selectedResult.scenes.length} сцен
-                          </h3>
-                          {selectedResult.scenes.map((sc) => {
-                            const typeInfo = SCENE_TYPE_LABELS[sc.scene_type] || SCENE_TYPE_LABELS.mixed;
-                            return (
-                              <Card key={sc.scene_number}>
-                                <CardContent className="py-3 px-4 space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium">
-                                      Сцена {sc.scene_number}: {sc.title}
-                                    </span>
-                                    <div className="flex items-center gap-1.5">
-                                      <Badge variant="outline" className={`text-[10px] ${typeInfo.color}`}>
-                                        {typeInfo.label}
-                                      </Badge>
-                                      <Badge variant="outline" className="text-[10px]">{sc.mood}</Badge>
-                                      <Badge variant="outline" className="text-[10px] font-mono">
-                                        {sc.bpm} BPM
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                  {sc.content_preview && (
-                                    <p className="text-xs text-muted-foreground line-clamp-2">
-                                      {sc.content_preview}
-                                    </p>
-                                  )}
-                                </CardContent>
-                              </Card>
-                            );
-                          })}
+                {/* ── Right Panel: Chapter Detail ── */}
+                <ResizablePanel defaultSize={78}>
+                  <div className="flex-1 flex flex-col h-full overflow-hidden">
+                    {selectedIdx === null ? (
+                      <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                        <div className="text-center space-y-3">
+                          <Layers className="h-12 w-12 mx-auto opacity-30" />
+                          <p className="text-sm">Выберите главу для анализа</p>
                         </div>
-                      )}
+                      </div>
+                    ) : selectedEntry && (
+                      <ScrollArea className="flex-1">
+                        <div className="p-6 max-w-3xl mx-auto space-y-4">
+                          <Card>
+                            <CardHeader className="pb-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className="h-10 w-10 rounded-xl gradient-cyan flex items-center justify-center shadow-cool">
+                                    <FileText className="h-5 w-5 text-primary-foreground" />
+                                  </div>
+                                  <div>
+                                    <CardTitle className="text-lg">{selectedEntry.title}</CardTitle>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                      Стр. {selectedEntry.startPage}–{selectedEntry.endPage}
+                                      {selectedEntry.partTitle && ` • ${selectedEntry.partTitle}`}
+                                    </p>
+                                  </div>
+                                </div>
 
-                      {/* Done but empty */}
-                      {selectedResult?.status === "done" && selectedResult.scenes.length === 0 && (
-                        <Card className="border-dashed">
-                          <CardContent className="py-6 flex flex-col items-center gap-2 text-muted-foreground">
-                            <p className="text-sm italic">Сцены не определены (мало текста или нестандартная структура)</p>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
-                  </ScrollArea>
-                )}
-              </div>
+                                {selectedResult?.status === "pending" && (
+                                  <Button variant="outline" size="sm" onClick={() => analyzeChapter(selectedIdx)} className="gap-2">
+                                    <PlayCircle className="h-4 w-4" />
+                                    Анализировать
+                                  </Button>
+                                )}
+                                {selectedResult?.status === "done" && (
+                                  <Button variant="ghost" size="sm" onClick={() => analyzeChapter(selectedIdx)} className="gap-2 text-muted-foreground">
+                                    <Zap className="h-4 w-4" />
+                                    Повторить
+                                  </Button>
+                                )}
+                                {selectedResult?.status === "error" && (
+                                  <Button variant="outline" size="sm" onClick={() => analyzeChapter(selectedIdx)} className="gap-2 border-destructive/30 text-destructive">
+                                    <AlertCircle className="h-4 w-4" />
+                                    Повторить
+                                  </Button>
+                                )}
+                              </div>
+                            </CardHeader>
+                          </Card>
+
+                          {selectedResult?.status === "analyzing" && (
+                            <Card>
+                              <CardContent className="py-8 flex flex-col items-center gap-4">
+                                <div className="h-14 w-14 rounded-2xl gradient-cyan flex items-center justify-center shadow-cool animate-pulse">
+                                  <Zap className="h-7 w-7 text-primary-foreground" />
+                                </div>
+                                <div className="text-center">
+                                  <p className="font-display font-semibold">The Architect</p>
+                                  <p className="text-sm text-muted-foreground mt-1">Анализируем сцены...</p>
+                                </div>
+                                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                              </CardContent>
+                            </Card>
+                          )}
+
+                          {selectedResult?.status === "pending" && (
+                            <Card className="border-dashed">
+                              <CardContent className="py-8 flex flex-col items-center gap-3 text-muted-foreground">
+                                <PlayCircle className="h-10 w-10 opacity-30" />
+                                <p className="text-sm">Нажмите «Анализировать» для AI-декомпозиции на сцены</p>
+                              </CardContent>
+                            </Card>
+                          )}
+
+                          {selectedResult?.status === "error" && (
+                            <Card className="border-destructive/30">
+                              <CardContent className="py-6 flex flex-col items-center gap-3">
+                                <AlertCircle className="h-8 w-8 text-destructive" />
+                                <p className="text-sm text-muted-foreground">Ошибка при анализе. Попробуйте снова.</p>
+                              </CardContent>
+                            </Card>
+                          )}
+
+                          {selectedResult?.status === "done" && selectedResult.scenes.length > 0 && (
+                            <div className="space-y-2">
+                              <h3 className="text-sm font-semibold text-muted-foreground px-1">
+                                {selectedResult.scenes.length} сцен
+                              </h3>
+                              {selectedResult.scenes.map((sc) => {
+                                const typeInfo = SCENE_TYPE_LABELS[sc.scene_type] || SCENE_TYPE_LABELS.mixed;
+                                return (
+                                  <Card key={sc.scene_number}>
+                                    <CardContent className="py-3 px-4 space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium">
+                                          Сцена {sc.scene_number}: {sc.title}
+                                        </span>
+                                        <div className="flex items-center gap-1.5">
+                                          <Badge variant="outline" className={`text-[10px] ${typeInfo.color}`}>
+                                            {typeInfo.label}
+                                          </Badge>
+                                          <Badge variant="outline" className="text-[10px]">{sc.mood}</Badge>
+                                          <Badge variant="outline" className="text-[10px] font-mono">
+                                            {sc.bpm} BPM
+                                          </Badge>
+                                        </div>
+                                      </div>
+                                      {sc.content_preview && (
+                                        <p className="text-xs text-muted-foreground line-clamp-2">
+                                          {sc.content_preview}
+                                        </p>
+                                      )}
+                                    </CardContent>
+                                  </Card>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {selectedResult?.status === "done" && selectedResult.scenes.length === 0 && (
+                            <Card className="border-dashed">
+                              <CardContent className="py-6 flex flex-col items-center gap-2 text-muted-foreground">
+                                <p className="text-sm italic">Сцены не определены (мало текста или нестандартная структура)</p>
+                              </CardContent>
+                            </Card>
+                          )}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
             </motion.div>
           )}
         </AnimatePresence>
