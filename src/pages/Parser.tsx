@@ -823,6 +823,41 @@ export default function Parser() {
   const analyzedCount = Array.from(chapterResults.values()).filter(r => r.status === "done").length;
   const totalScenes = Array.from(chapterResults.values()).reduce((a, r) => a + r.scenes.length, 0);
 
+  // Check if a chapter (and all its nested children) are fully analyzed
+  const isChapterFullyDone = (idx: number): boolean => {
+    const entry = tocEntries[idx];
+    const result = chapterResults.get(idx);
+    if (!result || result.status !== "done" || result.scenes.length === 0) return false;
+    // Check children
+    for (let i = idx + 1; i < tocEntries.length; i++) {
+      if (tocEntries[i].level <= entry.level) break;
+      if (tocEntries[i].sectionType !== entry.sectionType) break;
+      const childResult = chapterResults.get(i);
+      if (!childResult || childResult.status !== "done" || childResult.scenes.length === 0) return false;
+    }
+    return true;
+  };
+
+  const sendToStudio = (idx: number) => {
+    const entry = tocEntries[idx];
+    const result = chapterResults.get(idx);
+    if (!result) return;
+    // Collect scenes from this chapter and all nested children
+    const allScenes = [...result.scenes];
+    for (let i = idx + 1; i < tocEntries.length; i++) {
+      if (tocEntries[i].level <= entry.level) break;
+      if (tocEntries[i].sectionType !== entry.sectionType) break;
+      const childResult = chapterResults.get(i);
+      if (childResult) allScenes.push(...childResult.scenes);
+    }
+    saveStudioChapter({
+      chapterTitle: entry.title,
+      bookTitle: fileName.replace('.pdf', ''),
+      scenes: allScenes,
+    });
+    navigate("/studio");
+  };
+
   // Group content entries by part
   const partGroups: { title: string; indices: number[] }[] = [];
   const partlessIndices: number[] = [];
