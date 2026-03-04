@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { User, Key, Settings } from 'lucide-react';
+import { User, Key, Settings, HardDrive } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,6 +12,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { ProfileTab } from '@/components/profile/tabs/ProfileTab';
 import { PreferencesTab } from '@/components/profile/tabs/PreferencesTab';
 import { ApiKeysTab } from '@/components/profile/tabs/ApiKeysTab';
+import { StorageTab } from '@/components/profile/tabs/StorageTab';
 
 export default function Profile() {
   const { theme, setTheme } = useTheme();
@@ -160,6 +161,18 @@ export default function Profile() {
             />
           </TabsContent>
         </Tabs>
+      </section>
+
+      <Separator className="my-2" />
+
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <HardDrive className="h-5 w-5 text-primary" />
+          <h2 className="text-xl font-semibold font-display">
+            {isRu ? 'Файлохранилище' : 'File Storage'}
+          </h2>
+        </div>
+        {user && <StorageTab isRu={isRu} userId={user.id} />}
       </section>
 
       <Separator className="my-2" />
