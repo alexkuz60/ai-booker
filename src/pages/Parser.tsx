@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import ModelSelector from "@/components/ModelSelector";
-import { DEFAULT_MODEL_ID } from "@/config/modelRegistry";
+import { DEFAULT_MODEL_ID, isLovableModel } from "@/config/modelRegistry";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -479,13 +479,17 @@ export default function Parser() {
         return;
       }
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('api_keys')
-        .eq('id', user.id)
-        .single();
-      const apiKeys = (profile?.api_keys as Record<string, string>) || {};
-      const userKey = apiKeys.openai || apiKeys.gemini || null;
+      // Only send user API key for non-Lovable models
+      let userKey: string | null = null;
+      if (!isLovableModel(selectedModel)) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('api_keys')
+          .eq('id', user.id)
+          .single();
+        const apiKeys = (profile?.api_keys as Record<string, string>) || {};
+        userKey = apiKeys.openai || apiKeys.gemini || null;
+      }
 
       const { data: fnData, error: fnError } = await supabase.functions.invoke('parse-book-structure', {
         body: { text, user_api_key: userKey, user_model: selectedModel, mode: "chapter", chapter_title: entry.title },

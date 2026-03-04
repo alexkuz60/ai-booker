@@ -38,3 +38,8 @@ export function getModelsForAnalysis(): ModelRegistryEntry[] {
 }
 
 export const DEFAULT_MODEL_ID = 'google/gemini-3-flash-preview';
+
+export function isLovableModel(modelId: string): boolean {
+  const entry = registryMap.get(modelId);
+  return entry?.provider === 'lovable';
+}
