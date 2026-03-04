@@ -478,9 +478,17 @@ export default function Parser() {
       setStep("workspace");
     } catch (err: any) {
       console.error("Parser error:", err);
-      setErrorMsg(err.message || "Unknown error");
+      const msg = err.message || "Unknown error";
+      let userErr: string;
+      if (/402|payment|credits/i.test(msg)) userErr = t("errPayment", isRu);
+      else if (/429|rate.?limit/i.test(msg)) userErr = t("errRateLimit", isRu);
+      else if (/timeout|timed?\s?out/i.test(msg)) userErr = t("errTimeout", isRu);
+      else if (/api.?key/i.test(msg)) userErr = t("errNoApiKey", isRu);
+      else if (/fetch|network/i.test(msg)) userErr = t("errNetwork", isRu);
+      else userErr = msg;
+      setErrorMsg(userErr);
       setStep("error");
-      toast.error("Ошибка: " + (err.message || ""));
+      toast.error(userErr, { duration: 8000 });
     }
 
     if (fileInputRef.current) fileInputRef.current.value = "";
