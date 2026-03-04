@@ -137,6 +137,10 @@ export default function Profile() {
               <Settings className="h-4 w-4 shrink-0" />
               <span>{isRu ? 'Настройки' : 'Preferences'}</span>
             </TabsTrigger>
+            <TabsTrigger value="api-routers" className="flex items-center gap-2 flex-1">
+              <Network className="h-4 w-4 shrink-0" />
+              <span>{isRu ? 'API Роутеры' : 'API Routers'}</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="profile">
