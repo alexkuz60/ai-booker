@@ -14,6 +14,130 @@ export type Database = {
   }
   public: {
     Tables: {
+      book_chapters: {
+        Row: {
+          book_id: string
+          bpm: number | null
+          chapter_number: number
+          content: string | null
+          created_at: string
+          id: string
+          mood: string | null
+          scene_type: string | null
+          title: string
+        }
+        Insert: {
+          book_id: string
+          bpm?: number | null
+          chapter_number?: number
+          content?: string | null
+          created_at?: string
+          id?: string
+          mood?: string | null
+          scene_type?: string | null
+          title?: string
+        }
+        Update: {
+          book_id?: string
+          bpm?: number | null
+          chapter_number?: number
+          content?: string | null
+          created_at?: string
+          id?: string
+          mood?: string | null
+          scene_type?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_chapters_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      book_scenes: {
+        Row: {
+          bpm: number | null
+          chapter_id: string
+          content: string | null
+          created_at: string
+          id: string
+          mood: string | null
+          scene_number: number
+          scene_type: string | null
+          title: string
+        }
+        Insert: {
+          bpm?: number | null
+          chapter_id: string
+          content?: string | null
+          created_at?: string
+          id?: string
+          mood?: string | null
+          scene_number?: number
+          scene_type?: string | null
+          title?: string
+        }
+        Update: {
+          bpm?: number | null
+          chapter_id?: string
+          content?: string | null
+          created_at?: string
+          id?: string
+          mood?: string | null
+          scene_number?: number
+          scene_type?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_scenes_chapter_id_fkey"
+            columns: ["chapter_id"]
+            isOneToOne: false
+            referencedRelation: "book_chapters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      books: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_path: string | null
+          id: string
+          raw_text: string | null
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name?: string
+          file_path?: string | null
+          id?: string
+          raw_text?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_path?: string | null
+          id?: string
+          raw_text?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           api_keys: Json | null
