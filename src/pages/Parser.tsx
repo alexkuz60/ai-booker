@@ -1115,7 +1115,7 @@ export default function Parser() {
               >
                 {/* ── Left Panel: Navigator ── */}
                 <ResizablePanel defaultSize={22} minSize={14} maxSize={45}>
-                  <div className="flex flex-col h-full bg-card/50">
+                  <div className="flex flex-col h-full overflow-hidden bg-card/50">
                     <div className="px-4 py-3 border-b border-border">
                       <div className="flex items-center gap-2">
                         <BookOpen className="h-5 w-5 text-primary" />
