@@ -23,6 +23,7 @@ export type Database = {
           created_at: string
           id: string
           mood: string | null
+          part_id: string | null
           scene_type: string | null
           title: string
         }
@@ -34,6 +35,7 @@ export type Database = {
           created_at?: string
           id?: string
           mood?: string | null
+          part_id?: string | null
           scene_type?: string | null
           title?: string
         }
@@ -45,12 +47,52 @@ export type Database = {
           created_at?: string
           id?: string
           mood?: string | null
+          part_id?: string | null
           scene_type?: string | null
           title?: string
         }
         Relationships: [
           {
             foreignKeyName: "book_chapters_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "book_chapters_part_id_fkey"
+            columns: ["part_id"]
+            isOneToOne: false
+            referencedRelation: "book_parts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      book_parts: {
+        Row: {
+          book_id: string
+          created_at: string
+          id: string
+          part_number: number
+          title: string
+        }
+        Insert: {
+          book_id: string
+          created_at?: string
+          id?: string
+          part_number?: number
+          title?: string
+        }
+        Update: {
+          book_id?: string
+          created_at?: string
+          id?: string
+          part_number?: number
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_parts_book_id_fkey"
             columns: ["book_id"]
             isOneToOne: false
             referencedRelation: "books"
