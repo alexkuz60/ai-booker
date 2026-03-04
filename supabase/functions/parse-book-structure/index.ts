@@ -412,7 +412,8 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { text, user_api_key, user_model, provider, mode, chapter_title, openrouter_api_key } = body;
+    const { text, user_api_key, user_model, provider, mode, chapter_title, openrouter_api_key, lang } = body;
+    const effectiveLang = lang || 'en';
 
     if (!text || text.trim().length < 50) {
       return new Response(JSON.stringify({ error: "Text too short for analysis (min 50 chars)" }),
@@ -432,7 +433,7 @@ serve(async (req) => {
           console.log(`Non-admin, redirecting ${orModel} to OpenRouter`);
           return await handleAIRequest(
             truncatedText, 'https://openrouter.ai/api/v1/chat/completions',
-            orModel, openrouter_api_key, 'openrouter', mode, chapter_title, null
+            orModel, openrouter_api_key, 'openrouter', mode, chapter_title, null, effectiveLang
           );
         }
         return new Response(
@@ -450,7 +451,7 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    return await handleAIRequest(truncatedText, endpoint, model, apiKey, effectiveProvider, mode, chapter_title, openrouter_api_key);
+    return await handleAIRequest(truncatedText, endpoint, model, apiKey, effectiveProvider, mode, chapter_title, openrouter_api_key, effectiveLang);
   } catch (e) {
     console.error("parse-book-structure error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
