@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { Clock } from "lucide-react";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -10,6 +11,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { ChapterNavigator, EmptyNavigator } from "@/components/studio/ChapterNavigator";
 import { StudioWorkspace } from "@/components/studio/StudioWorkspace";
 import { StudioTimeline, TIMELINE_HEADER_HEIGHT } from "@/components/studio/StudioTimeline";
+import { estimateChapterDuration, estimateSceneDuration } from "@/lib/durationEstimate";
 
 const Studio = () => {
   const { isRu } = useLanguage();
