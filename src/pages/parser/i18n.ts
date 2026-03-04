@@ -62,6 +62,13 @@ const texts: Record<string, { ru: string; en: string }> = {
   sceneDescription: { ru: "Описание", en: "Description" },
   sceneMonologue: { ru: "Монолог", en: "Monologue" },
   sceneMixed: { ru: "Смешанный", en: "Mixed" },
+  sceneNarration: { ru: "Повествование", en: "Narration" },
+  sceneExposition: { ru: "Экспозиция", en: "Exposition" },
+  sceneConflict: { ru: "Конфликт", en: "Conflict" },
+  sceneClimax: { ru: "Кульминация", en: "Climax" },
+  sceneTransition: { ru: "Переход", en: "Transition" },
+  sceneFlashback: { ru: "Флешбэк", en: "Flashback" },
+  sceneSetting: { ru: "Сеттинг", en: "Setting" },
 
   // Mood labels
   moodTense: { ru: "Напряжённый", en: "Tense" },
@@ -77,6 +84,17 @@ const texts: Record<string, { ru: string; en: string }> = {
   moodDramatic: { ru: "Драматичный", en: "Dramatic" },
   moodMelancholic: { ru: "Меланхоличный", en: "Melancholic" },
   moodNeutral: { ru: "Нейтральный", en: "Neutral" },
+  moodComedic: { ru: "Комедийный", en: "Comedic" },
+  moodSuspenseful: { ru: "Тревожный", en: "Suspenseful" },
+  moodHopeful: { ru: "Обнадёживающий", en: "Hopeful" },
+  moodAngry: { ru: "Злой", en: "Angry" },
+  moodFearful: { ru: "Тревожный", en: "Fearful" },
+  moodSerene: { ru: "Умиротворённый", en: "Serene" },
+  moodBittersweet: { ru: "Светлая грусть", en: "Bittersweet" },
+  moodAnxious: { ru: "Тревожный", en: "Anxious" },
+  moodUplifting: { ru: "Воодушевляющий", en: "Uplifting" },
+  moodEerie: { ru: "Зловещий", en: "Eerie" },
+  moodTragic: { ru: "Трагичный", en: "Tragic" },
 
   // Scene label prefix
   scenePrefix: { ru: "Сцена", en: "Scene" },
@@ -92,7 +110,24 @@ const texts: Record<string, { ru: string; en: string }> = {
   errChapterFailed: { ru: "Не удалось проанализировать главу", en: "Failed to analyze chapter" },
 };
 
-// Mood map: English AI output → i18n key
+function normalizeToken(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[–—-]/g, "_")
+    .replace(/\s+/g, "_")
+    .replace(/[^\p{L}\p{N}_]/gu, "");
+}
+
+function humanizeToken(value: string): string {
+  return value
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
+// Mood map: English/Russian AI output → i18n key
 const MOOD_MAP: Record<string, string> = {
   tense: "moodTense", напряжённый: "moodTense", напряженный: "moodTense",
   calm: "moodCalm", спокойный: "moodCalm",
@@ -107,6 +142,54 @@ const MOOD_MAP: Record<string, string> = {
   dramatic: "moodDramatic", драматичный: "moodDramatic",
   melancholic: "moodMelancholic", меланхоличный: "moodMelancholic",
   neutral: "moodNeutral", нейтральный: "moodNeutral",
+  comedic: "moodComedic", comedy: "moodComedic", комедийный: "moodComedic",
+  suspenseful: "moodSuspenseful", suspense: "moodSuspenseful", саспенс: "moodSuspenseful",
+  hopeful: "moodHopeful", optimistic: "moodHopeful", обнадёживающий: "moodHopeful", обнадеживающий: "moodHopeful",
+  angry: "moodAngry", гневный: "moodAngry", злой: "moodAngry",
+  fearful: "moodFearful", fear: "moodFearful", тревожный: "moodFearful",
+  serene: "moodSerene", умиротворённый: "moodSerene", умиротворенный: "moodSerene",
+  bittersweet: "moodBittersweet", bittersweet_sadness: "moodBittersweet",
+  anxious: "moodAnxious", anxiety: "moodAnxious",
+  uplifting: "moodUplifting", вдохновляющий: "moodUplifting", воодушевляющий: "moodUplifting",
+  eerie: "moodEerie", зловещий: "moodEerie",
+  tragic: "moodTragic", трагичный: "moodTragic", трагический: "moodTragic",
+};
+
+const SCENE_TYPE_MAP: Record<string, string> = {
+  action: "sceneAction",
+  dialogue: "sceneDialogue",
+  lyrical_digression: "sceneLyrical",
+  lyrical: "sceneLyrical",
+  description: "sceneDescription",
+  descriptive: "sceneDescription",
+  inner_monologue: "sceneMonologue",
+  monologue: "sceneMonologue",
+  mixed: "sceneMixed",
+  narration: "sceneNarration",
+  narrative: "sceneNarration",
+  exposition: "sceneExposition",
+  conflict: "sceneConflict",
+  climax: "sceneClimax",
+  transition: "sceneTransition",
+  flashback: "sceneFlashback",
+  setting: "sceneSetting",
+};
+
+const SCENE_TITLE_MAP: Record<string, string> = {
+  action_scene: "sceneAction",
+  dialogue_scene: "sceneDialogue",
+  lyrical_scene: "sceneLyrical",
+  description_scene: "sceneDescription",
+  monologue_scene: "sceneMonologue",
+  mixed_scene: "sceneMixed",
+  narration_scene: "sceneNarration",
+  exposition_scene: "sceneExposition",
+  transition_scene: "sceneTransition",
+  flashback_scene: "sceneFlashback",
+  climax_scene: "sceneClimax",
+  conflict_scene: "sceneConflict",
+  opening_scene: "sceneSetting",
+  closing_scene: "sceneTransition",
 };
 
 export function t(key: string, isRu: boolean): string {
@@ -116,22 +199,29 @@ export function t(key: string, isRu: boolean): string {
 }
 
 export function tMood(raw: string, isRu: boolean): string {
-  const key = MOOD_MAP[raw.toLowerCase()];
+  const normalized = normalizeToken(raw);
+  const key = MOOD_MAP[normalized];
   if (key) return t(key, isRu);
-  return raw; // fallback to raw value
+  return humanizeToken(raw);
 }
 
-export function tSceneType(key: string, isRu: boolean): string {
-  const map: Record<string, string> = {
-    action: "sceneAction",
-    dialogue: "sceneDialogue",
-    lyrical_digression: "sceneLyrical",
-    description: "sceneDescription",
-    inner_monologue: "sceneMonologue",
-    mixed: "sceneMixed",
-  };
-  const i18nKey = map[key];
-  return i18nKey ? t(i18nKey, isRu) : key;
+export function tSceneType(raw: string, isRu: boolean): string {
+  const normalized = normalizeToken(raw);
+  const i18nKey = SCENE_TYPE_MAP[normalized];
+  return i18nKey ? t(i18nKey, isRu) : humanizeToken(raw);
+}
+
+export function tSceneTitle(raw: string, isRu: boolean): string {
+  const normalized = normalizeToken(raw);
+  const i18nKey = SCENE_TITLE_MAP[normalized] || SCENE_TYPE_MAP[normalized];
+  if (i18nKey) return t(i18nKey, isRu);
+
+  if (isRu) {
+    const sceneMatch = raw.match(/^scene\s+(\d+)$/i);
+    if (sceneMatch) return `${t("scenePrefix", true)} ${sceneMatch[1]}`;
+  }
+
+  return raw;
 }
 
 export function tSection(type: string, isRu: boolean): string {

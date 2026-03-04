@@ -113,7 +113,7 @@ const SECTION_ICONS: Record<SectionType, string> = {
   endnotes: "🔗",
   appendix: "📎",
 };
-import { t, tSceneType, tMood, tSection } from "@/pages/parser/i18n";
+import { t, tSceneType, tMood, tSection, tSceneTitle } from "@/pages/parser/i18n";
 import { useLanguage } from "@/hooks/useLanguage";
 
 const SCENE_TYPE_COLORS: Record<string, string> = {
@@ -1077,7 +1077,7 @@ export default function Parser() {
                                     <CardContent className="py-3 px-4 space-y-2">
                                       <div className="flex items-center justify-between">
                                         <span className="text-sm font-medium">
-                                          {t("scenePrefix", isRu)} {sc.scene_number}: {sc.title}
+                                          {t("scenePrefix", isRu)} {sc.scene_number}: {tSceneTitle(sc.title, isRu)}
                                         </span>
                                         <div className="flex items-center gap-1.5">
                                           <Badge variant="outline" className={`text-[10px] ${colorCls}`}>
