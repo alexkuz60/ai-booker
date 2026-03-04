@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.parse-book-structure]
 verify_jwt = false
+
+[functions.proxy-api-test]
+verify_jwt = false
+
+[functions.dotpoint-api-test]
+verify_jwt = false
