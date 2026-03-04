@@ -651,7 +651,44 @@ export default function Parser() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [user]);
 
-  // ─── Single Chapter Analysis ───────────────────────────────
+  // ─── Helper: call edge function ─────────────────────────────
+
+  const callParseFunction = async (body: Record<string, unknown>): Promise<any> => {
+    const abortCtrl = new AbortController();
+    const timeoutId = setTimeout(() => abortCtrl.abort(), 180_000);
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const session = (await supabase.auth.getSession()).data.session;
+
+    try {
+      const resp = await fetch(`${supabaseUrl}/functions/v1/parse-book-structure`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || supabaseKey}`,
+          'apikey': supabaseKey,
+        },
+        body: JSON.stringify(body),
+        signal: abortCtrl.signal,
+      });
+      clearTimeout(timeoutId);
+      if (!resp.ok) {
+        const errBody = await resp.text();
+        let errMsg: string;
+        try { errMsg = JSON.parse(errBody).error; } catch { errMsg = errBody; }
+        throw new Error(errMsg || `HTTP ${resp.status}`);
+      }
+      return await resp.json();
+    } catch (fetchErr: any) {
+      clearTimeout(timeoutId);
+      if (fetchErr.name === 'AbortError') {
+        throw new Error(isRu ? 'Timeout: анализ занял более 3 минут' : 'Timeout: analysis took more than 3 minutes');
+      }
+      throw fetchErr;
+    }
+  };
+
+  // ─── Two-stage Chapter Analysis (with resume) ─────────────
 
   const analyzeChapter = async (idx: number) => {
     if (!pdfRef || !user) return;
@@ -662,145 +699,199 @@ export default function Parser() {
     setAnalysisLog([]);
     if (analysisTimerRef.current) clearInterval(analysisTimerRef.current);
 
+    const addLog = (msg: string) => setAnalysisLog(prev => [...prev, msg]);
+
+    // Pick the right API key based on model provider
+    let userKey: string | null = null;
+    const modelEntry = getModelRegistryEntry(selectedModel);
+    if (modelEntry?.apiKeyField) {
+      userKey = userApiKeys[modelEntry.apiKeyField] || null;
+    }
+    const baseBody = {
+      user_api_key: userKey,
+      user_model: selectedModel,
+      provider: modelEntry?.provider || 'lovable',
+      openrouter_api_key: userApiKeys['openrouter'] || null,
+    };
+
+    const existingChId = chapterIdMap.get(idx);
+
+    // Determine which scenes need enrichment (no scene_type or scene_type is empty)
+    const needsEnrichment = (sc: Scene) => !sc.scene_type || sc.scene_type === '' || sc.scene_type === 'pending';
+
+    // Check if we already have scenes (resume scenario)
+    const existingResult = chapterResults.get(idx);
+    let scenes: Scene[] = existingResult?.scenes || [];
+    const wasFullyDone = existingResult?.status === 'done' && scenes.length > 0 && scenes.every(sc => !needsEnrichment(sc));
+
+    // If fully done, user wants to re-analyze from scratch — clear old scenes
+    if (wasFullyDone && existingChId) {
+      addLog(isRu ? "🗑️ Очистка предыдущих результатов..." : "🗑️ Clearing previous results...");
+      await supabase.from('book_scenes').delete().eq('chapter_id', existingChId);
+      scenes = [];
+    }
+
+    const hasExistingScenes = scenes.length > 0;
+
+    if (hasExistingScenes && scenes.every(sc => !needsEnrichment(sc))) {
+      toast.info(isRu ? "Все сцены уже проанализированы" : "All scenes already analyzed");
+      return;
+    }
+
     setChapterResults(prev => {
       const next = new Map(prev);
-      next.set(idx, { scenes: [], status: "analyzing" });
+      next.set(idx, { scenes, status: "analyzing" });
       return next;
     });
 
-    const addLog = (msg: string) => setAnalysisLog(prev => [...prev, msg]);
-
     try {
-      addLog(isRu ? `📖 Извлечение текста главы «${entry.title}»...` : `📖 Extracting chapter text "${entry.title}"...`);
-      const text = await extractTextByPageRange(pdfRef, entry.startPage, entry.endPage);
-      const charCount = text.trim().length;
+      // ─── STAGE 1: Boundary detection (skip if we already have scenes) ───
+      if (!hasExistingScenes) {
+        addLog(isRu ? `📖 Извлечение текста главы «${entry.title}»...` : `📖 Extracting chapter text "${entry.title}"...`);
+        const text = await extractTextByPageRange(pdfRef, entry.startPage, entry.endPage);
+        const charCount = text.trim().length;
 
-      if (charCount < 50) {
+        if (charCount < 50) {
+          setChapterResults(prev => {
+            const next = new Map(prev);
+            next.set(idx, { scenes: [], status: "done" });
+            return next;
+          });
+          toast.info(`"${entry.title}" — ${isRu ? "недостаточно текста для анализа" : "not enough text for analysis"}`);
+          return;
+        }
+
+        addLog(isRu
+          ? `📝 Текст извлечён: ${charCount.toLocaleString()} символов (${entry.startPage}–${entry.endPage} стр.)`
+          : `📝 Text extracted: ${charCount.toLocaleString()} chars (pages ${entry.startPage}–${entry.endPage})`);
+
+        addLog(isRu ? `🎭 Этап 1: Определение границ сцен...` : `🎭 Stage 1: Detecting scene boundaries...`);
+        addLog(isRu ? `🚀 Запрос к AI модели ${selectedModel.split('/').pop()}...` : `🚀 Calling AI model ${selectedModel.split('/').pop()}...`);
+
+        const fnData = await callParseFunction({
+          ...baseBody,
+          text,
+          mode: "boundaries",
+          chapter_title: entry.title,
+        });
+
+        if (fnData?.error) throw new Error(fnData.error);
+
+        const rawScenes = fnData.structure?.scenes || [];
+        scenes = rawScenes.map((s: any) => ({
+          scene_number: s.scene_number,
+          title: s.title,
+          content: s.content || '',
+          content_preview: (s.content || '').slice(0, 200),
+          scene_type: 'pending',
+          mood: '',
+          bpm: 0,
+        }));
+
+        addLog(isRu ? `✅ Определено ${scenes.length} сцен:` : `✅ Found ${scenes.length} scenes:`);
+        scenes.forEach((sc, i) => {
+          const dur = Math.round((sc.content?.length || 0) / 15);
+          addLog(isRu
+            ? `  📍 Сцена ${i + 1}: «${sc.title}» (~${dur}с)`
+            : `  📍 Scene ${i + 1}: "${sc.title}" (~${dur}s)`);
+        });
+
+        // Save boundaries to DB immediately
+        addLog(isRu ? "💾 Сохранение структуры в базу данных..." : "💾 Saving structure to database...");
+
+        if (existingChId) {
+          for (const sc of scenes) {
+            const { data: scRow } = await supabase.from('book_scenes').insert({
+              chapter_id: existingChId,
+              scene_number: sc.scene_number,
+              title: sc.title,
+              content: sc.content || '',
+              scene_type: null,
+              mood: null,
+              bpm: null,
+            }).select('id').single();
+            if (scRow) sc.id = scRow.id;
+          }
+        }
+
+        // Update UI with boundaries (scenes visible but not yet enriched)
         setChapterResults(prev => {
           const next = new Map(prev);
-          next.set(idx, { scenes: [], status: "done" });
+          next.set(idx, { scenes: [...scenes], status: "analyzing" });
           return next;
         });
-        toast.info(`"${entry.title}" — недостаточно текста для анализа`);
-        return;
+      } else {
+        addLog(isRu
+          ? `📍 Найдено ${scenes.length} сохранённых сцен, продолжаем обогащение...`
+          : `📍 Found ${scenes.length} saved scenes, resuming enrichment...`);
       }
 
-      addLog(isRu
-        ? `📝 Текст извлечён: ${charCount.toLocaleString()} символов (${entry.startPage}–${entry.endPage} стр.)`
-        : `📝 Text extracted: ${charCount.toLocaleString()} chars (pages ${entry.startPage}–${entry.endPage})`);
+      // ─── STAGE 2: Enrich each scene with metadata (resumable) ───
+      const toEnrich = scenes.filter(needsEnrichment);
+      if (toEnrich.length > 0) {
+        addLog(isRu
+          ? `🧠 Этап 2: Обогащение ${toEnrich.length} из ${scenes.length} сцен...`
+          : `🧠 Stage 2: Enriching ${toEnrich.length} of ${scenes.length} scenes...`);
 
-      // Simulated progressive stages while AI works
-      const stages = isRu ? [
-        "🔍 Очистка текста от артефактов...",
-        "🧠 Анализ структуры повествования...",
-        "🎭 Определение границ сцен...",
-        "📊 Классификация типов сцен...",
-        "🎵 Вычисление темпа повествования (BPM)...",
-        "💭 Анализ настроения и эмоционального тона...",
-        "✍️ Формирование заголовков сцен...",
-        "📐 Верификация полноты текста сцен...",
-        "🔗 Проверка целостности декомпозиции...",
-        "⏳ Финализация структуры...",
-        "🔄 AI обрабатывает большой объём текста, ожидаем ответ...",
-        "⏳ Генерация продолжается...",
-      ] : [
-        "🔍 Cleaning text artifacts...",
-        "🧠 Analyzing narrative structure...",
-        "🎭 Detecting scene boundaries...",
-        "📊 Classifying scene types...",
-        "🎵 Computing narrative tempo (BPM)...",
-        "💭 Analyzing mood and emotional tone...",
-        "✍️ Generating scene titles...",
-        "📐 Verifying scene text completeness...",
-        "🔗 Checking decomposition integrity...",
-        "⏳ Finalizing structure...",
-        "🔄 AI processing large text volume, awaiting response...",
-        "⏳ Generation continues...",
-      ];
+        for (const sc of toEnrich) {
+          const scIdx = scenes.indexOf(sc);
+          addLog(isRu
+            ? `  🎬 Анализ сцены ${scIdx + 1}/${scenes.length}: «${sc.title}»...`
+            : `  🎬 Analyzing scene ${scIdx + 1}/${scenes.length}: "${sc.title}"...`);
 
-      let stageIdx = 0;
-      const interval = Math.max(2500, Math.min(5000, charCount / 20));
-      analysisTimerRef.current = setInterval(() => {
-        if (stageIdx < stages.length) {
-          addLog(stages[stageIdx]);
-          stageIdx++;
+          const sceneText = sc.content || sc.content_preview || '';
+          if (sceneText.length < 20) {
+            sc.scene_type = 'mixed';
+            sc.mood = 'neutral';
+            sc.bpm = 100;
+            addLog(isRu ? `    ⚡ Текст слишком короткий, установлены значения по умолчанию` : `    ⚡ Text too short, using defaults`);
+          } else {
+            const enrichData = await callParseFunction({
+              ...baseBody,
+              text: sceneText.slice(0, 30000),
+              mode: "enrich",
+            });
+
+            if (enrichData?.error) throw new Error(enrichData.error);
+
+            const meta = enrichData.structure || {};
+            sc.scene_type = meta.scene_type || 'mixed';
+            sc.mood = meta.mood || 'neutral';
+            sc.bpm = meta.bpm || 100;
+
+            addLog(isRu
+              ? `    ✅ ${sc.scene_type}, ${sc.mood}, ${sc.bpm} bpm`
+              : `    ✅ ${sc.scene_type}, ${sc.mood}, ${sc.bpm} bpm`);
+          }
+
+          // Save enrichment to DB immediately
+          if (sc.id) {
+            await supabase.from('book_scenes').update({
+              scene_type: sc.scene_type,
+              mood: sc.mood,
+              bpm: sc.bpm,
+            }).eq('id', sc.id);
+          }
+
+          // Update UI progressively
+          setChapterResults(prev => {
+            const next = new Map(prev);
+            next.set(idx, { scenes: [...scenes], status: "analyzing" });
+            return next;
+          });
         }
-      }, interval);
-
-      // Pick the right API key based on model provider
-      let userKey: string | null = null;
-      const modelEntry = getModelRegistryEntry(selectedModel);
-      if (modelEntry?.apiKeyField) {
-        userKey = userApiKeys[modelEntry.apiKeyField] || null;
       }
 
-      addLog(isRu ? `🚀 Запрос к AI модели ${selectedModel.split('/').pop()}...` : `🚀 Calling AI model ${selectedModel.split('/').pop()}...`);
-
-      // Use direct fetch with extended timeout (3 min) instead of supabase.functions.invoke
-      // which has a short default timeout causing "Failed to send a request" errors on large chapters
-      const abortCtrl = new AbortController();
-      const timeoutId = setTimeout(() => abortCtrl.abort(), 180_000);
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const session = (await supabase.auth.getSession()).data.session;
-
-      let fnData: any;
-      try {
-        const resp = await fetch(`${supabaseUrl}/functions/v1/parse-book-structure`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token || supabaseKey}`,
-            'apikey': supabaseKey,
-          },
-          body: JSON.stringify({
-            text,
-            user_api_key: userKey,
-            user_model: selectedModel,
-            provider: modelEntry?.provider || 'lovable',
-            mode: "chapter",
-            chapter_title: entry.title,
-            openrouter_api_key: userApiKeys['openrouter'] || null,
-          }),
-          signal: abortCtrl.signal,
-        });
-        clearTimeout(timeoutId);
-        if (!resp.ok) {
-          const errBody = await resp.text();
-          let errMsg: string;
-          try { errMsg = JSON.parse(errBody).error; } catch { errMsg = errBody; }
-          throw new Error(errMsg || `HTTP ${resp.status}`);
-        }
-        fnData = await resp.json();
-      } catch (fetchErr: any) {
-        clearTimeout(timeoutId);
-        if (fetchErr.name === 'AbortError') {
-          throw new Error(isRu ? 'Timeout: анализ занял более 3 минут' : 'Timeout: analysis took more than 3 minutes');
-        }
-        throw fetchErr;
+      // Update chapter-level metadata
+      if (existingChId && scenes.length > 0) {
+        await supabase.from('book_chapters').update({
+          scene_type: scenes[0].scene_type,
+          mood: scenes[0].mood,
+          bpm: scenes[0].bpm,
+        }).eq('id', existingChId);
       }
 
       if (analysisTimerRef.current) { clearInterval(analysisTimerRef.current); analysisTimerRef.current = null; }
-
-      if (fnData?.error) throw new Error(fnData.error);
-
-      const rawScenes = fnData.structure?.scenes || [];
-      const scenes: Scene[] = rawScenes.map((s: any) => ({
-        ...s,
-        content: s.content || s.content_preview || '',
-        content_preview: (s.content || s.content_preview || '').slice(0, 200),
-      }));
-
-      // Log each detected scene
-      addLog(isRu ? `✅ AI вернул ${scenes.length} сцен:` : `✅ AI returned ${scenes.length} scenes:`);
-      scenes.forEach((sc, i) => {
-        const dur = Math.round((sc.content?.length || 0) / 15);
-        addLog(isRu
-          ? `  🎬 Сцена ${i + 1}: «${sc.title}» — ${sc.scene_type}, ${sc.mood}, ${sc.bpm} bpm, ~${dur}с`
-          : `  🎬 Scene ${i + 1}: "${sc.title}" — ${sc.scene_type}, ${sc.mood}, ${sc.bpm} bpm, ~${dur}s`);
-      });
-
-      addLog(isRu ? "💾 Сохранение результатов в базу данных..." : "💾 Saving results to database...");
 
       setChapterResults(prev => {
         const next = new Map(prev);
@@ -808,64 +899,25 @@ export default function Parser() {
         return next;
       });
 
-      // Save analysis results to existing chapter row
-      const existingChId = chapterIdMap.get(idx);
-      if (existingChId) {
-        if (scenes.length > 0) {
-          await supabase.from('book_chapters').update({
-            scene_type: scenes[0].scene_type,
-            mood: scenes[0].mood,
-            bpm: scenes[0].bpm,
-          }).eq('id', existingChId);
-        }
-        for (const sc of scenes) {
-          const { data: scRow } = await supabase.from('book_scenes').insert({
-            chapter_id: existingChId,
-            scene_number: sc.scene_number,
-            title: sc.title,
-            content: sc.content || sc.content_preview || '',
-            scene_type: sc.scene_type,
-            mood: sc.mood,
-            bpm: sc.bpm,
-          }).select('id').single();
-          if (scRow) sc.id = scRow.id;
-        }
-      } else if (bookId) {
-        // Fallback: create chapter if no pre-saved ID
-        const partId = entry.partTitle ? partIdMap.get(entry.partTitle) : null;
-        const { data: chRow } = await supabase
-          .from('book_chapters')
-          .insert({
-            book_id: bookId,
-            chapter_number: idx + 1,
-            title: entry.title,
-            ...(partId ? { part_id: partId } : {}),
-          })
-          .select('id')
-          .single();
-        if (chRow) {
-          setChapterIdMap(prev => new Map(prev).set(idx, chRow.id));
-          for (const sc of scenes) {
-            const { data: scRow } = await supabase.from('book_scenes').insert({
-              chapter_id: chRow.id,
-              scene_number: sc.scene_number,
-              title: sc.title,
-              content: sc.content || sc.content_preview || '',
-              scene_type: sc.scene_type,
-              mood: sc.mood,
-              bpm: sc.bpm,
-            }).select('id').single();
-            if (scRow) sc.id = scRow.id;
-          }
-        }
-      }
-
-      addLog(isRu ? `🎉 Глава «${entry.title}» успешно проанализирована!` : `🎉 Chapter "${entry.title}" analyzed successfully!`);
-      toast.success(`Глава "${entry.title}" проанализирована: ${scenes.length} сцен`);
+      addLog(isRu ? `🎉 Глава «${entry.title}» полностью проанализирована!` : `🎉 Chapter "${entry.title}" fully analyzed!`);
+      toast.success(isRu
+        ? `Глава "${entry.title}" проанализирована: ${scenes.length} сцен`
+        : `Chapter "${entry.title}" analyzed: ${scenes.length} scenes`);
     } catch (err: any) {
       if (analysisTimerRef.current) { clearInterval(analysisTimerRef.current); analysisTimerRef.current = null; }
       console.error(`Chapter analysis failed for "${entry.title}":`, err);
       addLog(`❌ ${isRu ? "Ошибка" : "Error"}: ${err?.message || "Unknown error"}`);
+
+      // Save partial progress — scenes already saved to DB individually
+      const partialScenes = scenes.length > 0 ? scenes : [];
+      const enrichedCount = partialScenes.filter(s => s.scene_type && s.scene_type !== 'pending').length;
+
+      if (partialScenes.length > 0) {
+        addLog(isRu
+          ? `💡 Сохранено: ${partialScenes.length} сцен (${enrichedCount} обогащено). Нажмите ▶ чтобы продолжить.`
+          : `💡 Saved: ${partialScenes.length} scenes (${enrichedCount} enriched). Click ▶ to resume.`);
+      }
+
       const errMsg = err?.message || "";
       let userError: string;
       if (/402|payment|credits/i.test(errMsg)) {
@@ -883,9 +935,11 @@ export default function Parser() {
       } else {
         userError = `${t("errChapterFailed", isRu)}: ${errMsg || entry.title}`;
       }
+
       setChapterResults(prev => {
         const next = new Map(prev);
-        next.set(idx, { scenes: [], status: "error" });
+        // Keep partial scenes with "error" status so user can resume
+        next.set(idx, { scenes: partialScenes, status: "error" });
         return next;
       });
       toast.error(userError, { duration: 8000 });
@@ -1318,19 +1372,22 @@ export default function Parser() {
                                 {selectedResult?.status === "pending" && (
                                   <Button variant="outline" size="sm" onClick={() => analyzeChapter(selectedIdx)} className="gap-2">
                                     <PlayCircle className="h-4 w-4" />
-                                    Анализировать
+                                    {isRu ? "Анализировать" : "Analyze"}
                                   </Button>
                                 )}
                                 {selectedResult?.status === "done" && (
                                   <Button variant="ghost" size="sm" onClick={() => analyzeChapter(selectedIdx)} className="gap-2 text-muted-foreground">
                                     <Zap className="h-4 w-4" />
-                                    Повторить
+                                    {isRu ? "Повторить" : "Re-analyze"}
                                   </Button>
                                 )}
                                 {selectedResult?.status === "error" && (
                                   <Button variant="outline" size="sm" onClick={() => analyzeChapter(selectedIdx)} className="gap-2 border-destructive/30 text-destructive">
-                                    <AlertCircle className="h-4 w-4" />
-                                    Повторить
+                                    {(selectedResult?.scenes?.length || 0) > 0 ? (
+                                      <><PlayCircle className="h-4 w-4" />{isRu ? "Продолжить" : "Resume"}</>
+                                    ) : (
+                                      <><AlertCircle className="h-4 w-4" />{isRu ? "Повторить" : "Retry"}</>
+                                    )}
                                   </Button>
                                 )}
                               </div>

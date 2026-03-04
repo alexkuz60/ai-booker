@@ -34,6 +34,27 @@ Your task:
 
 You MUST respond using the suggest_scenes tool.`;
 
+const SYSTEM_PROMPT_BOUNDARIES = `You are "The Architect" — an AI agent that quickly identifies scene boundaries in a chapter of a book.
+
+Your task:
+1. Clean the text: remove page numbers, footnotes, headers/footers, and other technical artifacts.
+2. Split the chapter into scenes — logical segments where setting, time, or action changes.
+3. For each scene, provide:
+   - A brief descriptive title
+   - The COMPLETE text of the scene, preserving original wording exactly. Do NOT truncate or abbreviate.
+
+Do NOT analyze mood, scene_type, or bpm — just identify boundaries and extract complete text.
+You MUST respond using the suggest_boundaries tool.`;
+
+const SYSTEM_PROMPT_ENRICH = `You are "The Architect" — an AI agent that analyzes a single scene from a book and determines its characteristics.
+
+Given the scene text, determine:
+- scene_type: one of "action", "dialogue", "lyrical_digression", "description", "inner_monologue", "mixed"
+- mood: the dominant emotional tone (e.g. "tense", "calm", "melancholic", "joyful", "dark", "romantic", "comedic")
+- bpm: suggested narrative tempo as beats-per-minute metaphor (60-80 slow/contemplative, 80-110 moderate, 110-140 dynamic, 140+ intense)
+
+You MUST respond using the suggest_metadata tool.`;
+
 const fullStructureTool = {
   type: "function",
   function: {
@@ -76,6 +97,55 @@ const fullStructureTool = {
         },
       },
       required: ["book_title", "chapters"],
+      additionalProperties: false,
+    },
+  },
+};
+
+const boundariesTool = {
+  type: "function",
+  function: {
+    name: "suggest_boundaries",
+    description: "Return scene boundaries with titles and complete text for a chapter",
+    parameters: {
+      type: "object",
+      properties: {
+        scenes: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              scene_number: { type: "integer" },
+              title: { type: "string", description: "Brief scene title" },
+              content: { type: "string", description: "Complete text of the scene, preserving original wording" },
+            },
+            required: ["scene_number", "title", "content"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["scenes"],
+      additionalProperties: false,
+    },
+  },
+};
+
+const enrichTool = {
+  type: "function",
+  function: {
+    name: "suggest_metadata",
+    description: "Return scene metadata: type, mood, and bpm",
+    parameters: {
+      type: "object",
+      properties: {
+        scene_type: {
+          type: "string",
+          enum: ["action", "dialogue", "lyrical_digression", "description", "inner_monologue", "mixed"],
+        },
+        mood: { type: "string" },
+        bpm: { type: "integer" },
+      },
+      required: ["scene_type", "mood", "bpm"],
       additionalProperties: false,
     },
   },
@@ -206,13 +276,32 @@ async function handleAIRequest(
   provider: string, mode: string | undefined, chapterTitle: string | undefined,
   openrouterApiKey: string | null
 ): Promise<Response> {
-  const isChapterMode = mode === "chapter";
-  const systemPrompt = isChapterMode ? SYSTEM_PROMPT_CHAPTER : SYSTEM_PROMPT_FULL;
-  const userContent = isChapterMode
-    ? `Analyze the following chapter "${chapterTitle || 'Untitled'}" and decompose it into scenes:\n\n${truncatedText}`
-    : `Analyze the following book text and decompose it into chapters and scenes:\n\n${truncatedText}`;
-  const tools = isChapterMode ? [chapterScenesTool] : [fullStructureTool];
-  const toolName = isChapterMode ? "suggest_scenes" : "suggest_structure";
+  let systemPrompt: string;
+  let userContent: string;
+  let tools: unknown[];
+  let toolName: string;
+
+  if (mode === "boundaries") {
+    systemPrompt = SYSTEM_PROMPT_BOUNDARIES;
+    userContent = `Split the following chapter "${chapterTitle || 'Untitled'}" into scenes. Return boundaries and complete text only:\n\n${truncatedText}`;
+    tools = [boundariesTool];
+    toolName = "suggest_boundaries";
+  } else if (mode === "enrich") {
+    systemPrompt = SYSTEM_PROMPT_ENRICH;
+    userContent = `Analyze the following scene text and determine its type, mood, and tempo:\n\n${truncatedText}`;
+    tools = [enrichTool];
+    toolName = "suggest_metadata";
+  } else if (mode === "chapter") {
+    systemPrompt = SYSTEM_PROMPT_CHAPTER;
+    userContent = `Analyze the following chapter "${chapterTitle || 'Untitled'}" and decompose it into scenes:\n\n${truncatedText}`;
+    tools = [chapterScenesTool];
+    toolName = "suggest_scenes";
+  } else {
+    systemPrompt = SYSTEM_PROMPT_FULL;
+    userContent = `Analyze the following book text and decompose it into chapters and scenes:\n\n${truncatedText}`;
+    tools = [fullStructureTool];
+    toolName = "suggest_structure";
+  }
 
   const requestBody: Record<string, unknown> = {
     messages: [
