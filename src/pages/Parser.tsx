@@ -270,57 +270,84 @@ export default function Parser() {
     setBookId(book.id);
 
     try {
-      // Load chapters with their scenes
-      const { data: chapters } = await supabase
-        .from('book_chapters')
-        .select('id, chapter_number, title, scene_type, mood, bpm')
-        .eq('book_id', book.id)
-        .order('chapter_number');
+      // Load parts and chapters in parallel
+      const [partsRes, chaptersRes] = await Promise.all([
+        supabase.from('book_parts').select('id, part_number, title').eq('book_id', book.id).order('part_number'),
+        supabase.from('book_chapters').select('id, chapter_number, title, scene_type, mood, bpm, part_id').eq('book_id', book.id).order('chapter_number'),
+      ]);
 
-      if (!chapters || chapters.length === 0) {
-        toast.info("У этой книги ещё нет проанализированных глав. Загрузите PDF заново.");
+      const parts = partsRes.data || [];
+      const chapters = chaptersRes.data || [];
+
+      if (chapters.length === 0) {
+        toast.info(isRu ? "У этой книги ещё нет глав. Загрузите PDF заново." : "No chapters found. Please re-upload the PDF.");
         setStep("upload");
         return;
       }
 
-      // Build TOC entries from saved chapters
+      // Build part lookup: id → title
+      const partById = new Map<string, string>();
+      const newPartIdMap = new Map<string, string>();
+      for (const p of parts) {
+        partById.set(p.id, p.title);
+        newPartIdMap.set(p.title, p.id);
+      }
+      setPartIdMap(newPartIdMap);
+
+      // Reconstruct level: chapters with part get level 1, without part get level 0
+      const hasParts = parts.length > 0;
       const savedToc: TocChapter[] = chapters.map(ch => ({
         title: ch.title,
         startPage: 0,
         endPage: 0,
-        level: 0,
+        level: hasParts && ch.part_id ? 1 : 0,
+        partTitle: ch.part_id ? partById.get(ch.part_id) : undefined,
         sectionType: classifySection(ch.title),
       }));
       setTocEntries(savedToc);
       setTotalPages(0);
 
-      // Load scenes for each chapter
-      const initMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
-      for (let i = 0; i < chapters.length; i++) {
-        const ch = chapters[i];
-        const { data: scenes } = await supabase
-          .from('book_scenes')
-          .select('scene_number, title, content, scene_type, mood, bpm')
-          .eq('chapter_id', ch.id)
-          .order('scene_number');
+      // Build chapterIdMap
+      const newChapterIdMap = new Map<number, string>();
+      chapters.forEach((ch, i) => newChapterIdMap.set(i, ch.id));
+      setChapterIdMap(newChapterIdMap);
 
-        const mappedScenes: Scene[] = (scenes || []).map(s => ({
+      // Batch-load all scenes for all chapters at once
+      const allChapterIds = chapters.map(c => c.id);
+      const { data: allScenes } = await supabase
+        .from('book_scenes')
+        .select('chapter_id, scene_number, title, content, scene_type, mood, bpm')
+        .in('chapter_id', allChapterIds)
+        .order('scene_number');
+
+      // Group scenes by chapter_id
+      const scenesByChapter = new Map<string, Scene[]>();
+      for (const s of (allScenes || [])) {
+        const list = scenesByChapter.get(s.chapter_id) || [];
+        list.push({
           scene_number: s.scene_number,
           title: s.title,
           content_preview: s.content || undefined,
           scene_type: s.scene_type || "mixed",
           mood: s.mood || "neutral",
           bpm: s.bpm || 120,
-        }));
-
-        initMap.set(i, {
-          scenes: mappedScenes,
-          status: mappedScenes.length > 0 ? "done" : "pending",
         });
+        scenesByChapter.set(s.chapter_id, list);
       }
+
+      // Build results map
+      const initMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
+      chapters.forEach((ch, i) => {
+        const scenes = scenesByChapter.get(ch.id) || [];
+        initMap.set(i, {
+          scenes,
+          status: scenes.length > 0 ? "done" : "pending",
+        });
+      });
+
       setChapterResults(initMap);
       setStep("workspace");
-      toast.success(`Книга "${book.title}" загружена из библиотеки`);
+      toast.success(isRu ? `Книга «${book.title}» загружена` : `Book "${book.title}" loaded`);
     } catch (err: any) {
       console.error("Failed to open book:", err);
       setErrorMsg(err.message || "Unknown error");
