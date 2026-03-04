@@ -1291,11 +1291,24 @@ export default function Parser() {
   }
 
   function renderNavSection(type: SectionType) {
-    const entries = tocEntries
-      .map((e, i) => ({ entry: e, idx: i }))
-      .filter(({ entry }) => entry.sectionType === type);
-    if (entries.length === 0) return null;
+    // Build set of child indices for this section type
+    const sectionChildOf = new Set<number>();
+    tocEntries.forEach((entry, idx) => {
+      if (entry.sectionType !== type) return;
+      for (let i = idx + 1; i < tocEntries.length; i++) {
+        if (tocEntries[i].level <= entry.level) break;
+        if (tocEntries[i].sectionType !== entry.sectionType) break;
+        sectionChildOf.add(i);
+      }
+    });
 
+    // Only root-level entries (not children of another entry in same section)
+    const rootEntries = tocEntries
+      .map((e, i) => ({ entry: e, idx: i }))
+      .filter(({ entry, idx }) => entry.sectionType === type && !sectionChildOf.has(idx));
+    if (rootEntries.length === 0) return null;
+
+    const allEntries = tocEntries.filter(e => e.sectionType === type);
     const sectionKey = `section:${type}`;
     const isExpanded = expandedNodes.has(sectionKey);
 
@@ -1309,9 +1322,9 @@ export default function Parser() {
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             {SECTION_ICONS[type]} {tSection(type, isRu)}
           </span>
-          <span className="ml-auto text-[10px] text-muted-foreground">{entries.length}</span>
+          <span className="ml-auto text-[10px] text-muted-foreground">{allEntries.length}</span>
         </button>
-        {isExpanded && entries.map(({ idx }) => renderNavItem(idx, 0))}
+        {isExpanded && rootEntries.map(({ idx }) => renderNavItem(idx, 0))}
       </>
     );
   }
