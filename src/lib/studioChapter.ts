@@ -8,6 +8,7 @@ export interface StudioScene {
   mood: string;
   bpm: number;
   content_preview?: string;
+  content?: string;
 }
 
 export interface StudioChapter {

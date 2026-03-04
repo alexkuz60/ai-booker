@@ -436,7 +436,7 @@ export default function Parser() {
       const allChapterIds = chapters.map(c => c.id);
       const { data: allScenes } = await supabase
         .from('book_scenes')
-        .select('chapter_id, scene_number, title, content, scene_type, mood, bpm')
+        .select('id, chapter_id, scene_number, title, content, scene_type, mood, bpm')
         .in('chapter_id', allChapterIds)
         .order('scene_number');
 
@@ -445,9 +445,11 @@ export default function Parser() {
       for (const s of (allScenes || [])) {
         const list = scenesByChapter.get(s.chapter_id) || [];
         list.push({
+          id: s.id,
           scene_number: s.scene_number,
           title: s.title,
-          content_preview: s.content || undefined,
+          content: s.content || undefined,
+          content_preview: (s.content || '').slice(0, 200) || undefined,
           scene_type: s.scene_type || "mixed",
           mood: s.mood || "neutral",
           bpm: s.bpm || 120,
