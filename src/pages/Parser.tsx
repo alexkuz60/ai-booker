@@ -104,14 +104,18 @@ const SECTION_ICONS: Record<SectionType, string> = {
   endnotes: "🔗",
   appendix: "📎",
 };
+import { t, tSceneType, tMood, tSection } from "@/pages/parser/i18n";
 
-const SCENE_TYPE_LABELS: Record<string, { label: string; color: string }> = {
-  action: { label: "Экшн", color: "bg-red-500/20 text-red-400 border-red-500/30" },
-  dialogue: { label: "Диалог", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
-  lyrical_digression: { label: "Лирика", color: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
-  description: { label: "Описание", color: "bg-green-500/20 text-green-400 border-green-500/30" },
-  inner_monologue: { label: "Монолог", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" },
-  mixed: { label: "Смешанный", color: "bg-muted text-muted-foreground border-border" },
+// TODO: wire to global lang context when available
+const isRu = true;
+
+const SCENE_TYPE_COLORS: Record<string, string> = {
+  action: "bg-red-500/20 text-red-400 border-red-500/30",
+  dialogue: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  lyrical_digression: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  description: "bg-green-500/20 text-green-400 border-green-500/30",
+  inner_monologue: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  mixed: "bg-muted text-muted-foreground border-border",
 };
 
 type Step = "upload" | "extracting_toc" | "workspace" | "error";
@@ -654,22 +658,22 @@ export default function Parser() {
                           {selectedResult?.status === "done" && selectedResult.scenes.length > 0 && (
                             <div className="space-y-2">
                               <h3 className="text-sm font-semibold text-muted-foreground px-1">
-                                {selectedResult.scenes.length} сцен
+                                {selectedResult.scenes.length} {t("scenes", isRu)}
                               </h3>
                               {selectedResult.scenes.map((sc) => {
-                                const typeInfo = SCENE_TYPE_LABELS[sc.scene_type] || SCENE_TYPE_LABELS.mixed;
+                                const colorCls = SCENE_TYPE_COLORS[sc.scene_type] || SCENE_TYPE_COLORS.mixed;
                                 return (
                                   <Card key={sc.scene_number}>
                                     <CardContent className="py-3 px-4 space-y-2">
                                       <div className="flex items-center justify-between">
                                         <span className="text-sm font-medium">
-                                          Сцена {sc.scene_number}: {sc.title}
+                                          {t("scenePrefix", isRu)} {sc.scene_number}: {sc.title}
                                         </span>
                                         <div className="flex items-center gap-1.5">
-                                          <Badge variant="outline" className={`text-[10px] ${typeInfo.color}`}>
-                                            {typeInfo.label}
+                                          <Badge variant="outline" className={`text-[10px] ${colorCls}`}>
+                                            {tSceneType(sc.scene_type, isRu)}
                                           </Badge>
-                                          <Badge variant="outline" className="text-[10px]">{sc.mood}</Badge>
+                                          <Badge variant="outline" className="text-[10px]">{tMood(sc.mood, isRu)}</Badge>
                                           <Badge variant="outline" className="text-[10px] font-mono">
                                             {sc.bpm} BPM
                                           </Badge>
@@ -759,7 +763,7 @@ export default function Parser() {
       <>
         <div className="px-4 py-1 mt-2">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            {SECTION_ICONS[type]} {type === "preface" ? "Вступление" : type === "afterword" ? "Послесловие" : type === "endnotes" ? "Примечания" : "Приложения"}
+            {SECTION_ICONS[type]} {tSection(type, isRu)}
           </span>
         </div>
         {entries.map(({ idx }) => renderNavItem(idx))}
