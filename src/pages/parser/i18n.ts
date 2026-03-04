@@ -1,0 +1,122 @@
+const texts: Record<string, { ru: string; en: string }> = {
+  // Page
+  parserTitle: { ru: "Парсер", en: "Parser" },
+  parserSubtitle: { ru: "Модуль 1.1 — The Architect: структурная декомпозиция", en: "Module 1.1 — The Architect: structural decomposition" },
+  newFile: { ru: "Новый файл", en: "New file" },
+  chapters: { ru: "глав", en: "chapters" },
+  scenes: { ru: "сцен", en: "scenes" },
+  pages: { ru: "стр.", en: "pp." },
+  suppl: { ru: "доп.", en: "suppl." },
+
+  // Upload
+  uploadTitle: { ru: "Загрузите PDF книги", en: "Upload a book PDF" },
+  uploadHint: { ru: "Максимум 20 МБ • PDF формат", en: "Max 20 MB • PDF format" },
+  selectFile: { ru: "Выбрать файл", en: "Select file" },
+  onlyPdf: { ru: "Поддерживается только PDF формат", en: "Only PDF format is supported" },
+  maxSize: { ru: "Максимальный размер файла — 20 МБ", en: "Max file size is 20 MB" },
+
+  // TOC extraction
+  searchingToc: { ru: "Поиск оглавления в PDF...", en: "Searching for TOC in PDF..." },
+  tocFound: { ru: "Найдено оглавление", en: "TOC found" },
+  tocNotFound: { ru: "Оглавление не найдено. Книга загружена как один блок.", en: "No TOC found. Book loaded as a single block." },
+  items: { ru: "элементов", en: "items" },
+
+  // Workspace
+  selectChapter: { ru: "Выберите главу для анализа", en: "Select a chapter to analyze" },
+  analyze: { ru: "Анализировать", en: "Analyze" },
+  reanalyze: { ru: "Повторить", en: "Reanalyze" },
+  analyzing: { ru: "Анализируем сцены...", en: "Analyzing scenes..." },
+  pendingHint: { ru: "Нажмите «Анализировать» для AI-декомпозиции на сцены", en: "Click \"Analyze\" for AI scene decomposition" },
+  errorAnalysis: { ru: "Ошибка при анализе. Попробуйте снова.", en: "Analysis failed. Please try again." },
+  errorPrefix: { ru: "Ошибка анализа", en: "Analysis error" },
+  notEnoughText: { ru: "недостаточно текста для анализа", en: "not enough text to analyze" },
+  chapterAnalyzed: { ru: "проанализирована", en: "analyzed" },
+  noScenes: { ru: "Сцены не определены (мало текста или нестандартная структура)", en: "No scenes detected (too little text or non-standard structure)" },
+  error: { ru: "Ошибка", en: "Error" },
+  tryAgain: { ru: "Попробовать снова", en: "Try again" },
+
+  // Section types
+  sectionPreface: { ru: "Вступление", en: "Preface" },
+  sectionAfterword: { ru: "Послесловие", en: "Afterword" },
+  sectionEndnotes: { ru: "Примечания", en: "Notes" },
+  sectionAppendix: { ru: "Приложения", en: "Appendix" },
+
+  // Scene types
+  sceneAction: { ru: "Экшн", en: "Action" },
+  sceneDialogue: { ru: "Диалог", en: "Dialogue" },
+  sceneLyrical: { ru: "Лирика", en: "Lyrical" },
+  sceneDescription: { ru: "Описание", en: "Description" },
+  sceneMonologue: { ru: "Монолог", en: "Monologue" },
+  sceneMixed: { ru: "Смешанный", en: "Mixed" },
+
+  // Mood labels
+  moodTense: { ru: "Напряжённый", en: "Tense" },
+  moodCalm: { ru: "Спокойный", en: "Calm" },
+  moodSad: { ru: "Грустный", en: "Sad" },
+  moodJoyful: { ru: "Радостный", en: "Joyful" },
+  moodMysterious: { ru: "Загадочный", en: "Mysterious" },
+  moodRomantic: { ru: "Романтичный", en: "Romantic" },
+  moodDark: { ru: "Мрачный", en: "Dark" },
+  moodEpic: { ru: "Эпичный", en: "Epic" },
+  moodNostalgic: { ru: "Ностальгичный", en: "Nostalgic" },
+  moodHumorous: { ru: "Юмористичный", en: "Humorous" },
+  moodDramatic: { ru: "Драматичный", en: "Dramatic" },
+  moodMelancholic: { ru: "Меланхоличный", en: "Melancholic" },
+  moodNeutral: { ru: "Нейтральный", en: "Neutral" },
+
+  // Scene label prefix
+  scenePrefix: { ru: "Сцена", en: "Scene" },
+};
+
+// Mood map: English AI output → i18n key
+const MOOD_MAP: Record<string, string> = {
+  tense: "moodTense", напряжённый: "moodTense", напряженный: "moodTense",
+  calm: "moodCalm", спокойный: "moodCalm",
+  sad: "moodSad", грустный: "moodSad",
+  joyful: "moodJoyful", радостный: "moodJoyful",
+  mysterious: "moodMysterious", загадочный: "moodMysterious",
+  romantic: "moodRomantic", романтичный: "moodRomantic",
+  dark: "moodDark", мрачный: "moodDark",
+  epic: "moodEpic", эпичный: "moodEpic",
+  nostalgic: "moodNostalgic", ностальгичный: "moodNostalgic",
+  humorous: "moodHumorous", юмористичный: "moodHumorous",
+  dramatic: "moodDramatic", драматичный: "moodDramatic",
+  melancholic: "moodMelancholic", меланхоличный: "moodMelancholic",
+  neutral: "moodNeutral", нейтральный: "moodNeutral",
+};
+
+export function t(key: string, isRu: boolean): string {
+  const entry = texts[key];
+  if (!entry) return key;
+  return isRu ? entry.ru : entry.en;
+}
+
+export function tMood(raw: string, isRu: boolean): string {
+  const key = MOOD_MAP[raw.toLowerCase()];
+  if (key) return t(key, isRu);
+  return raw; // fallback to raw value
+}
+
+export function tSceneType(key: string, isRu: boolean): string {
+  const map: Record<string, string> = {
+    action: "sceneAction",
+    dialogue: "sceneDialogue",
+    lyrical_digression: "sceneLyrical",
+    description: "sceneDescription",
+    inner_monologue: "sceneMonologue",
+    mixed: "sceneMixed",
+  };
+  const i18nKey = map[key];
+  return i18nKey ? t(i18nKey, isRu) : key;
+}
+
+export function tSection(type: string, isRu: boolean): string {
+  const map: Record<string, string> = {
+    preface: "sectionPreface",
+    afterword: "sectionAfterword",
+    endnotes: "sectionEndnotes",
+    appendix: "sectionAppendix",
+  };
+  const i18nKey = map[type];
+  return i18nKey ? t(i18nKey, isRu) : type;
+}
