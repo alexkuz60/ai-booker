@@ -1,6 +1,7 @@
 // Shared types and helpers for transferring a chapter from Parser → Studio
 
 export interface StudioScene {
+  id?: string; // DB id from book_scenes
   scene_number: number;
   title: string;
   scene_type: string;
