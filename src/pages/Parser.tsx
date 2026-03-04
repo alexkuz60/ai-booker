@@ -1628,7 +1628,7 @@ export default function Parser() {
           <span className="text-[11px] text-muted-foreground font-mono flex-shrink-0">
             {entry.startPage}
           </span>
-          {isChapterFullyDone(idx) && (
+          {depth === 0 && isChapterFullyDone(idx) && (
             <button
               title={isRu ? "В студию!" : "To Studio!"}
               onClick={(e) => { e.stopPropagation(); sendToStudio(idx); }}
