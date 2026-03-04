@@ -354,6 +354,7 @@ const Studio = () => {
               </div>
             </div>
 
+          {!timelineCollapsed && (
             <div className="flex-1 flex min-h-0">
               <div className="w-28 shrink-0 border-r border-border flex flex-col">
                 <div className="h-6 border-b border-border" />
@@ -373,9 +374,9 @@ const Studio = () => {
                 </div>
               </ScrollArea>
             </div>
-          </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+          )}
+        </div>
+      </div>
     </motion.div>
   );
 };
