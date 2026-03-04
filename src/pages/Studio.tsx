@@ -102,7 +102,11 @@ const Studio = () => {
             <ResizableHandle withHandle />
 
             <ResizablePanel defaultSize={70} className="min-h-0">
-              <StudioWorkspace isRu={isRu} />
+              <StudioWorkspace
+                isRu={isRu}
+                selectedSceneId={selectedScene?.id ?? null}
+                selectedSceneContent={sceneContent}
+              />
             </ResizablePanel>
           </ResizablePanelGroup>
         </div>
