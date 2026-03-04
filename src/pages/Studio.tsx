@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { ChevronRight, ChevronDown, ChevronUp, Mic2, Wind, Volume2, Plus, ZoomIn, ZoomOut, Clapperboard, Users } from "lucide-react";
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -207,36 +207,33 @@ const Studio = () => {
     try { return localStorage.getItem("studio-timeline-collapsed") === "true"; } catch { return false; }
   });
   const [timelineSize, setTimelineSize] = useState(() => {
-    try { return Number(localStorage.getItem("studio-timeline-size")) || 45; } catch { return 45; }
+    try { return Number(localStorage.getItem("studio-timeline-size")) || 250; } catch { return 250; }
   });
-  const timelinePanelRef = useRef<any>(null);
 
   const toggleTimeline = useCallback(() => {
     setTimelineCollapsed(prev => {
       const next = !prev;
       localStorage.setItem("studio-timeline-collapsed", String(next));
-      if (next) {
-        timelinePanelRef.current?.collapse();
-      } else {
-        timelinePanelRef.current?.expand();
-      }
       return next;
     });
   }, []);
 
-  const handleTimelineResize = useCallback((size: number) => {
-    if (size > 0) {
-      setTimelineSize(size);
-      localStorage.setItem("studio-timeline-size", String(size));
-      if (timelineCollapsed) {
-        setTimelineCollapsed(false);
-        localStorage.setItem("studio-timeline-collapsed", "false");
-      }
-    } else {
-      setTimelineCollapsed(true);
-      localStorage.setItem("studio-timeline-collapsed", "true");
-    }
-  }, [timelineCollapsed]);
+  const handleTimelineMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startSize = timelineSize;
+    const onMouseMove = (ev: MouseEvent) => {
+      const newSize = Math.max(100, startSize + (startY - ev.clientY));
+      setTimelineSize(newSize);
+      localStorage.setItem("studio-timeline-size", String(newSize));
+    };
+    const onMouseUp = () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }, [timelineSize]);
 
   return (
     <motion.div
@@ -256,8 +253,8 @@ const Studio = () => {
         </p>
       </div>
 
-      <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">
-        <ResizablePanel defaultSize={55} minSize={30}>
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className={cn("flex-1 min-h-0", timelineCollapsed ? "" : "")}>
           <ResizablePanelGroup direction="horizontal" className="h-full">
             {/* Left: Chapter navigator */}
             <ResizablePanel defaultSize={30} minSize={15} maxSize={50}>
@@ -321,21 +318,18 @@ const Studio = () => {
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>
-        </ResizablePanel>
-
-        <ResizableHandle withHandle />
+        </div>
 
         {/* BOTTOM: Multitrack Timeline */}
-        <ResizablePanel
-          ref={timelinePanelRef}
-          defaultSize={timelineCollapsed ? 0 : timelineSize}
-          minSize={0}
-          collapsible
-          collapsedSize={0}
-          onResize={handleTimelineResize}
-        >
-          <div className="h-full flex flex-col bg-background">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
+        <div className="flex flex-col bg-background border-t border-border shrink-0" style={timelineCollapsed ? undefined : { height: `${timelineSize}px` }}>
+          {/* Resize handle */}
+          {!timelineCollapsed && (
+            <div
+              onMouseDown={handleTimelineMouseDown}
+              className="h-1 cursor-row-resize hover:bg-primary/30 transition-colors shrink-0"
+            />
+          )}
+          <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
               <button
                 onClick={toggleTimeline}
                 className="flex items-center gap-1.5 hover:text-foreground transition-colors"
@@ -364,6 +358,7 @@ const Studio = () => {
               </div>
             </div>
 
+          {!timelineCollapsed && (
             <div className="flex-1 flex min-h-0">
               <div className="w-28 shrink-0 border-r border-border flex flex-col">
                 <div className="h-6 border-b border-border" />
@@ -383,9 +378,9 @@ const Studio = () => {
                 </div>
               </ScrollArea>
             </div>
-          </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+          )}
+        </div>
+      </div>
     </motion.div>
   );
 };
