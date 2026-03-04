@@ -17,6 +17,7 @@ Your task:
    - scene_type: one of "action", "dialogue", "lyrical_digression", "description", "inner_monologue", "mixed"
    - mood: the dominant emotional tone (e.g. "tense", "calm", "melancholic", "joyful", "dark", "romantic", "comedic")
    - bpm: suggested narrative tempo as beats-per-minute metaphor (60-80 slow/contemplative, 80-110 moderate, 110-140 dynamic, 140+ intense)
+   - content: the COMPLETE text of the scene, preserving original wording exactly. Do NOT truncate or abbreviate.
 
 You MUST respond using the suggest_structure tool.`;
 
@@ -29,6 +30,7 @@ Your task:
    - scene_type: one of "action", "dialogue", "lyrical_digression", "description", "inner_monologue", "mixed"
    - mood: the dominant emotional tone (e.g. "tense", "calm", "melancholic", "joyful", "dark", "romantic", "comedic")
    - bpm: suggested narrative tempo as beats-per-minute metaphor (60-80 slow/contemplative, 80-110 moderate, 110-140 dynamic, 140+ intense)
+   - content: the COMPLETE text of the scene, preserving original wording exactly. Do NOT truncate or abbreviate.
 
 You MUST respond using the suggest_scenes tool.`;
 
