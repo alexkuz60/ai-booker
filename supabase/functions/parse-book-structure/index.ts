@@ -139,7 +139,6 @@ function getEndpointAndModel(provider: string, userModel: string, userApiKey: st
   }
 
   if (provider === 'openrouter' && userApiKey) {
-    // OpenRouter model IDs: strip 'openrouter/' prefix
     const realModel = userModel.replace('openrouter/', '');
     return {
       endpoint: 'https://openrouter.ai/api/v1/chat/completions',
@@ -148,7 +147,7 @@ function getEndpointAndModel(provider: string, userModel: string, userApiKey: st
     };
   }
 
-  // Default: Lovable AI gateway
+  // Lovable AI gateway (will be gated by admin check in handler)
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   return {
     endpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions',
@@ -157,7 +156,23 @@ function getEndpointAndModel(provider: string, userModel: string, userApiKey: st
   };
 }
 
-/** Try OpenRouter as fallback when Lovable gateway rejects a model (400) */
+/** Check if user has admin role */
+async function isAdmin(authHeader: string | null): Promise<boolean> {
+  if (!authHeader) return false;
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+    const { data } = await supabase.rpc("has_role", { _user_id: user.id, _role: "admin" });
+    return !!data;
+  } catch {
+    return false;
+  }
+}
 function canFallbackToOpenRouter(userApiKey: string | null, model: string): { endpoint: string; model: string; apiKey: string } | null {
   if (!userApiKey) return null;
   // These models exist on OpenRouter with the same ID format
