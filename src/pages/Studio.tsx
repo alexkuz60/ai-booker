@@ -210,6 +210,7 @@ const Studio = () => {
   const [selectedSceneIdx, setSelectedSceneIdx] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const duration = 180;
+  const TIMELINE_HEADER_HEIGHT = 41;
 
   // Timeline collapse & height persistence
   const [timelineCollapsed, setTimelineCollapsed] = useState(() => {
