@@ -269,20 +269,25 @@ export default function Parser() {
   // ─── Auto-restore active book on mount ─────────────────────
   const [restoredOnce, setRestoredOnce] = useState(false);
   useEffect(() => {
-    if (restoredOnce || !user || step !== "library" || loadingLibrary) return;
+    if (restoredOnce || !user || loadingLibrary) return;
     const savedBookId = sessionStorage.getItem(ACTIVE_BOOK_KEY);
-    if (!savedBookId) return;
-    // Wait for books to load, then find and reopen
+    if (!savedBookId) {
+      // No saved book — ensure we show library
+      if (step === "extracting_toc") setStep("library");
+      setRestoredOnce(true);
+      return;
+    }
     const book = books.find(b => b.id === savedBookId);
     if (book) {
       setRestoredOnce(true);
       openSavedBook(book);
     } else if (books.length > 0) {
-      // Book not found (deleted?), clear
+      // Book not found (deleted?), clear and show library
       sessionStorage.removeItem(ACTIVE_BOOK_KEY);
+      setStep("library");
       setRestoredOnce(true);
     }
-  }, [user, step, loadingLibrary, books, restoredOnce]);
+  }, [user, loadingLibrary, books, restoredOnce]);
 
   // ─── Open saved book from DB ──────────────────────────────
 
