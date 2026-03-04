@@ -206,6 +206,10 @@ export default function Parser() {
   const [chapterResults, setChapterResults] = useState<Map<number, { scenes: Scene[]; status: ChapterStatus }>>(new Map());
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
+  // Progressive analysis status
+  const [analysisLog, setAnalysisLog] = useState<string[]>([]);
+  const analysisTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const toggleNode = (key: string) => {
     setExpandedNodes(prev => {
       const next = new Set(prev);
@@ -655,16 +659,23 @@ export default function Parser() {
     if (!entry) return;
 
     userStartedAnalysis.current = true;
+    setAnalysisLog([]);
+    if (analysisTimerRef.current) clearInterval(analysisTimerRef.current);
+
     setChapterResults(prev => {
       const next = new Map(prev);
       next.set(idx, { scenes: [], status: "analyzing" });
       return next;
     });
 
-    try {
-      const text = await extractTextByPageRange(pdfRef, entry.startPage, entry.endPage);
+    const addLog = (msg: string) => setAnalysisLog(prev => [...prev, msg]);
 
-      if (text.trim().length < 50) {
+    try {
+      addLog(isRu ? `📖 Извлечение текста главы «${entry.title}»...` : `📖 Extracting chapter text "${entry.title}"...`);
+      const text = await extractTextByPageRange(pdfRef, entry.startPage, entry.endPage);
+      const charCount = text.trim().length;
+
+      if (charCount < 50) {
         setChapterResults(prev => {
           const next = new Map(prev);
           next.set(idx, { scenes: [], status: "done" });
@@ -674,12 +685,56 @@ export default function Parser() {
         return;
       }
 
+      addLog(isRu
+        ? `📝 Текст извлечён: ${charCount.toLocaleString()} символов (${entry.startPage}–${entry.endPage} стр.)`
+        : `📝 Text extracted: ${charCount.toLocaleString()} chars (pages ${entry.startPage}–${entry.endPage})`);
+
+      // Simulated progressive stages while AI works
+      const stages = isRu ? [
+        "🔍 Очистка текста от артефактов...",
+        "🧠 Анализ структуры повествования...",
+        "🎭 Определение границ сцен...",
+        "📊 Классификация типов сцен...",
+        "🎵 Вычисление темпа повествования (BPM)...",
+        "💭 Анализ настроения и эмоционального тона...",
+        "✍️ Формирование заголовков сцен...",
+        "📐 Верификация полноты текста сцен...",
+        "🔗 Проверка целостности декомпозиции...",
+        "⏳ Финализация структуры...",
+        "🔄 AI обрабатывает большой объём текста, ожидаем ответ...",
+        "⏳ Генерация продолжается...",
+      ] : [
+        "🔍 Cleaning text artifacts...",
+        "🧠 Analyzing narrative structure...",
+        "🎭 Detecting scene boundaries...",
+        "📊 Classifying scene types...",
+        "🎵 Computing narrative tempo (BPM)...",
+        "💭 Analyzing mood and emotional tone...",
+        "✍️ Generating scene titles...",
+        "📐 Verifying scene text completeness...",
+        "🔗 Checking decomposition integrity...",
+        "⏳ Finalizing structure...",
+        "🔄 AI processing large text volume, awaiting response...",
+        "⏳ Generation continues...",
+      ];
+
+      let stageIdx = 0;
+      const interval = Math.max(2500, Math.min(5000, charCount / 20));
+      analysisTimerRef.current = setInterval(() => {
+        if (stageIdx < stages.length) {
+          addLog(stages[stageIdx]);
+          stageIdx++;
+        }
+      }, interval);
+
       // Pick the right API key based on model provider
       let userKey: string | null = null;
       const modelEntry = getModelRegistryEntry(selectedModel);
       if (modelEntry?.apiKeyField) {
         userKey = userApiKeys[modelEntry.apiKeyField] || null;
       }
+
+      addLog(isRu ? `🚀 Запрос к AI модели ${selectedModel.split('/').pop()}...` : `🚀 Calling AI model ${selectedModel.split('/').pop()}...`);
 
       const { data: fnData, error: fnError } = await supabase.functions.invoke('parse-book-structure', {
         body: {
@@ -692,6 +747,8 @@ export default function Parser() {
           openrouter_api_key: userApiKeys['openrouter'] || null,
         },
       });
+
+      if (analysisTimerRef.current) { clearInterval(analysisTimerRef.current); analysisTimerRef.current = null; }
 
       if (fnError || fnData?.error) throw new Error(fnError?.message || fnData?.error);
 
