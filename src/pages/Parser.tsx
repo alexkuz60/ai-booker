@@ -1078,6 +1078,7 @@ export default function Parser() {
                                       <div className="flex items-center justify-between">
                                         <span className="text-sm font-medium">
                                           {t("scenePrefix", isRu)} {sc.scene_number}: {tSceneTitle(sc.title, isRu)}
+                                        </span>
                                         <div className="flex items-center gap-1.5">
                                           <Badge variant="outline" className={`text-[10px] ${colorCls}`}>
                                             {tSceneType(sc.scene_type, isRu)}
