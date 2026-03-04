@@ -374,27 +374,24 @@ async function handleAIRequest(
   const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
 
   if (!toolCall) {
-    // Fallback: try to parse from message content (some models skip tool_calls)
-    const content = data.choices?.[0]?.message?.content;
-    if (content) {
-      console.warn("AI returned content instead of tool_call, attempting to parse:", content.slice(0, 200));
+    // Fallback: try to parse from message content or reasoning (some models skip tool_calls)
+    const msg = data.choices?.[0]?.message;
+    const candidates = [msg?.content, msg?.reasoning].filter(Boolean);
+    for (const candidate of candidates) {
       try {
-        // Try to extract JSON from content
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        const jsonMatch = candidate.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           const parsed = JSON.parse(jsonMatch[0]);
-          // For enrich mode, we expect scene_type/mood/bpm directly
           if (parsed.scene_type || parsed.scenes || parsed.chapters || parsed.book_title) {
+            console.warn("AI returned text instead of tool_call, extracted JSON from fallback");
             return new Response(JSON.stringify({ structure: parsed }), {
               headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
           }
         }
-      } catch (parseErr) {
-        console.error("Failed to parse AI content as JSON:", parseErr);
-      }
+      } catch { /* continue to next candidate */ }
     }
-    console.error("AI response had no tool_calls:", JSON.stringify(data.choices?.[0]?.message).slice(0, 500));
+    console.error("AI response had no tool_calls:", JSON.stringify(msg).slice(0, 500));
     return new Response(JSON.stringify({ error: "AI did not return structured output" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
