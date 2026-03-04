@@ -373,6 +373,27 @@ async function handleAIRequest(
   const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
 
   if (!toolCall) {
+    // Fallback: try to parse from message content (some models skip tool_calls)
+    const content = data.choices?.[0]?.message?.content;
+    if (content) {
+      console.warn("AI returned content instead of tool_call, attempting to parse:", content.slice(0, 200));
+      try {
+        // Try to extract JSON from content
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          // For enrich mode, we expect scene_type/mood/bpm directly
+          if (parsed.scene_type || parsed.scenes || parsed.chapters || parsed.book_title) {
+            return new Response(JSON.stringify({ structure: parsed }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        }
+      } catch (parseErr) {
+        console.error("Failed to parse AI content as JSON:", parseErr);
+      }
+    }
+    console.error("AI response had no tool_calls:", JSON.stringify(data.choices?.[0]?.message).slice(0, 500));
     return new Response(JSON.stringify({ error: "AI did not return structured output" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
