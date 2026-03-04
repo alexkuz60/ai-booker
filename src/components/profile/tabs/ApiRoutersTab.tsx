@@ -15,13 +15,15 @@ interface ApiRoutersTabProps {
   saving: boolean;
   proxyapiPriority: boolean;
   onPriorityChange: (val: boolean) => void;
+  isAdmin?: boolean;
 }
 
 export function ApiRoutersTab({
   apiKeys, language, onKeyChange,
-  onSave, saving, proxyapiPriority, onPriorityChange,
+  onSave, saving, proxyapiPriority, onPriorityChange, isAdmin,
 }: ApiRoutersTabProps) {
-  const [activeRouter, setActiveRouter] = useState('lovable');
+  const defaultTab = isAdmin ? 'lovable' : 'openrouter';
+  const [activeRouter, setActiveRouter] = useState(defaultTab);
   const isRu = language === 'ru';
 
   return (
@@ -33,11 +35,13 @@ export function ApiRoutersTab({
 
       <Tabs value={activeRouter} onValueChange={setActiveRouter}>
         <TabsList className="flex w-full h-auto flex-wrap gap-0.5">
-          <TabsTrigger value="lovable" className="flex items-center gap-2 flex-1">
-            <Sparkles className="h-4 w-4 shrink-0" />
-            <span>Lovable AI</span>
-            <Badge variant="outline" className="ml-1 text-[10px] h-4 bg-primary/10 text-primary border-primary/30">ON</Badge>
-          </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="lovable" className="flex items-center gap-2 flex-1">
+              <Sparkles className="h-4 w-4 shrink-0" />
+              <span>Lovable AI</span>
+              <Badge variant="outline" className="ml-1 text-[10px] h-4 bg-primary/10 text-primary border-primary/30">ON</Badge>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="openrouter" className="flex items-center gap-2 flex-1">
             <Globe className="h-4 w-4 shrink-0" />
             <span>OpenRouter</span>
@@ -55,9 +59,11 @@ export function ApiRoutersTab({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="lovable" forceMount className="data-[state=inactive]:hidden">
-          <LovableAIPanel language={language} />
-        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="lovable" forceMount className="data-[state=inactive]:hidden">
+            <LovableAIPanel language={language} />
+          </TabsContent>
+        )}
 
         <TabsContent value="openrouter" forceMount className="data-[state=inactive]:hidden">
           <OpenRouterDashboard
