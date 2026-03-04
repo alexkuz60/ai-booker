@@ -140,15 +140,34 @@ export default function Parser() {
   // Workspace state
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [chapterResults, setChapterResults] = useState<Map<number, { scenes: Scene[]; status: ChapterStatus }>>(new Map());
-  const [expandedParts, setExpandedParts] = useState<Set<string>>(new Set());
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
-  const togglePart = (key: string) => {
-    setExpandedParts(prev => {
+  const toggleNode = (key: string) => {
+    setExpandedNodes(prev => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
     });
   };
+
+  // Auto-expand all nodes on first load
+  useEffect(() => {
+    if (tocEntries.length > 0 && expandedNodes.size === 0) {
+      const allKeys = new Set<string>();
+      tocEntries.forEach((e, idx) => {
+        if (e.partTitle) allKeys.add(`part:${e.partTitle}`);
+        // Auto-expand items that have children
+        const hasChild = idx + 1 < tocEntries.length &&
+          tocEntries[idx + 1].level > e.level &&
+          tocEntries[idx + 1].sectionType === e.sectionType;
+        if (hasChild) allKeys.add(`item:${idx}`);
+      });
+      ["preface", "afterword", "endnotes", "appendix"].forEach(s => {
+        if (tocEntries.some(e => e.sectionType === s)) allKeys.add(`section:${s}`);
+      });
+      setExpandedNodes(allKeys);
+    }
+  }, [tocEntries]);
 
   // ─── File Upload & TOC Extraction ──────────────────────────
 
@@ -386,7 +405,7 @@ export default function Parser() {
     setFile(null);
     setSelectedIdx(null);
     setChapterResults(new Map());
-    setExpandedParts(new Set());
+    setExpandedNodes(new Set());
     prefetchingRef.current = false;
   };
 
@@ -406,6 +425,18 @@ export default function Parser() {
   const partlessIndices: number[] = [];
   const partMap = new Map<string, number[]>();
 
+  // Track which indices are "consumed" as children of another entry
+  const childOfAnother = new Set<number>();
+  tocEntries.forEach((entry, idx) => {
+    if (entry.sectionType !== "content") return;
+    // Mark subsequent deeper-level entries as children
+    for (let i = idx + 1; i < tocEntries.length; i++) {
+      if (tocEntries[i].level <= entry.level) break;
+      if (tocEntries[i].sectionType !== entry.sectionType) break;
+      childOfAnother.add(i);
+    }
+  });
+
   tocEntries.forEach((entry, idx) => {
     if (entry.sectionType !== "content") return;
     const key = entry.partTitle || "";
@@ -414,9 +445,14 @@ export default function Parser() {
         partMap.set(key, []);
         partGroups.push({ title: key, indices: partMap.get(key)! });
       }
-      partMap.get(key)!.push(idx);
+      // Only add root-level entries within the part; children are rendered recursively
+      if (!childOfAnother.has(idx)) {
+        partMap.get(key)!.push(idx);
+      }
     } else {
-      partlessIndices.push(idx);
+      if (!childOfAnother.has(idx)) {
+        partlessIndices.push(idx);
+      }
     }
   });
 
@@ -536,29 +572,34 @@ export default function Parser() {
                       <div className="py-2">
                         {renderNavSection("preface")}
 
-                        {partGroups.map((group) => (
-                          <div key={group.title}>
-                            <button
-                              onClick={() => togglePart(group.title)}
-                              className="w-full flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-primary hover:bg-muted/30 transition-colors"
-                            >
-                              {expandedParts.has(group.title) ? (
-                                <ChevronDown className="h-3 w-3" />
-                              ) : (
-                                <ChevronRight className="h-3 w-3" />
+                        {partGroups.map((group) => {
+                          const partKey = `part:${group.title}`;
+                          const isExpanded = expandedNodes.has(partKey);
+                          return (
+                            <div key={group.title}>
+                              <button
+                                onClick={() => toggleNode(partKey)}
+                                className="w-full flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-primary hover:bg-muted/30 transition-colors"
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="h-3 w-3 flex-shrink-0" />
+                                ) : (
+                                  <ChevronRight className="h-3 w-3 flex-shrink-0" />
+                                )}
+                                <FolderOpen className="h-3 w-3 flex-shrink-0" />
+                                <span className="truncate">{group.title}</span>
+                                <span className="ml-auto text-[10px] text-muted-foreground font-normal">{group.indices.length}</span>
+                              </button>
+                              {isExpanded && (
+                                <div>
+                                  {group.indices.map(idx => renderNavItem(idx, 1))}
+                                </div>
                               )}
-                              <FolderOpen className="h-3 w-3" />
-                              <span className="truncate">{group.title}</span>
-                            </button>
-                            {expandedParts.has(group.title) && (
-                              <div className="ml-2">
-                                {group.indices.map(idx => renderNavItem(idx))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                            </div>
+                          );
+                        })}
 
-                        {partlessIndices.map(idx => renderNavItem(idx))}
+                        {partlessIndices.map(idx => renderNavItem(idx, 0))}
 
                         {renderNavSection("afterword")}
                         {renderNavSection("endnotes")}
@@ -712,43 +753,78 @@ export default function Parser() {
 
   // ─── Nav Sidebar Helpers ───────────────────────────────────
 
-  function renderNavItem(idx: number) {
+  function renderNavItem(idx: number, depth: number = 0) {
     const entry = tocEntries[idx];
     const result = chapterResults.get(idx);
     const isSelected = selectedIdx === idx;
     const status = result?.status || "pending";
 
-    const indent = entry.partTitle ? "pl-8" : "pl-4";
+    // Check if this entry has "children" (subsequent entries with higher level)
+    const hasChildren = idx + 1 < tocEntries.length &&
+      tocEntries[idx + 1].level > entry.level &&
+      tocEntries[idx + 1].sectionType === entry.sectionType;
+
+    const childIndices: number[] = [];
+    if (hasChildren) {
+      for (let i = idx + 1; i < tocEntries.length; i++) {
+        if (tocEntries[i].level <= entry.level) break;
+        if (tocEntries[i].sectionType !== entry.sectionType) break;
+        childIndices.push(i);
+      }
+    }
+
+    // Only show direct children (next level down)
+    const directChildren = childIndices.filter(i => tocEntries[i].level === entry.level + 1);
+    const nodeKey = `item:${idx}`;
+    const isExpanded = expandedNodes.has(nodeKey);
+    const paddingLeft = `${(depth + 1) * 12 + 16}px`;
 
     return (
-      <button
-        key={idx}
-        onClick={() => {
-          setSelectedIdx(idx);
-          if (status === "pending") analyzeChapter(idx);
-        }}
-        className={`w-full flex items-center gap-2 ${indent} pr-4 py-1.5 text-left text-xs transition-colors ${
-          isSelected
-            ? "bg-primary/10 text-primary border-r-2 border-primary"
-            : "text-foreground/70 hover:bg-muted/40 hover:text-foreground"
-        }`}
-      >
-        <span className="flex-shrink-0">
-          {status === "done" ? (
-            <CheckCircle2 className="h-3 w-3 text-green-500" />
-          ) : status === "analyzing" ? (
-            <Loader2 className="h-3 w-3 animate-spin text-primary" />
-          ) : status === "error" ? (
-            <AlertCircle className="h-3 w-3 text-destructive" />
+      <div key={idx}>
+        <button
+          onClick={() => {
+            if (hasChildren && directChildren.length > 0) {
+              toggleNode(nodeKey);
+            }
+            setSelectedIdx(idx);
+            if (status === "pending") analyzeChapter(idx);
+          }}
+          style={{ paddingLeft }}
+          className={`w-full flex items-center gap-1.5 pr-4 py-1.5 text-left text-xs transition-colors ${
+            isSelected
+              ? "bg-primary/10 text-primary border-r-2 border-primary"
+              : "text-foreground/70 hover:bg-muted/40 hover:text-foreground"
+          }`}
+        >
+          {hasChildren && directChildren.length > 0 ? (
+            <span className="flex-shrink-0" onClick={(e) => { e.stopPropagation(); toggleNode(nodeKey); }}>
+              {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            </span>
           ) : (
-            <div className="h-3 w-3 rounded-full border border-border" />
+            <span className="w-3 flex-shrink-0" />
           )}
-        </span>
-        <span className="truncate flex-1">{entry.title}</span>
-        <span className="text-[10px] text-muted-foreground font-mono flex-shrink-0">
-          {entry.startPage}
-        </span>
-      </button>
+          <span className="flex-shrink-0">
+            {status === "done" ? (
+              <CheckCircle2 className="h-3 w-3 text-green-500" />
+            ) : status === "analyzing" ? (
+              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+            ) : status === "error" ? (
+              <AlertCircle className="h-3 w-3 text-destructive" />
+            ) : (
+              <div className="h-3 w-3 rounded-full border border-border" />
+            )}
+          </span>
+          <span className="truncate flex-1">{entry.title}</span>
+          <span className="text-[10px] text-muted-foreground font-mono flex-shrink-0">
+            {entry.startPage}
+          </span>
+        </button>
+        {isExpanded && directChildren.length > 0 && (
+          <div>
+            {directChildren.map(childIdx => renderNavItem(childIdx, depth + 1))}
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -758,14 +834,22 @@ export default function Parser() {
       .filter(({ entry }) => entry.sectionType === type);
     if (entries.length === 0) return null;
 
+    const sectionKey = `section:${type}`;
+    const isExpanded = expandedNodes.has(sectionKey);
+
     return (
       <>
-        <div className="px-4 py-1 mt-2">
+        <button
+          onClick={() => toggleNode(sectionKey)}
+          className="w-full flex items-center gap-1.5 px-4 py-1 mt-2 text-left"
+        >
+          {isExpanded ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             {SECTION_ICONS[type]} {tSection(type, isRu)}
           </span>
-        </div>
-        {entries.map(({ idx }) => renderNavItem(idx))}
+          <span className="ml-auto text-[10px] text-muted-foreground">{entries.length}</span>
+        </button>
+        {isExpanded && entries.map(({ idx }) => renderNavItem(idx, 0))}
       </>
     );
   }
