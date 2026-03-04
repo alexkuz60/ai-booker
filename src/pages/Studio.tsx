@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Clock } from "lucide-react";
 import {
   ResizablePanelGroup,
@@ -12,17 +12,35 @@ import { ChapterNavigator, EmptyNavigator } from "@/components/studio/ChapterNav
 import { StudioWorkspace } from "@/components/studio/StudioWorkspace";
 import { StudioTimeline, TIMELINE_HEADER_HEIGHT } from "@/components/studio/StudioTimeline";
 import { estimateChapterDuration, estimateSceneDuration } from "@/lib/durationEstimate";
+import { supabase } from "@/integrations/supabase/client";
 
 const Studio = () => {
   const { isRu } = useLanguage();
   const [chapter] = useState<StudioChapter | null>(() => loadStudioChapter());
   const [selectedSceneIdx, setSelectedSceneIdx] = useState<number | null>(null);
+  const [sceneContent, setSceneContent] = useState<string | null>(null);
+
+  const selectedScene = chapter && selectedSceneIdx !== null ? chapter.scenes[selectedSceneIdx] : null;
 
   const chapterEstimate = useMemo(() => chapter ? estimateChapterDuration(chapter) : null, [chapter]);
   const sceneEstimate = useMemo(() => {
     if (!chapter || selectedSceneIdx === null) return null;
     return estimateSceneDuration(chapter.scenes[selectedSceneIdx]);
   }, [chapter, selectedSceneIdx]);
+
+  // Load full scene content from DB when scene is selected
+  useEffect(() => {
+    setSceneContent(null);
+    if (!selectedScene?.id) return;
+    (async () => {
+      const { data } = await supabase
+        .from("book_scenes")
+        .select("content")
+        .eq("id", selectedScene.id)
+        .maybeSingle();
+      setSceneContent(data?.content || null);
+    })();
+  }, [selectedScene?.id]);
 
   return (
     <motion.div
