@@ -2,7 +2,8 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload, FileText, BookOpen, ChevronDown, ChevronRight, Loader2,
-  AlertCircle, CheckCircle2, Zap, Layers, PlayCircle, FolderOpen
+  AlertCircle, CheckCircle2, Zap, Layers, PlayCircle, FolderOpen,
+  Library, Trash2, ArrowLeft, Clock
 } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
@@ -116,8 +117,18 @@ const SCENE_TYPE_COLORS: Record<string, string> = {
   mixed: "bg-muted text-muted-foreground border-border",
 };
 
-type Step = "upload" | "extracting_toc" | "workspace" | "error";
+type Step = "library" | "upload" | "extracting_toc" | "workspace" | "error";
 type ChapterStatus = "pending" | "analyzing" | "done" | "error";
+
+interface BookRecord {
+  id: string;
+  title: string;
+  file_name: string;
+  status: string;
+  created_at: string;
+  chapter_count?: number;
+  scene_count?: number;
+}
 
 const NAV_WIDTH_KEY = "parser-nav-width";
 
@@ -126,7 +137,9 @@ export default function Parser() {
   const { isRu } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [step, setStep] = useState<Step>("upload");
+  const [step, setStep] = useState<Step>("library");
+  const [books, setBooks] = useState<BookRecord[]>([]);
+  const [loadingLibrary, setLoadingLibrary] = useState(true);
   const [fileName, setFileName] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [bookId, setBookId] = useState<string | null>(null);
@@ -168,6 +181,142 @@ export default function Parser() {
       setExpandedNodes(allKeys);
     }
   }, [tocEntries]);
+
+  // ─── Library: Load user's books ────────────────────────────
+
+  const loadLibrary = useCallback(async () => {
+    if (!user) return;
+    setLoadingLibrary(true);
+    try {
+      const { data: booksData } = await supabase
+        .from('books')
+        .select('id, title, file_name, status, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (booksData && booksData.length > 0) {
+        // Fetch chapter & scene counts
+        const enriched: BookRecord[] = [];
+        for (const b of booksData) {
+          const { count: chCount } = await supabase
+            .from('book_chapters')
+            .select('id', { count: 'exact', head: true })
+            .eq('book_id', b.id);
+          const { data: chapterIds } = await supabase
+            .from('book_chapters')
+            .select('id')
+            .eq('book_id', b.id);
+          let scCount = 0;
+          if (chapterIds && chapterIds.length > 0) {
+            const { count } = await supabase
+              .from('book_scenes')
+              .select('id', { count: 'exact', head: true })
+              .in('chapter_id', chapterIds.map(c => c.id));
+            scCount = count || 0;
+          }
+          enriched.push({
+            ...b,
+            chapter_count: chCount || 0,
+            scene_count: scCount,
+          });
+        }
+        setBooks(enriched);
+      } else {
+        setBooks([]);
+      }
+    } catch (err) {
+      console.error("Failed to load library:", err);
+    } finally {
+      setLoadingLibrary(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user && step === "library") loadLibrary();
+  }, [user, step, loadLibrary]);
+
+  // ─── Open saved book from DB ──────────────────────────────
+
+  const openSavedBook = async (book: BookRecord) => {
+    if (!user) return;
+    setStep("extracting_toc");
+    setFileName(book.file_name);
+    setBookId(book.id);
+
+    try {
+      // Load chapters with their scenes
+      const { data: chapters } = await supabase
+        .from('book_chapters')
+        .select('id, chapter_number, title, scene_type, mood, bpm')
+        .eq('book_id', book.id)
+        .order('chapter_number');
+
+      if (!chapters || chapters.length === 0) {
+        toast.info("У этой книги ещё нет проанализированных глав. Загрузите PDF заново.");
+        setStep("upload");
+        return;
+      }
+
+      // Build TOC entries from saved chapters
+      const savedToc: TocChapter[] = chapters.map(ch => ({
+        title: ch.title,
+        startPage: 0,
+        endPage: 0,
+        level: 0,
+        sectionType: classifySection(ch.title),
+      }));
+      setTocEntries(savedToc);
+      setTotalPages(0);
+
+      // Load scenes for each chapter
+      const initMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
+      for (let i = 0; i < chapters.length; i++) {
+        const ch = chapters[i];
+        const { data: scenes } = await supabase
+          .from('book_scenes')
+          .select('scene_number, title, content, scene_type, mood, bpm')
+          .eq('chapter_id', ch.id)
+          .order('scene_number');
+
+        const mappedScenes: Scene[] = (scenes || []).map(s => ({
+          scene_number: s.scene_number,
+          title: s.title,
+          content_preview: s.content || undefined,
+          scene_type: s.scene_type || "mixed",
+          mood: s.mood || "neutral",
+          bpm: s.bpm || 120,
+        }));
+
+        initMap.set(i, {
+          scenes: mappedScenes,
+          status: mappedScenes.length > 0 ? "done" : "pending",
+        });
+      }
+      setChapterResults(initMap);
+      setStep("workspace");
+      toast.success(`Книга "${book.title}" загружена из библиотеки`);
+    } catch (err: any) {
+      console.error("Failed to open book:", err);
+      setErrorMsg(err.message || "Unknown error");
+      setStep("error");
+    }
+  };
+
+  // ─── Delete book ──────────────────────────────────────────
+
+  const deleteBook = async (bookId: string) => {
+    try {
+      // Scenes are cascade-deleted via chapter FK
+      await supabase.from('book_chapters').delete().eq('book_id', bookId);
+      await supabase.from('book_parts').delete().eq('book_id', bookId);
+      await supabase.from('books').delete().eq('id', bookId);
+      setBooks(prev => prev.filter(b => b.id !== bookId));
+      toast.success("Книга удалена");
+    } catch (err) {
+      console.error("Failed to delete book:", err);
+      toast.error("Не удалось удалить книгу");
+    }
+  };
 
   // ─── File Upload & TOC Extraction ──────────────────────────
 
@@ -396,7 +545,7 @@ export default function Parser() {
   // ─── Reset ─────────────────────────────────────────────────
 
   const handleReset = () => {
-    setStep("upload");
+    setStep("library");
     setFileName("");
     setErrorMsg("");
     setBookId(null);
@@ -468,23 +617,102 @@ export default function Parser() {
             Модуль 1.1 — The Architect: структурная декомпозиция
           </p>
         </div>
-        {step !== "upload" && (
+        {step === "workspace" && (
           <div className="flex items-center gap-3">
-            {step === "workspace" && (
-              <div className="text-xs text-muted-foreground">
-                {analyzedCount}/{tocEntries.length} глав • {totalScenes} сцен
-              </div>
-            )}
-            <Button variant="outline" size="sm" onClick={handleReset}>
-              Новый файл
+            <div className="text-xs text-muted-foreground">
+              {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} • {totalScenes} {t("scenes", isRu)}
+            </div>
+            <Button variant="outline" size="sm" onClick={handleReset} className="gap-1.5">
+              <ArrowLeft className="h-3 w-3" />
+              {t("libraryBack", isRu)}
             </Button>
           </div>
+        )}
+        {step === "upload" && (
+          <Button variant="ghost" size="sm" onClick={() => setStep("library")} className="gap-1.5">
+            <ArrowLeft className="h-3 w-3" />
+            {t("libraryBack", isRu)}
+          </Button>
         )}
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
+
+          {/* ═══ LIBRARY ═══ */}
+          {step === "library" && (
+            <motion.div key="library" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+              className="flex-1 h-full overflow-auto">
+              <div className="max-w-3xl mx-auto py-8 px-6 space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-display text-xl font-semibold text-foreground">{t("libraryTitle", isRu)}</h2>
+                  <Button variant="outline" size="sm" onClick={() => setStep("upload")} className="gap-2">
+                    <Upload className="h-4 w-4" />
+                    {t("libraryUpload", isRu)}
+                  </Button>
+                </div>
+
+                {loadingLibrary ? (
+                  <div className="flex items-center justify-center py-16 gap-3 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span className="text-sm">{t("libraryLoading", isRu)}</span>
+                  </div>
+                ) : books.length === 0 ? (
+                  <Card className="border-dashed">
+                    <CardContent className="py-16 flex flex-col items-center gap-4 text-muted-foreground">
+                      <Library className="h-12 w-12 opacity-30" />
+                      <p className="text-sm">{t("libraryEmpty", isRu)}</p>
+                      <Button variant="outline" onClick={() => setStep("upload")} className="gap-2">
+                        <Upload className="h-4 w-4" />
+                        {t("libraryUpload", isRu)}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-2">
+                    {books.map(book => (
+                      <Card key={book.id} className="hover:border-primary/30 transition-colors group">
+                        <CardContent className="py-3 px-4 flex items-center gap-4">
+                          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <BookOpen className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm text-foreground truncate">{book.title}</p>
+                            <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {new Date(book.created_at).toLocaleDateString(isRu ? 'ru-RU' : 'en-US')}
+                              </span>
+                              {(book.chapter_count || 0) > 0 && (
+                                <span>{book.chapter_count} {t("libraryChapters", isRu)}</span>
+                              )}
+                              {(book.scene_count || 0) > 0 && (
+                                <span>{book.scene_count} {t("libraryScenes", isRu)}</span>
+                              )}
+                              <Badge variant="outline" className="text-[10px]">
+                                {(book.chapter_count || 0) > 0 ? t("libraryAnalyzed", isRu) : t("libraryUploaded", isRu)}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="outline" size="sm" onClick={() => openSavedBook(book)} className="gap-1.5 text-xs">
+                              <FolderOpen className="h-3 w-3" />
+                              {t("libraryOpen", isRu)}
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => deleteBook(book.id)} className="text-destructive hover:text-destructive h-8 w-8 p-0">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
           {/* Upload */}
           {step === "upload" && (
             <motion.div key="upload" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
@@ -496,12 +724,12 @@ export default function Parser() {
                     <Upload className="h-8 w-8 text-primary-foreground" />
                   </div>
                   <div className="text-center">
-                    <p className="font-display font-semibold text-lg text-foreground">Загрузите PDF книги</p>
-                    <p className="text-sm text-muted-foreground mt-1">Максимум 20 МБ • PDF формат</p>
+                    <p className="font-display font-semibold text-lg text-foreground">{t("uploadTitle", isRu)}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{t("uploadHint", isRu)}</p>
                   </div>
                   <Button variant="outline" size="lg">
                     <Upload className="h-4 w-4 mr-2" />
-                    Выбрать файл
+                    {t("selectFile", isRu)}
                   </Button>
                 </CardContent>
               </Card>

@@ -8,6 +8,20 @@ const texts: Record<string, { ru: string; en: string }> = {
   pages: { ru: "стр.", en: "pp." },
   suppl: { ru: "доп.", en: "suppl." },
 
+  // Library
+  libraryTitle: { ru: "Ваши книги", en: "Your books" },
+  libraryEmpty: { ru: "Пока нет загруженных книг", en: "No books uploaded yet" },
+  libraryUpload: { ru: "Загрузить новую книгу", en: "Upload new book" },
+  libraryOpen: { ru: "Открыть", en: "Open" },
+  libraryDelete: { ru: "Удалить", en: "Delete" },
+  libraryChapters: { ru: "глав", en: "chapters" },
+  libraryScenes: { ru: "сцен", en: "scenes" },
+  libraryUploaded: { ru: "Загружена", en: "Uploaded" },
+  libraryAnalyzed: { ru: "Проанализирована", en: "Analyzed" },
+  libraryBack: { ru: "К библиотеке", en: "Back to library" },
+  libraryLoading: { ru: "Загрузка библиотеки...", en: "Loading library..." },
+  libraryLoadingBook: { ru: "Загрузка книги...", en: "Loading book..." },
+
   // Upload
   uploadTitle: { ru: "Загрузите PDF книги", en: "Upload a book PDF" },
   uploadHint: { ru: "Максимум 20 МБ • PDF формат", en: "Max 20 MB • PDF format" },
