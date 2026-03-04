@@ -169,29 +169,30 @@ export function StoryboardPanel({
     );
   }
 
-  // ── Loading state ──
-  if (loading) {
+  // ── Loading / analyzing state ──
+  if (loading || analyzing) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      <div className="h-full flex flex-col items-center justify-center gap-3">
+        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground font-body">
+          {analyzing
+            ? (isRu ? "Анализируем сцену…" : "Analyzing scene…")
+            : (isRu ? "Загрузка…" : "Loading…")}
+        </p>
       </div>
     );
   }
 
-  // ── No segments yet → offer analysis ──
-  if (loaded && segments.length === 0) {
+  // ── No segments and no content to analyze ──
+  if (loaded && segments.length === 0 && !sceneContent) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 p-6">
         <Sparkles className="h-8 w-8 text-muted-foreground/40" />
         <p className="text-sm text-muted-foreground font-body text-center max-w-xs">
           {isRu
-            ? "Сцена ещё не раскадрована. Запустите AI-анализ для разбиения на структурные фрагменты и фразы."
-            : "Scene not yet segmented. Run AI analysis to split into structural fragments and phrases."}
+            ? "Нет контента для анализа. Откройте главу из Парсера."
+            : "No content to analyze. Open a chapter from Parser."}
         </p>
-        <Button onClick={runAnalysis} disabled={analyzing || !sceneContent} size="sm" className="gap-2">
-          {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          {isRu ? "Раскадровать" : "Analyze"}
-        </Button>
       </div>
     );
   }
