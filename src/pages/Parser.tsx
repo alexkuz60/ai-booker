@@ -147,7 +147,10 @@ export default function Parser() {
   const { isRu } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [step, setStep] = useState<Step>("library");
+  // If we have an active book in session, start in "extracting_toc" to avoid flashing library
+  const [step, setStep] = useState<Step>(() =>
+    sessionStorage.getItem(ACTIVE_BOOK_KEY) ? "extracting_toc" : "library"
+  );
   const [books, setBooks] = useState<BookRecord[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(true);
   const [fileName, setFileName] = useState("");
@@ -266,20 +269,25 @@ export default function Parser() {
   // ─── Auto-restore active book on mount ─────────────────────
   const [restoredOnce, setRestoredOnce] = useState(false);
   useEffect(() => {
-    if (restoredOnce || !user || step !== "library" || loadingLibrary) return;
+    if (restoredOnce || !user || loadingLibrary) return;
     const savedBookId = sessionStorage.getItem(ACTIVE_BOOK_KEY);
-    if (!savedBookId) return;
-    // Wait for books to load, then find and reopen
+    if (!savedBookId) {
+      // No saved book — ensure we show library
+      if (step === "extracting_toc") setStep("library");
+      setRestoredOnce(true);
+      return;
+    }
     const book = books.find(b => b.id === savedBookId);
     if (book) {
       setRestoredOnce(true);
       openSavedBook(book);
     } else if (books.length > 0) {
-      // Book not found (deleted?), clear
+      // Book not found (deleted?), clear and show library
       sessionStorage.removeItem(ACTIVE_BOOK_KEY);
+      setStep("library");
       setRestoredOnce(true);
     }
-  }, [user, step, loadingLibrary, books, restoredOnce]);
+  }, [user, loadingLibrary, books, restoredOnce]);
 
   // ─── Open saved book from DB ──────────────────────────────
 
@@ -312,7 +320,7 @@ export default function Parser() {
       // Restore PDF reference for future analysis
       let restoredPdf: any = null;
       let restoredTotalPages = 0;
-      let tocFromPdf: TocChapter[] = [];
+      let tocFromPdf: { startPage: number; endPage: number; level: number }[] = [];
 
       if (pdfBlob) {
         try {
@@ -347,17 +355,17 @@ export default function Parser() {
               pdf.numPages
             );
 
-            // Build a title→pageRange lookup from the flat TOC
-            const pageRangeByTitle = new Map<string, { startPage: number; endPage: number }>();
+            // Build a title→entry lookup from the flat TOC (preserving level + page ranges)
+            const tocInfoByTitle = new Map<string, { startPage: number; endPage: number; level: number }>();
             for (const entry of flat) {
-              pageRangeByTitle.set(entry.title, { startPage: entry.startPage, endPage: entry.endPage });
+              tocInfoByTitle.set(entry.title, { startPage: entry.startPage, endPage: entry.endPage, level: entry.level });
             }
 
             // Match DB chapters to PDF TOC entries by title
             tocFromPdf = chapters.map(ch => {
-              const range = pageRangeByTitle.get(ch.title);
-              return range || null;
-            }).map((range) => range ? { startPage: range.startPage, endPage: range.endPage } : { startPage: 0, endPage: 0 }) as any;
+              const info = tocInfoByTitle.get(ch.title);
+              return info || { startPage: 0, endPage: 0, level: 0 };
+            });
           }
         } catch (pdfErr) {
           console.warn("Could not restore PDF for analysis:", pdfErr);
@@ -376,16 +384,19 @@ export default function Parser() {
       }
       setPartIdMap(newPartIdMap);
 
-      // Reconstruct TOC with page ranges from PDF if available
+      // Reconstruct TOC with page ranges and levels from PDF if available
       const hasParts = parts.length > 0;
-      const savedToc: TocChapter[] = chapters.map((ch, i) => ({
-        title: ch.title,
-        startPage: tocFromPdf[i]?.startPage || 0,
-        endPage: tocFromPdf[i]?.endPage || 0,
-        level: hasParts && ch.part_id ? 1 : 0,
-        partTitle: ch.part_id ? partById.get(ch.part_id) : undefined,
-        sectionType: classifySection(ch.title),
-      }));
+      const savedToc: TocChapter[] = chapters.map((ch, i) => {
+        const pdfInfo = tocFromPdf[i];
+        return {
+          title: ch.title,
+          startPage: pdfInfo?.startPage || 0,
+          endPage: pdfInfo?.endPage || 0,
+          level: pdfInfo?.level ?? (hasParts && ch.part_id ? 1 : 0),
+          partTitle: ch.part_id ? partById.get(ch.part_id) : undefined,
+          sectionType: classifySection(ch.title),
+        };
+      });
       setTocEntries(savedToc);
 
       // Build chapterIdMap
@@ -613,6 +624,7 @@ export default function Parser() {
     const entry = tocEntries[idx];
     if (!entry) return;
 
+    userStartedAnalysis.current = true;
     setChapterResults(prev => {
       const next = new Map(prev);
       next.set(idx, { scenes: [], status: "analyzing" });
@@ -743,9 +755,12 @@ export default function Parser() {
   // ─── Background Prefetch: auto-analyze next 1–3 chapters ───
 
   const prefetchingRef = useRef(false);
+  const userStartedAnalysis = useRef(false);
 
   useEffect(() => {
     if (prefetchingRef.current) return;
+    // Only prefetch after user has explicitly triggered analysis (not on restore)
+    if (!userStartedAnalysis.current) return;
     // Find indices that are "done" — prefetch next pending ones
     const doneIndices = Array.from(chapterResults.entries())
       .filter(([, r]) => r.status === "done")
@@ -791,6 +806,7 @@ export default function Parser() {
     setChapterResults(new Map());
     setExpandedNodes(new Set());
     prefetchingRef.current = false;
+    userStartedAnalysis.current = false;
   };
 
   // ─── Helpers ───────────────────────────────────────────────
