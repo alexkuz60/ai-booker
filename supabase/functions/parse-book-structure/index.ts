@@ -34,6 +34,27 @@ Your task:
 
 You MUST respond using the suggest_scenes tool.`;
 
+const SYSTEM_PROMPT_BOUNDARIES = `You are "The Architect" — an AI agent that quickly identifies scene boundaries in a chapter of a book.
+
+Your task:
+1. Clean the text: remove page numbers, footnotes, headers/footers, and other technical artifacts.
+2. Split the chapter into scenes — logical segments where setting, time, or action changes.
+3. For each scene, provide:
+   - A brief descriptive title
+   - The COMPLETE text of the scene, preserving original wording exactly. Do NOT truncate or abbreviate.
+
+Do NOT analyze mood, scene_type, or bpm — just identify boundaries and extract complete text.
+You MUST respond using the suggest_boundaries tool.`;
+
+const SYSTEM_PROMPT_ENRICH = `You are "The Architect" — an AI agent that analyzes a single scene from a book and determines its characteristics.
+
+Given the scene text, determine:
+- scene_type: one of "action", "dialogue", "lyrical_digression", "description", "inner_monologue", "mixed"
+- mood: the dominant emotional tone (e.g. "tense", "calm", "melancholic", "joyful", "dark", "romantic", "comedic")
+- bpm: suggested narrative tempo as beats-per-minute metaphor (60-80 slow/contemplative, 80-110 moderate, 110-140 dynamic, 140+ intense)
+
+You MUST respond using the suggest_metadata tool.`;
+
 const fullStructureTool = {
   type: "function",
   function: {
