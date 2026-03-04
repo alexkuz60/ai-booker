@@ -156,6 +156,17 @@ function getEndpointAndModel(provider: string, userModel: string, userApiKey: st
   };
 }
 
+/** Try OpenRouter as fallback when Lovable gateway rejects a model (400) */
+function canFallbackToOpenRouter(userApiKey: string | null, model: string): { endpoint: string; model: string; apiKey: string } | null {
+  if (!userApiKey) return null;
+  // These models exist on OpenRouter with the same ID format
+  return {
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    model,
+    apiKey: userApiKey,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
