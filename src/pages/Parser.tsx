@@ -736,21 +736,53 @@ export default function Parser() {
 
       addLog(isRu ? `🚀 Запрос к AI модели ${selectedModel.split('/').pop()}...` : `🚀 Calling AI model ${selectedModel.split('/').pop()}...`);
 
-      const { data: fnData, error: fnError } = await supabase.functions.invoke('parse-book-structure', {
-        body: {
-          text,
-          user_api_key: userKey,
-          user_model: selectedModel,
-          provider: modelEntry?.provider || 'lovable',
-          mode: "chapter",
-          chapter_title: entry.title,
-          openrouter_api_key: userApiKeys['openrouter'] || null,
-        },
-      });
+      // Use direct fetch with extended timeout (3 min) instead of supabase.functions.invoke
+      // which has a short default timeout causing "Failed to send a request" errors on large chapters
+      const abortCtrl = new AbortController();
+      const timeoutId = setTimeout(() => abortCtrl.abort(), 180_000);
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const session = (await supabase.auth.getSession()).data.session;
+
+      let fnData: any;
+      try {
+        const resp = await fetch(`${supabaseUrl}/functions/v1/parse-book-structure`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token || supabaseKey}`,
+            'apikey': supabaseKey,
+          },
+          body: JSON.stringify({
+            text,
+            user_api_key: userKey,
+            user_model: selectedModel,
+            provider: modelEntry?.provider || 'lovable',
+            mode: "chapter",
+            chapter_title: entry.title,
+            openrouter_api_key: userApiKeys['openrouter'] || null,
+          }),
+          signal: abortCtrl.signal,
+        });
+        clearTimeout(timeoutId);
+        if (!resp.ok) {
+          const errBody = await resp.text();
+          let errMsg: string;
+          try { errMsg = JSON.parse(errBody).error; } catch { errMsg = errBody; }
+          throw new Error(errMsg || `HTTP ${resp.status}`);
+        }
+        fnData = await resp.json();
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        if (fetchErr.name === 'AbortError') {
+          throw new Error(isRu ? 'Timeout: анализ занял более 3 минут' : 'Timeout: analysis took more than 3 minutes');
+        }
+        throw fetchErr;
+      }
 
       if (analysisTimerRef.current) { clearInterval(analysisTimerRef.current); analysisTimerRef.current = null; }
 
-      if (fnError || fnData?.error) throw new Error(fnError?.message || fnData?.error);
+      if (fnData?.error) throw new Error(fnData.error);
 
       const rawScenes = fnData.structure?.scenes || [];
       const scenes: Scene[] = rawScenes.map((s: any) => ({
