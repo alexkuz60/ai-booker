@@ -644,6 +644,7 @@ export default function Parser() {
     setErrorMsg("");
     setBookId(null);
     setPartIdMap(new Map());
+    setChapterIdMap(new Map());
     setTocEntries([]);
     setPdfRef(null);
     setFile(null);
