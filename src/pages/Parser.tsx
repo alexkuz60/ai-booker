@@ -9,6 +9,11 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -725,9 +730,29 @@ export default function Parser() {
                               <FolderOpen className="h-3 w-3" />
                               {t("libraryOpen", isRu)}
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={() => deleteBook(book.id)} className="text-destructive hover:text-destructive h-8 w-8 p-0">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-8 w-8 p-0">
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>{isRu ? "Удалить книгу?" : "Delete book?"}</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    {isRu
+                                      ? `«${book.title}» и все результаты анализа будут удалены безвозвратно.`
+                                      : `"${book.title}" and all analysis results will be permanently deleted.`}
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteBook(book.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                    {t("libraryDelete", isRu)}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
                         </CardContent>
                       </Card>
