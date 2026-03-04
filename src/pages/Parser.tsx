@@ -829,11 +829,20 @@ export default function Parser() {
         }
 
         addLog(isRu ? `✅ Определено ${scenes.length} сцен:` : `✅ Found ${scenes.length} scenes:`);
+        // Calculate page ranges proportionally from character offsets
+        const totalChars = text.length;
+        const pageSpan = entry.endPage - entry.startPage + 1;
+        let charOffset = 0;
         scenes.forEach((sc, i) => {
-          const dur = Math.round((sc.content?.length || 0) / 15);
+          const scLen = sc.content?.length || 0;
+          const startFrac = totalChars > 0 ? charOffset / totalChars : 0;
+          const endFrac = totalChars > 0 ? (charOffset + scLen) / totalChars : 0;
+          const pageStart = Math.floor(entry.startPage + startFrac * pageSpan);
+          const pageEnd = Math.max(pageStart, Math.ceil(entry.startPage + endFrac * pageSpan) - 1);
+          charOffset += scLen;
           addLog(isRu
-            ? `  📍 Сцена ${i + 1}: «${sc.title}» (~${dur}с)`
-            : `  📍 Scene ${i + 1}: "${sc.title}" (~${dur}s)`);
+            ? `  📍 Сцена ${i + 1}: «${sc.title}» — стр. ${pageStart}–${pageEnd}, ${scLen.toLocaleString()} зн.`
+            : `  📍 Scene ${i + 1}: "${sc.title}" — pp. ${pageStart}–${pageEnd}, ${scLen.toLocaleString()} chars`);
         });
 
         // Save boundaries to DB immediately
