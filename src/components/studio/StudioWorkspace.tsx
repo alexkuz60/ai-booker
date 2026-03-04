@@ -1,11 +1,15 @@
-import { Users, Wind, Volume2 } from "lucide-react";
+import { Users, Wind, Volume2, Film } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function StudioWorkspace({ isRu }: { isRu: boolean }) {
   return (
     <div className="h-full min-h-0 flex flex-col p-4">
-      <Tabs defaultValue="narrators" className="flex-1 flex flex-col min-h-0">
+      <Tabs defaultValue="storyboard" className="flex-1 flex flex-col min-h-0">
         <TabsList className="w-fit shrink-0">
+          <TabsTrigger value="storyboard" className="gap-1.5">
+            <Film className="h-3.5 w-3.5" />
+            <span className="font-body text-sm">{isRu ? "Раскадровка" : "Storyboard"}</span>
+          </TabsTrigger>
           <TabsTrigger value="narrators" className="gap-1.5">
             <Users className="h-3.5 w-3.5" />
             <span className="font-body text-sm">{isRu ? "Персонажи" : "Characters"}</span>
@@ -19,6 +23,14 @@ export function StudioWorkspace({ isRu }: { isRu: boolean }) {
             <span className="font-body text-sm">{isRu ? "Звуки" : "Sounds"}</span>
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="storyboard" className="flex-1 mt-4 min-h-0">
+          <div className="rounded-lg border border-border bg-card/50 h-full flex items-center justify-center">
+            <p className="text-sm text-muted-foreground font-body">
+              {isRu ? "Раскадровка выбранной сцены" : "Storyboard for selected scene"}
+            </p>
+          </div>
+        </TabsContent>
 
         <TabsContent value="narrators" className="flex-1 mt-4 min-h-0">
           <div className="rounded-lg border border-border bg-card/50 h-full flex items-center justify-center">
