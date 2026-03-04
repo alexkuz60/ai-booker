@@ -248,7 +248,7 @@ const Studio = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex-1 flex flex-col h-full"
+      className="flex-1 flex flex-col h-full min-h-0 overflow-hidden"
     >
       {/* Header */}
       <div className="px-6 py-3 border-b border-border shrink-0">
