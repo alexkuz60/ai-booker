@@ -37,6 +37,7 @@ interface Scene {
   scene_number: number;
   title: string;
   content_preview?: string;
+  content?: string;
   scene_type: string;
   mood: string;
   bpm: number;
