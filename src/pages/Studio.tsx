@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { ChevronRight, ChevronDown, ChevronUp, Mic2, Wind, Volume2, Plus, ZoomIn, ZoomOut, Clapperboard, Users } from "lucide-react";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -123,7 +123,7 @@ function ChapterNavigator({
           {chapter.bookTitle}
         </p>
       </div>
-      <ScrollArea className="flex-1 min-h-0">
+      <ScrollArea type="always" className="flex-1 min-h-0">
         <div className="py-2 px-1">
           <Collapsible open={chapterOpen} onOpenChange={setChapterOpen}>
             <CollapsibleTrigger asChild>
