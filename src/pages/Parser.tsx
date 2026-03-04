@@ -350,17 +350,17 @@ export default function Parser() {
               pdf.numPages
             );
 
-            // Build a title→pageRange lookup from the flat TOC
-            const pageRangeByTitle = new Map<string, { startPage: number; endPage: number }>();
+            // Build a title→entry lookup from the flat TOC (preserving level + page ranges)
+            const tocInfoByTitle = new Map<string, { startPage: number; endPage: number; level: number }>();
             for (const entry of flat) {
-              pageRangeByTitle.set(entry.title, { startPage: entry.startPage, endPage: entry.endPage });
+              tocInfoByTitle.set(entry.title, { startPage: entry.startPage, endPage: entry.endPage, level: entry.level });
             }
 
             // Match DB chapters to PDF TOC entries by title
             tocFromPdf = chapters.map(ch => {
-              const range = pageRangeByTitle.get(ch.title);
-              return range || null;
-            }).map((range) => range ? { startPage: range.startPage, endPage: range.endPage } : { startPage: 0, endPage: 0 }) as any;
+              const info = tocInfoByTitle.get(ch.title);
+              return info || { startPage: 0, endPage: 0, level: 0 };
+            });
           }
         } catch (pdfErr) {
           console.warn("Could not restore PDF for analysis:", pdfErr);
