@@ -1325,7 +1325,7 @@ export default function Parser() {
           {/* ═══ WORKSPACE: Split Panel ═══ */}
           {step === "workspace" && (
             <motion.div key="workspace" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="flex h-full">
+              className="flex h-full min-h-0 overflow-hidden">
 
               <ResizablePanelGroup
                 direction="horizontal"
