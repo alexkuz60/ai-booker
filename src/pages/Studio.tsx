@@ -263,11 +263,14 @@ const Studio = () => {
         </p>
       </div>
 
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <ResizablePanelGroup direction="horizontal" className="h-full" autoSaveId="studio-h-panels">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div
+          className="min-h-0 overflow-hidden"
+          style={{ height: timelineCollapsed ? `calc(100% - ${TIMELINE_HEADER_HEIGHT}px)` : `calc(100% - ${timelineSize}px)` }}
+        >
+          <ResizablePanelGroup direction="horizontal" className="h-full min-h-0" autoSaveId="studio-h-panels">
             {/* Left: Chapter navigator */}
-            <ResizablePanel defaultSize={30} minSize={15} maxSize={50}>
+            <ResizablePanel defaultSize={30} minSize={15} maxSize={50} className="min-h-0">
               {chapter ? (
                 <ChapterNavigator
                   chapter={chapter}
@@ -283,8 +286,8 @@ const Studio = () => {
             <ResizableHandle withHandle />
 
             {/* Right: Tabs workspace */}
-            <ResizablePanel defaultSize={70}>
-              <div className="h-full flex flex-col p-4">
+            <ResizablePanel defaultSize={70} className="min-h-0">
+              <div className="h-full min-h-0 flex flex-col p-4">
                 <Tabs defaultValue="narrators" className="flex-1 flex flex-col min-h-0">
                   <TabsList className="w-fit shrink-0">
                     <TabsTrigger value="narrators" className="gap-1.5">
@@ -301,7 +304,7 @@ const Studio = () => {
                     </TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="narrators" className="flex-1 mt-4">
+                  <TabsContent value="narrators" className="flex-1 mt-4 min-h-0">
                     <div className="rounded-lg border border-border bg-card/50 h-full flex items-center justify-center">
                       <p className="text-sm text-muted-foreground font-body">
                         {isRu ? "Управление персонажами для выбранного раздела" : "Character management for selected section"}
@@ -309,7 +312,7 @@ const Studio = () => {
                     </div>
                   </TabsContent>
 
-                  <TabsContent value="atmosphere" className="flex-1 mt-4">
+                  <TabsContent value="atmosphere" className="flex-1 mt-4 min-h-0">
                     <div className="rounded-lg border border-border bg-card/50 h-full flex items-center justify-center">
                       <p className="text-sm text-muted-foreground font-body">
                         {isRu ? "Фоновая атмосфера и эмбиент" : "Background atmosphere and ambience"}
@@ -317,7 +320,7 @@ const Studio = () => {
                     </div>
                   </TabsContent>
 
-                  <TabsContent value="sounds" className="flex-1 mt-4">
+                  <TabsContent value="sounds" className="flex-1 mt-4 min-h-0">
                     <div className="rounded-lg border border-border bg-card/50 h-full flex items-center justify-center">
                       <p className="text-sm text-muted-foreground font-body">
                         {isRu ? "Конкретные звуковые эффекты" : "Sound effects"}
@@ -331,7 +334,10 @@ const Studio = () => {
         </div>
 
         {/* BOTTOM: Multitrack Timeline */}
-        <div className="flex flex-col bg-background border-t border-border shrink-0" style={timelineCollapsed ? undefined : { height: `${timelineSize}px` }}>
+        <div
+          className="flex flex-col bg-background border-t border-border shrink-0"
+          style={{ height: timelineCollapsed ? `${TIMELINE_HEADER_HEIGHT}px` : `${timelineSize}px` }}
+        >
           {/* Resize handle */}
           {!timelineCollapsed && (
             <div
