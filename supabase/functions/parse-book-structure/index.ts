@@ -102,6 +102,55 @@ const fullStructureTool = {
   },
 };
 
+const boundariesTool = {
+  type: "function",
+  function: {
+    name: "suggest_boundaries",
+    description: "Return scene boundaries with titles and complete text for a chapter",
+    parameters: {
+      type: "object",
+      properties: {
+        scenes: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              scene_number: { type: "integer" },
+              title: { type: "string", description: "Brief scene title" },
+              content: { type: "string", description: "Complete text of the scene, preserving original wording" },
+            },
+            required: ["scene_number", "title", "content"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["scenes"],
+      additionalProperties: false,
+    },
+  },
+};
+
+const enrichTool = {
+  type: "function",
+  function: {
+    name: "suggest_metadata",
+    description: "Return scene metadata: type, mood, and bpm",
+    parameters: {
+      type: "object",
+      properties: {
+        scene_type: {
+          type: "string",
+          enum: ["action", "dialogue", "lyrical_digression", "description", "inner_monologue", "mixed"],
+        },
+        mood: { type: "string" },
+        bpm: { type: "integer" },
+      },
+      required: ["scene_type", "mood", "bpm"],
+      additionalProperties: false,
+    },
+  },
+};
+
 const chapterScenesTool = {
   type: "function",
   function: {
