@@ -379,16 +379,19 @@ export default function Parser() {
       }
       setPartIdMap(newPartIdMap);
 
-      // Reconstruct TOC with page ranges from PDF if available
+      // Reconstruct TOC with page ranges and levels from PDF if available
       const hasParts = parts.length > 0;
-      const savedToc: TocChapter[] = chapters.map((ch, i) => ({
-        title: ch.title,
-        startPage: tocFromPdf[i]?.startPage || 0,
-        endPage: tocFromPdf[i]?.endPage || 0,
-        level: hasParts && ch.part_id ? 1 : 0,
-        partTitle: ch.part_id ? partById.get(ch.part_id) : undefined,
-        sectionType: classifySection(ch.title),
-      }));
+      const savedToc: TocChapter[] = chapters.map((ch, i) => {
+        const pdfInfo = tocFromPdf[i];
+        return {
+          title: ch.title,
+          startPage: pdfInfo?.startPage || 0,
+          endPage: pdfInfo?.endPage || 0,
+          level: pdfInfo?.level ?? (hasParts && ch.part_id ? 1 : 0),
+          partTitle: ch.part_id ? partById.get(ch.part_id) : undefined,
+          sectionType: classifySection(ch.title),
+        };
+      });
       setTocEntries(savedToc);
 
       // Build chapterIdMap
