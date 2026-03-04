@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload, FileText, BookOpen, ChevronDown, ChevronRight, Loader2,
   AlertCircle, CheckCircle2, Zap, Layers, PlayCircle, FolderOpen,
-  Library, Trash2, ArrowLeft, Clock
+  Library, Trash2, ArrowLeft, Clock, Clapperboard
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +28,7 @@ import {
   extractOutline, extractTextByPageRange, extractTextFromPdf,
   flattenTocWithRanges, type TocEntry
 } from "@/lib/pdf-extract";
+import { saveStudioChapter } from "@/lib/studioChapter";
 
 // ─── Types ───────────────────────────────────────────────────
 
