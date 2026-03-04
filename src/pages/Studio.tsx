@@ -321,7 +321,14 @@ const Studio = () => {
         </div>
 
         {/* BOTTOM: Multitrack Timeline */}
-        <div className="flex flex-col bg-background border-t border-border" style={timelineCollapsed ? undefined : { height: `${timelineSize}px` }}>
+        <div className="flex flex-col bg-background border-t border-border shrink-0" style={timelineCollapsed ? undefined : { height: `${timelineSize}px` }}>
+          {/* Resize handle */}
+          {!timelineCollapsed && (
+            <div
+              onMouseDown={handleTimelineMouseDown}
+              className="h-1 cursor-row-resize hover:bg-primary/30 transition-colors shrink-0"
+            />
+          )}
           <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
               <button
                 onClick={toggleTimeline}
