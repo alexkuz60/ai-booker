@@ -263,6 +263,24 @@ export default function Parser() {
     if (user && step === "library") loadLibrary();
   }, [user, step, loadLibrary]);
 
+  // ─── Auto-restore active book on mount ─────────────────────
+  const [restoredOnce, setRestoredOnce] = useState(false);
+  useEffect(() => {
+    if (restoredOnce || !user || step !== "library" || loadingLibrary) return;
+    const savedBookId = sessionStorage.getItem(ACTIVE_BOOK_KEY);
+    if (!savedBookId) return;
+    // Wait for books to load, then find and reopen
+    const book = books.find(b => b.id === savedBookId);
+    if (book) {
+      setRestoredOnce(true);
+      openSavedBook(book);
+    } else if (books.length > 0) {
+      // Book not found (deleted?), clear
+      sessionStorage.removeItem(ACTIVE_BOOK_KEY);
+      setRestoredOnce(true);
+    }
+  }, [user, step, loadingLibrary, books, restoredOnce]);
+
   // ─── Open saved book from DB ──────────────────────────────
 
   const openSavedBook = async (book: BookRecord) => {
