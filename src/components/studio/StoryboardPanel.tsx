@@ -63,10 +63,12 @@ export function StoryboardPanel({
   sceneId,
   sceneContent,
   isRu,
+  onSegmented,
 }: {
   sceneId: string | null;
   sceneContent: string | null;
   isRu: boolean;
+  onSegmented?: (sceneId: string) => void;
 }) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(false);
