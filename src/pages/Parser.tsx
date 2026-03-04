@@ -154,6 +154,8 @@ export default function Parser() {
 
   // Map partTitle → DB part_id for linking chapters
   const [partIdMap, setPartIdMap] = useState<Map<string, string>>(new Map());
+  // Map chapter index → DB chapter id
+  const [chapterIdMap, setChapterIdMap] = useState<Map<number, string>>(new Map());
 
   // TOC state
   const [tocEntries, setTocEntries] = useState<TocChapter[]>([]);
@@ -448,6 +450,26 @@ export default function Parser() {
       }
       setPartIdMap(newPartIdMap);
 
+      // Save ALL chapters to DB immediately (full structure)
+      const newChapterIdMap = new Map<number, string>();
+      for (let i = 0; i < chapters.length; i++) {
+        const ch = chapters[i];
+        const partId = ch.partTitle ? newPartIdMap.get(ch.partTitle) : null;
+        const { data: chRow } = await supabase
+          .from('book_chapters')
+          .insert({
+            book_id: book.id,
+            chapter_number: i + 1,
+            title: ch.title,
+            scene_type: ch.sectionType !== 'content' ? ch.sectionType : null,
+            ...(partId ? { part_id: partId } : {}),
+          })
+          .select('id')
+          .single();
+        if (chRow) newChapterIdMap.set(i, chRow.id);
+      }
+      setChapterIdMap(newChapterIdMap);
+
       // Init status map
       const initMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
       chapters.forEach((_, i) => initMap.set(i, { scenes: [], status: "pending" }));
@@ -518,8 +540,29 @@ export default function Parser() {
         return next;
       });
 
-      // Save to DB
-      if (bookId) {
+      // Save analysis results to existing chapter row
+      const existingChId = chapterIdMap.get(idx);
+      if (existingChId) {
+        if (scenes.length > 0) {
+          await supabase.from('book_chapters').update({
+            scene_type: scenes[0].scene_type,
+            mood: scenes[0].mood,
+            bpm: scenes[0].bpm,
+          }).eq('id', existingChId);
+        }
+        for (const sc of scenes) {
+          await supabase.from('book_scenes').insert({
+            chapter_id: existingChId,
+            scene_number: sc.scene_number,
+            title: sc.title,
+            content: sc.content_preview || '',
+            scene_type: sc.scene_type,
+            mood: sc.mood,
+            bpm: sc.bpm,
+          });
+        }
+      } else if (bookId) {
+        // Fallback: create chapter if no pre-saved ID
         const partId = entry.partTitle ? partIdMap.get(entry.partTitle) : null;
         const { data: chRow } = await supabase
           .from('book_chapters')
@@ -531,8 +574,8 @@ export default function Parser() {
           })
           .select('id')
           .single();
-
         if (chRow) {
+          setChapterIdMap(prev => new Map(prev).set(idx, chRow.id));
           for (const sc of scenes) {
             await supabase.from('book_scenes').insert({
               chapter_id: chRow.id,
