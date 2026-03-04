@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { User, Key, Settings, HardDrive } from 'lucide-react';
+import { User, Key, Settings, HardDrive, Network } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -28,6 +28,9 @@ export default function Profile() {
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [userTab, setUserTab] = useState('profile');
   const [apiTab, setApiTab] = useState('api-keys');
+  
+  // Cloud settings for ProxyAPI priority
+  const { value: proxyapiPriority, update: setProxyapiPriority } = useCloudSettings('proxyapi-priority', false);
 
   // Load profile from DB
   useEffect(() => {
@@ -146,6 +149,18 @@ export default function Profile() {
               onSave={handleSaveProfile}
               onAvatarFileSelect={() => {}}
               onDeleteAvatar={() => setAvatarUrl(null)}
+            />
+          </TabsContent>
+
+          <TabsContent value="api-routers">
+            <ApiRoutersTab
+              apiKeys={apiKeys}
+              language={lang}
+              onKeyChange={setKeyValue}
+              onSave={handleSaveApiKeys}
+              saving={saving}
+              proxyapiPriority={proxyapiPriority}
+              onPriorityChange={setProxyapiPriority}
             />
           </TabsContent>
 
