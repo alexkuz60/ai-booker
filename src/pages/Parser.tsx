@@ -38,13 +38,62 @@ interface BookStructure {
   chapters?: Chapter[];
 }
 
+type SectionType = "content" | "preface" | "afterword" | "endnotes" | "appendix";
+
 interface TocChapter {
   title: string;
   startPage: number;
   endPage: number;
   level: number;
   partTitle?: string;
+  sectionType: SectionType;
 }
+
+const SECTION_PATTERNS: { type: SectionType; patterns: RegExp[] }[] = [
+  {
+    type: "preface",
+    patterns: [
+      /предисловие/i, /введение/i, /вступление/i, /от\s+автора/i, /пролог/i,
+      /preface/i, /foreword/i, /introduction/i, /prologue/i,
+    ],
+  },
+  {
+    type: "afterword",
+    patterns: [
+      /послесловие/i, /заключение/i, /эпилог/i, /от\s+переводчика/i, /от\s+редактора/i,
+      /afterword/i, /epilogue/i, /conclusion/i, /postscript/i,
+    ],
+  },
+  {
+    type: "endnotes",
+    patterns: [
+      /примечани/i, /сноск/i, /комментари/i, /ссылк/i, /библиограф/i, /литератур/i,
+      /указатель/i, /глоссарий/i, /словарь/i,
+      /notes/i, /references/i, /bibliography/i, /glossary/i, /index/i, /endnotes/i, /footnotes/i,
+    ],
+  },
+  {
+    type: "appendix",
+    patterns: [
+      /приложен/i, /дополнен/i, /appendix/i, /supplement/i,
+    ],
+  },
+];
+
+function classifySection(title: string): SectionType {
+  for (const { type, patterns } of SECTION_PATTERNS) {
+    if (patterns.some(p => p.test(title))) return type;
+  }
+  return "content";
+}
+
+const SECTION_LABELS: Record<SectionType, { label: string; icon: string }> = {
+  content: { label: "Контент", icon: "📖" },
+  preface: { label: "Предисловие", icon: "📝" },
+  afterword: { label: "Послесловие", icon: "📜" },
+  endnotes: { label: "Примечания / Ссылки", icon: "🔗" },
+  appendix: { label: "Приложения", icon: "📎" },
+};
 
 type Step = "upload" | "extracting_toc" | "review_toc" | "analyzing" | "done" | "error";
 
@@ -145,6 +194,7 @@ export default function Parser() {
               endPage: entry.endPage,
               level: entry.level,
               partTitle: currentPart || undefined,
+              sectionType: classifySection(entry.title),
             });
           }
         }
@@ -157,6 +207,7 @@ export default function Parser() {
               startPage: entry.startPage,
               endPage: entry.endPage,
               level: entry.level,
+              sectionType: classifySection(entry.title),
             });
           }
         }
@@ -582,7 +633,11 @@ export default function Parser() {
                       <div>
                         <CardTitle className="text-xl">Структура из оглавления PDF</CardTitle>
                         <p className="text-sm text-muted-foreground">
-                          {tocEntries.length} глав • {totalPages} страниц — проверьте и запустите анализ
+                          {tocEntries.filter(e => e.sectionType === "content").length} глав
+                          {tocEntries.filter(e => e.sectionType !== "content").length > 0 && (
+                            <> • {tocEntries.filter(e => e.sectionType !== "content").length} доп. секций</>
+                          )}
+                          {" "}• {totalPages} страниц
                         </p>
                       </div>
                     </div>
@@ -594,43 +649,41 @@ export default function Parser() {
                 </CardHeader>
               </Card>
 
-              {/* Group by parts */}
+              {/* Supplementary: preface */}
+              {renderTocSection("preface")}
+
+              {/* Main content grouped by parts */}
               {(() => {
-                const parts = [...new Set(tocEntries.map(e => e.partTitle).filter(Boolean))];
+                const contentEntries = tocEntries.filter(e => e.sectionType === "content");
+                const parts = [...new Set(contentEntries.map(e => e.partTitle).filter(Boolean))];
                 if (parts.length > 0) {
                   return parts.map((partTitle, pi) => (
-                    <Card key={pi}>
+                    <Card key={`part-${pi}`}>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-base text-primary">{partTitle}</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-1.5">
-                        {tocEntries.filter(e => e.partTitle === partTitle).map((entry, i) => (
-                          <div key={i} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
-                            <span className="text-sm font-medium">{entry.title}</span>
-                            <Badge variant="outline" className="text-[10px] font-mono">
-                              стр. {entry.startPage}–{entry.endPage}
-                            </Badge>
-                          </div>
-                        ))}
+                        {contentEntries.filter(e => e.partTitle === partTitle).map((entry, i) => renderTocEntry(entry, i))}
                       </CardContent>
                     </Card>
                   ));
                 }
-                return (
+                return contentEntries.length > 0 ? (
                   <Card>
-                    <CardContent className="pt-4 space-y-1.5">
-                      {tocEntries.map((entry, i) => (
-                        <div key={i} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
-                          <span className="text-sm font-medium">{entry.title}</span>
-                          <Badge variant="outline" className="text-[10px] font-mono">
-                            стр. {entry.startPage}–{entry.endPage}
-                          </Badge>
-                        </div>
-                      ))}
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">📖 Основной контент</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-1.5">
+                      {contentEntries.map((entry, i) => renderTocEntry(entry, i))}
                     </CardContent>
                   </Card>
-                );
+                ) : null;
               })()}
+
+              {/* Supplementary: afterword, endnotes, appendix */}
+              {renderTocSection("afterword")}
+              {renderTocSection("endnotes")}
+              {renderTocSection("appendix")}
             </motion.div>
           )}
 
@@ -739,6 +792,41 @@ export default function Parser() {
       </div>
     </motion.div>
   );
+
+  function renderTocEntry(entry: TocChapter, i: number) {
+    const sectionInfo = SECTION_LABELS[entry.sectionType];
+    return (
+      <div key={i} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
+        <div className="flex items-center gap-2">
+          {entry.sectionType !== "content" && (
+            <span className="text-xs">{sectionInfo.icon}</span>
+          )}
+          <span className="text-sm font-medium">{entry.title}</span>
+        </div>
+        <Badge variant="outline" className="text-[10px] font-mono">
+          стр. {entry.startPage}–{entry.endPage}
+        </Badge>
+      </div>
+    );
+  }
+
+  function renderTocSection(type: SectionType) {
+    const entries = tocEntries.filter(e => e.sectionType === type);
+    if (entries.length === 0) return null;
+    const info = SECTION_LABELS[type];
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base text-muted-foreground">
+            {info.icon} {info.label}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-1.5">
+          {entries.map((entry, i) => renderTocEntry(entry, i))}
+        </CardContent>
+      </Card>
+    );
+  }
 
   function renderChapter(ch: Chapter, key: string) {
     return (
