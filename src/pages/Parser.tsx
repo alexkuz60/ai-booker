@@ -423,7 +423,7 @@ export default function Parser() {
           sectionType: classifySection(ch.title),
         };
       });
-      setTocEntries(savedToc);
+      setTocEntries(normalizeLevels(savedToc));
 
       // Build chapterIdMap
       const newChapterIdMap = new Map<number, string>();
@@ -560,7 +560,7 @@ export default function Parser() {
         }];
       }
 
-      setTocEntries(chapters);
+      setTocEntries(normalizeLevels(chapters));
 
       // Create book record
       const filePath = `${user.id}/${Date.now()}_${f.name}`;
