@@ -358,16 +358,15 @@ export default function Parser() {
               pdf.numPages
             );
 
-            // Build a title→entry lookup from the flat TOC (preserving level + page ranges)
-            const tocInfoByTitle = new Map<string, { startPage: number; endPage: number; level: number }>();
-            for (const entry of flat) {
-              tocInfoByTitle.set(entry.title, { startPage: entry.startPage, endPage: entry.endPage, level: entry.level });
-            }
-
-            // Match DB chapters to PDF TOC entries by title
-            tocFromPdf = chapters.map(ch => {
-              const info = tocInfoByTitle.get(ch.title);
-              return info || { startPage: 0, endPage: 0, level: 0 };
+            // Match DB chapters to PDF TOC entries by positional order
+            // (DB chapters are stored in the same order as original TOC)
+            tocFromPdf = chapters.map((ch, i) => {
+              // First try exact title match
+              const byTitle = flat.find(f => f.title === ch.title);
+              if (byTitle) return { startPage: byTitle.startPage, endPage: byTitle.endPage, level: byTitle.level };
+              // Fallback: use positional index if within range
+              if (i < flat.length) return { startPage: flat[i].startPage, endPage: flat[i].endPage, level: flat[i].level };
+              return { startPage: 0, endPage: 0, level: 0 };
             });
           }
         } catch (pdfErr) {
