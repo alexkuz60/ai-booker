@@ -1,12 +1,12 @@
 import { motion } from "framer-motion";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Clock } from "lucide-react";
 import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { loadStudioChapter, type StudioChapter } from "@/lib/studioChapter";
+import { loadStudioChapter, type StudioChapter, type StudioScene } from "@/lib/studioChapter";
 import { useLanguage } from "@/hooks/useLanguage";
 import { ChapterNavigator, EmptyNavigator } from "@/components/studio/ChapterNavigator";
 import { StudioWorkspace } from "@/components/studio/StudioWorkspace";
@@ -16,9 +16,10 @@ import { supabase } from "@/integrations/supabase/client";
 
 const Studio = () => {
   const { isRu } = useLanguage();
-  const [chapter] = useState<StudioChapter | null>(() => loadStudioChapter());
+  const [chapter, setChapter] = useState<StudioChapter | null>(() => loadStudioChapter());
   const [selectedSceneIdx, setSelectedSceneIdx] = useState<number | null>(null);
   const [sceneContent, setSceneContent] = useState<string | null>(null);
+  const [segmentedSceneIds, setSegmentedSceneIds] = useState<Set<string>>(new Set());
 
   const selectedScene = chapter && selectedSceneIdx !== null ? chapter.scenes[selectedSceneIdx] : null;
 
@@ -28,7 +29,51 @@ const Studio = () => {
     return estimateSceneDuration(chapter.scenes[selectedSceneIdx]);
   }, [chapter, selectedSceneIdx]);
 
-  // Load full scene content from DB when scene is selected
+  // Resolve scene DB IDs on load if missing
+  useEffect(() => {
+    if (!chapter || chapter.scenes.every(s => s.id)) return;
+    (async () => {
+      // Find scenes by matching chapter title and scene numbers
+      const { data: dbChapters } = await supabase
+        .from("book_chapters")
+        .select("id, title")
+        .ilike("title", chapter.chapterTitle);
+      if (!dbChapters?.length) return;
+
+      const chapterIds = dbChapters.map(c => c.id);
+      const { data: dbScenes } = await supabase
+        .from("book_scenes")
+        .select("id, chapter_id, scene_number, content")
+        .in("chapter_id", chapterIds)
+        .order("scene_number");
+      if (!dbScenes?.length) return;
+
+      const updated = { ...chapter, scenes: chapter.scenes.map(s => {
+        if (s.id) return s;
+        const match = dbScenes.find(db => db.scene_number === s.scene_number);
+        return match ? { ...s, id: match.id } : s;
+      })};
+      setChapter(updated);
+    })();
+  }, [chapter?.chapterTitle]);
+
+  // Check which scenes already have segments
+  useEffect(() => {
+    if (!chapter) return;
+    const ids = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
+    if (ids.length === 0) return;
+    (async () => {
+      const { data } = await supabase
+        .from("scene_segments")
+        .select("scene_id")
+        .in("scene_id", ids);
+      if (data) {
+        setSegmentedSceneIds(new Set(data.map(d => d.scene_id)));
+      }
+    })();
+  }, [chapter?.scenes.map(s => s.id).join(",")]);
+
+  // Load scene content from DB when scene is selected
   useEffect(() => {
     setSceneContent(null);
     if (!selectedScene?.id) return;
@@ -41,6 +86,10 @@ const Studio = () => {
       setSceneContent(data?.content || null);
     })();
   }, [selectedScene?.id]);
+
+  const onSegmented = useCallback((sceneId: string) => {
+    setSegmentedSceneIds(prev => new Set(prev).add(sceneId));
+  }, []);
 
   return (
     <motion.div
@@ -93,6 +142,7 @@ const Studio = () => {
                   selectedSceneIdx={selectedSceneIdx}
                   onSelectScene={setSelectedSceneIdx}
                   isRu={isRu}
+                  segmentedSceneIds={segmentedSceneIds}
                 />
               ) : (
                 <EmptyNavigator isRu={isRu} />
@@ -106,6 +156,7 @@ const Studio = () => {
                 isRu={isRu}
                 selectedSceneId={selectedScene?.id ?? null}
                 selectedSceneContent={sceneContent}
+                onSegmented={onSegmented}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
