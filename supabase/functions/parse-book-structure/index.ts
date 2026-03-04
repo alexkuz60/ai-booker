@@ -276,13 +276,32 @@ async function handleAIRequest(
   provider: string, mode: string | undefined, chapterTitle: string | undefined,
   openrouterApiKey: string | null
 ): Promise<Response> {
-  const isChapterMode = mode === "chapter";
-  const systemPrompt = isChapterMode ? SYSTEM_PROMPT_CHAPTER : SYSTEM_PROMPT_FULL;
-  const userContent = isChapterMode
-    ? `Analyze the following chapter "${chapterTitle || 'Untitled'}" and decompose it into scenes:\n\n${truncatedText}`
-    : `Analyze the following book text and decompose it into chapters and scenes:\n\n${truncatedText}`;
-  const tools = isChapterMode ? [chapterScenesTool] : [fullStructureTool];
-  const toolName = isChapterMode ? "suggest_scenes" : "suggest_structure";
+  let systemPrompt: string;
+  let userContent: string;
+  let tools: unknown[];
+  let toolName: string;
+
+  if (mode === "boundaries") {
+    systemPrompt = SYSTEM_PROMPT_BOUNDARIES;
+    userContent = `Split the following chapter "${chapterTitle || 'Untitled'}" into scenes. Return boundaries and complete text only:\n\n${truncatedText}`;
+    tools = [boundariesTool];
+    toolName = "suggest_boundaries";
+  } else if (mode === "enrich") {
+    systemPrompt = SYSTEM_PROMPT_ENRICH;
+    userContent = `Analyze the following scene text and determine its type, mood, and tempo:\n\n${truncatedText}`;
+    tools = [enrichTool];
+    toolName = "suggest_metadata";
+  } else if (mode === "chapter") {
+    systemPrompt = SYSTEM_PROMPT_CHAPTER;
+    userContent = `Analyze the following chapter "${chapterTitle || 'Untitled'}" and decompose it into scenes:\n\n${truncatedText}`;
+    tools = [chapterScenesTool];
+    toolName = "suggest_scenes";
+  } else {
+    systemPrompt = SYSTEM_PROMPT_FULL;
+    userContent = `Analyze the following book text and decompose it into chapters and scenes:\n\n${truncatedText}`;
+    tools = [fullStructureTool];
+    toolName = "suggest_structure";
+  }
 
   const requestBody: Record<string, unknown> = {
     messages: [
