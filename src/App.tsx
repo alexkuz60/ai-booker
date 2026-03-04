@@ -12,6 +12,7 @@ import Parser from "./pages/Parser";
 import Studio from "./pages/Studio";
 import Narrators from "./pages/Narrators";
 import Profile from "./pages/Profile";
+import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -38,6 +39,7 @@ function ProtectedRoutes() {
         <Route path="/studio" element={<Studio />} />
         <Route path="/narrators" element={<Narrators />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/admin" element={<Admin />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
