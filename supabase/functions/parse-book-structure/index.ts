@@ -7,7 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SYSTEM_PROMPT_FULL = `You are "The Architect" — an AI agent that analyzes book text and decomposes it into a structured screenplay format.
+const SYSTEM_PROMPT_FULL = (lang: string) => `You are "The Architect" — an AI agent that analyzes book text and decomposes it into a structured screenplay format.
 
 Your task:
 1. Clean the text: remove page numbers, footnotes, headers/footers, and other technical artifacts.
@@ -18,10 +18,10 @@ Your task:
    - mood: the dominant emotional tone (e.g. "tense", "calm", "melancholic", "joyful", "dark", "romantic", "comedic")
    - bpm: suggested narrative tempo as beats-per-minute metaphor (60-80 slow/contemplative, 80-110 moderate, 110-140 dynamic, 140+ intense)
    - content: the COMPLETE text of the scene, preserving original wording exactly. Do NOT truncate or abbreviate.
-
+${lang === 'ru' ? 'IMPORTANT: All scene and chapter titles MUST be in Russian.' : ''}
 You MUST respond using the suggest_structure tool.`;
 
-const SYSTEM_PROMPT_CHAPTER = `You are "The Architect" — an AI agent that analyzes a single chapter of a book and decomposes it into scenes.
+const SYSTEM_PROMPT_CHAPTER = (lang: string) => `You are "The Architect" — an AI agent that analyzes a single chapter of a book and decomposes it into scenes.
 
 Your task:
 1. Clean the text: remove page numbers, footnotes, headers/footers, and other technical artifacts.
@@ -31,19 +31,20 @@ Your task:
    - mood: the dominant emotional tone (e.g. "tense", "calm", "melancholic", "joyful", "dark", "romantic", "comedic")
    - bpm: suggested narrative tempo as beats-per-minute metaphor (60-80 slow/contemplative, 80-110 moderate, 110-140 dynamic, 140+ intense)
    - content: the COMPLETE text of the scene, preserving original wording exactly. Do NOT truncate or abbreviate.
-
+${lang === 'ru' ? 'IMPORTANT: All scene titles MUST be in Russian.' : ''}
 You MUST respond using the suggest_scenes tool.`;
 
-const SYSTEM_PROMPT_BOUNDARIES = `You are "The Architect" — an AI agent that quickly identifies scene boundaries in a chapter of a book.
+const SYSTEM_PROMPT_BOUNDARIES = (lang: string) => `You are "The Architect" — an AI agent that quickly identifies scene boundaries in a chapter of a book.
 
 Your task:
 1. Split the chapter into scenes — logical segments where setting, time, or action changes.
 2. For each scene, provide:
-   - A brief descriptive title
+   - A brief descriptive title${lang === 'ru' ? ' IN RUSSIAN' : ''}
    - start_marker: the EXACT first 60-80 characters of the scene text (verbatim copy from the original, enough to uniquely locate it in the chapter)
 
 IMPORTANT: Do NOT return the full scene text. Only return start_marker.
 Do NOT analyze mood, scene_type, or bpm.
+${lang === 'ru' ? 'IMPORTANT: All scene titles MUST be in Russian.' : ''}
 You MUST respond using the suggest_boundaries tool.`;
 
 const SYSTEM_PROMPT_ENRICH = `You are "The Architect" — an AI agent that analyzes a single scene from a book and determines its characteristics.
@@ -274,7 +275,7 @@ function canFallbackToOpenRouter(userApiKey: string | null, model: string): { en
 async function handleAIRequest(
   truncatedText: string, endpoint: string, model: string, apiKey: string,
   provider: string, mode: string | undefined, chapterTitle: string | undefined,
-  openrouterApiKey: string | null
+  openrouterApiKey: string | null, lang: string = 'en'
 ): Promise<Response> {
   let systemPrompt: string;
   let userContent: string;
@@ -282,7 +283,7 @@ async function handleAIRequest(
   let toolName: string;
 
   if (mode === "boundaries") {
-    systemPrompt = SYSTEM_PROMPT_BOUNDARIES;
+    systemPrompt = SYSTEM_PROMPT_BOUNDARIES(lang);
     userContent = `Split the following chapter "${chapterTitle || 'Untitled'}" into scenes. Return boundaries and complete text only:\n\n${truncatedText}`;
     tools = [boundariesTool];
     toolName = "suggest_boundaries";
@@ -292,12 +293,12 @@ async function handleAIRequest(
     tools = [enrichTool];
     toolName = "suggest_metadata";
   } else if (mode === "chapter") {
-    systemPrompt = SYSTEM_PROMPT_CHAPTER;
+    systemPrompt = SYSTEM_PROMPT_CHAPTER(lang);
     userContent = `Analyze the following chapter "${chapterTitle || 'Untitled'}" and decompose it into scenes:\n\n${truncatedText}`;
     tools = [chapterScenesTool];
     toolName = "suggest_scenes";
   } else {
-    systemPrompt = SYSTEM_PROMPT_FULL;
+    systemPrompt = SYSTEM_PROMPT_FULL(lang);
     userContent = `Analyze the following book text and decompose it into chapters and scenes:\n\n${truncatedText}`;
     tools = [fullStructureTool];
     toolName = "suggest_structure";
@@ -411,7 +412,8 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { text, user_api_key, user_model, provider, mode, chapter_title, openrouter_api_key } = body;
+    const { text, user_api_key, user_model, provider, mode, chapter_title, openrouter_api_key, lang } = body;
+    const effectiveLang = lang || 'en';
 
     if (!text || text.trim().length < 50) {
       return new Response(JSON.stringify({ error: "Text too short for analysis (min 50 chars)" }),
@@ -431,7 +433,7 @@ serve(async (req) => {
           console.log(`Non-admin, redirecting ${orModel} to OpenRouter`);
           return await handleAIRequest(
             truncatedText, 'https://openrouter.ai/api/v1/chat/completions',
-            orModel, openrouter_api_key, 'openrouter', mode, chapter_title, null
+            orModel, openrouter_api_key, 'openrouter', mode, chapter_title, null, effectiveLang
           );
         }
         return new Response(
@@ -449,7 +451,7 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    return await handleAIRequest(truncatedText, endpoint, model, apiKey, effectiveProvider, mode, chapter_title, openrouter_api_key);
+    return await handleAIRequest(truncatedText, endpoint, model, apiKey, effectiveProvider, mode, chapter_title, openrouter_api_key, effectiveLang);
   } catch (e) {
     console.error("parse-book-structure error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
