@@ -132,6 +132,7 @@ interface BookRecord {
   id: string;
   title: string;
   file_name: string;
+  file_path: string | null;
   status: string;
   created_at: string;
   chapter_count?: number;
@@ -216,7 +217,7 @@ export default function Parser() {
     try {
       const { data: booksData } = await supabase
         .from('books')
-        .select('id, title, file_name, status, created_at')
+        .select('id, title, file_name, file_path, status, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
