@@ -264,7 +264,7 @@ const Studio = () => {
 
       <div className="flex-1 flex flex-col min-h-0">
         <div className="flex-1 min-h-0 overflow-hidden">
-          <ResizablePanelGroup direction="horizontal" className="h-full">
+          <ResizablePanelGroup direction="horizontal" className="h-full" autoSaveId="studio-h-panels">
             {/* Left: Chapter navigator */}
             <ResizablePanel defaultSize={30} minSize={15} maxSize={50}>
               {chapter ? (
