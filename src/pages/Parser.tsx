@@ -263,8 +263,8 @@ export default function Parser() {
   }, [user]);
 
   useEffect(() => {
-    if (user && step === "library") loadLibrary();
-  }, [user, step, loadLibrary]);
+    if (user) loadLibrary();
+  }, [user, loadLibrary]);
 
   // ─── Auto-restore active book on mount ─────────────────────
   const [restoredOnce, setRestoredOnce] = useState(false);
