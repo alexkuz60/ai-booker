@@ -9,7 +9,7 @@ interface StudioWorkspaceProps {
   onSegmented?: (sceneId: string) => void;
 }
 
-export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent }: StudioWorkspaceProps) {
+export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, onSegmented }: StudioWorkspaceProps) {
   return (
     <div className="h-full min-h-0 flex flex-col p-4">
       <Tabs defaultValue="storyboard" className="flex-1 flex flex-col min-h-0">
@@ -38,6 +38,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent }:
               sceneId={selectedSceneId ?? null}
               sceneContent={selectedSceneContent ?? null}
               isRu={isRu}
+              onSegmented={onSegmented}
             />
           </div>
         </TabsContent>
