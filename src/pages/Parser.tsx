@@ -1356,12 +1356,15 @@ export default function Parser() {
           <span className="text-[10px] text-muted-foreground font-mono flex-shrink-0">
             {entry.startPage}
           </span>
-        </button>
-        {isExpanded && directChildren.length > 0 && (
-          <div>
-            {directChildren.map(childIdx => renderNavItem(childIdx, depth + 1))}
-          </div>
-        )}
+          {isChapterFullyDone(idx) && (
+            <button
+              title={isRu ? "В студию!" : "To Studio!"}
+              onClick={(e) => { e.stopPropagation(); sendToStudio(idx); }}
+              className="flex-shrink-0 ml-1 p-0.5 rounded hover:bg-primary/20 text-primary transition-colors"
+            >
+              <Clapperboard className="h-3 w-3" />
+            </button>
+          )}
       </div>
     );
   }
