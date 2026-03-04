@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { Clock } from "lucide-react";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -10,11 +11,18 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { ChapterNavigator, EmptyNavigator } from "@/components/studio/ChapterNavigator";
 import { StudioWorkspace } from "@/components/studio/StudioWorkspace";
 import { StudioTimeline, TIMELINE_HEADER_HEIGHT } from "@/components/studio/StudioTimeline";
+import { estimateChapterDuration, estimateSceneDuration } from "@/lib/durationEstimate";
 
 const Studio = () => {
   const { isRu } = useLanguage();
   const [chapter] = useState<StudioChapter | null>(() => loadStudioChapter());
   const [selectedSceneIdx, setSelectedSceneIdx] = useState<number | null>(null);
+
+  const chapterEstimate = useMemo(() => chapter ? estimateChapterDuration(chapter) : null, [chapter]);
+  const sceneEstimate = useMemo(() => {
+    if (!chapter || selectedSceneIdx === null) return null;
+    return estimateSceneDuration(chapter.scenes[selectedSceneIdx]);
+  }, [chapter, selectedSceneIdx]);
 
   return (
     <motion.div
@@ -24,14 +32,35 @@ const Studio = () => {
     >
       {/* Header */}
       <div className="px-6 py-3 border-b border-border shrink-0">
-        <h1 className="font-display text-2xl font-bold text-foreground">
-          {isRu ? "Студия" : "Studio"}
-        </h1>
-        <p className="text-sm text-muted-foreground font-body">
-          {chapter
-            ? `${chapter.bookTitle} → ${chapter.chapterTitle}`
-            : (isRu ? "Рабочая панель" : "Workspace")}
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-display text-2xl font-bold text-foreground">
+              {isRu ? "Студия" : "Studio"}
+            </h1>
+            <p className="text-sm text-muted-foreground font-body">
+              {chapter
+                ? `${chapter.bookTitle} → ${chapter.chapterTitle}`
+                : (isRu ? "Рабочая панель" : "Workspace")}
+            </p>
+          </div>
+          {chapterEstimate && chapterEstimate.chars > 0 && (
+            <div className="flex items-center gap-3 text-sm font-body">
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                <span className="font-medium text-foreground">{chapterEstimate.formatted}</span>
+                <span className="text-xs">
+                  ({chapterEstimate.chars.toLocaleString()} {isRu ? "сим." : "chars"})
+                </span>
+              </div>
+              {sceneEstimate && sceneEstimate.chars > 0 && (
+                <div className="text-xs text-muted-foreground border-l border-border pl-3">
+                  {isRu ? "Сцена" : "Scene"}: <span className="font-medium text-foreground">{sceneEstimate.formatted}</span>
+                  <span className="ml-1">({sceneEstimate.chars.toLocaleString()} {isRu ? "сим." : "ch."})</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Body: upper workspace + bottom timeline */}
