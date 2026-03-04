@@ -144,6 +144,9 @@ export default function Parser() {
   const [errorMsg, setErrorMsg] = useState("");
   const [bookId, setBookId] = useState<string | null>(null);
 
+  // Map partTitle → DB part_id for linking chapters
+  const [partIdMap, setPartIdMap] = useState<Map<string, string>>(new Map());
+
   // TOC state
   const [tocEntries, setTocEntries] = useState<TocChapter[]>([]);
   const [pdfRef, setPdfRef] = useState<any>(null);
@@ -405,6 +408,25 @@ export default function Parser() {
       if (bookErr) throw bookErr;
       setBookId(book.id);
 
+      // Save parts to DB
+      const uniqueParts = [...new Set(chapters.map(c => c.partTitle).filter(Boolean))] as string[];
+      const newPartIdMap = new Map<string, string>();
+      for (let i = 0; i < uniqueParts.length; i++) {
+        const { data: partRow } = await supabase
+          .from('book_parts')
+          .insert({
+            book_id: book.id,
+            part_number: i + 1,
+            title: uniqueParts[i],
+          })
+          .select('id')
+          .single();
+        if (partRow) {
+          newPartIdMap.set(uniqueParts[i], partRow.id);
+        }
+      }
+      setPartIdMap(newPartIdMap);
+
       // Init status map
       const initMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
       chapters.forEach((_, i) => initMap.set(i, { scenes: [], status: "pending" }));
@@ -471,12 +493,14 @@ export default function Parser() {
 
       // Save to DB
       if (bookId) {
+        const partId = entry.partTitle ? partIdMap.get(entry.partTitle) : null;
         const { data: chRow } = await supabase
           .from('book_chapters')
           .insert({
             book_id: bookId,
             chapter_number: idx + 1,
             title: entry.title,
+            ...(partId ? { part_id: partId } : {}),
           })
           .select('id')
           .single();
@@ -549,6 +573,7 @@ export default function Parser() {
     setFileName("");
     setErrorMsg("");
     setBookId(null);
+    setPartIdMap(new Map());
     setTocEntries([]);
     setPdfRef(null);
     setFile(null);
