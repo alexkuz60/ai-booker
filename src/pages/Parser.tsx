@@ -1095,12 +1095,12 @@ export default function Parser() {
                   <div className="flex flex-col h-full bg-card/50">
                     <div className="px-4 py-3 border-b border-border">
                       <div className="flex items-center gap-2">
-                        <BookOpen className="h-4 w-4 text-primary" />
-                        <span className="font-display font-semibold text-sm text-foreground truncate">
+                        <BookOpen className="h-5 w-5 text-primary" />
+                        <span className="font-display font-semibold text-base text-foreground truncate">
                           {fileName.replace('.pdf', '')}
                         </span>
                       </div>
-                      <p className="text-[11px] text-muted-foreground mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         {totalPages} стр. • {contentEntries.length} глав
                         {supplementaryEntries.length > 0 && ` • ${supplementaryEntries.length} доп.`}
                       </p>
@@ -1115,18 +1115,18 @@ export default function Parser() {
                           const isExpanded = expandedNodes.has(partKey);
                           return (
                             <div key={group.title}>
-                              <button
+                          <button
                                 onClick={() => toggleNode(partKey)}
-                                className="w-full flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-primary hover:bg-muted/30 transition-colors"
+                                className="w-full flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-primary hover:bg-muted/30 transition-colors"
                               >
                                 {isExpanded ? (
-                                  <ChevronDown className="h-3 w-3 flex-shrink-0" />
+                                  <ChevronDown className="h-3.5 w-3.5 flex-shrink-0" />
                                 ) : (
-                                  <ChevronRight className="h-3 w-3 flex-shrink-0" />
+                                  <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
                                 )}
-                                <FolderOpen className="h-3 w-3 flex-shrink-0" />
+                                <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
                                 <span className="truncate">{group.title}</span>
-                                <span className="ml-auto text-[10px] text-muted-foreground font-normal">{group.indices.length}</span>
+                                <span className="ml-auto text-[11px] text-muted-foreground font-normal">{group.indices.length}</span>
                               </button>
                               {isExpanded && (
                                 <div>
@@ -1328,7 +1328,7 @@ export default function Parser() {
             if (status === "pending") analyzeChapter(idx);
           }}
           style={{ paddingLeft }}
-          className={`w-full flex items-center gap-1.5 pr-4 py-1.5 text-left text-xs transition-colors ${
+          className={`w-full flex items-center gap-2 pr-4 py-2 text-left text-sm transition-colors ${
             isSelected
               ? "bg-primary/10 text-primary border-r-2 border-primary"
               : "text-foreground/70 hover:bg-muted/40 hover:text-foreground"
@@ -1336,24 +1336,24 @@ export default function Parser() {
         >
           {hasChildren && directChildren.length > 0 ? (
             <span className="flex-shrink-0" onClick={(e) => { e.stopPropagation(); toggleNode(nodeKey); }}>
-              {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             </span>
           ) : (
-            <span className="w-3 flex-shrink-0" />
+            <span className="w-3.5 flex-shrink-0" />
           )}
           <span className="flex-shrink-0">
             {status === "done" ? (
-              <CheckCircle2 className="h-3 w-3 text-green-500" />
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
             ) : status === "analyzing" ? (
-              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
             ) : status === "error" ? (
-              <AlertCircle className="h-3 w-3 text-destructive" />
+              <AlertCircle className="h-3.5 w-3.5 text-destructive" />
             ) : (
-              <div className="h-3 w-3 rounded-full border border-border" />
+              <div className="h-3.5 w-3.5 rounded-full border border-border" />
             )}
           </span>
           <span className="truncate flex-1">{entry.title}</span>
-          <span className="text-[10px] text-muted-foreground font-mono flex-shrink-0">
+          <span className="text-[11px] text-muted-foreground font-mono flex-shrink-0">
             {entry.startPage}
           </span>
           {isChapterFullyDone(idx) && (
@@ -1362,7 +1362,7 @@ export default function Parser() {
               onClick={(e) => { e.stopPropagation(); sendToStudio(idx); }}
               className="flex-shrink-0 ml-1 p-0.5 rounded hover:bg-primary/20 text-primary transition-colors"
             >
-              <Clapperboard className="h-3 w-3" />
+              <Clapperboard className="h-3.5 w-3.5" />
             </button>
           )}
         </button>
@@ -1401,13 +1401,13 @@ export default function Parser() {
       <>
         <button
           onClick={() => toggleNode(sectionKey)}
-          className="w-full flex items-center gap-1.5 px-4 py-1 mt-2 text-left"
+          className="w-full flex items-center gap-1.5 px-4 py-1.5 mt-2 text-left"
         >
-          {isExpanded ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             {SECTION_ICONS[type]} {tSection(type, isRu)}
           </span>
-          <span className="ml-auto text-[10px] text-muted-foreground">{allEntries.length}</span>
+          <span className="ml-auto text-[11px] text-muted-foreground">{allEntries.length}</span>
         </button>
         {isExpanded && rootEntries.map(({ idx }) => renderNavItem(idx, 0))}
       </>
