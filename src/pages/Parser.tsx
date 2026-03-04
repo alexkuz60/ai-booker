@@ -9,6 +9,8 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import ModelSelector from "@/components/ModelSelector";
+import { DEFAULT_MODEL_ID } from "@/config/modelRegistry";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -157,6 +159,9 @@ export default function Parser() {
   const [pdfRef, setPdfRef] = useState<any>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [file, setFile] = useState<File | null>(null);
+
+  // Model selector
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
 
   // Workspace state
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -483,7 +488,7 @@ export default function Parser() {
       const userKey = apiKeys.openai || apiKeys.gemini || null;
 
       const { data: fnData, error: fnError } = await supabase.functions.invoke('parse-book-structure', {
-        body: { text, user_api_key: userKey, mode: "chapter", chapter_title: entry.title },
+        body: { text, user_api_key: userKey, user_model: selectedModel, mode: "chapter", chapter_title: entry.title },
       });
 
       if (fnError || fnData?.error) throw new Error(fnError?.message || fnData?.error);
@@ -649,6 +654,7 @@ export default function Parser() {
         </div>
         {step === "workspace" && (
           <div className="flex items-center gap-3">
+            <ModelSelector value={selectedModel} onChange={setSelectedModel} isRu={isRu} />
             <div className="text-xs text-muted-foreground">
               {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} • {totalScenes} {t("scenes", isRu)}
             </div>
