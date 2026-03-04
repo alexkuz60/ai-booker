@@ -777,6 +777,7 @@ export default function Parser() {
 
   const handleReset = () => {
     setStep("library");
+    sessionStorage.removeItem(ACTIVE_BOOK_KEY);
     setFileName("");
     setErrorMsg("");
     setBookId(null);
