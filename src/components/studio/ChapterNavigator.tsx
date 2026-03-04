@@ -97,6 +97,9 @@ export function ChapterNavigator({
                         {isRu ? (SCENE_TYPE_RU[scene.scene_type] || scene.scene_type) : scene.scene_type}
                       </span>
                       <span className="truncate flex-1">{scene.title}</span>
+                      {segmentedSceneIds?.has(scene.id || "") && (
+                        <Film className="h-3 w-3 text-primary shrink-0" />
+                      )}
                       <span className="text-[11px] text-muted-foreground font-mono shrink-0" title={`${est.chars} ${isRu ? "сим." : "chars"}`}>
                         {est.formatted}
                       </span>
