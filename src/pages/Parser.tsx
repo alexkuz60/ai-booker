@@ -712,6 +712,7 @@ export default function Parser() {
       user_model: selectedModel,
       provider: modelEntry?.provider || 'lovable',
       openrouter_api_key: userApiKeys['openrouter'] || null,
+      lang: isRu ? 'ru' : 'en',
     };
 
     const existingChId = chapterIdMap.get(idx);
