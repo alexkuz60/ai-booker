@@ -90,7 +90,7 @@ const Studio = () => {
         </div>
 
         {/* Bottom: Timeline */}
-        <StudioTimeline isRu={isRu} />
+        <StudioTimeline isRu={isRu} durationSec={chapterEstimate?.sec} />
       </div>
     </motion.div>
   );

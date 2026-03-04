@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
-import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut } from "lucide-react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -10,6 +10,8 @@ const MOCK_TRACKS = [
   { id: "ambience", label: "Атмосфера", color: "hsl(175 45% 45%)", type: "atmosphere" },
   { id: "sfx", label: "SFX", color: "hsl(220 50% 55%)", type: "sfx" },
 ];
+
+const TRACK_LABELS_WIDTH = 112; // w-28 = 7rem = 112px
 
 // ─── Sub-components ─────────────────────────────────────────
 
@@ -36,16 +38,16 @@ function TimelineRuler({ zoom, duration }: { zoom: number; duration: number }) {
 
 function TimelineTrack({ track, zoom, duration }: { track: typeof MOCK_TRACKS[0]; zoom: number; duration: number }) {
   const clips = track.id === "narrator-1"
-    ? [{ start: 0, end: 45 }, { start: 50, end: 120 }]
+    ? [{ start: 0, end: Math.min(45, duration) }, { start: Math.min(50, duration), end: Math.min(120, duration) }]
     : track.id === "narrator-2"
-    ? [{ start: 48, end: 80 }]
+    ? [{ start: Math.min(48, duration), end: Math.min(80, duration) }]
     : track.id === "ambience"
-    ? [{ start: 0, end: 180 }]
-    : [{ start: 20, end: 25 }, { start: 60, end: 63 }, { start: 100, end: 104 }];
+    ? [{ start: 0, end: duration }]
+    : [{ start: Math.min(20, duration), end: Math.min(25, duration) }, { start: Math.min(60, duration), end: Math.min(63, duration) }, { start: Math.min(100, duration), end: Math.min(104, duration) }];
 
   return (
     <div className="flex h-10 border-b border-border/50 relative" style={{ width: `${duration * zoom * 4}px` }}>
-      {clips.map((clip, i) => (
+      {clips.filter(c => c.start < c.end).map((clip, i) => (
         <div
           key={i}
           className="absolute top-1 bottom-1 rounded-sm opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
@@ -71,9 +73,43 @@ export const TIMELINE_HEADER_HEIGHT = 41;
 
 // ─── Main component ─────────────────────────────────────────
 
-export function StudioTimeline({ isRu }: { isRu: boolean }) {
-  const [zoom, setZoom] = useState(1);
-  const duration = 180;
+interface StudioTimelineProps {
+  isRu: boolean;
+  /** Estimated chapter duration in seconds; falls back to 180 */
+  durationSec?: number;
+}
+
+export function StudioTimeline({ isRu, durationSec }: StudioTimelineProps) {
+  const duration = durationSec && durationSec > 0 ? durationSec : 180;
+  const tracksContainerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  // Measure available width for tracks area
+  useEffect(() => {
+    const measure = () => {
+      if (tracksContainerRef.current) {
+        setContainerWidth(tracksContainerRef.current.clientWidth - TRACK_LABELS_WIDTH);
+      }
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (tracksContainerRef.current) ro.observe(tracksContainerRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  // Fit-to-width zoom: availableWidth = duration * fitZoom * 4
+  const fitZoom = useMemo(() => {
+    if (containerWidth <= 0 || duration <= 0) return 1;
+    return containerWidth / (duration * 4);
+  }, [containerWidth, duration]);
+
+  const [zoomOverride, setZoomOverride] = useState<number | null>(null);
+  const zoom = zoomOverride ?? fitZoom;
+
+  // Reset to fit when duration or container changes
+  useEffect(() => {
+    setZoomOverride(null);
+  }, [fitZoom]);
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("studio-timeline-collapsed") === "true"; } catch { return false; }
@@ -127,6 +163,17 @@ export function StudioTimeline({ isRu }: { isRu: boolean }) {
 
   const height = collapsed ? TIMELINE_HEADER_HEIGHT : size;
 
+  const adjustZoom = useCallback((delta: number) => {
+    setZoomOverride((prev) => {
+      const current = prev ?? fitZoom;
+      return Math.max(0.1, Math.min(10, current + delta));
+    });
+  }, [fitZoom]);
+
+  const resetZoom = useCallback(() => setZoomOverride(null), []);
+
+  const displayZoomPercent = Math.round(zoom * 100);
+
   return (
     <div
       className="flex flex-col bg-background border-t border-border shrink-0"
@@ -158,12 +205,15 @@ export function StudioTimeline({ isRu }: { isRu: boolean }) {
           </span>
         </button>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))}>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom(-0.25)} title={isRu ? "Уменьшить" : "Zoom out"}>
             <ZoomOut className="h-3.5 w-3.5" />
           </Button>
-          <span className="text-xs text-muted-foreground font-body w-10 text-center">{Math.round(zoom * 100)}%</span>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoom((z) => Math.min(4, z + 0.25))}>
+          <span className="text-xs text-muted-foreground font-body w-10 text-center">{displayZoomPercent}%</span>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom(0.25)} title={isRu ? "Увеличить" : "Zoom in"}>
             <ZoomIn className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetZoom} title={isRu ? "По ширине" : "Fit to width"}>
+            <Maximize2 className="h-3.5 w-3.5" />
           </Button>
           <div className="w-px h-4 bg-border mx-1" />
           <Button variant="ghost" size="icon" className="h-7 w-7">
@@ -174,7 +224,7 @@ export function StudioTimeline({ isRu }: { isRu: boolean }) {
 
       {/* Tracks */}
       {!collapsed && (
-        <div className="flex-1 flex min-h-0 overflow-hidden">
+        <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
           <div className="w-28 shrink-0 border-r border-border flex flex-col">
             <div className="h-6 border-b border-border" />
             {MOCK_TRACKS.map((track) => (
