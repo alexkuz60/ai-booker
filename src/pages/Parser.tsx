@@ -1347,7 +1347,7 @@ export default function Parser() {
                       </p>
                     </div>
 
-                    <ScrollArea className="flex-1">
+                    <ScrollArea className="flex-1 min-h-0">
                       <div className="py-2">
                         {renderNavSection("preface")}
 
@@ -1371,14 +1371,14 @@ export default function Parser() {
                               </button>
                               {isExpanded && (
                                 <div>
-                                  {group.indices.map(idx => renderNavItem(idx, 1))}
+                                  {group.indices.map(idx => renderNavItem(idx, 1, true))}
                                 </div>
                               )}
                             </div>
                           );
                         })}
 
-                        {partlessIndices.map(idx => renderNavItem(idx, 0))}
+                        {partlessIndices.map(idx => renderNavItem(idx, 0, true))}
 
                         {renderNavSection("afterword")}
                         {renderNavSection("endnotes")}
@@ -1563,7 +1563,7 @@ export default function Parser() {
 
   // ─── Nav Sidebar Helpers ───────────────────────────────────
 
-  function renderNavItem(idx: number, depth: number = 0) {
+  function renderNavItem(idx: number, depth: number = 0, isTopLevel: boolean = false) {
     const entry = tocEntries[idx];
     const result = chapterResults.get(idx);
     const isSelected = selectedIdx === idx;
@@ -1628,7 +1628,7 @@ export default function Parser() {
           <span className="text-[11px] text-muted-foreground font-mono flex-shrink-0">
             {entry.startPage}
           </span>
-          {depth === 0 && isChapterFullyDone(idx) && (
+          {isTopLevel && isChapterFullyDone(idx) && (
             <button
               title={isRu ? "В студию!" : "To Studio!"}
               onClick={(e) => { e.stopPropagation(); sendToStudio(idx); }}
@@ -1640,7 +1640,7 @@ export default function Parser() {
         </button>
         {isExpanded && directChildren.length > 0 && (
           <div>
-            {directChildren.map(childIdx => renderNavItem(childIdx, depth + 1))}
+            {directChildren.map(childIdx => renderNavItem(childIdx, depth + 1, false))}
           </div>
         )}
       </div>
@@ -1681,7 +1681,7 @@ export default function Parser() {
           </span>
           <span className="ml-auto text-[11px] text-muted-foreground">{allEntries.length}</span>
         </button>
-        {isExpanded && rootEntries.map(({ idx }) => renderNavItem(idx, 0))}
+        {isExpanded && rootEntries.map(({ idx }) => renderNavItem(idx, 0, true))}
       </>
     );
   }

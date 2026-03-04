@@ -91,7 +91,7 @@ const Studio = () => {
         .maybeSingle();
       setSceneContent(data?.content || null);
     })();
-  }, [selectedScene?.id]);
+  }, [selectedScene?.id, selectedScene?.content]);
 
   const onSegmented = useCallback((sceneId: string) => {
     setSegmentedSceneIds(prev => new Set(prev).add(sceneId));
