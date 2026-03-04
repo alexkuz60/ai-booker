@@ -719,10 +719,16 @@ export default function Parser() {
     // Check if we already have scenes (resume scenario)
     const existingResult = chapterResults.get(idx);
     let scenes: Scene[] = existingResult?.scenes || [];
-    const hasExistingScenes = scenes.length > 0;
+    const wasFullyDone = existingResult?.status === 'done' && scenes.length > 0 && scenes.every(sc => !needsEnrichment(sc));
 
-    // Determine which scenes need enrichment (no scene_type or scene_type is empty)
-    const needsEnrichment = (sc: Scene) => !sc.scene_type || sc.scene_type === '' || sc.scene_type === 'pending';
+    // If fully done, user wants to re-analyze from scratch — clear old scenes
+    if (wasFullyDone && existingChId) {
+      addLog(isRu ? "🗑️ Очистка предыдущих результатов..." : "🗑️ Clearing previous results...");
+      await supabase.from('book_scenes').delete().eq('chapter_id', existingChId);
+      scenes = [];
+    }
+
+    const hasExistingScenes = scenes.length > 0;
 
     if (hasExistingScenes && scenes.every(sc => !needsEnrichment(sc))) {
       toast.info(isRu ? "Все сцены уже проанализированы" : "All scenes already analyzed");
