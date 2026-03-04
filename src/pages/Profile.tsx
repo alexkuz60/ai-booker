@@ -7,6 +7,7 @@ import { User, Key, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/hooks/useLanguage';
 
 import { ProfileTab } from '@/components/profile/tabs/ProfileTab';
 import { PreferencesTab } from '@/components/profile/tabs/PreferencesTab';
@@ -15,8 +16,7 @@ import { ApiKeysTab } from '@/components/profile/tabs/ApiKeysTab';
 export default function Profile() {
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
-  const [lang, setLang] = useState('ru');
-  const isRu = lang === 'ru';
+  const { lang, isRu, setLang } = useLanguage();
 
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
@@ -41,7 +41,7 @@ export default function Profile() {
         setDisplayName(data.display_name || '');
         setUsername(data.username || '');
         setAvatarUrl(data.avatar_url);
-        setLang(data.language || 'ru');
+        setLang((data.language as "ru" | "en") || 'ru');
         setApiKeys((data.api_keys as Record<string, string>) || {});
         if (data.theme) setTheme(data.theme);
       }
@@ -87,7 +87,7 @@ export default function Profile() {
     setApiKeys(prev => ({ ...prev, [provider]: value }));
   }, []);
 
-  const handleLangChange = (v: string) => setLang(v);
+  const handleLangChange = (v: string) => setLang(v as "ru" | "en");
 
   if (loadingProfile) {
     return (

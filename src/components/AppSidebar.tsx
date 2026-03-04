@@ -2,8 +2,8 @@ import { Home, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen, LogOut } f
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useTheme } from "next-themes";
-import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 
 import {
   Sidebar,
@@ -33,13 +33,12 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { theme, setTheme } = useTheme();
-  const [lang, setLang] = useState<"ru" | "en">("ru");
+  const { lang, isRu, toggleLang } = useLanguage();
 
   const isActive = (path: string) =>
     path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
 
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
-  const toggleLang = () => setLang((l) => (l === "ru" ? "en" : "ru"));
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border bg-sidebar">

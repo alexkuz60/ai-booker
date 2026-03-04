@@ -105,9 +105,7 @@ const SECTION_ICONS: Record<SectionType, string> = {
   appendix: "📎",
 };
 import { t, tSceneType, tMood, tSection } from "@/pages/parser/i18n";
-
-// TODO: wire to global lang context when available
-const isRu = true;
+import { useLanguage } from "@/hooks/useLanguage";
 
 const SCENE_TYPE_COLORS: Record<string, string> = {
   action: "bg-red-500/20 text-red-400 border-red-500/30",
@@ -125,6 +123,7 @@ const NAV_WIDTH_KEY = "parser-nav-width";
 
 export default function Parser() {
   const { user } = useAuth();
+  const { isRu } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>("upload");
