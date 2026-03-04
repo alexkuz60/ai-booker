@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SYSTEM_PROMPT = `You are "The Architect" — an AI agent that analyzes book text and decomposes it into a structured screenplay format.
+const SYSTEM_PROMPT_FULL = `You are "The Architect" — an AI agent that analyzes book text and decomposes it into a structured screenplay format.
 
 Your task:
 1. Clean the text: remove page numbers, footnotes, headers/footers, and other technical artifacts.
@@ -19,28 +19,121 @@ Your task:
 
 You MUST respond using the suggest_structure tool.`;
 
+const SYSTEM_PROMPT_CHAPTER = `You are "The Architect" — an AI agent that analyzes a single chapter of a book and decomposes it into scenes.
+
+Your task:
+1. Clean the text: remove page numbers, footnotes, headers/footers, and other technical artifacts.
+2. Identify scenes — logical segments where setting, time, or action changes.
+3. For each scene, determine:
+   - scene_type: one of "action", "dialogue", "lyrical_digression", "description", "inner_monologue", "mixed"
+   - mood: the dominant emotional tone (e.g. "tense", "calm", "melancholic", "joyful", "dark", "romantic", "comedic")
+   - bpm: suggested narrative tempo as beats-per-minute metaphor (60-80 slow/contemplative, 80-110 moderate, 110-140 dynamic, 140+ intense)
+
+You MUST respond using the suggest_scenes tool.`;
+
+const fullStructureTool = {
+  type: "function",
+  function: {
+    name: "suggest_structure",
+    description: "Return the structured decomposition of the book into chapters and scenes",
+    parameters: {
+      type: "object",
+      properties: {
+        book_title: { type: "string", description: "Detected or inferred book title" },
+        chapters: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              chapter_number: { type: "integer" },
+              title: { type: "string" },
+              scenes: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    scene_number: { type: "integer" },
+                    title: { type: "string", description: "Brief scene title" },
+                    content_preview: { type: "string", description: "First 200 chars of scene" },
+                    scene_type: {
+                      type: "string",
+                      enum: ["action", "dialogue", "lyrical_digression", "description", "inner_monologue", "mixed"],
+                    },
+                    mood: { type: "string" },
+                    bpm: { type: "integer" },
+                  },
+                  required: ["scene_number", "title", "scene_type", "mood", "bpm"],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["chapter_number", "title", "scenes"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["book_title", "chapters"],
+      additionalProperties: false,
+    },
+  },
+};
+
+const chapterScenesTool = {
+  type: "function",
+  function: {
+    name: "suggest_scenes",
+    description: "Return scene decomposition for a single chapter",
+    parameters: {
+      type: "object",
+      properties: {
+        scenes: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              scene_number: { type: "integer" },
+              title: { type: "string", description: "Brief scene title" },
+              content_preview: { type: "string", description: "First 200 chars of scene" },
+              scene_type: {
+                type: "string",
+                enum: ["action", "dialogue", "lyrical_digression", "description", "inner_monologue", "mixed"],
+              },
+              mood: { type: "string" },
+              bpm: { type: "integer" },
+            },
+            required: ["scene_number", "title", "scene_type", "mood", "bpm"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["scenes"],
+      additionalProperties: false,
+    },
+  },
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { text, user_api_key, user_model } = await req.json();
+    const body = await req.json();
+    const { text, user_api_key, user_model, mode, chapter_title } = body;
+    // mode: "full" (default) | "chapter" (single chapter analysis)
 
-    if (!text || text.trim().length < 100) {
+    if (!text || text.trim().length < 50) {
       return new Response(
-        JSON.stringify({ error: "Text too short for analysis (min 100 chars)" }),
+        JSON.stringify({ error: "Text too short for analysis (min 50 chars)" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Truncate to ~100k chars to fit context window
     const truncatedText = text.slice(0, 100000);
 
-    // Determine API key and endpoint
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const apiKey = user_api_key || LOVABLE_API_KEY;
-    
+
     if (!apiKey) {
       return new Response(
         JSON.stringify({ error: "No API key available. Configure in profile or contact admin." }),
@@ -53,7 +146,15 @@ serve(async (req) => {
       ? "https://ai.gateway.lovable.dev/v1/chat/completions"
       : "https://api.openai.com/v1/chat/completions";
 
-    const model = user_model || (isLovableAI ? "google/gemini-2.5-flash" : "gpt-4o");
+    const model = user_model || (isLovableAI ? "google/gemini-3-flash-preview" : "gpt-5");
+
+    const isChapterMode = mode === "chapter";
+    const systemPrompt = isChapterMode ? SYSTEM_PROMPT_CHAPTER : SYSTEM_PROMPT_FULL;
+    const userContent = isChapterMode
+      ? `Analyze the following chapter "${chapter_title || 'Untitled'}" and decompose it into scenes:\n\n${truncatedText}`
+      : `Analyze the following book text and decompose it into chapters and scenes:\n\n${truncatedText}`;
+    const tools = isChapterMode ? [chapterScenesTool] : [fullStructureTool];
+    const toolName = isChapterMode ? "suggest_scenes" : "suggest_structure";
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -64,61 +165,11 @@ serve(async (req) => {
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: `Analyze the following book text and decompose it into chapters and scenes:\n\n${truncatedText}`,
-          },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
         ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "suggest_structure",
-              description: "Return the structured decomposition of the book into chapters and scenes",
-              parameters: {
-                type: "object",
-                properties: {
-                  book_title: { type: "string", description: "Detected or inferred book title" },
-                  chapters: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        chapter_number: { type: "integer" },
-                        title: { type: "string" },
-                        scenes: {
-                          type: "array",
-                          items: {
-                            type: "object",
-                            properties: {
-                              scene_number: { type: "integer" },
-                              title: { type: "string", description: "Brief scene title" },
-                              content_preview: { type: "string", description: "First 200 chars of scene" },
-                              scene_type: {
-                                type: "string",
-                                enum: ["action", "dialogue", "lyrical_digression", "description", "inner_monologue", "mixed"],
-                              },
-                              mood: { type: "string" },
-                              bpm: { type: "integer" },
-                            },
-                            required: ["scene_number", "title", "scene_type", "mood", "bpm"],
-                            additionalProperties: false,
-                          },
-                        },
-                      },
-                      required: ["chapter_number", "title", "scenes"],
-                      additionalProperties: false,
-                    },
-                  },
-                },
-                required: ["book_title", "chapters"],
-                additionalProperties: false,
-              },
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "suggest_structure" } },
+        tools,
+        tool_choice: { type: "function", function: { name: toolName } },
       }),
     });
 
