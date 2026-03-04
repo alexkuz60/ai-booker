@@ -828,8 +828,10 @@ export default function Parser() {
         }
       }
 
+      addLog(isRu ? `🎉 Глава «${entry.title}» успешно проанализирована!` : `🎉 Chapter "${entry.title}" analyzed successfully!`);
       toast.success(`Глава "${entry.title}" проанализирована: ${scenes.length} сцен`);
     } catch (err: any) {
+      if (analysisTimerRef.current) { clearInterval(analysisTimerRef.current); analysisTimerRef.current = null; }
       console.error(`Chapter analysis failed for "${entry.title}":`, err);
       const errMsg = err?.message || "";
       let userError: string;
@@ -1304,15 +1306,32 @@ export default function Parser() {
 
                           {selectedResult?.status === "analyzing" && (
                             <Card>
-                              <CardContent className="py-8 flex flex-col items-center gap-4">
-                                <div className="h-14 w-14 rounded-2xl gradient-cyan flex items-center justify-center shadow-cool animate-pulse">
-                                  <Zap className="h-7 w-7 text-primary-foreground" />
+                              <CardContent className="py-4 space-y-2">
+                                <div className="flex items-center gap-3 mb-3">
+                                  <div className="h-10 w-10 rounded-xl gradient-cyan flex items-center justify-center shadow-cool animate-pulse shrink-0">
+                                    <Zap className="h-5 w-5 text-primary-foreground" />
+                                  </div>
+                                  <div>
+                                    <p className="font-display font-semibold text-sm">The Architect</p>
+                                    <p className="text-xs text-muted-foreground">{isRu ? "Декомпозиция главы на сцены" : "Decomposing chapter into scenes"}</p>
+                                  </div>
+                                  <Loader2 className="h-4 w-4 animate-spin text-primary ml-auto shrink-0" />
                                 </div>
-                                <div className="text-center">
-                                  <p className="font-display font-semibold">The Architect</p>
-                                  <p className="text-sm text-muted-foreground mt-1">Анализируем сцены...</p>
-                                </div>
-                                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                <ScrollArea className="max-h-[300px]">
+                                  <div className="space-y-1 font-mono text-xs">
+                                    {analysisLog.map((line, i) => (
+                                      <motion.div
+                                        key={i}
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className={line.startsWith("  ") ? "pl-4 text-muted-foreground" : "text-foreground"}
+                                      >
+                                        {line}
+                                      </motion.div>
+                                    ))}
+                                  </div>
+                                </ScrollArea>
                               </CardContent>
                             </Card>
                           )}
