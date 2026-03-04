@@ -759,6 +759,17 @@ export default function Parser() {
         content_preview: (s.content || s.content_preview || '').slice(0, 200),
       }));
 
+      // Log each detected scene
+      addLog(isRu ? `✅ AI вернул ${scenes.length} сцен:` : `✅ AI returned ${scenes.length} scenes:`);
+      scenes.forEach((sc, i) => {
+        const dur = Math.round((sc.content?.length || 0) / 15);
+        addLog(isRu
+          ? `  🎬 Сцена ${i + 1}: «${sc.title}» — ${sc.scene_type}, ${sc.mood}, ${sc.bpm} bpm, ~${dur}с`
+          : `  🎬 Scene ${i + 1}: "${sc.title}" — ${sc.scene_type}, ${sc.mood}, ${sc.bpm} bpm, ~${dur}s`);
+      });
+
+      addLog(isRu ? "💾 Сохранение результатов в базу данных..." : "💾 Saving results to database...");
+
       setChapterResults(prev => {
         const next = new Map(prev);
         next.set(idx, { scenes, status: "done" });
