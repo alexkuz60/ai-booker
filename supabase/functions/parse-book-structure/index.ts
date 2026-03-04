@@ -256,7 +256,7 @@ serve(async (req) => {
         );
       }
       const errText = response ? await response.text() : "No response";
-      console.error("AI error:", status, errText);
+      console.error("AI error:", status, "model:", model, errText);
       return new Response(
         JSON.stringify({ error: `AI analysis failed (${status})` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
