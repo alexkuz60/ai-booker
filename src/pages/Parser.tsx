@@ -626,6 +626,7 @@ export default function Parser() {
           provider: modelEntry?.provider || 'lovable',
           mode: "chapter",
           chapter_title: entry.title,
+          openrouter_api_key: userApiKeys['openrouter'] || null,
         },
       });
 
