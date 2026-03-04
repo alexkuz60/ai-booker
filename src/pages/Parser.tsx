@@ -1363,13 +1363,13 @@ export default function Parser() {
                                 {selectedResult?.status === "pending" && (
                                   <Button variant="outline" size="sm" onClick={() => analyzeChapter(selectedIdx)} className="gap-2">
                                     <PlayCircle className="h-4 w-4" />
-                                    Анализировать
+                                    {isRu ? "Анализировать" : "Analyze"}
                                   </Button>
                                 )}
                                 {selectedResult?.status === "done" && (
                                   <Button variant="ghost" size="sm" onClick={() => analyzeChapter(selectedIdx)} className="gap-2 text-muted-foreground">
                                     <Zap className="h-4 w-4" />
-                                    Повторить
+                                    {isRu ? "Повторить" : "Re-analyze"}
                                   </Button>
                                 )}
                                 {selectedResult?.status === "error" && (
