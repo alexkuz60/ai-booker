@@ -113,26 +113,33 @@ const chapterScenesTool = {
   },
 };
 
-// ─── ProxyAPI model mapping ───
+// ─── ProxyAPI model mapping (universal endpoint with provider prefix, synced with Hydra) ───
 const PROXYAPI_MODEL_MAP: Record<string, string> = {
-  'proxyapi/gpt-5': 'gpt-5',
-  'proxyapi/gpt-5-mini': 'gpt-5-mini',
-  'proxyapi/gpt-5.2': 'gpt-5.2',
-  'proxyapi/gpt-4o': 'gpt-4o',
-  'proxyapi/gpt-4o-mini': 'gpt-4o-mini',
-  'proxyapi/claude-sonnet-4': 'claude-sonnet-4-20250514',
-  'proxyapi/claude-opus-4': 'claude-opus-4-20250514',
-  'proxyapi/claude-3-5-sonnet': 'claude-3-5-sonnet-20241022',
-  'proxyapi/gemini-2.5-pro': 'gemini-2.5-pro-preview-06-05',
-  'proxyapi/gemini-2.5-flash': 'gemini-2.5-flash-preview-05-20',
+  'proxyapi/gpt-4o': 'openai/gpt-4o',
+  'proxyapi/gpt-4o-mini': 'openai/gpt-4o-mini',
+  'proxyapi/gpt-5': 'openai/gpt-5',
+  'proxyapi/gpt-5-mini': 'openai/gpt-5-mini',
+  'proxyapi/gpt-5.2': 'openai/gpt-5.2',
+  'proxyapi/claude-sonnet-4': 'anthropic/claude-sonnet-4-20250514',
+  'proxyapi/claude-opus-4': 'anthropic/claude-opus-4-6',
+  'proxyapi/claude-3-5-sonnet': 'anthropic/claude-3-5-sonnet-20241022',
+  'proxyapi/gemini-3-pro-preview': 'gemini/gemini-3-pro-preview',
+  'proxyapi/gemini-3-flash-preview': 'gemini/gemini-3-flash-preview',
+  'proxyapi/gemini-2.5-pro': 'gemini/gemini-2.5-pro',
+  'proxyapi/gemini-2.5-flash': 'gemini/gemini-2.5-flash',
+  'proxyapi/deepseek-chat': 'deepseek/deepseek-chat',
+  'proxyapi/deepseek-reasoner': 'deepseek/deepseek-reasoner',
 };
+
+// ─── DotPoint config ───
+const DOTPOINT_BASE_URL = 'https://llms.dotpoin.com/v1';
 
 // ─── Endpoint routing ───
 function getEndpointAndModel(provider: string, userModel: string, userApiKey: string | null) {
   if (provider === 'proxyapi' && userApiKey) {
     const realModel = PROXYAPI_MODEL_MAP[userModel] || userModel.replace('proxyapi/', '');
     return {
-      endpoint: 'https://api.proxyapi.ru/openai/v1/chat/completions',
+      endpoint: 'https://openai.api.proxyapi.ru/v1/chat/completions',
       model: realModel,
       apiKey: userApiKey,
     };
@@ -147,7 +154,16 @@ function getEndpointAndModel(provider: string, userModel: string, userApiKey: st
     };
   }
 
-  // Lovable AI gateway (will be gated by admin check in handler)
+  if (provider === 'dotpoint' && userApiKey) {
+    const realModel = userModel.replace('dotpoint/', '');
+    return {
+      endpoint: `${DOTPOINT_BASE_URL}/chat/completions`,
+      model: realModel,
+      apiKey: userApiKey,
+    };
+  }
+
+  // Lovable AI gateway (admin-only, gated in handler)
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   return {
     endpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions',
