@@ -288,6 +288,7 @@ export default function Parser() {
     setStep("extracting_toc");
     setFileName(book.file_name);
     setBookId(book.id);
+    sessionStorage.setItem(ACTIVE_BOOK_KEY, book.id);
 
     try {
       // Load parts, chapters, and PDF file in parallel
