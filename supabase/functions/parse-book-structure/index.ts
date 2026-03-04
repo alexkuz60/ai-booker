@@ -151,7 +151,7 @@ function getEndpointAndModel(provider: string, userModel: string, userApiKey: st
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   return {
     endpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions',
-    model: userModel || 'google/gemini-3-flash-preview',
+    model: userModel || 'google/gemini-2.5-flash',
     apiKey: LOVABLE_API_KEY || '',
   };
 }
@@ -176,7 +176,7 @@ serve(async (req) => {
 
     const { endpoint, model, apiKey } = getEndpointAndModel(
       provider || 'lovable',
-      user_model || 'google/gemini-3-flash-preview',
+      user_model || 'google/gemini-2.5-flash',
       user_api_key || null
     );
 
@@ -256,7 +256,7 @@ serve(async (req) => {
         );
       }
       const errText = response ? await response.text() : "No response";
-      console.error("AI error:", status, errText);
+      console.error("AI error:", status, "model:", model, errText);
       return new Response(
         JSON.stringify({ error: `AI analysis failed (${status})` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

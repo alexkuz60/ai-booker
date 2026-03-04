@@ -69,7 +69,7 @@ export function getAvailableModels(userApiKeys: Record<string, string>): ModelRe
   });
 }
 
-export const DEFAULT_MODEL_ID = 'google/gemini-3-flash-preview';
+export const DEFAULT_MODEL_ID = 'google/gemini-2.5-flash';
 
 export function isLovableModel(modelId: string): boolean {
   const entry = registryMap.get(modelId);
