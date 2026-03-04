@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
       try {
         const resp = await fetch(`${DOTPOINT_BASE_URL}/models`, {
           headers: { Authorization: `Bearer ${dotpointKey}` },
-          signal: AbortSignal.timeout(10_000),
+          signal: AbortSignal.timeout(20_000),
         });
         const latency = Date.now() - start;
         if (resp.ok) {
@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
           method: "POST",
           headers: { Authorization: `Bearer ${dotpointKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({ model: realModel, messages: [{ role: "user", content: "Say hi." }], max_tokens: 30, stream: false }),
-          signal: AbortSignal.timeout(30_000),
+          signal: AbortSignal.timeout(60_000),
         });
         const latency = Date.now() - start;
 
@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
 
     if (action === "models") {
       try {
-        const resp = await fetch(`${DOTPOINT_BASE_URL}/models`, { headers: { Authorization: `Bearer ${dotpointKey}` }, signal: AbortSignal.timeout(15_000) });
+        const resp = await fetch(`${DOTPOINT_BASE_URL}/models`, { headers: { Authorization: `Bearer ${dotpointKey}` }, signal: AbortSignal.timeout(30_000) });
         if (!resp.ok) return new Response(JSON.stringify({ error: `HTTP ${resp.status}` }), { status: resp.status, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
         const data = await resp.json();
         const models = (data?.data || []).map((m: any) => ({ id: m.id, owned_by: m.owned_by || "unknown", created: m.created }));
