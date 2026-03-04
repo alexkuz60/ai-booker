@@ -33,6 +33,7 @@ import { saveStudioChapter } from "@/lib/studioChapter";
 // ─── Types ───────────────────────────────────────────────────
 
 interface Scene {
+  id?: string;
   scene_number: number;
   title: string;
   content_preview?: string;
