@@ -541,6 +541,7 @@ export default function Parser() {
         .single();
       if (bookErr) throw bookErr;
       setBookId(book.id);
+      sessionStorage.setItem(ACTIVE_BOOK_KEY, book.id);
 
       // Save parts to DB
       const uniqueParts = [...new Set(chapters.map(c => c.partTitle).filter(Boolean))] as string[];
