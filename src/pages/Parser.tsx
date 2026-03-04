@@ -160,6 +160,9 @@ export default function Parser() {
   const [totalPages, setTotalPages] = useState(0);
   const [file, setFile] = useState<File | null>(null);
 
+  // Model selector
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
+
   // Workspace state
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [chapterResults, setChapterResults] = useState<Map<number, { scenes: Scene[]; status: ChapterStatus }>>(new Map());
