@@ -1348,9 +1348,20 @@ export default function Parser() {
 
                           {selectedResult?.status === "error" && (
                             <Card className="border-destructive/30">
-                              <CardContent className="py-6 flex flex-col items-center gap-3">
-                                <AlertCircle className="h-8 w-8 text-destructive" />
-                                <p className="text-sm text-muted-foreground">Ошибка при анализе. Попробуйте снова.</p>
+                              <CardContent className="py-4 space-y-2">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+                                  <p className="text-sm text-muted-foreground">{isRu ? "Ошибка при анализе. Попробуйте снова." : "Analysis failed. Try again."}</p>
+                                </div>
+                                {analysisLog.length > 0 && (
+                                  <ScrollArea className="max-h-[200px]">
+                                    <div className="space-y-1 font-mono text-xs text-muted-foreground">
+                                      {analysisLog.map((line, i) => (
+                                        <div key={i} className={line.startsWith("❌") ? "text-destructive" : ""}>{line}</div>
+                                      ))}
+                                    </div>
+                                  </ScrollArea>
+                                )}
                               </CardContent>
                             </Card>
                           )}
