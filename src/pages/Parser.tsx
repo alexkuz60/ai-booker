@@ -1374,8 +1374,11 @@ export default function Parser() {
                                 )}
                                 {selectedResult?.status === "error" && (
                                   <Button variant="outline" size="sm" onClick={() => analyzeChapter(selectedIdx)} className="gap-2 border-destructive/30 text-destructive">
-                                    <AlertCircle className="h-4 w-4" />
-                                    Повторить
+                                    {(selectedResult?.scenes?.length || 0) > 0 ? (
+                                      <><PlayCircle className="h-4 w-4" />{isRu ? "Продолжить" : "Resume"}</>
+                                    ) : (
+                                      <><AlertCircle className="h-4 w-4" />{isRu ? "Повторить" : "Retry"}</>
+                                    )}
                                   </Button>
                                 )}
                               </div>
