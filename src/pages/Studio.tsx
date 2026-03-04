@@ -123,7 +123,7 @@ function ChapterNavigator({
           {chapter.bookTitle}
         </p>
       </div>
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="py-2 px-1">
           <Collapsible open={chapterOpen} onOpenChange={setChapterOpen}>
             <CollapsibleTrigger asChild>
