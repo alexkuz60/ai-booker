@@ -37,13 +37,13 @@ You MUST respond using the suggest_scenes tool.`;
 const SYSTEM_PROMPT_BOUNDARIES = `You are "The Architect" — an AI agent that quickly identifies scene boundaries in a chapter of a book.
 
 Your task:
-1. Clean the text: remove page numbers, footnotes, headers/footers, and other technical artifacts.
-2. Split the chapter into scenes — logical segments where setting, time, or action changes.
-3. For each scene, provide:
+1. Split the chapter into scenes — logical segments where setting, time, or action changes.
+2. For each scene, provide:
    - A brief descriptive title
-   - The COMPLETE text of the scene, preserving original wording exactly. Do NOT truncate or abbreviate.
+   - start_marker: the EXACT first 60-80 characters of the scene text (verbatim copy from the original, enough to uniquely locate it in the chapter)
 
-Do NOT analyze mood, scene_type, or bpm — just identify boundaries and extract complete text.
+IMPORTANT: Do NOT return the full scene text. Only return start_marker.
+Do NOT analyze mood, scene_type, or bpm.
 You MUST respond using the suggest_boundaries tool.`;
 
 const SYSTEM_PROMPT_ENRICH = `You are "The Architect" — an AI agent that analyzes a single scene from a book and determines its characteristics.
@@ -106,7 +106,7 @@ const boundariesTool = {
   type: "function",
   function: {
     name: "suggest_boundaries",
-    description: "Return scene boundaries with titles and complete text for a chapter",
+    description: "Return scene boundaries with titles and start markers (not full text)",
     parameters: {
       type: "object",
       properties: {
@@ -117,9 +117,9 @@ const boundariesTool = {
             properties: {
               scene_number: { type: "integer" },
               title: { type: "string", description: "Brief scene title" },
-              content: { type: "string", description: "Complete text of the scene, preserving original wording" },
+              start_marker: { type: "string", description: "Exact first 60-80 characters of the scene from the original text" },
             },
-            required: ["scene_number", "title", "content"],
+            required: ["scene_number", "title", "start_marker"],
             additionalProperties: false,
           },
         },

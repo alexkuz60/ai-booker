@@ -778,8 +778,34 @@ export default function Parser() {
         if (fnData?.error) throw new Error(fnData.error);
 
         const rawScenes = fnData.structure?.scenes || [];
-        scenes = rawScenes.map((s: any) => ({
-          scene_number: s.scene_number,
+
+        // Split original text into scene content using start_markers
+        const splitTextByMarkers = (fullText: string, markers: { start_marker: string; title: string; scene_number: number }[]) => {
+          const positions: { idx: number; scene: typeof markers[0] }[] = [];
+          for (const m of markers) {
+            if (!m.start_marker) continue;
+            // Find marker in text (fuzzy: try exact, then trimmed, then first 40 chars)
+            let idx = fullText.indexOf(m.start_marker);
+            if (idx === -1) idx = fullText.indexOf(m.start_marker.trim());
+            if (idx === -1 && m.start_marker.length > 40) idx = fullText.indexOf(m.start_marker.slice(0, 40));
+            if (idx !== -1) positions.push({ idx, scene: m });
+          }
+          // Sort by position
+          positions.sort((a, b) => a.idx - b.idx);
+          // Extract content between markers
+          return positions.map((p, i) => {
+            const start = p.idx;
+            const end = i + 1 < positions.length ? positions[i + 1].idx : fullText.length;
+            return {
+              ...p.scene,
+              content: fullText.slice(start, end).trim(),
+            };
+          });
+        };
+
+        const splitScenes = splitTextByMarkers(text, rawScenes);
+        scenes = splitScenes.map((s, i) => ({
+          scene_number: s.scene_number || i + 1,
           title: s.title,
           content: s.content || '',
           content_preview: (s.content || '').slice(0, 200),
@@ -787,6 +813,20 @@ export default function Parser() {
           mood: '',
           bpm: 0,
         }));
+
+        // If marker splitting failed, use raw scenes without content
+        if (scenes.length === 0 && rawScenes.length > 0) {
+          scenes = rawScenes.map((s: any, i: number) => ({
+            scene_number: s.scene_number || i + 1,
+            title: s.title,
+            content: '',
+            content_preview: '',
+            scene_type: 'pending',
+            mood: '',
+            bpm: 0,
+          }));
+          addLog(isRu ? `⚠️ Маркеры не найдены в тексте, контент будет пустым` : `⚠️ Markers not found in text, content will be empty`);
+        }
 
         addLog(isRu ? `✅ Определено ${scenes.length} сцен:` : `✅ Found ${scenes.length} scenes:`);
         scenes.forEach((sc, i) => {
