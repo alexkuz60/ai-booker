@@ -132,6 +132,7 @@ interface BookRecord {
   id: string;
   title: string;
   file_name: string;
+  file_path: string | null;
   status: string;
   created_at: string;
   chapter_count?: number;
@@ -216,7 +217,7 @@ export default function Parser() {
     try {
       const { data: booksData } = await supabase
         .from('books')
-        .select('id, title, file_name, status, created_at')
+        .select('id, title, file_name, file_path, status, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -270,10 +271,13 @@ export default function Parser() {
     setBookId(book.id);
 
     try {
-      // Load parts and chapters in parallel
-      const [partsRes, chaptersRes] = await Promise.all([
+      // Load parts, chapters, and PDF file in parallel
+      const [partsRes, chaptersRes, pdfBlob] = await Promise.all([
         supabase.from('book_parts').select('id, part_number, title').eq('book_id', book.id).order('part_number'),
         supabase.from('book_chapters').select('id, chapter_number, title, scene_type, mood, bpm, part_id').eq('book_id', book.id).order('chapter_number'),
+        book.file_path
+          ? supabase.storage.from('book-uploads').download(book.file_path).then(r => r.data)
+          : Promise.resolve(null),
       ]);
 
       const parts = partsRes.data || [];
@@ -285,6 +289,64 @@ export default function Parser() {
         return;
       }
 
+      // Restore PDF reference for future analysis
+      let restoredPdf: any = null;
+      let restoredTotalPages = 0;
+      let tocFromPdf: TocChapter[] = [];
+
+      if (pdfBlob) {
+        try {
+          const arrayBuffer = await pdfBlob.arrayBuffer();
+          const { getDocument } = await import('pdfjs-dist');
+          const pdf = await getDocument({ data: arrayBuffer }).promise;
+          restoredPdf = pdf;
+          restoredTotalPages = pdf.numPages;
+
+          // Re-extract outline to get page ranges
+          const rawOutline = await pdf.getOutline();
+          if (rawOutline && rawOutline.length > 0) {
+            const flat = flattenTocWithRanges(
+              await (async function parseItems(items: any[], level: number): Promise<TocEntry[]> {
+                const entries: TocEntry[] = [];
+                for (const item of items) {
+                  let pageNumber = 1;
+                  try {
+                    if (item.dest) {
+                      const dest = typeof item.dest === 'string' ? await pdf.getDestination(item.dest) : item.dest;
+                      if (dest && dest[0]) {
+                        const pageIndex = await pdf.getPageIndex(dest[0]);
+                        pageNumber = pageIndex + 1;
+                      }
+                    }
+                  } catch { /* fallback */ }
+                  const children = item.items?.length ? await parseItems(item.items, level + 1) : [];
+                  entries.push({ title: item.title || 'Untitled', pageNumber, level, children });
+                }
+                return entries;
+              })(rawOutline, 0),
+              pdf.numPages
+            );
+
+            // Build a title→pageRange lookup from the flat TOC
+            const pageRangeByTitle = new Map<string, { startPage: number; endPage: number }>();
+            for (const entry of flat) {
+              pageRangeByTitle.set(entry.title, { startPage: entry.startPage, endPage: entry.endPage });
+            }
+
+            // Match DB chapters to PDF TOC entries by title
+            tocFromPdf = chapters.map(ch => {
+              const range = pageRangeByTitle.get(ch.title);
+              return range || null;
+            }).map((range) => range ? { startPage: range.startPage, endPage: range.endPage } : { startPage: 0, endPage: 0 }) as any;
+          }
+        } catch (pdfErr) {
+          console.warn("Could not restore PDF for analysis:", pdfErr);
+        }
+      }
+
+      setPdfRef(restoredPdf);
+      setTotalPages(restoredTotalPages);
+
       // Build part lookup: id → title
       const partById = new Map<string, string>();
       const newPartIdMap = new Map<string, string>();
@@ -294,18 +356,17 @@ export default function Parser() {
       }
       setPartIdMap(newPartIdMap);
 
-      // Reconstruct level: chapters with part get level 1, without part get level 0
+      // Reconstruct TOC with page ranges from PDF if available
       const hasParts = parts.length > 0;
-      const savedToc: TocChapter[] = chapters.map(ch => ({
+      const savedToc: TocChapter[] = chapters.map((ch, i) => ({
         title: ch.title,
-        startPage: 0,
-        endPage: 0,
+        startPage: tocFromPdf[i]?.startPage || 0,
+        endPage: tocFromPdf[i]?.endPage || 0,
         level: hasParts && ch.part_id ? 1 : 0,
         partTitle: ch.part_id ? partById.get(ch.part_id) : undefined,
         sectionType: classifySection(ch.title),
       }));
       setTocEntries(savedToc);
-      setTotalPages(0);
 
       // Build chapterIdMap
       const newChapterIdMap = new Map<number, string>();
@@ -347,7 +408,10 @@ export default function Parser() {
 
       setChapterResults(initMap);
       setStep("workspace");
-      toast.success(isRu ? `Книга «${book.title}» загружена` : `Book "${book.title}" loaded`);
+      const pdfStatus = restoredPdf
+        ? (isRu ? ' (PDF восстановлен, анализ доступен)' : ' (PDF restored, analysis available)')
+        : (isRu ? ' (PDF не найден, только просмотр)' : ' (PDF not found, view only)');
+      toast.success((isRu ? `Книга «${book.title}» загружена` : `Book "${book.title}" loaded`) + pdfStatus);
     } catch (err: any) {
       console.error("Failed to open book:", err);
       setErrorMsg(err.message || "Unknown error");
