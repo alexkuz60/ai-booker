@@ -140,6 +140,7 @@ interface BookRecord {
 }
 
 const NAV_WIDTH_KEY = "parser-nav-width";
+const ACTIVE_BOOK_KEY = "parser-active-book";
 
 export default function Parser() {
   const { user } = useAuth();
@@ -262,6 +263,24 @@ export default function Parser() {
     if (user && step === "library") loadLibrary();
   }, [user, step, loadLibrary]);
 
+  // ─── Auto-restore active book on mount ─────────────────────
+  const [restoredOnce, setRestoredOnce] = useState(false);
+  useEffect(() => {
+    if (restoredOnce || !user || step !== "library" || loadingLibrary) return;
+    const savedBookId = sessionStorage.getItem(ACTIVE_BOOK_KEY);
+    if (!savedBookId) return;
+    // Wait for books to load, then find and reopen
+    const book = books.find(b => b.id === savedBookId);
+    if (book) {
+      setRestoredOnce(true);
+      openSavedBook(book);
+    } else if (books.length > 0) {
+      // Book not found (deleted?), clear
+      sessionStorage.removeItem(ACTIVE_BOOK_KEY);
+      setRestoredOnce(true);
+    }
+  }, [user, step, loadingLibrary, books, restoredOnce]);
+
   // ─── Open saved book from DB ──────────────────────────────
 
   const openSavedBook = async (book: BookRecord) => {
@@ -269,6 +288,7 @@ export default function Parser() {
     setStep("extracting_toc");
     setFileName(book.file_name);
     setBookId(book.id);
+    sessionStorage.setItem(ACTIVE_BOOK_KEY, book.id);
 
     try {
       // Load parts, chapters, and PDF file in parallel
@@ -521,6 +541,7 @@ export default function Parser() {
         .single();
       if (bookErr) throw bookErr;
       setBookId(book.id);
+      sessionStorage.setItem(ACTIVE_BOOK_KEY, book.id);
 
       // Save parts to DB
       const uniqueParts = [...new Set(chapters.map(c => c.partTitle).filter(Boolean))] as string[];
@@ -757,6 +778,7 @@ export default function Parser() {
 
   const handleReset = () => {
     setStep("library");
+    sessionStorage.removeItem(ACTIVE_BOOK_KEY);
     setFileName("");
     setErrorMsg("");
     setBookId(null);
