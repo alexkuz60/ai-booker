@@ -201,8 +201,30 @@ serve(async (req) => {
 
     const truncatedText = text.slice(0, 100000);
 
+    // Gate Lovable AI behind admin role
+    const effectiveProvider = provider || 'lovable';
+    if (effectiveProvider === 'lovable') {
+      const authHeader = req.headers.get("Authorization");
+      const admin = await isAdmin(authHeader);
+      if (!admin) {
+        // Non-admin trying to use Lovable AI — check if they have OpenRouter/ProxyAPI key
+        if (openrouter_api_key) {
+          // Redirect to OpenRouter with same model ID
+          const orModel = user_model || 'google/gemini-2.5-flash';
+          console.log(`Non-admin user, redirecting ${orModel} to OpenRouter`);
+          const { endpoint, model, apiKey } = getEndpointAndModel('openrouter', orModel, openrouter_api_key);
+          // fall through with redirected config
+          return await handleAIRequest(req, truncatedText, endpoint, model, apiKey, 'openrouter', mode, chapter_title, openrouter_api_key);
+        }
+        return new Response(
+          JSON.stringify({ error: "Lovable AI доступен только администраторам. Настройте ключ OpenRouter или ProxyAPI в профиле." }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     const { endpoint, model, apiKey } = getEndpointAndModel(
-      provider || 'lovable',
+      effectiveProvider,
       user_model || 'google/gemini-2.5-flash',
       user_api_key || null
     );
@@ -213,6 +235,8 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    return await handleAIRequest(req, truncatedText, endpoint, model, apiKey, effectiveProvider, mode, chapter_title, openrouter_api_key);
 
     const isChapterMode = mode === "chapter";
     const systemPrompt = isChapterMode ? SYSTEM_PROMPT_CHAPTER : SYSTEM_PROMPT_FULL;
