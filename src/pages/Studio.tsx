@@ -73,10 +73,16 @@ const Studio = () => {
     })();
   }, [chapter?.scenes.map(s => s.id).join(",")]);
 
-  // Load scene content from DB when scene is selected
+  // Load scene content: prefer in-memory, fallback to DB
   useEffect(() => {
     setSceneContent(null);
-    if (!selectedScene?.id) return;
+    if (!selectedScene) return;
+    // Use content already in sessionStorage if available
+    if (selectedScene.content) {
+      setSceneContent(selectedScene.content);
+      return;
+    }
+    if (!selectedScene.id) return;
     (async () => {
       const { data } = await supabase
         .from("book_scenes")
