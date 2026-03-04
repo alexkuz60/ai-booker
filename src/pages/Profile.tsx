@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useCloudSettings } from '@/hooks/useCloudSettings';
+import { useUserRole } from '@/hooks/useUserRole';
 
 import { ProfileTab } from '@/components/profile/tabs/ProfileTab';
 import { PreferencesTab } from '@/components/profile/tabs/PreferencesTab';
@@ -19,6 +20,7 @@ import { StorageTab } from '@/components/profile/tabs/StorageTab';
 export default function Profile() {
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
+  const { isAdmin } = useUserRole();
   const { lang, isRu, setLang } = useLanguage();
 
   const [displayName, setDisplayName] = useState('');
@@ -163,6 +165,7 @@ export default function Profile() {
               saving={saving}
               proxyapiPriority={proxyapiPriority}
               onPriorityChange={setProxyapiPriority}
+              isAdmin={isAdmin}
             />
           </TabsContent>
 
