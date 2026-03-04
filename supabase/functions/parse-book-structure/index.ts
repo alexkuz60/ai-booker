@@ -156,6 +156,17 @@ function getEndpointAndModel(provider: string, userModel: string, userApiKey: st
   };
 }
 
+/** Try OpenRouter as fallback when Lovable gateway rejects a model (400) */
+function canFallbackToOpenRouter(userApiKey: string | null, model: string): { endpoint: string; model: string; apiKey: string } | null {
+  if (!userApiKey) return null;
+  // These models exist on OpenRouter with the same ID format
+  return {
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    model,
+    apiKey: userApiKey,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -163,7 +174,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { text, user_api_key, user_model, provider, mode, chapter_title } = body;
+    const { text, user_api_key, user_model, provider, mode, chapter_title, openrouter_api_key } = body;
 
     if (!text || text.trim().length < 50) {
       return new Response(
@@ -196,7 +207,6 @@ serve(async (req) => {
     const toolName = isChapterMode ? "suggest_scenes" : "suggest_structure";
 
     const requestBody: Record<string, unknown> = {
-      model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userContent },
@@ -205,38 +215,49 @@ serve(async (req) => {
       tool_choice: { type: "function", function: { name: toolName } },
     };
 
-    // OpenRouter requires extra headers
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    };
-    if (provider === 'openrouter') {
-      headers["HTTP-Referer"] = "https://booker-studio.lovable.app";
-      headers["X-Title"] = "BookerStudio Parser";
+    // Helper to make the AI call with retries
+    async function callAI(ep: string, mdl: string, key: string, prov: string): Promise<Response> {
+      const hdrs: Record<string, string> = {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      };
+      if (prov === 'openrouter') {
+        hdrs["HTTP-Referer"] = "https://booker-studio.lovable.app";
+        hdrs["X-Title"] = "BookerStudio Parser";
+      }
+
+      let resp: Response | null = null;
+      const MAX_RETRIES = 3;
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        resp = await fetch(ep, {
+          method: "POST",
+          headers: hdrs,
+          body: JSON.stringify({ ...requestBody, model: mdl }),
+        });
+        if (resp.status !== 502 && resp.status !== 503) break;
+        console.warn(`AI returned ${resp.status} (${prov}), attempt ${attempt + 1}/${MAX_RETRIES}`);
+        await resp.text();
+        if (attempt < MAX_RETRIES - 1) await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+      }
+      return resp!;
     }
 
-    // Retry logic for transient errors (503, 502, etc.)
-    let response: Response | null = null;
-    const MAX_RETRIES = 3;
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      response = await fetch(endpoint, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(requestBody),
-      });
+    // Primary call
+    let response = await callAI(endpoint, model, apiKey, provider || 'lovable');
 
-      if (response.status !== 502 && response.status !== 503) break;
-
-      console.warn(`AI returned ${response.status}, attempt ${attempt + 1}/${MAX_RETRIES}`);
-      // Consume body before retrying
-      await response.text();
-      if (attempt < MAX_RETRIES - 1) {
-        await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+    // Fallback: if Lovable gateway returns 400 (model not supported), try OpenRouter
+    if (response.status === 400 && (provider === 'lovable' || !provider)) {
+      const orKey = openrouter_api_key || user_api_key;
+      const fallback = canFallbackToOpenRouter(orKey, model);
+      if (fallback) {
+        console.log(`Lovable gateway 400 for model ${model}, falling back to OpenRouter`);
+        await response.text(); // consume
+        response = await callAI(fallback.endpoint, fallback.model, fallback.apiKey, 'openrouter');
       }
     }
 
-    if (!response || !response.ok) {
-      const status = response?.status || 500;
+    if (!response.ok) {
+      const status = response.status;
       if (status === 429) {
         return new Response(
           JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
@@ -255,7 +276,7 @@ serve(async (req) => {
           { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const errText = response ? await response.text() : "No response";
+      const errText = await response.text();
       console.error("AI error:", status, "model:", model, errText);
       return new Response(
         JSON.stringify({ error: `AI analysis failed (${status})` }),
