@@ -275,7 +275,7 @@ function canFallbackToOpenRouter(userApiKey: string | null, model: string): { en
 async function handleAIRequest(
   truncatedText: string, endpoint: string, model: string, apiKey: string,
   provider: string, mode: string | undefined, chapterTitle: string | undefined,
-  openrouterApiKey: string | null
+  openrouterApiKey: string | null, lang: string = 'en'
 ): Promise<Response> {
   let systemPrompt: string;
   let userContent: string;
@@ -283,7 +283,7 @@ async function handleAIRequest(
   let toolName: string;
 
   if (mode === "boundaries") {
-    systemPrompt = SYSTEM_PROMPT_BOUNDARIES;
+    systemPrompt = SYSTEM_PROMPT_BOUNDARIES(lang);
     userContent = `Split the following chapter "${chapterTitle || 'Untitled'}" into scenes. Return boundaries and complete text only:\n\n${truncatedText}`;
     tools = [boundariesTool];
     toolName = "suggest_boundaries";
@@ -293,12 +293,12 @@ async function handleAIRequest(
     tools = [enrichTool];
     toolName = "suggest_metadata";
   } else if (mode === "chapter") {
-    systemPrompt = SYSTEM_PROMPT_CHAPTER;
+    systemPrompt = SYSTEM_PROMPT_CHAPTER(lang);
     userContent = `Analyze the following chapter "${chapterTitle || 'Untitled'}" and decompose it into scenes:\n\n${truncatedText}`;
     tools = [chapterScenesTool];
     toolName = "suggest_scenes";
   } else {
-    systemPrompt = SYSTEM_PROMPT_FULL;
+    systemPrompt = SYSTEM_PROMPT_FULL(lang);
     userContent = `Analyze the following book text and decompose it into chapters and scenes:\n\n${truncatedText}`;
     tools = [fullStructureTool];
     toolName = "suggest_structure";
