@@ -215,29 +215,50 @@ serve(async (req) => {
       headers["X-Title"] = "BookerStudio Parser";
     }
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(requestBody),
-    });
+    // Retry logic for transient errors (503, 502, etc.)
+    let response: Response | null = null;
+    const MAX_RETRIES = 3;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      response = await fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestBody),
+      });
 
-    if (!response.ok) {
-      if (response.status === 429) {
+      if (response.status !== 502 && response.status !== 503) break;
+
+      console.warn(`AI returned ${response.status}, attempt ${attempt + 1}/${MAX_RETRIES}`);
+      // Consume body before retrying
+      await response.text();
+      if (attempt < MAX_RETRIES - 1) {
+        await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+      }
+    }
+
+    if (!response || !response.ok) {
+      const status = response?.status || 500;
+      if (status === 429) {
         return new Response(
           JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (response.status === 402) {
+      if (status === 402) {
         return new Response(
           JSON.stringify({ error: "Payment required. Please add credits." }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const errText = await response.text();
-      console.error("AI error:", response.status, errText);
+      if (status === 502 || status === 503) {
+        return new Response(
+          JSON.stringify({ error: "AI service temporarily unavailable. Please retry in a few seconds." }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const errText = response ? await response.text() : "No response";
+      console.error("AI error:", status, errText);
       return new Response(
-        JSON.stringify({ error: `AI analysis failed (${response.status})` }),
+        JSON.stringify({ error: `AI analysis failed (${status})` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
