@@ -22,6 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCloudSettings } from "@/hooks/useCloudSettings";
 import {
   extractOutline, extractTextByPageRange, extractTextFromPdf,
   flattenTocWithRanges, type TocEntry
