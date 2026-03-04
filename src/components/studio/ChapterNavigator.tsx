@@ -5,6 +5,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { StudioChapter } from "@/lib/studioChapter";
+import { estimateSceneDuration } from "@/lib/durationEstimate";
 
 // ─── Scene type colors (same as Parser) ─────────────────────
 export const SCENE_TYPE_COLORS: Record<string, string> = {
@@ -79,6 +80,7 @@ export function ChapterNavigator({
               <div className="space-y-0.5">
                 {chapter.scenes.map((scene, idx) => {
                   const colorClass = SCENE_TYPE_COLORS[scene.scene_type] || SCENE_TYPE_COLORS.mixed;
+                  const est = estimateSceneDuration(scene);
                   return (
                     <button
                       key={idx}
@@ -93,8 +95,8 @@ export function ChapterNavigator({
                         {isRu ? (SCENE_TYPE_RU[scene.scene_type] || scene.scene_type) : scene.scene_type}
                       </span>
                       <span className="truncate flex-1">{scene.title}</span>
-                      <span className="text-[11px] text-muted-foreground font-mono shrink-0">
-                        {scene.bpm}
+                      <span className="text-[11px] text-muted-foreground font-mono shrink-0" title={`${est.chars} ${isRu ? "сим." : "chars"}`}>
+                        {est.formatted}
                       </span>
                     </button>
                   );
