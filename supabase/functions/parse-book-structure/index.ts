@@ -57,7 +57,7 @@ const fullStructureTool = {
                   properties: {
                     scene_number: { type: "integer" },
                     title: { type: "string", description: "Brief scene title" },
-                    content_preview: { type: "string", description: "First 200 chars of scene" },
+                    content: { type: "string", description: "Complete text of the scene, preserving original wording" },
                     scene_type: {
                       type: "string",
                       enum: ["action", "dialogue", "lyrical_digression", "description", "inner_monologue", "mixed"],
@@ -96,7 +96,7 @@ const chapterScenesTool = {
             properties: {
               scene_number: { type: "integer" },
               title: { type: "string", description: "Brief scene title" },
-              content_preview: { type: "string", description: "First 200 chars of scene" },
+              content: { type: "string", description: "Complete text of the scene, preserving original wording" },
               scene_type: {
                 type: "string",
                 enum: ["action", "dialogue", "lyrical_digression", "description", "inner_monologue", "mixed"],
