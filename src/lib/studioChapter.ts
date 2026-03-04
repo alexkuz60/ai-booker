@@ -20,7 +20,24 @@ export interface StudioChapter {
 const STUDIO_CHAPTER_KEY = "studio-active-chapter";
 
 export function saveStudioChapter(chapter: StudioChapter) {
-  sessionStorage.setItem(STUDIO_CHAPTER_KEY, JSON.stringify(chapter));
+  const json = JSON.stringify(chapter);
+  try {
+    sessionStorage.setItem(STUDIO_CHAPTER_KEY, json);
+    return;
+  } catch {
+    // sessionStorage full — strip content and retry
+  }
+  const light: StudioChapter = {
+    ...chapter,
+    scenes: chapter.scenes.map(({ content, ...rest }) => rest),
+  };
+  try {
+    sessionStorage.setItem(STUDIO_CHAPTER_KEY, JSON.stringify(light));
+  } catch {
+    // still too large — clear and save minimal
+    sessionStorage.removeItem(STUDIO_CHAPTER_KEY);
+    sessionStorage.setItem(STUDIO_CHAPTER_KEY, JSON.stringify(light));
+  }
 }
 
 export function loadStudioChapter(): StudioChapter | null {
