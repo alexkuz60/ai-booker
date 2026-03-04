@@ -1077,8 +1077,7 @@ export default function Parser() {
                                     <CardContent className="py-3 px-4 space-y-2">
                                       <div className="flex items-center justify-between">
                                         <span className="text-sm font-medium">
-                                          {t("scenePrefix", isRu)} {sc.scene_number}: {sc.title}
-                                        </span>
+                                          {t("scenePrefix", isRu)} {sc.scene_number}: {tSceneTitle(sc.title, isRu)}
                                         <div className="flex items-center gap-1.5">
                                           <Badge variant="outline" className={`text-[10px] ${colorCls}`}>
                                             {tSceneType(sc.scene_type, isRu)}
