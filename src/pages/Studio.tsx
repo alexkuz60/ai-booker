@@ -18,6 +18,12 @@ const Studio = () => {
   const [chapter] = useState<StudioChapter | null>(() => loadStudioChapter());
   const [selectedSceneIdx, setSelectedSceneIdx] = useState<number | null>(null);
 
+  const chapterEstimate = useMemo(() => chapter ? estimateChapterDuration(chapter) : null, [chapter]);
+  const sceneEstimate = useMemo(() => {
+    if (!chapter || selectedSceneIdx === null) return null;
+    return estimateSceneDuration(chapter.scenes[selectedSceneIdx]);
+  }, [chapter, selectedSceneIdx]);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
