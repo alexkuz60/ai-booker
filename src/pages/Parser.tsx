@@ -108,6 +108,30 @@ function classifySection(title: string): SectionType {
   return "content";
 }
 
+/** Normalize levels: demote orphaned entries whose parent level doesn't exist */
+function normalizeLevels(entries: TocChapter[]): TocChapter[] {
+  const result = entries.map(e => ({ ...e }));
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let i = 0; i < result.length; i++) {
+      if (result[i].level === 0) continue;
+      const parentLevel = result[i].level - 1;
+      let parentFound = false;
+      for (let j = i - 1; j >= 0; j--) {
+        if (result[j].sectionType !== result[i].sectionType) continue;
+        if (result[j].level === parentLevel) { parentFound = true; break; }
+        if (result[j].level < parentLevel) break;
+      }
+      if (!parentFound) {
+        result[i].level--;
+        changed = true;
+      }
+    }
+  }
+  return result;
+}
+
 const SECTION_ICONS: Record<SectionType, string> = {
   content: "📖",
   preface: "📝",
