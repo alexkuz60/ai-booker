@@ -33,6 +33,7 @@ import { saveStudioChapter } from "@/lib/studioChapter";
 // ─── Types ───────────────────────────────────────────────────
 
 interface Scene {
+  id?: string;
   scene_number: number;
   title: string;
   content_preview?: string;
@@ -710,7 +711,7 @@ export default function Parser() {
           }).eq('id', existingChId);
         }
         for (const sc of scenes) {
-          await supabase.from('book_scenes').insert({
+          const { data: scRow } = await supabase.from('book_scenes').insert({
             chapter_id: existingChId,
             scene_number: sc.scene_number,
             title: sc.title,
@@ -718,7 +719,8 @@ export default function Parser() {
             scene_type: sc.scene_type,
             mood: sc.mood,
             bpm: sc.bpm,
-          });
+          }).select('id').single();
+          if (scRow) sc.id = scRow.id;
         }
       } else if (bookId) {
         // Fallback: create chapter if no pre-saved ID
@@ -736,7 +738,7 @@ export default function Parser() {
         if (chRow) {
           setChapterIdMap(prev => new Map(prev).set(idx, chRow.id));
           for (const sc of scenes) {
-            await supabase.from('book_scenes').insert({
+            const { data: scRow } = await supabase.from('book_scenes').insert({
               chapter_id: chRow.id,
               scene_number: sc.scene_number,
               title: sc.title,
@@ -744,7 +746,8 @@ export default function Parser() {
               scene_type: sc.scene_type,
               mood: sc.mood,
               bpm: sc.bpm,
-            });
+            }).select('id').single();
+            if (scRow) sc.id = scRow.id;
           }
         }
       }

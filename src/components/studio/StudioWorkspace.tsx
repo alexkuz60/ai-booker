@@ -1,7 +1,14 @@
 import { Users, Wind, Volume2, Film } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { StoryboardPanel } from "./StoryboardPanel";
 
-export function StudioWorkspace({ isRu }: { isRu: boolean }) {
+interface StudioWorkspaceProps {
+  isRu: boolean;
+  selectedSceneId?: string | null;
+  selectedSceneContent?: string | null;
+}
+
+export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent }: StudioWorkspaceProps) {
   return (
     <div className="h-full min-h-0 flex flex-col p-4">
       <Tabs defaultValue="storyboard" className="flex-1 flex flex-col min-h-0">
@@ -25,10 +32,12 @@ export function StudioWorkspace({ isRu }: { isRu: boolean }) {
         </TabsList>
 
         <TabsContent value="storyboard" className="flex-1 mt-4 min-h-0">
-          <div className="rounded-lg border border-border bg-card/50 h-full flex items-center justify-center">
-            <p className="text-sm text-muted-foreground font-body">
-              {isRu ? "Раскадровка выбранной сцены" : "Storyboard for selected scene"}
-            </p>
+          <div className="rounded-lg border border-border bg-card/50 h-full">
+            <StoryboardPanel
+              sceneId={selectedSceneId ?? null}
+              sceneContent={selectedSceneContent ?? null}
+              isRu={isRu}
+            />
           </div>
         </TabsContent>
 
