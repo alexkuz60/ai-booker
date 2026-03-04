@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ChevronRight, ChevronDown, Mic2, Wind, Volume2, Plus, ZoomIn, ZoomOut, Clapperboard } from "lucide-react";
+import { ChevronRight, ChevronDown, ChevronUp, Mic2, Wind, Volume2, Plus, ZoomIn, ZoomOut, Clapperboard, Users } from "lucide-react";
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
