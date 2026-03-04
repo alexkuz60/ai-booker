@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import ModelSelector from "@/components/ModelSelector";
-import { DEFAULT_MODEL_ID, isLovableModel } from "@/config/modelRegistry";
+import { DEFAULT_MODEL_ID, isLovableModel, getModelRegistryEntry } from "@/config/modelRegistry";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -162,6 +162,7 @@ export default function Parser() {
 
   // Model selector
   const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
+  const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
 
   // Workspace state
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -194,6 +195,15 @@ export default function Parser() {
       setExpandedNodes(allKeys);
     }
   }, [tocEntries]);
+
+  // ─── Load user API keys ─────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('profiles').select('api_keys').eq('id', user.id).single()
+      .then(({ data }) => {
+        if (data?.api_keys) setUserApiKeys(data.api_keys as Record<string, string>);
+      });
+  }, [user]);
 
   // ─── Library: Load user's books ────────────────────────────
 
@@ -658,7 +668,7 @@ export default function Parser() {
         </div>
         {step === "workspace" && (
           <div className="flex items-center gap-3">
-            <ModelSelector value={selectedModel} onChange={setSelectedModel} isRu={isRu} />
+            <ModelSelector value={selectedModel} onChange={setSelectedModel} isRu={isRu} userApiKeys={userApiKeys} />
             <div className="text-xs text-muted-foreground">
               {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} • {totalScenes} {t("scenes", isRu)}
             </div>
