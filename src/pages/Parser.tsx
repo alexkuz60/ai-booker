@@ -37,6 +37,7 @@ interface Scene {
   scene_number: number;
   title: string;
   content_preview?: string;
+  content?: string;
   scene_type: string;
   mood: string;
   bpm: number;
@@ -692,7 +693,12 @@ export default function Parser() {
 
       if (fnError || fnData?.error) throw new Error(fnError?.message || fnData?.error);
 
-      const scenes: Scene[] = fnData.structure?.scenes || [];
+      const rawScenes = fnData.structure?.scenes || [];
+      const scenes: Scene[] = rawScenes.map((s: any) => ({
+        ...s,
+        content: s.content || s.content_preview || '',
+        content_preview: (s.content || s.content_preview || '').slice(0, 200),
+      }));
 
       setChapterResults(prev => {
         const next = new Map(prev);
@@ -715,7 +721,7 @@ export default function Parser() {
             chapter_id: existingChId,
             scene_number: sc.scene_number,
             title: sc.title,
-            content: sc.content_preview || '',
+            content: sc.content || sc.content_preview || '',
             scene_type: sc.scene_type,
             mood: sc.mood,
             bpm: sc.bpm,
@@ -742,7 +748,7 @@ export default function Parser() {
               chapter_id: chRow.id,
               scene_number: sc.scene_number,
               title: sc.title,
-              content: sc.content_preview || '',
+              content: sc.content || sc.content_preview || '',
               scene_type: sc.scene_type,
               mood: sc.mood,
               bpm: sc.bpm,

@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2 } from "lucide-react";
+import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +55,76 @@ function renderPhraseText(text: string) {
     }
     return <span key={i}>{part}</span>;
   });
+}
+
+// ─── Editable phrase ────────────────────────────────────────
+
+function EditablePhrase({ phrase, isRu, onSave }: {
+  phrase: Phrase;
+  isRu: boolean;
+  onSave: (id: string, text: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(phrase.text);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (editing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
+    }
+  }, [editing]);
+
+  const save = () => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== phrase.text) {
+      onSave(phrase.phrase_id, trimmed);
+    }
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex gap-2 px-3 py-1.5 group">
+        <span className="text-[10px] text-muted-foreground font-mono pt-1.5 shrink-0 w-5 text-right">
+          {phrase.phrase_number}
+        </span>
+        <textarea
+          ref={textareaRef}
+          value={draft}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            e.target.style.height = "auto";
+            e.target.style.height = e.target.scrollHeight + "px";
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); }
+            if (e.key === "Escape") { setDraft(phrase.text); setEditing(false); }
+          }}
+          className="flex-1 text-sm font-body text-foreground leading-relaxed bg-background border border-primary/30 rounded px-2 py-1 resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+        <button onClick={save} className="shrink-0 text-primary hover:text-primary/80 pt-1">
+          <Check className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex gap-2 px-3 py-1.5 hover:bg-accent/20 transition-colors group cursor-text"
+      onClick={() => setEditing(true)}
+    >
+      <span className="text-[10px] text-muted-foreground font-mono pt-0.5 shrink-0 w-5 text-right">
+        {phrase.phrase_number}
+      </span>
+      <p className="text-sm font-body text-foreground leading-relaxed flex-1">
+        {renderPhraseText(phrase.text)}
+      </p>
+      <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
+    </div>
+  );
 }
 
 // ─── Main component ─────────────────────────────────────────
@@ -158,6 +228,24 @@ export function StoryboardPanel({
     }
   }, [loaded, segments.length, sceneContent, sceneId]);
 
+  // Save edited phrase to DB and update local state
+  const savePhrase = useCallback(async (phraseId: string, newText: string) => {
+    const { error } = await supabase
+      .from("segment_phrases")
+      .update({ text: newText })
+      .eq("id", phraseId);
+    if (error) {
+      toast.error(isRu ? "Ошибка сохранения" : "Save failed");
+      return;
+    }
+    setSegments(prev => prev.map(seg => ({
+      ...seg,
+      phrases: seg.phrases.map(ph =>
+        ph.phrase_id === phraseId ? { ...ph, text: newText } : ph
+      ),
+    })));
+  }, [isRu]);
+
   // ── No scene selected ──
   if (!sceneId) {
     return (
@@ -190,19 +278,21 @@ export function StoryboardPanel({
         <Sparkles className="h-8 w-8 text-muted-foreground/40" />
         <p className="text-sm text-muted-foreground font-body text-center max-w-xs">
           {isRu
-            ? "Нет контента для анализа. Откройте главу из Парсера."
-            : "No content to analyze. Open a chapter from Parser."}
+            ? "Нет контента для анализа. Переанализируйте главу в Парсере."
+            : "No content to analyze. Re-analyze the chapter in Parser."}
         </p>
       </div>
     );
   }
 
   // ── Segments view ──
+  const totalPhrases = segments.reduce((a, s) => a + s.phrases.length, 0);
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
         <span className="text-xs text-muted-foreground font-body">
-          {segments.length} {isRu ? "фрагм." : "segments"} · {segments.reduce((a, s) => a + s.phrases.length, 0)} {isRu ? "фраз" : "phrases"}
+          {segments.length} {isRu ? "фрагм." : "seg."} · {totalPhrases} {isRu ? "фраз" : "phrases"}
         </span>
         <Button variant="ghost" size="sm" onClick={runAnalysis} disabled={analyzing || !sceneContent} className="gap-1.5 h-7 text-xs">
           {analyzing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
@@ -234,17 +324,12 @@ export function StoryboardPanel({
                 {/* Phrases */}
                 <div className="divide-y divide-border/30">
                   {seg.phrases.map((ph) => (
-                    <div
+                    <EditablePhrase
                       key={ph.phrase_id}
-                      className="flex gap-2 px-3 py-1.5 hover:bg-accent/20 transition-colors group"
-                    >
-                      <span className="text-[10px] text-muted-foreground font-mono pt-0.5 shrink-0 w-5 text-right">
-                        {ph.phrase_number}
-                      </span>
-                      <p className="text-sm font-body text-foreground leading-relaxed flex-1">
-                        {renderPhraseText(ph.text)}
-                      </p>
-                    </div>
+                      phrase={ph}
+                      isRu={isRu}
+                      onSave={savePhrase}
+                    />
                   ))}
                 </div>
               </div>
