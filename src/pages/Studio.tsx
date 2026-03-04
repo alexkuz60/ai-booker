@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { ChevronRight, ChevronDown, ChevronUp, Mic2, Wind, Volume2, Plus, ZoomIn, ZoomOut, Clapperboard, Users } from "lucide-react";
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -202,6 +202,42 @@ const Studio = () => {
   const [zoom, setZoom] = useState(1);
   const duration = 180;
 
+  // Timeline collapse & height persistence
+  const [timelineCollapsed, setTimelineCollapsed] = useState(() => {
+    try { return localStorage.getItem("studio-timeline-collapsed") === "true"; } catch { return false; }
+  });
+  const [timelineSize, setTimelineSize] = useState(() => {
+    try { return Number(localStorage.getItem("studio-timeline-size")) || 45; } catch { return 45; }
+  });
+  const timelinePanelRef = useRef<any>(null);
+
+  const toggleTimeline = useCallback(() => {
+    setTimelineCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem("studio-timeline-collapsed", String(next));
+      if (next) {
+        timelinePanelRef.current?.collapse();
+      } else {
+        timelinePanelRef.current?.expand();
+      }
+      return next;
+    });
+  }, []);
+
+  const handleTimelineResize = useCallback((size: number) => {
+    if (size > 0) {
+      setTimelineSize(size);
+      localStorage.setItem("studio-timeline-size", String(size));
+      if (timelineCollapsed) {
+        setTimelineCollapsed(false);
+        localStorage.setItem("studio-timeline-collapsed", "false");
+      }
+    } else {
+      setTimelineCollapsed(true);
+      localStorage.setItem("studio-timeline-collapsed", "true");
+    }
+  }, [timelineCollapsed]);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -245,8 +281,8 @@ const Studio = () => {
                 <Tabs defaultValue="narrators" className="flex-1 flex flex-col min-h-0">
                   <TabsList className="w-fit shrink-0">
                     <TabsTrigger value="narrators" className="gap-1.5">
-                      <Mic2 className="h-3.5 w-3.5" />
-                      <span className="font-body text-sm">{isRu ? "Дикторы" : "Narrators"}</span>
+                      <Users className="h-3.5 w-3.5" />
+                      <span className="font-body text-sm">{isRu ? "Персонажи" : "Characters"}</span>
                     </TabsTrigger>
                     <TabsTrigger value="atmosphere" className="gap-1.5">
                       <Wind className="h-3.5 w-3.5" />
@@ -261,7 +297,7 @@ const Studio = () => {
                   <TabsContent value="narrators" className="flex-1 mt-4">
                     <div className="rounded-lg border border-border bg-card/50 h-full flex items-center justify-center">
                       <p className="text-sm text-muted-foreground font-body">
-                        {isRu ? "Управление дикторами для выбранного раздела" : "Narrator management for selected section"}
+                        {isRu ? "Управление персонажами для выбранного раздела" : "Character management for selected section"}
                       </p>
                     </div>
                   </TabsContent>
@@ -290,12 +326,29 @@ const Studio = () => {
         <ResizableHandle withHandle />
 
         {/* BOTTOM: Multitrack Timeline */}
-        <ResizablePanel defaultSize={45} minSize={20}>
+        <ResizablePanel
+          ref={timelinePanelRef}
+          defaultSize={timelineCollapsed ? 0 : timelineSize}
+          minSize={0}
+          collapsible
+          collapsedSize={0}
+          onResize={handleTimelineResize}
+        >
           <div className="h-full flex flex-col bg-background">
             <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-body">
-                {isRu ? "Таймлайн" : "Timeline"}
-              </span>
+              <button
+                onClick={toggleTimeline}
+                className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+              >
+                {timelineCollapsed ? (
+                  <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                )}
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-body">
+                  {isRu ? "Таймлайн" : "Timeline"}
+                </span>
+              </button>
               <div className="flex items-center gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))}>
                   <ZoomOut className="h-3.5 w-3.5" />
