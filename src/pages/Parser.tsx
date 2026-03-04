@@ -22,6 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCloudSettings } from "@/hooks/useCloudSettings";
 import {
   extractOutline, extractTextByPageRange, extractTextFromPdf,
   flattenTocWithRanges, type TocEntry
@@ -160,8 +161,8 @@ export default function Parser() {
   const [totalPages, setTotalPages] = useState(0);
   const [file, setFile] = useState<File | null>(null);
 
-  // Model selector
-  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
+   // Model selector (cloud-synced)
+  const { value: selectedModel, update: setSelectedModel, loaded: modelLoaded } = useCloudSettings('parser-model', DEFAULT_MODEL_ID);
   const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
 
   // Workspace state
