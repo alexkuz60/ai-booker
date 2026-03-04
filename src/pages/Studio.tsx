@@ -105,12 +105,12 @@ function ChapterNavigator({
     <div className="h-full flex flex-col border-r border-border">
       <div className="px-4 py-3 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
-          <Clapperboard className="h-4 w-4 text-primary" />
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-body">
+          <Clapperboard className="h-5 w-5 text-primary" />
+          <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider font-body">
             {isRu ? "Глава" : "Chapter"}
           </span>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+        <p className="text-xs text-muted-foreground mt-0.5 truncate">
           {chapter.bookTitle}
         </p>
       </div>
@@ -120,18 +120,18 @@ function ChapterNavigator({
             <CollapsibleTrigger asChild>
               <button
                 className={cn(
-                  "w-full flex items-center gap-1.5 px-3 py-2 text-sm font-body rounded-md transition-colors",
+                  "w-full flex items-center gap-2 px-3 py-2 text-base font-body rounded-md transition-colors",
                   "hover:bg-accent/50 font-semibold text-foreground"
                 )}
                 onClick={() => onSelectScene(null)}
               >
                 {chapterOpen ? (
-                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
                 ) : (
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 )}
                 <span className="truncate">{chapter.chapterTitle}</span>
-                <Badge variant="outline" className="ml-auto text-[10px] shrink-0">
+                <Badge variant="outline" className="ml-auto text-[11px] shrink-0">
                   {chapter.scenes.length}
                 </Badge>
               </button>
@@ -145,16 +145,16 @@ function ChapterNavigator({
                       key={idx}
                       onClick={() => onSelectScene(idx)}
                       className={cn(
-                        "w-full flex items-center gap-2 pl-8 pr-3 py-1.5 text-xs font-body rounded-md transition-colors text-left",
+                        "w-full flex items-center gap-2 pl-9 pr-3 py-2 text-sm font-body rounded-md transition-colors text-left",
                         "hover:bg-accent/50",
                         selectedSceneIdx === idx && "bg-primary/10 text-primary border-r-2 border-primary"
                       )}
                     >
-                      <span className={cn("px-1 py-0.5 rounded text-[9px] border shrink-0", colorClass)}>
+                      <span className={cn("px-1.5 py-0.5 rounded text-[10px] border shrink-0", colorClass)}>
                         {scene.scene_type}
                       </span>
                       <span className="truncate flex-1">{scene.title}</span>
-                      <span className="text-[10px] text-muted-foreground font-mono shrink-0">
+                      <span className="text-[11px] text-muted-foreground font-mono shrink-0">
                         {scene.bpm}
                       </span>
                     </button>
