@@ -49,7 +49,7 @@ export function useParserHelpers({
     }
 
     // Renumber scenes sequentially across all children
-    const numberedScenes = allScenes.map((s, i) => ({ ...s, sceneNumber: i + 1 }));
+    const numberedScenes = allScenes.map((s, i) => ({ ...s, scene_number: i + 1 }));
     return { scenes: numberedScenes, status: worstStatus };
   }, [selectedIdx, tocEntries, chapterResults]);
 

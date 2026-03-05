@@ -40,9 +40,9 @@ function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
           ≈ {totalDuration.formatted}
         </span>
       </div>
-      {scenes.map((sc) => {
+      {scenes.map((sc, i) => {
         const colorCls = SCENE_TYPE_COLORS[sc.scene_type] || SCENE_TYPE_COLORS.mixed;
-        const isExpanded = expandedId === sc.scene_number;
+        const isExpanded = expandedId === i;
         const content = sc.content || sc.content_preview || "";
         const preview = content.slice(0, 100);
         const hasMore = content.length > 100;
@@ -50,9 +50,9 @@ function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
 
         return (
           <Card
-            key={sc.scene_number}
+            key={`${sc.scene_number}-${i}`}
             className={hasMore ? "cursor-pointer" : ""}
-            onClick={() => hasMore && setExpandedId(isExpanded ? null : sc.scene_number)}
+            onClick={() => hasMore && setExpandedId(isExpanded ? null : i)}
           >
             <CardContent className="py-3 px-4 space-y-2">
               <div className="flex items-center justify-between">
