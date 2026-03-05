@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { motion } from "framer-motion";
 import {
   FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock
@@ -11,6 +11,49 @@ import { t, tSceneType, tMood, tSceneTitle } from "@/pages/parser/i18n";
 import type { TocChapter, Scene, ChapterStatus } from "@/pages/parser/types";
 import { SCENE_TYPE_COLORS } from "@/pages/parser/types";
 import { estimateDurationSec, formatDuration } from "@/lib/durationEstimate";
+
+/**
+ * Render scene text with styled inline markers:
+ * - [стр. N]  → muted gray badge
+ * - [сн. N]…[/сн.] → amber footnote badge + dimmed content
+ */
+function renderMarkedText(text: string) {
+  const regex = /(\[стр\.\s*\d+\]|\[сн\.\s*\d+\]|\[\/сн\.\])/g;
+  const parts = text.split(regex);
+  if (parts.length === 1) return text;
+
+  let insideFootnote = false;
+
+  return parts.map((part, i) => {
+    if (/^\[стр\.\s*\d+\]$/.test(part)) {
+      return (
+        <span key={i} className="inline-flex items-center mx-1 px-1.5 py-0 rounded text-[10px] font-mono bg-muted text-muted-foreground/60 align-baseline">
+          {part}
+        </span>
+      );
+    }
+    if (/^\[сн\.\s*\d+\]$/.test(part)) {
+      insideFootnote = true;
+      return (
+        <span key={i} className="inline-flex items-center mx-1 px-1.5 py-0 rounded text-[10px] font-mono bg-amber-500/15 text-amber-400/80 align-baseline">
+          {part}
+        </span>
+      );
+    }
+    if (part === '[/сн.]') {
+      insideFootnote = false;
+      return (
+        <span key={i} className="inline-flex items-center mx-0.5 px-1 py-0 rounded text-[10px] font-mono bg-amber-500/15 text-amber-400/60 align-baseline">
+          ⌟
+        </span>
+      );
+    }
+    if (insideFootnote) {
+      return <span key={i} className="text-amber-300/50 italic text-xs">{part}</span>;
+    }
+    return <Fragment key={i}>{part}</Fragment>;
+  });
+}
 
 interface ChapterDetailPanelProps {
   isRu: boolean;
@@ -78,9 +121,9 @@ function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
               </div>
               {content && (
                 <p className="text-sm text-muted-foreground whitespace-pre-line">
-                  {isExpanded ? content : (
+                  {isExpanded ? renderMarkedText(content) : (
                     <>
-                      {preview}{hasMore && "…"}
+                      {renderMarkedText(preview)}{hasMore && "…"}
                     </>
                   )}
                 </p>
