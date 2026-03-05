@@ -33,7 +33,7 @@ export default function Parser() {
 
   const {
     step, setStep, books, loadingLibrary, fileName, errorMsg,
-    chapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages,
+    chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages,
     chapterResults, setChapterResults, fileInputRef,
     openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset,
   } = useBookManager({ userId: user?.id, isRu });
