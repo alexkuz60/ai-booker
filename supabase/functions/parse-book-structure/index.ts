@@ -443,6 +443,8 @@ serve(async (req) => {
       effectiveProvider, user_model || 'google/gemini-2.5-flash', user_api_key || null
     );
 
+    console.log(`[parse-book-structure] provider=${effectiveProvider} model=${model} mode=${mode || 'full'} textLen=${truncatedText.length}`);
+
     if (!apiKey) {
       return new Response(JSON.stringify({ error: "No API key available. Configure in profile or contact admin." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
