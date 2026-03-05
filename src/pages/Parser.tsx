@@ -131,8 +131,8 @@ export default function Parser() {
       const oldId = oldMap.get(i);
       if (oldId) newMap.set(newIdx, oldId);
       newIdx++;
-    }
-    // We need access to setChapterIdMap - but it's not exposed. We'll work around via chapterResults too.
+    setChapterIdMap(newMap);
+
     
     // Clear selection if deleted
     if (selectedIdx !== null && deleteSet.has(selectedIdx)) {
