@@ -124,7 +124,7 @@ export async function extractTextByPageRange(
           currentLine = str;
         } else {
           // Same line — add space only if not joining to punctuation
-          const needsSpace = currentLine && str && !currentLine.endsWith(' ') && !str.startsWith(' ') && !/^[.,;:!?\-—–)»"\u201D\u2019\u00BB]/.test(str);
+          const needsSpace = currentLine && str && !currentLine.endsWith(' ') && !str.startsWith(' ') && !/^[.,;:!?—–)»"\u201D\u2019\u00BB]/.test(str);
           currentLine += (needsSpace ? ' ' : '') + str;
         }
       } else {
