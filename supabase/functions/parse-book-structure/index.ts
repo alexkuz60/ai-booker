@@ -418,6 +418,7 @@ async function handleAIRequest(
   console.error("AI response had no tool_calls after retries:", JSON.stringify(lastMsg).slice(0, 500));
   return new Response(JSON.stringify({ error: "AI did not return structured output" }),
     { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
