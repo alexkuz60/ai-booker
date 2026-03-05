@@ -151,7 +151,7 @@ export default function NavSidebar({
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-card/50">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden bg-card/50">
       <div className="px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
           <BookOpen className="h-5 w-5 text-primary" />
