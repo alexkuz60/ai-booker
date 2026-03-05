@@ -338,6 +338,7 @@ async function handleAIRequest(
     return resp!;
   }
 
+  const t0 = performance.now();
   let response = await callAI(endpoint, model, apiKey, provider);
 
   // Fallback: if Lovable gateway returns 400, try OpenRouter
@@ -370,7 +371,10 @@ async function handleAIRequest(
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
+  const latencyMs = Math.round(performance.now() - t0);
   const data = await response.json();
+  const usage = data.usage;
+  console.log(`[parse-book-structure] latency=${latencyMs}ms tokens_in=${usage?.prompt_tokens ?? '?'} tokens_out=${usage?.completion_tokens ?? '?'} total=${usage?.total_tokens ?? '?'}`);
   const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
 
   if (!toolCall) {
