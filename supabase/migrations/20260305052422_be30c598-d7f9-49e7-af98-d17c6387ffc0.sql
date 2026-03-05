@@ -1,0 +1,1 @@
+ALTER TABLE public.book_chapters ADD COLUMN IF NOT EXISTS level integer NOT NULL DEFAULT 0;

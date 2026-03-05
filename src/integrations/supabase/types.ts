@@ -22,6 +22,7 @@ export type Database = {
           content: string | null
           created_at: string
           id: string
+          level: number
           mood: string | null
           part_id: string | null
           scene_type: string | null
@@ -34,6 +35,7 @@ export type Database = {
           content?: string | null
           created_at?: string
           id?: string
+          level?: number
           mood?: string | null
           part_id?: string | null
           scene_type?: string | null
@@ -46,6 +48,7 @@ export type Database = {
           content?: string | null
           created_at?: string
           id?: string
+          level?: number
           mood?: string | null
           part_id?: string | null
           scene_type?: string | null
