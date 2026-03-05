@@ -71,17 +71,23 @@ export default function Parser() {
       const entry = next[idx];
       const newLevel = entry.level + delta;
       if (newLevel < 0) return prev;
-      // Find children (same sectionType, deeper level)
-      const childIndices: number[] = [];
+      const affectedIndices = [idx];
       for (let i = idx + 1; i < next.length; i++) {
         if (next[i].level <= entry.level) break;
         if (next[i].sectionType !== entry.sectionType) break;
-        childIndices.push(i);
+        affectedIndices.push(i);
       }
       next[idx].level = newLevel;
-      for (const ci of childIndices) {
+      for (const ci of affectedIndices.slice(1)) {
         next[ci].level += delta;
         if (next[ci].level < 0) next[ci].level = 0;
+      }
+      // Auto-save levels to DB
+      for (const ci of affectedIndices) {
+        const chapterId = chapterIdMap.get(ci);
+        if (chapterId) {
+          supabase.from('book_chapters').update({ level: next[ci].level } as any).eq('id', chapterId).then();
+        }
       }
       return next;
     });

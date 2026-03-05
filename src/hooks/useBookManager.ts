@@ -116,7 +116,7 @@ export function useBookManager({ userId, isRu }: UseBookManagerParams) {
     try {
       const [partsRes, chaptersRes, pdfBlob] = await Promise.all([
         supabase.from('book_parts').select('id, part_number, title').eq('book_id', book.id).order('part_number'),
-        supabase.from('book_chapters').select('id, chapter_number, title, scene_type, mood, bpm, part_id').eq('book_id', book.id).order('chapter_number'),
+        supabase.from('book_chapters').select('id, chapter_number, title, scene_type, mood, bpm, part_id, level').eq('book_id', book.id).order('chapter_number'),
         book.file_path
           ? supabase.storage.from('book-uploads').download(book.file_path).then(r => r.data)
           : Promise.resolve(null),
@@ -193,11 +193,12 @@ export function useBookManager({ userId, isRu }: UseBookManagerParams) {
       const hasParts = parts.length > 0;
       const savedToc: TocChapter[] = chapters.map((ch, i) => {
         const pdfInfo = tocFromPdf[i];
+        const dbLevel = (ch as any).level;
         return {
           title: ch.title,
           startPage: pdfInfo?.startPage || 0,
           endPage: pdfInfo?.endPage || 0,
-          level: pdfInfo?.level ?? (hasParts && ch.part_id ? 1 : 0),
+          level: dbLevel != null ? dbLevel : (pdfInfo?.level ?? (hasParts && ch.part_id ? 1 : 0)),
           partTitle: ch.part_id ? partById.get(ch.part_id) : undefined,
           sectionType: classifySection(ch.title),
         };
