@@ -62,6 +62,19 @@ export default function Parser() {
     resetAnalysis();
   };
 
+  const handleOpenPdf = () => {
+    if (file) {
+      const url = URL.createObjectURL(file);
+      window.open(url, '_blank');
+    } else if (pdfRef?.getData) {
+      pdfRef.getData().then((data: Uint8Array) => {
+        const blob = new Blob([data], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+      });
+    }
+  };
+
   const handleSelectChapter = (idx: number, e: React.MouseEvent) => {
     if (e.shiftKey && lastClickedIdx !== null) {
       const from = Math.min(lastClickedIdx, idx);
