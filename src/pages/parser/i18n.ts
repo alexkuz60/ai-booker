@@ -99,6 +99,58 @@ const texts: Record<string, { ru: string; en: string }> = {
   // Scene label prefix
   scenePrefix: { ru: "Сцена", en: "Scene" },
 
+  // ChapterDetailPanel
+  pageRange: { ru: "Стр.", en: "pp." },
+  resume: { ru: "Продолжить", en: "Resume" },
+  retry: { ru: "Повторить", en: "Retry" },
+  decomposing: { ru: "Декомпозиция главы на сцены", en: "Decomposing chapter into scenes" },
+
+  // NavSidebar
+  toStudio: { ru: "В студию!", en: "To Studio!" },
+
+  // LibraryView
+  deleteBookTitle: { ru: "Удалить книгу?", en: "Delete book?" },
+  deleteBookDesc: { ru: "и все результаты анализа будут удалены безвозвратно.", en: "and all analysis results will be permanently deleted." },
+  cancel: { ru: "Отмена", en: "Cancel" },
+
+  // Parser.tsx toasts
+  noChaptersFound: { ru: "У этой книги ещё нет глав. Загрузите PDF заново.", en: "No chapters found. Please re-upload the PDF." },
+  bookLoaded: { ru: "Книга загружена", en: "Book loaded" },
+  pdfRestored: { ru: "PDF восстановлен, анализ доступен", en: "PDF restored, analysis available" },
+  pdfNotFound: { ru: "PDF не найден, только просмотр", en: "PDF not found, view only" },
+  bookDeleted: { ru: "Книга удалена", en: "Book deleted" },
+  bookDeleteFailed: { ru: "Не удалось удалить книгу", en: "Failed to delete book" },
+
+  // useChapterAnalysis log messages
+  logTimeout: { ru: "Timeout: анализ занял более 3 минут", en: "Timeout: analysis took more than 3 minutes" },
+  logClearing: { ru: "🗑️ Очистка предыдущих результатов...", en: "🗑️ Clearing previous results..." },
+  logAllDone: { ru: "Все сцены уже проанализированы", en: "All scenes already analyzed" },
+  logExtracting: { ru: "📖 Извлечение текста главы", en: "📖 Extracting chapter text" },
+  logNotEnough: { ru: "недостаточно текста для анализа", en: "not enough text for analysis" },
+  logExtracted: { ru: "📝 Текст извлечён", en: "📝 Text extracted" },
+  logChars: { ru: "символов", en: "chars" },
+  logPagesAbbr: { ru: "стр.", en: "pages" },
+  logStage1: { ru: "🎭 Этап 1: Определение границ сцен...", en: "🎭 Stage 1: Detecting scene boundaries..." },
+  logCallingAI: { ru: "🚀 Запрос к AI модели", en: "🚀 Calling AI model" },
+  logMarkersNotFound: { ru: "⚠️ Маркеры не найдены в тексте, контент будет пустым", en: "⚠️ Markers not found in text, content will be empty" },
+  logFoundScenes: { ru: "✅ Определено", en: "✅ Found" },
+  logScenesWord: { ru: "сцен", en: "scenes" },
+  logSceneItem: { ru: "📍 Сцена", en: "📍 Scene" },
+  logCharsAbbr: { ru: "зн.", en: "chars" },
+  logSaving: { ru: "💾 Сохранение структуры в базу данных...", en: "💾 Saving structure to database..." },
+  logResuming: { ru: "📍 Найдено сохранённых сцен, продолжаем обогащение...", en: "📍 Found saved scenes, resuming enrichment..." },
+  logStage2: { ru: "🧠 Этап 2: Обогащение", en: "🧠 Stage 2: Enriching" },
+  logOfScenes: { ru: "из", en: "of" },
+  logAnalyzingScene: { ru: "🎬 Анализ сцены", en: "🎬 Analyzing scene" },
+  logSkipped: { ru: "⏭️ Пропущена (слишком мало текста)", en: "⏭️ Skipped (too little text)" },
+  logEnrichFailed: { ru: "⚠️ Обогащение не удалось", en: "⚠️ Enrichment failed" },
+  logDefaults: { ru: "Установлены значения по умолчанию.", en: "Using defaults." },
+  logSceneDone: { ru: "✅ Сцена", en: "✅ Scene" },
+  logChapterDone: { ru: "🎉 Глава проанализирована!", en: "🎉 Chapter analyzed!" },
+  logSavedPartial: { ru: "💡 Сохранено", en: "💡 Saved" },
+  logScenesEnriched: { ru: "сцен (обогащено:", en: "scenes (enriched:" },
+  logClickResume: { ru: "Нажмите ▶ чтобы продолжить.", en: "Click ▶ to resume." },
+
   // Error messages
   errPayment: { ru: "Закончились средства на API-ключе. Пополните баланс провайдера или смените модель.", en: "API key credits exhausted. Top up your provider balance or switch model." },
   errRateLimit: { ru: "Превышен лимит запросов. Подождите немного и попробуйте снова.", en: "Rate limit exceeded. Wait a moment and try again." },

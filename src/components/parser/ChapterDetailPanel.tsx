@@ -47,7 +47,7 @@ export default function ChapterDetailPanel({
                 <div>
                   <CardTitle className="text-lg">{selectedEntry.title}</CardTitle>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {isRu ? "Стр." : "pp."} {selectedEntry.startPage}–{selectedEntry.endPage}
+                    {t("pageRange", isRu)} {selectedEntry.startPage}–{selectedEntry.endPage}
                     {selectedEntry.partTitle && ` • ${selectedEntry.partTitle}`}
                   </p>
                 </div>
@@ -68,9 +68,9 @@ export default function ChapterDetailPanel({
               {selectedResult?.status === "error" && (
                 <Button variant="outline" size="sm" onClick={() => onAnalyze(selectedIdx)} className="gap-2 border-destructive/30 text-destructive">
                   {(selectedResult?.scenes?.length || 0) > 0 ? (
-                    <><PlayCircle className="h-4 w-4" />{isRu ? "Продолжить" : "Resume"}</>
+                    <><PlayCircle className="h-4 w-4" />{t("resume", isRu)}</>
                   ) : (
-                    <><AlertCircle className="h-4 w-4" />{isRu ? "Повторить" : "Retry"}</>
+                    <><AlertCircle className="h-4 w-4" />{t("retry", isRu)}</>
                   )}
                 </Button>
               )}
@@ -88,7 +88,7 @@ export default function ChapterDetailPanel({
                 </div>
                 <div>
                   <p className="font-display font-semibold text-sm">The Architect</p>
-                  <p className="text-xs text-muted-foreground">{isRu ? "Декомпозиция главы на сцены" : "Decomposing chapter into scenes"}</p>
+                  <p className="text-xs text-muted-foreground">{t("decomposing", isRu)}</p>
                 </div>
                 <Loader2 className="h-4 w-4 animate-spin text-primary ml-auto shrink-0" />
               </div>
