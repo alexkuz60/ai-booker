@@ -1,6 +1,6 @@
 import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2, AlertCircle,
-  BookOpen, FolderOpen, Clapperboard, ChevronLeft, ChevronRightIcon
+  BookOpen, FolderOpen, Clapperboard, ChevronLeft, ChevronRightIcon, Trash2
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { t, tSection } from "@/pages/parser/i18n";
@@ -25,6 +25,7 @@ interface NavSidebarProps {
   onSendToStudio: (idx: number) => void;
   isChapterFullyDone: (idx: number) => boolean;
   onChangeLevel: (idx: number, delta: number) => void;
+  onDeleteEntry: (idx: number) => void;
 }
 
 export default function NavSidebar({
@@ -32,8 +33,15 @@ export default function NavSidebar({
   selectedIdx, expandedNodes, contentEntries, supplementaryEntries,
   partGroups, partlessIndices,
   onSelectChapter, onAnalyzeChapter, onToggleNode, onSendToStudio, isChapterFullyDone,
-  onChangeLevel,
+  onChangeLevel, onDeleteEntry,
 }: NavSidebarProps) {
+
+  function hasDirectChildren(idx: number): boolean {
+    const entry = tocEntries[idx];
+    return idx + 1 < tocEntries.length &&
+      tocEntries[idx + 1].level > entry.level &&
+      tocEntries[idx + 1].sectionType === entry.sectionType;
+  }
 
   function renderNavItem(idx: number, depth: number = 0, isTopLevel: boolean = false) {
     const entry = tocEntries[idx];
@@ -41,12 +49,10 @@ export default function NavSidebar({
     const isSelected = selectedIdx === idx;
     const status = result?.status || "pending";
 
-    const hasChildren = idx + 1 < tocEntries.length &&
-      tocEntries[idx + 1].level > entry.level &&
-      tocEntries[idx + 1].sectionType === entry.sectionType;
+    const isParent = hasDirectChildren(idx);
 
     const childIndices: number[] = [];
-    if (hasChildren) {
+    if (isParent) {
       for (let i = idx + 1; i < tocEntries.length; i++) {
         if (tocEntries[i].level <= entry.level) break;
         if (tocEntries[i].sectionType !== entry.sectionType) break;
@@ -63,7 +69,7 @@ export default function NavSidebar({
       <div key={idx}>
         <button
           onClick={() => {
-            if (hasChildren && directChildren.length > 0) onToggleNode(nodeKey);
+            if (isParent && directChildren.length > 0) onToggleNode(nodeKey);
             onSelectChapter(idx);
             if (status === "pending") onAnalyzeChapter(idx);
           }}
@@ -74,7 +80,7 @@ export default function NavSidebar({
               : "text-foreground/70 hover:bg-muted/40 hover:text-foreground"
           }`}
         >
-          {hasChildren && directChildren.length > 0 ? (
+          {isParent && directChildren.length > 0 ? (
             <span className="flex-shrink-0" onClick={(e) => { e.stopPropagation(); onToggleNode(nodeKey); }}>
               {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             </span>
@@ -82,7 +88,9 @@ export default function NavSidebar({
             <span className="w-3.5 flex-shrink-0" />
           )}
           <span className="flex-shrink-0">
-            {status === "done" ? (
+            {isParent ? (
+              <FolderOpen className="h-3.5 w-3.5 text-primary/70" />
+            ) : status === "done" ? (
               <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
             ) : status === "analyzing" ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
@@ -113,9 +121,16 @@ export default function NavSidebar({
               >
                 <ChevronRightIcon className="h-3.5 w-3.5" />
               </button>
+              <button
+                title={t("deleteEntry", isRu)}
+                onClick={(e) => { e.stopPropagation(); onDeleteEntry(idx); }}
+                className="p-0.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors ml-0.5"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
             </span>
           )}
-          {isTopLevel && isChapterFullyDone(idx) && (
+          {isParent && isChapterFullyDone(idx) && (
             <button
               title={t("toStudio", isRu)}
               onClick={(e) => { e.stopPropagation(); onSendToStudio(idx); }}

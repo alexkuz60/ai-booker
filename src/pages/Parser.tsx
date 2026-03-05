@@ -11,6 +11,7 @@ import { useCloudSettings } from "@/hooks/useCloudSettings";
 import { useLanguage } from "@/hooks/useLanguage";
 import { t } from "@/pages/parser/i18n";
 import { NAV_WIDTH_KEY } from "@/pages/parser/types";
+import type { Scene, ChapterStatus } from "@/pages/parser/types";
 import { useChapterAnalysis } from "@/hooks/useChapterAnalysis";
 import { useBookManager } from "@/hooks/useBookManager";
 import { useParserHelpers } from "@/hooks/useParserHelpers";
@@ -32,7 +33,7 @@ export default function Parser() {
 
   const {
     step, setStep, books, loadingLibrary, fileName, errorMsg,
-    chapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages,
+    chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages,
     chapterResults, setChapterResults, fileInputRef,
     openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset,
   } = useBookManager({ userId: user?.id, isRu });
@@ -91,6 +92,64 @@ export default function Parser() {
       }
       return next;
     });
+  };
+
+  const deleteEntry = (idx: number) => {
+    const entry = tocEntries[idx];
+    const title = entry.title;
+    const confirmMsg = t("deleteEntryConfirm", isRu).replace("{title}", title);
+    if (!window.confirm(confirmMsg)) return;
+
+    // Collect indices to delete (entry + all deeper children)
+    const toDelete = [idx];
+    for (let i = idx + 1; i < tocEntries.length; i++) {
+      if (tocEntries[i].level <= entry.level) break;
+      if (tocEntries[i].sectionType !== entry.sectionType) break;
+      toDelete.push(i);
+    }
+
+    // Delete from DB
+    for (const di of toDelete) {
+      const chapterId = chapterIdMap.get(di);
+      if (chapterId) {
+        supabase.from('book_scenes').delete().eq('chapter_id', chapterId).then();
+        supabase.from('book_chapters').delete().eq('id', chapterId).then();
+      }
+    }
+
+    // Remove from state
+    const deleteSet = new Set(toDelete);
+    const newEntries = tocEntries.filter((_, i) => !deleteSet.has(i));
+    setTocEntries(newEntries);
+
+    // Rebuild chapterIdMap with new indices
+    const oldMap = chapterIdMap;
+    const newMap = new Map<number, string>();
+    let newIdx = 0;
+    for (let i = 0; i < tocEntries.length; i++) {
+      if (deleteSet.has(i)) continue;
+      const oldId = oldMap.get(i);
+      if (oldId) newMap.set(newIdx, oldId);
+      newIdx++;
+    }
+    setChapterIdMap(newMap);
+
+
+    // Clear selection if deleted
+    if (selectedIdx !== null && deleteSet.has(selectedIdx)) {
+      setSelectedIdx(null);
+    }
+
+    // Rebuild chapterResults
+    const newResults = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
+    newIdx = 0;
+    for (let i = 0; i < tocEntries.length; i++) {
+      if (deleteSet.has(i)) continue;
+      const oldResult = chapterResults.get(i);
+      if (oldResult) newResults.set(newIdx, oldResult);
+      newIdx++;
+    }
+    setChapterResults(newResults);
   };
 
   useEffect(() => {
@@ -177,6 +236,7 @@ export default function Parser() {
                     onToggleNode={toggleNode} onSendToStudio={sendToStudio}
                     isChapterFullyDone={isChapterFullyDone}
                     onChangeLevel={changeLevel}
+                    onDeleteEntry={deleteEntry}
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle />

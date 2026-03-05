@@ -395,7 +395,7 @@ export function useBookManager({ userId, isRu }: UseBookManagerParams) {
   return {
     // State
     step, setStep, books, loadingLibrary, fileName, errorMsg, bookId,
-    partIdMap, chapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
+    partIdMap, chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
     chapterResults, setChapterResults, fileInputRef,
     // Actions
     openSavedBook, deleteBook, handleFileSelect, handleReset,
