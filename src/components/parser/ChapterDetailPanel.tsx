@@ -145,39 +145,7 @@ export default function ChapterDetailPanel({
 
         {/* Scene cards */}
         {selectedResult?.status === "done" && selectedResult.scenes.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-muted-foreground px-1">
-              {selectedResult.scenes.length} {t("scenes", isRu)}
-            </h3>
-            {selectedResult.scenes.map((sc) => {
-              const colorCls = SCENE_TYPE_COLORS[sc.scene_type] || SCENE_TYPE_COLORS.mixed;
-              return (
-                <Card key={sc.scene_number}>
-                  <CardContent className="py-3 px-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">
-                        {t("scenePrefix", isRu)} {sc.scene_number}: {tSceneTitle(sc.title, isRu)}
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant="outline" className={`text-[10px] ${colorCls}`}>
-                          {tSceneType(sc.scene_type, isRu)}
-                        </Badge>
-                        <Badge variant="outline" className="text-[10px]">{tMood(sc.mood, isRu)}</Badge>
-                        <Badge variant="outline" className="text-[10px] font-mono">
-                          {sc.bpm} BPM
-                        </Badge>
-                      </div>
-                    </div>
-                    {sc.content_preview && (
-                      <p className="text-xs text-muted-foreground line-clamp-2">
-                        {sc.content_preview}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+          <SceneCards scenes={selectedResult.scenes} isRu={isRu} />
         )}
 
         {/* Done but empty */}
