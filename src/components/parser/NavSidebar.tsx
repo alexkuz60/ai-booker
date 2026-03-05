@@ -210,7 +210,11 @@ export default function NavSidebar({
             />
           ) : (
             <span
-              className="text-[11px] text-muted-foreground font-mono flex-shrink-0 cursor-pointer hover:text-foreground"
+              className="text-[11px] text-muted-foreground font-mono flex-shrink-0 cursor-pointer hover:text-primary hover:underline"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenPdf?.(entry.startPage);
+              }}
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 setEditingPageIdx(idx);
@@ -289,7 +293,7 @@ export default function NavSidebar({
               variant="ghost" size="icon"
               className="h-6 w-6 flex-shrink-0 text-muted-foreground hover:text-primary"
               title={isRu ? "Открыть PDF" : "Open PDF"}
-              onClick={onOpenPdf}
+              onClick={() => onOpenPdf?.()}
             >
               <ExternalLink className="h-3.5 w-3.5" />
             </Button>
@@ -381,7 +385,13 @@ export default function NavSidebar({
                     </span>
                   )}
                   {firstEntry && (
-                    <span className="text-[11px] text-muted-foreground font-mono font-normal flex-shrink-0">
+                    <span
+                      className="text-[11px] text-muted-foreground font-mono font-normal flex-shrink-0 cursor-pointer hover:text-primary hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenPdf?.(firstEntry.startPage);
+                      }}
+                    >
                       {firstEntry.startPage}
                     </span>
                   )}
