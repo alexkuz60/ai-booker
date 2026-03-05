@@ -235,6 +235,7 @@ export default function Parser() {
                     onToggleNode={toggleNode} onSendToStudio={sendToStudio}
                     isChapterFullyDone={isChapterFullyDone}
                     onChangeLevel={changeLevel}
+                    onDeleteEntry={deleteEntry}
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle />
