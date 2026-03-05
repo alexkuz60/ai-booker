@@ -93,6 +93,63 @@ export default function Parser() {
     });
   };
 
+  const deleteEntry = (idx: number) => {
+    const entry = tocEntries[idx];
+    const title = entry.title;
+    const confirmMsg = t("deleteEntryConfirm", isRu).replace("{title}", title);
+    if (!window.confirm(confirmMsg)) return;
+
+    // Collect indices to delete (entry + all deeper children)
+    const toDelete = [idx];
+    for (let i = idx + 1; i < tocEntries.length; i++) {
+      if (tocEntries[i].level <= entry.level) break;
+      if (tocEntries[i].sectionType !== entry.sectionType) break;
+      toDelete.push(i);
+    }
+
+    // Delete from DB
+    for (const di of toDelete) {
+      const chapterId = chapterIdMap.get(di);
+      if (chapterId) {
+        supabase.from('book_scenes').delete().eq('chapter_id', chapterId).then();
+        supabase.from('book_chapters').delete().eq('id', chapterId).then();
+      }
+    }
+
+    // Remove from state
+    const deleteSet = new Set(toDelete);
+    const newEntries = tocEntries.filter((_, i) => !deleteSet.has(i));
+    setTocEntries(newEntries);
+
+    // Rebuild chapterIdMap with new indices
+    const oldMap = chapterIdMap;
+    const newMap = new Map<number, string>();
+    let newIdx = 0;
+    for (let i = 0; i < tocEntries.length; i++) {
+      if (deleteSet.has(i)) continue;
+      const oldId = oldMap.get(i);
+      if (oldId) newMap.set(newIdx, oldId);
+      newIdx++;
+    }
+    // We need access to setChapterIdMap - but it's not exposed. We'll work around via chapterResults too.
+    
+    // Clear selection if deleted
+    if (selectedIdx !== null && deleteSet.has(selectedIdx)) {
+      setSelectedIdx(null);
+    }
+
+    // Rebuild chapterResults
+    const newResults = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
+    newIdx = 0;
+    for (let i = 0; i < tocEntries.length; i++) {
+      if (deleteSet.has(i)) continue;
+      const oldResult = chapterResults.get(i);
+      if (oldResult) newResults.set(newIdx, oldResult);
+      newIdx++;
+    }
+    setChapterResults(newResults);
+  };
+
   useEffect(() => {
     if (tocEntries.length > 0 && expandedNodes.size === 0) {
       const allKeys = new Set<string>();

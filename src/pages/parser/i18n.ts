@@ -107,6 +107,8 @@ const texts: Record<string, { ru: string; en: string }> = {
 
   // NavSidebar
   toStudio: { ru: "В студию!", en: "To Studio!" },
+  deleteEntry: { ru: "Удалить из структуры", en: "Remove from structure" },
+  deleteEntryConfirm: { ru: "Удалить «{title}» и все вложенные элементы?", en: "Delete \"{title}\" and all nested items?" },
 
   // LibraryView
   deleteBookTitle: { ru: "Удалить книгу?", en: "Delete book?" },
