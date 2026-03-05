@@ -84,10 +84,12 @@ export default function Parser() {
   }, [selectedIndices, lastClickedIdx, expandedNodes]);
 
   const handleReset = () => {
+    bookReset();
     setSelectedIndices(new Set());
     setLastClickedIdx(null);
     setExpandedNodes(new Set());
     resetAnalysis();
+    sessionStorage.removeItem(NAV_STATE_KEY);
   };
 
   const handleOpenPdf = (page?: number) => {
