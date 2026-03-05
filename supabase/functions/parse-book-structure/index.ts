@@ -311,6 +311,7 @@ async function handleAIRequest(
     ],
     tools,
     tool_choice: { type: "function", function: { name: toolName } },
+    temperature: 0.3,
   };
 
   async function callAI(ep: string, mdl: string, key: string, prov: string): Promise<Response> {
@@ -338,48 +339,59 @@ async function handleAIRequest(
     return resp!;
   }
 
-  const t0 = performance.now();
-  let response = await callAI(endpoint, model, apiKey, provider);
+  const MAX_TOOL_RETRIES = 2;
+  let lastMsg: unknown = null;
 
-  // Fallback: if Lovable gateway returns 400, try OpenRouter
-  if (response.status === 400 && provider === 'lovable') {
-    const fallback = canFallbackToOpenRouter(openrouterApiKey, model);
-    if (fallback) {
-      console.log(`Lovable gateway 400 for model ${model}, falling back to OpenRouter`);
-      await response.text();
-      response = await callAI(fallback.endpoint, fallback.model, fallback.apiKey, 'openrouter');
-    }
-  }
+  for (let toolAttempt = 0; toolAttempt < MAX_TOOL_RETRIES; toolAttempt++) {
+    const t0 = performance.now();
+    let response = await callAI(endpoint, model, apiKey, provider);
 
-  if (!response.ok) {
-    const status = response.status;
-    if (status === 429) {
-      return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // Fallback: if Lovable gateway returns 400, try OpenRouter
+    if (response.status === 400 && provider === 'lovable') {
+      const fallback = canFallbackToOpenRouter(openrouterApiKey, model);
+      if (fallback) {
+        console.log(`Lovable gateway 400 for model ${model}, falling back to OpenRouter`);
+        await response.text();
+        response = await callAI(fallback.endpoint, fallback.model, fallback.apiKey, 'openrouter');
+      }
     }
-    if (status === 402) {
-      return new Response(JSON.stringify({ error: "Payment required. Please add credits." }),
-        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    if (status === 502 || status === 503) {
-      return new Response(JSON.stringify({ error: "AI service temporarily unavailable. Please retry in a few seconds." }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const errText = await response.text();
-    console.error("AI error:", status, "model:", model, "provider:", provider, errText);
-    return new Response(JSON.stringify({ error: `AI analysis failed (${status})` }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  }
 
-  const latencyMs = Math.round(performance.now() - t0);
-  const data = await response.json();
-  const usage = data.usage;
-  console.log(`[parse-book-structure] latency=${latencyMs}ms tokens_in=${usage?.prompt_tokens ?? '?'} tokens_out=${usage?.completion_tokens ?? '?'} total=${usage?.total_tokens ?? '?'}`);
-  const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    if (!response.ok) {
+      const status = response.status;
+      if (status === 429) {
+        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (status === 402) {
+        return new Response(JSON.stringify({ error: "Payment required. Please add credits." }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (status === 502 || status === 503) {
+        return new Response(JSON.stringify({ error: "AI service temporarily unavailable. Please retry in a few seconds." }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const errText = await response.text();
+      console.error("AI error:", status, "model:", model, "provider:", provider, errText);
+      return new Response(JSON.stringify({ error: `AI analysis failed (${status})` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
-  if (!toolCall) {
-    // Fallback: try to parse from message content or reasoning (some models skip tool_calls)
+    const latencyMs = Math.round(performance.now() - t0);
+    const data = await response.json();
+    const usage = data.usage;
+    console.log(`[parse-book-structure] latency=${latencyMs}ms tokens_in=${usage?.prompt_tokens ?? '?'} tokens_out=${usage?.completion_tokens ?? '?'} total=${usage?.total_tokens ?? '?'}`);
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+
+    if (toolCall) {
+      const structure = JSON.parse(toolCall.function.arguments);
+      return new Response(JSON.stringify({ structure }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Fallback: try to parse from message content or reasoning
     const msg = data.choices?.[0]?.message;
+    lastMsg = msg;
     const candidates = [msg?.content, msg?.reasoning].filter(Boolean);
     for (const candidate of candidates) {
       try {
@@ -395,16 +407,17 @@ async function handleAIRequest(
         }
       } catch { /* continue to next candidate */ }
     }
-    console.error("AI response had no tool_calls:", JSON.stringify(msg).slice(0, 500));
-    return new Response(JSON.stringify({ error: "AI did not return structured output" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    // No tool_calls and no parseable JSON — retry
+    console.warn(`AI response had no tool_calls (attempt ${toolAttempt + 1}/${MAX_TOOL_RETRIES}), retrying...`);
+    if (toolAttempt < MAX_TOOL_RETRIES - 1) {
+      await new Promise(r => setTimeout(r, 1000));
+    }
   }
 
-  const structure = JSON.parse(toolCall.function.arguments);
-  return new Response(JSON.stringify({ structure }), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
+  console.error("AI response had no tool_calls after retries:", JSON.stringify(lastMsg).slice(0, 500));
+  return new Response(JSON.stringify({ error: "AI did not return structured output" }),
+    { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
