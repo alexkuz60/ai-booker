@@ -311,6 +311,7 @@ async function handleAIRequest(
     ],
     tools,
     tool_choice: { type: "function", function: { name: toolName } },
+    temperature: 0.3,
   };
 
   async function callAI(ep: string, mdl: string, key: string, prov: string): Promise<Response> {
