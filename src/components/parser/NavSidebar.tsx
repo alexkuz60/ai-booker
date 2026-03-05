@@ -384,18 +384,21 @@ export default function NavSidebar({
                       {group.title}
                     </span>
                   )}
-                  {firstEntry && (
-                    <span
-                      className="text-[11px] text-muted-foreground font-mono font-normal flex-shrink-0 cursor-pointer hover:text-primary hover:underline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenPdf?.(firstEntry.startPage);
-                      }}
-                    >
-                      {firstEntry.startPage}
-                    </span>
-                  )}
-                  <span className="text-[11px] text-muted-foreground font-normal flex-shrink-0">{group.indices.length}</span>
+                  <span className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+                    {firstEntry && (
+                      <span
+                        className="text-[11px] text-muted-foreground font-mono font-normal cursor-pointer hover:text-primary hover:underline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenPdf?.(firstEntry.startPage);
+                        }}
+                      >
+                        p.{firstEntry.startPage}
+                      </span>
+                    )}
+                    <span className="text-[11px] text-muted-foreground/60 font-normal">·</span>
+                    <span className="text-[11px] text-muted-foreground font-normal">{group.indices.length}</span>
+                  </span>
                 </button>
                 {isExpanded && (
                   <div>
