@@ -57,7 +57,7 @@ export function useChapterAnalysis({
     } catch (fetchErr: any) {
       clearTimeout(timeoutId);
       if (fetchErr.name === 'AbortError') {
-        throw new Error(isRu ? 'Timeout: анализ занял более 3 минут' : 'Timeout: analysis took more than 3 minutes');
+        throw new Error(t("logTimeout", isRu));
       }
       throw fetchErr;
     }
@@ -96,7 +96,7 @@ export function useChapterAnalysis({
     const wasFullyDone = existingResult?.status === 'done' && scenes.length > 0 && scenes.every(sc => !needsEnrichment(sc));
 
     if (wasFullyDone && existingChId) {
-      addLog(isRu ? "🗑️ Очистка предыдущих результатов..." : "🗑️ Clearing previous results...");
+      addLog(t("logClearing", isRu));
       await supabase.from('book_scenes').delete().eq('chapter_id', existingChId);
       scenes = [];
     }
@@ -104,7 +104,7 @@ export function useChapterAnalysis({
     const hasExistingScenes = scenes.length > 0;
 
     if (hasExistingScenes && scenes.every(sc => !needsEnrichment(sc))) {
-      toast.info(isRu ? "Все сцены уже проанализированы" : "All scenes already analyzed");
+      toast.info(t("logAllDone", isRu));
       return;
     }
 
@@ -117,7 +117,7 @@ export function useChapterAnalysis({
     try {
       // ─── STAGE 1: Boundary detection ───
       if (!hasExistingScenes) {
-        addLog(isRu ? `📖 Извлечение текста главы «${entry.title}»...` : `📖 Extracting chapter text "${entry.title}"...`);
+        addLog(`${t("logExtracting", isRu)} «${entry.title}»...`);
         const text = await extractTextByPageRange(pdfRef, entry.startPage, entry.endPage);
         const charCount = text.trim().length;
 
@@ -127,15 +127,13 @@ export function useChapterAnalysis({
             next.set(idx, { scenes: [], status: "done" });
             return next;
           });
-          toast.info(`"${entry.title}" — ${isRu ? "недостаточно текста для анализа" : "not enough text for analysis"}`);
+          toast.info(`"${entry.title}" — ${t("logNotEnough", isRu)}`);
           return;
         }
 
-        addLog(isRu
-          ? `📝 Текст извлечён: ${charCount.toLocaleString()} символов (${entry.startPage}–${entry.endPage} стр.)`
-          : `📝 Text extracted: ${charCount.toLocaleString()} chars (pages ${entry.startPage}–${entry.endPage})`);
-        addLog(isRu ? `🎭 Этап 1: Определение границ сцен...` : `🎭 Stage 1: Detecting scene boundaries...`);
-        addLog(isRu ? `🚀 Запрос к AI модели ${selectedModel.split('/').pop()}...` : `🚀 Calling AI model ${selectedModel.split('/').pop()}...`);
+        addLog(`${t("logExtracted", isRu)}: ${charCount.toLocaleString()} ${t("logChars", isRu)} (${entry.startPage}–${entry.endPage} ${t("logPagesAbbr", isRu)})`);
+        addLog(t("logStage1", isRu));
+        addLog(`${t("logCallingAI", isRu)} ${selectedModel.split('/').pop()}...`);
 
         const fnData = await callParseFunction({ ...baseBody, text, mode: "boundaries", chapter_title: entry.title });
         if (fnData?.error) throw new Error(fnData.error);
@@ -172,10 +170,10 @@ export function useChapterAnalysis({
             scene_number: s.scene_number || i + 1, title: s.title,
             content: '', content_preview: '', scene_type: 'pending', mood: '', bpm: 0,
           }));
-          addLog(isRu ? `⚠️ Маркеры не найдены в тексте, контент будет пустым` : `⚠️ Markers not found in text, content will be empty`);
+          addLog(t("logMarkersNotFound", isRu));
         }
 
-        addLog(isRu ? `✅ Определено ${scenes.length} сцен:` : `✅ Found ${scenes.length} scenes:`);
+        addLog(`${t("logFoundScenes", isRu)} ${scenes.length} ${t("logScenesWord", isRu)}:`);
         const totalChars = text.length;
         const pageSpan = entry.endPage - entry.startPage + 1;
         let charOffset = 0;
@@ -186,12 +184,10 @@ export function useChapterAnalysis({
           const pageStart = Math.floor(entry.startPage + startFrac * pageSpan);
           const pageEnd = Math.max(pageStart, Math.ceil(entry.startPage + endFrac * pageSpan) - 1);
           charOffset += scLen;
-          addLog(isRu
-            ? `  📍 Сцена ${i + 1}: «${sc.title}» — стр. ${pageStart}–${pageEnd}, ${scLen.toLocaleString()} зн.`
-            : `  📍 Scene ${i + 1}: "${sc.title}" — pp. ${pageStart}–${pageEnd}, ${scLen.toLocaleString()} chars`);
+          addLog(`  ${t("logSceneItem", isRu)} ${i + 1}: «${sc.title}» — ${t("logPagesAbbr", isRu)} ${pageStart}–${pageEnd}, ${scLen.toLocaleString()} ${t("logCharsAbbr", isRu)}`);
         });
 
-        addLog(isRu ? "💾 Сохранение структуры в базу данных..." : "💾 Saving structure to database...");
+        addLog(t("logSaving", isRu));
         if (existingChId) {
           for (const sc of scenes) {
             const { data: scRow } = await supabase.from('book_scenes').insert({
@@ -208,28 +204,22 @@ export function useChapterAnalysis({
           return next;
         });
       } else {
-        addLog(isRu
-          ? `📍 Найдено ${scenes.length} сохранённых сцен, продолжаем обогащение...`
-          : `📍 Found ${scenes.length} saved scenes, resuming enrichment...`);
+        addLog(`${t("logResuming", isRu).replace("...", "")} ${scenes.length} ...`);
       }
 
       // ─── STAGE 2: Enrich each scene with metadata ───
       const toEnrich = scenes.filter(needsEnrichment);
       if (toEnrich.length > 0) {
-        addLog(isRu
-          ? `🧠 Этап 2: Обогащение ${toEnrich.length} из ${scenes.length} сцен...`
-          : `🧠 Stage 2: Enriching ${toEnrich.length} of ${scenes.length} scenes...`);
+        addLog(`${t("logStage2", isRu)} ${toEnrich.length} ${t("logOfScenes", isRu)} ${scenes.length} ${t("logScenesWord", isRu)}...`);
 
         for (const sc of toEnrich) {
           const scIdx = scenes.indexOf(sc);
-          addLog(isRu
-            ? `  🎬 Анализ сцены ${scIdx + 1}/${scenes.length}: «${sc.title}»...`
-            : `  🎬 Analyzing scene ${scIdx + 1}/${scenes.length}: "${sc.title}"...`);
+          addLog(`  ${t("logAnalyzingScene", isRu)} ${scIdx + 1}/${scenes.length}: «${sc.title}»...`);
 
           const sceneText = sc.content || sc.content_preview || '';
           if (sceneText.length < 20) {
             sc.scene_type = 'mixed'; sc.mood = 'neutral'; sc.bpm = 100;
-            addLog(isRu ? `  ⏭️ Пропущена (слишком мало текста)` : `  ⏭️ Skipped (too little text)`);
+            addLog(`  ${t("logSkipped", isRu)}`);
             continue;
           }
 
@@ -243,9 +233,7 @@ export function useChapterAnalysis({
           } catch (enrichErr: any) {
             console.warn(`Enrich failed for scene ${scIdx + 1}:`, enrichErr);
             sc.scene_type = 'mixed'; sc.mood = 'neutral'; sc.bpm = 100;
-            addLog(isRu
-              ? `  ⚠️ Обогащение не удалось: ${enrichErr.message}. Установлены значения по умолчанию.`
-              : `  ⚠️ Enrichment failed: ${enrichErr.message}. Using defaults.`);
+            addLog(`  ${t("logEnrichFailed", isRu)}: ${enrichErr.message}. ${t("logDefaults", isRu)}`);
           }
 
           if (sc.id) {
@@ -254,9 +242,7 @@ export function useChapterAnalysis({
             }).eq('id', sc.id);
           }
 
-          addLog(isRu
-            ? `  ✅ Сцена ${scIdx + 1}: ${sc.scene_type} / ${sc.mood} / ${sc.bpm} BPM`
-            : `  ✅ Scene ${scIdx + 1}: ${sc.scene_type} / ${sc.mood} / ${sc.bpm} BPM`);
+          addLog(`  ${t("logSceneDone", isRu)} ${scIdx + 1}: ${sc.scene_type} / ${sc.mood} / ${sc.bpm} BPM`);
 
           setChapterResults(prev => {
             const next = new Map(prev);
@@ -266,7 +252,7 @@ export function useChapterAnalysis({
         }
       }
 
-      addLog(isRu ? `🎉 Глава «${entry.title}» проанализирована!` : `🎉 Chapter "${entry.title}" analyzed!`);
+      addLog(`${t("logChapterDone", isRu).replace("!", "")} «${entry.title}»!`);
       setChapterResults(prev => {
         const next = new Map(prev);
         next.set(idx, { scenes: [...scenes], status: "done" });
@@ -281,9 +267,7 @@ export function useChapterAnalysis({
       const enrichedCount = partialScenes.filter(s => s.scene_type && s.scene_type !== 'pending').length;
 
       if (partialScenes.length > 0) {
-        addLog(isRu
-          ? `💡 Сохранено: ${partialScenes.length} сцен (${enrichedCount} обогащено). Нажмите ▶ чтобы продолжить.`
-          : `💡 Saved: ${partialScenes.length} scenes (${enrichedCount} enriched). Click ▶ to resume.`);
+        addLog(`${t("logSavedPartial", isRu)}: ${partialScenes.length} ${t("logScenesEnriched", isRu)} ${enrichedCount}). ${t("logClickResume", isRu)}`);
       }
 
       const errMsg = err?.message || "";

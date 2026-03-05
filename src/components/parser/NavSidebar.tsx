@@ -96,7 +96,7 @@ export default function NavSidebar({
           </span>
           {isTopLevel && isChapterFullyDone(idx) && (
             <button
-              title={isRu ? "В студию!" : "To Studio!"}
+              title={t("toStudio", isRu)}
               onClick={(e) => { e.stopPropagation(); onSendToStudio(idx); }}
               className="flex-shrink-0 ml-1 p-0.5 rounded hover:bg-primary/20 text-primary transition-colors"
             >

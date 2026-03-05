@@ -187,7 +187,7 @@ export default function Parser() {
       const chapters = chaptersRes.data || [];
 
       if (chapters.length === 0) {
-        toast.info(isRu ? "У этой книги ещё нет глав. Загрузите PDF заново." : "No chapters found. Please re-upload the PDF.");
+        toast.info(t("noChaptersFound", isRu));
         setStep("upload");
         return;
       }
@@ -297,9 +297,9 @@ export default function Parser() {
       setChapterResults(initMap);
       setStep("workspace");
       const pdfStatus = restoredPdf
-        ? (isRu ? ' (PDF восстановлен, анализ доступен)' : ' (PDF restored, analysis available)')
-        : (isRu ? ' (PDF не найден, только просмотр)' : ' (PDF not found, view only)');
-      toast.success((isRu ? `Книга «${book.title}» загружена` : `Book "${book.title}" loaded`) + pdfStatus);
+        ? ` (${t("pdfRestored", isRu)})`
+        : ` (${t("pdfNotFound", isRu)})`;
+      toast.success(`${t("bookLoaded", isRu)}: «${book.title}»` + pdfStatus);
     } catch (err: any) {
       console.error("Failed to open book:", err);
       setErrorMsg(err.message || "Unknown error");
@@ -314,10 +314,10 @@ export default function Parser() {
       await supabase.from('book_parts').delete().eq('book_id', delBookId);
       await supabase.from('books').delete().eq('id', delBookId);
       setBooks(prev => prev.filter(b => b.id !== delBookId));
-      toast.success(isRu ? "Книга удалена" : "Book deleted");
+      toast.success(t("bookDeleted", isRu));
     } catch (err) {
       console.error("Failed to delete book:", err);
-      toast.error(isRu ? "Не удалось удалить книгу" : "Failed to delete book");
+      toast.error(t("bookDeleteFailed", isRu));
     }
   };
 

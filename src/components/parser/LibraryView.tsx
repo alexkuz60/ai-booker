@@ -88,15 +88,13 @@ export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onO
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>{isRu ? "Удалить книгу?" : "Delete book?"}</AlertDialogTitle>
+                          <AlertDialogTitle>{t("deleteBookTitle", isRu)}</AlertDialogTitle>
                           <AlertDialogDescription>
-                            {isRu
-                              ? `«${book.title}» и все результаты анализа будут удалены безвозвратно.`
-                              : `"${book.title}" and all analysis results will be permanently deleted.`}
+                            {isRu ? `«${book.title}» ` : `"${book.title}" `}{t("deleteBookDesc", isRu)}
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
+                          <AlertDialogCancel>{t("cancel", isRu)}</AlertDialogCancel>
                           <AlertDialogAction onClick={() => onDelete(book.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                             {t("libraryDelete", isRu)}
                           </AlertDialogAction>
