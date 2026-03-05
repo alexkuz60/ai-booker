@@ -103,8 +103,11 @@ export async function extractTextByPageRange(
       ? heights.sort((a, b) => a - b)[Math.floor(heights.length / 2)]
       : 12;
 
-    const lines: string[] = [];
+    // Track Y positions per line for page-number detection
+    interface LineInfo { text: string; y: number | null }
+    const lineInfos: LineInfo[] = [];
     let currentLine = '';
+    let currentLineY: number | null = null;
     let prevY: number | null = null;
 
     for (const item of items) {
@@ -117,13 +120,15 @@ export async function extractTextByPageRange(
 
         if (gap > medianHeight * 1.8) {
           // Large gap → paragraph break
-          lines.push(currentLine.trimEnd());
-          lines.push(''); // empty line = paragraph separator
+          lineInfos.push({ text: currentLine.trimEnd(), y: currentLineY });
+          lineInfos.push({ text: '', y: null }); // paragraph separator
           currentLine = str;
+          currentLineY = y;
         } else if (gap > medianHeight * 0.3) {
           // Normal line break (same paragraph)
-          lines.push(currentLine.trimEnd());
+          lineInfos.push({ text: currentLine.trimEnd(), y: currentLineY });
           currentLine = str;
+          currentLineY = y;
         } else {
           // Same line — add space only if not joining to punctuation
           const needsSpace = currentLine && str && !currentLine.endsWith(' ') && !str.startsWith(' ') && !/^[.,;:!?—–)»"\u201D\u2019\u00BB]/.test(str);
@@ -131,12 +136,27 @@ export async function extractTextByPageRange(
         }
       } else {
         currentLine += str;
+        if (currentLineY === null) currentLineY = y;
       }
 
       if (y !== null) prevY = y;
     }
 
-    if (currentLine) lines.push(currentLine.trimEnd());
+    if (currentLine) lineInfos.push({ text: currentLine.trimEnd(), y: currentLineY });
+
+    // Detect page numbers: isolated digit-only lines in top/bottom 12% of page
+    const marginZone = pageHeight * 0.12;
+    const lines: string[] = lineInfos.map(li => {
+      if (li.text && li.y !== null && /^\d{1,4}$/.test(li.text.trim())) {
+        // PDF Y is bottom-up: low Y = bottom, high Y = top
+        const isTop = li.y > pageHeight - marginZone;
+        const isBottom = li.y < marginZone;
+        if (isTop || isBottom) {
+          return `[стр. ${li.text.trim()}]`;
+        }
+      }
+      return li.text;
+    });
 
     // Merge consecutive non-empty lines into paragraphs, keep empty lines as \n\n
     const paragraphs: string[] = [];
