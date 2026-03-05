@@ -3,7 +3,7 @@ import {
   BookOpen, FolderOpen, Clapperboard
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { tSection } from "@/pages/parser/i18n";
+import { t, tSection } from "@/pages/parser/i18n";
 import type { TocChapter, SectionType, ChapterStatus, Scene } from "@/pages/parser/types";
 import { SECTION_ICONS } from "@/pages/parser/types";
 
@@ -160,8 +160,8 @@ export default function NavSidebar({
           </span>
         </div>
         <p className="text-xs text-muted-foreground mt-1">
-          {totalPages} стр. • {contentEntries.length} глав
-          {supplementaryEntries.length > 0 && ` • ${supplementaryEntries.length} доп.`}
+          {totalPages} {t("pages", isRu)} • {contentEntries.length} {t("chapters", isRu)}
+          {supplementaryEntries.length > 0 && ` • ${supplementaryEntries.length} ${t("suppl", isRu)}`}
         </p>
       </div>
 
