@@ -117,7 +117,7 @@ export default function Parser() {
         )}
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
           {step === "library" && (
             <LibraryView
@@ -136,7 +136,7 @@ export default function Parser() {
           )}
           {step === "workspace" && (
             <motion.div key="workspace" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="flex min-h-0">
+              className="flex h-full min-h-0 overflow-hidden">
               <ResizablePanelGroup direction="horizontal" autoSaveId={NAV_WIDTH_KEY}>
                 <ResizablePanel defaultSize={22} minSize={14} maxSize={45}>
                   <NavSidebar
