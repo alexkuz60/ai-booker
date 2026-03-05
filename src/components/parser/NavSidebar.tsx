@@ -30,7 +30,7 @@ interface NavSidebarProps {
   onDeleteEntry: (indices: number[]) => void;
   onRenameEntry: (idx: number, newTitle: string) => void;
   onChangeStartPage: (idx: number, newPage: number) => void;
-  onOpenPdf?: () => void;
+  onOpenPdf?: (page?: number) => void;
   onRenamePart?: (oldTitle: string, newTitle: string) => void;
 }
 
