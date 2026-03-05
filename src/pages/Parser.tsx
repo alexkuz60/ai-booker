@@ -44,8 +44,15 @@ export default function Parser() {
     tocEntries, chapterIdMap, chapterResults, setChapterResults,
   });
 
+  const selectedIdx = selectedIndices.size === 1 ? Array.from(selectedIndices)[0] : null;
+
   const {
     selectedEntry, selectedResult,
+    contentEntries, supplementaryEntries,
+    analyzedCount, totalScenes,
+    isChapterFullyDone, sendToStudio,
+    partGroups, partlessIndices,
+  } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName });
     contentEntries, supplementaryEntries,
     analyzedCount, totalScenes,
     isChapterFullyDone, sendToStudio,
