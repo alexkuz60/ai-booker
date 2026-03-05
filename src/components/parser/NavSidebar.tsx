@@ -195,7 +195,7 @@ export default function NavSidebar({
               className="h-6 w-6"
               title={isRu ? "Уменьшить вложенность" : "Outdent"}
               onClick={() => onChangeLevel(selectedArray, -1)}
-              disabled={selectedArray.some(i => tocEntries[i]?.level === 0)}
+              disabled={selectedArray.every(i => tocEntries[i]?.level === 0)}
             >
               <ChevronLeft className="h-3.5 w-3.5" />
             </Button>
