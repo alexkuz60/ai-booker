@@ -47,6 +47,8 @@ export function useParserHelpers({
     const entry = tocEntries[idx];
     const result = chapterResults.get(idx);
     if (!result) return;
+
+    // Collect scenes for this item + its children
     const allScenes = [...result.scenes];
     for (let i = idx + 1; i < tocEntries.length; i++) {
       if (tocEntries[i].level <= entry.level) break;
@@ -54,7 +56,34 @@ export function useParserHelpers({
       const childResult = chapterResults.get(i);
       if (childResult) allScenes.push(...childResult.scenes);
     }
-    saveStudioChapter({ chapterTitle: entry.title, bookTitle: fileName.replace('.pdf', ''), scenes: allScenes });
+
+    // Determine if this is a child of a parent chapter → part splitting
+    let chapterTitle = entry.title;
+    let parentIdx: number | null = null;
+    for (let j = idx - 1; j >= 0; j--) {
+      if (tocEntries[j].sectionType !== entry.sectionType) continue;
+      if (tocEntries[j].level < entry.level) {
+        parentIdx = j;
+        break;
+      }
+    }
+
+    if (parentIdx !== null) {
+      const parent = tocEntries[parentIdx];
+      // Count which part this is among parent's direct children
+      let partNumber = 0;
+      for (let i = parentIdx + 1; i < tocEntries.length; i++) {
+        if (tocEntries[i].level <= parent.level) break;
+        if (tocEntries[i].sectionType !== parent.sectionType) break;
+        if (tocEntries[i].level === entry.level) {
+          partNumber++;
+          if (i === idx) break;
+        }
+      }
+      chapterTitle = `${parent.title} (Часть ${partNumber})`;
+    }
+
+    saveStudioChapter({ chapterTitle, bookTitle: fileName.replace('.pdf', ''), scenes: allScenes });
     navigate("/studio");
   }, [tocEntries, chapterResults, fileName, navigate]);
 

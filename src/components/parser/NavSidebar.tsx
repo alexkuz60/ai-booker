@@ -312,6 +312,20 @@ export default function NavSidebar({
             {selectedIndices.size} {t("selectedCount", isRu)}
           </span>
           <div className="flex items-center gap-1 ml-auto">
+            {selectedIndices.size === 1 && (() => {
+              const singleIdx = selectedArray[0];
+              const singleResult = chapterResults.get(singleIdx);
+              return singleResult?.status === "done" && singleResult.scenes.length > 0;
+            })() && (
+              <Button
+                variant="ghost" size="icon"
+                className="h-6 w-6 text-primary hover:text-primary"
+                title={t("toStudio", isRu)}
+                onClick={() => onSendToStudio(selectedArray[0])}
+              >
+                <Clapperboard className="h-3.5 w-3.5" />
+              </Button>
+            )}
             <Button
               variant="ghost" size="icon"
               className="h-6 w-6"
