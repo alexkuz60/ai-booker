@@ -38,7 +38,7 @@ export default function Auth() {
     }
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleSignUp = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     const { error } = await supabase.auth.signUp({
