@@ -2,7 +2,7 @@ import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2, AlertCircle,
   BookOpen, FolderOpen, Clapperboard
 } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { t, tSection } from "@/pages/parser/i18n";
 import type { TocChapter, SectionType, ChapterStatus, Scene } from "@/pages/parser/types";
 import { SECTION_ICONS } from "@/pages/parser/types";
