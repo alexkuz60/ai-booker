@@ -377,7 +377,18 @@ async function handleAIRequest(
     }
 
     const latencyMs = Math.round(performance.now() - t0);
-    const data = await response.json();
+    let data: any;
+    try {
+      data = await response.json();
+    } catch (bodyErr: any) {
+      console.warn(`Body read failed (attempt ${toolAttempt + 1}/${MAX_TOOL_RETRIES}): ${bodyErr.message}`);
+      if (toolAttempt < MAX_TOOL_RETRIES - 1) {
+        await new Promise(r => setTimeout(r, 2000));
+        continue;
+      }
+      return new Response(JSON.stringify({ error: "Connection to AI provider was interrupted. Please retry." }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const usage = data.usage;
     console.log(`[parse-book-structure] latency=${latencyMs}ms tokens_in=${usage?.prompt_tokens ?? '?'} tokens_out=${usage?.completion_tokens ?? '?'} total=${usage?.total_tokens ?? '?'}`);
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
