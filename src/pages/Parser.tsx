@@ -28,7 +28,8 @@ export default function Parser() {
 
   const { value: selectedModel, update: setSelectedModel } = useCloudSettings('parser-model', DEFAULT_MODEL_ID);
   const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
-  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const [lastClickedIdx, setLastClickedIdx] = useState<number | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
   const {
@@ -43,6 +44,8 @@ export default function Parser() {
     tocEntries, chapterIdMap, chapterResults, setChapterResults,
   });
 
+  const selectedIdx = selectedIndices.size === 1 ? Array.from(selectedIndices)[0] : null;
+
   const {
     selectedEntry, selectedResult,
     contentEntries, supplementaryEntries,
@@ -53,9 +56,31 @@ export default function Parser() {
 
   const handleReset = () => {
     bookReset();
-    setSelectedIdx(null);
+    setSelectedIndices(new Set());
+    setLastClickedIdx(null);
     setExpandedNodes(new Set());
     resetAnalysis();
+  };
+
+  const handleSelectChapter = (idx: number, e: React.MouseEvent) => {
+    if (e.shiftKey && lastClickedIdx !== null) {
+      const from = Math.min(lastClickedIdx, idx);
+      const to = Math.max(lastClickedIdx, idx);
+      setSelectedIndices(prev => {
+        const next = new Set(prev);
+        for (let i = from; i <= to; i++) next.add(i);
+        return next;
+      });
+    } else if (e.ctrlKey || e.metaKey) {
+      setSelectedIndices(prev => {
+        const next = new Set(prev);
+        next.has(idx) ? next.delete(idx) : next.add(idx);
+        return next;
+      });
+    } else {
+      setSelectedIndices(new Set([idx]));
+    }
+    setLastClickedIdx(idx);
   };
 
   const toggleNode = (key: string) => {
@@ -66,25 +91,33 @@ export default function Parser() {
     });
   };
 
-  const changeLevel = (idx: number, delta: number) => {
+  const changeLevel = (indices: number[], delta: number) => {
     setTocEntries(prev => {
       const next = prev.map(e => ({ ...e }));
-      const entry = next[idx];
-      const newLevel = entry.level + delta;
-      if (newLevel < 0) return prev;
-      const affectedIndices = [idx];
-      for (let i = idx + 1; i < next.length; i++) {
-        if (next[i].level <= entry.level) break;
-        if (next[i].sectionType !== entry.sectionType) break;
-        affectedIndices.push(i);
+      const allAffected = new Set<number>();
+      
+      for (const idx of indices) {
+        const entry = next[idx];
+        const newLevel = entry.level + delta;
+        if (newLevel < 0) continue;
+        
+        const affected = [idx];
+        for (let i = idx + 1; i < next.length; i++) {
+          if (next[i].level <= entry.level) break;
+          if (next[i].sectionType !== entry.sectionType) break;
+          affected.push(i);
+        }
+        
+        next[idx].level = newLevel;
+        for (const ci of affected.slice(1)) {
+          next[ci].level += delta;
+          if (next[ci].level < 0) next[ci].level = 0;
+        }
+        affected.forEach(i => allAffected.add(i));
       }
-      next[idx].level = newLevel;
-      for (const ci of affectedIndices.slice(1)) {
-        next[ci].level += delta;
-        if (next[ci].level < 0) next[ci].level = 0;
-      }
+      
       // Auto-save levels to DB
-      for (const ci of affectedIndices) {
+      for (const ci of allAffected) {
         const chapterId = chapterIdMap.get(ci);
         if (chapterId) {
           supabase.from('book_chapters').update({ level: next[ci].level } as any).eq('id', chapterId).then();
@@ -94,18 +127,23 @@ export default function Parser() {
     });
   };
 
-  const deleteEntry = (idx: number) => {
-    const entry = tocEntries[idx];
-    const title = entry.title;
-    const confirmMsg = t("deleteEntryConfirm", isRu).replace("{title}", title);
+  const deleteEntry = (indices: number[]) => {
+    const count = indices.length;
+    const confirmMsg = count === 1
+      ? t("deleteEntryConfirm", isRu).replace("{title}", tocEntries[indices[0]]?.title || "")
+      : t("deleteMultiConfirm", isRu).replace("{count}", String(count));
     if (!window.confirm(confirmMsg)) return;
 
-    // Collect indices to delete (entry + all deeper children)
-    const toDelete = [idx];
-    for (let i = idx + 1; i < tocEntries.length; i++) {
-      if (tocEntries[i].level <= entry.level) break;
-      if (tocEntries[i].sectionType !== entry.sectionType) break;
-      toDelete.push(i);
+    // Collect all indices to delete (each entry + deeper children)
+    const toDelete = new Set<number>();
+    for (const idx of indices) {
+      toDelete.add(idx);
+      const entry = tocEntries[idx];
+      for (let i = idx + 1; i < tocEntries.length; i++) {
+        if (tocEntries[i].level <= entry.level) break;
+        if (tocEntries[i].sectionType !== entry.sectionType) break;
+        toDelete.add(i);
+      }
     }
 
     // Delete from DB
@@ -118,33 +156,33 @@ export default function Parser() {
     }
 
     // Remove from state
-    const deleteSet = new Set(toDelete);
-    const newEntries = tocEntries.filter((_, i) => !deleteSet.has(i));
+    const newEntries = tocEntries.filter((_, i) => !toDelete.has(i));
     setTocEntries(newEntries);
 
-    // Rebuild chapterIdMap with new indices
+    // Rebuild chapterIdMap
     const oldMap = chapterIdMap;
     const newMap = new Map<number, string>();
     let newIdx = 0;
     for (let i = 0; i < tocEntries.length; i++) {
-      if (deleteSet.has(i)) continue;
+      if (toDelete.has(i)) continue;
       const oldId = oldMap.get(i);
       if (oldId) newMap.set(newIdx, oldId);
       newIdx++;
     }
     setChapterIdMap(newMap);
 
-
-    // Clear selection if deleted
-    if (selectedIdx !== null && deleteSet.has(selectedIdx)) {
-      setSelectedIdx(null);
-    }
+    // Clear selection
+    setSelectedIndices(prev => {
+      const next = new Set(prev);
+      for (const di of toDelete) next.delete(di);
+      return next.size > 0 ? next : new Set<number>();
+    });
 
     // Rebuild chapterResults
     const newResults = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
     newIdx = 0;
     for (let i = 0; i < tocEntries.length; i++) {
-      if (deleteSet.has(i)) continue;
+      if (toDelete.has(i)) continue;
       const oldResult = chapterResults.get(i);
       if (oldResult) newResults.set(newIdx, oldResult);
       newIdx++;
@@ -229,10 +267,10 @@ export default function Parser() {
                   <NavSidebar
                     isRu={isRu} fileName={fileName} totalPages={totalPages}
                     tocEntries={tocEntries} chapterResults={chapterResults}
-                    selectedIdx={selectedIdx} expandedNodes={expandedNodes}
+                    selectedIndices={selectedIndices} expandedNodes={expandedNodes}
                     contentEntries={contentEntries} supplementaryEntries={supplementaryEntries}
                     partGroups={partGroups} partlessIndices={partlessIndices}
-                    onSelectChapter={setSelectedIdx} onAnalyzeChapter={analyzeChapter}
+                    onSelectChapter={handleSelectChapter} onAnalyzeChapter={analyzeChapter}
                     onToggleNode={toggleNode} onSendToStudio={sendToStudio}
                     isChapterFullyDone={isChapterFullyDone}
                     onChangeLevel={changeLevel}

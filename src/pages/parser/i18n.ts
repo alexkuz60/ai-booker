@@ -109,6 +109,8 @@ const texts: Record<string, { ru: string; en: string }> = {
   toStudio: { ru: "В студию!", en: "To Studio!" },
   deleteEntry: { ru: "Удалить из структуры", en: "Remove from structure" },
   deleteEntryConfirm: { ru: "Удалить «{title}» и все вложенные элементы?", en: "Delete \"{title}\" and all nested items?" },
+  deleteMultiConfirm: { ru: "Удалить {count} выбранных элементов и все их вложения?", en: "Delete {count} selected items and all nested?" },
+  selectedCount: { ru: "выбрано", en: "selected" },
 
   // LibraryView
   deleteBookTitle: { ru: "Удалить книгу?", en: "Delete book?" },
