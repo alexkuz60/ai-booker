@@ -72,7 +72,18 @@ export default function Parser() {
     partGroups, partlessIndices,
   } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName });
 
-  const handleReset = () => {
+  // Persist nav state to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(NAV_STATE_KEY, JSON.stringify({
+        selected: Array.from(selectedIndices),
+        lastClicked: lastClickedIdx,
+        expanded: Array.from(expandedNodes),
+      }));
+    } catch {}
+  }, [selectedIndices, lastClickedIdx, expandedNodes]);
+
+
     bookReset();
     setSelectedIndices(new Set());
     setLastClickedIdx(null);
