@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2, AlertCircle,
-  BookOpen, FolderOpen, Clapperboard, ChevronLeft, ChevronRightIcon, Trash2
+  BookOpen, FolderOpen, Clapperboard, ChevronLeft, ChevronRightIcon, Trash2, ExternalLink
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ interface NavSidebarProps {
   onDeleteEntry: (indices: number[]) => void;
   onRenameEntry: (idx: number, newTitle: string) => void;
   onChangeStartPage: (idx: number, newPage: number) => void;
+  onOpenPdf?: () => void;
 }
 
 export default function NavSidebar({
@@ -38,6 +39,7 @@ export default function NavSidebar({
   partGroups, partlessIndices,
   onSelectChapter, onAnalyzeChapter, onToggleNode, onSendToStudio, isChapterFullyDone,
   onChangeLevel, onDeleteEntry, onRenameEntry, onChangeStartPage,
+  onOpenPdf,
 }: NavSidebarProps) {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -261,9 +263,19 @@ export default function NavSidebar({
       <div className="px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
           <BookOpen className="h-5 w-5 text-primary" />
-          <span className="font-display font-semibold text-base text-foreground truncate">
+          <span className="font-display font-semibold text-base text-foreground truncate flex-1">
             {fileName.replace('.pdf', '')}
           </span>
+          {onOpenPdf && (
+            <Button
+              variant="ghost" size="icon"
+              className="h-6 w-6 flex-shrink-0 text-muted-foreground hover:text-primary"
+              title={isRu ? "Открыть PDF" : "Open PDF"}
+              onClick={onOpenPdf}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
         <p className="text-xs text-muted-foreground mt-1">
           {totalPages} {t("pages", isRu)} • {contentEntries.length} {t("chapters", isRu)}
