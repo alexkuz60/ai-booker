@@ -151,7 +151,7 @@ export default function NavSidebar({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden bg-card/50">
+    <div className="flex flex-col bg-card/50">
       <div className="px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
           <BookOpen className="h-5 w-5 text-primary" />
@@ -165,40 +165,38 @@ export default function NavSidebar({
         </p>
       </div>
 
-      <ScrollArea className="flex-1 min-h-0">
-        <div className="py-2">
-          {renderNavSection("preface")}
+      <div className="py-2">
+        {renderNavSection("preface")}
 
-          {partGroups.map((group) => {
-            const partKey = `part:${group.title}`;
-            const isExpanded = expandedNodes.has(partKey);
-            return (
-              <div key={group.title}>
-                <button
-                  onClick={() => onToggleNode(partKey)}
-                  className="w-full flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-primary hover:bg-muted/30 transition-colors"
-                >
-                  {isExpanded ? <ChevronDown className="h-3.5 w-3.5 flex-shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />}
-                  <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
-                  <span className="truncate">{group.title}</span>
-                  <span className="ml-auto text-[11px] text-muted-foreground font-normal">{group.indices.length}</span>
-                </button>
-                {isExpanded && (
-                  <div>
-                    {group.indices.map(idx => renderNavItem(idx, 1, true))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        {partGroups.map((group) => {
+          const partKey = `part:${group.title}`;
+          const isExpanded = expandedNodes.has(partKey);
+          return (
+            <div key={group.title}>
+              <button
+                onClick={() => onToggleNode(partKey)}
+                className="w-full flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-primary hover:bg-muted/30 transition-colors"
+              >
+                {isExpanded ? <ChevronDown className="h-3.5 w-3.5 flex-shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />}
+                <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="truncate">{group.title}</span>
+                <span className="ml-auto text-[11px] text-muted-foreground font-normal">{group.indices.length}</span>
+              </button>
+              {isExpanded && (
+                <div>
+                  {group.indices.map(idx => renderNavItem(idx, 1, true))}
+                </div>
+              )}
+            </div>
+          );
+        })}
 
-          {partlessIndices.map(idx => renderNavItem(idx, 0, true))}
+        {partlessIndices.map(idx => renderNavItem(idx, 0, true))}
 
-          {renderNavSection("afterword")}
-          {renderNavSection("endnotes")}
-          {renderNavSection("appendix")}
-        </div>
-      </ScrollArea>
+        {renderNavSection("afterword")}
+        {renderNavSection("endnotes")}
+        {renderNavSection("appendix")}
+      </div>
     </div>
   );
 }
