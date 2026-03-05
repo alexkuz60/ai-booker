@@ -31,6 +31,7 @@ interface NavSidebarProps {
   onRenameEntry: (idx: number, newTitle: string) => void;
   onChangeStartPage: (idx: number, newPage: number) => void;
   onOpenPdf?: () => void;
+  onRenamePart?: (oldTitle: string, newTitle: string) => void;
 }
 
 export default function NavSidebar({
@@ -39,8 +40,11 @@ export default function NavSidebar({
   partGroups, partlessIndices,
   onSelectChapter, onAnalyzeChapter, onToggleNode, onSendToStudio, isChapterFullyDone,
   onChangeLevel, onDeleteEntry, onRenameEntry, onChangeStartPage,
-  onOpenPdf,
+  onOpenPdf, onRenamePart,
 }: NavSidebarProps) {
+  const [editingPartTitle, setEditingPartTitle] = useState<string | null>(null);
+  const [editPartValue, setEditPartValue] = useState("");
+  const editPartRef = useRef<HTMLInputElement>(null);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
   const [editingPageIdx, setEditingPageIdx] = useState<number | null>(null);
