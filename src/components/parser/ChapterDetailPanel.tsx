@@ -43,15 +43,15 @@ function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
           >
             <CardContent className="py-3 px-4 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">
+                <span className="text-base font-medium">
                   {t("scenePrefix", isRu)} {sc.scene_number}: {tSceneTitle(sc.title, isRu)}
                 </span>
                 <div className="flex items-center gap-1.5">
-                  <Badge variant="outline" className={`text-[10px] ${colorCls}`}>
+                  <Badge variant="outline" className={`text-xs ${colorCls}`}>
                     {tSceneType(sc.scene_type, isRu)}
                   </Badge>
-                  <Badge variant="outline" className="text-[10px]">{tMood(sc.mood, isRu)}</Badge>
-                  <Badge variant="outline" className="text-[10px] font-mono">
+                  <Badge variant="outline" className="text-xs">{tMood(sc.mood, isRu)}</Badge>
+                  <Badge variant="outline" className="text-xs font-mono">
                     {sc.bpm} BPM
                   </Badge>
                   {hasMore && (
@@ -60,7 +60,7 @@ function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
                 </div>
               </div>
               {content && (
-                <p className="text-xs text-muted-foreground whitespace-pre-line">
+                <p className="text-sm text-muted-foreground whitespace-pre-line">
                   {isExpanded ? content : (
                     <>
                       {preview}{hasMore && "…"}
