@@ -3,6 +3,7 @@ import {
   BookOpen, FolderOpen, Clapperboard, ChevronLeft, ChevronRightIcon, Trash2
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 import { t, tSection } from "@/pages/parser/i18n";
 import type { TocChapter, SectionType, ChapterStatus, Scene } from "@/pages/parser/types";
 import { SECTION_ICONS } from "@/pages/parser/types";
@@ -13,24 +14,24 @@ interface NavSidebarProps {
   totalPages: number;
   tocEntries: TocChapter[];
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
-  selectedIdx: number | null;
+  selectedIndices: Set<number>;
   expandedNodes: Set<string>;
   contentEntries: TocChapter[];
   supplementaryEntries: TocChapter[];
   partGroups: { title: string; indices: number[] }[];
   partlessIndices: number[];
-  onSelectChapter: (idx: number) => void;
+  onSelectChapter: (idx: number, e: React.MouseEvent) => void;
   onAnalyzeChapter: (idx: number) => void;
   onToggleNode: (key: string) => void;
   onSendToStudio: (idx: number) => void;
   isChapterFullyDone: (idx: number) => boolean;
-  onChangeLevel: (idx: number, delta: number) => void;
-  onDeleteEntry: (idx: number) => void;
+  onChangeLevel: (indices: number[], delta: number) => void;
+  onDeleteEntry: (indices: number[]) => void;
 }
 
 export default function NavSidebar({
   isRu, fileName, totalPages, tocEntries, chapterResults,
-  selectedIdx, expandedNodes, contentEntries, supplementaryEntries,
+  selectedIndices, expandedNodes, contentEntries, supplementaryEntries,
   partGroups, partlessIndices,
   onSelectChapter, onAnalyzeChapter, onToggleNode, onSendToStudio, isChapterFullyDone,
   onChangeLevel, onDeleteEntry,
@@ -43,10 +44,13 @@ export default function NavSidebar({
       tocEntries[idx + 1].sectionType === entry.sectionType;
   }
 
-  function renderNavItem(idx: number, depth: number = 0, isTopLevel: boolean = false) {
+  const selectedArray = Array.from(selectedIndices).sort((a, b) => a - b);
+  const multiSelected = selectedIndices.size > 1;
+
+  function renderNavItem(idx: number, depth: number = 0) {
     const entry = tocEntries[idx];
     const result = chapterResults.get(idx);
-    const isSelected = selectedIdx === idx;
+    const isSelected = selectedIndices.has(idx);
     const status = result?.status || "pending";
 
     const isParent = hasDirectChildren(idx);
@@ -68,10 +72,14 @@ export default function NavSidebar({
     return (
       <div key={idx}>
         <button
-          onClick={() => {
-            if (isParent && directChildren.length > 0) onToggleNode(nodeKey);
-            onSelectChapter(idx);
-            if (status === "pending") onAnalyzeChapter(idx);
+          onClick={(e) => {
+            if (isParent && directChildren.length > 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+              onToggleNode(nodeKey);
+            }
+            onSelectChapter(idx, e);
+            if (status === "pending" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+              onAnalyzeChapter(idx);
+            }
           }}
           style={{ paddingLeft }}
           className={`w-full flex items-center gap-2 pr-4 py-2 text-left text-sm transition-colors ${
@@ -104,32 +112,6 @@ export default function NavSidebar({
           <span className="text-[11px] text-muted-foreground font-mono flex-shrink-0">
             {entry.startPage}
           </span>
-          {isSelected && (
-            <span className="flex items-center gap-0 flex-shrink-0 ml-1">
-              <button
-                title={isRu ? "Уменьшить вложенность" : "Outdent"}
-                onClick={(e) => { e.stopPropagation(); onChangeLevel(idx, -1); }}
-                disabled={entry.level === 0}
-                className="p-0.5 rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30 disabled:pointer-events-none"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </button>
-              <button
-                title={isRu ? "Увеличить вложенность" : "Indent"}
-                onClick={(e) => { e.stopPropagation(); onChangeLevel(idx, 1); }}
-                className="p-0.5 rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ChevronRightIcon className="h-3.5 w-3.5" />
-              </button>
-              <button
-                title={t("deleteEntry", isRu)}
-                onClick={(e) => { e.stopPropagation(); onDeleteEntry(idx); }}
-                className="p-0.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors ml-0.5"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </span>
-          )}
           {isParent && isChapterFullyDone(idx) && (
             <button
               title={t("toStudio", isRu)}
@@ -142,7 +124,7 @@ export default function NavSidebar({
         </button>
         {isExpanded && directChildren.length > 0 && (
           <div>
-            {directChildren.map(childIdx => renderNavItem(childIdx, depth + 1, false))}
+            {directChildren.map(childIdx => renderNavItem(childIdx, depth + 1))}
           </div>
         )}
       </div>
@@ -181,7 +163,7 @@ export default function NavSidebar({
           </span>
           <span className="ml-auto text-[11px] text-muted-foreground">{allEntries.length}</span>
         </button>
-        {isExpanded && rootEntries.map(({ idx }) => renderNavItem(idx, 0, true))}
+        {isExpanded && rootEntries.map(({ idx }) => renderNavItem(idx, 0))}
       </>
     );
   }
@@ -200,6 +182,42 @@ export default function NavSidebar({
           {supplementaryEntries.length > 0 && ` • ${supplementaryEntries.length} ${t("suppl", isRu)}`}
         </p>
       </div>
+
+      {/* Bulk actions toolbar */}
+      {selectedIndices.size > 0 && (
+        <div className="px-3 py-2 border-b border-border bg-primary/5 flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-primary font-medium">
+            {selectedIndices.size} {t("selectedCount", isRu)}
+          </span>
+          <div className="flex items-center gap-1 ml-auto">
+            <Button
+              variant="ghost" size="icon"
+              className="h-6 w-6"
+              title={isRu ? "Уменьшить вложенность" : "Outdent"}
+              onClick={() => onChangeLevel(selectedArray, -1)}
+              disabled={selectedArray.some(i => tocEntries[i]?.level === 0)}
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost" size="icon"
+              className="h-6 w-6"
+              title={isRu ? "Увеличить вложенность" : "Indent"}
+              onClick={() => onChangeLevel(selectedArray, 1)}
+            >
+              <ChevronRightIcon className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost" size="icon"
+              className="h-6 w-6 hover:bg-destructive/20 hover:text-destructive"
+              title={t("deleteEntry", isRu)}
+              onClick={() => onDeleteEntry(selectedArray)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       <ScrollArea className="flex-1 min-h-0">
         <div className="py-2">
@@ -221,14 +239,14 @@ export default function NavSidebar({
                 </button>
                 {isExpanded && (
                   <div>
-                    {group.indices.map(idx => renderNavItem(idx, 1, true))}
+                    {group.indices.map(idx => renderNavItem(idx, 1))}
                   </div>
                 )}
               </div>
             );
           })}
 
-          {partlessIndices.map(idx => renderNavItem(idx, 0, true))}
+          {partlessIndices.map(idx => renderNavItem(idx, 0))}
 
           {renderNavSection("afterword")}
           {renderNavSection("endnotes")}
