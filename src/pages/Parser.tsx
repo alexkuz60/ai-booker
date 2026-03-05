@@ -53,11 +53,6 @@ export default function Parser() {
     isChapterFullyDone, sendToStudio,
     partGroups, partlessIndices,
   } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName });
-    contentEntries, supplementaryEntries,
-    analyzedCount, totalScenes,
-    isChapterFullyDone, sendToStudio,
-    partGroups, partlessIndices,
-  } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName });
 
   const handleReset = () => {
     bookReset();
