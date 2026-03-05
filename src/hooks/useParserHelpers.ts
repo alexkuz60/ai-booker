@@ -48,7 +48,9 @@ export function useParserHelpers({
       allScenes.push(...r.scenes);
     }
 
-    return { scenes: allScenes, status: worstStatus };
+    // Renumber scenes sequentially across all children
+    const numberedScenes = allScenes.map((s, i) => ({ ...s, sceneNumber: i + 1 }));
+    return { scenes: numberedScenes, status: worstStatus };
   }, [selectedIdx, tocEntries, chapterResults]);
 
   const contentEntries = useMemo(() => tocEntries.filter(e => e.sectionType === "content"), [tocEntries]);
