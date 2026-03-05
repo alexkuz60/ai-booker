@@ -83,8 +83,7 @@ export default function Parser() {
     } catch {}
   }, [selectedIndices, lastClickedIdx, expandedNodes]);
 
-
-    bookReset();
+  const handleReset = () => {
     setSelectedIndices(new Set());
     setLastClickedIdx(null);
     setExpandedNodes(new Set());
