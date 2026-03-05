@@ -387,7 +387,7 @@ export function useBookManager({ userId, isRu }: UseBookManagerParams) {
       let userErr: string;
       if (/402|payment|credits/i.test(msg)) userErr = t("errPayment", isRu);
       else if (/429|rate.?limit/i.test(msg)) userErr = t("errRateLimit", isRu);
-      else if (/timeout|timed?\\s?out/i.test(msg)) userErr = t("errTimeout", isRu);
+      else if (/timeout|timed?\s?out/i.test(msg)) userErr = t("errTimeout", isRu);
       else if (/api.?key/i.test(msg)) userErr = t("errNoApiKey", isRu);
       else if (/fetch|network/i.test(msg)) userErr = t("errNetwork", isRu);
       else userErr = msg;

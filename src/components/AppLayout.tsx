@@ -1,7 +1,8 @@
+import type { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 
-export function AppLayout({ children }: { children: React.ReactNode }) {
+export function AppLayout({ children }: { children: ReactNode }) {
   return (
     <SidebarProvider defaultOpen={false}>
       <div className="h-screen flex w-full overflow-hidden">
