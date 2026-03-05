@@ -159,6 +159,14 @@ export default function Parser() {
     });
   };
 
+  const renamePart = (oldTitle: string, newTitle: string) => {
+    setTocEntries(prev => prev.map(e => e.partTitle === oldTitle ? { ...e, partTitle: newTitle } : e));
+    const partId = partIdMap.get(oldTitle);
+    if (partId) {
+      supabase.from('book_parts').update({ title: newTitle } as any).eq('id', partId).then();
+    }
+  };
+
   const deleteEntry = (indices: number[]) => {
     const count = indices.length;
     const confirmMsg = count === 1
