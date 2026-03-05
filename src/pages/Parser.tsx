@@ -128,14 +128,22 @@ export default function Parser() {
   };
 
   const renameEntry = (idx: number, newTitle: string) => {
-    setTocEntries(prev => {
-      const next = prev.map((e, i) => i === idx ? { ...e, title: newTitle } : e);
-      return next;
-    });
+    setTocEntries(prev => prev.map((e, i) => i === idx ? { ...e, title: newTitle } : e));
     const chapterId = chapterIdMap.get(idx);
     if (chapterId) {
       supabase.from('book_chapters').update({ title: newTitle } as any).eq('id', chapterId).then();
     }
+  };
+
+  const changeStartPage = (idx: number, newPage: number) => {
+    setTocEntries(prev => {
+      const next = prev.map((e, i) => i === idx ? { ...e, startPage: newPage } : e);
+      // Also update endPage of previous entry if applicable
+      if (idx > 0 && next[idx - 1].endPage === prev[idx].startPage) {
+        next[idx - 1] = { ...next[idx - 1], endPage: newPage };
+      }
+      return next;
+    });
   };
 
   const deleteEntry = (indices: number[]) => {
@@ -287,6 +295,7 @@ export default function Parser() {
                     onChangeLevel={changeLevel}
                     onDeleteEntry={deleteEntry}
                     onRenameEntry={renameEntry}
+                    onChangeStartPage={changeStartPage}
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle />

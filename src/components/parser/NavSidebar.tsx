@@ -29,6 +29,7 @@ interface NavSidebarProps {
   onChangeLevel: (indices: number[], delta: number) => void;
   onDeleteEntry: (indices: number[]) => void;
   onRenameEntry: (idx: number, newTitle: string) => void;
+  onChangeStartPage: (idx: number, newPage: number) => void;
 }
 
 export default function NavSidebar({
@@ -36,10 +37,13 @@ export default function NavSidebar({
   selectedIndices, expandedNodes, contentEntries, supplementaryEntries,
   partGroups, partlessIndices,
   onSelectChapter, onAnalyzeChapter, onToggleNode, onSendToStudio, isChapterFullyDone,
-  onChangeLevel, onDeleteEntry, onRenameEntry,
+  onChangeLevel, onDeleteEntry, onRenameEntry, onChangeStartPage,
 }: NavSidebarProps) {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [editingPageIdx, setEditingPageIdx] = useState<number | null>(null);
+  const [editPageValue, setEditPageValue] = useState("");
+  const editPageRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -48,6 +52,23 @@ export default function NavSidebar({
       editInputRef.current?.select();
     }
   }, [editingIdx]);
+
+  useEffect(() => {
+    if (editingPageIdx !== null) {
+      editPageRef.current?.focus();
+      editPageRef.current?.select();
+    }
+  }, [editingPageIdx]);
+
+  const commitPageEdit = () => {
+    if (editingPageIdx !== null) {
+      const parsed = parseInt(editPageValue, 10);
+      if (!isNaN(parsed) && parsed > 0 && parsed !== tocEntries[editingPageIdx]?.startPage) {
+        onChangeStartPage(editingPageIdx, parsed);
+      }
+      setEditingPageIdx(null);
+    }
+  };
 
   const commitRename = () => {
     if (editingIdx !== null && editValue.trim() && editValue.trim() !== tocEntries[editingIdx]?.title) {
@@ -153,9 +174,32 @@ export default function NavSidebar({
               {entry.title}
             </span>
           )}
-          <span className="text-[11px] text-muted-foreground font-mono flex-shrink-0">
-            {entry.startPage}
-          </span>
+          {editingPageIdx === idx ? (
+            <input
+              ref={editPageRef}
+              value={editPageValue}
+              onChange={(e) => setEditPageValue(e.target.value)}
+              onBlur={commitPageEdit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitPageEdit();
+                if (e.key === "Escape") setEditingPageIdx(null);
+                e.stopPropagation();
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-10 bg-background border border-primary rounded px-1 py-0 text-[11px] font-mono text-foreground outline-none text-center flex-shrink-0"
+            />
+          ) : (
+            <span
+              className="text-[11px] text-muted-foreground font-mono flex-shrink-0 cursor-pointer hover:text-foreground"
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                setEditingPageIdx(idx);
+                setEditPageValue(String(entry.startPage));
+              }}
+            >
+              {entry.startPage}
+            </span>
+          )}
           {isParent && isChapterFullyDone(idx) && (
             <button
               title={t("toStudio", isRu)}
