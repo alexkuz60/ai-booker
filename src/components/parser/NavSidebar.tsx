@@ -1,6 +1,6 @@
 import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2, AlertCircle,
-  BookOpen, FolderOpen, Clapperboard
+  BookOpen, FolderOpen, Clapperboard, ChevronLeft, ChevronRightIcon
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { t, tSection } from "@/pages/parser/i18n";
@@ -24,6 +24,7 @@ interface NavSidebarProps {
   onToggleNode: (key: string) => void;
   onSendToStudio: (idx: number) => void;
   isChapterFullyDone: (idx: number) => boolean;
+  onChangeLevel: (idx: number, delta: number) => void;
 }
 
 export default function NavSidebar({
@@ -31,6 +32,7 @@ export default function NavSidebar({
   selectedIdx, expandedNodes, contentEntries, supplementaryEntries,
   partGroups, partlessIndices,
   onSelectChapter, onAnalyzeChapter, onToggleNode, onSendToStudio, isChapterFullyDone,
+  onChangeLevel,
 }: NavSidebarProps) {
 
   function renderNavItem(idx: number, depth: number = 0, isTopLevel: boolean = false) {
@@ -94,6 +96,25 @@ export default function NavSidebar({
           <span className="text-[11px] text-muted-foreground font-mono flex-shrink-0">
             {entry.startPage}
           </span>
+          {isSelected && (
+            <span className="flex items-center gap-0 flex-shrink-0 ml-1">
+              <button
+                title={isRu ? "Уменьшить вложенность" : "Outdent"}
+                onClick={(e) => { e.stopPropagation(); onChangeLevel(idx, -1); }}
+                disabled={entry.level === 0}
+                className="p-0.5 rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30 disabled:pointer-events-none"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <button
+                title={isRu ? "Увеличить вложенность" : "Indent"}
+                onClick={(e) => { e.stopPropagation(); onChangeLevel(idx, 1); }}
+                className="p-0.5 rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronRightIcon className="h-3.5 w-3.5" />
+              </button>
+            </span>
+          )}
           {isTopLevel && isChapterFullyDone(idx) && (
             <button
               title={t("toStudio", isRu)}
