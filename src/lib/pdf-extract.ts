@@ -1,5 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
 
+import { type LineInfo, type FootnoteState, initialFootnoteState, separateFootnotes, processFootnotes } from './pdf-footnotes';
+
 // Use the worker from CDN
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
@@ -79,6 +81,7 @@ export async function extractTextByPageRange(
 ): Promise<string> {
   const pages: string[] = [];
   const total = endPage - startPage + 1;
+  let footnoteState: FootnoteState = initialFootnoteState();
 
   for (let i = startPage; i <= endPage; i++) {
     const page = await pdf.getPage(i);
@@ -103,52 +106,59 @@ export async function extractTextByPageRange(
       ? heights.sort((a, b) => a - b)[Math.floor(heights.length / 2)]
       : 12;
 
-    // Track Y positions per line for page-number detection
-    interface LineInfo { text: string; y: number | null }
+    // Track Y positions and font sizes per line for page-number and footnote detection
     const lineInfos: LineInfo[] = [];
     let currentLine = '';
     let currentLineY: number | null = null;
+    let currentLineFontSize: number | null = null;
     let prevY: number | null = null;
 
     for (const item of items) {
       const t = (item as any).transform;
       const y = t ? t[5] : null; // Y coordinate (bottom of text)
       const str: string = (item as any).str;
+      const itemFontSize = t ? Math.abs(t[3]) : null;
 
       if (prevY !== null && y !== null) {
         const gap = Math.abs(prevY - y);
 
         if (gap > medianHeight * 1.8) {
           // Large gap → paragraph break
-          lineInfos.push({ text: currentLine.trimEnd(), y: currentLineY });
-          lineInfos.push({ text: '', y: null }); // paragraph separator
+          lineInfos.push({ text: currentLine.trimEnd(), y: currentLineY, fontSize: currentLineFontSize });
+          lineInfos.push({ text: '', y: null, fontSize: null }); // paragraph separator
           currentLine = str;
           currentLineY = y;
+          currentLineFontSize = itemFontSize;
         } else if (gap > medianHeight * 0.3) {
           // Normal line break (same paragraph)
-          lineInfos.push({ text: currentLine.trimEnd(), y: currentLineY });
+          lineInfos.push({ text: currentLine.trimEnd(), y: currentLineY, fontSize: currentLineFontSize });
           currentLine = str;
           currentLineY = y;
+          currentLineFontSize = itemFontSize;
         } else {
           // Same line — add space only if not joining to punctuation
           const needsSpace = currentLine && str && !currentLine.endsWith(' ') && !str.startsWith(' ') && !/^[.,;:!?—–)»"\u201D\u2019\u00BB]/.test(str);
           currentLine += (needsSpace ? ' ' : '') + str;
+          if (itemFontSize !== null) currentLineFontSize = itemFontSize;
         }
       } else {
         currentLine += str;
         if (currentLineY === null) currentLineY = y;
+        if (currentLineFontSize === null) currentLineFontSize = itemFontSize;
       }
 
       if (y !== null) prevY = y;
     }
 
-    if (currentLine) lineInfos.push({ text: currentLine.trimEnd(), y: currentLineY });
+    if (currentLine) lineInfos.push({ text: currentLine.trimEnd(), y: currentLineY, fontSize: currentLineFontSize });
 
-    // Detect page numbers: isolated digit-only lines in top/bottom 12% of page
+    // Separate footnotes from body text
+    const { bodyLines, footnoteLines } = separateFootnotes(lineInfos, pageHeight, medianHeight);
+
+    // Detect page numbers in body: isolated digit-only lines in top/bottom 12% of page
     const marginZone = pageHeight * 0.12;
-    const lines: string[] = lineInfos.map(li => {
+    const lines: string[] = bodyLines.map(li => {
       if (li.text && li.y !== null && /^\d{1,4}$/.test(li.text.trim())) {
-        // PDF Y is bottom-up: low Y = bottom, high Y = top
         const isTop = li.y > pageHeight - marginZone;
         const isBottom = li.y < marginZone;
         if (isTop || isBottom) {
@@ -157,6 +167,11 @@ export async function extractTextByPageRange(
       }
       return li.text;
     });
+
+    // Process footnotes into marked text
+    const footnoteText = footnoteLines.map(li => li.text).join(' ');
+    const { marked: markedFootnotes, newState } = processFootnotes(footnoteText, footnoteState);
+    footnoteState = newState;
 
     // Merge consecutive non-empty lines into paragraphs, keep empty lines as \n\n
     const paragraphs: string[] = [];
@@ -167,13 +182,17 @@ export async function extractTextByPageRange(
           paragraphs.push(buf.join(' '));
           buf = [];
         }
-        // paragraph break marker
         paragraphs.push('');
       } else {
         buf.push(line);
       }
     }
     if (buf.length > 0) paragraphs.push(buf.join(' '));
+
+    // Append footnote block if present
+    if (markedFootnotes) {
+      paragraphs.push(markedFootnotes);
+    }
 
     pages.push(paragraphs.filter((p, idx, arr) => {
       // Deduplicate consecutive empty strings
