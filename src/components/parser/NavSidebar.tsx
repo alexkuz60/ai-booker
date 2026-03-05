@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from "react";
 import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2, AlertCircle,
   BookOpen, FolderOpen, Clapperboard, ChevronLeft, ChevronRightIcon, Trash2
@@ -27,6 +28,7 @@ interface NavSidebarProps {
   isChapterFullyDone: (idx: number) => boolean;
   onChangeLevel: (indices: number[], delta: number) => void;
   onDeleteEntry: (indices: number[]) => void;
+  onRenameEntry: (idx: number, newTitle: string) => void;
 }
 
 export default function NavSidebar({
@@ -34,8 +36,25 @@ export default function NavSidebar({
   selectedIndices, expandedNodes, contentEntries, supplementaryEntries,
   partGroups, partlessIndices,
   onSelectChapter, onAnalyzeChapter, onToggleNode, onSendToStudio, isChapterFullyDone,
-  onChangeLevel, onDeleteEntry,
+  onChangeLevel, onDeleteEntry, onRenameEntry,
 }: NavSidebarProps) {
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingIdx !== null) {
+      editInputRef.current?.focus();
+      editInputRef.current?.select();
+    }
+  }, [editingIdx]);
+
+  const commitRename = () => {
+    if (editingIdx !== null && editValue.trim() && editValue.trim() !== tocEntries[editingIdx]?.title) {
+      onRenameEntry(editingIdx, editValue.trim());
+    }
+    setEditingIdx(null);
+  };
 
   function hasDirectChildren(idx: number): boolean {
     const entry = tocEntries[idx];
@@ -108,7 +127,32 @@ export default function NavSidebar({
               <div className="h-3.5 w-3.5 rounded-full border border-border" />
             )}
           </span>
-          <span className="truncate flex-1">{entry.title}</span>
+          {editingIdx === idx ? (
+            <input
+              ref={editInputRef}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitRename();
+                if (e.key === "Escape") setEditingIdx(null);
+                e.stopPropagation();
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 bg-background border border-primary rounded px-1 py-0 text-sm text-foreground outline-none"
+            />
+          ) : (
+            <span
+              className="truncate flex-1"
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                setEditingIdx(idx);
+                setEditValue(entry.title);
+              }}
+            >
+              {entry.title}
+            </span>
+          )}
           <span className="text-[11px] text-muted-foreground font-mono flex-shrink-0">
             {entry.startPage}
           </span>
