@@ -318,6 +318,7 @@ export default function Parser() {
                     onRenameEntry={renameEntry}
                     onChangeStartPage={changeStartPage}
                     onOpenPdf={handleOpenPdf}
+                    onRenamePart={renamePart}
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle />
