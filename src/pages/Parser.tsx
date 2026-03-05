@@ -137,8 +137,8 @@ export default function Parser() {
           {step === "workspace" && (
             <motion.div key="workspace" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="flex h-full min-h-0 overflow-hidden">
-              <ResizablePanelGroup direction="horizontal" autoSaveId={NAV_WIDTH_KEY}>
-                <ResizablePanel defaultSize={22} minSize={14} maxSize={45}>
+              <ResizablePanelGroup direction="horizontal" autoSaveId={NAV_WIDTH_KEY} className="h-full min-h-0">
+                <ResizablePanel defaultSize={22} minSize={14} maxSize={45} className="min-h-0 overflow-hidden">
                   <NavSidebar
                     isRu={isRu} fileName={fileName} totalPages={totalPages}
                     tocEntries={tocEntries} chapterResults={chapterResults}
@@ -151,8 +151,8 @@ export default function Parser() {
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle />
-                <ResizablePanel defaultSize={78}>
-                  <div className="flex-1 flex flex-col h-full overflow-hidden">
+                <ResizablePanel defaultSize={78} className="min-h-0 overflow-hidden">
+                  <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
                     <ChapterDetailPanel
                       isRu={isRu} selectedIdx={selectedIdx}
                       selectedEntry={selectedEntry} selectedResult={selectedResult}
