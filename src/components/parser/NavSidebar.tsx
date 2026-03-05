@@ -393,11 +393,11 @@ export default function NavSidebar({
                           onOpenPdf?.(firstEntry.startPage);
                         }}
                       >
-                        p.{firstEntry.startPage}
+                        {t("partPagePrefix", isRu)}{firstEntry.startPage}
                       </span>
                     )}
                     <span className="text-[11px] text-muted-foreground/60 font-normal">·</span>
-                    <span className="text-[11px] text-muted-foreground font-normal">{group.indices.length}</span>
+                    <span className="text-[11px] text-muted-foreground font-normal">{t("partChaptersSuffix", isRu)} {group.indices.length}</span>
                   </span>
                 </button>
                 {isExpanded && (
