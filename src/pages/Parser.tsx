@@ -131,9 +131,10 @@ export default function Parser() {
       const oldId = oldMap.get(i);
       if (oldId) newMap.set(newIdx, oldId);
       newIdx++;
+    }
     setChapterIdMap(newMap);
 
-    
+
     // Clear selection if deleted
     if (selectedIdx !== null && deleteSet.has(selectedIdx)) {
       setSelectedIdx(null);
