@@ -19,6 +19,7 @@ interface ChapterDetailPanelProps {
   selectedResult: { scenes: Scene[]; status: ChapterStatus } | null | undefined;
   analysisLog: string[];
   onAnalyze: (idx: number) => void;
+  childCount?: number;
 }
 
 function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
@@ -93,7 +94,7 @@ function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
 }
 
 export default function ChapterDetailPanel({
-  isRu, selectedIdx, selectedEntry, selectedResult, analysisLog, onAnalyze,
+  isRu, selectedIdx, selectedEntry, selectedResult, analysisLog, onAnalyze, childCount = 0,
 }: ChapterDetailPanelProps) {
   if (selectedIdx === null || !selectedEntry) {
     return (
@@ -115,12 +116,13 @@ export default function ChapterDetailPanel({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl gradient-cyan flex items-center justify-center shadow-cool">
-                  <FileText className="h-5 w-5 text-primary-foreground" />
+                  {childCount > 0 ? <Layers className="h-5 w-5 text-primary-foreground" /> : <FileText className="h-5 w-5 text-primary-foreground" />}
                 </div>
                 <div>
                   <CardTitle className="text-lg">{selectedEntry.title}</CardTitle>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {t("pageRange", isRu)} {selectedEntry.startPage}–{selectedEntry.endPage}
+                    {childCount > 0 && ` • ${childCount} ${isRu ? "разд." : "sections"}`}
                     {selectedEntry.partTitle && ` • ${selectedEntry.partTitle}`}
                   </p>
                 </div>

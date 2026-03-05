@@ -17,6 +17,19 @@ export function useParserHelpers({
 
   const selectedEntry = selectedIdx !== null ? tocEntries[selectedIdx] : null;
 
+  // Count direct children of selected entry
+  const selectedChildCount = useMemo(() => {
+    if (selectedIdx === null) return 0;
+    const entry = tocEntries[selectedIdx];
+    let count = 0;
+    for (let i = selectedIdx + 1; i < tocEntries.length; i++) {
+      if (tocEntries[i].level <= entry.level) break;
+      if (tocEntries[i].sectionType !== entry.sectionType) break;
+      if (tocEntries[i].level === entry.level + 1) count++;
+    }
+    return count;
+  }, [selectedIdx, tocEntries]);
+
   // Aggregate scenes from selected entry + all its children
   const selectedResult = useMemo(() => {
     if (selectedIdx === null) return null;
@@ -156,7 +169,7 @@ export function useParserHelpers({
   }, [tocEntries]);
 
   return {
-    selectedEntry, selectedResult,
+    selectedEntry, selectedResult, selectedChildCount,
     contentEntries, supplementaryEntries,
     analyzedCount, totalScenes,
     isChapterFullyDone, sendToStudio,

@@ -65,7 +65,7 @@ export default function Parser() {
   const selectedIdx = selectedIndices.size === 1 ? Array.from(selectedIndices)[0] : null;
 
   const {
-    selectedEntry, selectedResult,
+    selectedEntry, selectedResult, selectedChildCount,
     contentEntries, supplementaryEntries,
     analyzedCount, totalScenes,
     isChapterFullyDone, sendToStudio,
@@ -359,6 +359,7 @@ export default function Parser() {
                       isRu={isRu} selectedIdx={selectedIdx}
                       selectedEntry={selectedEntry} selectedResult={selectedResult}
                       analysisLog={analysisLog} onAnalyze={analyzeChapter}
+                      childCount={selectedChildCount}
                     />
                   </div>
                 </ResizablePanel>
