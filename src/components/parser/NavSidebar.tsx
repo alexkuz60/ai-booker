@@ -251,6 +251,14 @@ export default function NavSidebar({
             >
               <ChevronRightIcon className="h-3.5 w-3.5" />
             </Button>
+            <Button
+              variant="ghost" size="icon"
+              className="h-6 w-6 text-destructive hover:text-destructive"
+              title={isRu ? "Удалить" : "Delete"}
+              onClick={() => onDeleteEntry(selectedArray)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
           </div>
         </div>
       )}
