@@ -82,6 +82,8 @@ export async function extractTextByPageRange(
 
   for (let i = startPage; i <= endPage; i++) {
     const page = await pdf.getPage(i);
+    const viewport = page.getViewport({ scale: 1 });
+    const pageHeight = viewport.height;
     const content = await page.getTextContent();
     const items = content.items.filter((it: any) => typeof it.str === 'string');
 
