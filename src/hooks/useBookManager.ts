@@ -323,6 +323,23 @@ export function useBookManager({ userId, isRu }: UseBookManagerParams) {
 
       setTocEntries(normalizeLevels(chapters));
 
+      // Clean up previous uploads of the same file name
+      const { data: existingBooks } = await supabase
+        .from('books')
+        .select('id, file_path')
+        .eq('user_id', userId)
+        .eq('file_name', f.name);
+      if (existingBooks?.length) {
+        const oldPaths = existingBooks.map(b => b.file_path).filter(Boolean) as string[];
+        if (oldPaths.length) {
+          await supabase.storage.from('book-uploads').remove(oldPaths);
+        }
+        const oldIds = existingBooks.map(b => b.id);
+        await supabase.from('book_chapters').delete().in('book_id', oldIds);
+        await supabase.from('book_parts').delete().in('book_id', oldIds);
+        await supabase.from('books').delete().in('id', oldIds);
+      }
+
       const filePath = `${userId}/${Date.now()}_${f.name}`;
       await supabase.storage.from('book-uploads').upload(filePath, f);
       const { data: book, error: bookErr } = await supabase
