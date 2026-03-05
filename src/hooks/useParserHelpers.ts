@@ -16,7 +16,40 @@ export function useParserHelpers({
   const navigate = useNavigate();
 
   const selectedEntry = selectedIdx !== null ? tocEntries[selectedIdx] : null;
-  const selectedResult = selectedIdx !== null ? chapterResults.get(selectedIdx) : null;
+
+  // Aggregate scenes from selected entry + all its children
+  const selectedResult = useMemo(() => {
+    if (selectedIdx === null) return null;
+    const entry = tocEntries[selectedIdx];
+    const ownResult = chapterResults.get(selectedIdx);
+
+    // Collect child indices
+    const childIndices: number[] = [];
+    for (let i = selectedIdx + 1; i < tocEntries.length; i++) {
+      if (tocEntries[i].level <= entry.level) break;
+      if (tocEntries[i].sectionType !== entry.sectionType) break;
+      childIndices.push(i);
+    }
+
+    // If no children, return own result directly
+    if (childIndices.length === 0) return ownResult ?? null;
+
+    // Aggregate scenes from self + children
+    const allScenes: Scene[] = [];
+    let worstStatus: ChapterStatus = "done";
+
+    const indices = [selectedIdx, ...childIndices];
+    for (const idx of indices) {
+      const r = chapterResults.get(idx);
+      if (!r) { worstStatus = "pending"; continue; }
+      if (r.status === "analyzing") worstStatus = "analyzing";
+      else if (r.status === "error" && worstStatus !== "analyzing") worstStatus = "error";
+      else if (r.status === "pending" && worstStatus === "done") worstStatus = "pending";
+      allScenes.push(...r.scenes);
+    }
+
+    return { scenes: allScenes, status: worstStatus };
+  }, [selectedIdx, tocEntries, chapterResults]);
 
   const contentEntries = useMemo(() => tocEntries.filter(e => e.sectionType === "content"), [tocEntries]);
   const supplementaryEntries = useMemo(() => tocEntries.filter(e => e.sectionType !== "content"), [tocEntries]);
