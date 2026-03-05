@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
 import ModelSelector from "@/components/ModelSelector";
@@ -10,14 +9,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
 import { useLanguage } from "@/hooks/useLanguage";
-import { saveStudioChapter } from "@/lib/studioChapter";
 import { t } from "@/pages/parser/i18n";
-import type { Scene, ChapterStatus } from "@/pages/parser/types";
 import { NAV_WIDTH_KEY } from "@/pages/parser/types";
 import { useChapterAnalysis } from "@/hooks/useChapterAnalysis";
 import { useBookManager } from "@/hooks/useBookManager";
+import { useParserHelpers } from "@/hooks/useParserHelpers";
 
-// UI components
 import LibraryView from "@/components/parser/LibraryView";
 import UploadView from "@/components/parser/UploadView";
 import { ExtractingTocView, ErrorView } from "@/components/parser/StatusViews";
@@ -27,14 +24,12 @@ import ChapterDetailPanel from "@/components/parser/ChapterDetailPanel";
 export default function Parser() {
   const { user } = useAuth();
   const { isRu } = useLanguage();
-  const navigate = useNavigate();
 
   const { value: selectedModel, update: setSelectedModel } = useCloudSettings('parser-model', DEFAULT_MODEL_ID);
   const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
-  // ─── Book manager hook ─────────────────────────────────────
   const {
     step, setStep, books, loadingLibrary, fileName, errorMsg,
     chapterIdMap, tocEntries, pdfRef, totalPages,
@@ -42,11 +37,18 @@ export default function Parser() {
     openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset,
   } = useBookManager({ userId: user?.id, isRu });
 
-  // ─── Analysis hook ─────────────────────────────────────────
   const { analysisLog, analyzeChapter, resetAnalysis } = useChapterAnalysis({
     isRu, pdfRef, userId: user?.id, selectedModel, userApiKeys,
     tocEntries, chapterIdMap, chapterResults, setChapterResults,
   });
+
+  const {
+    selectedEntry, selectedResult,
+    contentEntries, supplementaryEntries,
+    analyzedCount, totalScenes,
+    isChapterFullyDone, sendToStudio,
+    partGroups, partlessIndices,
+  } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName });
 
   const handleReset = () => {
     bookReset();
@@ -63,7 +65,6 @@ export default function Parser() {
     });
   };
 
-  // Auto-expand all nodes on first load
   useEffect(() => {
     if (tocEntries.length > 0 && expandedNodes.size === 0) {
       const allKeys = new Set<string>();
@@ -81,7 +82,6 @@ export default function Parser() {
     }
   }, [tocEntries]);
 
-  // ─── Load user API keys ─────────────────────────────────────
   useEffect(() => {
     if (!user) return;
     supabase.from('profiles').select('api_keys').eq('id', user.id).single()
@@ -90,77 +90,8 @@ export default function Parser() {
       });
   }, [user]);
 
-  // ─── Computed helpers ──────────────────────────────────────
-  const selectedEntry = selectedIdx !== null ? tocEntries[selectedIdx] : null;
-  const selectedResult = selectedIdx !== null ? chapterResults.get(selectedIdx) : null;
-
-  const contentEntries = tocEntries.filter(e => e.sectionType === "content");
-  const supplementaryEntries = tocEntries.filter(e => e.sectionType !== "content");
-
-  const analyzedCount = Array.from(chapterResults.values()).filter(r => r.status === "done").length;
-  const totalScenes = Array.from(chapterResults.values()).reduce((a, r) => a + r.scenes.length, 0);
-
-  const isChapterFullyDone = (idx: number): boolean => {
-    const entry = tocEntries[idx];
-    const result = chapterResults.get(idx);
-    if (!result || result.status !== "done" || result.scenes.length === 0) return false;
-    for (let i = idx + 1; i < tocEntries.length; i++) {
-      if (tocEntries[i].level <= entry.level) break;
-      if (tocEntries[i].sectionType !== entry.sectionType) break;
-      const childResult = chapterResults.get(i);
-      if (!childResult || childResult.status !== "done" || childResult.scenes.length === 0) return false;
-    }
-    return true;
-  };
-
-  const sendToStudio = (idx: number) => {
-    const entry = tocEntries[idx];
-    const result = chapterResults.get(idx);
-    if (!result) return;
-    const allScenes = [...result.scenes];
-    for (let i = idx + 1; i < tocEntries.length; i++) {
-      if (tocEntries[i].level <= entry.level) break;
-      if (tocEntries[i].sectionType !== entry.sectionType) break;
-      const childResult = chapterResults.get(i);
-      if (childResult) allScenes.push(...childResult.scenes);
-    }
-    saveStudioChapter({ chapterTitle: entry.title, bookTitle: fileName.replace('.pdf', ''), scenes: allScenes });
-    navigate("/studio");
-  };
-
-  // Part grouping
-  const partGroups: { title: string; indices: number[] }[] = [];
-  const partlessIndices: number[] = [];
-  const partMap = new Map<string, number[]>();
-  const childOfAnother = new Set<number>();
-
-  tocEntries.forEach((entry, idx) => {
-    if (entry.sectionType !== "content") return;
-    for (let i = idx + 1; i < tocEntries.length; i++) {
-      if (tocEntries[i].level <= entry.level) break;
-      if (tocEntries[i].sectionType !== entry.sectionType) break;
-      childOfAnother.add(i);
-    }
-  });
-
-  tocEntries.forEach((entry, idx) => {
-    if (entry.sectionType !== "content") return;
-    const key = entry.partTitle || "";
-    if (key) {
-      if (!partMap.has(key)) {
-        partMap.set(key, []);
-        partGroups.push({ title: key, indices: partMap.get(key)! });
-      }
-      if (!childOfAnother.has(idx)) partMap.get(key)!.push(idx);
-    } else {
-      if (!childOfAnother.has(idx)) partlessIndices.push(idx);
-    }
-  });
-
-  // ─── Render ────────────────────────────────────────────────
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col h-full">
-      {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-border">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">{t("parserTitle", isRu)}</h1>
@@ -186,7 +117,6 @@ export default function Parser() {
         )}
       </div>
 
-      {/* Content */}
       <div className="flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
           {step === "library" && (
@@ -195,19 +125,15 @@ export default function Parser() {
               onUpload={() => setStep("upload")} onOpen={openSavedBook} onDelete={deleteBook}
             />
           )}
-
           {step === "upload" && (
             <UploadView isRu={isRu} fileInputRef={fileInputRef} onFileSelect={handleFileSelect} />
           )}
-
           {step === "extracting_toc" && (
             <ExtractingTocView fileName={fileName} isRu={isRu} />
           )}
-
           {step === "error" && (
             <ErrorView errorMsg={errorMsg} isRu={isRu} onReset={handleReset} />
           )}
-
           {step === "workspace" && (
             <motion.div key="workspace" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="flex h-full min-h-0 overflow-hidden">
