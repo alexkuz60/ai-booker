@@ -15,6 +15,18 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    const { error } = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
+    });
+    setGoogleLoading(false);
+    if (error) {
+      toast.error(error.message || 'Ошибка входа через Google');
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
