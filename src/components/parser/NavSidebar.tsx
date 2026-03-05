@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from "react";
 import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2, AlertCircle,
   BookOpen, FolderOpen, Clapperboard, ChevronLeft, ChevronRightIcon, Trash2
@@ -27,6 +28,7 @@ interface NavSidebarProps {
   isChapterFullyDone: (idx: number) => boolean;
   onChangeLevel: (indices: number[], delta: number) => void;
   onDeleteEntry: (indices: number[]) => void;
+  onRenameEntry: (idx: number, newTitle: string) => void;
 }
 
 export default function NavSidebar({
@@ -34,8 +36,25 @@ export default function NavSidebar({
   selectedIndices, expandedNodes, contentEntries, supplementaryEntries,
   partGroups, partlessIndices,
   onSelectChapter, onAnalyzeChapter, onToggleNode, onSendToStudio, isChapterFullyDone,
-  onChangeLevel, onDeleteEntry,
+  onChangeLevel, onDeleteEntry, onRenameEntry,
 }: NavSidebarProps) {
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingIdx !== null) {
+      editInputRef.current?.focus();
+      editInputRef.current?.select();
+    }
+  }, [editingIdx]);
+
+  const commitRename = () => {
+    if (editingIdx !== null && editValue.trim() && editValue.trim() !== tocEntries[editingIdx]?.title) {
+      onRenameEntry(editingIdx, editValue.trim());
+    }
+    setEditingIdx(null);
+  };
 
   function hasDirectChildren(idx: number): boolean {
     const entry = tocEntries[idx];
