@@ -88,101 +88,75 @@ export function useOpenRouterData(hasKey: boolean) {
     }));
   }, [logs]);
 
-  const getApiKey = useCallback(async (): Promise<string | null> => {
-    const { data } = await supabase.rpc('get_my_api_keys');
-    return (data as any)?.openrouter || null;
+  // All OpenRouter calls now go through the edge function proxy
+  const invokeProxy = useCallback(async (action: string, model_id?: string) => {
+    const { data, error } = await supabase.functions.invoke('openrouter-proxy', {
+      body: { action, model_id },
+    });
+    if (error) throw error;
+    return data;
   }, []);
 
   const handlePing = useCallback(async () => {
     if (!hasKey) return;
     setPinging(true);
     setPingResult(null);
-    const start = Date.now();
     try {
-      const apiKey = await getApiKey();
-      if (!apiKey) { setPinging(false); return; }
-      const res = await fetch('https://openrouter.ai/api/v1/key', {
-        headers: { 'Authorization': `Bearer ${apiKey}` },
-      });
-      const latency = Date.now() - start;
-      if (res.ok) {
-        const json = await res.json();
-        setKeyInfo(json.data);
-        setPingResult({ status: 'online', latency_ms: latency });
-      } else {
-        setPingResult({ status: 'error', latency_ms: latency, error: `HTTP ${res.status}` });
-      }
+      const data = await invokeProxy('ping');
+      setPingResult({ status: data.status, latency_ms: data.latency_ms, error: data.error });
+      if (data.key_info) setKeyInfo(data.key_info);
     } catch (err: any) {
-      setPingResult({ status: 'error', latency_ms: Date.now() - start, error: err.message || 'Network error' });
+      setPingResult({ status: 'error', latency_ms: 0, error: err.message || 'Network error' });
     } finally {
       setPinging(false);
     }
-  }, [hasKey, getApiKey]);
+  }, [hasKey, invokeProxy]);
 
   const fetchKeyInfo = useCallback(async () => {
     if (!hasKey) return;
     setKeyLoading(true);
     try {
-      const apiKey = await getApiKey();
-      if (!apiKey) { setKeyLoading(false); return; }
-      const res = await fetch('https://openrouter.ai/api/v1/key', {
-        headers: { 'Authorization': `Bearer ${apiKey}` },
-      });
-      if (res.ok) {
-        const json = await res.json();
-        setKeyInfo(json.data);
-      }
+      const data = await invokeProxy('ping');
+      if (data.key_info) setKeyInfo(data.key_info);
     } catch { /* silent */ } finally {
       setKeyLoading(false);
     }
-  }, [hasKey, getApiKey]);
+  }, [hasKey, invokeProxy]);
 
   const fetchCatalog = useCallback(async (force = false) => {
     if (catalogLoaded && !force) return;
     setCatalogLoading(true);
     try {
-      const res = await fetch('https://openrouter.ai/api/v1/models');
-      if (res.ok) {
-        const json = await res.json();
-        const models = (json.data || []).map((m: any) => ({
-          id: m.id, name: m.name || m.id, pricing: m.pricing, context_length: m.context_length,
-        }));
-        setCatalog(models);
+      const data = await invokeProxy('models');
+      if (data.models) {
+        setCatalog(data.models);
         setCatalogLoaded(true);
       }
     } catch { /* silent */ } finally {
       setCatalogLoading(false);
     }
-  }, [catalogLoaded]);
+  }, [catalogLoaded, invokeProxy]);
 
   const handleTestModel = useCallback(async (modelId: string) => {
     if (!hasKey) return;
     setTestingModel(modelId);
-    const start = Date.now();
     try {
-      const apiKey = await getApiKey();
-      if (!apiKey) { setTestingModel(null); return; }
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: 'Say ok' }], max_tokens: 5 }),
-      });
-      const latency_ms = Date.now() - start;
-      if (res.ok) {
-        const json = await res.json();
-        const usage = json.usage;
-        setTestResults(prev => ({ ...prev, [modelId]: { status: 'success', latency_ms, tokens: usage ? { input: usage.prompt_tokens || 0, output: usage.completion_tokens || 0 } : undefined } }));
-      } else if (res.status === 404) {
-        setTestResults(prev => ({ ...prev, [modelId]: { status: 'gone', latency_ms, error: 'Not found (404)' } }));
-      } else {
-        setTestResults(prev => ({ ...prev, [modelId]: { status: 'error', latency_ms, error: `HTTP ${res.status}` } }));
-      }
+      const data = await invokeProxy('test', modelId);
+      setTestResults(prev => ({
+        ...prev,
+        [modelId]: {
+          status: data.status,
+          latency_ms: data.latency_ms,
+          tokens: data.tokens,
+          error: data.error,
+        },
+      }));
     } catch (err: any) {
-      setTestResults(prev => ({ ...prev, [modelId]: { status: 'error', latency_ms: Date.now() - start, error: err.message } }));
+      setTestResults(prev => ({ ...prev, [modelId]: { status: 'error', latency_ms: 0, error: err.message } }));
     } finally {
       setTestingModel(null);
     }
-  }, [hasKey, getApiKey, setTestResults]);
+  }, [hasKey, invokeProxy, setTestResults]);
 
   const handleMassTest = useCallback(async () => {
     if (!hasKey || massTestRunning) return;
@@ -190,22 +164,16 @@ export function useOpenRouterData(hasKey: boolean) {
     if (allModels.length === 0) return;
     setMassTestRunning(true);
     setMassTestProgress({ done: 0, total: allModels.length });
-    const apiKey = await getApiKey();
-    if (!apiKey) { setMassTestRunning(false); return; }
 
     for (let i = 0; i < allModels.length; i++) {
       const modelId = allModels[i];
       setTestingModel(modelId);
-      const start = Date.now();
       try {
-        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-          body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: 'Say ok' }], max_tokens: 5 }),
-        });
-        const latency_ms = Date.now() - start;
-        if (res.ok) setTestResults(prev => ({ ...prev, [modelId]: { status: 'success', latency_ms } }));
-        else setTestResults(prev => ({ ...prev, [modelId]: { status: 'error', latency_ms, error: `HTTP ${res.status}` } }));
+        const data = await invokeProxy('test', modelId);
+        setTestResults(prev => ({
+          ...prev,
+          [modelId]: { status: data.status, latency_ms: data.latency_ms, error: data.error },
+        }));
       } catch {
         setTestResults(prev => ({ ...prev, [modelId]: { status: 'error', latency_ms: 0, error: 'Network error' } }));
       }
@@ -213,7 +181,7 @@ export function useOpenRouterData(hasKey: boolean) {
     }
     setTestingModel(null);
     setMassTestRunning(false);
-  }, [hasKey, massTestRunning, registryModels, userAddedModels, getApiKey, setTestResults]);
+  }, [hasKey, massTestRunning, registryModels, userAddedModels, invokeProxy, setTestResults]);
 
   const addUserModel = useCallback((modelId: string) => {
     updateCloudUserModels(prev => [...new Set([...prev, modelId])]);

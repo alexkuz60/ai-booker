@@ -121,7 +121,7 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
     } catch (e) {
       console.error("Failed to parse AI response:", raw);
       return new Response(
-        JSON.stringify({ error: "AI returned invalid JSON", raw }),
+        JSON.stringify({ error: "AI returned an unstructured response. Please retry." }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
