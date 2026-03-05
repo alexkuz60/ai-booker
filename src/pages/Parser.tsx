@@ -32,7 +32,7 @@ export default function Parser() {
 
   const {
     step, setStep, books, loadingLibrary, fileName, errorMsg,
-    chapterIdMap, tocEntries, pdfRef, totalPages,
+    chapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages,
     chapterResults, setChapterResults, fileInputRef,
     openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset,
   } = useBookManager({ userId: user?.id, isRu });
@@ -61,6 +61,28 @@ export default function Parser() {
     setExpandedNodes(prev => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
+  const changeLevel = (idx: number, delta: number) => {
+    setTocEntries(prev => {
+      const next = prev.map(e => ({ ...e }));
+      const entry = next[idx];
+      const newLevel = entry.level + delta;
+      if (newLevel < 0) return prev;
+      // Find children (same sectionType, deeper level)
+      const childIndices: number[] = [];
+      for (let i = idx + 1; i < next.length; i++) {
+        if (next[i].level <= entry.level) break;
+        if (next[i].sectionType !== entry.sectionType) break;
+        childIndices.push(i);
+      }
+      next[idx].level = newLevel;
+      for (const ci of childIndices) {
+        next[ci].level += delta;
+        if (next[ci].level < 0) next[ci].level = 0;
+      }
       return next;
     });
   };
@@ -148,6 +170,7 @@ export default function Parser() {
                     onSelectChapter={setSelectedIdx} onAnalyzeChapter={analyzeChapter}
                     onToggleNode={toggleNode} onSendToStudio={sendToStudio}
                     isChapterFullyDone={isChapterFullyDone}
+                    onChangeLevel={changeLevel}
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle />
