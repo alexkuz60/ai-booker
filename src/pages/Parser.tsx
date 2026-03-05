@@ -11,6 +11,7 @@ import { useCloudSettings } from "@/hooks/useCloudSettings";
 import { useLanguage } from "@/hooks/useLanguage";
 import { t } from "@/pages/parser/i18n";
 import { NAV_WIDTH_KEY } from "@/pages/parser/types";
+import type { Scene, ChapterStatus } from "@/pages/parser/types";
 import { useChapterAnalysis } from "@/hooks/useChapterAnalysis";
 import { useBookManager } from "@/hooks/useBookManager";
 import { useParserHelpers } from "@/hooks/useParserHelpers";
