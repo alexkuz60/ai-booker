@@ -127,7 +127,32 @@ export default function NavSidebar({
               <div className="h-3.5 w-3.5 rounded-full border border-border" />
             )}
           </span>
-          <span className="truncate flex-1">{entry.title}</span>
+          {editingIdx === idx ? (
+            <input
+              ref={editInputRef}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitRename();
+                if (e.key === "Escape") setEditingIdx(null);
+                e.stopPropagation();
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 bg-background border border-primary rounded px-1 py-0 text-sm text-foreground outline-none"
+            />
+          ) : (
+            <span
+              className="truncate flex-1"
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                setEditingIdx(idx);
+                setEditValue(entry.title);
+              }}
+            >
+              {entry.title}
+            </span>
+          )}
           <span className="text-[11px] text-muted-foreground font-mono flex-shrink-0">
             {entry.startPage}
           </span>

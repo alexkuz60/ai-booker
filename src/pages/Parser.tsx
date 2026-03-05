@@ -127,6 +127,17 @@ export default function Parser() {
     });
   };
 
+  const renameEntry = (idx: number, newTitle: string) => {
+    setTocEntries(prev => {
+      const next = prev.map((e, i) => i === idx ? { ...e, title: newTitle } : e);
+      return next;
+    });
+    const chapterId = chapterIdMap.get(idx);
+    if (chapterId) {
+      supabase.from('book_chapters').update({ title: newTitle } as any).eq('id', chapterId).then();
+    }
+  };
+
   const deleteEntry = (indices: number[]) => {
     const count = indices.length;
     const confirmMsg = count === 1
@@ -275,6 +286,7 @@ export default function Parser() {
                     isChapterFullyDone={isChapterFullyDone}
                     onChangeLevel={changeLevel}
                     onDeleteEntry={deleteEntry}
+                    onRenameEntry={renameEntry}
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle />
