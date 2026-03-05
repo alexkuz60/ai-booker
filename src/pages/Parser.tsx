@@ -35,7 +35,7 @@ export default function Parser() {
   const {
     step, setStep, books, loadingLibrary, fileName, errorMsg,
     chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
-    chapterResults, setChapterResults, fileInputRef,
+    partIdMap, chapterResults, setChapterResults, fileInputRef,
     openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset,
   } = useBookManager({ userId: user?.id, isRu });
 
@@ -157,6 +157,14 @@ export default function Parser() {
       }
       return next;
     });
+  };
+
+  const renamePart = (oldTitle: string, newTitle: string) => {
+    setTocEntries(prev => prev.map(e => e.partTitle === oldTitle ? { ...e, partTitle: newTitle } : e));
+    const partId = partIdMap.get(oldTitle);
+    if (partId) {
+      supabase.from('book_parts').update({ title: newTitle } as any).eq('id', partId).then();
+    }
   };
 
   const deleteEntry = (indices: number[]) => {
@@ -310,6 +318,7 @@ export default function Parser() {
                     onRenameEntry={renameEntry}
                     onChangeStartPage={changeStartPage}
                     onOpenPdf={handleOpenPdf}
+                    onRenamePart={renamePart}
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle />

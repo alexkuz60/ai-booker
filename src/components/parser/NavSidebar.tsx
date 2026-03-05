@@ -31,6 +31,7 @@ interface NavSidebarProps {
   onRenameEntry: (idx: number, newTitle: string) => void;
   onChangeStartPage: (idx: number, newPage: number) => void;
   onOpenPdf?: () => void;
+  onRenamePart?: (oldTitle: string, newTitle: string) => void;
 }
 
 export default function NavSidebar({
@@ -39,8 +40,11 @@ export default function NavSidebar({
   partGroups, partlessIndices,
   onSelectChapter, onAnalyzeChapter, onToggleNode, onSendToStudio, isChapterFullyDone,
   onChangeLevel, onDeleteEntry, onRenameEntry, onChangeStartPage,
-  onOpenPdf,
+  onOpenPdf, onRenamePart,
 }: NavSidebarProps) {
+  const [editingPartTitle, setEditingPartTitle] = useState<string | null>(null);
+  const [editPartValue, setEditPartValue] = useState("");
+  const editPartRef = useRef<HTMLInputElement>(null);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
   const [editingPageIdx, setEditingPageIdx] = useState<number | null>(null);
@@ -61,6 +65,20 @@ export default function NavSidebar({
       editPageRef.current?.select();
     }
   }, [editingPageIdx]);
+
+  useEffect(() => {
+    if (editingPartTitle !== null) {
+      editPartRef.current?.focus();
+      editPartRef.current?.select();
+    }
+  }, [editingPartTitle]);
+
+  const commitPartRename = () => {
+    if (editingPartTitle !== null && editPartValue.trim() && editPartValue.trim() !== editingPartTitle) {
+      onRenamePart?.(editingPartTitle, editPartValue.trim());
+    }
+    setEditingPartTitle(null);
+  };
 
   const commitPageEdit = () => {
     if (editingPageIdx !== null) {
@@ -326,6 +344,8 @@ export default function NavSidebar({
           {partGroups.map((group) => {
             const partKey = `part:${group.title}`;
             const isExpanded = expandedNodes.has(partKey);
+            const firstIdx = group.indices[0];
+            const firstEntry = firstIdx != null ? tocEntries[firstIdx] : null;
             return (
               <div key={group.title}>
                 <button
@@ -334,8 +354,38 @@ export default function NavSidebar({
                 >
                   {isExpanded ? <ChevronDown className="h-3.5 w-3.5 flex-shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />}
                   <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
-                  <span className="truncate">{group.title}</span>
-                  <span className="ml-auto text-[11px] text-muted-foreground font-normal">{group.indices.length}</span>
+                  {editingPartTitle === group.title ? (
+                    <input
+                      ref={editPartRef}
+                      value={editPartValue}
+                      onChange={(e) => setEditPartValue(e.target.value)}
+                      onBlur={commitPartRename}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitPartRename();
+                        if (e.key === "Escape") setEditingPartTitle(null);
+                        e.stopPropagation();
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex-1 bg-background border border-primary rounded px-1 py-0 text-sm text-foreground outline-none font-semibold"
+                    />
+                  ) : (
+                    <span
+                      className="truncate flex-1"
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        setEditingPartTitle(group.title);
+                        setEditPartValue(group.title);
+                      }}
+                    >
+                      {group.title}
+                    </span>
+                  )}
+                  {firstEntry && (
+                    <span className="text-[11px] text-muted-foreground font-mono font-normal flex-shrink-0">
+                      {firstEntry.startPage}
+                    </span>
+                  )}
+                  <span className="text-[11px] text-muted-foreground font-normal flex-shrink-0">{group.indices.length}</span>
                 </button>
                 {isExpanded && (
                   <div>
