@@ -135,3 +135,4 @@ export const SCENE_TYPE_COLORS: Record<string, string> = {
 
 export const NAV_WIDTH_KEY = "parser-nav-width";
 export const ACTIVE_BOOK_KEY = "parser-active-book";
+export const NAV_STATE_KEY = "parser-nav-state";

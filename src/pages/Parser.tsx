@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
 import { useLanguage } from "@/hooks/useLanguage";
 import { t } from "@/pages/parser/i18n";
-import { NAV_WIDTH_KEY } from "@/pages/parser/types";
+import { NAV_WIDTH_KEY, NAV_STATE_KEY } from "@/pages/parser/types";
 import type { Scene, ChapterStatus } from "@/pages/parser/types";
 import { useChapterAnalysis } from "@/hooks/useChapterAnalysis";
 import { useBookManager } from "@/hooks/useBookManager";
@@ -28,9 +28,27 @@ export default function Parser() {
 
   const { value: selectedModel, update: setSelectedModel } = useCloudSettings('parser-model', DEFAULT_MODEL_ID);
   const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
-  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
-  const [lastClickedIdx, setLastClickedIdx] = useState<number | null>(null);
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(() => {
+    try {
+      const saved = sessionStorage.getItem(NAV_STATE_KEY);
+      if (saved) { const p = JSON.parse(saved); return new Set(p.selected || []); }
+    } catch {}
+    return new Set();
+  });
+  const [lastClickedIdx, setLastClickedIdx] = useState<number | null>(() => {
+    try {
+      const saved = sessionStorage.getItem(NAV_STATE_KEY);
+      if (saved) { const p = JSON.parse(saved); return p.lastClicked ?? null; }
+    } catch {}
+    return null;
+  });
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => {
+    try {
+      const saved = sessionStorage.getItem(NAV_STATE_KEY);
+      if (saved) { const p = JSON.parse(saved); return new Set(p.expanded || []); }
+    } catch {}
+    return new Set();
+  });
 
   const {
     step, setStep, books, loadingLibrary, fileName, errorMsg,
@@ -54,12 +72,24 @@ export default function Parser() {
     partGroups, partlessIndices,
   } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName });
 
+  // Persist nav state to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(NAV_STATE_KEY, JSON.stringify({
+        selected: Array.from(selectedIndices),
+        lastClicked: lastClickedIdx,
+        expanded: Array.from(expandedNodes),
+      }));
+    } catch {}
+  }, [selectedIndices, lastClickedIdx, expandedNodes]);
+
   const handleReset = () => {
     bookReset();
     setSelectedIndices(new Set());
     setLastClickedIdx(null);
     setExpandedNodes(new Set());
     resetAnalysis();
+    sessionStorage.removeItem(NAV_STATE_KEY);
   };
 
   const handleOpenPdf = (page?: number) => {
