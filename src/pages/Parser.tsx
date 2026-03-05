@@ -67,7 +67,7 @@ export default function Parser() {
       const url = URL.createObjectURL(file);
       window.open(url, '_blank');
     } else if (pdfRef?.getData) {
-      pdfRef.getData().then((data: Uint8Array) => {
+      pdfRef.getData().then((data: any) => {
         const blob = new Blob([data], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         window.open(url, '_blank');
