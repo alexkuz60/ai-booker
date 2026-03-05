@@ -28,9 +28,27 @@ export default function Parser() {
 
   const { value: selectedModel, update: setSelectedModel } = useCloudSettings('parser-model', DEFAULT_MODEL_ID);
   const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
-  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
-  const [lastClickedIdx, setLastClickedIdx] = useState<number | null>(null);
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(() => {
+    try {
+      const saved = sessionStorage.getItem(NAV_STATE_KEY);
+      if (saved) { const p = JSON.parse(saved); return new Set(p.selected || []); }
+    } catch {}
+    return new Set();
+  });
+  const [lastClickedIdx, setLastClickedIdx] = useState<number | null>(() => {
+    try {
+      const saved = sessionStorage.getItem(NAV_STATE_KEY);
+      if (saved) { const p = JSON.parse(saved); return p.lastClicked ?? null; }
+    } catch {}
+    return null;
+  });
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => {
+    try {
+      const saved = sessionStorage.getItem(NAV_STATE_KEY);
+      if (saved) { const p = JSON.parse(saved); return new Set(p.expanded || []); }
+    } catch {}
+    return new Set();
+  });
 
   const {
     step, setStep, books, loadingLibrary, fileName, errorMsg,
