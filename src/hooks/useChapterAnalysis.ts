@@ -141,14 +141,41 @@ export function useChapterAnalysis({
         const rawScenes = fnData.structure?.scenes || [];
 
         // Split text by markers
+        const normalizeWS = (s: string) => s.replace(/\s+/g, ' ').trim();
         const splitTextByMarkers = (fullText: string, markers: { start_marker: string; title: string; scene_number: number }[]) => {
+          const normText = normalizeWS(fullText);
+          // Build a map from normalized-char-index to original-char-index
+          const normToOrig: number[] = [];
+          let ni = 0;
+          const normChars = normText.length;
+          let oi = 0;
+          const origLen = fullText.length;
+          // Walk both strings in parallel
+          while (ni < normChars && oi < origLen) {
+            // skip extra whitespace in original
+            if (/\s/.test(fullText[oi]) && (oi === 0 || /\s/.test(fullText[oi - 1]))) {
+              // In normalized, consecutive ws collapsed to single space
+              // If current norm char is space and we already mapped it, skip orig
+              if (normToOrig.length > 0 && normToOrig.length === ni) { oi++; continue; }
+            }
+            normToOrig.push(oi);
+            ni++; oi++;
+            // After matching a space in norm, skip remaining ws in orig
+            if (ni > 0 && normText[ni - 1] === ' ') {
+              while (oi < origLen && /\s/.test(fullText[oi])) oi++;
+            }
+          }
+
           const positions: { idx: number; scene: typeof markers[0] }[] = [];
           for (const m of markers) {
             if (!m.start_marker) continue;
-            let pos = fullText.indexOf(m.start_marker);
-            if (pos === -1) pos = fullText.indexOf(m.start_marker.trim());
-            if (pos === -1 && m.start_marker.length > 40) pos = fullText.indexOf(m.start_marker.slice(0, 40));
-            if (pos !== -1) positions.push({ idx: pos, scene: m });
+            const normMarker = normalizeWS(m.start_marker);
+            let normPos = normText.indexOf(normMarker);
+            if (normPos === -1 && normMarker.length > 40) normPos = normText.indexOf(normMarker.slice(0, 40));
+            if (normPos !== -1) {
+              const origPos = normToOrig[normPos] ?? 0;
+              positions.push({ idx: origPos, scene: m });
+            }
           }
           positions.sort((a, b) => a.idx - b.idx);
           return positions.map((p, i) => {
