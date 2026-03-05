@@ -67,6 +67,10 @@ export async function extractOutline(file: File): Promise<{ outline: TocEntry[];
 /**
  * Extract text from specific page ranges of a PDF.
  */
+/**
+ * Extract text from specific page ranges of a PDF,
+ * preserving paragraph breaks using Y-coordinate gaps between text items.
+ */
 export async function extractTextByPageRange(
   pdf: pdfjsLib.PDFDocumentProxy,
   startPage: number,
@@ -79,8 +83,81 @@ export async function extractTextByPageRange(
   for (let i = startPage; i <= endPage; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const text = content.items.map((item: any) => item.str).join(' ');
-    pages.push(text);
+    const items = content.items.filter((it: any) => typeof it.str === 'string');
+
+    if (items.length === 0) {
+      pages.push('');
+      onProgress?.(Math.round(((i - startPage + 1) / total) * 100));
+      continue;
+    }
+
+    // Collect line heights to compute a typical line spacing
+    const heights: number[] = [];
+    for (const item of items) {
+      const h = Math.abs((item as any).transform?.[3] || (item as any).height || 0);
+      if (h > 0) heights.push(h);
+    }
+    const medianHeight = heights.length > 0
+      ? heights.sort((a, b) => a - b)[Math.floor(heights.length / 2)]
+      : 12;
+
+    const lines: string[] = [];
+    let currentLine = '';
+    let prevY: number | null = null;
+
+    for (const item of items) {
+      const t = (item as any).transform;
+      const y = t ? t[5] : null; // Y coordinate (bottom of text)
+      const str: string = (item as any).str;
+
+      if (prevY !== null && y !== null) {
+        const gap = Math.abs(prevY - y);
+
+        if (gap > medianHeight * 1.8) {
+          // Large gap → paragraph break
+          lines.push(currentLine.trimEnd());
+          lines.push(''); // empty line = paragraph separator
+          currentLine = str;
+        } else if (gap > medianHeight * 0.3) {
+          // Normal line break (same paragraph)
+          lines.push(currentLine.trimEnd());
+          currentLine = str;
+        } else {
+          // Same line, just append with space
+          currentLine += (currentLine && str && !currentLine.endsWith(' ') && !str.startsWith(' ') ? ' ' : '') + str;
+        }
+      } else {
+        currentLine += str;
+      }
+
+      if (y !== null) prevY = y;
+    }
+
+    if (currentLine) lines.push(currentLine.trimEnd());
+
+    // Merge consecutive non-empty lines into paragraphs, keep empty lines as \n\n
+    const paragraphs: string[] = [];
+    let buf: string[] = [];
+    for (const line of lines) {
+      if (line === '') {
+        if (buf.length > 0) {
+          paragraphs.push(buf.join(' '));
+          buf = [];
+        }
+        // paragraph break marker
+        paragraphs.push('');
+      } else {
+        buf.push(line);
+      }
+    }
+    if (buf.length > 0) paragraphs.push(buf.join(' '));
+
+    pages.push(paragraphs.filter((p, idx, arr) => {
+      // Deduplicate consecutive empty strings
+      if (p === '' && idx > 0 && arr[idx - 1] === '') return false;
+      return true;
+    }).join('\n'));
+
     onProgress?.(Math.round(((i - startPage + 1) / total) * 100));
   }
 
