@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
-  FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown
+  FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { t, tSceneType, tMood, tSceneTitle } from "@/pages/parser/i18n";
 import type { TocChapter, Scene, ChapterStatus } from "@/pages/parser/types";
 import { SCENE_TYPE_COLORS } from "@/pages/parser/types";
+import { estimateDurationSec, formatDuration } from "@/lib/durationEstimate";
 
 interface ChapterDetailPanelProps {
   isRu: boolean;
