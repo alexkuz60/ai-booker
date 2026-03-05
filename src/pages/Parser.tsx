@@ -34,7 +34,7 @@ export default function Parser() {
 
   const {
     step, setStep, books, loadingLibrary, fileName, errorMsg,
-    chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages,
+    chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
     chapterResults, setChapterResults, fileInputRef,
     openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset,
   } = useBookManager({ userId: user?.id, isRu });
@@ -60,6 +60,19 @@ export default function Parser() {
     setLastClickedIdx(null);
     setExpandedNodes(new Set());
     resetAnalysis();
+  };
+
+  const handleOpenPdf = () => {
+    if (file) {
+      const url = URL.createObjectURL(file);
+      window.open(url, '_blank');
+    } else if (pdfRef?.getData) {
+      pdfRef.getData().then((data: any) => {
+        const blob = new Blob([data], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+      });
+    }
   };
 
   const handleSelectChapter = (idx: number, e: React.MouseEvent) => {
@@ -296,6 +309,7 @@ export default function Parser() {
                     onDeleteEntry={deleteEntry}
                     onRenameEntry={renameEntry}
                     onChangeStartPage={changeStartPage}
+                    onOpenPdf={handleOpenPdf}
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle />
