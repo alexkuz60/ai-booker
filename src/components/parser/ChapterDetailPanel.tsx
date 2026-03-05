@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
-  FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2
+  FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,62 @@ interface ChapterDetailPanelProps {
   selectedResult: { scenes: Scene[]; status: ChapterStatus } | null | undefined;
   analysisLog: string[];
   onAnalyze: (idx: number) => void;
+}
+
+function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-semibold text-muted-foreground px-1">
+        {scenes.length} {t("scenes", isRu)}
+      </h3>
+      {scenes.map((sc) => {
+        const colorCls = SCENE_TYPE_COLORS[sc.scene_type] || SCENE_TYPE_COLORS.mixed;
+        const isExpanded = expandedId === sc.scene_number;
+        const content = sc.content || sc.content_preview || "";
+        const preview = content.slice(0, 100);
+        const hasMore = content.length > 100;
+
+        return (
+          <Card
+            key={sc.scene_number}
+            className={hasMore ? "cursor-pointer" : ""}
+            onClick={() => hasMore && setExpandedId(isExpanded ? null : sc.scene_number)}
+          >
+            <CardContent className="py-3 px-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  {t("scenePrefix", isRu)} {sc.scene_number}: {tSceneTitle(sc.title, isRu)}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <Badge variant="outline" className={`text-[10px] ${colorCls}`}>
+                    {tSceneType(sc.scene_type, isRu)}
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px]">{tMood(sc.mood, isRu)}</Badge>
+                  <Badge variant="outline" className="text-[10px] font-mono">
+                    {sc.bpm} BPM
+                  </Badge>
+                  {hasMore && (
+                    <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                  )}
+                </div>
+              </div>
+              {content && (
+                <p className="text-xs text-muted-foreground whitespace-pre-line">
+                  {isExpanded ? content : (
+                    <>
+                      {preview}{hasMore && "…"}
+                    </>
+                  )}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function ChapterDetailPanel({
@@ -144,39 +201,7 @@ export default function ChapterDetailPanel({
 
         {/* Scene cards */}
         {selectedResult?.status === "done" && selectedResult.scenes.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-muted-foreground px-1">
-              {selectedResult.scenes.length} {t("scenes", isRu)}
-            </h3>
-            {selectedResult.scenes.map((sc) => {
-              const colorCls = SCENE_TYPE_COLORS[sc.scene_type] || SCENE_TYPE_COLORS.mixed;
-              return (
-                <Card key={sc.scene_number}>
-                  <CardContent className="py-3 px-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">
-                        {t("scenePrefix", isRu)} {sc.scene_number}: {tSceneTitle(sc.title, isRu)}
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant="outline" className={`text-[10px] ${colorCls}`}>
-                          {tSceneType(sc.scene_type, isRu)}
-                        </Badge>
-                        <Badge variant="outline" className="text-[10px]">{tMood(sc.mood, isRu)}</Badge>
-                        <Badge variant="outline" className="text-[10px] font-mono">
-                          {sc.bpm} BPM
-                        </Badge>
-                      </div>
-                    </div>
-                    {sc.content_preview && (
-                      <p className="text-xs text-muted-foreground line-clamp-2">
-                        {sc.content_preview}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+          <SceneCards scenes={selectedResult.scenes} isRu={isRu} />
         )}
 
         {/* Done but empty */}
