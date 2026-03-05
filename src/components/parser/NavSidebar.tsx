@@ -66,6 +66,20 @@ export default function NavSidebar({
     }
   }, [editingPageIdx]);
 
+  useEffect(() => {
+    if (editingPartTitle !== null) {
+      editPartRef.current?.focus();
+      editPartRef.current?.select();
+    }
+  }, [editingPartTitle]);
+
+  const commitPartRename = () => {
+    if (editingPartTitle !== null && editPartValue.trim() && editPartValue.trim() !== editingPartTitle) {
+      onRenamePart?.(editingPartTitle, editPartValue.trim());
+    }
+    setEditingPartTitle(null);
+  };
+
   const commitPageEdit = () => {
     if (editingPageIdx !== null) {
       const parsed = parseInt(editPageValue, 10);
