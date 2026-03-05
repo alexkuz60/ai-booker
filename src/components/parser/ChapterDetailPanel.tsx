@@ -24,17 +24,29 @@ interface ChapterDetailPanelProps {
 function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
+  const totalDuration = useMemo(() => {
+    const totalChars = scenes.reduce((sum, sc) => sum + (sc.content?.length ?? sc.content_preview?.length ?? 0), 0);
+    return { sec: estimateDurationSec(totalChars), formatted: formatDuration(estimateDurationSec(totalChars)) };
+  }, [scenes]);
+
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-muted-foreground px-1">
-        {scenes.length} {t("scenes", isRu)}
-      </h3>
+      <div className="flex items-center justify-between px-1">
+        <h3 className="text-sm font-semibold text-muted-foreground">
+          {scenes.length} {t("scenes", isRu)}
+        </h3>
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Clock className="h-3 w-3" />
+          ≈ {totalDuration.formatted}
+        </span>
+      </div>
       {scenes.map((sc) => {
         const colorCls = SCENE_TYPE_COLORS[sc.scene_type] || SCENE_TYPE_COLORS.mixed;
         const isExpanded = expandedId === sc.scene_number;
         const content = sc.content || sc.content_preview || "";
         const preview = content.slice(0, 100);
         const hasMore = content.length > 100;
+        const sceneDur = formatDuration(estimateDurationSec(content.length));
 
         return (
           <Card
@@ -55,6 +67,9 @@ function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
                   <Badge variant="outline" className="text-xs font-mono">
                     {sc.bpm} BPM
                   </Badge>
+                  <span className="text-[10px] text-muted-foreground font-mono ml-1">
+                    {sceneDur}
+                  </span>
                   {hasMore && (
                     <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
                   )}
