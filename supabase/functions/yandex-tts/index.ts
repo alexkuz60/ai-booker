@@ -39,12 +39,22 @@ async function getIamToken(): Promise<string> {
   const signingInput = `${headerB64}.${payloadB64}`;
 
   // Import RSA private key
-  const pemBody = privateKeyPem
+  // Normalize PEM: handle literal \n, escaped \\n, and various header formats
+  const normalizedPem = privateKeyPem
     .replace(/\\n/g, "\n")
-    .replace(/-----BEGIN PRIVATE KEY-----/, "")
-    .replace(/-----END PRIVATE KEY-----/, "")
-    .replace(/\s/g, "");
-  const binaryDer = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
+    .replace(/-----BEGIN (RSA )?PRIVATE KEY-----/g, "")
+    .replace(/-----END (RSA )?PRIVATE KEY-----/g, "")
+    .replace(/[\s\r\n]/g, "");
+
+  console.log("PEM body length after cleanup:", normalizedPem.length, "first 20 chars:", normalizedPem.substring(0, 20));
+
+  let binaryDer: Uint8Array;
+  try {
+    binaryDer = Uint8Array.from(atob(normalizedPem), (c) => c.charCodeAt(0));
+  } catch (e) {
+    console.error("Base64 decode failed. PEM preview:", normalizedPem.substring(0, 50), "...", normalizedPem.substring(normalizedPem.length - 20));
+    throw new Error("Failed to decode private key PEM. Ensure YANDEX_SA_PRIVATE_KEY contains a valid PEM-encoded RSA key.");
+  }
 
   const cryptoKey = await crypto.subtle.importKey(
     "pkcs8",
