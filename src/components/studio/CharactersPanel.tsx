@@ -899,9 +899,16 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                                 }`}
                                 onClick={async () => {
                                   const charId = selectedChar.id;
+                                  // Re-match voice to new gender
+                                  const newVoiceId = matchVoice(g, selectedChar.age_group);
+                                  const newVoice = YANDEX_VOICES.find(x => x.id === newVoiceId);
+                                  const newRole = newVoice ? matchRole(newVoiceId, selectedChar.temperament) : role;
+                                  setVoice(newVoiceId);
+                                  setRole(newRole);
                                   setCharacters(prev => prev.map(c =>
                                     c.id === charId ? { ...c, gender: g } : c
                                   ));
+                                  markDirty();
                                   try {
                                     const { error } = await supabase
                                       .from("book_characters")
