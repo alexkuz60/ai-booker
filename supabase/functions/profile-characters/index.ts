@@ -16,104 +16,262 @@ interface CharacterProfile {
   description: string;
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+// ── Helpers ──────────────────────────────────────────────
+
+function buildPrompt(
+  characters: Array<{ name: string; aliases: string[] }>,
+  speakerDialogues: Map<string, string[]>,
+  narratorExcerpts: string[],
+  lang: "ru" | "en",
+  existingProfiles?: Map<string, string>, // name → existing description
+) {
+  const characterList = characters.map(c => {
+    const dialogues = speakerDialogues.get(c.name);
+    let block = `### ${c.name}`;
+    if (c.aliases?.length) block += ` (aliases: ${c.aliases.join(", ")})`;
+    block += "\n";
+    const existing = existingProfiles?.get(c.name);
+    if (existing) {
+      block += `Current profile: ${existing}\n`;
+      block += "IMPORTANT: Update this profile only if the new dialogue samples reveal significant new character traits, emotional depth, or behavioral patterns not captured above. If nothing substantially new, return the same profile.\n";
+    }
+    if (dialogues?.length) {
+      block += "Dialogue samples:\n" + dialogues.map((d, i) => `  ${i + 1}. "${d}"`).join("\n") + "\n";
+    } else {
+      block += "No direct dialogue found.\n";
+    }
+    return block;
+  }).join("\n");
+
+  const narratorContext = narratorExcerpts.length > 0
+    ? "\n\n## Narrator excerpts (for additional context):\n" + narratorExcerpts.map((n, i) => `${i + 1}. ${n}`).join("\n")
+    : "";
+
+  const systemPrompt = lang === "ru"
+    ? `Ты — литературный аналитик. Проанализируй персонажей книги на основе их реплик и контекста повествования.\n\nДля каждого персонажа определи:\n- aliases: все варианты имени (сокращения, прозвища, обращения)\n- gender: male / female / unknown\n- age_group: child / teen / young / adult / elder / unknown\n- temperament: один из: sanguine (сангвиник), choleric (холерик), melancholic (меланхолик), phlegmatic (флегматик), или смешанный\n- speech_style: краткое описание стиля речи (2-3 предложения)\n- description: психологический портрет персонажа (3-5 предложений)\n\nОтвечай на русском языке в полях description и speech_style.`
+    : `You are a literary analyst. Analyze book characters based on their dialogue and narrative context.\n\nFor each character determine:\n- aliases: all name variations (nicknames, shortened forms, titles)\n- gender: male / female / unknown\n- age_group: child / teen / young / adult / elder / unknown\n- temperament: one of: sanguine, choleric, melancholic, phlegmatic, or mixed\n- speech_style: brief description of speech patterns (2-3 sentences)\n- description: psychological portrait (3-5 sentences)`;
+
+  return { systemPrompt, userPrompt: `## Characters to profile:\n\n${characterList}${narratorContext}` };
+}
+
+async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en"): Promise<CharacterProfile[]> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) throw new Error("AI key not configured");
+
+  const aiBody = JSON.stringify({
+    model: "google/gemini-2.5-flash",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    temperature: 0.3,
+    max_tokens: 4096,
+    tools: [{
+      type: "function",
+      function: {
+        name: "save_character_profiles",
+        description: "Save profiled character data",
+        parameters: {
+          type: "object",
+          properties: {
+            characters: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string", description: "Primary character name (must match input)" },
+                  aliases: { type: "array", items: { type: "string" } },
+                  gender: { type: "string", enum: ["male", "female", "unknown"] },
+                  age_group: { type: "string", enum: ["child", "teen", "young", "adult", "elder", "unknown"] },
+                  temperament: { type: "string" },
+                  speech_style: { type: "string" },
+                  description: { type: "string" },
+                },
+                required: ["name", "aliases", "gender", "age_group", "temperament", "speech_style", "description"],
+              },
+            },
+          },
+          required: ["characters"],
+        },
+      },
+    }],
+    tool_choice: { type: "function", function: { name: "save_character_profiles" } },
+  });
+
+  const MAX_RETRIES = 3;
+  let profiles: CharacterProfile[] | undefined;
+  let lastError: string | undefined;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120_000);
+
+      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${LOVABLE_API_KEY}` },
+        body: aiBody,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      console.log(`AI attempt ${attempt}/${MAX_RETRIES}, status=${aiRes.status}`);
+
+      if (aiRes.status === 429) {
+        lastError = lang === "ru" ? "Превышен лимит запросов" : "Rate limit exceeded";
+        if (attempt < MAX_RETRIES) { await new Promise(r => setTimeout(r, 2000 * attempt)); continue; }
+        throw new Error(lastError);
+      }
+      if (aiRes.status === 402) throw new Error(lang === "ru" ? "Необходимо пополнить баланс" : "Payment required");
+      if (!aiRes.ok) {
+        lastError = `AI error: ${aiRes.status}`;
+        if (attempt < MAX_RETRIES) { await new Promise(r => setTimeout(r, 1500 * attempt)); continue; }
+        throw new Error(lastError);
+      }
+
+      const aiData = await aiRes.json();
+      const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+
+      if (toolCall?.function?.arguments) {
+        try { profiles = JSON.parse(toolCall.function.arguments).characters; } catch { /* fallback below */ }
+      }
+      if (!profiles) {
+        const raw = (aiData.choices?.[0]?.message?.content || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        if (raw) { try { const p = JSON.parse(raw); profiles = p.characters || p; } catch { /* retry */ } }
+      }
+      if (profiles && profiles.length > 0) break;
+
+      lastError = "AI returned unparseable response";
+      if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, 1500 * attempt));
+    } catch (fetchErr) {
+      lastError = String(fetchErr);
+      if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, 2000 * attempt));
+      else throw new Error(lastError);
+    }
   }
+
+  if (!profiles || profiles.length === 0) throw new Error(lastError || "AI returned empty response");
+  return profiles;
+}
+
+// ── Main Handler ─────────────────────────────────────────
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { book_id, language } = await req.json();
+    const { book_id, language, scene_ids } = await req.json();
     if (!book_id) {
       return new Response(JSON.stringify({ error: "book_id is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const lang = language === "ru" ? "ru" : "en";
+    const lang: "ru" | "en" = language === "ru" ? "ru" : "en";
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Verify user owns this book
+    // Verify ownership
     const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: bookCheck, error: bookErr } = await userClient
-      .from("books")
-      .select("id")
-      .eq("id", book_id)
-      .maybeSingle();
+      .from("books").select("id").eq("id", book_id).maybeSingle();
     if (bookErr || !bookCheck) {
       return new Response(JSON.stringify({ error: "Book not found or access denied" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Load existing characters
-    const { data: characters } = await supabase
+    // Load all characters
+    const { data: allCharacters } = await supabase
       .from("book_characters")
-      .select("id, name, aliases")
+      .select("id, name, aliases, description, gender, age_group")
       .eq("book_id", book_id);
 
-    if (!characters || characters.length === 0) {
-      return new Response(JSON.stringify({ error: lang === "ru" ? "Нет персонажей для профайлинга. Сначала выполните сегментацию сцен." : "No characters to profile. Run scene segmentation first." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (!allCharacters || allCharacters.length === 0) {
+      return new Response(JSON.stringify({ error: lang === "ru" ? "Нет персонажей для профайлинга" : "No characters to profile" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Load all dialogue/first_person segments with their phrases for context
+    // ── Determine which characters to profile ────────────
+    const incremental = Array.isArray(scene_ids) && scene_ids.length > 0;
+    let charsToProfile: typeof allCharacters;
+    let existingProfiles: Map<string, string> | undefined;
+
+    if (incremental) {
+      // Find characters appearing in the given scenes
+      const { data: appearances } = await supabase
+        .from("character_appearances")
+        .select("character_id")
+        .in("scene_id", scene_ids);
+      const appearedIds = new Set(appearances?.map(a => a.character_id) || []);
+
+      // Also include any character with no description (new, never profiled)
+      charsToProfile = allCharacters.filter(c => !c.description || appearedIds.has(c.id));
+
+      if (charsToProfile.length === 0) {
+        return new Response(JSON.stringify({
+          profiled: 0, total: allCharacters.length, skipped: allCharacters.length,
+          message: lang === "ru" ? "Все персонажи уже профилированы, новых появлений нет" : "All characters already profiled, no new appearances",
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Provide existing descriptions so AI can decide whether to update
+      existingProfiles = new Map();
+      for (const c of charsToProfile) {
+        if (c.description) existingProfiles.set(c.name, c.description);
+      }
+
+      console.log(`Incremental mode: ${charsToProfile.length} chars to profile (${existingProfiles.size} existing), ${allCharacters.length - charsToProfile.length} skipped`);
+    } else {
+      charsToProfile = allCharacters;
+    }
+
+    // ── Load dialogue context ────────────────────────────
     const { data: chapters } = await supabase
-      .from("book_chapters")
-      .select("id, title")
-      .eq("book_id", book_id);
+      .from("book_chapters").select("id").eq("book_id", book_id);
     if (!chapters?.length) {
       return new Response(JSON.stringify({ error: "No chapters found" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const chapterIds = chapters.map(c => c.id);
     const { data: scenes } = await supabase
-      .from("book_scenes")
-      .select("id, title")
-      .in("chapter_id", chapterIds);
+      .from("book_scenes").select("id").in("chapter_id", chapterIds);
     if (!scenes?.length) {
       return new Response(JSON.stringify({ error: "No scenes found" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const sceneIds = scenes.map(s => s.id);
+    // In incremental mode, only load segments from the new scenes for context
+    const contextSceneIds = incremental ? scene_ids : scenes.map(s => s.id);
     const { data: segments } = await supabase
       .from("scene_segments")
       .select("id, segment_type, speaker, scene_id")
-      .in("scene_id", sceneIds)
+      .in("scene_id", contextSceneIds)
       .in("segment_type", ["dialogue", "first_person", "inner_thought", "narrator"])
       .order("segment_number");
 
     if (!segments?.length) {
       return new Response(JSON.stringify({ error: lang === "ru" ? "Нет сегментов для анализа" : "No segments to analyze" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Load phrases for these segments (limit to keep context manageable)
+    // Load phrases
     const segmentIds = segments.map(s => s.id);
-    // Batch load in chunks of 200 to avoid query limits
     const allPhrases: Array<{ segment_id: string; text: string; phrase_number: number }> = [];
     for (let i = 0; i < segmentIds.length; i += 200) {
       const batch = segmentIds.slice(i, i + 200);
@@ -125,8 +283,8 @@ Deno.serve(async (req) => {
       if (phrases) allPhrases.push(...phrases);
     }
 
-    // Build character context: group dialogue by speaker
-    const characterNames = characters.map(c => c.name);
+    // Build per-character dialogue map
+    const charNames = new Set(charsToProfile.map(c => c.name));
     const speakerDialogues = new Map<string, string[]>();
     const narratorExcerpts: string[] = [];
 
@@ -136,189 +294,27 @@ Deno.serve(async (req) => {
         .sort((a, b) => a.phrase_number - b.phrase_number)
         .map(p => p.text)
         .join(" ");
-
       if (!phrases) continue;
 
-      if (seg.speaker && characterNames.includes(seg.speaker)) {
+      if (seg.speaker && charNames.has(seg.speaker)) {
         const existing = speakerDialogues.get(seg.speaker) || [];
-        // Keep max ~10 excerpts per character
-        if (existing.length < 10) {
-          existing.push(phrases.slice(0, 500));
-        }
+        if (existing.length < 10) existing.push(phrases.slice(0, 500));
         speakerDialogues.set(seg.speaker, existing);
       } else if (seg.segment_type === "narrator" || seg.segment_type === "inner_thought") {
-        // Keep some narrator excerpts for context (max 20)
-        if (narratorExcerpts.length < 20) {
-          narratorExcerpts.push(phrases.slice(0, 300));
-        }
+        if (narratorExcerpts.length < 20) narratorExcerpts.push(phrases.slice(0, 300));
       }
     }
 
-    // Build the prompt
-    const characterList = characters.map(c => {
-      const dialogues = speakerDialogues.get(c.name);
-      let block = `### ${c.name}`;
-      if (c.aliases?.length) block += ` (aliases: ${c.aliases.join(", ")})`;
-      block += "\n";
-      if (dialogues?.length) {
-        block += "Dialogue samples:\n" + dialogues.map((d, i) => `  ${i + 1}. "${d}"`).join("\n") + "\n";
-      } else {
-        block += "No direct dialogue found.\n";
-      }
-      return block;
-    }).join("\n");
+    // ── Call AI ───────────────────────────────────────────
+    const { systemPrompt, userPrompt } = buildPrompt(
+      charsToProfile, speakerDialogues, narratorExcerpts, lang, existingProfiles,
+    );
+    const profiles = await callAI(systemPrompt, userPrompt, lang);
 
-    const narratorContext = narratorExcerpts.length > 0
-      ? "\n\n## Narrator excerpts (for additional context):\n" + narratorExcerpts.map((n, i) => `${i + 1}. ${n}`).join("\n")
-      : "";
-
-    const systemPrompt = lang === "ru"
-      ? `Ты — литературный аналитик. Проанализируй персонажей книги на основе их реплик и контекста повествования.\n\nДля каждого персонажа определи:\n- aliases: все варианты имени (сокращения, прозвища, обращения)\n- gender: male / female / unknown\n- age_group: child / teen / young / adult / elder / unknown\n- temperament: один из: sanguine (сангвиник), choleric (холерик), melancholic (меланхолик), phlegmatic (флегматик), или смешанный\n- speech_style: краткое описание стиля речи (2-3 предложения)\n- description: психологический портрет персонажа (3-5 предложений)\n\nОтвечай на русском языке в полях description и speech_style.`
-      : `You are a literary analyst. Analyze book characters based on their dialogue and narrative context.\n\nFor each character determine:\n- aliases: all name variations (nicknames, shortened forms, titles)\n- gender: male / female / unknown\n- age_group: child / teen / young / adult / elder / unknown\n- temperament: one of: sanguine, choleric, melancholic, phlegmatic, or mixed\n- speech_style: brief description of speech patterns (2-3 sentences)\n- description: psychological portrait (3-5 sentences)`;
-
-    const userPrompt = `## Characters to profile:\n\n${characterList}${narratorContext}`;
-
-    // AI call with tool calling for structured output
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "AI key not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const aiBody = JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.3,
-      max_tokens: 4096,
-      tools: [{
-        type: "function",
-        function: {
-          name: "save_character_profiles",
-          description: "Save profiled character data",
-          parameters: {
-            type: "object",
-            properties: {
-              characters: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    name: { type: "string", description: "Primary character name (must match input)" },
-                    aliases: { type: "array", items: { type: "string" } },
-                    gender: { type: "string", enum: ["male", "female", "unknown"] },
-                    age_group: { type: "string", enum: ["child", "teen", "young", "adult", "elder", "unknown"] },
-                    temperament: { type: "string" },
-                    speech_style: { type: "string" },
-                    description: { type: "string" },
-                  },
-                  required: ["name", "aliases", "gender", "age_group", "temperament", "speech_style", "description"],
-                },
-              },
-            },
-            required: ["characters"],
-          },
-        },
-      }],
-      tool_choice: { type: "function", function: { name: "save_character_profiles" } },
-    });
-
-    // Retry logic: up to 3 attempts with exponential backoff
-    const MAX_RETRIES = 3;
-    let profiles: CharacterProfile[] | undefined;
-    let lastError: string | undefined;
-
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        const t0 = Date.now();
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 120_000);
-
-        const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          },
-          body: aiBody,
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-
-        const latency = Date.now() - t0;
-        console.log(`AI attempt ${attempt}/${MAX_RETRIES}, status=${aiRes.status}, latency=${latency}ms`);
-
-        if (aiRes.status === 429) {
-          lastError = lang === "ru" ? "Превышен лимит запросов, попробуйте позже" : "Rate limit exceeded, try again later";
-          if (attempt < MAX_RETRIES) { await new Promise(r => setTimeout(r, 2000 * attempt)); continue; }
-          return new Response(JSON.stringify({ error: lastError }), {
-            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        if (aiRes.status === 402) {
-          return new Response(JSON.stringify({ error: lang === "ru" ? "Необходимо пополнить баланс" : "Payment required" }), {
-            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        if (!aiRes.ok) {
-          const errText = await aiRes.text().catch(() => "");
-          console.error(`AI error attempt ${attempt}:`, aiRes.status, errText.slice(0, 300));
-          lastError = `AI error: ${aiRes.status}`;
-          if (attempt < MAX_RETRIES) { await new Promise(r => setTimeout(r, 1500 * attempt)); continue; }
-          return new Response(JSON.stringify({ error: lastError }), {
-            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-
-        const aiData = await aiRes.json();
-        const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-
-        if (toolCall?.function?.arguments) {
-          try {
-            profiles = JSON.parse(toolCall.function.arguments).characters;
-          } catch {
-            console.error(`Parse tool_calls failed (attempt ${attempt}):`, toolCall.function.arguments?.slice(0, 200));
-          }
-        }
-
-        if (!profiles) {
-          const raw = (aiData.choices?.[0]?.message?.content || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-          if (raw) {
-            try {
-              const parsed = JSON.parse(raw);
-              profiles = parsed.characters || parsed;
-            } catch {
-              console.error(`Parse content failed (attempt ${attempt}):`, raw.slice(0, 200));
-            }
-          }
-        }
-
-        if (profiles && profiles.length > 0) break;
-
-        lastError = "AI returned unparseable response";
-        console.error(`Attempt ${attempt} produced no profiles, retrying...`);
-        if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, 1500 * attempt));
-      } catch (fetchErr) {
-        lastError = String(fetchErr);
-        console.error(`AI fetch error attempt ${attempt}:`, lastError);
-        if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, 2000 * attempt));
-      }
-    }
-
-    if (!profiles || profiles.length === 0) {
-      return new Response(JSON.stringify({ error: lastError || "AI returned empty response" }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Update each character in DB
+    // ── Update DB ────────────────────────────────────────
     let updated = 0;
     for (const profile of profiles) {
-      const char = characters.find(c => c.name === profile.name);
+      const char = charsToProfile.find(c => c.name === profile.name);
       if (!char) continue;
 
       const { error } = await supabase
@@ -338,18 +334,17 @@ Deno.serve(async (req) => {
       else console.error("Failed to update character:", char.name, error);
     }
 
+    const skipped = allCharacters.length - charsToProfile.length;
     return new Response(JSON.stringify({
       profiled: updated,
-      total: characters.length,
-      profiles: profiles,
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+      total: allCharacters.length,
+      skipped,
+      profiles,
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     console.error("profile-characters error:", err);
     return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
