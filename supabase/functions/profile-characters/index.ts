@@ -59,7 +59,7 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
   if (!LOVABLE_API_KEY) throw new Error("AI key not configured");
 
   const aiBody = JSON.stringify({
-    model: "google/gemini-2.5-flash",
+    model: "google/gemini-3-flash-preview",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
