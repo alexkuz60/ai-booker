@@ -39,11 +39,26 @@ async function getIamToken(): Promise<string> {
   const signingInput = `${headerB64}.${payloadB64}`;
 
   // Import RSA private key
-  // Normalize PEM: handle literal \n, escaped \\n, and various header formats
-  const normalizedPem = privateKeyPem
+  // Normalize PEM: supports raw PEM, escaped newlines, JSON service-account payload, and malformed header spacing
+  let rawPrivateKey = privateKeyPem.trim();
+
+  if (rawPrivateKey.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(rawPrivateKey);
+      if (typeof parsed?.private_key === "string") {
+        rawPrivateKey = parsed.private_key;
+      }
+    } catch {
+      // keep original value if it's not valid JSON
+    }
+  }
+
+  const normalizedPem = rawPrivateKey
+    .replace(/^"|"$/g, "")
+    .replace(/\\r/g, "\r")
     .replace(/\\n/g, "\n")
-    .replace(/-----BEGIN (RSA )?PRIVATE KEY-----/g, "")
-    .replace(/-----END (RSA )?PRIVATE KEY-----/g, "")
+    .replace(/-+BEGIN[^-]*PRIVATE\s*KEY-+/gi, "")
+    .replace(/-+END[^-]*PRIVATE\s*KEY-+/gi, "")
     .replace(/[\s\r\n]/g, "");
 
   console.log("PEM body length after cleanup:", normalizedPem.length, "first 20 chars:", normalizedPem.substring(0, 20));
@@ -51,8 +66,8 @@ async function getIamToken(): Promise<string> {
   let binaryDer: Uint8Array;
   try {
     binaryDer = Uint8Array.from(atob(normalizedPem), (c) => c.charCodeAt(0));
-  } catch (e) {
-    console.error("Base64 decode failed. PEM preview:", normalizedPem.substring(0, 50), "...", normalizedPem.substring(normalizedPem.length - 20));
+  } catch {
+    console.error("Base64 decode failed. PEM preview:", normalizedPem.substring(0, 50), "...", normalizedPem.substring(Math.max(0, normalizedPem.length - 20)));
     throw new Error("Failed to decode private key PEM. Ensure YANDEX_SA_PRIVATE_KEY contains a valid PEM-encoded RSA key.");
   }
 
