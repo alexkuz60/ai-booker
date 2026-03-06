@@ -365,6 +365,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     if (!selectedId) return;
     setSaving(true);
     try {
+      const currentChar = characters.find(c => c.id === selectedId);
       const voiceConfig = {
         provider: "yandex",
         voice_id: voice,
@@ -372,6 +373,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         speed,
         pitch: pitch !== 0 ? pitch : undefined,
         volume: volume !== 0 ? volume : undefined,
+        is_extra: currentChar?.voice_config?.is_extra,
       };
       const { error } = await supabase
         .from("book_characters")
