@@ -46,7 +46,7 @@ const Index = () => {
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ text, voiceId }),
+          body: JSON.stringify({ text, voiceId, lang: 'en' }),
         }
       );
 
