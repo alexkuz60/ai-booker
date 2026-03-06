@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
-import { Users, Volume2, Loader2, Square, Play, RotateCcw, Save, Sparkles, User, Wand2 } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
+import { Users, Volume2, Loader2, Square, Play, RotateCcw, Save, Sparkles, User, Wand2, Filter, Merge, CheckSquare, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -153,6 +153,15 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [profiling, setProfiling] = useState(false);
   const [casting, setCasting] = useState(false);
 
+  // Filter: "all" or "scene"
+  const [filterMode, setFilterMode] = useState<"all" | "scene">("all");
+  const [sceneCharIds, setSceneCharIds] = useState<Set<string>>(new Set());
+
+  // Multi-select & merge
+  const [multiSelect, setMultiSelect] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [merging, setMerging] = useState(false);
+
   // Voice settings state
   const [voice, setVoice] = useState("marina");
   const [role, setRole] = useState("neutral");
@@ -173,7 +182,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
   // ── Load characters from DB ─────────────────────────────
   const loadCharacters = useCallback(async () => {
-    if (!bookId) { setCharacters([]); return; }
+    if (!bookId) { setCharacters([]); setSceneCharIds(new Set()); return; }
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -183,20 +192,22 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         .order("sort_order");
       if (error) throw error;
 
+      let scIds = new Set<string>();
       if (sceneId && data && data.length > 0) {
         const { data: appearances } = await supabase
           .from("character_appearances")
           .select("character_id")
           .eq("scene_id", sceneId);
-        const sceneCharIds = new Set(appearances?.map(a => a.character_id) || []);
+        scIds = new Set(appearances?.map(a => a.character_id) || []);
         const sorted = [
-          ...data.filter(c => sceneCharIds.has(c.id)),
-          ...data.filter(c => !sceneCharIds.has(c.id)),
+          ...data.filter(c => scIds.has(c.id)),
+          ...data.filter(c => !scIds.has(c.id)),
         ];
         setCharacters(sorted.map(c => ({ ...c, voice_config: (c.voice_config as BookCharacter["voice_config"]) || {} })));
       } else {
         setCharacters((data || []).map(c => ({ ...c, voice_config: (c.voice_config as BookCharacter["voice_config"]) || {} })));
       }
+      setSceneCharIds(scIds);
     } catch (e) {
       console.error("Load characters error:", e);
     } finally {
@@ -205,6 +216,14 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   }, [bookId, sceneId]);
 
   useEffect(() => { loadCharacters(); }, [loadCharacters]);
+
+  // Filtered character list
+  const filteredCharacters = useMemo(() => {
+    if (filterMode === "scene" && sceneCharIds.size > 0) {
+      return characters.filter(c => sceneCharIds.has(c.id));
+    }
+    return characters;
+  }, [characters, filterMode, sceneCharIds]);
 
   // ── Sync voice settings when character selected ─────────
   useEffect(() => {
@@ -386,6 +405,91 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
   useImperativeHandle(ref, () => ({ autoCast: handleAutoCast, incrementalProfile: handleIncrementalProfile, casting, profiling }), [characters, selectedId, casting, profiling, chapterSceneIds]);
 
+  // ── Merge characters ────────────────────────────────────
+  const handleMerge = async () => {
+    if (selectedIds.size < 2) {
+      toast.warning(isRu ? "Выберите минимум 2 персонажа" : "Select at least 2 characters");
+      return;
+    }
+    setMerging(true);
+    try {
+      // Order: first selected in list order becomes primary
+      const ordered = characters.filter(c => selectedIds.has(c.id));
+      const primary = ordered[0];
+      const others = ordered.slice(1);
+
+      // Collect aliases: primary aliases + other names + other aliases
+      const newAliases = [
+        ...primary.aliases,
+        ...others.flatMap(c => [c.name, ...c.aliases]),
+      ].filter((v, i, a) => a.indexOf(v) === i && v !== primary.name);
+
+      // Update primary character
+      const { error: updateErr } = await supabase
+        .from("book_characters")
+        .update({ aliases: newAliases, updated_at: new Date().toISOString() })
+        .eq("id", primary.id);
+      if (updateErr) throw updateErr;
+
+      // Update character_appearances: reassign merged characters' appearances to primary
+      for (const other of others) {
+        const { data: appearances } = await supabase
+          .from("character_appearances")
+          .select("*")
+          .eq("character_id", other.id);
+        if (appearances?.length) {
+          for (const app of appearances) {
+            // Check if primary already has an appearance in this scene
+            const { data: existing } = await supabase
+              .from("character_appearances")
+              .select("id, segment_ids")
+              .eq("character_id", primary.id)
+              .eq("scene_id", app.scene_id)
+              .maybeSingle();
+            if (existing) {
+              // Merge segment_ids
+              const mergedSegments = [...new Set([...existing.segment_ids, ...app.segment_ids])];
+              await supabase.from("character_appearances").update({ segment_ids: mergedSegments }).eq("id", existing.id);
+              await supabase.from("character_appearances").delete().eq("id", app.id);
+            } else {
+              await supabase.from("character_appearances").update({ character_id: primary.id }).eq("id", app.id);
+            }
+          }
+        }
+        // Delete the merged character
+        await supabase.from("book_characters").delete().eq("id", other.id);
+      }
+
+      toast.success(
+        isRu
+          ? `${others.length} персонаж(ей) объединено с "${primary.name}"`
+          : `${others.length} character(s) merged into "${primary.name}"`
+      );
+      setMultiSelect(false);
+      setSelectedIds(new Set());
+      setSelectedId(primary.id);
+      await loadCharacters();
+    } catch (e) {
+      console.error("Merge error:", e);
+      toast.error(isRu ? "Ошибка объединения" : "Merge error");
+    } finally {
+      setMerging(false);
+    }
+  };
+
+  const toggleMultiSelect = () => {
+    setMultiSelect(prev => !prev);
+    setSelectedIds(new Set());
+  };
+
+  const toggleCharInSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   // ── TTS Preview ─────────────────────────────────────────
   const handlePreview = async () => {
     if (playing && audioRef) {
@@ -453,13 +557,56 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
             <span className="text-sm font-semibold font-display text-foreground">
               {isRu ? "Персонажи" : "Characters"}
             </span>
-            {characters.length > 0 && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                {characters.length}
-              </Badge>
-            )}
+            <div className="flex items-center gap-1">
+              {/* Filter toggle */}
+              {sceneId && sceneCharIds.size > 0 && (
+                <Button
+                  variant={filterMode === "scene" ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => setFilterMode(prev => prev === "all" ? "scene" : "all")}
+                  title={filterMode === "all"
+                    ? (isRu ? "Только из сцены" : "Scene only")
+                    : (isRu ? "Все персонажи" : "All characters")}
+                >
+                  <Filter className="h-3 w-3" />
+                </Button>
+              )}
+              {/* Multi-select toggle */}
+              {characters.length > 1 && (
+                <Button
+                  variant={multiSelect ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={toggleMultiSelect}
+                  title={isRu ? "Мультивыбор для слияния" : "Multi-select for merge"}
+                >
+                  {multiSelect ? <X className="h-3 w-3" /> : <CheckSquare className="h-3 w-3" />}
+                </Button>
+              )}
+              {characters.length > 0 && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                  {filterMode === "scene" && sceneCharIds.size > 0 ? filteredCharacters.length : characters.length}
+                </Badge>
+              )}
+            </div>
           </div>
-          {characters.length > 0 && (
+          {/* Merge button (shown in multi-select mode) */}
+          {multiSelect && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full gap-1.5 text-xs"
+              onClick={handleMerge}
+              disabled={merging || selectedIds.size < 2}
+            >
+              {merging ? <Loader2 className="h-3 w-3 animate-spin" /> : <Merge className="h-3 w-3" />}
+              {merging
+                ? (isRu ? "Слияние..." : "Merging...")
+                : (isRu ? `Объединить (${selectedIds.size})` : `Merge (${selectedIds.size})`)}
+            </Button>
+          )}
+          {!multiSelect && characters.length > 0 && (
             <Button
               variant="outline"
               size="sm"
@@ -482,28 +629,45 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
             <div className="p-4 flex justify-center">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-          ) : characters.length === 0 ? (
+          ) : filteredCharacters.length === 0 ? (
             <div className="p-4 text-center">
               <Users className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
               <p className="text-xs text-muted-foreground">
-                {isRu
-                  ? "Персонажи появятся после сегментации сцен"
-                  : "Characters will appear after scene segmentation"}
+                {filterMode === "scene"
+                  ? (isRu ? "В этой сцене нет персонажей" : "No characters in this scene")
+                  : (isRu ? "Персонажи появятся после сегментации сцен" : "Characters will appear after scene segmentation")}
               </p>
             </div>
           ) : (
             <div className="p-1 space-y-0.5">
-              {characters.map(ch => (
+              {filteredCharacters.map(ch => (
                 <button
                   key={ch.id}
-                  onClick={() => setSelectedId(ch.id)}
+                  onClick={() => {
+                    if (multiSelect) {
+                      toggleCharInSelection(ch.id);
+                    } else {
+                      setSelectedId(ch.id);
+                    }
+                  }}
                   className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                    selectedId === ch.id
-                      ? "bg-accent/15 text-accent-foreground"
-                      : "text-muted-foreground hover:bg-muted/50"
+                    multiSelect
+                      ? selectedIds.has(ch.id)
+                        ? "bg-primary/15 text-accent-foreground ring-1 ring-primary/30"
+                        : "text-muted-foreground hover:bg-muted/50"
+                      : selectedId === ch.id
+                        ? "bg-accent/15 text-accent-foreground"
+                        : "text-muted-foreground hover:bg-muted/50"
                   }`}
                 >
                   <div className="flex items-center gap-2">
+                    {multiSelect && (
+                      <div className={`h-3.5 w-3.5 rounded border shrink-0 flex items-center justify-center ${
+                        selectedIds.has(ch.id) ? "bg-primary border-primary" : "border-muted-foreground/40"
+                      }`}>
+                        {selectedIds.has(ch.id) && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                      </div>
+                    )}
                     <span className="truncate font-medium">{ch.name}</span>
                     <div className="flex items-center gap-1 shrink-0">
                       {ch.description && <User className="h-3 w-3 text-primary/60" />}
