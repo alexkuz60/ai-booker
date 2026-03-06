@@ -508,9 +508,7 @@ export function StudioTimeline({
                 <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} clips={clipsByTrack.get(track.id)} />
               ))}
               {/* Playhead */}
-              {player.state !== "stopped" && (
-                <Playhead positionSec={player.positionSec} zoom={zoom} />
-              )}
+              <Playhead positionSec={player.positionSec} zoom={zoom} />
             </div>
           </ScrollArea>
         </div>
