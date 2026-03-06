@@ -143,12 +143,15 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
         }
       }
 
-      // 2) Content field (may contain JSON)
+      // 2) Content or reasoning field (may contain JSON)
       if (!profiles) {
-        const content = msg?.content || "";
-        const reasoning = (msg as Record<string, unknown>)?.reasoning || "";
-        const raw = String(content || reasoning).replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-        if (raw) {
+        const content = String(msg?.content || "");
+        const reasoning = String((msg as Record<string, unknown>)?.reasoning || "");
+        // Try content first, then reasoning
+        for (const source of [content, reasoning]) {
+          if (profiles) break;
+          const raw = source.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+          if (!raw) continue;
           try {
             const p = JSON.parse(raw);
             profiles = p.characters || (Array.isArray(p) ? p : undefined);
@@ -171,7 +174,8 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       if (profiles && profiles.length > 0) break;
 
       // Log raw response for debugging
-      console.log(`Attempt ${attempt} unparseable. Keys: ${JSON.stringify(Object.keys(aiData.choices?.[0]?.message || {}))}. Tool calls: ${JSON.stringify(toolCall?.function?.name)}. Content length: ${(msg?.content || "").length}`);
+      const reasoningLen = String((msg as Record<string, unknown>)?.reasoning || "").length;
+      console.log(`Attempt ${attempt} unparseable. Keys: ${JSON.stringify(Object.keys(msg || {}))}. Tool calls: ${toolCall?.function?.name}. Content len: ${(msg?.content || "").length}. Reasoning len: ${reasoningLen}`);
       lastError = "AI returned unparseable response";
       if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, 1500 * attempt));
     } catch (fetchErr) {
