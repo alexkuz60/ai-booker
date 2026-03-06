@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, Play } from "lucide-react";
+import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, Play, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -286,6 +286,7 @@ export function StoryboardPanel({
   const [synthProgress, setSynthProgress] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [characters, setCharacters] = useState<CharacterOption[]>([]);
+  const [audioStatus, setAudioStatus] = useState<Map<string, { status: string; durationMs: number }>>(new Map());
 
   // Load characters for the book
   useEffect(() => {
@@ -299,6 +300,22 @@ export function StoryboardPanel({
       if (data) setCharacters(data.map(c => ({ id: c.id, name: c.name, color: c.color })));
     })();
   }, [bookId]);
+
+  // Load audio status for segments
+  const loadAudioStatus = useCallback(async (segIds: string[]) => {
+    if (segIds.length === 0) { setAudioStatus(new Map()); return; }
+    const { data } = await supabase
+      .from("segment_audio")
+      .select("segment_id, status, duration_ms")
+      .in("segment_id", segIds);
+    const map = new Map<string, { status: string; durationMs: number }>();
+    if (data) {
+      for (const a of data) {
+        map.set(a.segment_id, { status: a.status, durationMs: a.duration_ms });
+      }
+    }
+    setAudioStatus(map);
+  }, []);
 
   // Load existing segments from DB, then apply saved type→character mappings
   const loadSegments = useCallback(async (sid: string) => {
@@ -383,12 +400,14 @@ export function StoryboardPanel({
 
       setSegments(builtSegments);
       setLoaded(true);
+      // Load audio status
+      loadAudioStatus(builtSegments.map(s => s.segment_id));
     } catch (err) {
       console.error("Failed to load segments:", err);
       toast.error(isRu ? "Ошибка загрузки сегментов" : "Failed to load segments");
     }
     setLoading(false);
-  }, [isRu, characters]);
+  }, [isRu, characters, loadAudioStatus]);
 
   useEffect(() => {
     setSegments([]);
@@ -535,13 +554,15 @@ export function StoryboardPanel({
       }
       // Trigger timeline refresh by notifying parent
       onSegmented?.(sceneId);
+      // Reload audio status indicators
+      loadAudioStatus(segments.map(s => s.segment_id));
     } catch (err: any) {
       console.error("Synthesis failed:", err);
       toast.error(isRu ? "Ошибка синтеза" : "Synthesis failed");
     }
     setSynthesizing(false);
     setSynthProgress("");
-  }, [sceneId, segments.length, isRu, onSegmented]);
+  }, [sceneId, segments, isRu, onSegmented, loadAudioStatus]);
 
   // ── No scene selected ──
   if (!sceneId) {
@@ -628,6 +649,23 @@ export function StoryboardPanel({
                     isRu={isRu}
                     onChange={(newSpeaker) => updateSpeaker(seg.segment_id, newSpeaker)}
                   />
+                  {/* Audio status indicator */}
+                  {(() => {
+                    const audio = audioStatus.get(seg.segment_id);
+                    if (!audio) return null;
+                    const durSec = (audio.durationMs / 1000).toFixed(1);
+                    return audio.status === "ready" ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-green-400 font-mono">
+                        <CheckCircle2 className="h-3 w-3" />
+                        {durSec}s
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-destructive font-mono">
+                        <XCircle className="h-3 w-3" />
+                        {isRu ? "ошибка" : "error"}
+                      </span>
+                    );
+                  })()}
                   <span className="ml-auto text-[10px] text-muted-foreground font-mono">
                     #{seg.segment_number}
                   </span>

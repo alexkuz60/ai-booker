@@ -245,8 +245,14 @@ export function StudioTimeline({
     return map;
   }, [timelineClips]);
 
-  const allTracks = useMemo(() => [...charTracks, ...FIXED_TRACKS], [charTracks]);
-
+  // Auto-add narrator-fallback track if clips reference it
+  const allTracks = useMemo(() => {
+    const hasNarratorFallback = timelineClips.some(c => c.trackId === "narrator-fallback");
+    const narratorTrack: TimelineTrackData[] = hasNarratorFallback
+      ? [{ id: "narrator-fallback", label: isRu ? "Рассказчик" : "Narrator", color: "hsl(var(--primary))", type: "narrator" }]
+      : [];
+    return [...narratorTrack, ...charTracks, ...FIXED_TRACKS];
+  }, [charTracks, timelineClips, isRu]);
 
   // ── Layout / zoom ─────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
