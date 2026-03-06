@@ -49,7 +49,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
             </TabsTrigger>
             <TabsTrigger value="sounds" className="gap-1.5">
               <Volume2 className="h-3.5 w-3.5" />
-              <span className="font-body text-sm">{isRu ? "Звуки" : "Sounds"}</span>
+              <span className="font-body text-sm">{isRu ? "Готовые главы" : "Finished Chapters"}</span>
             </TabsTrigger>
           </TabsList>
 
