@@ -76,7 +76,7 @@ export function useTimelineClips(
           .in("segment_id", segIds)
           .order("phrase_number"),
         supabase
-          .from("segment_audio" as any)
+          .from("segment_audio")
           .select("segment_id, duration_ms, audio_path, status")
           .in("segment_id", segIds)
           .eq("status", "ready"),
