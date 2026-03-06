@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
-import { Users, Volume2, Loader2, Square, Play, RotateCcw, Save, Sparkles, User, Wand2, Filter, Merge, CheckSquare, X, Check } from "lucide-react";
+import { Users, UsersRound, Volume2, Loader2, Square, Play, RotateCcw, Save, Sparkles, User, Wand2, Filter, Merge, CheckSquare, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -174,6 +174,9 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   // Segment counts per character (for "extras" detection)
   const [segmentCounts, setSegmentCounts] = useState<Map<string, number>>(new Map());
 
+  // Manual extras override: charId → true (forced extra) | false (forced non-extra)
+  const [extrasOverride, setExtrasOverride] = useState<Map<string, boolean>>(new Map());
+
   // Multi-select & merge
   const [multiSelect, setMultiSelect] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -197,8 +200,20 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const selectedChar = characters.find(c => c.id === selectedId);
   const hasProfiles = characters.some(c => c.description);
 
-  /** A character is "extras" (массовка) if they have ≤1 dialogue segment total */
-  const isExtra = useCallback((charId: string) => (segmentCounts.get(charId) ?? 0) <= 1, [segmentCounts]);
+  /** A character is "extras" if manually overridden or has ≤1 dialogue segment */
+  const isExtra = useCallback((charId: string) => {
+    if (extrasOverride.has(charId)) return extrasOverride.get(charId)!;
+    return (segmentCounts.get(charId) ?? 0) <= 1;
+  }, [segmentCounts, extrasOverride]);
+
+  const toggleExtra = useCallback((charId: string) => {
+    setExtrasOverride(prev => {
+      const next = new Map(prev);
+      const current = isExtra(charId);
+      next.set(charId, !current);
+      return next;
+    });
+  }, [isExtra]);
 
   // ── Load characters from DB ─────────────────────────────
   const loadCharacters = useCallback(async () => {
@@ -634,6 +649,20 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                   <Filter className={`h-3 w-3 ${filterMode === "scene" ? "text-primary" : ""}`} />
                 </Button>
               )}
+              {/* Extras toggle for selected character */}
+              {selectedId && !multiSelect && (
+                <Button
+                  variant={isExtra(selectedId) ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => toggleExtra(selectedId)}
+                  title={isExtra(selectedId)
+                    ? (isRu ? "Убрать из массовки" : "Remove from extras")
+                    : (isRu ? "Пометить как массовку" : "Mark as extra")}
+                >
+                  <UsersRound className={`h-3 w-3 ${isExtra(selectedId) ? "text-primary" : ""}`} />
+                </Button>
+              )}
               {/* Multi-select toggle */}
               {characters.length > 1 && (
                 <Button
@@ -733,9 +762,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                     <span className="truncate font-medium">{ch.name}</span>
                     <div className="flex items-center gap-1 shrink-0">
                       {isExtra(ch.id) && (
-                        <Badge variant="outline" className="text-[9px] px-1 py-0 border-muted-foreground/30 text-muted-foreground/60">
-                          {isRu ? "массовка" : "extra"}
-                        </Badge>
+                        <span title={isRu ? "Массовка" : "Extra"}><UsersRound className="h-3 w-3 text-muted-foreground/50" /></span>
                       )}
                       {ch.description && <User className="h-3 w-3 text-primary/60" />}
                       {ch.voice_config?.voice_id && <Volume2 className="h-3 w-3 text-primary/60" />}
@@ -776,9 +803,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                     <h4 className="text-base font-semibold font-display text-foreground mb-2 flex items-center gap-2">
                       {selectedChar.name}
                       {isExtra(selectedChar.id) && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-muted-foreground/40 text-muted-foreground/70 font-normal">
-                          {isRu ? "Массовка" : "Extra"}
-                        </Badge>
+                        <span title={isRu ? "Массовка" : "Extra"}><UsersRound className="h-4 w-4 text-muted-foreground/60" /></span>
                       )}
                     </h4>
                     {selectedChar.description && (
