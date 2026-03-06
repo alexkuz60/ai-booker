@@ -298,7 +298,7 @@ export function StoryboardPanel({
     })();
   }, [bookId]);
 
-  // Load existing segments from DB
+  // Load existing segments from DB, then apply saved type→character mappings
   const loadSegments = useCallback(async (sid: string) => {
     setLoading(true);
     try {
@@ -317,13 +317,31 @@ export function StoryboardPanel({
       }
 
       const segIds = segs.map((s) => s.id);
-      const { data: phrases, error: phErr } = await supabase
-        .from("segment_phrases")
-        .select("id, segment_id, phrase_number, text")
-        .in("segment_id", segIds)
-        .order("phrase_number");
+      const [{ data: phrases, error: phErr }, { data: mappings }] = await Promise.all([
+        supabase
+          .from("segment_phrases")
+          .select("id, segment_id, phrase_number, text")
+          .in("segment_id", segIds)
+          .order("phrase_number"),
+        supabase
+          .from("scene_type_mappings" as any)
+          .select("segment_type, character_id")
+          .eq("scene_id", sid),
+      ]);
 
       if (phErr) throw phErr;
+
+      // Build character id→name map for mapping application
+      const charNameMap = new Map(characters.map(c => [c.id, c.name]));
+
+      // Build mapping: segment_type → character name
+      const typeSpeakerMap = new Map<string, string>();
+      if (mappings) {
+        for (const m of mappings as any[]) {
+          const name = charNameMap.get(m.character_id);
+          if (name) typeSpeakerMap.set(m.segment_type, name);
+        }
+      }
 
       const phraseMap = new Map<string, Phrase[]>();
       for (const p of phrases || []) {
@@ -332,22 +350,43 @@ export function StoryboardPanel({
         phraseMap.set(p.segment_id, list);
       }
 
-      setSegments(
-        segs.map((s) => ({
+      // Apply saved mappings to segments missing a speaker
+      const needUpdate: string[] = [];
+      const builtSegments = segs.map((s) => {
+        let speaker = s.speaker;
+        if (!speaker && typeSpeakerMap.has(s.segment_type)) {
+          speaker = typeSpeakerMap.get(s.segment_type)!;
+          needUpdate.push(s.id);
+        }
+        return {
           segment_id: s.id,
           segment_number: s.segment_number,
           segment_type: s.segment_type,
-          speaker: s.speaker,
+          speaker,
           phrases: phraseMap.get(s.id) || [],
-        }))
-      );
+        };
+      });
+
+      // Persist auto-applied speakers
+      if (needUpdate.length > 0) {
+        for (const [type, name] of typeSpeakerMap) {
+          const ids = builtSegments
+            .filter(s => s.segment_type === type && needUpdate.includes(s.segment_id))
+            .map(s => s.segment_id);
+          if (ids.length > 0) {
+            await supabase.from("scene_segments").update({ speaker: name }).in("id", ids);
+          }
+        }
+      }
+
+      setSegments(builtSegments);
       setLoaded(true);
     } catch (err) {
       console.error("Failed to load segments:", err);
       toast.error(isRu ? "Ошибка загрузки сегментов" : "Failed to load segments");
     }
     setLoading(false);
-  }, [isRu]);
+  }, [isRu, characters]);
 
   useEffect(() => {
     setSegments([]);
@@ -428,11 +467,30 @@ export function StoryboardPanel({
       sameTypeIds.includes(seg.segment_id) ? { ...seg, speaker: newSpeaker } : seg
     ));
 
-    // Persist all to DB
+    // Persist segments to DB
     const { error } = await supabase
       .from("scene_segments")
       .update({ speaker: newSpeaker })
       .in("id", sameTypeIds);
+
+    // Upsert or delete scene-level type→character mapping
+    if (sceneId) {
+      const charRecord = newSpeaker ? characters.find(c => c.name === newSpeaker) : null;
+      if (charRecord) {
+        await supabase
+          .from("scene_type_mappings" as any)
+          .upsert(
+            { scene_id: sceneId, segment_type: targetSeg.segment_type, character_id: charRecord.id },
+            { onConflict: "scene_id,segment_type" }
+          );
+      } else {
+        await supabase
+          .from("scene_type_mappings" as any)
+          .delete()
+          .eq("scene_id", sceneId)
+          .eq("segment_type", targetSeg.segment_type);
+      }
+    }
 
     if (error) {
       toast.error(isRu ? "Ошибка сохранения персонажа" : "Failed to save speaker");
@@ -446,7 +504,7 @@ export function StoryboardPanel({
           : `"${typeLabel}" → ${newSpeaker || "?"} (${sameTypeIds.length} seg.)`
       );
     }
-  }, [isRu, segments]);
+  }, [isRu, segments, sceneId, characters]);
 
   // ── No scene selected ──
   if (!sceneId) {
