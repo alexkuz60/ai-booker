@@ -79,8 +79,12 @@ function TtsTestButton({ isRu }: { isRu: boolean }) {
       );
 
       if (!response.ok) {
-        const err = await response.text();
-        throw new Error(err || `HTTP ${response.status}`);
+        let errMsg = `HTTP ${response.status}`;
+        try {
+          const errData = await response.json();
+          errMsg = errData.error || errMsg;
+        } catch { /* ignore */ }
+        throw new Error(errMsg);
       }
 
       const blob = await response.blob();
