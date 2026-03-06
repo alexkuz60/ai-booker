@@ -321,12 +321,19 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   useEffect(() => {
     if (!selectedChar) return;
     const vc = selectedChar.voice_config;
-    setVoice(vc.voice_id || "marina");
-    setRole(vc.role || "neutral");
+    let voiceId = vc.voice_id || "marina";
+    // If saved voice gender doesn't match character gender, re-match
+    const savedVoice = YANDEX_VOICES.find(v => v.id === voiceId);
+    if (savedVoice && selectedChar.gender !== "unknown" && savedVoice.gender !== selectedChar.gender) {
+      voiceId = matchVoice(selectedChar.gender, selectedChar.age_group);
+    }
+    setVoice(voiceId);
+    const currentVoice = YANDEX_VOICES.find(v => v.id === voiceId);
+    setRole(currentVoice?.roles?.includes(vc.role || "") ? (vc.role || "neutral") : (currentVoice?.roles?.[0] || vc.role || "neutral"));
     setSpeed(vc.speed ?? 1.0);
     setPitch(vc.pitch ?? 0);
     setVolume(vc.volume ?? 0);
-    setDirty(false);
+    setDirty(voiceId !== (vc.voice_id || "marina")); // mark dirty if voice was re-matched
   }, [selectedId]);
 
   const markDirty = () => setDirty(true);
