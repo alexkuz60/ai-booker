@@ -1,10 +1,12 @@
-import { Home, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen, LogOut, Shield } from "lucide-react";
+import { useState } from "react";
+import { Home, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen, LogOut, Shield, MessageCircle } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useLanguage } from "@/hooks/useLanguage";
+import { AssistantChat } from "@/components/AssistantChat";
 
 import {
   Sidebar,
