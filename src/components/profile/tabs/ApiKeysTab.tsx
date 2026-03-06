@@ -100,7 +100,7 @@ function TtsTestButton({ isRu }: { isRu: boolean }) {
       toast.success(isRu ? 'TTS работает!' : 'TTS is working!');
     } catch (e) {
       console.error('TTS test error:', e);
-      toast.error(isRu ? 'Ошибка TTS' : 'TTS error');
+      toast.error(e instanceof Error ? e.message : (isRu ? 'Ошибка TTS' : 'TTS error'));
     } finally {
       setTesting(false);
     }

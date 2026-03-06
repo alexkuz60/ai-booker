@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ error: userMessage, status: response.status }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
