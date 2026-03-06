@@ -366,19 +366,33 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       const updates: { id: string; voice_config: BookCharacter["voice_config"] }[] = [];
 
       for (const ch of characters) {
-        let voiceId = matchVoice(ch.gender, ch.age_group);
+        let voiceId: string;
+        let roleId: string;
 
-        // Try to avoid duplicates: pick alternate from same gender
-        const genderVoices = YANDEX_VOICES.filter(v =>
-          ch.gender !== "unknown" ? v.gender === ch.gender : true
-        );
-        if (usedVoices.has(voiceId) && genderVoices.length > 1) {
-          const alt = genderVoices.find(v => !usedVoices.has(v.id));
-          if (alt) voiceId = alt.id;
+        if (isExtra(ch.id)) {
+          // Массовка: random voice from all available
+          const pool = YANDEX_VOICES.filter(v => v.gender !== "unknown");
+          const randomVoice = pool[Math.floor(Math.random() * pool.length)] || YANDEX_VOICES[0];
+          voiceId = randomVoice.id;
+          // Random role if available
+          const roles = randomVoice.roles ?? ["neutral"];
+          roleId = roles[Math.floor(Math.random() * roles.length)];
+        } else {
+          voiceId = matchVoice(ch.gender, ch.age_group);
+
+          // Try to avoid duplicates: pick alternate from same gender
+          const genderVoices = YANDEX_VOICES.filter(v =>
+            ch.gender !== "unknown" ? v.gender === ch.gender : true
+          );
+          if (usedVoices.has(voiceId) && genderVoices.length > 1) {
+            const alt = genderVoices.find(v => !usedVoices.has(v.id));
+            if (alt) voiceId = alt.id;
+          }
+
+          roleId = matchRole(voiceId, ch.temperament);
         }
         usedVoices.add(voiceId);
 
-        const roleId = matchRole(voiceId, ch.temperament);
         const vc: BookCharacter["voice_config"] = {
           provider: "yandex",
           voice_id: voiceId,
