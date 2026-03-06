@@ -762,7 +762,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                     <span className="truncate font-medium">{ch.name}</span>
                     <div className="flex items-center gap-1 shrink-0">
                       {isExtra(ch.id) && (
-                        <UsersRound className="h-3 w-3 text-muted-foreground/50" title={isRu ? "Массовка" : "Extra"} />
+                        <span title={isRu ? "Массовка" : "Extra"}><UsersRound className="h-3 w-3 text-muted-foreground/50" /></span>
                       )}
                       {ch.description && <User className="h-3 w-3 text-primary/60" />}
                       {ch.voice_config?.voice_id && <Volume2 className="h-3 w-3 text-primary/60" />}
@@ -803,7 +803,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                     <h4 className="text-base font-semibold font-display text-foreground mb-2 flex items-center gap-2">
                       {selectedChar.name}
                       {isExtra(selectedChar.id) && (
-                        <UsersRound className="h-4 w-4 text-muted-foreground/60" title={isRu ? "Массовка" : "Extra"} />
+                        <span title={isRu ? "Массовка" : "Extra"}><UsersRound className="h-4 w-4 text-muted-foreground/60" /></span>
                       )}
                     </h4>
                     {selectedChar.description && (
