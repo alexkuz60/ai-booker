@@ -371,7 +371,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
         if (isExtra(ch.id)) {
           // Массовка: random voice from all available
-          const pool = YANDEX_VOICES.filter(v => v.gender !== "unknown");
+          const pool = YANDEX_VOICES;
           const randomVoice = pool[Math.floor(Math.random() * pool.length)] || YANDEX_VOICES[0];
           voiceId = randomVoice.id;
           // Random role if available
