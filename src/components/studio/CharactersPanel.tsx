@@ -750,8 +750,13 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
               {selectedChar ? (
                 <>
                   <div>
-                    <h4 className="text-base font-semibold font-display text-foreground mb-2">
+                    <h4 className="text-base font-semibold font-display text-foreground mb-2 flex items-center gap-2">
                       {selectedChar.name}
+                      {isExtra(selectedChar.id) && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-muted-foreground/40 text-muted-foreground/70 font-normal">
+                          {isRu ? "Массовка" : "Extra"}
+                        </Badge>
+                      )}
                     </h4>
                     {selectedChar.description && (
                       <p className="text-sm text-foreground/90 leading-relaxed mb-3">
