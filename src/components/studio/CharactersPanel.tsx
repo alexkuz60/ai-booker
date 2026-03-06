@@ -370,31 +370,40 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     }
   };
 
-  // ── Auto-cast voices for all characters ─────────────────
+  // ── Auto-cast voices (incremental: only uncast characters) ──
   const handleAutoCast = async () => {
     if (characters.length === 0) return;
     setCasting(true);
     try {
-      // Track used voice IDs to avoid duplicates where possible
+      // Collect already-used voice IDs from previously cast characters
       const usedVoices = new Set<string>();
+      for (const ch of characters) {
+        if (ch.voice_config?.voice_id) usedVoices.add(ch.voice_config.voice_id);
+      }
+
+      // Only cast characters that don't have a voice yet
+      const toCast = characters.filter(ch => !ch.voice_config?.voice_id);
+      if (toCast.length === 0) {
+        toast.info(isRu ? "Все персонажи уже озвучены" : "All characters already have voices");
+        setCasting(false);
+        return;
+      }
+
       const updates: { id: string; voice_config: BookCharacter["voice_config"] }[] = [];
 
-      for (const ch of characters) {
+      for (const ch of toCast) {
         let voiceId: string;
         let roleId: string;
 
         if (isExtra(ch.id)) {
-          // Массовка: random voice from all available
           const pool = YANDEX_VOICES;
           const randomVoice = pool[Math.floor(Math.random() * pool.length)] || YANDEX_VOICES[0];
           voiceId = randomVoice.id;
-          // Random role if available
           const roles = randomVoice.roles ?? ["neutral"];
           roleId = roles[Math.floor(Math.random() * roles.length)];
         } else {
           voiceId = matchVoice(ch.gender, ch.age_group);
 
-          // Try to avoid duplicates: pick alternate from same gender
           const genderVoices = YANDEX_VOICES.filter(v =>
             ch.gender !== "unknown" ? v.gender === ch.gender : true
           );
@@ -445,8 +454,8 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
       toast.success(
         isRu
-          ? `Голоса подобраны для ${updates.length} персонажей`
-          : `Voices matched for ${updates.length} characters`
+          ? `Голоса подобраны для ${updates.length} новых персонажей`
+          : `Voices matched for ${updates.length} new characters`
       );
     } catch (e) {
       console.error("Auto-cast error:", e);
