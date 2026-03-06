@@ -81,8 +81,18 @@ Deno.serve(async (req) => {
     if (!response.ok) {
       const errText = await response.text();
       console.error("ElevenLabs error:", response.status, errText);
+
+      let userMessage = "Failed to generate audio from ElevenLabs.";
+      if (response.status === 401) {
+        userMessage = "ElevenLabs: invalid API key or free tier blocked. A paid plan may be required.";
+      } else if (response.status === 429) {
+        userMessage = "ElevenLabs: rate limit exceeded. Please try again later.";
+      } else if (response.status === 403) {
+        userMessage = "ElevenLabs: access forbidden. Check your API key permissions.";
+      }
+
       return new Response(
-        JSON.stringify({ error: "Failed to generate audio from ElevenLabs." }),
+        JSON.stringify({ error: userMessage, status: response.status }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
