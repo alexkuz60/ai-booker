@@ -286,6 +286,7 @@ export function StoryboardPanel({
   const [synthProgress, setSynthProgress] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [characters, setCharacters] = useState<CharacterOption[]>([]);
+  const [audioStatus, setAudioStatus] = useState<Map<string, { status: string; durationMs: number }>>(new Map());
 
   // Load characters for the book
   useEffect(() => {
