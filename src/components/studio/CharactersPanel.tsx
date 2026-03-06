@@ -136,11 +136,14 @@ interface CharactersPanelProps {
   isRu: boolean;
   bookId?: string | null;
   sceneId?: string | null;
+  chapterSceneIds?: string[];
 }
 
 export interface CharactersPanelHandle {
   autoCast: () => Promise<void>;
+  incrementalProfile: () => Promise<void>;
   casting: boolean;
+  profiling: boolean;
 }
 
 export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanelProps>(function CharactersPanel({ isRu, bookId, sceneId }, ref) {
