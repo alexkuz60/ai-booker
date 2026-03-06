@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import VoiceSelector from "@/components/VoiceSelector";
 import AudioPlayer from "@/components/AudioPlayer";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const MAX_CHARS = 5000;
 
@@ -29,6 +30,13 @@ const Index = () => {
     setAudioUrl(null);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please sign in to use TTS");
+        setIsGenerating(false);
+        return;
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
         {
@@ -36,7 +44,7 @@ const Index = () => {
           headers: {
             "Content-Type": "application/json",
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({ text, voiceId }),
         }
