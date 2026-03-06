@@ -13,6 +13,7 @@ import { StudioWorkspace } from "@/components/studio/StudioWorkspace";
 import { StudioTimeline, TIMELINE_HEADER_HEIGHT } from "@/components/studio/StudioTimeline";
 import { estimateChapterDuration, estimateSceneDuration } from "@/lib/durationEstimate";
 import { supabase } from "@/integrations/supabase/client";
+import { usePageHeader } from "@/hooks/usePageHeader";
 
 const Studio = () => {
   const { isRu } = useLanguage();
@@ -97,6 +98,8 @@ const Studio = () => {
     setSegmentedSceneIds(prev => new Set(prev).add(sceneId));
   }, []);
 
+  const { setPageHeader } = usePageHeader();
+
   const studioTitle = isRu ? "Студия" : "Studio";
   const studioSubtitle = chapter
     ? `${chapter.bookTitle} → ${chapter.chapterTitle}`
@@ -119,6 +122,11 @@ const Studio = () => {
       )}
     </div>
   ) : undefined;
+
+  useEffect(() => {
+    setPageHeader({ title: studioTitle, subtitle: studioSubtitle, headerRight });
+    return () => setPageHeader({});
+  }, [studioTitle, studioSubtitle, chapterEstimate?.formatted, sceneEstimate?.formatted]);
 
   return (
     <motion.div
