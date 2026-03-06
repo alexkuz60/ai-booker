@@ -321,12 +321,19 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   useEffect(() => {
     if (!selectedChar) return;
     const vc = selectedChar.voice_config;
-    setVoice(vc.voice_id || "marina");
-    setRole(vc.role || "neutral");
+    let voiceId = vc.voice_id || "marina";
+    // If saved voice gender doesn't match character gender, re-match
+    const savedVoice = YANDEX_VOICES.find(v => v.id === voiceId);
+    if (savedVoice && selectedChar.gender !== "unknown" && savedVoice.gender !== selectedChar.gender) {
+      voiceId = matchVoice(selectedChar.gender, selectedChar.age_group);
+    }
+    setVoice(voiceId);
+    const currentVoice = YANDEX_VOICES.find(v => v.id === voiceId);
+    setRole(currentVoice?.roles?.includes(vc.role || "") ? (vc.role || "neutral") : (currentVoice?.roles?.[0] || vc.role || "neutral"));
     setSpeed(vc.speed ?? 1.0);
     setPitch(vc.pitch ?? 0);
     setVolume(vc.volume ?? 0);
-    setDirty(false);
+    setDirty(voiceId !== (vc.voice_id || "marina")); // mark dirty if voice was re-matched
   }, [selectedId]);
 
   const markDirty = () => setDirty(true);
@@ -337,6 +344,17 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     const newVoice = YANDEX_VOICES.find(x => x.id === v);
     if (newVoice?.roles && !newVoice.roles.includes(role)) {
       setRole(newVoice.roles[0] || "neutral");
+    }
+    // Sync character gender to match voice gender
+    if (newVoice && selectedChar && newVoice.gender !== selectedChar.gender) {
+      const charId = selectedChar.id;
+      setCharacters(prev => prev.map(c =>
+        c.id === charId ? { ...c, gender: newVoice.gender } : c
+      ));
+      supabase.from("book_characters")
+        .update({ gender: newVoice.gender, updated_at: new Date().toISOString() })
+        .eq("id", charId)
+        .then();
     }
   };
 
@@ -888,9 +906,16 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                                 }`}
                                 onClick={async () => {
                                   const charId = selectedChar.id;
+                                  // Re-match voice to new gender
+                                  const newVoiceId = matchVoice(g, selectedChar.age_group);
+                                  const newVoice = YANDEX_VOICES.find(x => x.id === newVoiceId);
+                                  const newRole = newVoice ? matchRole(newVoiceId, selectedChar.temperament) : role;
+                                  setVoice(newVoiceId);
+                                  setRole(newRole);
                                   setCharacters(prev => prev.map(c =>
                                     c.id === charId ? { ...c, gender: g } : c
                                   ));
+                                  markDirty();
                                   try {
                                     const { error } = await supabase
                                       .from("book_characters")
