@@ -3,7 +3,7 @@ import { Users, Wind, Volume2, Film, Wand2, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { StoryboardPanel } from "./StoryboardPanel";
-import { CharactersPanel } from "./CharactersPanel";
+import { CharactersPanel, type CharactersPanelHandle } from "./CharactersPanel";
 
 interface StudioWorkspaceProps {
   isRu: boolean;
