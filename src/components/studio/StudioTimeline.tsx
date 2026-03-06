@@ -3,6 +3,7 @@ import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut, Maximize2, Layers, Film 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
+import { useTimelineClips, type TimelineClip } from "@/hooks/useTimelineClips";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -58,33 +59,49 @@ function TimelineRuler({ zoom, duration }: { zoom: number; duration: number }) {
   );
 }
 
-function TimelineTrack({ track, zoom, duration }: { track: TimelineTrackData; zoom: number; duration: number }) {
-  // Placeholder clips based on track type
-  const clips = track.type === "atmosphere"
-    ? [{ start: 0, end: duration }]
-    : track.type === "sfx"
-      ? [] // SFX tracks start empty
-      : [{ start: 0, end: Math.min(duration * 0.3, duration) }]; // narrator placeholder
+function TimelineTrack({
+  track,
+  zoom,
+  duration,
+  clips: realClips,
+}: {
+  track: TimelineTrackData;
+  zoom: number;
+  duration: number;
+  clips?: TimelineClip[];
+}) {
+  // Use real clips if available, otherwise fallback placeholders
+  const clips = realClips && realClips.length > 0
+    ? realClips.map(c => ({ start: c.startSec, end: c.startSec + c.durationSec, label: c.label, type: c.segmentType }))
+    : track.type === "atmosphere"
+      ? [{ start: 0, end: duration, label: track.label, type: "atmosphere" }]
+      : track.type === "sfx"
+        ? []
+        : [];
 
   return (
     <div className="flex h-10 border-b border-border/50 relative" style={{ width: `${duration * zoom * 4}px` }}>
-      {clips.filter(c => c.start < c.end).map((clip, i) => (
-        <div
-          key={i}
-          className="absolute top-1 bottom-1 rounded-sm opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
-          style={{
-            left: `${clip.start * zoom * 4}px`,
-            width: `${(clip.end - clip.start) * zoom * 4}px`,
-            backgroundColor: track.color,
-          }}
-        >
-          {(clip.end - clip.start) * zoom * 4 > 40 && (
-            <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
-              {track.label}
-            </span>
-          )}
-        </div>
-      ))}
+      {clips.filter(c => c.start < c.end).map((clip, i) => {
+        const widthPx = (clip.end - clip.start) * zoom * 4;
+        return (
+          <div
+            key={i}
+            className="absolute top-1 bottom-1 rounded-sm opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
+            style={{
+              left: `${clip.start * zoom * 4}px`,
+              width: `${widthPx}px`,
+              backgroundColor: track.color,
+            }}
+            title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)`}
+          >
+            {widthPx > 40 && (
+              <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
+                {clip.label}
+              </span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -123,35 +140,46 @@ export function StudioTimeline({
 
   // ── Character tracks ──────────────────────────────────────
   const [charTracks, setCharTracks] = useState<TimelineTrackData[]>([]);
+  const [speakerToCharId, setSpeakerToCharId] = useState<Map<string, string>>(new Map());
+
+  const contextSceneIds = useMemo(() =>
+    mode === "scene"
+      ? (sceneId ? [sceneId] : [])
+      : (chapterSceneIds ?? []),
+    [mode, sceneId, chapterSceneIds?.join(",")]
+  );
 
   useEffect(() => {
-    if (!bookId) { setCharTracks([]); return; }
-
-    const contextSceneIds = mode === "scene"
-      ? (sceneId ? [sceneId] : [])
-      : (chapterSceneIds ?? []);
-
-    if (contextSceneIds.length === 0) { setCharTracks([]); return; }
+    if (!bookId) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
+    if (contextSceneIds.length === 0) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
 
     (async () => {
-      // Get character IDs that appear in these scenes
       const { data: appearances } = await supabase
         .from("character_appearances")
         .select("character_id")
         .in("scene_id", contextSceneIds);
 
-      if (!appearances?.length) { setCharTracks([]); return; }
+      if (!appearances?.length) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
 
       const charIds = [...new Set(appearances.map(a => a.character_id))];
 
-      // Load character names
       const { data: chars } = await supabase
         .from("book_characters")
-        .select("id, name, color, sort_order")
+        .select("id, name, color, sort_order, aliases")
         .in("id", charIds)
         .order("sort_order");
 
-      if (!chars?.length) { setCharTracks([]); return; }
+      if (!chars?.length) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
+
+      // Build speaker name → character ID map
+      const nameMap = new Map<string, string>();
+      for (const c of chars) {
+        nameMap.set(c.name.toLowerCase(), c.id);
+        for (const alias of (c.aliases ?? [])) {
+          if (alias) nameMap.set(alias.toLowerCase(), c.id);
+        }
+      }
+      setSpeakerToCharId(nameMap);
 
       setCharTracks(
         chars.map((c, i) => ({
@@ -164,7 +192,22 @@ export function StudioTimeline({
     })();
   }, [bookId, sceneId, chapterSceneIds?.join(","), mode]);
 
+  // ── Real clips from segments ──────────────────────────────
+  const { clips: timelineClips } = useTimelineClips(contextSceneIds, speakerToCharId);
+
+  // Group clips by track ID
+  const clipsByTrack = useMemo(() => {
+    const map = new Map<string, TimelineClip[]>();
+    for (const clip of timelineClips) {
+      const list = map.get(clip.trackId) ?? [];
+      list.push(clip);
+      map.set(clip.trackId, list);
+    }
+    return map;
+  }, [timelineClips]);
+
   const allTracks = useMemo(() => [...charTracks, ...FIXED_TRACKS], [charTracks]);
+
 
   // ── Layout / zoom ─────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
@@ -357,7 +400,7 @@ export function StudioTimeline({
             <div className="min-w-full">
               <TimelineRuler zoom={zoom} duration={duration} />
               {allTracks.map((track) => (
-                <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} />
+                <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} clips={clipsByTrack.get(track.id)} />
               ))}
             </div>
           </ScrollArea>
