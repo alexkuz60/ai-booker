@@ -15,11 +15,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <SidebarTrigger className="text-muted-foreground hover:text-foreground shrink-0" />
             {title && (
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                <h1 className="font-display text-base font-bold text-foreground whitespace-nowrap">{title}</h1>
+                <h1 className="font-display text-lg font-bold text-foreground whitespace-nowrap">{title}</h1>
                 {subtitle && (
                   <>
                     <span className="text-muted-foreground/50 text-xs">·</span>
-                    <span className="text-xs text-muted-foreground font-body truncate">{subtitle}</span>
+                    <span className="text-sm text-muted-foreground font-body truncate">{subtitle}</span>
                   </>
                 )}
               </div>
