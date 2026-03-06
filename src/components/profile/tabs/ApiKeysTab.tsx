@@ -74,7 +74,7 @@ function TtsTestButton({ isRu }: { isRu: boolean }) {
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ text, voiceId: 'JBFqnCBsd6RMkjVDRZzb' }),
+          body: JSON.stringify({ text, voiceId: 'JBFqnCBsd6RMkjVDRZzb', lang: isRu ? 'ru' : 'en' }),
         }
       );
 
