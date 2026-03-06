@@ -159,6 +159,18 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [filterMode, setFilterMode] = useState<"all" | "scene">("all");
   const [sceneCharIds, setSceneCharIds] = useState<Set<string>>(new Set());
 
+  // Sync with external selectedCharacterId
+  useEffect(() => {
+    if (selectedCharacterId !== undefined && selectedCharacterId !== selectedId) {
+      setSelectedId(selectedCharacterId);
+    }
+  }, [selectedCharacterId]);
+
+  const handleSelectCharacter = useCallback((id: string | null) => {
+    setSelectedId(id);
+    onSelectCharacter?.(id);
+  }, [onSelectCharacter]);
+
   // Segment counts per character (for "extras" detection)
   const [segmentCounts, setSegmentCounts] = useState<Map<string, number>>(new Map());
 
