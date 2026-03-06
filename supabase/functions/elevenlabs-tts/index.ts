@@ -37,11 +37,12 @@ Deno.serve(async (req) => {
     }
 
     // ── TTS logic ──
-    const { text, voiceId } = await req.json();
+    const { text, voiceId, lang } = await req.json();
+    const isRu = lang === 'ru';
 
     if (!text || typeof text !== "string" || text.length > 5000) {
       return new Response(
-        JSON.stringify({ error: "Text is required and must be under 5000 characters." }),
+        JSON.stringify({ error: isRu ? "Текст обязателен и должен быть до 5000 символов." : "Text is required and must be under 5000 characters." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -49,7 +50,7 @@ Deno.serve(async (req) => {
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
     if (!ELEVENLABS_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "ElevenLabs API key not configured." }),
+        JSON.stringify({ error: isRu ? "API-ключ ElevenLabs не настроен на сервере." : "ElevenLabs API key not configured." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -82,14 +83,22 @@ Deno.serve(async (req) => {
       const errText = await response.text();
       console.error("ElevenLabs error:", response.status, errText);
 
-      let userMessage = "Failed to generate audio from ElevenLabs.";
-      if (response.status === 401) {
-        userMessage = "ElevenLabs: invalid API key or free tier blocked. A paid plan may be required.";
-      } else if (response.status === 429) {
-        userMessage = "ElevenLabs: rate limit exceeded. Please try again later.";
-      } else if (response.status === 403) {
-        userMessage = "ElevenLabs: access forbidden. Check your API key permissions.";
-      }
+      const msgs: Record<number, { ru: string; en: string }> = {
+        401: {
+          ru: "ElevenLabs: неверный API-ключ или бесплатный тариф заблокирован. Требуется платный план.",
+          en: "ElevenLabs: invalid API key or free tier blocked. A paid plan may be required.",
+        },
+        403: {
+          ru: "ElevenLabs: доступ запрещён. Проверьте права API-ключа.",
+          en: "ElevenLabs: access forbidden. Check your API key permissions.",
+        },
+        429: {
+          ru: "ElevenLabs: превышен лимит запросов. Попробуйте позже.",
+          en: "ElevenLabs: rate limit exceeded. Please try again later.",
+        },
+      };
+      const fallback = isRu ? "Не удалось сгенерировать аудио через ElevenLabs." : "Failed to generate audio from ElevenLabs.";
+      const userMessage = msgs[response.status]?.[isRu ? 'ru' : 'en'] || fallback;
 
       return new Response(
         JSON.stringify({ error: userMessage, status: response.status }),
