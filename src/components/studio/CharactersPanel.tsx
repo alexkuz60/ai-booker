@@ -276,13 +276,21 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
   useEffect(() => { loadCharacters(); }, [loadCharacters]);
 
+  // System character names (Narrator / Commentator)
+  const SYSTEM_NAMES = useMemo(() => new Set([
+    "Рассказчик", "Narrator", "Комментатор", "Commentator",
+  ]), []);
+
   // Filtered character list
   const filteredCharacters = useMemo(() => {
     if (filterMode === "scene" && sceneId) {
-      return characters.filter(c => sceneCharIds.has(c.id));
+      const sceneChars = characters.filter(c => sceneCharIds.has(c.id));
+      if (sceneChars.length > 0) return sceneChars;
+      // Narrative scene — show system characters (Narrator / Commentator)
+      return characters.filter(c => SYSTEM_NAMES.has(c.name));
     }
     return characters;
-  }, [characters, filterMode, sceneCharIds, sceneId]);
+  }, [characters, filterMode, sceneCharIds, sceneId, SYSTEM_NAMES]);
 
   // ── Sync voice settings when character selected ─────────
   useEffect(() => {
