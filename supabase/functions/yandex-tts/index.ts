@@ -6,18 +6,14 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-/**
- * Generate a JWT signed with the service account's RSA private key,
- * then exchange it for an IAM token via Yandex Cloud API.
- */
+// ─── IAM Token (Service Account JWT → IAM exchange) ───────────────
+
 async function getIamToken(): Promise<string> {
   const keyId = Deno.env.get("YANDEX_SA_KEY_ID")!;
   const serviceAccountId = Deno.env.get("YANDEX_SA_SERVICE_ACCOUNT_ID")!;
   const privateKeyPem = Deno.env.get("YANDEX_SA_PRIVATE_KEY")!;
 
   const now = Math.floor(Date.now() / 1000);
-
-  // JWT header & payload
   const header = { alg: "PS256", typ: "JWT", kid: keyId };
   const payload = {
     iss: serviceAccountId,
@@ -38,22 +34,15 @@ async function getIamToken(): Promise<string> {
   const payloadB64 = enc(payload);
   const signingInput = `${headerB64}.${payloadB64}`;
 
-  // Import RSA private key
-  // Normalize PEM: supports raw PEM, escaped newlines, JSON service-account payload, and malformed header spacing
-  let rawPrivateKey = privateKeyPem.trim();
-
-  if (rawPrivateKey.startsWith("{")) {
+  // Normalize PEM
+  let rawKey = privateKeyPem.trim();
+  if (rawKey.startsWith("{")) {
     try {
-      const parsed = JSON.parse(rawPrivateKey);
-      if (typeof parsed?.private_key === "string") {
-        rawPrivateKey = parsed.private_key;
-      }
-    } catch {
-      // keep original value if it's not valid JSON
-    }
+      const parsed = JSON.parse(rawKey);
+      if (typeof parsed?.private_key === "string") rawKey = parsed.private_key;
+    } catch { /* keep original */ }
   }
-
-  const normalizedPem = rawPrivateKey
+  const pemBody = rawKey
     .replace(/^"|"$/g, "")
     .replace(/\\r/g, "\r")
     .replace(/\\n/g, "\n")
@@ -61,68 +50,198 @@ async function getIamToken(): Promise<string> {
     .replace(/-+END[^-]*PRIVATE\s*KEY-+/gi, "")
     .replace(/[\s\r\n]/g, "");
 
-  console.log("PEM body length after cleanup:", normalizedPem.length, "first 20 chars:", normalizedPem.substring(0, 20));
-
-  let binaryDer: Uint8Array;
-  try {
-    binaryDer = Uint8Array.from(atob(normalizedPem), (c) => c.charCodeAt(0));
-  } catch {
-    console.error("Base64 decode failed. PEM preview:", normalizedPem.substring(0, 50), "...", normalizedPem.substring(Math.max(0, normalizedPem.length - 20)));
-    throw new Error("Failed to decode private key PEM. Ensure YANDEX_SA_PRIVATE_KEY contains a valid PEM-encoded RSA key.");
-  }
-
+  const binaryDer = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
   const cryptoKey = await crypto.subtle.importKey(
-    "pkcs8",
-    binaryDer,
-    { name: "RSA-PSS", hash: "SHA-256" },
-    false,
-    ["sign"]
+    "pkcs8", binaryDer, { name: "RSA-PSS", hash: "SHA-256" }, false, ["sign"]
   );
-
-  // Sign
   const signature = await crypto.subtle.sign(
-    { name: "RSA-PSS", saltLength: 32 },
-    cryptoKey,
-    new TextEncoder().encode(signingInput)
+    { name: "RSA-PSS", saltLength: 32 }, cryptoKey, new TextEncoder().encode(signingInput)
   );
-
   const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
   const jwt = `${signingInput}.${sigB64}`;
-
-  // Exchange JWT for IAM token
   const resp = await fetch("https://iam.api.cloud.yandex.net/iam/v1/tokens", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jwt }),
   });
-
   if (!resp.ok) {
     const errText = await resp.text();
-    console.error("IAM token error:", resp.status, errText);
-    throw new Error(`Failed to get IAM token: ${resp.status} ${errText}`);
+    throw new Error(`IAM token failed: ${resp.status} ${errText}`);
   }
-
-  const data = await resp.json();
-  return data.iamToken;
+  return (await resp.json()).iamToken;
 }
 
-// Simple in-memory IAM token cache
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
 async function getCachedIamToken(): Promise<string> {
   const now = Date.now();
-  // Refresh 5 min before expiry
-  if (cachedToken && cachedToken.expiresAt > now + 5 * 60 * 1000) {
-    return cachedToken.token;
-  }
+  if (cachedToken && cachedToken.expiresAt > now + 5 * 60 * 1000) return cachedToken.token;
   const token = await getIamToken();
   cachedToken = { token, expiresAt: now + 3600 * 1000 };
   return token;
 }
+
+// ─── V1 Synthesis (REST, form-urlencoded) ─────────────────────────
+
+interface TtsParams {
+  text: string;
+  voice: string;
+  lang: string;
+  speed: number;
+  emotion?: string;   // v1 only (role alias)
+  role?: string;      // v3 only
+  pitchShift?: number; // v3 only, Hz [-1000..1000]
+  volume?: number;     // v3 only
+  apiVersion?: "v1" | "v3";
+}
+
+async function synthesizeV1(
+  iamToken: string,
+  params: TtsParams,
+): Promise<{ audio: Uint8Array; contentType: string }> {
+  const folderId = Deno.env.get("YANDEX_FOLDER_ID")!;
+  const form = new URLSearchParams();
+  form.append("text", params.text);
+  form.append("lang", params.lang);
+  form.append("voice", params.voice);
+  form.append("folderId", folderId);
+  form.append("format", "mp3");
+  form.append("sampleRateHertz", "48000");
+  form.append("speed", String(params.speed));
+  if (params.emotion) form.append("emotion", params.emotion);
+
+  const response = await fetch(
+    "https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize",
+    { method: "POST", headers: { Authorization: `Bearer ${iamToken}` }, body: form },
+  );
+  if (!response.ok) {
+    const errText = await response.text();
+    if (response.status === 401) cachedToken = null;
+    throw new YandexTtsError(response.status, errText);
+  }
+  return { audio: new Uint8Array(await response.arrayBuffer()), contentType: "audio/mpeg" };
+}
+
+// ─── V3 Synthesis (REST JSON, utteranceSynthesis) ─────────────────
+
+async function synthesizeV3(
+  iamToken: string,
+  params: TtsParams,
+): Promise<{ audio: Uint8Array; contentType: string }> {
+  const folderId = Deno.env.get("YANDEX_FOLDER_ID")!;
+
+  // Build hints array — each hint is a single-key object
+  const hints: Record<string, unknown>[] = [
+    { voice: params.voice },
+    { speed: params.speed },
+  ];
+  if (params.role) hints.push({ role: params.role });
+  if (params.pitchShift !== undefined && params.pitchShift !== 0) {
+    hints.push({ pitch_shift: params.pitchShift });
+  }
+  if (params.volume !== undefined) {
+    hints.push({ volume: params.volume });
+  }
+
+  const body = {
+    text: params.text,
+    hints,
+    output_audio_spec: {
+      container_audio: { container_audio_type: "MP3" },
+    },
+    loudness_normalization_type: "LUFS",
+    unsafe_mode: true,  // auto-split long texts
+  };
+
+  console.log("Yandex TTS v3 request:", {
+    voice: params.voice,
+    role: params.role,
+    speed: params.speed,
+    pitchShift: params.pitchShift,
+    volume: params.volume,
+    textLen: params.text.length,
+  });
+
+  const response = await fetch(
+    "https://tts.api.cloud.yandex.net:443/tts/v3/utteranceSynthesis",
+    {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${iamToken}`,
+        "x-folder-id": folderId,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
+  );
+
+  if (!response.ok) {
+    const errText = await response.text();
+    if (response.status === 401) cachedToken = null;
+    throw new YandexTtsError(response.status, errText);
+  }
+
+  // V3 REST returns newline-delimited JSON, each with result.audioChunk.data (base64)
+  const responseText = await response.text();
+  const audioChunks: Uint8Array[] = [];
+
+  for (const line of responseText.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const parsed = JSON.parse(trimmed);
+      const b64 = parsed?.result?.audioChunk?.data;
+      if (b64) {
+        audioChunks.push(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
+      }
+    } catch {
+      // skip non-JSON lines
+    }
+  }
+
+  // Concatenate all audio chunks
+  const totalLen = audioChunks.reduce((sum, c) => sum + c.length, 0);
+  const combined = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const chunk of audioChunks) {
+    combined.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  return { audio: combined, contentType: "audio/mpeg" };
+}
+
+// ─── Error helper ─────────────────────────────────────────────────
+
+class YandexTtsError extends Error {
+  status: number;
+  constructor(status: number, detail: string) {
+    super(detail);
+    this.status = status;
+  }
+}
+
+function errorMessage(status: number, isRu: boolean): string {
+  const msgs: Record<number, { ru: string; en: string }> = {
+    401: { ru: "Yandex SpeechKit: ошибка авторизации.", en: "Yandex SpeechKit: auth error." },
+    403: { ru: "Yandex SpeechKit: доступ запрещён.", en: "Yandex SpeechKit: access forbidden." },
+    429: { ru: "Yandex SpeechKit: лимит запросов.", en: "Yandex SpeechKit: rate limit." },
+  };
+  const fallback = isRu ? "Не удалось сгенерировать аудио." : "Failed to generate audio.";
+  return msgs[status]?.[isRu ? "ru" : "en"] || fallback;
+}
+
+// ─── V3-only voices (not available in v1) ─────────────────────────
+
+const V3_ONLY_VOICES = new Set([
+  "dasha", "julia", "lera", "masha", "alexander", "kirill", "anton",
+  "saule_ru", "zamira_ru", "zhanar_ru", "yulduz_ru",
+  "naomi", "saule", "zhanar", "zamira", "yulduz",
+]);
+
+// ─── Main handler ─────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -130,19 +249,19 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // ── Auth guard ──
+    // Auth guard
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
+      { global: { headers: { Authorization: authHeader } } },
     );
 
     const token = authHeader.replace("Bearer ", "");
@@ -150,119 +269,92 @@ Deno.serve(async (req) => {
     if (authErr || !userData?.user) {
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // ── Admin-only guard ──
+    // Admin-only guard
     const { data: roleData } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userData.user.id)
-      .eq("role", "admin")
+      .from("user_roles").select("role")
+      .eq("user_id", userData.user.id).eq("role", "admin")
       .maybeSingle();
 
     if (!roleData) {
       return new Response(
         JSON.stringify({ error: "Yandex TTS is available for admins only." }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // ── Parse request ──
-    const { text, voice, lang, speed } = await req.json();
-    const isRu = lang === "ru";
+    // Parse request
+    const body = await req.json();
+    const {
+      text, voice, lang, speed,
+      emotion, role, pitchShift, pitch_shift, volume,
+      apiVersion, api_version,
+    } = body;
 
+    const isRu = lang === "ru";
     if (!text || typeof text !== "string" || text.length > 5000) {
       return new Response(
-        JSON.stringify({ error: isRu ? "Текст обязателен и должен быть до 5000 символов." : "Text is required and must be under 5000 characters." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: isRu ? "Текст до 5000 символов." : "Text must be under 5000 chars." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // ── Get IAM token from service account ──
-    const iamToken = await getCachedIamToken();
-
-    // ── Call Yandex SpeechKit v1 ──
     const selectedVoice = voice || "alena";
-    const selectedSpeed = speed || "1.0";
+    const selectedSpeed = parseFloat(speed) || 1.0;
     const selectedLang = isRu ? "ru-RU" : "en-US";
+    const selectedRole = role || emotion || undefined;
+    const selectedPitch = pitchShift ?? pitch_shift ?? undefined;
+    const selectedVolume = volume ?? undefined;
 
-    const folderId = Deno.env.get("YANDEX_FOLDER_ID")!;
+    // Auto-detect API version:
+    // - Explicit apiVersion/api_version wins
+    // - v3 if pitch/volume/role requested, or voice is v3-only
+    // - Otherwise v1
+    let ver: "v1" | "v3" = (apiVersion || api_version) as "v1" | "v3" || "v1";
+    const needsV3 =
+      selectedPitch !== undefined ||
+      selectedVolume !== undefined ||
+      selectedRole !== undefined ||
+      V3_ONLY_VOICES.has(selectedVoice);
+    if (!apiVersion && !api_version && needsV3) ver = "v3";
 
-    const formData = new URLSearchParams();
-    formData.append("text", text);
-    formData.append("lang", selectedLang);
-    formData.append("voice", selectedVoice);
-    formData.append("folderId", folderId);
-    formData.append("format", "mp3");
-    formData.append("sampleRateHertz", "48000");
-    formData.append("speed", selectedSpeed);
-
-    console.log("Yandex TTS request:", {
+    const params: TtsParams = {
+      text,
       voice: selectedVoice,
       lang: selectedLang,
       speed: selectedSpeed,
-      textLen: text.length,
-      authType: "IAM token (service account)",
-    });
+      emotion: ver === "v1" ? selectedRole : undefined,
+      role: ver === "v3" ? selectedRole : undefined,
+      pitchShift: selectedPitch,
+      volume: selectedVolume,
+      apiVersion: ver,
+    };
 
-    const response = await fetch(
-      "https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize",
-      {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${iamToken}`,
-        },
-        body: formData,
-      }
-    );
+    console.log("Yandex TTS dispatch:", { ver, voice: selectedVoice, role: selectedRole, pitch: selectedPitch, volume: selectedVolume });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Yandex SpeechKit error:", response.status, errText);
+    const iamToken = await getCachedIamToken();
+    const result = ver === "v3"
+      ? await synthesizeV3(iamToken, params)
+      : await synthesizeV1(iamToken, params);
 
-      // If 401, invalidate cached token
-      if (response.status === 401) {
-        cachedToken = null;
-      }
-
-      const msgs: Record<number, { ru: string; en: string }> = {
-        401: {
-          ru: "Yandex SpeechKit: ошибка авторизации. Проверьте сервисный аккаунт.",
-          en: "Yandex SpeechKit: auth error. Check service account.",
-        },
-        403: {
-          ru: "Yandex SpeechKit: доступ запрещён. Проверьте права сервисного аккаунта.",
-          en: "Yandex SpeechKit: access forbidden. Check service account permissions.",
-        },
-        429: {
-          ru: "Yandex SpeechKit: превышен лимит запросов. Попробуйте позже.",
-          en: "Yandex SpeechKit: rate limit exceeded. Try again later.",
-        },
-      };
-      const fallback = isRu ? "Не удалось сгенерировать аудио через Yandex SpeechKit." : "Failed to generate audio via Yandex SpeechKit.";
-      const userMessage = msgs[response.status]?.[isRu ? "ru" : "en"] || fallback;
-
-      return new Response(
-        JSON.stringify({ error: userMessage, status: response.status }),
-        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const audioBytes = new Uint8Array(await response.arrayBuffer());
-
-    return new Response(audioBytes, {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "audio/mpeg",
-      },
+    return new Response(result.audio, {
+      headers: { ...corsHeaders, "Content-Type": result.contentType },
     });
   } catch (e) {
     console.error("Yandex TTS error:", e);
+    const isRu = true; // fallback
+    if (e instanceof YandexTtsError) {
+      return new Response(
+        JSON.stringify({ error: errorMessage(e.status, isRu), detail: e.message }),
+        { status: e.status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
