@@ -147,10 +147,13 @@ Deno.serve(async (req) => {
     const selectedSpeed = speed || "1.0";
     const selectedLang = isRu ? "ru-RU" : "en-US";
 
+    const folderId = Deno.env.get("YANDEX_FOLDER_ID")!;
+
     const formData = new URLSearchParams();
     formData.append("text", text);
     formData.append("lang", selectedLang);
     formData.append("voice", selectedVoice);
+    formData.append("folderId", folderId);
     formData.append("format", "mp3");
     formData.append("sampleRateHertz", "48000");
     formData.append("speed", selectedSpeed);
