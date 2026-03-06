@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import VoiceSelector from "@/components/VoiceSelector";
 import AudioPlayer from "@/components/AudioPlayer";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const MAX_CHARS = 5000;
 
