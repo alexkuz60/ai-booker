@@ -173,6 +173,69 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     }
   }, []);
 
+  const seek = useCallback((toSec: number) => {
+    const clamped = Math.max(0, Math.min(toSec, totalDuration));
+    // Stop current audio
+    cancelAnimationFrame(rafRef.current);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    setPositionSec(clamped);
+    pausedAtRef.current = clamped;
+    clipOffsetRef.current = clamped;
+    clipStartTimeRef.current = performance.now();
+
+    if (stateRef.current === "playing") {
+      // Find the audio clip that contains this position
+      const idx = audioClips.findIndex(
+        c => c.startSec <= clamped && clamped < c.startSec + c.durationSec
+      );
+      if (idx >= 0) {
+        // Seek within this clip
+        const clip = audioClips[idx];
+        const offsetInClip = clamped - clip.startSec;
+        clipIndexRef.current = idx;
+        (async () => {
+          const url = await getSignedUrl(clip.audioPath!);
+          if (!url || stateRef.current !== "playing") return;
+          const audio = new Audio(url);
+          audioRef.current = audio;
+          audio.currentTime = offsetInClip;
+          audio.onended = () => {
+            if (stateRef.current !== "playing") return;
+            clipOffsetRef.current = clip.startSec + clip.durationSec;
+            clipStartTimeRef.current = performance.now();
+            playClip(idx + 1);
+          };
+          audio.onerror = () => {
+            if (stateRef.current !== "playing") return;
+            clipOffsetRef.current = clip.startSec + clip.durationSec;
+            clipStartTimeRef.current = performance.now();
+            playClip(idx + 1);
+          };
+          try {
+            await audio.play();
+            rafRef.current = requestAnimationFrame(updatePosition);
+          } catch {
+            playClip(idx + 1);
+          }
+        })();
+      } else {
+        // Position is in a gap — find next clip
+        const nextIdx = audioClips.findIndex(c => c.startSec > clamped);
+        playClip(nextIdx >= 0 ? nextIdx : audioClips.length);
+      }
+    } else {
+      // If paused or stopped, just update position
+      if (stateRef.current === "stopped") {
+        stateRef.current = "paused";
+        setState("paused");
+      }
+    }
+  }, [totalDuration, audioClips, getSignedUrl, playClip, updatePosition]);
+
   return {
     state,
     positionSec,
@@ -181,5 +244,6 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     play,
     pause,
     stop,
+    seek,
   };
 }
