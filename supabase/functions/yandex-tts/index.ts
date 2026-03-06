@@ -78,12 +78,25 @@ Deno.serve(async (req) => {
     formData.append("sampleRateHertz", "48000");
     formData.append("speed", selectedSpeed);
 
+    // Determine auth header format: if key already has a known prefix, use as-is
+    const authValue = apiKey.startsWith("Api-Key ") || apiKey.startsWith("Bearer ")
+      ? apiKey
+      : `Api-Key ${apiKey}`;
+
+    console.log("Yandex TTS request:", {
+      voice: selectedVoice,
+      lang: selectedLang,
+      speed: selectedSpeed,
+      textLen: text.length,
+      authPrefix: authValue.substring(0, 12) + "...",
+    });
+
     const response = await fetch(
       "https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize",
       {
         method: "POST",
         headers: {
-          "Authorization": `Api-Key ${apiKey}`,
+          "Authorization": authValue,
         },
         body: formData,
       }
