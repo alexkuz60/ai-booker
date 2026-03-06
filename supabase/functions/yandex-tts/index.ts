@@ -65,30 +65,27 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── Call Yandex SpeechKit v3 ──
+    // ── Call Yandex SpeechKit v1 ──
     const selectedVoice = voice || "alena";
     const selectedSpeed = speed || "1.0";
+    const selectedLang = isRu ? "ru-RU" : "en-US";
 
-    const body = {
-      text,
-      outputAudioSpec: {
-        containerAudio: { containerAudioType: "MP3" },
-      },
-      hints: [
-        { voice: selectedVoice },
-        { speed: selectedSpeed },
-      ],
-    };
+    const formData = new URLSearchParams();
+    formData.append("text", text);
+    formData.append("lang", selectedLang);
+    formData.append("voice", selectedVoice);
+    formData.append("format", "mp3");
+    formData.append("sampleRateHertz", "48000");
+    formData.append("speed", selectedSpeed);
 
     const response = await fetch(
-      "https://tts.api.cloud.yandex.net:443/tts/v3/utteranceSynthesis",
+      "https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize",
       {
         method: "POST",
         headers: {
-          "Authorization": apiKey,
-          "Content-Type": "application/json",
+          "Authorization": `Api-Key ${apiKey}`,
         },
-        body: JSON.stringify(body),
+        body: formData,
       }
     );
 
@@ -119,43 +116,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // v3 returns JSON with base64 audio chunks
-    const result = await response.json();
-    
-    // Collect all audio chunks
-    const chunks: Uint8Array[] = [];
-    if (result.result?.audioChunk?.data) {
-      // Single response
-      const binary = Uint8Array.from(atob(result.result.audioChunk.data), c => c.charCodeAt(0));
-      chunks.push(binary);
-    } else if (Array.isArray(result)) {
-      // Streaming array response
-      for (const item of result) {
-        if (item.result?.audioChunk?.data) {
-          const binary = Uint8Array.from(atob(item.result.audioChunk.data), c => c.charCodeAt(0));
-          chunks.push(binary);
-        }
-      }
-    }
+    // v1 returns raw audio bytes directly
+    const audioBytes = new Uint8Array(await response.arrayBuffer());
 
-    if (chunks.length === 0) {
-      console.error("No audio chunks in response:", JSON.stringify(result).slice(0, 500));
-      return new Response(
-        JSON.stringify({ error: isRu ? "Нет аудиоданных в ответе Yandex." : "No audio data in Yandex response." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Merge chunks
-    const totalLen = chunks.reduce((s, c) => s + c.length, 0);
-    const merged = new Uint8Array(totalLen);
-    let offset = 0;
-    for (const c of chunks) {
-      merged.set(c, offset);
-      offset += c.length;
-    }
-
-    return new Response(merged, {
+    return new Response(audioBytes, {
       headers: {
         ...corsHeaders,
         "Content-Type": "audio/mpeg",
