@@ -397,6 +397,45 @@ export type Database = {
           },
         ]
       }
+      scene_type_mappings: {
+        Row: {
+          character_id: string
+          created_at: string
+          id: string
+          scene_id: string
+          segment_type: string
+        }
+        Insert: {
+          character_id: string
+          created_at?: string
+          id?: string
+          scene_id: string
+          segment_type: string
+        }
+        Update: {
+          character_id?: string
+          created_at?: string
+          id?: string
+          scene_id?: string
+          segment_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scene_type_mappings_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "book_characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scene_type_mappings_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "book_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       segment_phrases: {
         Row: {
           created_at: string
