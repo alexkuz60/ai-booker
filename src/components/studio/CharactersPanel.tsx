@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Users, UserPlus, Volume2, Loader2, Square, Play, RotateCcw, Save } from "lucide-react";
+import { Users, Volume2, Loader2, Square, Play, RotateCcw, Save, Sparkles, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
@@ -33,6 +33,21 @@ interface BookCharacter {
   sort_order: number;
 }
 
+const GENDER_LABELS: Record<string, { ru: string; en: string }> = {
+  male: { ru: "Мужской", en: "Male" },
+  female: { ru: "Женский", en: "Female" },
+  unknown: { ru: "Не определён", en: "Unknown" },
+};
+
+const AGE_LABELS: Record<string, { ru: string; en: string }> = {
+  child: { ru: "Ребёнок", en: "Child" },
+  teen: { ru: "Подросток", en: "Teen" },
+  young: { ru: "Молодой", en: "Young" },
+  adult: { ru: "Взрослый", en: "Adult" },
+  elder: { ru: "Пожилой", en: "Elder" },
+  unknown: { ru: "Не определён", en: "Unknown" },
+};
+
 // ─── Component ───────────────────────────────────────────
 
 interface CharactersPanelProps {
@@ -45,8 +60,9 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
   const [characters, setCharacters] = useState<BookCharacter[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [profiling, setProfiling] = useState(false);
 
-  // Voice settings state (bound to selected character)
+  // Voice settings state
   const [voice, setVoice] = useState("marina");
   const [role, setRole] = useState("neutral");
   const [pitch, setPitch] = useState(0);
@@ -62,43 +78,33 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
   const selectedVoice = YANDEX_VOICES.find(v => v.id === voice);
   const availableRoles = selectedVoice?.roles ?? ["neutral"];
   const selectedChar = characters.find(c => c.id === selectedId);
+  const hasProfiles = characters.some(c => c.description);
 
   // ── Load characters from DB ─────────────────────────────
   const loadCharacters = useCallback(async () => {
     if (!bookId) { setCharacters([]); return; }
     setLoading(true);
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from("book_characters")
         .select("*")
         .eq("book_id", bookId)
         .order("sort_order");
-
-      const { data, error } = await query;
       if (error) throw error;
 
-      // If sceneId provided, filter to characters appearing in this scene
       if (sceneId && data && data.length > 0) {
         const { data: appearances } = await supabase
           .from("character_appearances")
           .select("character_id")
           .eq("scene_id", sceneId);
-        
         const sceneCharIds = new Set(appearances?.map(a => a.character_id) || []);
-        // Show scene characters first, then all others dimmed
         const sorted = [
           ...data.filter(c => sceneCharIds.has(c.id)),
           ...data.filter(c => !sceneCharIds.has(c.id)),
         ];
-        setCharacters(sorted.map(c => ({
-          ...c,
-          voice_config: (c.voice_config as BookCharacter["voice_config"]) || {},
-        })));
+        setCharacters(sorted.map(c => ({ ...c, voice_config: (c.voice_config as BookCharacter["voice_config"]) || {} })));
       } else {
-        setCharacters((data || []).map(c => ({
-          ...c,
-          voice_config: (c.voice_config as BookCharacter["voice_config"]) || {},
-        })));
+        setCharacters((data || []).map(c => ({ ...c, voice_config: (c.voice_config as BookCharacter["voice_config"]) || {} })));
       }
     } catch (e) {
       console.error("Load characters error:", e);
@@ -132,7 +138,51 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
     }
   };
 
-  // ── Save voice config to DB ─────────────────────────────
+  // ── AI Profiling ────────────────────────────────────────
+  const handleProfile = async () => {
+    if (!bookId) return;
+    setProfiling(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error(isRu ? "Необходимо авторизоваться" : "Please sign in");
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/profile-characters`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ book_id: bookId, language: isRu ? "ru" : "en" }),
+        }
+      );
+
+      if (!response.ok) {
+        const d = await response.json().catch(() => ({}));
+        throw new Error(d.error || `HTTP ${response.status}`);
+      }
+
+      const result = await response.json();
+      toast.success(
+        isRu
+          ? `Профайлинг завершён: ${result.profiled} из ${result.total} персонажей`
+          : `Profiling complete: ${result.profiled} of ${result.total} characters`
+      );
+      await loadCharacters();
+    } catch (e) {
+      console.error("Profiling error:", e);
+      toast.error(e instanceof Error ? e.message : (isRu ? "Ошибка профайлинга" : "Profiling error"));
+    } finally {
+      setProfiling(false);
+    }
+  };
+
+  // ── Save voice config ───────────────────────────────────
   const handleSave = async () => {
     if (!selectedId) return;
     setSaving(true);
@@ -151,7 +201,6 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
         .eq("id", selectedId);
       if (error) throw error;
       setDirty(false);
-      // Update local state
       setCharacters(prev => prev.map(c =>
         c.id === selectedId ? { ...c, voice_config: voiceConfig } : c
       ));
@@ -171,24 +220,17 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
       setPlaying(false);
       return;
     }
-
     setTesting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error(isRu ? "Необходимо авторизоваться" : "Please sign in");
-        return;
-      }
+      if (!session) { toast.error(isRu ? "Необходимо авторизоваться" : "Please sign in"); return; }
 
       const testText = isRu
         ? "Здравствуйте. Это предварительное прослушивание голоса для вашего персонажа."
         : "Hello. This is a voice preview for your character.";
 
       const body: Record<string, unknown> = {
-        text: testText,
-        voice,
-        lang: selectedVoice?.lang === "en" ? "en" : "ru",
-        speed,
+        text: testText, voice, lang: selectedVoice?.lang === "en" ? "en" : "ru", speed,
         role: role !== "neutral" ? role : undefined,
         pitchShift: pitch !== 0 ? pitch : undefined,
         volume: volume !== 0 ? volume : undefined,
@@ -232,14 +274,32 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
     <div className="h-full flex">
       {/* Left: character list */}
       <div className="w-56 shrink-0 border-r border-border flex flex-col">
-        <div className="p-3 border-b border-border flex items-center justify-between">
-          <span className="text-sm font-semibold font-display text-foreground">
-            {isRu ? "Персонажи" : "Characters"}
-          </span>
+        <div className="p-3 border-b border-border flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold font-display text-foreground">
+              {isRu ? "Персонажи" : "Characters"}
+            </span>
+            {characters.length > 0 && (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                {characters.length}
+              </Badge>
+            )}
+          </div>
           {characters.length > 0 && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-              {characters.length}
-            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full gap-1.5 text-xs"
+              onClick={handleProfile}
+              disabled={profiling}
+            >
+              {profiling ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+              {profiling
+                ? (isRu ? "Анализ..." : "Profiling...")
+                : hasProfiles
+                  ? (isRu ? "Обновить профили" : "Re-profile")
+                  : (isRu ? "AI-профайлинг" : "AI Profile")}
+            </Button>
           )}
         </div>
 
@@ -270,16 +330,24 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="truncate">{ch.name}</span>
-                    {ch.voice_config?.voice_id && (
-                      <Volume2 className="h-3 w-3 shrink-0 text-primary/60" />
+                    <span className="truncate font-medium">{ch.name}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {ch.description && <User className="h-3 w-3 text-primary/60" />}
+                      {ch.voice_config?.voice_id && <Volume2 className="h-3 w-3 text-primary/60" />}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    {ch.gender !== "unknown" && (
+                      <span className="text-[10px] text-muted-foreground/60">
+                        {ch.gender === "female" ? "♀" : "♂"}
+                      </span>
+                    )}
+                    {ch.temperament && (
+                      <span className="text-[10px] text-muted-foreground/50 truncate">
+                        {ch.temperament}
+                      </span>
                     )}
                   </div>
-                  {ch.gender !== "unknown" && (
-                    <span className="text-[10px] text-muted-foreground/60">
-                      {ch.gender === "female" ? "♀" : "♂"}
-                    </span>
-                  )}
                 </button>
               ))}
             </div>
@@ -287,152 +355,179 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
         </ScrollArea>
       </div>
 
-      {/* Right: voice settings */}
+      {/* Right: profile + voice settings */}
       <div className="flex-1 min-w-0 overflow-auto">
-        <div className="p-4 space-y-5 max-w-lg">
-          <div>
-            <h3 className="text-base font-semibold font-display text-foreground mb-1">
-              {selectedChar
-                ? `${isRu ? "Голос:" : "Voice:"} ${selectedChar.name}`
-                : (isRu ? "Настройки голоса" : "Voice Settings")}
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              {isRu ? "Yandex SpeechKit · предпрослушивание" : "Yandex SpeechKit · preview"}
-            </p>
-          </div>
-
-          <Separator />
-
-          {/* Voice selector */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              {isRu ? "Голос" : "Voice"}
-            </label>
-            <Select value={voice} onValueChange={handleVoiceChange}>
-              <SelectTrigger className="bg-secondary border-border">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-card border-border">
-                {YANDEX_VOICES.map(v => (
-                  <SelectItem key={v.id} value={v.id}>
-                    <div className="flex items-center gap-2">
-                      <span>{isRu ? v.name.ru : v.name.en}</span>
-                      <Badge variant="outline" className="text-[10px] px-1 py-0">
-                        {v.gender === "female" ? "♀" : "♂"}
+        <ScrollArea className="h-full">
+          <div className="p-4 space-y-5 max-w-lg">
+            {/* Character profile section */}
+            {selectedChar && selectedChar.description && (
+              <>
+                <div>
+                  <h3 className="text-base font-semibold font-display text-foreground mb-3">
+                    {selectedChar.name}
+                  </h3>
+                  <p className="text-sm text-foreground/90 leading-relaxed mb-3">
+                    {selectedChar.description}
+                  </p>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    <Badge variant="outline" className="text-xs">
+                      {GENDER_LABELS[selectedChar.gender]?.[isRu ? "ru" : "en"] ?? selectedChar.gender}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs">
+                      {AGE_LABELS[selectedChar.age_group]?.[isRu ? "ru" : "en"] ?? selectedChar.age_group}
+                    </Badge>
+                    {selectedChar.temperament && (
+                      <Badge variant="secondary" className="text-xs">
+                        {selectedChar.temperament}
                       </Badge>
-                      {v.apiVersion === "v3" && (
-                        <Badge variant="secondary" className="text-[10px] px-1 py-0">v3</Badge>
-                      )}
+                    )}
+                  </div>
+                  {selectedChar.speech_style && (
+                    <div className="mt-2">
+                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                        {isRu ? "Стиль речи" : "Speech Style"}
+                      </span>
+                      <p className="text-xs text-muted-foreground mt-1 italic">
+                        {selectedChar.speech_style}
+                      </p>
                     </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+                  )}
+                  {selectedChar.aliases.length > 0 && (
+                    <div className="mt-2">
+                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                        {isRu ? "Также известен как" : "Also known as"}
+                      </span>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {selectedChar.aliases.join(", ")}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <Separator />
+              </>
+            )}
 
-          {/* Role / амплуа */}
-          {availableRoles.length > 1 && (
+            {/* Voice settings header */}
+            <div>
+              <h3 className="text-base font-semibold font-display text-foreground mb-1">
+                {selectedChar
+                  ? `${isRu ? "Голос:" : "Voice:"} ${selectedChar.name}`
+                  : (isRu ? "Настройки голоса" : "Voice Settings")}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                {isRu ? "Yandex SpeechKit · предпрослушивание" : "Yandex SpeechKit · preview"}
+              </p>
+            </div>
+
+            <Separator />
+
+            {/* Voice selector */}
             <div className="space-y-2">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {isRu ? "Амплуа" : "Role"}
+                {isRu ? "Голос" : "Voice"}
               </label>
-              <Select value={role} onValueChange={v => { setRole(v); markDirty(); }}>
+              <Select value={voice} onValueChange={handleVoiceChange}>
                 <SelectTrigger className="bg-secondary border-border">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border">
-                  {availableRoles.map(r => (
-                    <SelectItem key={r} value={r}>
-                      {ROLE_LABELS[r]?.[isRu ? "ru" : "en"] ?? r}
+                  {YANDEX_VOICES.map(v => (
+                    <SelectItem key={v.id} value={v.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{isRu ? v.name.ru : v.name.en}</span>
+                        <Badge variant="outline" className="text-[10px] px-1 py-0">
+                          {v.gender === "female" ? "♀" : "♂"}
+                        </Badge>
+                        {v.apiVersion === "v3" && (
+                          <Badge variant="secondary" className="text-[10px] px-1 py-0">v3</Badge>
+                        )}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          )}
 
-          {/* Speed slider */}
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {isRu ? "Скорость" : "Speed"}
-              </label>
-              <span className="text-xs text-muted-foreground tabular-nums">{speed.toFixed(1)}×</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Slider min={0.3} max={2.0} step={0.1} value={[speed]} onValueChange={([v]) => { setSpeed(v); markDirty(); }} className="flex-1" />
-              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setSpeed(1.0); markDirty(); }} disabled={speed === 1.0}>
-                <RotateCcw className="h-3 w-3" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Pitch slider */}
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {isRu ? "Тон (pitch)" : "Pitch"}
-              </label>
-              <span className="text-xs text-muted-foreground tabular-nums">{pitch > 0 ? "+" : ""}{pitch} Hz</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Slider min={-500} max={500} step={50} value={[pitch]} onValueChange={([v]) => { setPitch(v); markDirty(); }} className="flex-1" />
-              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setPitch(0); markDirty(); }} disabled={pitch === 0}>
-                <RotateCcw className="h-3 w-3" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Volume slider */}
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {isRu ? "Громкость" : "Volume"}
-              </label>
-              <span className="text-xs text-muted-foreground tabular-nums">{volume > 0 ? "+" : ""}{volume} dB</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Slider min={-15} max={15} step={1} value={[volume]} onValueChange={([v]) => { setVolume(v); markDirty(); }} className="flex-1" />
-              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setVolume(0); markDirty(); }} disabled={volume === 0}>
-                <RotateCcw className="h-3 w-3" />
-              </Button>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Action buttons */}
-          <div className="flex gap-2">
-            <Button
-              onClick={handlePreview}
-              disabled={testing}
-              variant="outline"
-              className="gap-2"
-            >
-              {testing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : playing ? (
-                <Square className="h-4 w-4" />
-              ) : (
-                <Play className="h-4 w-4" />
-              )}
-              {playing
-                ? (isRu ? "Стоп" : "Stop")
-                : (isRu ? "Прослушать" : "Preview")}
-            </Button>
-
-            {selectedId && (
-              <Button
-                onClick={handleSave}
-                disabled={saving || !dirty}
-                className="gap-2"
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                {isRu ? "Сохранить" : "Save"}
-              </Button>
+            {/* Role */}
+            {availableRoles.length > 1 && (
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {isRu ? "Амплуа" : "Role"}
+                </label>
+                <Select value={role} onValueChange={v => { setRole(v); markDirty(); }}>
+                  <SelectTrigger className="bg-secondary border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    {availableRoles.map(r => (
+                      <SelectItem key={r} value={r}>
+                        {ROLE_LABELS[r]?.[isRu ? "ru" : "en"] ?? r}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
+
+            {/* Speed */}
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Скорость" : "Speed"}</label>
+                <span className="text-xs text-muted-foreground tabular-nums">{speed.toFixed(1)}×</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Slider min={0.3} max={2.0} step={0.1} value={[speed]} onValueChange={([v]) => { setSpeed(v); markDirty(); }} className="flex-1" />
+                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setSpeed(1.0); markDirty(); }} disabled={speed === 1.0}>
+                  <RotateCcw className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Pitch */}
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Тон (pitch)" : "Pitch"}</label>
+                <span className="text-xs text-muted-foreground tabular-nums">{pitch > 0 ? "+" : ""}{pitch} Hz</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Slider min={-500} max={500} step={50} value={[pitch]} onValueChange={([v]) => { setPitch(v); markDirty(); }} className="flex-1" />
+                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setPitch(0); markDirty(); }} disabled={pitch === 0}>
+                  <RotateCcw className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Volume */}
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Громкость" : "Volume"}</label>
+                <span className="text-xs text-muted-foreground tabular-nums">{volume > 0 ? "+" : ""}{volume} dB</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Slider min={-15} max={15} step={1} value={[volume]} onValueChange={([v]) => { setVolume(v); markDirty(); }} className="flex-1" />
+                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setVolume(0); markDirty(); }} disabled={volume === 0}>
+                  <RotateCcw className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Action buttons */}
+            <div className="flex gap-2">
+              <Button onClick={handlePreview} disabled={testing} variant="outline" className="gap-2">
+                {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : playing ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                {playing ? (isRu ? "Стоп" : "Stop") : (isRu ? "Прослушать" : "Preview")}
+              </Button>
+              {selectedId && (
+                <Button onClick={handleSave} disabled={saving || !dirty} className="gap-2">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  {isRu ? "Сохранить" : "Save"}
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
+        </ScrollArea>
       </div>
     </div>
   );
