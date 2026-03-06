@@ -554,6 +554,8 @@ export function StoryboardPanel({
       }
       // Trigger timeline refresh by notifying parent
       onSegmented?.(sceneId);
+      // Reload audio status indicators
+      loadAudioStatus(segments.map(s => s.segment_id));
     } catch (err: any) {
       console.error("Synthesis failed:", err);
       toast.error(isRu ? "Ошибка синтеза" : "Synthesis failed");
