@@ -143,6 +143,7 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [profiling, setProfiling] = useState(false);
+  const [casting, setCasting] = useState(false);
 
   // Voice settings state
   const [voice, setVoice] = useState("marina");
@@ -291,6 +292,78 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
       toast.error(isRu ? "Ошибка сохранения" : "Save error");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ── Auto-cast voices for all characters ─────────────────
+  const handleAutoCast = async () => {
+    if (characters.length === 0) return;
+    setCasting(true);
+    try {
+      // Track used voice IDs to avoid duplicates where possible
+      const usedVoices = new Set<string>();
+      const updates: { id: string; voice_config: BookCharacter["voice_config"] }[] = [];
+
+      for (const ch of characters) {
+        let voiceId = matchVoice(ch.gender, ch.age_group);
+
+        // Try to avoid duplicates: pick alternate from same gender
+        const genderVoices = YANDEX_VOICES.filter(v =>
+          ch.gender !== "unknown" ? v.gender === ch.gender : true
+        );
+        if (usedVoices.has(voiceId) && genderVoices.length > 1) {
+          const alt = genderVoices.find(v => !usedVoices.has(v.id));
+          if (alt) voiceId = alt.id;
+        }
+        usedVoices.add(voiceId);
+
+        const roleId = matchRole(voiceId, ch.temperament);
+        const vc: BookCharacter["voice_config"] = {
+          provider: "yandex",
+          voice_id: voiceId,
+          role: roleId !== "neutral" ? roleId : undefined,
+          speed: 1.0,
+        };
+        updates.push({ id: ch.id, voice_config: vc });
+      }
+
+      // Batch save to DB
+      for (const u of updates) {
+        await supabase
+          .from("book_characters")
+          .update({ voice_config: u.voice_config, updated_at: new Date().toISOString() })
+          .eq("id", u.id);
+      }
+
+      // Update local state
+      setCharacters(prev => prev.map(c => {
+        const u = updates.find(x => x.id === c.id);
+        return u ? { ...c, voice_config: u.voice_config } : c;
+      }));
+
+      // Sync current selection
+      if (selectedId) {
+        const u = updates.find(x => x.id === selectedId);
+        if (u) {
+          setVoice(u.voice_config.voice_id || "marina");
+          setRole(u.voice_config.role || "neutral");
+          setSpeed(u.voice_config.speed ?? 1.0);
+          setPitch(u.voice_config.pitch ?? 0);
+          setVolume(u.voice_config.volume ?? 0);
+          setDirty(false);
+        }
+      }
+
+      toast.success(
+        isRu
+          ? `Голоса подобраны для ${updates.length} персонажей`
+          : `Voices matched for ${updates.length} characters`
+      );
+    } catch (e) {
+      console.error("Auto-cast error:", e);
+      toast.error(isRu ? "Ошибка подбора" : "Casting error");
+    } finally {
+      setCasting(false);
     }
   };
 
