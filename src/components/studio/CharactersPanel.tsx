@@ -485,18 +485,23 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         updates.push({ id: ch.id, voice_config: vc, gender: syncedGender });
       }
 
-      // Batch save to DB
+      // Batch save to DB (voice_config + gender sync)
       for (const u of updates) {
+        const updateData: Record<string, unknown> = {
+          voice_config: u.voice_config,
+          updated_at: new Date().toISOString(),
+        };
+        if (u.gender) updateData.gender = u.gender;
         await supabase
           .from("book_characters")
-          .update({ voice_config: u.voice_config, updated_at: new Date().toISOString() })
+          .update(updateData)
           .eq("id", u.id);
       }
 
       // Update local state
       setCharacters(prev => prev.map(c => {
         const u = updates.find(x => x.id === c.id);
-        return u ? { ...c, voice_config: u.voice_config } : c;
+        return u ? { ...c, voice_config: u.voice_config, gender: u.gender ?? c.gender } : c;
       }));
 
       // Sync current selection
