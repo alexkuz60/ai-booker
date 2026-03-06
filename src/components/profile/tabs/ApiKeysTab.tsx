@@ -40,7 +40,27 @@ function renderHint(p: typeof TTS_PROVIDERS[number], isRu: boolean) {
   );
 }
 
-function TtsTestButton({ isRu }: { isRu: boolean }) {
+type TtsProvider = 'elevenlabs' | 'yandex_speechkit';
+
+const TTS_ENDPOINTS: Record<TtsProvider, string> = {
+  elevenlabs: 'elevenlabs-tts',
+  yandex_speechkit: 'yandex-tts',
+};
+
+const TTS_TEST_BODY: Record<TtsProvider, (isRu: boolean) => Record<string, string>> = {
+  elevenlabs: (isRu) => ({
+    text: isRu ? 'Привет! Это тестовое сообщение от AI Booker.' : 'Hello! This is a test message from AI Booker.',
+    voiceId: 'JBFqnCBsd6RMkjVDRZzb',
+    lang: isRu ? 'ru' : 'en',
+  }),
+  yandex_speechkit: (isRu) => ({
+    text: isRu ? 'Привет! Это тестовое сообщение от AI Booker.' : 'Hello! This is a test message from AI Booker.',
+    voice: 'alena',
+    lang: isRu ? 'ru' : 'en',
+  }),
+};
+
+function TtsTestButton({ provider, isRu }: { provider: TtsProvider; isRu: boolean }) {
   const [testing, setTesting] = useState(false);
   const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -61,12 +81,11 @@ function TtsTestButton({ isRu }: { isRu: boolean }) {
         return;
       }
 
-      const text = isRu
-        ? 'Привет! Это тестовое сообщение от AI Booker.'
-        : 'Hello! This is a test message from AI Booker.';
+      const endpoint = TTS_ENDPOINTS[provider];
+      const body = TTS_TEST_BODY[provider](isRu);
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${endpoint}`,
         {
           method: 'POST',
           headers: {
@@ -74,7 +93,7 @@ function TtsTestButton({ isRu }: { isRu: boolean }) {
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ text, voiceId: 'JBFqnCBsd6RMkjVDRZzb', lang: isRu ? 'ru' : 'en' }),
+          body: JSON.stringify(body),
         }
       );
 
@@ -127,6 +146,8 @@ function TtsTestButton({ isRu }: { isRu: boolean }) {
   );
 }
 
+const TESTABLE_TTS: Set<string> = new Set(['elevenlabs', 'yandex_speechkit']);
+
 export function ApiKeysTab({ apiKeys, saving, isRu, onKeyChange, onSave }: ApiKeysTabProps) {
   const p = (key: string) => getProfileText(key, isRu);
 
@@ -158,9 +179,9 @@ export function ApiKeysTab({ apiKeys, saving, isRu, onKeyChange, onSave }: ApiKe
                   hint={renderHint(prov, isRu)}
                 />
               </div>
-              {prov.provider === 'elevenlabs' && (
+              {TESTABLE_TTS.has(prov.provider) && (
                 <div className="pb-6">
-                  <TtsTestButton isRu={isRu} />
+                  <TtsTestButton provider={prov.provider as TtsProvider} isRu={isRu} />
                 </div>
               )}
             </div>
