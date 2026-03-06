@@ -400,6 +400,8 @@ export function StoryboardPanel({
 
       setSegments(builtSegments);
       setLoaded(true);
+      // Load audio status
+      loadAudioStatus(builtSegments.map(s => s.segment_id));
     } catch (err) {
       console.error("Failed to load segments:", err);
       toast.error(isRu ? "Ошибка загрузки сегментов" : "Failed to load segments");
