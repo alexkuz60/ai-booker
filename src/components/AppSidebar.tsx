@@ -1,10 +1,12 @@
-import { Home, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen, LogOut, Shield } from "lucide-react";
+import { useState } from "react";
+import { Home, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen, LogOut, Shield, MessageCircle } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useLanguage } from "@/hooks/useLanguage";
+import { AssistantChat } from "@/components/AssistantChat";
 
 import {
   Sidebar,
@@ -29,6 +31,7 @@ const mainNav = [
 ];
 
 export function AppSidebar() {
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const { signOut } = useAuth();
   const { isAdmin } = useUserRole();
   const { state } = useSidebar();
@@ -43,6 +46,7 @@ export function AppSidebar() {
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
 
   return (
+    <>
     <Sidebar collapsible="icon" className="border-r border-border bg-sidebar">
       {/* Logo */}
       <SidebarHeader className="px-3 py-4">
@@ -157,6 +161,22 @@ export function AppSidebar() {
             </SidebarMenuItem>
           )}
 
+          {/* Assistant */}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={() => setAssistantOpen(true)}
+              tooltip={collapsed ? (isRu ? "Ассистент" : "Assistant") : undefined}
+              className="hover:bg-accent/50"
+            >
+              <MessageCircle className="h-4 w-4" />
+              {!collapsed && (
+                <span className="font-body text-sm">
+                  {isRu ? "Ассистент" : "Assistant"}
+                </span>
+              )}
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
           {/* Profile */}
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -196,5 +216,7 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
+    <AssistantChat open={assistantOpen} onOpenChange={setAssistantOpen} />
+    </>
   );
 }
