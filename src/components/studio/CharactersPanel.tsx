@@ -136,14 +136,17 @@ interface CharactersPanelProps {
   isRu: boolean;
   bookId?: string | null;
   sceneId?: string | null;
+  chapterSceneIds?: string[];
 }
 
 export interface CharactersPanelHandle {
   autoCast: () => Promise<void>;
+  incrementalProfile: () => Promise<void>;
   casting: boolean;
+  profiling: boolean;
 }
 
-export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanelProps>(function CharactersPanel({ isRu, bookId, sceneId }, ref) {
+export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanelProps>(function CharactersPanel({ isRu, bookId, sceneId, chapterSceneIds }, ref) {
   const [characters, setCharacters] = useState<BookCharacter[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -226,8 +229,8 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     }
   };
 
-  // ── AI Profiling ────────────────────────────────────────
-  const handleProfile = async () => {
+  // ── AI Profiling (full or incremental) ───────────────
+  const runProfile = async (sceneIdsForIncremental?: string[]) => {
     if (!bookId) return;
     setProfiling(true);
     try {
@@ -236,6 +239,9 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         toast.error(isRu ? "Необходимо авторизоваться" : "Please sign in");
         return;
       }
+
+      const body: Record<string, unknown> = { book_id: bookId, language: isRu ? "ru" : "en" };
+      if (sceneIdsForIncremental?.length) body.scene_ids = sceneIdsForIncremental;
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/profile-characters`,
@@ -246,7 +252,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ book_id: bookId, language: isRu ? "ru" : "en" }),
+          body: JSON.stringify(body),
         }
       );
 
@@ -256,10 +262,13 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       }
 
       const result = await response.json();
+      const skippedMsg = result.skipped > 0
+        ? (isRu ? `, пропущено: ${result.skipped}` : `, skipped: ${result.skipped}`)
+        : "";
       toast.success(
         isRu
-          ? `Профайлинг завершён: ${result.profiled} из ${result.total} персонажей`
-          : `Profiling complete: ${result.profiled} of ${result.total} characters`
+          ? `Профайлинг завершён: ${result.profiled} из ${result.total}${skippedMsg}`
+          : `Profiling complete: ${result.profiled} of ${result.total}${skippedMsg}`
       );
       await loadCharacters();
     } catch (e) {
@@ -269,6 +278,9 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       setProfiling(false);
     }
   };
+
+  const handleProfile = () => runProfile();
+  const handleIncrementalProfile = () => runProfile(chapterSceneIds);
 
   // ── Save voice config ───────────────────────────────────
   const handleSave = async () => {
@@ -372,7 +384,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     }
   };
 
-  useImperativeHandle(ref, () => ({ autoCast: handleAutoCast, casting }), [characters, selectedId, casting]);
+  useImperativeHandle(ref, () => ({ autoCast: handleAutoCast, incrementalProfile: handleIncrementalProfile, casting, profiling }), [characters, selectedId, casting, profiling, chapterSceneIds]);
 
   // ── TTS Preview ─────────────────────────────────────────
   const handlePreview = async () => {

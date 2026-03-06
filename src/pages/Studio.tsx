@@ -22,6 +22,7 @@ const Studio = () => {
   const [sceneContent, setSceneContent] = useState<string | null>(null);
   const [segmentedSceneIds, setSegmentedSceneIds] = useState<Set<string>>(new Set());
   const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
+  const chapterSceneIds = chapter?.scenes.map(s => s.id).filter(Boolean) as string[] | undefined;
 
   const selectedScene = chapter && selectedSceneIdx !== null ? chapter.scenes[selectedSceneIdx] : null;
 
@@ -173,6 +174,7 @@ const Studio = () => {
                 selectedSceneId={selectedScene?.id ?? null}
                 selectedSceneContent={sceneContent}
                 bookId={bookId}
+                chapterSceneIds={chapterSceneIds}
                 onSegmented={onSegmented}
               />
             </ResizablePanel>
