@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Users, UserPlus, Volume2, Loader2, Square, Play, RotateCcw } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Users, UserPlus, Volume2, Loader2, Square, Play, RotateCcw, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
@@ -8,94 +8,162 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { YANDEX_VOICES, ROLE_LABELS } from "@/config/yandexVoices";
 
-// ─── Yandex SpeechKit voice registry ─────────────────────────────
+// ─── Types ──────────────────────────────────────────────
 
-interface YandexVoice {
-  id: string;
-  name: { ru: string; en: string };
-  gender: "male" | "female";
-  lang: string;
-  apiVersion: "v1" | "v3" | "both";
-  roles?: string[];
-}
-
-const YANDEX_VOICES: YandexVoice[] = [
-  // v1+v3
-  { id: "alena", name: { ru: "Алёна", en: "Alena" }, gender: "female", lang: "ru", apiVersion: "both", roles: ["neutral", "good"] },
-  { id: "filipp", name: { ru: "Филипп", en: "Filipp" }, gender: "male", lang: "ru", apiVersion: "both" },
-  { id: "ermil", name: { ru: "Ермил", en: "Ermil" }, gender: "male", lang: "ru", apiVersion: "both", roles: ["neutral", "good"] },
-  { id: "jane", name: { ru: "Джейн", en: "Jane" }, gender: "female", lang: "ru", apiVersion: "both", roles: ["neutral", "good", "evil"] },
-  { id: "madirus", name: { ru: "Мадирус", en: "Madirus" }, gender: "male", lang: "ru", apiVersion: "both" },
-  { id: "omazh", name: { ru: "Омаж", en: "Omazh" }, gender: "female", lang: "ru", apiVersion: "both", roles: ["neutral", "evil"] },
-  { id: "zahar", name: { ru: "Захар", en: "Zahar" }, gender: "male", lang: "ru", apiVersion: "both", roles: ["neutral", "good"] },
-  // v3-only
-  { id: "dasha", name: { ru: "Даша", en: "Dasha" }, gender: "female", lang: "ru", apiVersion: "v3", roles: ["neutral", "friendly", "strict"] },
-  { id: "julia", name: { ru: "Юлия", en: "Julia" }, gender: "female", lang: "ru", apiVersion: "v3", roles: ["neutral", "strict"] },
-  { id: "lera", name: { ru: "Лера", en: "Lera" }, gender: "female", lang: "ru", apiVersion: "v3", roles: ["neutral", "friendly"] },
-  { id: "masha", name: { ru: "Маша", en: "Masha" }, gender: "female", lang: "ru", apiVersion: "v3", roles: ["neutral", "friendly", "strict"] },
-  { id: "marina", name: { ru: "Марина", en: "Marina" }, gender: "female", lang: "ru", apiVersion: "v3", roles: ["neutral", "whisper", "friendly"] },
-  { id: "alexander", name: { ru: "Александр", en: "Alexander" }, gender: "male", lang: "ru", apiVersion: "v3", roles: ["neutral", "good"] },
-  { id: "kirill", name: { ru: "Кирилл", en: "Kirill" }, gender: "male", lang: "ru", apiVersion: "v3", roles: ["neutral", "strict", "good"] },
-  { id: "anton", name: { ru: "Антон", en: "Anton" }, gender: "male", lang: "ru", apiVersion: "v3", roles: ["neutral", "good"] },
-  // English
-  { id: "john", name: { ru: "Джон", en: "John" }, gender: "male", lang: "en", apiVersion: "both" },
-];
-
-const ROLE_LABELS: Record<string, { ru: string; en: string }> = {
-  neutral: { ru: "Нейтральный", en: "Neutral" },
-  good: { ru: "Радостный", en: "Cheerful" },
-  evil: { ru: "Раздражённый", en: "Irritated" },
-  friendly: { ru: "Дружелюбный", en: "Friendly" },
-  strict: { ru: "Строгий", en: "Strict" },
-  whisper: { ru: "Шёпот", en: "Whisper" },
-};
-
-// ─── Character type ──────────────────────────────────────────────
-
-interface Character {
+interface BookCharacter {
   id: string;
   name: string;
-  voice?: string;
-  role?: string;
-  pitch: number;
-  speed: number;
-  volume: number;
+  aliases: string[];
+  gender: string;
+  age_group: string;
+  temperament: string | null;
+  speech_style: string | null;
+  description: string | null;
+  voice_config: {
+    provider?: string;
+    voice_id?: string;
+    role?: string;
+    speed?: number;
+    pitch?: number;
+    volume?: number;
+  };
+  color: string | null;
+  sort_order: number;
 }
 
-// ─── Component ───────────────────────────────────────────────────
+// ─── Component ───────────────────────────────────────────
 
 interface CharactersPanelProps {
   isRu: boolean;
+  bookId?: string | null;
+  sceneId?: string | null;
 }
 
-export function CharactersPanel({ isRu }: CharactersPanelProps) {
-  const [characters] = useState<Character[]>([]);
+export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps) {
+  const [characters, setCharacters] = useState<BookCharacter[]>([]);
+  const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Demo state for voice settings (no character selected → standalone preview)
+  // Voice settings state (bound to selected character)
   const [voice, setVoice] = useState("marina");
   const [role, setRole] = useState("neutral");
   const [pitch, setPitch] = useState(0);
   const [speed, setSpeed] = useState(1.0);
   const [volume, setVolume] = useState(0);
+  const [dirty, setDirty] = useState(false);
 
   const [testing, setTesting] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const selectedVoice = YANDEX_VOICES.find(v => v.id === voice);
   const availableRoles = selectedVoice?.roles ?? ["neutral"];
+  const selectedChar = characters.find(c => c.id === selectedId);
 
-  // Reset role if not available for selected voice
+  // ── Load characters from DB ─────────────────────────────
+  const loadCharacters = useCallback(async () => {
+    if (!bookId) { setCharacters([]); return; }
+    setLoading(true);
+    try {
+      let query = supabase
+        .from("book_characters")
+        .select("*")
+        .eq("book_id", bookId)
+        .order("sort_order");
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // If sceneId provided, filter to characters appearing in this scene
+      if (sceneId && data && data.length > 0) {
+        const { data: appearances } = await supabase
+          .from("character_appearances")
+          .select("character_id")
+          .eq("scene_id", sceneId);
+        
+        const sceneCharIds = new Set(appearances?.map(a => a.character_id) || []);
+        // Show scene characters first, then all others dimmed
+        const sorted = [
+          ...data.filter(c => sceneCharIds.has(c.id)),
+          ...data.filter(c => !sceneCharIds.has(c.id)),
+        ];
+        setCharacters(sorted.map(c => ({
+          ...c,
+          voice_config: (c.voice_config as BookCharacter["voice_config"]) || {},
+        })));
+      } else {
+        setCharacters((data || []).map(c => ({
+          ...c,
+          voice_config: (c.voice_config as BookCharacter["voice_config"]) || {},
+        })));
+      }
+    } catch (e) {
+      console.error("Load characters error:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [bookId, sceneId]);
+
+  useEffect(() => { loadCharacters(); }, [loadCharacters]);
+
+  // ── Sync voice settings when character selected ─────────
+  useEffect(() => {
+    if (!selectedChar) return;
+    const vc = selectedChar.voice_config;
+    setVoice(vc.voice_id || "marina");
+    setRole(vc.role || "neutral");
+    setSpeed(vc.speed ?? 1.0);
+    setPitch(vc.pitch ?? 0);
+    setVolume(vc.volume ?? 0);
+    setDirty(false);
+  }, [selectedId]);
+
+  const markDirty = () => setDirty(true);
+
   const handleVoiceChange = (v: string) => {
     setVoice(v);
+    markDirty();
     const newVoice = YANDEX_VOICES.find(x => x.id === v);
     if (newVoice?.roles && !newVoice.roles.includes(role)) {
       setRole(newVoice.roles[0] || "neutral");
     }
   };
 
+  // ── Save voice config to DB ─────────────────────────────
+  const handleSave = async () => {
+    if (!selectedId) return;
+    setSaving(true);
+    try {
+      const voiceConfig = {
+        provider: "yandex",
+        voice_id: voice,
+        role: role !== "neutral" ? role : undefined,
+        speed,
+        pitch: pitch !== 0 ? pitch : undefined,
+        volume: volume !== 0 ? volume : undefined,
+      };
+      const { error } = await supabase
+        .from("book_characters")
+        .update({ voice_config: voiceConfig, updated_at: new Date().toISOString() })
+        .eq("id", selectedId);
+      if (error) throw error;
+      setDirty(false);
+      // Update local state
+      setCharacters(prev => prev.map(c =>
+        c.id === selectedId ? { ...c, voice_config: voiceConfig } : c
+      ));
+      toast.success(isRu ? "Голос сохранён" : "Voice saved");
+    } catch (e) {
+      toast.error(isRu ? "Ошибка сохранения" : "Save error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── TTS Preview ─────────────────────────────────────────
   const handlePreview = async () => {
     if (playing && audioRef) {
       audioRef.pause();
@@ -168,13 +236,19 @@ export function CharactersPanel({ isRu }: CharactersPanelProps) {
           <span className="text-sm font-semibold font-display text-foreground">
             {isRu ? "Персонажи" : "Characters"}
           </span>
-          <Button variant="ghost" size="icon" className="h-7 w-7" disabled>
-            <UserPlus className="h-4 w-4" />
-          </Button>
+          {characters.length > 0 && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+              {characters.length}
+            </Badge>
+          )}
         </div>
 
         <ScrollArea className="flex-1">
-          {characters.length === 0 ? (
+          {loading ? (
+            <div className="p-4 flex justify-center">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : characters.length === 0 ? (
             <div className="p-4 text-center">
               <Users className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
               <p className="text-xs text-muted-foreground">
@@ -195,7 +269,17 @@ export function CharactersPanel({ isRu }: CharactersPanelProps) {
                       : "text-muted-foreground hover:bg-muted/50"
                   }`}
                 >
-                  {ch.name}
+                  <div className="flex items-center gap-2">
+                    <span className="truncate">{ch.name}</span>
+                    {ch.voice_config?.voice_id && (
+                      <Volume2 className="h-3 w-3 shrink-0 text-primary/60" />
+                    )}
+                  </div>
+                  {ch.gender !== "unknown" && (
+                    <span className="text-[10px] text-muted-foreground/60">
+                      {ch.gender === "female" ? "♀" : "♂"}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -208,7 +292,9 @@ export function CharactersPanel({ isRu }: CharactersPanelProps) {
         <div className="p-4 space-y-5 max-w-lg">
           <div>
             <h3 className="text-base font-semibold font-display text-foreground mb-1">
-              {isRu ? "Настройки голоса" : "Voice Settings"}
+              {selectedChar
+                ? `${isRu ? "Голос:" : "Voice:"} ${selectedChar.name}`
+                : (isRu ? "Настройки голоса" : "Voice Settings")}
             </h3>
             <p className="text-xs text-muted-foreground">
               {isRu ? "Yandex SpeechKit · предпрослушивание" : "Yandex SpeechKit · preview"}
@@ -250,7 +336,7 @@ export function CharactersPanel({ isRu }: CharactersPanelProps) {
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {isRu ? "Амплуа" : "Role"}
               </label>
-              <Select value={role} onValueChange={setRole}>
+              <Select value={role} onValueChange={v => { setRole(v); markDirty(); }}>
                 <SelectTrigger className="bg-secondary border-border">
                   <SelectValue />
                 </SelectTrigger>
@@ -274,8 +360,8 @@ export function CharactersPanel({ isRu }: CharactersPanelProps) {
               <span className="text-xs text-muted-foreground tabular-nums">{speed.toFixed(1)}×</span>
             </div>
             <div className="flex items-center gap-2">
-              <Slider min={0.3} max={2.0} step={0.1} value={[speed]} onValueChange={([v]) => setSpeed(v)} className="flex-1" />
-              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => setSpeed(1.0)} disabled={speed === 1.0} title={isRu ? "Сбросить" : "Reset"}>
+              <Slider min={0.3} max={2.0} step={0.1} value={[speed]} onValueChange={([v]) => { setSpeed(v); markDirty(); }} className="flex-1" />
+              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setSpeed(1.0); markDirty(); }} disabled={speed === 1.0}>
                 <RotateCcw className="h-3 w-3" />
               </Button>
             </div>
@@ -290,8 +376,8 @@ export function CharactersPanel({ isRu }: CharactersPanelProps) {
               <span className="text-xs text-muted-foreground tabular-nums">{pitch > 0 ? "+" : ""}{pitch} Hz</span>
             </div>
             <div className="flex items-center gap-2">
-              <Slider min={-500} max={500} step={50} value={[pitch]} onValueChange={([v]) => setPitch(v)} className="flex-1" />
-              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => setPitch(0)} disabled={pitch === 0} title={isRu ? "Сбросить" : "Reset"}>
+              <Slider min={-500} max={500} step={50} value={[pitch]} onValueChange={([v]) => { setPitch(v); markDirty(); }} className="flex-1" />
+              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setPitch(0); markDirty(); }} disabled={pitch === 0}>
                 <RotateCcw className="h-3 w-3" />
               </Button>
             </div>
@@ -306,8 +392,8 @@ export function CharactersPanel({ isRu }: CharactersPanelProps) {
               <span className="text-xs text-muted-foreground tabular-nums">{volume > 0 ? "+" : ""}{volume} dB</span>
             </div>
             <div className="flex items-center gap-2">
-              <Slider min={-15} max={15} step={1} value={[volume]} onValueChange={([v]) => setVolume(v)} className="flex-1" />
-              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => setVolume(0)} disabled={volume === 0} title={isRu ? "Сбросить" : "Reset"}>
+              <Slider min={-15} max={15} step={1} value={[volume]} onValueChange={([v]) => { setVolume(v); markDirty(); }} className="flex-1" />
+              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setVolume(0); markDirty(); }} disabled={volume === 0}>
                 <RotateCcw className="h-3 w-3" />
               </Button>
             </div>
@@ -315,23 +401,37 @@ export function CharactersPanel({ isRu }: CharactersPanelProps) {
 
           <Separator />
 
-          {/* Preview button */}
-          <Button
-            onClick={handlePreview}
-            disabled={testing}
-            className="gap-2"
-          >
-            {testing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : playing ? (
-              <Square className="h-4 w-4" />
-            ) : (
-              <Play className="h-4 w-4" />
+          {/* Action buttons */}
+          <div className="flex gap-2">
+            <Button
+              onClick={handlePreview}
+              disabled={testing}
+              variant="outline"
+              className="gap-2"
+            >
+              {testing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : playing ? (
+                <Square className="h-4 w-4" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              {playing
+                ? (isRu ? "Стоп" : "Stop")
+                : (isRu ? "Прослушать" : "Preview")}
+            </Button>
+
+            {selectedId && (
+              <Button
+                onClick={handleSave}
+                disabled={saving || !dirty}
+                className="gap-2"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {isRu ? "Сохранить" : "Save"}
+              </Button>
             )}
-            {playing
-              ? (isRu ? "Остановить" : "Stop")
-              : (isRu ? "Прослушать" : "Preview")}
-          </Button>
+          </div>
         </div>
       </div>
     </div>
