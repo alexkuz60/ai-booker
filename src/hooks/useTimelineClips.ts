@@ -76,7 +76,7 @@ export function useTimelineClips(
           .in("segment_id", segIds)
           .order("phrase_number"),
         supabase
-          .from("segment_audio" as any)
+          .from("segment_audio")
           .select("segment_id, duration_ms, audio_path, status")
           .in("segment_id", segIds)
           .eq("status", "ready"),
@@ -87,7 +87,7 @@ export function useTimelineClips(
       // Build audio duration map
       const audioDurationMap = new Map<string, { durationMs: number; audioPath: string }>();
       if (audioData) {
-        for (const a of audioData as any[]) {
+        for (const a of audioData) {
           audioDurationMap.set(a.segment_id, {
             durationMs: a.duration_ms,
             audioPath: a.audio_path,

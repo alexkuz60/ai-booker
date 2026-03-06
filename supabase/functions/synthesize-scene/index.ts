@@ -29,9 +29,12 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: authHeader } },
     });
+    // Service-role client for storage uploads & segment_audio writes (bypasses RLS)
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
     const token = authHeader.replace("Bearer ", "");
     const { data: userData, error: authErr } = await supabase.auth.getUser(token);
@@ -185,14 +188,20 @@ Deno.serve(async (req) => {
         pitchShift = (vc as Record<string, unknown>).pitchShift as number | undefined;
         volume = (vc as Record<string, unknown>).volume as number | undefined;
       } else {
-        // Random voice with variations for unassigned characters
-        const randomVoices = [
-          "alena", "filipp", "ermil", "jane", "madirus", "omazh", "zahar",
-          "dasha", "julia", "lera", "masha", "marina", "alexander", "kirill", "anton",
-        ];
-        const rolesPool = ["neutral", "good", "friendly", "strict"];
+        // Random voice with validated role from Yandex SpeechKit registry
+        const voiceRolesMap: Record<string, string[]> = {
+          alena: ["neutral", "good"], filipp: ["neutral"], ermil: ["neutral", "good"],
+          jane: ["neutral", "good", "evil"], madirus: ["neutral"], omazh: ["neutral", "evil"],
+          zahar: ["neutral", "good"], dasha: ["neutral", "friendly", "strict"],
+          julia: ["neutral", "strict"], lera: ["neutral", "friendly"],
+          masha: ["neutral", "friendly", "strict"], marina: ["neutral", "whisper", "friendly"],
+          alexander: ["neutral", "good"], kirill: ["neutral", "strict", "good"],
+          anton: ["neutral", "good"],
+        };
+        const randomVoices = Object.keys(voiceRolesMap);
         voice = randomVoices[Math.floor(Math.random() * randomVoices.length)];
-        role = rolesPool[Math.floor(Math.random() * rolesPool.length)];
+        const validRoles = voiceRolesMap[voice];
+        role = validRoles[Math.floor(Math.random() * validRoles.length)];
         speed = 0.9 + Math.random() * 0.3; // 0.9–1.2
         speed = Math.round(speed * 100) / 100;
         pitchShift = Math.floor(Math.random() * 400) - 200; // -200..+200 Hz
@@ -240,7 +249,7 @@ Deno.serve(async (req) => {
 
         // Upload to storage
         const storagePath = `tts/${userData.user.id}/${scene_id}/${seg.id}.mp3`;
-        const { error: uploadErr } = await supabase.storage
+        const { error: uploadErr } = await supabaseAdmin.storage
           .from("user-media")
           .upload(storagePath, audioBytes, {
             contentType: "audio/mpeg",
@@ -260,7 +269,7 @@ Deno.serve(async (req) => {
         }
 
         // Upsert segment_audio record
-        await supabase.from("segment_audio" as any).upsert(
+        await supabaseAdmin.from("segment_audio").upsert(
           {
             segment_id: seg.id,
             audio_path: storagePath,
