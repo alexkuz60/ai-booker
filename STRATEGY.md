@@ -102,17 +102,58 @@ Character {
   book_id: uuid
   name: string                    // основное имя
   aliases: string[]               // «Иван Петрович», «Ваня», «старик»
-  gender: "male" | "female" | "neutral"
-  age_range: "child" | "teen" | "young_adult" | "adult" | "elder"
+  gender: "male" | "female" | "unknown"
+  age_group: "child" | "teen" | "young" | "adult" | "elder" | "unknown"
   temperament: string             // «холерик», «меланхолик», etc.
-  speech_style: string            // «формальный», «разговорный», «грубый»
-  language_register: string       // «высокий», «нейтральный», «просторечие»
-  replica_count: number
-  voice_id: string | null         // привязанный голос
-  voice_settings: json | null     // stability, similarity_boost, style, speed
-  notes: string | null            // пользовательские заметки
+  speech_style: string            // «грубый, отрывистый, с просторечиями»
+  description: string             // краткий профиль от AI
+  voice_config: json              // { provider, voice_id, role, speed, pitch, volume }
+  color: string                   // цвет для UI-маркировки на таймлайне
+  sort_order: number              // по частоте появления
 }
 ```
+
+#### Схема БД
+
+**Таблица `book_characters`** — глобальный реестр персонажей книги:
+
+| Поле | Тип | Описание |
+|------|------|----------|
+| `id` | uuid PK | — |
+| `book_id` | uuid FK → books | Привязка к книге |
+| `name` | text | Основное имя |
+| `aliases` | text[] | Псевдонимы и вариации |
+| `gender` | text | male / female / unknown |
+| `age_group` | text | child / teen / young / adult / elder / unknown |
+| `temperament` | text | sanguine / choleric / melancholic / phlegmatic |
+| `speech_style` | text | Свободное описание стиля речи |
+| `description` | text | Краткий профиль от AI |
+| `voice_config` | jsonb | `{ provider, voice_id, role, speed, pitch, volume }` |
+| `color` | text | Цвет для UI-маркировки |
+| `sort_order` | int | Порядок (по частоте появления) |
+| `created_at` | timestamptz | — |
+| `updated_at` | timestamptz | — |
+
+**Таблица `character_appearances`** — связь "персонаж ↔ сцена":
+
+| Поле | Тип | Описание |
+|------|------|----------|
+| `id` | uuid PK | — |
+| `character_id` | uuid FK → book_characters | — |
+| `scene_id` | uuid FK → book_scenes | В какой сцене появляется |
+| `role_in_scene` | text | speaker / mentioned / narrator |
+| `segment_ids` | uuid[] | Ссылки на конкретные сегменты |
+
+#### План реализации
+
+| Шаг | Описание | Где | Статус |
+|-----|----------|-----|--------|
+| **Шаг 1** | Создать таблицы `book_characters` и `character_appearances` с RLS | БД (миграция) | ⬜ |
+| **Шаг 2** | При сегментации сцен (`segment-scene`) извлекать speakers → upsert в `book_characters`, создавать записи в `character_appearances` | Edge Function | ⬜ |
+| **Шаг 3** | В `CharactersPanel` загружать реестр персонажей главы, привязывать голоса, сохранять `voice_config` | UI (Студия) | ⬜ |
+| **Шаг 4** | Глубокий профайлинг: отдельный AI-проход по всей книге для заполнения `description`, `temperament`, `speech_style`, кластеризации алиасов | Edge Function + UI | ⬜ |
+
+> **Стратегическая перспектива:** Реестр персонажей с профилями и графом появлений — фундамент для будущего расширения в видеопроизводство (casting sheet, сценарные карточки, раскадровка с визуальными образами).
 
 #### UI
 
