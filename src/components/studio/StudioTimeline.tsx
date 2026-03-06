@@ -3,6 +3,7 @@ import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut, Maximize2, Layers, Film 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
+import { useTimelineClips, type TimelineClip } from "@/hooks/useTimelineClips";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -58,33 +59,49 @@ function TimelineRuler({ zoom, duration }: { zoom: number; duration: number }) {
   );
 }
 
-function TimelineTrack({ track, zoom, duration }: { track: TimelineTrackData; zoom: number; duration: number }) {
-  // Placeholder clips based on track type
-  const clips = track.type === "atmosphere"
-    ? [{ start: 0, end: duration }]
-    : track.type === "sfx"
-      ? [] // SFX tracks start empty
-      : [{ start: 0, end: Math.min(duration * 0.3, duration) }]; // narrator placeholder
+function TimelineTrack({
+  track,
+  zoom,
+  duration,
+  clips: realClips,
+}: {
+  track: TimelineTrackData;
+  zoom: number;
+  duration: number;
+  clips?: TimelineClip[];
+}) {
+  // Use real clips if available, otherwise fallback placeholders
+  const clips = realClips && realClips.length > 0
+    ? realClips.map(c => ({ start: c.startSec, end: c.startSec + c.durationSec, label: c.label, type: c.segmentType }))
+    : track.type === "atmosphere"
+      ? [{ start: 0, end: duration, label: track.label, type: "atmosphere" }]
+      : track.type === "sfx"
+        ? []
+        : [];
 
   return (
     <div className="flex h-10 border-b border-border/50 relative" style={{ width: `${duration * zoom * 4}px` }}>
-      {clips.filter(c => c.start < c.end).map((clip, i) => (
-        <div
-          key={i}
-          className="absolute top-1 bottom-1 rounded-sm opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
-          style={{
-            left: `${clip.start * zoom * 4}px`,
-            width: `${(clip.end - clip.start) * zoom * 4}px`,
-            backgroundColor: track.color,
-          }}
-        >
-          {(clip.end - clip.start) * zoom * 4 > 40 && (
-            <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
-              {track.label}
-            </span>
-          )}
-        </div>
-      ))}
+      {clips.filter(c => c.start < c.end).map((clip, i) => {
+        const widthPx = (clip.end - clip.start) * zoom * 4;
+        return (
+          <div
+            key={i}
+            className="absolute top-1 bottom-1 rounded-sm opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
+            style={{
+              left: `${clip.start * zoom * 4}px`,
+              width: `${widthPx}px`,
+              backgroundColor: track.color,
+            }}
+            title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)`}
+          >
+            {widthPx > 40 && (
+              <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
+                {clip.label}
+              </span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
