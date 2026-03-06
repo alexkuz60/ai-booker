@@ -273,14 +273,12 @@ export function CharactersPanel({ isRu }: CharactersPanelProps) {
               </label>
               <span className="text-xs text-muted-foreground tabular-nums">{speed.toFixed(1)}×</span>
             </div>
-            <Slider
-              min={0.3}
-              max={2.0}
-              step={0.1}
-              value={[speed]}
-              onValueChange={([v]) => setSpeed(v)}
-              className="w-full"
-            />
+            <div className="flex items-center gap-2">
+              <Slider min={0.3} max={2.0} step={0.1} value={[speed]} onValueChange={([v]) => setSpeed(v)} className="flex-1" />
+              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => setSpeed(1.0)} disabled={speed === 1.0} title={isRu ? "Сбросить" : "Reset"}>
+                <RotateCcw className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
 
           {/* Pitch slider */}
@@ -291,14 +289,12 @@ export function CharactersPanel({ isRu }: CharactersPanelProps) {
               </label>
               <span className="text-xs text-muted-foreground tabular-nums">{pitch > 0 ? "+" : ""}{pitch} Hz</span>
             </div>
-            <Slider
-              min={-500}
-              max={500}
-              step={50}
-              value={[pitch]}
-              onValueChange={([v]) => setPitch(v)}
-              className="w-full"
-            />
+            <div className="flex items-center gap-2">
+              <Slider min={-500} max={500} step={50} value={[pitch]} onValueChange={([v]) => setPitch(v)} className="flex-1" />
+              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => setPitch(0)} disabled={pitch === 0} title={isRu ? "Сбросить" : "Reset"}>
+                <RotateCcw className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
 
           {/* Volume slider */}
@@ -309,14 +305,12 @@ export function CharactersPanel({ isRu }: CharactersPanelProps) {
               </label>
               <span className="text-xs text-muted-foreground tabular-nums">{volume > 0 ? "+" : ""}{volume} dB</span>
             </div>
-            <Slider
-              min={-15}
-              max={15}
-              step={1}
-              value={[volume]}
-              onValueChange={([v]) => setVolume(v)}
-              className="w-full"
-            />
+            <div className="flex items-center gap-2">
+              <Slider min={-15} max={15} step={1} value={[volume]} onValueChange={([v]) => setVolume(v)} className="flex-1" />
+              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => setVolume(0)} disabled={volume === 0} title={isRu ? "Сбросить" : "Reset"}>
+                <RotateCcw className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
 
           <Separator />
