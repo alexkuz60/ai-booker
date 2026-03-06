@@ -631,7 +631,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                     ? (isRu ? "Только из сцены" : "Scene only")
                     : (isRu ? "Все персонажи" : "All characters")}
                 >
-                  <Filter className="h-3 w-3" />
+                  <Filter className={`h-3 w-3 ${filterMode === "scene" ? "text-primary" : ""}`} />
                 </Button>
               )}
               {/* Multi-select toggle */}
