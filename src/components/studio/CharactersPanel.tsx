@@ -557,13 +557,56 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
             <span className="text-sm font-semibold font-display text-foreground">
               {isRu ? "Персонажи" : "Characters"}
             </span>
-            {characters.length > 0 && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                {characters.length}
-              </Badge>
-            )}
+            <div className="flex items-center gap-1">
+              {/* Filter toggle */}
+              {sceneId && sceneCharIds.size > 0 && (
+                <Button
+                  variant={filterMode === "scene" ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => setFilterMode(prev => prev === "all" ? "scene" : "all")}
+                  title={filterMode === "all"
+                    ? (isRu ? "Только из сцены" : "Scene only")
+                    : (isRu ? "Все персонажи" : "All characters")}
+                >
+                  <Filter className="h-3 w-3" />
+                </Button>
+              )}
+              {/* Multi-select toggle */}
+              {characters.length > 1 && (
+                <Button
+                  variant={multiSelect ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={toggleMultiSelect}
+                  title={isRu ? "Мультивыбор для слияния" : "Multi-select for merge"}
+                >
+                  {multiSelect ? <X className="h-3 w-3" /> : <CheckSquare className="h-3 w-3" />}
+                </Button>
+              )}
+              {characters.length > 0 && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                  {filterMode === "scene" && sceneCharIds.size > 0 ? filteredCharacters.length : characters.length}
+                </Badge>
+              )}
+            </div>
           </div>
-          {characters.length > 0 && (
+          {/* Merge button (shown in multi-select mode) */}
+          {multiSelect && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full gap-1.5 text-xs"
+              onClick={handleMerge}
+              disabled={merging || selectedIds.size < 2}
+            >
+              {merging ? <Loader2 className="h-3 w-3 animate-spin" /> : <Merge className="h-3 w-3" />}
+              {merging
+                ? (isRu ? "Слияние..." : "Merging...")
+                : (isRu ? `Объединить (${selectedIds.size})` : `Merge (${selectedIds.size})`)}
+            </Button>
+          )}
+          {!multiSelect && characters.length > 0 && (
             <Button
               variant="outline"
               size="sm"
@@ -586,28 +629,45 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
             <div className="p-4 flex justify-center">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-          ) : characters.length === 0 ? (
+          ) : filteredCharacters.length === 0 ? (
             <div className="p-4 text-center">
               <Users className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
               <p className="text-xs text-muted-foreground">
-                {isRu
-                  ? "Персонажи появятся после сегментации сцен"
-                  : "Characters will appear after scene segmentation"}
+                {filterMode === "scene"
+                  ? (isRu ? "В этой сцене нет персонажей" : "No characters in this scene")
+                  : (isRu ? "Персонажи появятся после сегментации сцен" : "Characters will appear after scene segmentation")}
               </p>
             </div>
           ) : (
             <div className="p-1 space-y-0.5">
-              {characters.map(ch => (
+              {filteredCharacters.map(ch => (
                 <button
                   key={ch.id}
-                  onClick={() => setSelectedId(ch.id)}
+                  onClick={() => {
+                    if (multiSelect) {
+                      toggleCharInSelection(ch.id);
+                    } else {
+                      setSelectedId(ch.id);
+                    }
+                  }}
                   className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                    selectedId === ch.id
-                      ? "bg-accent/15 text-accent-foreground"
-                      : "text-muted-foreground hover:bg-muted/50"
+                    multiSelect
+                      ? selectedIds.has(ch.id)
+                        ? "bg-primary/15 text-accent-foreground ring-1 ring-primary/30"
+                        : "text-muted-foreground hover:bg-muted/50"
+                      : selectedId === ch.id
+                        ? "bg-accent/15 text-accent-foreground"
+                        : "text-muted-foreground hover:bg-muted/50"
                   }`}
                 >
                   <div className="flex items-center gap-2">
+                    {multiSelect && (
+                      <div className={`h-3.5 w-3.5 rounded border shrink-0 flex items-center justify-center ${
+                        selectedIds.has(ch.id) ? "bg-primary border-primary" : "border-muted-foreground/40"
+                      }`}>
+                        {selectedIds.has(ch.id) && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                      </div>
+                    )}
                     <span className="truncate font-medium">{ch.name}</span>
                     <div className="flex items-center gap-1 shrink-0">
                       {ch.description && <User className="h-3 w-3 text-primary/60" />}
