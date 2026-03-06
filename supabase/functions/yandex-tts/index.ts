@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
       {
         method: "POST",
         headers: {
-          "Authorization": `Api-Key ${apiKey}`,
+          "Authorization": apiKey,
         },
         body: params,
       }
