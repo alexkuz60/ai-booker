@@ -78,6 +78,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
               sceneId={selectedSceneId ?? null}
               sceneContent={selectedSceneContent ?? null}
               isRu={isRu}
+              bookId={bookId ?? null}
               onSegmented={onSegmented}
             />
           </div>

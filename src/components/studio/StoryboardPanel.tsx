@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check } from "lucide-react";
+import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -23,7 +24,15 @@ interface Segment {
   phrases: Phrase[];
 }
 
+interface CharacterOption {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
 // ─── Segment type config ────────────────────────────────────
+
+const SEGMENT_TYPES = ["epigraph", "narrator", "first_person", "inner_thought", "dialogue", "lyric", "footnote"] as const;
 
 const SEGMENT_CONFIG: Record<string, {
   icon: typeof Quote;
@@ -127,23 +136,167 @@ function EditablePhrase({ phrase, isRu, onSave }: {
   );
 }
 
+// ─── Segment type selector ──────────────────────────────────
+
+function SegmentTypeBadge({ segmentType, isRu, onChange }: {
+  segmentType: string;
+  isRu: boolean;
+  onChange: (newType: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const config = SEGMENT_CONFIG[segmentType] || SEGMENT_CONFIG.narrator;
+  const Icon = config.icon;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="inline-flex items-center cursor-pointer hover:ring-1 hover:ring-primary/40 rounded-full transition-all">
+          <Badge variant="outline" className={cn("text-[10px] gap-1 py-0", config.color)}>
+            <Icon className="h-3 w-3" />
+            {isRu ? config.label_ru : config.label_en}
+            <ChevronDown className="h-2.5 w-2.5 opacity-50" />
+          </Badge>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-44 p-1" align="start">
+        <div className="space-y-0.5">
+          {SEGMENT_TYPES.map((type) => {
+            const c = SEGMENT_CONFIG[type];
+            const TypeIcon = c.icon;
+            const isActive = type === segmentType;
+            return (
+              <button
+                key={type}
+                onClick={() => { onChange(type); setOpen(false); }}
+                className={cn(
+                  "w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs font-body transition-colors text-left",
+                  isActive ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
+                )}
+              >
+                <TypeIcon className="h-3 w-3 shrink-0" />
+                {isRu ? c.label_ru : c.label_en}
+              </button>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ─── Speaker selector ───────────────────────────────────────
+
+function SpeakerBadge({ speaker, characters, isRu, onChange }: {
+  speaker: string | null;
+  characters: CharacterOption[];
+  isRu: boolean;
+  onChange: (newSpeaker: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const charColor = speaker
+    ? characters.find(c => c.name === speaker)?.color
+    : null;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="inline-flex items-center cursor-pointer hover:ring-1 hover:ring-primary/40 rounded-full transition-all">
+          <Badge
+            variant="outline"
+            className={cn(
+              "text-[10px] gap-1 py-0",
+              speaker
+                ? "border-foreground/20 text-foreground/80"
+                : "border-orange-500/40 text-orange-400"
+            )}
+            style={charColor ? { borderColor: charColor + "60", color: charColor } : undefined}
+          >
+            {speaker ? (
+              <>
+                <User className="h-3 w-3" />
+                {speaker}
+              </>
+            ) : (
+              <>
+                <HelpCircle className="h-3 w-3" />
+                {isRu ? "персонаж ?" : "character ?"}
+              </>
+            )}
+            <ChevronDown className="h-2.5 w-2.5 opacity-50" />
+          </Badge>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-48 p-1" align="start">
+        <div className="space-y-0.5 max-h-52 overflow-y-auto">
+          <button
+            onClick={() => { onChange(null); setOpen(false); }}
+            className={cn(
+              "w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs font-body transition-colors text-left",
+              !speaker ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
+            )}
+          >
+            <HelpCircle className="h-3 w-3 shrink-0 text-orange-400" />
+            {isRu ? "Не назначен" : "Unassigned"}
+          </button>
+          {characters.map((ch) => {
+            const isActive = ch.name === speaker;
+            return (
+              <button
+                key={ch.id}
+                onClick={() => { onChange(ch.name); setOpen(false); }}
+                className={cn(
+                  "w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs font-body transition-colors text-left",
+                  isActive ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
+                )}
+              >
+                {ch.color && (
+                  <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: ch.color }} />
+                )}
+                {!ch.color && <User className="h-3 w-3 shrink-0" />}
+                {ch.name}
+              </button>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // ─── Main component ─────────────────────────────────────────
 
 export function StoryboardPanel({
   sceneId,
   sceneContent,
   isRu,
+  bookId,
   onSegmented,
 }: {
   sceneId: string | null;
   sceneContent: string | null;
   isRu: boolean;
+  bookId: string | null;
   onSegmented?: (sceneId: string) => void;
 }) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [characters, setCharacters] = useState<CharacterOption[]>([]);
+
+  // Load characters for the book
+  useEffect(() => {
+    if (!bookId) { setCharacters([]); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("book_characters")
+        .select("id, name, color")
+        .eq("book_id", bookId)
+        .order("sort_order");
+      if (data) setCharacters(data.map(c => ({ id: c.id, name: c.name, color: c.color })));
+    })();
+  }, [bookId]);
 
   // Load existing segments from DB
   const loadSegments = useCallback(async (sid: string) => {
@@ -246,6 +399,34 @@ export function StoryboardPanel({
     })));
   }, [isRu]);
 
+  // Update segment type in DB
+  const updateSegmentType = useCallback(async (segmentId: string, newType: string) => {
+    setSegments(prev => prev.map(seg =>
+      seg.segment_id === segmentId ? { ...seg, segment_type: newType } : seg
+    ));
+    const { error } = await supabase
+      .from("scene_segments")
+      .update({ segment_type: newType as any })
+      .eq("id", segmentId);
+    if (error) {
+      toast.error(isRu ? "Ошибка сохранения типа" : "Failed to save type");
+    }
+  }, [isRu]);
+
+  // Update speaker in DB
+  const updateSpeaker = useCallback(async (segmentId: string, newSpeaker: string | null) => {
+    setSegments(prev => prev.map(seg =>
+      seg.segment_id === segmentId ? { ...seg, speaker: newSpeaker } : seg
+    ));
+    const { error } = await supabase
+      .from("scene_segments")
+      .update({ speaker: newSpeaker })
+      .eq("id", segmentId);
+    if (error) {
+      toast.error(isRu ? "Ошибка сохранения персонажа" : "Failed to save speaker");
+    }
+  }, [isRu]);
+
   // ── No scene selected ──
   if (!sceneId) {
     return (
@@ -302,21 +483,21 @@ export function StoryboardPanel({
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-3 space-y-2">
           {segments.map((seg) => {
-            const config = SEGMENT_CONFIG[seg.segment_type] || SEGMENT_CONFIG.narrator;
-            const Icon = config.icon;
             return (
               <div key={seg.segment_id} className="rounded-lg border border-border bg-card/50 overflow-hidden">
                 {/* Segment header */}
                 <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 bg-muted/30">
-                  <Badge variant="outline" className={cn("text-[10px] gap-1 py-0", config.color)}>
-                    <Icon className="h-3 w-3" />
-                    {isRu ? config.label_ru : config.label_en}
-                  </Badge>
-                  {seg.speaker && (
-                    <span className="text-xs text-muted-foreground font-body">
-                      — {seg.speaker}
-                    </span>
-                  )}
+                  <SegmentTypeBadge
+                    segmentType={seg.segment_type}
+                    isRu={isRu}
+                    onChange={(newType) => updateSegmentType(seg.segment_id, newType)}
+                  />
+                  <SpeakerBadge
+                    speaker={seg.speaker}
+                    characters={characters}
+                    isRu={isRu}
+                    onChange={(newSpeaker) => updateSpeaker(seg.segment_id, newSpeaker)}
+                  />
                   <span className="ml-auto text-[10px] text-muted-foreground font-mono">
                     #{seg.segment_number}
                   </span>
