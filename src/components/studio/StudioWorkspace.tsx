@@ -19,7 +19,7 @@ interface StudioWorkspaceProps {
 }
 
 export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter }: StudioWorkspaceProps) {
-  const [activeTab, setActiveTab] = useState("storyboard");
+  const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem("studio_active_tab") || "storyboard");
   const charactersPanelRef = useRef<CharactersPanelHandle | null>(null);
   const [castingExternal, setCastingExternal] = useState(false);
 

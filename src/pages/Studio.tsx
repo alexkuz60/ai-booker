@@ -18,7 +18,10 @@ import { usePageHeader } from "@/hooks/usePageHeader";
 const Studio = () => {
   const { isRu } = useLanguage();
   const [chapter, setChapter] = useState<StudioChapter | null>(() => loadStudioChapter());
-  const [selectedSceneIdx, setSelectedSceneIdx] = useState<number | null>(null);
+  const [selectedSceneIdx, setSelectedSceneIdx] = useState<number | null>(() => {
+    const saved = sessionStorage.getItem("studio_selected_scene_idx");
+    return saved !== null ? Number(saved) : null;
+  });
   const [sceneContent, setSceneContent] = useState<string | null>(null);
   const [segmentedSceneIds, setSegmentedSceneIds] = useState<Set<string>>(new Set());
   const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
