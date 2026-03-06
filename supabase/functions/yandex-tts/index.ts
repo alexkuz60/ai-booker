@@ -154,6 +154,21 @@ Deno.serve(async (req) => {
       );
     }
 
+    // ── Admin-only guard ──
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userData.user.id)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (!roleData) {
+      return new Response(
+        JSON.stringify({ error: "Yandex TTS is available for admins only." }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // ── Parse request ──
     const { text, voice, lang, speed } = await req.json();
     const isRu = lang === "ru";
