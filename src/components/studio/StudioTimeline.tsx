@@ -502,7 +502,15 @@ export function StudioTimeline({
             })}
           </div>
           <ScrollArea className="flex-1">
-            <div className="min-w-full relative">
+            <div
+              className="min-w-full relative cursor-crosshair"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const sec = x / (zoom * 4);
+                player.seek(Math.max(0, Math.min(sec, duration)));
+              }}
+            >
               <TimelineRuler zoom={zoom} duration={duration} />
               {allTracks.map((track) => (
                 <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} clips={clipsByTrack.get(track.id)} />
