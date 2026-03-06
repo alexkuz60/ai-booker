@@ -709,6 +709,11 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                     )}
                     <span className="truncate font-medium">{ch.name}</span>
                     <div className="flex items-center gap-1 shrink-0">
+                      {isExtra(ch.id) && (
+                        <Badge variant="outline" className="text-[9px] px-1 py-0 border-muted-foreground/30 text-muted-foreground/60">
+                          {isRu ? "массовка" : "extra"}
+                        </Badge>
+                      )}
                       {ch.description && <User className="h-3 w-3 text-primary/60" />}
                       {ch.voice_config?.voice_id && <Volume2 className="h-3 w-3 text-primary/60" />}
                     </div>
