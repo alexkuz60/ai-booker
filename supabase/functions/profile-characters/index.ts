@@ -187,101 +187,132 @@ Deno.serve(async (req) => {
       });
     }
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.3,
-        max_tokens: 4096,
-        tools: [{
-          type: "function",
-          function: {
-            name: "save_character_profiles",
-            description: "Save profiled character data",
-            parameters: {
-              type: "object",
-              properties: {
-                characters: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      name: { type: "string", description: "Primary character name (must match input)" },
-                      aliases: { type: "array", items: { type: "string" } },
-                      gender: { type: "string", enum: ["male", "female", "unknown"] },
-                      age_group: { type: "string", enum: ["child", "teen", "young", "adult", "elder", "unknown"] },
-                      temperament: { type: "string" },
-                      speech_style: { type: "string" },
-                      description: { type: "string" },
-                    },
-                    required: ["name", "aliases", "gender", "age_group", "temperament", "speech_style", "description"],
+    const aiBody = JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.3,
+      max_tokens: 4096,
+      tools: [{
+        type: "function",
+        function: {
+          name: "save_character_profiles",
+          description: "Save profiled character data",
+          parameters: {
+            type: "object",
+            properties: {
+              characters: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string", description: "Primary character name (must match input)" },
+                    aliases: { type: "array", items: { type: "string" } },
+                    gender: { type: "string", enum: ["male", "female", "unknown"] },
+                    age_group: { type: "string", enum: ["child", "teen", "young", "adult", "elder", "unknown"] },
+                    temperament: { type: "string" },
+                    speech_style: { type: "string" },
+                    description: { type: "string" },
                   },
+                  required: ["name", "aliases", "gender", "age_group", "temperament", "speech_style", "description"],
                 },
               },
-              required: ["characters"],
             },
+            required: ["characters"],
           },
-        }],
-        tool_choice: { type: "function", function: { name: "save_character_profiles" } },
-      }),
+        },
+      }],
+      tool_choice: { type: "function", function: { name: "save_character_profiles" } },
     });
 
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      console.error("AI gateway error:", aiRes.status, errText);
-      if (aiRes.status === 429) {
-        return new Response(JSON.stringify({ error: lang === "ru" ? "Превышен лимит запросов, попробуйте позже" : "Rate limit exceeded, try again later" }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiRes.status === 402) {
-        return new Response(JSON.stringify({ error: lang === "ru" ? "Необходимо пополнить баланс" : "Payment required" }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify({ error: `AI error: ${aiRes.status}` }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Retry logic: up to 3 attempts with exponential backoff
+    const MAX_RETRIES = 3;
+    let profiles: CharacterProfile[] | undefined;
+    let lastError: string | undefined;
 
-    const aiData = await aiRes.json();
-    let profiles: CharacterProfile[];
-
-    // Try tool_calls first
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-    if (toolCall?.function?.arguments) {
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const parsed = JSON.parse(toolCall.function.arguments);
-        profiles = parsed.characters;
-      } catch (parseErr) {
-        console.error("Failed to parse tool_calls arguments:", toolCall.function.arguments?.slice(0, 200));
-        // Fallback: parse from content
-        const raw = (aiData.choices?.[0]?.message?.content || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-        if (!raw) {
-          return new Response(JSON.stringify({ error: "AI returned empty response" }), {
+        const t0 = Date.now();
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 120_000);
+
+        const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          },
+          body: aiBody,
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        const latency = Date.now() - t0;
+        console.log(`AI attempt ${attempt}/${MAX_RETRIES}, status=${aiRes.status}, latency=${latency}ms`);
+
+        if (aiRes.status === 429) {
+          lastError = lang === "ru" ? "Превышен лимит запросов, попробуйте позже" : "Rate limit exceeded, try again later";
+          if (attempt < MAX_RETRIES) { await new Promise(r => setTimeout(r, 2000 * attempt)); continue; }
+          return new Response(JSON.stringify({ error: lastError }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (aiRes.status === 402) {
+          return new Response(JSON.stringify({ error: lang === "ru" ? "Необходимо пополнить баланс" : "Payment required" }), {
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (!aiRes.ok) {
+          const errText = await aiRes.text().catch(() => "");
+          console.error(`AI error attempt ${attempt}:`, aiRes.status, errText.slice(0, 300));
+          lastError = `AI error: ${aiRes.status}`;
+          if (attempt < MAX_RETRIES) { await new Promise(r => setTimeout(r, 1500 * attempt)); continue; }
+          return new Response(JSON.stringify({ error: lastError }), {
             status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        profiles = JSON.parse(raw).characters;
+
+        const aiData = await aiRes.json();
+        const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+
+        if (toolCall?.function?.arguments) {
+          try {
+            profiles = JSON.parse(toolCall.function.arguments).characters;
+          } catch {
+            console.error(`Parse tool_calls failed (attempt ${attempt}):`, toolCall.function.arguments?.slice(0, 200));
+          }
+        }
+
+        if (!profiles) {
+          const raw = (aiData.choices?.[0]?.message?.content || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw);
+              profiles = parsed.characters || parsed;
+            } catch {
+              console.error(`Parse content failed (attempt ${attempt}):`, raw.slice(0, 200));
+            }
+          }
+        }
+
+        if (profiles && profiles.length > 0) break;
+
+        lastError = "AI returned unparseable response";
+        console.error(`Attempt ${attempt} produced no profiles, retrying...`);
+        if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, 1500 * attempt));
+      } catch (fetchErr) {
+        lastError = String(fetchErr);
+        console.error(`AI fetch error attempt ${attempt}:`, lastError);
+        if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, 2000 * attempt));
       }
-    } else {
-      const raw = (aiData.choices?.[0]?.message?.content || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      if (!raw) {
-        console.error("AI response has no tool_calls and no content:", JSON.stringify(aiData.choices?.[0]?.message).slice(0, 300));
-        return new Response(JSON.stringify({ error: "AI returned empty response" }), {
-          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const parsed = JSON.parse(raw);
-      profiles = parsed.characters || parsed;
+    }
+
+    if (!profiles || profiles.length === 0) {
+      return new Response(JSON.stringify({ error: lastError || "AI returned empty response" }), {
+        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Update each character in DB
