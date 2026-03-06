@@ -100,10 +100,10 @@ const Studio = () => {
 
   const { setPageHeader } = usePageHeader();
 
-  const studioTitle = isRu ? "Студия" : "Studio";
+  const studioTitle = isRu ? 'АУДИО СТУДИЯ "ОК"' : 'AUDIO STUDIO "OK"';
   const studioSubtitle = chapter
     ? `${chapter.bookTitle} → ${chapter.chapterTitle}`
-    : (isRu ? "Рабочая панель" : "Workspace");
+    : (isRu ? "Звукозапись ИИ-актеров. Монтаж. Сведение. Мастеринг." : "AI Voice Recording. Editing. Mixing. Mastering.");
 
   const headerRight = chapterEstimate && chapterEstimate.chars > 0 ? (
     <div className="flex items-center gap-3 text-sm font-body">
