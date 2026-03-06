@@ -130,17 +130,48 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       }
 
       const aiData = await aiRes.json();
-      const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+      const msg = aiData.choices?.[0]?.message;
+      const toolCall = msg?.tool_calls?.[0];
 
+      // 1) Tool call arguments
       if (toolCall?.function?.arguments) {
-        try { profiles = JSON.parse(toolCall.function.arguments).characters; } catch { /* fallback below */ }
+        try {
+          const parsed = JSON.parse(toolCall.function.arguments);
+          profiles = parsed.characters || (Array.isArray(parsed) ? parsed : undefined);
+        } catch (e) {
+          console.log("Tool call parse failed:", e);
+        }
       }
+
+      // 2) Content field (may contain JSON)
       if (!profiles) {
-        const raw = (aiData.choices?.[0]?.message?.content || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-        if (raw) { try { const p = JSON.parse(raw); profiles = p.characters || p; } catch { /* retry */ } }
+        const content = msg?.content || "";
+        const reasoning = (msg as Record<string, unknown>)?.reasoning || "";
+        const raw = String(content || reasoning).replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        if (raw) {
+          try {
+            const p = JSON.parse(raw);
+            profiles = p.characters || (Array.isArray(p) ? p : undefined);
+          } catch {
+            // Try to extract JSON array/object from the text
+            const jsonMatch = raw.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+              try { profiles = JSON.parse(jsonMatch[0]); } catch {}
+            }
+            if (!profiles) {
+              const objMatch = raw.match(/\{[\s\S]*"characters"\s*:\s*\[[\s\S]*\]\s*\}/);
+              if (objMatch) {
+                try { profiles = JSON.parse(objMatch[0]).characters; } catch {}
+              }
+            }
+          }
+        }
       }
+
       if (profiles && profiles.length > 0) break;
 
+      // Log raw response for debugging
+      console.log(`Attempt ${attempt} unparseable. Keys: ${JSON.stringify(Object.keys(aiData.choices?.[0]?.message || {}))}. Tool calls: ${JSON.stringify(toolCall?.function?.name)}. Content length: ${(msg?.content || "").length}`);
       lastError = "AI returned unparseable response";
       if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, 1500 * attempt));
     } catch (fetchErr) {
