@@ -140,35 +140,46 @@ export function StudioTimeline({
 
   // ── Character tracks ──────────────────────────────────────
   const [charTracks, setCharTracks] = useState<TimelineTrackData[]>([]);
+  const [speakerToCharId, setSpeakerToCharId] = useState<Map<string, string>>(new Map());
+
+  const contextSceneIds = useMemo(() =>
+    mode === "scene"
+      ? (sceneId ? [sceneId] : [])
+      : (chapterSceneIds ?? []),
+    [mode, sceneId, chapterSceneIds?.join(",")]
+  );
 
   useEffect(() => {
-    if (!bookId) { setCharTracks([]); return; }
-
-    const contextSceneIds = mode === "scene"
-      ? (sceneId ? [sceneId] : [])
-      : (chapterSceneIds ?? []);
-
-    if (contextSceneIds.length === 0) { setCharTracks([]); return; }
+    if (!bookId) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
+    if (contextSceneIds.length === 0) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
 
     (async () => {
-      // Get character IDs that appear in these scenes
       const { data: appearances } = await supabase
         .from("character_appearances")
         .select("character_id")
         .in("scene_id", contextSceneIds);
 
-      if (!appearances?.length) { setCharTracks([]); return; }
+      if (!appearances?.length) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
 
       const charIds = [...new Set(appearances.map(a => a.character_id))];
 
-      // Load character names
       const { data: chars } = await supabase
         .from("book_characters")
-        .select("id, name, color, sort_order")
+        .select("id, name, color, sort_order, aliases")
         .in("id", charIds)
         .order("sort_order");
 
-      if (!chars?.length) { setCharTracks([]); return; }
+      if (!chars?.length) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
+
+      // Build speaker name → character ID map
+      const nameMap = new Map<string, string>();
+      for (const c of chars) {
+        nameMap.set(c.name.toLowerCase(), c.id);
+        for (const alias of (c.aliases ?? [])) {
+          if (alias) nameMap.set(alias.toLowerCase(), c.id);
+        }
+      }
+      setSpeakerToCharId(nameMap);
 
       setCharTracks(
         chars.map((c, i) => ({
@@ -181,7 +192,22 @@ export function StudioTimeline({
     })();
   }, [bookId, sceneId, chapterSceneIds?.join(","), mode]);
 
+  // ── Real clips from segments ──────────────────────────────
+  const { clips: timelineClips } = useTimelineClips(contextSceneIds, speakerToCharId);
+
+  // Group clips by track ID
+  const clipsByTrack = useMemo(() => {
+    const map = new Map<string, TimelineClip[]>();
+    for (const clip of timelineClips) {
+      const list = map.get(clip.trackId) ?? [];
+      list.push(clip);
+      map.set(clip.trackId, list);
+    }
+    return map;
+  }, [timelineClips]);
+
   const allTracks = useMemo(() => [...charTracks, ...FIXED_TRACKS], [charTracks]);
+
 
   // ── Layout / zoom ─────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
@@ -374,7 +400,7 @@ export function StudioTimeline({
             <div className="min-w-full">
               <TimelineRuler zoom={zoom} duration={duration} />
               {allTracks.map((track) => (
-                <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} />
+                <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} clips={clipsByTrack.get(track.id)} />
               ))}
             </div>
           </ScrollArea>
