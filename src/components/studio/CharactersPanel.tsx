@@ -157,6 +157,9 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [filterMode, setFilterMode] = useState<"all" | "scene">("all");
   const [sceneCharIds, setSceneCharIds] = useState<Set<string>>(new Set());
 
+  // Segment counts per character (for "extras" detection)
+  const [segmentCounts, setSegmentCounts] = useState<Map<string, number>>(new Map());
+
   // Multi-select & merge
   const [multiSelect, setMultiSelect] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
