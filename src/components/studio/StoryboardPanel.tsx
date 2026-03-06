@@ -649,6 +649,23 @@ export function StoryboardPanel({
                     isRu={isRu}
                     onChange={(newSpeaker) => updateSpeaker(seg.segment_id, newSpeaker)}
                   />
+                  {/* Audio status indicator */}
+                  {(() => {
+                    const audio = audioStatus.get(seg.segment_id);
+                    if (!audio) return null;
+                    const durSec = (audio.durationMs / 1000).toFixed(1);
+                    return audio.status === "ready" ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-green-400 font-mono">
+                        <CheckCircle2 className="h-3 w-3" />
+                        {durSec}s
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-destructive font-mono">
+                        <XCircle className="h-3 w-3" />
+                        {isRu ? "ошибка" : "error"}
+                      </span>
+                    );
+                  })()}
                   <span className="ml-auto text-[10px] text-muted-foreground font-mono">
                     #{seg.segment_number}
                   </span>
