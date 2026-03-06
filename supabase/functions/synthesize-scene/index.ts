@@ -166,16 +166,39 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Resolve voice config
+      // Resolve voice config — random for unassigned speakers
       const vc = seg.speaker
         ? voiceConfigMap.get(seg.speaker.toLowerCase()) ?? {}
         : {};
 
-      const voice = (vc.voice as string) || "alena";
-      const role = (vc.role as string) || undefined;
-      const speed = (vc.speed as number) || 1.0;
-      const pitchShift = (vc.pitchShift as number) || undefined;
-      const volume = (vc.volume as number) || undefined;
+      const hasVoice = !!(vc as Record<string, unknown>).voice;
+      let voice: string;
+      let role: string | undefined;
+      let speed: number;
+      let pitchShift: number | undefined;
+      let volume: number | undefined;
+
+      if (hasVoice) {
+        voice = (vc as Record<string, unknown>).voice as string;
+        role = (vc as Record<string, unknown>).role as string | undefined;
+        speed = ((vc as Record<string, unknown>).speed as number) || 1.0;
+        pitchShift = (vc as Record<string, unknown>).pitchShift as number | undefined;
+        volume = (vc as Record<string, unknown>).volume as number | undefined;
+      } else {
+        // Random voice with variations for unassigned characters
+        const randomVoices = [
+          "alena", "filipp", "ermil", "jane", "madirus", "omazh", "zahar",
+          "dasha", "julia", "lera", "masha", "marina", "alexander", "kirill", "anton",
+        ];
+        const rolesPool = ["neutral", "good", "friendly", "strict"];
+        voice = randomVoices[Math.floor(Math.random() * randomVoices.length)];
+        role = rolesPool[Math.floor(Math.random() * rolesPool.length)];
+        speed = 0.9 + Math.random() * 0.3; // 0.9–1.2
+        speed = Math.round(speed * 100) / 100;
+        pitchShift = Math.floor(Math.random() * 400) - 200; // -200..+200 Hz
+        volume = undefined;
+        console.log(`Unassigned segment ${seg.id}: random voice=${voice}, role=${role}, speed=${speed}, pitch=${pitchShift}`);
+      }
 
       try {
         // Call yandex-tts
