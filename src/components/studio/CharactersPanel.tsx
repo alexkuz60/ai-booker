@@ -48,6 +48,14 @@ const AGE_LABELS: Record<string, { ru: string; en: string }> = {
   unknown: { ru: "Не определён", en: "Unknown" },
 };
 
+const TEMPERAMENT_LABELS: Record<string, { ru: string; en: string }> = {
+  sanguine: { ru: "Сангвиник", en: "Sanguine" },
+  choleric: { ru: "Холерик", en: "Choleric" },
+  melancholic: { ru: "Меланхолик", en: "Melancholic" },
+  phlegmatic: { ru: "Флегматик", en: "Phlegmatic" },
+  mixed: { ru: "Смешанный", en: "Mixed" },
+};
+
 // ─── Component ───────────────────────────────────────────
 
 interface CharactersPanelProps {
