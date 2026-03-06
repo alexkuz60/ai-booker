@@ -304,6 +304,32 @@ Deno.serve(async (req) => {
     const successCount = results.filter(r => r.status === "ready").length;
     const errorCount = results.filter(r => r.status === "error").length;
 
+    // Save playlist snapshot to scene_playlists
+    const playlistSegments = results.map((r, idx) => ({
+      segment_id: r.segment_id,
+      segment_number: segments[idx].segment_number,
+      speaker: segments[idx].speaker,
+      segment_type: segments[idx].segment_type,
+      audio_path: r.audio_path || null,
+      duration_ms: r.duration_ms,
+      status: r.status,
+    }));
+
+    const playlistStatus = errorCount === 0 ? "ready" : successCount > 0 ? "partial" : "error";
+
+    await supabaseAdmin.from("scene_playlists").upsert(
+      {
+        scene_id,
+        total_duration_ms: totalDurationMs,
+        status: playlistStatus,
+        segments: playlistSegments,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "scene_id" }
+    );
+
+    console.log(`Playlist saved for scene ${scene_id}: ${playlistStatus}, ${totalDurationMs}ms`);
+
     return new Response(
       JSON.stringify({
         scene_id,
