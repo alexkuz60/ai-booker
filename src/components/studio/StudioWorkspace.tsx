@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { StoryboardPanel } from "./StoryboardPanel";
 import { CharactersPanel, type CharactersPanelHandle } from "./CharactersPanel";
+import { AtmospherePanel } from "./AtmospherePanel";
 
 interface StudioWorkspaceProps {
   isRu: boolean;
@@ -92,10 +93,8 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
         </TabsContent>
 
         <TabsContent value="atmosphere" className="flex-1 mt-4 min-h-0">
-          <div className="rounded-lg border border-border bg-card/50 h-full flex items-center justify-center">
-            <p className="text-sm text-muted-foreground font-body">
-              {isRu ? "Фоновая атмосфера и эмбиент" : "Background atmosphere and ambience"}
-            </p>
+          <div className="rounded-lg border border-border bg-card/50 h-full overflow-hidden">
+            <AtmospherePanel isRu={isRu} />
           </div>
         </TabsContent>
 
