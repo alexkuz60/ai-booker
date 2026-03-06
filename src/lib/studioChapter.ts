@@ -14,6 +14,7 @@ export interface StudioScene {
 export interface StudioChapter {
   chapterTitle: string;
   bookTitle: string;
+  bookId?: string;
   scenes: StudioScene[];
 }
 
