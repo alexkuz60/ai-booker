@@ -153,6 +153,15 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [profiling, setProfiling] = useState(false);
   const [casting, setCasting] = useState(false);
 
+  // Filter: "all" or "scene"
+  const [filterMode, setFilterMode] = useState<"all" | "scene">("all");
+  const [sceneCharIds, setSceneCharIds] = useState<Set<string>>(new Set());
+
+  // Multi-select & merge
+  const [multiSelect, setMultiSelect] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [merging, setMerging] = useState(false);
+
   // Voice settings state
   const [voice, setVoice] = useState("marina");
   const [role, setRole] = useState("neutral");
@@ -164,6 +173,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [testing, setTesting] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
+  const [saving, setSaving] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const selectedVoice = YANDEX_VOICES.find(v => v.id === voice);
