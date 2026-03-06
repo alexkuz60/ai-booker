@@ -407,7 +407,7 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка загрузки сегментов" : "Failed to load segments");
     }
     setLoading(false);
-  }, [isRu, characters]);
+  }, [isRu, characters, loadAudioStatus]);
 
   useEffect(() => {
     setSegments([]);
@@ -562,7 +562,7 @@ export function StoryboardPanel({
     }
     setSynthesizing(false);
     setSynthProgress("");
-  }, [sceneId, segments.length, isRu, onSegmented]);
+  }, [sceneId, segments, isRu, onSegmented, loadAudioStatus]);
 
   // ── No scene selected ──
   if (!sceneId) {
