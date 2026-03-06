@@ -157,6 +157,9 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [filterMode, setFilterMode] = useState<"all" | "scene">("all");
   const [sceneCharIds, setSceneCharIds] = useState<Set<string>>(new Set());
 
+  // Segment counts per character (for "extras" detection)
+  const [segmentCounts, setSegmentCounts] = useState<Map<string, number>>(new Map());
+
   // Multi-select & merge
   const [multiSelect, setMultiSelect] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -180,9 +183,12 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const selectedChar = characters.find(c => c.id === selectedId);
   const hasProfiles = characters.some(c => c.description);
 
+  /** A character is "extras" (массовка) if they have ≤1 dialogue segment total */
+  const isExtra = useCallback((charId: string) => (segmentCounts.get(charId) ?? 0) <= 1, [segmentCounts]);
+
   // ── Load characters from DB ─────────────────────────────
   const loadCharacters = useCallback(async () => {
-    if (!bookId) { setCharacters([]); setSceneCharIds(new Set()); return; }
+    if (!bookId) { setCharacters([]); setSceneCharIds(new Set()); setSegmentCounts(new Map()); return; }
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -191,6 +197,25 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         .eq("book_id", bookId)
         .order("sort_order");
       if (error) throw error;
+
+      // Load all appearances to count total segments per character
+      const charIds = (data || []).map(c => c.id);
+      const counts = new Map<string, number>();
+      if (charIds.length > 0) {
+        for (let i = 0; i < charIds.length; i += 200) {
+          const batch = charIds.slice(i, i + 200);
+          const { data: apps } = await supabase
+            .from("character_appearances")
+            .select("character_id, segment_ids")
+            .in("character_id", batch);
+          if (apps) {
+            for (const a of apps) {
+              counts.set(a.character_id, (counts.get(a.character_id) ?? 0) + (a.segment_ids?.length ?? 0));
+            }
+          }
+        }
+      }
+      setSegmentCounts(counts);
 
       let scIds = new Set<string>();
       if (sceneId && data && data.length > 0) {
@@ -341,19 +366,33 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       const updates: { id: string; voice_config: BookCharacter["voice_config"] }[] = [];
 
       for (const ch of characters) {
-        let voiceId = matchVoice(ch.gender, ch.age_group);
+        let voiceId: string;
+        let roleId: string;
 
-        // Try to avoid duplicates: pick alternate from same gender
-        const genderVoices = YANDEX_VOICES.filter(v =>
-          ch.gender !== "unknown" ? v.gender === ch.gender : true
-        );
-        if (usedVoices.has(voiceId) && genderVoices.length > 1) {
-          const alt = genderVoices.find(v => !usedVoices.has(v.id));
-          if (alt) voiceId = alt.id;
+        if (isExtra(ch.id)) {
+          // Массовка: random voice from all available
+          const pool = YANDEX_VOICES;
+          const randomVoice = pool[Math.floor(Math.random() * pool.length)] || YANDEX_VOICES[0];
+          voiceId = randomVoice.id;
+          // Random role if available
+          const roles = randomVoice.roles ?? ["neutral"];
+          roleId = roles[Math.floor(Math.random() * roles.length)];
+        } else {
+          voiceId = matchVoice(ch.gender, ch.age_group);
+
+          // Try to avoid duplicates: pick alternate from same gender
+          const genderVoices = YANDEX_VOICES.filter(v =>
+            ch.gender !== "unknown" ? v.gender === ch.gender : true
+          );
+          if (usedVoices.has(voiceId) && genderVoices.length > 1) {
+            const alt = genderVoices.find(v => !usedVoices.has(v.id));
+            if (alt) voiceId = alt.id;
+          }
+
+          roleId = matchRole(voiceId, ch.temperament);
         }
         usedVoices.add(voiceId);
 
-        const roleId = matchRole(voiceId, ch.temperament);
         const vc: BookCharacter["voice_config"] = {
           provider: "yandex",
           voice_id: voiceId,
@@ -670,6 +709,11 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                     )}
                     <span className="truncate font-medium">{ch.name}</span>
                     <div className="flex items-center gap-1 shrink-0">
+                      {isExtra(ch.id) && (
+                        <Badge variant="outline" className="text-[9px] px-1 py-0 border-muted-foreground/30 text-muted-foreground/60">
+                          {isRu ? "массовка" : "extra"}
+                        </Badge>
+                      )}
                       {ch.description && <User className="h-3 w-3 text-primary/60" />}
                       {ch.voice_config?.voice_id && <Volume2 className="h-3 w-3 text-primary/60" />}
                     </div>
@@ -706,8 +750,13 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
               {selectedChar ? (
                 <>
                   <div>
-                    <h4 className="text-base font-semibold font-display text-foreground mb-2">
+                    <h4 className="text-base font-semibold font-display text-foreground mb-2 flex items-center gap-2">
                       {selectedChar.name}
+                      {isExtra(selectedChar.id) && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-muted-foreground/40 text-muted-foreground/70 font-normal">
+                          {isRu ? "Массовка" : "Extra"}
+                        </Badge>
+                      )}
                     </h4>
                     {selectedChar.description && (
                       <p className="text-sm text-foreground/90 leading-relaxed mb-3">
