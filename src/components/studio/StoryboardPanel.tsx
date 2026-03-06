@@ -414,18 +414,39 @@ export function StoryboardPanel({
   }, [isRu]);
 
   // Update speaker in DB
+  // Update speaker — and propagate to all segments of same type in this scene
   const updateSpeaker = useCallback(async (segmentId: string, newSpeaker: string | null) => {
+    const targetSeg = segments.find(s => s.segment_id === segmentId);
+    if (!targetSeg) return;
+
+    const sameTypeIds = segments
+      .filter(s => s.segment_type === targetSeg.segment_type)
+      .map(s => s.segment_id);
+
+    // Update all segments of same type locally
     setSegments(prev => prev.map(seg =>
-      seg.segment_id === segmentId ? { ...seg, speaker: newSpeaker } : seg
+      sameTypeIds.includes(seg.segment_id) ? { ...seg, speaker: newSpeaker } : seg
     ));
+
+    // Persist all to DB
     const { error } = await supabase
       .from("scene_segments")
       .update({ speaker: newSpeaker })
-      .eq("id", segmentId);
+      .in("id", sameTypeIds);
+
     if (error) {
       toast.error(isRu ? "Ошибка сохранения персонажа" : "Failed to save speaker");
+    } else if (sameTypeIds.length > 1) {
+      const typeLabel = isRu
+        ? SEGMENT_CONFIG[targetSeg.segment_type]?.label_ru
+        : SEGMENT_CONFIG[targetSeg.segment_type]?.label_en;
+      toast.success(
+        isRu
+          ? `«${typeLabel}» → ${newSpeaker || "?"} (${sameTypeIds.length} фрагм.)`
+          : `"${typeLabel}" → ${newSpeaker || "?"} (${sameTypeIds.length} seg.)`
+      );
     }
-  }, [isRu]);
+  }, [isRu, segments]);
 
   // ── No scene selected ──
   if (!sceneId) {
