@@ -649,6 +649,20 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                   <Filter className={`h-3 w-3 ${filterMode === "scene" ? "text-primary" : ""}`} />
                 </Button>
               )}
+              {/* Extras toggle for selected character */}
+              {selectedId && !multiSelect && (
+                <Button
+                  variant={isExtra(selectedId) ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => toggleExtra(selectedId)}
+                  title={isExtra(selectedId)
+                    ? (isRu ? "Убрать из массовки" : "Remove from extras")
+                    : (isRu ? "Пометить как массовку" : "Mark as extra")}
+                >
+                  <UsersRound className={`h-3 w-3 ${isExtra(selectedId) ? "text-primary" : ""}`} />
+                </Button>
+              )}
               {/* Multi-select toggle */}
               {characters.length > 1 && (
                 <Button
@@ -748,9 +762,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                     <span className="truncate font-medium">{ch.name}</span>
                     <div className="flex items-center gap-1 shrink-0">
                       {isExtra(ch.id) && (
-                        <Badge variant="outline" className="text-[9px] px-1 py-0 border-muted-foreground/30 text-muted-foreground/60">
-                          {isRu ? "массовка" : "extra"}
-                        </Badge>
+                        <UsersRound className="h-3 w-3 text-muted-foreground/50" title={isRu ? "Массовка" : "Extra"} />
                       )}
                       {ch.description && <User className="h-3 w-3 text-primary/60" />}
                       {ch.voice_config?.voice_id && <Volume2 className="h-3 w-3 text-primary/60" />}
@@ -791,9 +803,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                     <h4 className="text-base font-semibold font-display text-foreground mb-2 flex items-center gap-2">
                       {selectedChar.name}
                       {isExtra(selectedChar.id) && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-muted-foreground/40 text-muted-foreground/70 font-normal">
-                          {isRu ? "Массовка" : "Extra"}
-                        </Badge>
+                        <UsersRound className="h-4 w-4 text-muted-foreground/60" title={isRu ? "Массовка" : "Extra"} />
                       )}
                     </h4>
                     {selectedChar.description && (
