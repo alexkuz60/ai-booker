@@ -70,11 +70,16 @@ function TimelineTrack({
   duration: number;
   clips?: TimelineClip[];
 }) {
-  // Use real clips if available, otherwise fallback placeholders
   const clips = realClips && realClips.length > 0
-    ? realClips.map(c => ({ start: c.startSec, end: c.startSec + c.durationSec, label: c.label, type: c.segmentType }))
+    ? realClips.map(c => ({
+        start: c.startSec,
+        end: c.startSec + c.durationSec,
+        label: c.label,
+        type: c.segmentType,
+        hasAudio: c.hasAudio,
+      }))
     : track.type === "atmosphere"
-      ? [{ start: 0, end: duration, label: track.label, type: "atmosphere" }]
+      ? [{ start: 0, end: duration, label: track.label, type: "atmosphere", hasAudio: false }]
       : track.type === "sfx"
         ? []
         : [];
@@ -86,17 +91,22 @@ function TimelineTrack({
         return (
           <div
             key={i}
-            className="absolute top-1 bottom-1 rounded-sm opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
+            className={`absolute top-1 bottom-1 rounded-sm transition-opacity cursor-pointer ${
+              clip.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-50 hover:opacity-70"
+            }`}
             style={{
               left: `${clip.start * zoom * 4}px`,
               width: `${widthPx}px`,
               backgroundColor: track.color,
+              backgroundImage: clip.hasAudio
+                ? undefined
+                : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
             }}
-            title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)`}
+            title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${clip.hasAudio ? " 🔊" : ""}`}
           >
             {widthPx > 40 && (
               <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
-                {clip.label}
+                {clip.hasAudio ? "🔊 " : ""}{clip.label}
               </span>
             )}
           </div>
