@@ -174,7 +174,6 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [playing, setPlaying] = useState(false);
   const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
   const [saving, setSaving] = useState(false);
-  const [saving, setSaving] = useState(false);
 
   const selectedVoice = YANDEX_VOICES.find(v => v.id === voice);
   const availableRoles = selectedVoice?.roles ?? ["neutral"];
