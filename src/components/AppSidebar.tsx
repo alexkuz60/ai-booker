@@ -160,6 +160,22 @@ export function AppSidebar() {
             </SidebarMenuItem>
           )}
 
+          {/* Assistant */}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={() => setAssistantOpen(true)}
+              tooltip={collapsed ? (isRu ? "Ассистент" : "Assistant") : undefined}
+              className="hover:bg-accent/50"
+            >
+              <MessageCircle className="h-4 w-4" />
+              {!collapsed && (
+                <span className="font-body text-sm">
+                  {isRu ? "Ассистент" : "Assistant"}
+                </span>
+              )}
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
           {/* Profile */}
           <SidebarMenuItem>
             <SidebarMenuButton
