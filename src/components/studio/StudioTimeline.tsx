@@ -171,7 +171,7 @@ export function StudioTimeline({
 }: StudioTimelineProps) {
   const [mode, setMode] = useState<"scene" | "chapter">("scene");
 
-  // ── Real clips from segments ──────────────────────────────
+  
 
   // ── Character tracks ──────────────────────────────────────
   const [charTracks, setCharTracks] = useState<TimelineTrackData[]>([]);
