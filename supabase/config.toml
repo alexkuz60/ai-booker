@@ -29,3 +29,9 @@ verify_jwt = false
 
 [functions.elevenlabs-music]
 verify_jwt = false
+
+[functions.synthesize-scene]
+verify_jwt = false
+
+[functions.assistant-chat]
+verify_jwt = false
