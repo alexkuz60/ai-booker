@@ -180,7 +180,24 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [merging, setMerging] = useState(false);
 
-  /** A character is "extras" if explicitly set in voice_config, or auto-detected (≤1 segment) */
+  // Voice settings state
+  const [voice, setVoice] = useState("marina");
+  const [role, setRole] = useState("neutral");
+  const [pitch, setPitch] = useState(0);
+  const [speed, setSpeed] = useState(1.0);
+  const [volume, setVolume] = useState(0);
+  const [dirty, setDirty] = useState(false);
+
+  const [testing, setTesting] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const selectedVoice = YANDEX_VOICES.find(v => v.id === voice);
+  const availableRoles = selectedVoice?.roles ?? ["neutral"];
+  const selectedChar = characters.find(c => c.id === selectedId);
+  const hasProfiles = characters.some(c => c.description);
+
   const isExtra = useCallback((charId: string) => {
     const ch = characters.find(c => c.id === charId);
     if (ch?.voice_config?.is_extra !== undefined) return ch.voice_config.is_extra;
