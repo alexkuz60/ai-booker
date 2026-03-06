@@ -379,313 +379,327 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
         </ScrollArea>
       </div>
 
-      {/* Right: profile + voice settings */}
-      <div className="flex-1 min-w-0 overflow-auto">
-        <ScrollArea className="h-full">
-          <div className="p-4 space-y-5 max-w-lg">
-            {/* Character profile section */}
-            {selectedChar && selectedChar.description && (
-              <>
-                <div>
-                  <h3 className="text-base font-semibold font-display text-foreground mb-3">
-                    {selectedChar.name}
-                  </h3>
-                  <p className="text-sm text-foreground/90 leading-relaxed mb-3">
-                    {selectedChar.description}
-                  </p>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button type="button" className="inline-flex items-center">
-                          <Badge
-                            variant="outline"
-                            className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
-                              selectedChar.gender === "unknown" ? "border-dashed border-warning text-warning" : ""
-                            }`}
-                          >
-                            {GENDER_LABELS[selectedChar.gender]?.[isRu ? "ru" : "en"] ?? selectedChar.gender}
-                            {selectedChar.gender === "unknown" && " ▾"}
-                          </Badge>
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-1.5" align="start">
-                        <div className="grid gap-0.5">
-                          {GENDER_OPTIONS.map(g => (
-                            <button
-                              key={g}
-                              className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${
-                                selectedChar.gender === g
-                                  ? "bg-accent text-accent-foreground"
-                                  : "hover:bg-muted text-foreground"
-                              }`}
-                              onClick={async () => {
-                                const charId = selectedChar.id;
-                                setCharacters(prev => prev.map(c =>
-                                  c.id === charId ? { ...c, gender: g } : c
-                                ));
-                                try {
-                                  const { error } = await supabase
-                                    .from("book_characters")
-                                    .update({ gender: g, updated_at: new Date().toISOString() })
-                                    .eq("id", charId);
-                                  if (error) throw error;
-                                  toast.success(isRu ? "Пол сохранён" : "Gender saved");
-                                } catch {
-                                  toast.error(isRu ? "Ошибка сохранения" : "Save error");
-                                  loadCharacters();
-                                }
-                              }}
-                            >
-                              {GENDER_LABELS[g]?.[isRu ? "ru" : "en"]}
-                            </button>
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button type="button" className="inline-flex items-center">
-                          <Badge
-                            variant="outline"
-                            className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
-                              selectedChar.age_group === "unknown" ? "border-dashed border-warning text-warning" : ""
-                            }`}
-                          >
-                            {getAgeLabel(selectedChar.age_group, selectedChar.gender, isRu)}
-                            {selectedChar.age_group === "unknown" && " ▾"}
-                          </Badge>
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-1.5" align="start">
-                        <div className="grid gap-0.5">
-                          {AGE_OPTIONS.map(age => (
-                            <button
-                              key={age}
-                              className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${
-                                selectedChar.age_group === age
-                                  ? "bg-accent text-accent-foreground"
-                                  : "hover:bg-muted text-foreground"
-                              }`}
-                              onClick={async () => {
-                                const charId = selectedChar.id;
-                                setCharacters(prev => prev.map(c =>
-                                  c.id === charId ? { ...c, age_group: age } : c
-                                ));
-                                try {
-                                  const { error } = await supabase
-                                    .from("book_characters")
-                                    .update({ age_group: age, updated_at: new Date().toISOString() })
-                                    .eq("id", charId);
-                                  if (error) throw error;
-                                  toast.success(isRu ? "Возраст сохранён" : "Age saved");
-                                } catch {
-                                  toast.error(isRu ? "Ошибка сохранения" : "Save error");
-                                  loadCharacters();
-                                }
-                              }}
-                            >
-                              {getAgeLabel(age, selectedChar.gender, isRu)}
-                            </button>
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button type="button" className="inline-flex items-center">
-                          <Badge
-                            variant="secondary"
-                            className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
-                              !selectedChar.temperament ? "border-dashed border-warning text-warning" : ""
-                            }`}
-                          >
-                            {selectedChar.temperament
-                              ? (TEMPERAMENT_LABELS[selectedChar.temperament]?.[isRu ? "ru" : "en"] ?? selectedChar.temperament)
-                              : (isRu ? "Темперамент ▾" : "Temperament ▾")}
-                          </Badge>
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-1.5" align="start">
-                        <div className="grid gap-0.5">
-                          {TEMPERAMENT_OPTIONS.map(t => (
-                            <button
-                              key={t}
-                              className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${
-                                selectedChar.temperament === t
-                                  ? "bg-accent text-accent-foreground"
-                                  : "hover:bg-muted text-foreground"
-                              }`}
-                              onClick={async () => {
-                                const charId = selectedChar.id;
-                                setCharacters(prev => prev.map(c =>
-                                  c.id === charId ? { ...c, temperament: t } : c
-                                ));
-                                try {
-                                  const { error } = await supabase
-                                    .from("book_characters")
-                                    .update({ temperament: t, updated_at: new Date().toISOString() })
-                                    .eq("id", charId);
-                                  if (error) throw error;
-                                  toast.success(isRu ? "Темперамент сохранён" : "Temperament saved");
-                                } catch {
-                                  toast.error(isRu ? "Ошибка сохранения" : "Save error");
-                                  loadCharacters();
-                                }
-                              }}
-                            >
-                              {TEMPERAMENT_LABELS[t]?.[isRu ? "ru" : "en"]}
-                            </button>
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  {selectedChar.speech_style && (
-                    <div className="mt-2">
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                        {isRu ? "Стиль речи" : "Speech Style"}
-                      </span>
-                      <p className="text-xs text-muted-foreground mt-1 italic">
-                        {selectedChar.speech_style}
-                      </p>
-                    </div>
-                  )}
-                  {selectedChar.aliases.length > 0 && (
-                    <div className="mt-2">
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                        {isRu ? "Также известен как" : "Also known as"}
-                      </span>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {selectedChar.aliases.join(", ")}
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <Separator />
-              </>
-            )}
-
-            {/* Voice settings header */}
-            <div>
-              <h3 className="text-base font-semibold font-display text-foreground mb-1">
-                {selectedChar
-                  ? `${isRu ? "Голос:" : "Voice:"} ${selectedChar.name}`
-                  : (isRu ? "Настройки голоса" : "Voice Settings")}
+      {/* Right: two-column layout — Profile + Voice */}
+      <div className="flex-1 min-w-0 overflow-hidden flex">
+        {/* Column 1: Profile */}
+        <div className="flex-1 min-w-0 border-r border-border">
+          <ScrollArea className="h-full">
+            <div className="p-4 space-y-4">
+              <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider">
+                {isRu ? "Профайл" : "Profile"}
               </h3>
-              <p className="text-xs text-muted-foreground">
-                {isRu ? "Yandex SpeechKit · предпрослушивание" : "Yandex SpeechKit · preview"}
-              </p>
-            </div>
 
-            <Separator />
-
-            {/* Voice selector */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {isRu ? "Голос" : "Voice"}
-              </label>
-              <Select value={voice} onValueChange={handleVoiceChange}>
-                <SelectTrigger className="bg-secondary border-border">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  {YANDEX_VOICES.map(v => (
-                    <SelectItem key={v.id} value={v.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{isRu ? v.name.ru : v.name.en}</span>
-                        <Badge variant="outline" className="text-[10px] px-1 py-0">
-                          {v.gender === "female" ? "♀" : "♂"}
-                        </Badge>
-                        {v.apiVersion === "v3" && (
-                          <Badge variant="secondary" className="text-[10px] px-1 py-0">v3</Badge>
-                        )}
+              {selectedChar ? (
+                <>
+                  <div>
+                    <h4 className="text-base font-semibold font-display text-foreground mb-2">
+                      {selectedChar.name}
+                    </h4>
+                    {selectedChar.description && (
+                      <p className="text-sm text-foreground/90 leading-relaxed mb-3">
+                        {selectedChar.description}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button type="button" className="inline-flex items-center">
+                            <Badge
+                              variant="outline"
+                              className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
+                                selectedChar.gender === "unknown" ? "border-dashed border-warning text-warning" : ""
+                              }`}
+                            >
+                              {GENDER_LABELS[selectedChar.gender]?.[isRu ? "ru" : "en"] ?? selectedChar.gender}
+                              {selectedChar.gender === "unknown" && " ▾"}
+                            </Badge>
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-1.5" align="start">
+                          <div className="grid gap-0.5">
+                            {GENDER_OPTIONS.map(g => (
+                              <button
+                                key={g}
+                                className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${
+                                  selectedChar.gender === g
+                                    ? "bg-accent text-accent-foreground"
+                                    : "hover:bg-muted text-foreground"
+                                }`}
+                                onClick={async () => {
+                                  const charId = selectedChar.id;
+                                  setCharacters(prev => prev.map(c =>
+                                    c.id === charId ? { ...c, gender: g } : c
+                                  ));
+                                  try {
+                                    const { error } = await supabase
+                                      .from("book_characters")
+                                      .update({ gender: g, updated_at: new Date().toISOString() })
+                                      .eq("id", charId);
+                                    if (error) throw error;
+                                    toast.success(isRu ? "Пол сохранён" : "Gender saved");
+                                  } catch {
+                                    toast.error(isRu ? "Ошибка сохранения" : "Save error");
+                                    loadCharacters();
+                                  }
+                                }}
+                              >
+                                {GENDER_LABELS[g]?.[isRu ? "ru" : "en"]}
+                              </button>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button type="button" className="inline-flex items-center">
+                            <Badge
+                              variant="outline"
+                              className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
+                                selectedChar.age_group === "unknown" ? "border-dashed border-warning text-warning" : ""
+                              }`}
+                            >
+                              {getAgeLabel(selectedChar.age_group, selectedChar.gender, isRu)}
+                              {selectedChar.age_group === "unknown" && " ▾"}
+                            </Badge>
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-1.5" align="start">
+                          <div className="grid gap-0.5">
+                            {AGE_OPTIONS.map(age => (
+                              <button
+                                key={age}
+                                className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${
+                                  selectedChar.age_group === age
+                                    ? "bg-accent text-accent-foreground"
+                                    : "hover:bg-muted text-foreground"
+                                }`}
+                                onClick={async () => {
+                                  const charId = selectedChar.id;
+                                  setCharacters(prev => prev.map(c =>
+                                    c.id === charId ? { ...c, age_group: age } : c
+                                  ));
+                                  try {
+                                    const { error } = await supabase
+                                      .from("book_characters")
+                                      .update({ age_group: age, updated_at: new Date().toISOString() })
+                                      .eq("id", charId);
+                                    if (error) throw error;
+                                    toast.success(isRu ? "Возраст сохранён" : "Age saved");
+                                  } catch {
+                                    toast.error(isRu ? "Ошибка сохранения" : "Save error");
+                                    loadCharacters();
+                                  }
+                                }}
+                              >
+                                {getAgeLabel(age, selectedChar.gender, isRu)}
+                              </button>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button type="button" className="inline-flex items-center">
+                            <Badge
+                              variant="secondary"
+                              className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
+                                !selectedChar.temperament ? "border-dashed border-warning text-warning" : ""
+                              }`}
+                            >
+                              {selectedChar.temperament
+                                ? (TEMPERAMENT_LABELS[selectedChar.temperament]?.[isRu ? "ru" : "en"] ?? selectedChar.temperament)
+                                : (isRu ? "Темперамент ▾" : "Temperament ▾")}
+                            </Badge>
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-1.5" align="start">
+                          <div className="grid gap-0.5">
+                            {TEMPERAMENT_OPTIONS.map(t => (
+                              <button
+                                key={t}
+                                className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${
+                                  selectedChar.temperament === t
+                                    ? "bg-accent text-accent-foreground"
+                                    : "hover:bg-muted text-foreground"
+                                }`}
+                                onClick={async () => {
+                                  const charId = selectedChar.id;
+                                  setCharacters(prev => prev.map(c =>
+                                    c.id === charId ? { ...c, temperament: t } : c
+                                  ));
+                                  try {
+                                    const { error } = await supabase
+                                      .from("book_characters")
+                                      .update({ temperament: t, updated_at: new Date().toISOString() })
+                                      .eq("id", charId);
+                                    if (error) throw error;
+                                    toast.success(isRu ? "Темперамент сохранён" : "Temperament saved");
+                                  } catch {
+                                    toast.error(isRu ? "Ошибка сохранения" : "Save error");
+                                    loadCharacters();
+                                  }
+                                }}
+                              >
+                                {TEMPERAMENT_LABELS[t]?.[isRu ? "ru" : "en"]}
+                              </button>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    {selectedChar.speech_style && (
+                      <div className="mt-2">
+                        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                          {isRu ? "Стиль речи" : "Speech Style"}
+                        </span>
+                        <p className="text-xs text-muted-foreground mt-1 italic">
+                          {selectedChar.speech_style}
+                        </p>
                       </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    )}
+                    {selectedChar.aliases.length > 0 && (
+                      <div className="mt-2">
+                        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                          {isRu ? "Также известен как" : "Also known as"}
+                        </span>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {selectedChar.aliases.join(", ")}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+                  {isRu ? "Выберите персонажа" : "Select a character"}
+                </div>
+              )}
             </div>
+          </ScrollArea>
+        </div>
 
-            {/* Role */}
-            {availableRoles.length > 1 && (
+        {/* Column 2: Voice */}
+        <div className="flex-1 min-w-0">
+          <ScrollArea className="h-full">
+            <div className="p-4 space-y-4">
+              <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider">
+                {isRu ? "Голос" : "Voice"}
+              </h3>
+
+              <div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  {isRu ? "Yandex SpeechKit · предпрослушивание" : "Yandex SpeechKit · preview"}
+                </p>
+              </div>
+
+              {/* Voice selector */}
               <div className="space-y-2">
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {isRu ? "Амплуа" : "Role"}
+                  {isRu ? "Голос" : "Voice"}
                 </label>
-                <Select value={role} onValueChange={v => { setRole(v); markDirty(); }}>
+                <Select value={voice} onValueChange={handleVoiceChange}>
                   <SelectTrigger className="bg-secondary border-border">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-border">
-                    {availableRoles.map(r => (
-                      <SelectItem key={r} value={r}>
-                        {ROLE_LABELS[r]?.[isRu ? "ru" : "en"] ?? r}
+                    {YANDEX_VOICES.map(v => (
+                      <SelectItem key={v.id} value={v.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{isRu ? v.name.ru : v.name.en}</span>
+                          <Badge variant="outline" className="text-[10px] px-1 py-0">
+                            {v.gender === "female" ? "♀" : "♂"}
+                          </Badge>
+                          {v.apiVersion === "v3" && (
+                            <Badge variant="secondary" className="text-[10px] px-1 py-0">v3</Badge>
+                          )}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            )}
 
-            {/* Speed */}
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Скорость" : "Speed"}</label>
-                <span className="text-xs text-muted-foreground tabular-nums">{speed.toFixed(1)}×</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Slider min={0.3} max={2.0} step={0.1} value={[speed]} onValueChange={([v]) => { setSpeed(v); markDirty(); }} className="flex-1" />
-                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setSpeed(1.0); markDirty(); }} disabled={speed === 1.0}>
-                  <RotateCcw className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Pitch */}
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Тон (pitch)" : "Pitch"}</label>
-                <span className="text-xs text-muted-foreground tabular-nums">{pitch > 0 ? "+" : ""}{pitch} Hz</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Slider min={-500} max={500} step={50} value={[pitch]} onValueChange={([v]) => { setPitch(v); markDirty(); }} className="flex-1" />
-                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setPitch(0); markDirty(); }} disabled={pitch === 0}>
-                  <RotateCcw className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Volume */}
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Громкость" : "Volume"}</label>
-                <span className="text-xs text-muted-foreground tabular-nums">{volume > 0 ? "+" : ""}{volume} dB</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Slider min={-15} max={15} step={1} value={[volume]} onValueChange={([v]) => { setVolume(v); markDirty(); }} className="flex-1" />
-                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setVolume(0); markDirty(); }} disabled={volume === 0}>
-                  <RotateCcw className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Action buttons */}
-            <div className="flex gap-2">
-              <Button onClick={handlePreview} disabled={testing} variant="outline" className="gap-2">
-                {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : playing ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                {playing ? (isRu ? "Стоп" : "Stop") : (isRu ? "Прослушать" : "Preview")}
-              </Button>
-              {selectedId && (
-                <Button onClick={handleSave} disabled={saving || !dirty} className="gap-2">
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  {isRu ? "Сохранить" : "Save"}
-                </Button>
+              {/* Role */}
+              {availableRoles.length > 1 && (
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    {isRu ? "Амплуа" : "Role"}
+                  </label>
+                  <Select value={role} onValueChange={v => { setRole(v); markDirty(); }}>
+                    <SelectTrigger className="bg-secondary border-border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      {availableRoles.map(r => (
+                        <SelectItem key={r} value={r}>
+                          {ROLE_LABELS[r]?.[isRu ? "ru" : "en"] ?? r}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
+
+              {/* Speed */}
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Скорость" : "Speed"}</label>
+                  <span className="text-xs text-muted-foreground tabular-nums">{speed.toFixed(1)}×</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Slider min={0.3} max={2.0} step={0.1} value={[speed]} onValueChange={([v]) => { setSpeed(v); markDirty(); }} className="flex-1" />
+                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setSpeed(1.0); markDirty(); }} disabled={speed === 1.0}>
+                    <RotateCcw className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Pitch */}
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Тон (pitch)" : "Pitch"}</label>
+                  <span className="text-xs text-muted-foreground tabular-nums">{pitch > 0 ? "+" : ""}{pitch} Hz</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Slider min={-500} max={500} step={50} value={[pitch]} onValueChange={([v]) => { setPitch(v); markDirty(); }} className="flex-1" />
+                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setPitch(0); markDirty(); }} disabled={pitch === 0}>
+                    <RotateCcw className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Volume */}
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Громкость" : "Volume"}</label>
+                  <span className="text-xs text-muted-foreground tabular-nums">{volume > 0 ? "+" : ""}{volume} dB</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Slider min={-15} max={15} step={1} value={[volume]} onValueChange={([v]) => { setVolume(v); markDirty(); }} className="flex-1" />
+                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setVolume(0); markDirty(); }} disabled={volume === 0}>
+                    <RotateCcw className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Action buttons */}
+              <div className="flex gap-2">
+                <Button onClick={handlePreview} disabled={testing} variant="outline" className="gap-2">
+                  {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : playing ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  {playing ? (isRu ? "Стоп" : "Stop") : (isRu ? "Прослушать" : "Preview")}
+                </Button>
+                {selectedId && (
+                  <Button onClick={handleSave} disabled={saving || !dirty} className="gap-2">
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    {isRu ? "Сохранить" : "Save"}
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        </ScrollArea>
+          </ScrollArea>
+        </div>
       </div>
     </div>
   );
