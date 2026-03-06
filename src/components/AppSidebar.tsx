@@ -31,6 +31,7 @@ const mainNav = [
 ];
 
 export function AppSidebar() {
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const { signOut } = useAuth();
   const { isAdmin } = useUserRole();
   const { state } = useSidebar();
