@@ -443,6 +443,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
           voice_id: voiceId,
           role: roleId !== "neutral" ? roleId : undefined,
           speed: 1.0,
+          is_extra: ch.voice_config?.is_extra,
         };
         updates.push({ id: ch.id, voice_config: vc });
       }
