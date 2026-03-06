@@ -372,6 +372,8 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     }
   };
 
+  useImperativeHandle(ref, () => ({ autoCast: handleAutoCast, casting }), [characters, selectedId, casting]);
+
   // ── TTS Preview ─────────────────────────────────────────
   const handlePreview = async () => {
     if (playing && audioRef) {
