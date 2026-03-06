@@ -35,10 +35,14 @@ interface BookCharacter {
 }
 
 const GENDER_LABELS: Record<string, { ru: string; en: string }> = {
-  male: { ru: "Мужской", en: "Male" },
-  female: { ru: "Женский", en: "Female" },
+  male: { ru: "Мужской ♂", en: "Male ♂" },
+  female: { ru: "Женский ♀", en: "Female ♀" },
   unknown: { ru: "Не определён", en: "Unknown" },
 };
+
+const GENDER_OPTIONS = ["male", "female"] as const;
+
+const TEMPERAMENT_OPTIONS = ["sanguine", "choleric", "melancholic", "phlegmatic", "mixed"] as const;
 
 const AGE_LABELS: Record<string, { ru: { m: string; f: string; u: string }; en: { m: string; f: string; u: string } }> = {
   infant:  { ru: { m: "Младенец", f: "Младенец", u: "Младенец" },       en: { m: "Infant", f: "Infant", u: "Infant" } },
@@ -390,9 +394,52 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
                     {selectedChar.description}
                   </p>
                   <div className="flex flex-wrap gap-2 mb-2">
-                    <Badge variant="outline" className="text-xs">
-                      {GENDER_LABELS[selectedChar.gender]?.[isRu ? "ru" : "en"] ?? selectedChar.gender}
-                    </Badge>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
+                            selectedChar.gender === "unknown" ? "border-dashed border-warning text-warning" : ""
+                          }`}
+                        >
+                          {GENDER_LABELS[selectedChar.gender]?.[isRu ? "ru" : "en"] ?? selectedChar.gender}
+                          {selectedChar.gender === "unknown" && " ▾"}
+                        </Badge>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-1.5" align="start">
+                        <div className="grid gap-0.5">
+                          {GENDER_OPTIONS.map(g => (
+                            <button
+                              key={g}
+                              className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${
+                                selectedChar.gender === g
+                                  ? "bg-accent text-accent-foreground"
+                                  : "hover:bg-muted text-foreground"
+                              }`}
+                              onClick={async () => {
+                                const charId = selectedChar.id;
+                                setCharacters(prev => prev.map(c =>
+                                  c.id === charId ? { ...c, gender: g } : c
+                                ));
+                                try {
+                                  const { error } = await supabase
+                                    .from("book_characters")
+                                    .update({ gender: g, updated_at: new Date().toISOString() })
+                                    .eq("id", charId);
+                                  if (error) throw error;
+                                  toast.success(isRu ? "Пол сохранён" : "Gender saved");
+                                } catch {
+                                  toast.error(isRu ? "Ошибка сохранения" : "Save error");
+                                  loadCharacters();
+                                }
+                              }}
+                            >
+                              {GENDER_LABELS[g]?.[isRu ? "ru" : "en"]}
+                            </button>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Badge
@@ -439,11 +486,53 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
                         </div>
                       </PopoverContent>
                     </Popover>
-                    {selectedChar.temperament && (
-                      <Badge variant="secondary" className="text-xs">
-                        {TEMPERAMENT_LABELS[selectedChar.temperament]?.[isRu ? "ru" : "en"] ?? selectedChar.temperament}
-                      </Badge>
-                    )}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Badge
+                          variant="secondary"
+                          className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
+                            !selectedChar.temperament ? "border-dashed border-warning text-warning" : ""
+                          }`}
+                        >
+                          {selectedChar.temperament
+                            ? (TEMPERAMENT_LABELS[selectedChar.temperament]?.[isRu ? "ru" : "en"] ?? selectedChar.temperament)
+                            : (isRu ? "Темперамент ▾" : "Temperament ▾")}
+                        </Badge>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-1.5" align="start">
+                        <div className="grid gap-0.5">
+                          {TEMPERAMENT_OPTIONS.map(t => (
+                            <button
+                              key={t}
+                              className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${
+                                selectedChar.temperament === t
+                                  ? "bg-accent text-accent-foreground"
+                                  : "hover:bg-muted text-foreground"
+                              }`}
+                              onClick={async () => {
+                                const charId = selectedChar.id;
+                                setCharacters(prev => prev.map(c =>
+                                  c.id === charId ? { ...c, temperament: t } : c
+                                ));
+                                try {
+                                  const { error } = await supabase
+                                    .from("book_characters")
+                                    .update({ temperament: t, updated_at: new Date().toISOString() })
+                                    .eq("id", charId);
+                                  if (error) throw error;
+                                  toast.success(isRu ? "Темперамент сохранён" : "Temperament saved");
+                                } catch {
+                                  toast.error(isRu ? "Ошибка сохранения" : "Save error");
+                                  loadCharacters();
+                                }
+                              }}
+                            >
+                              {TEMPERAMENT_LABELS[t]?.[isRu ? "ru" : "en"]}
+                            </button>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   {selectedChar.speech_style && (
                     <div className="mt-2">
