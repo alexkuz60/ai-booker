@@ -182,7 +182,14 @@ const Studio = () => {
         </div>
 
         {/* Bottom: Timeline */}
-        <StudioTimeline isRu={isRu} durationSec={chapterEstimate?.sec} />
+        <StudioTimeline
+          isRu={isRu}
+          sceneDurationSec={sceneEstimate?.sec}
+          chapterDurationSec={chapterEstimate?.sec}
+          sceneId={selectedScene?.id ?? null}
+          bookId={bookId}
+          chapterSceneIds={chapterSceneIds}
+        />
       </div>
     </motion.div>
   );

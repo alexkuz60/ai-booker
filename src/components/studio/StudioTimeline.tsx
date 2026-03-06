@@ -1,17 +1,39 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut, Maximize2, Layers, Film } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { supabase } from "@/integrations/supabase/client";
 
-// ─── Track data ─────────────────────────────────────────────
-const MOCK_TRACKS = [
-  { id: "narrator-1", label: "Диктор 1", color: "hsl(var(--primary))", type: "narrator" },
-  { id: "narrator-2", label: "Диктор 2", color: "hsl(var(--accent))", type: "narrator" },
+// ─── Types ──────────────────────────────────────────────────
+
+export interface TimelineTrackData {
+  id: string;
+  label: string;
+  color: string;
+  type: "narrator" | "atmosphere" | "sfx";
+}
+
+const FIXED_TRACKS: TimelineTrackData[] = [
   { id: "ambience", label: "Атмосфера", color: "hsl(175 45% 45%)", type: "atmosphere" },
   { id: "sfx", label: "SFX", color: "hsl(220 50% 55%)", type: "sfx" },
 ];
 
-const TRACK_LABELS_WIDTH = 112; // w-28 = 7rem = 112px
+const TRACK_LABELS_WIDTH = 112;
+
+// ─── Palette for character colors ───────────────────────────
+
+const NARRATOR_COLORS = [
+  "hsl(var(--primary))",
+  "hsl(var(--accent))",
+  "hsl(30 70% 55%)",
+  "hsl(280 55% 55%)",
+  "hsl(350 65% 55%)",
+  "hsl(160 50% 45%)",
+  "hsl(200 60% 50%)",
+  "hsl(45 75% 50%)",
+  "hsl(320 55% 50%)",
+  "hsl(100 45% 45%)",
+];
 
 // ─── Sub-components ─────────────────────────────────────────
 
@@ -36,14 +58,13 @@ function TimelineRuler({ zoom, duration }: { zoom: number; duration: number }) {
   );
 }
 
-function TimelineTrack({ track, zoom, duration }: { track: typeof MOCK_TRACKS[0]; zoom: number; duration: number }) {
-  const clips = track.id === "narrator-1"
-    ? [{ start: 0, end: Math.min(45, duration) }, { start: Math.min(50, duration), end: Math.min(120, duration) }]
-    : track.id === "narrator-2"
-    ? [{ start: Math.min(48, duration), end: Math.min(80, duration) }]
-    : track.id === "ambience"
+function TimelineTrack({ track, zoom, duration }: { track: TimelineTrackData; zoom: number; duration: number }) {
+  // Placeholder clips based on track type
+  const clips = track.type === "atmosphere"
     ? [{ start: 0, end: duration }]
-    : [{ start: Math.min(20, duration), end: Math.min(25, duration) }, { start: Math.min(60, duration), end: Math.min(63, duration) }, { start: Math.min(100, duration), end: Math.min(104, duration) }];
+    : track.type === "sfx"
+      ? [] // SFX tracks start empty
+      : [{ start: 0, end: Math.min(duration * 0.3, duration) }]; // narrator placeholder
 
   return (
     <div className="flex h-10 border-b border-border/50 relative" style={{ width: `${duration * zoom * 4}px` }}>
@@ -75,16 +96,80 @@ export const TIMELINE_HEADER_HEIGHT = 41;
 
 interface StudioTimelineProps {
   isRu: boolean;
-  /** Estimated chapter duration in seconds; falls back to 180 */
-  durationSec?: number;
+  /** Estimated scene duration in seconds */
+  sceneDurationSec?: number;
+  /** Estimated chapter duration in seconds */
+  chapterDurationSec?: number;
+  /** Currently selected scene ID */
+  sceneId?: string | null;
+  /** Book ID for loading characters */
+  bookId?: string | null;
+  /** All scene IDs in the chapter */
+  chapterSceneIds?: string[];
 }
 
-export function StudioTimeline({ isRu, durationSec }: StudioTimelineProps) {
-  const duration = durationSec && durationSec > 0 ? durationSec : 180;
+export function StudioTimeline({
+  isRu,
+  sceneDurationSec,
+  chapterDurationSec,
+  sceneId,
+  bookId,
+  chapterSceneIds,
+}: StudioTimelineProps) {
+  const [mode, setMode] = useState<"scene" | "chapter">("scene");
+  const duration = mode === "scene"
+    ? (sceneDurationSec && sceneDurationSec > 0 ? sceneDurationSec : 60)
+    : (chapterDurationSec && chapterDurationSec > 0 ? chapterDurationSec : 180);
+
+  // ── Character tracks ──────────────────────────────────────
+  const [charTracks, setCharTracks] = useState<TimelineTrackData[]>([]);
+
+  useEffect(() => {
+    if (!bookId) { setCharTracks([]); return; }
+
+    const contextSceneIds = mode === "scene"
+      ? (sceneId ? [sceneId] : [])
+      : (chapterSceneIds ?? []);
+
+    if (contextSceneIds.length === 0) { setCharTracks([]); return; }
+
+    (async () => {
+      // Get character IDs that appear in these scenes
+      const { data: appearances } = await supabase
+        .from("character_appearances")
+        .select("character_id")
+        .in("scene_id", contextSceneIds);
+
+      if (!appearances?.length) { setCharTracks([]); return; }
+
+      const charIds = [...new Set(appearances.map(a => a.character_id))];
+
+      // Load character names
+      const { data: chars } = await supabase
+        .from("book_characters")
+        .select("id, name, color, sort_order")
+        .in("id", charIds)
+        .order("sort_order");
+
+      if (!chars?.length) { setCharTracks([]); return; }
+
+      setCharTracks(
+        chars.map((c, i) => ({
+          id: `char-${c.id}`,
+          label: c.name,
+          color: c.color || NARRATOR_COLORS[i % NARRATOR_COLORS.length],
+          type: "narrator" as const,
+        }))
+      );
+    })();
+  }, [bookId, sceneId, chapterSceneIds?.join(","), mode]);
+
+  const allTracks = useMemo(() => [...charTracks, ...FIXED_TRACKS], [charTracks]);
+
+  // ── Layout / zoom ─────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
-  // Measure available width for tracks area
   useEffect(() => {
     const measure = () => {
       if (tracksContainerRef.current) {
@@ -97,7 +182,6 @@ export function StudioTimeline({ isRu, durationSec }: StudioTimelineProps) {
     return () => ro.disconnect();
   }, []);
 
-  // Fit-to-width zoom: availableWidth = duration * fitZoom * 4
   const fitZoom = useMemo(() => {
     if (containerWidth <= 0 || duration <= 0) return 1;
     return containerWidth / (duration * 4);
@@ -106,10 +190,7 @@ export function StudioTimeline({ isRu, durationSec }: StudioTimelineProps) {
   const [zoomOverride, setZoomOverride] = useState<number | null>(null);
   const zoom = zoomOverride ?? fitZoom;
 
-  // Reset to fit when duration or container changes
-  useEffect(() => {
-    setZoomOverride(null);
-  }, [fitZoom]);
+  useEffect(() => { setZoomOverride(null); }, [fitZoom]);
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("studio-timeline-collapsed") === "true"; } catch { return false; }
@@ -125,9 +206,7 @@ export function StudioTimeline({ isRu, durationSec }: StudioTimelineProps) {
       const persisted = Number(localStorage.getItem("studio-timeline-size"));
       if (!Number.isFinite(persisted) || persisted <= 0) return 250;
       return clampSize(persisted);
-    } catch {
-      return 250;
-    }
+    } catch { return 250; }
   });
 
   useEffect(() => {
@@ -171,8 +250,12 @@ export function StudioTimeline({ isRu, durationSec }: StudioTimelineProps) {
   }, [fitZoom]);
 
   const resetZoom = useCallback(() => setZoomOverride(null), []);
-
   const displayZoomPercent = Math.round(zoom * 100);
+
+  const toggleMode = useCallback(() => {
+    setMode(prev => prev === "scene" ? "chapter" : "scene");
+    setZoomOverride(null);
+  }, []);
 
   return (
     <div
@@ -191,19 +274,55 @@ export function StudioTimeline({ isRu, durationSec }: StudioTimelineProps) {
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
-        <button
-          onClick={toggleCollapse}
-          className="flex items-center gap-1.5 hover:text-foreground transition-colors"
-        >
-          {collapsed ? (
-            <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleCollapse}
+            className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+          >
+            {collapsed ? (
+              <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-body">
+              {isRu ? "Таймлайн" : "Timeline"}
+            </span>
+          </button>
+
+          {/* Mode toggle */}
+          <div className="flex items-center bg-muted/50 rounded-md p-0.5">
+            <button
+              onClick={() => { setMode("scene"); setZoomOverride(null); }}
+              className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+                mode === "scene"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Film className="h-3 w-3" />
+              {isRu ? "Сцена" : "Scene"}
+            </button>
+            <button
+              onClick={() => { setMode("chapter"); setZoomOverride(null); }}
+              className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+                mode === "chapter"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Layers className="h-3 w-3" />
+              {isRu ? "Глава" : "Chapter"}
+            </button>
+          </div>
+
+          {/* Track count */}
+          {charTracks.length > 0 && (
+            <span className="text-[10px] text-muted-foreground/60 font-body">
+              {charTracks.length} {isRu ? "дикт." : "narr."}
+            </span>
           )}
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-body">
-            {isRu ? "Таймлайн" : "Timeline"}
-          </span>
-        </button>
+        </div>
+
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom(-0.25)} title={isRu ? "Уменьшить" : "Zoom out"}>
             <ZoomOut className="h-3.5 w-3.5" />
@@ -227,7 +346,7 @@ export function StudioTimeline({ isRu, durationSec }: StudioTimelineProps) {
         <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
           <div className="w-28 shrink-0 border-r border-border flex flex-col">
             <div className="h-6 border-b border-border" />
-            {MOCK_TRACKS.map((track) => (
+            {allTracks.map((track) => (
               <div key={track.id} className="h-10 flex items-center px-3 border-b border-border/50">
                 <div className="w-2 h-2 rounded-full shrink-0 mr-2" style={{ backgroundColor: track.color }} />
                 <span className="text-xs text-muted-foreground font-body truncate">{track.label}</span>
@@ -237,7 +356,7 @@ export function StudioTimeline({ isRu, durationSec }: StudioTimelineProps) {
           <ScrollArea className="flex-1">
             <div className="min-w-full">
               <TimelineRuler zoom={zoom} duration={duration} />
-              {MOCK_TRACKS.map((track) => (
+              {allTracks.map((track) => (
                 <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} />
               ))}
             </div>
