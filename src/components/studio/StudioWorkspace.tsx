@@ -49,7 +49,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
             </TabsTrigger>
             <TabsTrigger value="sounds" className="gap-1.5">
               <Volume2 className="h-3.5 w-3.5" />
-              <span className="font-body text-sm">{isRu ? "Звуки" : "Sounds"}</span>
+              <span className="font-body text-sm">{isRu ? "Готовые главы" : "Finished Chapters"}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -101,7 +101,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
         <TabsContent value="sounds" className="flex-1 mt-4 min-h-0">
           <div className="rounded-lg border border-border bg-card/50 h-full flex items-center justify-center">
             <p className="text-sm text-muted-foreground font-body">
-              {isRu ? "Конкретные звуковые эффекты" : "Sound effects"}
+              {isRu ? "Таблица готовых аудио глав" : "Finished audio chapters"}
             </p>
           </div>
         </TabsContent>
