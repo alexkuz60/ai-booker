@@ -61,7 +61,9 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
               disabled={castingExternal}
             >
               {castingExternal ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
-              {isRu ? "Подбор Актёров" : "Auto-Cast"}
+              {castingExternal
+                ? (isRu ? "Подбор и профайлинг..." : "Casting & profiling...")
+                : (isRu ? "Подбор Актёров" : "Auto-Cast")}
             </Button>
           )}
         </div>
