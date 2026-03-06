@@ -11,6 +11,8 @@ export interface TimelineClip {
   durationSec: number;
   label: string;
   segmentType: string;
+  hasAudio: boolean;
+  audioPath?: string;
 }
 
 interface RawSegment {
@@ -30,7 +32,7 @@ interface RawPhrase {
 
 /**
  * Load real clips for timeline from scene_segments + segment_phrases.
- * Returns clips mapped to character track IDs.
+ * Uses actual durations from segment_audio when available, falls back to char-based estimate.
  */
 export function useTimelineClips(
   sceneIds: string[],
@@ -66,14 +68,32 @@ export function useTimelineClips(
 
       const segIds = segments.map(s => s.id);
 
-      // Load all phrases for these segments
-      const { data: phrases } = await supabase
-        .from("segment_phrases")
-        .select("id, segment_id, phrase_number, text")
-        .in("segment_id", segIds)
-        .order("phrase_number");
+      // Load phrases and audio metadata in parallel
+      const [{ data: phrases }, { data: audioData }] = await Promise.all([
+        supabase
+          .from("segment_phrases")
+          .select("id, segment_id, phrase_number, text")
+          .in("segment_id", segIds)
+          .order("phrase_number"),
+        supabase
+          .from("segment_audio" as any)
+          .select("segment_id, duration_ms, audio_path, status")
+          .in("segment_id", segIds)
+          .eq("status", "ready"),
+      ]);
 
       if (cancelled) return;
+
+      // Build audio duration map
+      const audioDurationMap = new Map<string, { durationMs: number; audioPath: string }>();
+      if (audioData) {
+        for (const a of audioData as any[]) {
+          audioDurationMap.set(a.segment_id, {
+            durationMs: a.duration_ms,
+            audioPath: a.audio_path,
+          });
+        }
+      }
 
       // Group phrases by segment
       const phrasesBySegment = new Map<string, RawPhrase[]>();
@@ -83,8 +103,7 @@ export function useTimelineClips(
         phrasesBySegment.set(p.segment_id, list);
       }
 
-      // Build clips: sequential timeline, accumulating time
-      // Group segments by scene_id to handle chapter mode (multiple scenes in sequence)
+      // Build clips: sequential timeline
       const sceneOrder = sceneIds;
       let globalOffset = 0;
       const result: TimelineClip[] = [];
@@ -97,16 +116,24 @@ export function useTimelineClips(
         let sceneOffset = globalOffset;
 
         for (const seg of sceneSegments) {
-          const segPhrases = phrasesBySegment.get(seg.id) ?? [];
-          const totalChars = segPhrases.reduce((sum, p) => sum + p.text.length, 0);
-          const durationSec = Math.max(0.5, totalChars / CHARS_PER_SEC);
+          const audioInfo = audioDurationMap.get(seg.id);
+          let durationSec: number;
+
+          if (audioInfo && audioInfo.durationMs > 0) {
+            // Use real audio duration
+            durationSec = audioInfo.durationMs / 1000;
+          } else {
+            // Fallback: estimate from text
+            const segPhrases = phrasesBySegment.get(seg.id) ?? [];
+            const totalChars = segPhrases.reduce((sum, p) => sum + p.text.length, 0);
+            durationSec = Math.max(0.5, totalChars / CHARS_PER_SEC);
+          }
 
           // Determine track ID
           let trackId = "narrator-fallback";
           if (seg.speaker && characterMap.has(seg.speaker)) {
             trackId = `char-${characterMap.get(seg.speaker)}`;
           } else if (seg.segment_type === "narrator" || seg.segment_type === "first_person") {
-            // Narrator segments without speaker: try to find a narrator character
             trackId = "narrator-fallback";
           }
 
@@ -118,6 +145,8 @@ export function useTimelineClips(
             durationSec,
             label: seg.speaker || seg.segment_type,
             segmentType: seg.segment_type,
+            hasAudio: !!audioInfo,
+            audioPath: audioInfo?.audioPath,
           });
 
           sceneOffset += durationSec;
