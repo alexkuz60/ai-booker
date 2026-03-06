@@ -467,11 +467,30 @@ export function StoryboardPanel({
       sameTypeIds.includes(seg.segment_id) ? { ...seg, speaker: newSpeaker } : seg
     ));
 
-    // Persist all to DB
+    // Persist segments to DB
     const { error } = await supabase
       .from("scene_segments")
       .update({ speaker: newSpeaker })
       .in("id", sameTypeIds);
+
+    // Upsert or delete scene-level type→character mapping
+    if (sceneId) {
+      const charRecord = newSpeaker ? characters.find(c => c.name === newSpeaker) : null;
+      if (charRecord) {
+        await supabase
+          .from("scene_type_mappings" as any)
+          .upsert(
+            { scene_id: sceneId, segment_type: targetSeg.segment_type, character_id: charRecord.id },
+            { onConflict: "scene_id,segment_type" }
+          );
+      } else {
+        await supabase
+          .from("scene_type_mappings" as any)
+          .delete()
+          .eq("scene_id", sceneId)
+          .eq("segment_type", targetSeg.segment_type);
+      }
+    }
 
     if (error) {
       toast.error(isRu ? "Ошибка сохранения персонажа" : "Failed to save speaker");
@@ -485,7 +504,7 @@ export function StoryboardPanel({
           : `"${typeLabel}" → ${newSpeaker || "?"} (${sameTypeIds.length} seg.)`
       );
     }
-  }, [isRu, segments]);
+  }, [isRu, segments, sceneId, characters]);
 
   // ── No scene selected ──
   if (!sceneId) {
