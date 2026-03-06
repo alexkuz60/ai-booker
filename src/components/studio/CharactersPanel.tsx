@@ -174,6 +174,9 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   // Segment counts per character (for "extras" detection)
   const [segmentCounts, setSegmentCounts] = useState<Map<string, number>>(new Map());
 
+  // Manual extras override: charId → true (forced extra) | false (forced non-extra)
+  const [extrasOverride, setExtrasOverride] = useState<Map<string, boolean>>(new Map());
+
   // Multi-select & merge
   const [multiSelect, setMultiSelect] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -197,8 +200,20 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const selectedChar = characters.find(c => c.id === selectedId);
   const hasProfiles = characters.some(c => c.description);
 
-  /** A character is "extras" (массовка) if they have ≤1 dialogue segment total */
-  const isExtra = useCallback((charId: string) => (segmentCounts.get(charId) ?? 0) <= 1, [segmentCounts]);
+  /** A character is "extras" if manually overridden or has ≤1 dialogue segment */
+  const isExtra = useCallback((charId: string) => {
+    if (extrasOverride.has(charId)) return extrasOverride.get(charId)!;
+    return (segmentCounts.get(charId) ?? 0) <= 1;
+  }, [segmentCounts, extrasOverride]);
+
+  const toggleExtra = useCallback((charId: string) => {
+    setExtrasOverride(prev => {
+      const next = new Map(prev);
+      const current = isExtra(charId);
+      next.set(charId, !current);
+      return next;
+    });
+  }, [isExtra]);
 
   // ── Load characters from DB ─────────────────────────────
   const loadCharacters = useCallback(async () => {
