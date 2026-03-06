@@ -172,6 +172,7 @@ const Studio = () => {
                 isRu={isRu}
                 selectedSceneId={selectedScene?.id ?? null}
                 selectedSceneContent={sceneContent}
+                bookId={bookId}
                 onSegmented={onSegmented}
               />
             </ResizablePanel>
