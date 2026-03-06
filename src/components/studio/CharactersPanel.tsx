@@ -137,6 +137,8 @@ interface CharactersPanelProps {
   bookId?: string | null;
   sceneId?: string | null;
   chapterSceneIds?: string[];
+  selectedCharacterId?: string | null;
+  onSelectCharacter?: (characterId: string | null) => void;
 }
 
 export interface CharactersPanelHandle {
@@ -146,7 +148,7 @@ export interface CharactersPanelHandle {
   profiling: boolean;
 }
 
-export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanelProps>(function CharactersPanel({ isRu, bookId, sceneId, chapterSceneIds }, ref) {
+export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanelProps>(function CharactersPanel({ isRu, bookId, sceneId, chapterSceneIds, selectedCharacterId, onSelectCharacter }, ref) {
   const [characters, setCharacters] = useState<BookCharacter[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -156,6 +158,18 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   // Filter: "all" or "scene"
   const [filterMode, setFilterMode] = useState<"all" | "scene">("all");
   const [sceneCharIds, setSceneCharIds] = useState<Set<string>>(new Set());
+
+  // Sync with external selectedCharacterId
+  useEffect(() => {
+    if (selectedCharacterId !== undefined && selectedCharacterId !== selectedId) {
+      setSelectedId(selectedCharacterId);
+    }
+  }, [selectedCharacterId]);
+
+  const handleSelectCharacter = useCallback((id: string | null) => {
+    setSelectedId(id);
+    onSelectCharacter?.(id);
+  }, [onSelectCharacter]);
 
   // Segment counts per character (for "extras" detection)
   const [segmentCounts, setSegmentCounts] = useState<Map<string, number>>(new Map());
@@ -686,7 +700,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                     if (multiSelect) {
                       toggleCharInSelection(ch.id);
                     } else {
-                      setSelectedId(ch.id);
+                      handleSelectCharacter(ch.id);
                     }
                   }}
                   className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
