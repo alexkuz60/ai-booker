@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut, Maximize2, Layers, Film } from "lucide-react";
+import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut, Maximize2, Layers, Film, Play, Pause, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useTimelineClips, type TimelineClip } from "@/hooks/useTimelineClips";
+import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -116,6 +117,30 @@ function TimelineTrack({
   );
 }
 
+// ─── Playhead ───────────────────────────────────────────────
+
+function Playhead({ positionSec, zoom }: { positionSec: number; zoom: number }) {
+  const leftPx = positionSec * zoom * 4;
+  return (
+    <div
+      className="absolute top-0 bottom-0 pointer-events-none z-20"
+      style={{ left: `${leftPx}px` }}
+    >
+      {/* Triangle head */}
+      <div
+        className="absolute -top-0.5 -translate-x-1/2 w-0 h-0"
+        style={{
+          borderLeft: "5px solid transparent",
+          borderRight: "5px solid transparent",
+          borderTop: "6px solid hsl(var(--primary))",
+        }}
+      />
+      {/* Vertical line */}
+      <div className="absolute top-1 bottom-0 w-px bg-primary -translate-x-1/2" />
+    </div>
+  );
+}
+
 // ─── Constants ──────────────────────────────────────────────
 export const TIMELINE_HEADER_HEIGHT = 41;
 
@@ -205,6 +230,9 @@ export function StudioTimeline({
 
   // ── Real clips from segments ──────────────────────────────
   const { clips: timelineClips } = useTimelineClips(contextSceneIds, speakerToCharId);
+
+  // ── Audio player ──────────────────────────────────────────
+  const player = useTimelinePlayer(timelineClips);
 
   // Group clips by track ID
   const clipsByTrack = useMemo(() => {
@@ -306,10 +334,11 @@ export function StudioTimeline({
   const resetZoom = useCallback(() => setZoomOverride(null), []);
   const displayZoomPercent = Math.round(zoom * 100);
 
-  const toggleMode = useCallback(() => {
-    setMode(prev => prev === "scene" ? "chapter" : "scene");
-    setZoomOverride(null);
-  }, []);
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
 
   return (
     <div
@@ -342,6 +371,45 @@ export function StudioTimeline({
               {isRu ? "Таймлайн" : "Timeline"}
             </span>
           </button>
+
+          {/* Transport controls */}
+          <div className="flex items-center gap-0.5">
+            {player.state === "playing" ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={player.pause}
+                title={isRu ? "Пауза" : "Pause"}
+              >
+                <Pause className="h-3.5 w-3.5" />
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={player.play}
+                disabled={!player.hasAudio}
+                title={isRu ? "Воспроизвести" : "Play"}
+              >
+                <Play className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={player.stop}
+              disabled={player.state === "stopped"}
+              title={isRu ? "Стоп" : "Stop"}
+            >
+              <Square className="h-3 w-3" />
+            </Button>
+            <span className="text-[11px] text-muted-foreground font-mono min-w-[70px] text-center tabular-nums">
+              {formatTime(player.positionSec)} / {formatTime(player.totalDuration)}
+            </span>
+          </div>
 
           {/* Mode toggle */}
           <div className="flex items-center bg-muted/50 rounded-md p-0.5">
@@ -422,11 +490,15 @@ export function StudioTimeline({
             })}
           </div>
           <ScrollArea className="flex-1">
-            <div className="min-w-full">
+            <div className="min-w-full relative">
               <TimelineRuler zoom={zoom} duration={duration} />
               {allTracks.map((track) => (
                 <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} clips={clipsByTrack.get(track.id)} />
               ))}
+              {/* Playhead */}
+              {player.state !== "stopped" && (
+                <Playhead positionSec={player.positionSec} zoom={zoom} />
+              )}
             </div>
           </ScrollArea>
         </div>

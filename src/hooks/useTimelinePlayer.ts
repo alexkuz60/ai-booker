@@ -1,0 +1,185 @@
+import { useState, useRef, useCallback, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { TimelineClip } from "@/hooks/useTimelineClips";
+
+export type PlayerState = "stopped" | "playing" | "paused";
+
+/**
+ * Manages sequential playback of timeline audio clips.
+ * Returns current playback position in seconds and transport controls.
+ */
+export function useTimelinePlayer(clips: TimelineClip[]) {
+  const [state, setState] = useState<PlayerState>("stopped");
+  const [positionSec, setPositionSec] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const rafRef = useRef<number>(0);
+  const clipIndexRef = useRef(0);
+  const clipStartTimeRef = useRef(0); // wall-clock when current clip started
+  const clipOffsetRef = useRef(0);    // timeline offset of current clip start
+  const stateRef = useRef<PlayerState>("stopped");
+  const pausedAtRef = useRef(0);
+
+  // Sort clips with audio by start time
+  const audioClips = clips
+    .filter(c => c.hasAudio && c.audioPath)
+    .sort((a, b) => a.startSec - b.startSec);
+
+  const totalDuration = clips.length > 0
+    ? Math.max(...clips.map(c => c.startSec + c.durationSec))
+    : 0;
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const getSignedUrl = useCallback(async (path: string): Promise<string | null> => {
+    const { data, error } = await supabase.storage
+      .from("user-media")
+      .createSignedUrl(path, 3600);
+    if (error || !data?.signedUrl) return null;
+    return data.signedUrl;
+  }, []);
+
+  const updatePosition = useCallback(() => {
+    if (stateRef.current !== "playing") return;
+    const elapsed = (performance.now() - clipStartTimeRef.current) / 1000;
+    const pos = clipOffsetRef.current + elapsed;
+    setPositionSec(pos);
+
+    if (pos >= totalDuration) {
+      // Reached end
+      setState("stopped");
+      stateRef.current = "stopped";
+      setPositionSec(0);
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+      return;
+    }
+
+    rafRef.current = requestAnimationFrame(updatePosition);
+  }, [totalDuration]);
+
+  const playClip = useCallback(async (index: number) => {
+    if (index >= audioClips.length) {
+      // No more audio clips — continue timeline until total duration
+      clipOffsetRef.current = audioClips.length > 0
+        ? audioClips[audioClips.length - 1].startSec + audioClips[audioClips.length - 1].durationSec
+        : 0;
+      clipStartTimeRef.current = performance.now();
+      rafRef.current = requestAnimationFrame(updatePosition);
+      return;
+    }
+
+    const clip = audioClips[index];
+    clipIndexRef.current = index;
+
+    // If there's a gap before this clip, wait through it
+    const currentPos = clipOffsetRef.current;
+    if (clip.startSec > currentPos + 0.05) {
+      clipStartTimeRef.current = performance.now();
+      const gapMs = (clip.startSec - currentPos) * 1000;
+      rafRef.current = requestAnimationFrame(updatePosition);
+      await new Promise(resolve => setTimeout(resolve, gapMs));
+      if (stateRef.current !== "playing") return;
+    }
+
+    clipOffsetRef.current = clip.startSec;
+    clipStartTimeRef.current = performance.now();
+
+    const url = await getSignedUrl(clip.audioPath!);
+    if (!url || stateRef.current !== "playing") return;
+
+    const audio = new Audio(url);
+    audioRef.current = audio;
+
+    audio.onended = () => {
+      if (stateRef.current !== "playing") return;
+      clipOffsetRef.current = clip.startSec + clip.durationSec;
+      clipStartTimeRef.current = performance.now();
+      playClip(index + 1);
+    };
+
+    audio.onerror = () => {
+      // Skip broken clips
+      if (stateRef.current !== "playing") return;
+      clipOffsetRef.current = clip.startSec + clip.durationSec;
+      clipStartTimeRef.current = performance.now();
+      playClip(index + 1);
+    };
+
+    try {
+      await audio.play();
+      rafRef.current = requestAnimationFrame(updatePosition);
+    } catch {
+      // Autoplay blocked — skip
+      playClip(index + 1);
+    }
+  }, [audioClips, getSignedUrl, updatePosition]);
+
+  const play = useCallback(() => {
+    if (stateRef.current === "playing") return;
+
+    if (stateRef.current === "paused") {
+      // Resume
+      stateRef.current = "playing";
+      setState("playing");
+      clipStartTimeRef.current = performance.now();
+      clipOffsetRef.current = pausedAtRef.current;
+      if (audioRef.current) {
+        audioRef.current.play();
+      }
+      rafRef.current = requestAnimationFrame(updatePosition);
+      return;
+    }
+
+    // Start from beginning (or from current position if stopped mid-way)
+    stateRef.current = "playing";
+    setState("playing");
+    clipOffsetRef.current = 0;
+    clipStartTimeRef.current = performance.now();
+    setPositionSec(0);
+
+    // Find first audio clip
+    playClip(0);
+  }, [playClip, updatePosition]);
+
+  const pause = useCallback(() => {
+    if (stateRef.current !== "playing") return;
+    stateRef.current = "paused";
+    setState("paused");
+    cancelAnimationFrame(rafRef.current);
+    pausedAtRef.current = positionSec;
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+  }, [positionSec]);
+
+  const stop = useCallback(() => {
+    stateRef.current = "stopped";
+    setState("stopped");
+    cancelAnimationFrame(rafRef.current);
+    setPositionSec(0);
+    pausedAtRef.current = 0;
+    clipOffsetRef.current = 0;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+  }, []);
+
+  return {
+    state,
+    positionSec,
+    totalDuration,
+    hasAudio: audioClips.length > 0,
+    play,
+    pause,
+    stop,
+  };
+}
