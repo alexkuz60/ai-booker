@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle } from "lucide-react";
+import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -282,6 +282,8 @@ export function StoryboardPanel({
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [synthesizing, setSynthesizing] = useState(false);
+  const [synthProgress, setSynthProgress] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [characters, setCharacters] = useState<CharacterOption[]>([]);
 
@@ -506,6 +508,41 @@ export function StoryboardPanel({
     }
   }, [isRu, segments, sceneId, characters]);
 
+  // ── Synthesize scene ──
+  const runSynthesis = useCallback(async () => {
+    if (!sceneId || segments.length === 0) return;
+    setSynthesizing(true);
+    setSynthProgress(isRu ? "Запуск синтеза…" : "Starting synthesis…");
+    try {
+      const { data, error } = await supabase.functions.invoke("synthesize-scene", {
+        body: { scene_id: sceneId, language: isRu ? "ru" : "en" },
+      });
+      if (error) throw error;
+      const synth = data as { synthesized: number; errors: number; total_duration_ms: number };
+      const durSec = (synth.total_duration_ms / 1000).toFixed(1);
+      if (synth.errors > 0) {
+        toast.warning(
+          isRu
+            ? `Синтез: ${synth.synthesized} готово, ${synth.errors} ошибок (${durSec}с)`
+            : `Synthesis: ${synth.synthesized} done, ${synth.errors} errors (${durSec}s)`
+        );
+      } else {
+        toast.success(
+          isRu
+            ? `Синтез завершён: ${synth.synthesized} фрагм., ${durSec}с`
+            : `Synthesis done: ${synth.synthesized} seg., ${durSec}s`
+        );
+      }
+      // Trigger timeline refresh by notifying parent
+      onSegmented?.(sceneId);
+    } catch (err: any) {
+      console.error("Synthesis failed:", err);
+      toast.error(isRu ? "Ошибка синтеза" : "Synthesis failed");
+    }
+    setSynthesizing(false);
+    setSynthProgress("");
+  }, [sceneId, segments.length, isRu, onSegmented]);
+
   // ── No scene selected ──
   if (!sceneId) {
     return (
@@ -554,10 +591,24 @@ export function StoryboardPanel({
         <span className="text-xs text-muted-foreground font-body">
           {segments.length} {isRu ? "фрагм." : "seg."} · {totalPhrases} {isRu ? "фраз" : "phrases"}
         </span>
-        <Button variant="ghost" size="sm" onClick={runAnalysis} disabled={analyzing || !sceneContent} className="gap-1.5 h-7 text-xs">
-          {analyzing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-          {isRu ? "Переанализ" : "Re-analyze"}
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={runSynthesis}
+            disabled={synthesizing || analyzing || segments.length === 0}
+            className="gap-1.5 h-7 text-xs"
+          >
+            {synthesizing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+            {synthesizing
+              ? (synthProgress || (isRu ? "Синтез…" : "Synth…"))
+              : (isRu ? "Синтез сцены" : "Synthesize")}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={runAnalysis} disabled={analyzing || !sceneContent} className="gap-1.5 h-7 text-xs">
+            {analyzing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            {isRu ? "Переанализ" : "Re-analyze"}
+          </Button>
+        </div>
       </div>
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-3 space-y-2">
