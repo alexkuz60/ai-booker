@@ -1,7 +1,9 @@
-import { Users, Wind, Volume2, Film } from "lucide-react";
+import { useState, useRef } from "react";
+import { Users, Wind, Volume2, Film, Wand2, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { StoryboardPanel } from "./StoryboardPanel";
-import { CharactersPanel } from "./CharactersPanel";
+import { CharactersPanel, type CharactersPanelHandle } from "./CharactersPanel";
 
 interface StudioWorkspaceProps {
   isRu: boolean;
@@ -12,27 +14,54 @@ interface StudioWorkspaceProps {
 }
 
 export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, bookId, onSegmented }: StudioWorkspaceProps) {
+  const [activeTab, setActiveTab] = useState("storyboard");
+  const charactersPanelRef = useRef<CharactersPanelHandle | null>(null);
+  const [castingExternal, setCastingExternal] = useState(false);
+
+  const handleAutoCast = async () => {
+    if (charactersPanelRef.current) {
+      setCastingExternal(true);
+      await charactersPanelRef.current.autoCast();
+      setCastingExternal(false);
+    }
+  };
+
   return (
     <div className="h-full min-h-0 flex flex-col p-4">
-      <Tabs defaultValue="storyboard" className="flex-1 flex flex-col min-h-0">
-        <TabsList className="w-fit shrink-0">
-          <TabsTrigger value="storyboard" className="gap-1.5">
-            <Film className="h-3.5 w-3.5" />
-            <span className="font-body text-sm">{isRu ? "Раскадровка" : "Storyboard"}</span>
-          </TabsTrigger>
-          <TabsTrigger value="narrators" className="gap-1.5">
-            <Users className="h-3.5 w-3.5" />
-            <span className="font-body text-sm">{isRu ? "Персонажи" : "Characters"}</span>
-          </TabsTrigger>
-          <TabsTrigger value="atmosphere" className="gap-1.5">
-            <Wind className="h-3.5 w-3.5" />
-            <span className="font-body text-sm">{isRu ? "Атмосфера" : "Atmosphere"}</span>
-          </TabsTrigger>
-          <TabsTrigger value="sounds" className="gap-1.5">
-            <Volume2 className="h-3.5 w-3.5" />
-            <span className="font-body text-sm">{isRu ? "Звуки" : "Sounds"}</span>
-          </TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+        <div className="flex items-center justify-between shrink-0">
+          <TabsList className="w-fit">
+            <TabsTrigger value="storyboard" className="gap-1.5">
+              <Film className="h-3.5 w-3.5" />
+              <span className="font-body text-sm">{isRu ? "Раскадровка" : "Storyboard"}</span>
+            </TabsTrigger>
+            <TabsTrigger value="narrators" className="gap-1.5">
+              <Users className="h-3.5 w-3.5" />
+              <span className="font-body text-sm">{isRu ? "Персонажи" : "Characters"}</span>
+            </TabsTrigger>
+            <TabsTrigger value="atmosphere" className="gap-1.5">
+              <Wind className="h-3.5 w-3.5" />
+              <span className="font-body text-sm">{isRu ? "Атмосфера" : "Atmosphere"}</span>
+            </TabsTrigger>
+            <TabsTrigger value="sounds" className="gap-1.5">
+              <Volume2 className="h-3.5 w-3.5" />
+              <span className="font-body text-sm">{isRu ? "Звуки" : "Sounds"}</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {activeTab === "narrators" && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={handleAutoCast}
+              disabled={castingExternal}
+            >
+              {castingExternal ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
+              {isRu ? "Подбор Актёров" : "Auto-Cast"}
+            </Button>
+          )}
+        </div>
 
         <TabsContent value="storyboard" className="flex-1 mt-4 min-h-0">
           <div className="rounded-lg border border-border bg-card/50 h-full">
@@ -47,7 +76,12 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
 
         <TabsContent value="narrators" className="flex-1 mt-4 min-h-0">
           <div className="rounded-lg border border-border bg-card/50 h-full overflow-hidden">
-            <CharactersPanel isRu={isRu} bookId={bookId} sceneId={selectedSceneId} />
+            <CharactersPanel
+              ref={charactersPanelRef}
+              isRu={isRu}
+              bookId={bookId}
+              sceneId={selectedSceneId}
+            />
           </div>
         </TabsContent>
 

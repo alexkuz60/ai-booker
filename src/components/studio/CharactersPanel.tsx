@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { Users, Volume2, Loader2, Square, Play, RotateCcw, Save, Sparkles, User } from "lucide-react";
+import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
+import { Users, Volume2, Loader2, Square, Play, RotateCcw, Save, Sparkles, User, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -74,17 +74,81 @@ const TEMPERAMENT_LABELS: Record<string, { ru: string; en: string }> = {
 
 // ─── Component ───────────────────────────────────────────
 
+// ─── Voice Auto-Matching ─────────────────────────────────
+
+/** Pick best Yandex voice for a character based on gender & age_group */
+function matchVoice(gender: string, ageGroup: string): string {
+  // Filter by gender first
+  const genderVoices = gender !== "unknown"
+    ? YANDEX_VOICES.filter(v => v.gender === gender)
+    : YANDEX_VOICES;
+
+  if (genderVoices.length === 0) return "marina";
+
+  // Age-based preferences (heuristic mapping to specific voices)
+  const agePrefs: Record<string, Record<string, string[]>> = {
+    female: {
+      child:  ["masha", "julia"],
+      teen:   ["masha", "lera"],
+      young:  ["dasha", "lera", "marina"],
+      adult:  ["alena", "jane", "marina"],
+      elder:  ["omazh", "julia"],
+      infant: ["masha"],
+    },
+    male: {
+      child:  ["filipp"],
+      teen:   ["filipp", "anton"],
+      young:  ["anton", "alexander"],
+      adult:  ["kirill", "alexander", "madirus"],
+      elder:  ["zahar", "ermil"],
+      infant: ["filipp"],
+    },
+  };
+
+  const g = gender === "female" ? "female" : "male";
+  const prefs = agePrefs[g]?.[ageGroup];
+  if (prefs) {
+    const found = prefs.find(id => genderVoices.some(v => v.id === id));
+    if (found) return found;
+  }
+
+  return genderVoices[0].id;
+}
+
+/** Pick a default role based on temperament */
+function matchRole(voiceId: string, temperament: string | null): string {
+  const v = YANDEX_VOICES.find(x => x.id === voiceId);
+  if (!v?.roles || v.roles.length <= 1) return "neutral";
+  
+  const tempRoleMap: Record<string, string[]> = {
+    sanguine: ["good", "friendly"],
+    choleric: ["strict", "evil"],
+    melancholic: ["neutral", "whisper"],
+    phlegmatic: ["neutral", "friendly"],
+  };
+  
+  const preferred = tempRoleMap[temperament ?? ""] ?? [];
+  const found = preferred.find(r => v.roles!.includes(r));
+  return found ?? "neutral";
+}
+
 interface CharactersPanelProps {
   isRu: boolean;
   bookId?: string | null;
   sceneId?: string | null;
 }
 
-export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps) {
+export interface CharactersPanelHandle {
+  autoCast: () => Promise<void>;
+  casting: boolean;
+}
+
+export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanelProps>(function CharactersPanel({ isRu, bookId, sceneId }, ref) {
   const [characters, setCharacters] = useState<BookCharacter[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [profiling, setProfiling] = useState(false);
+  const [casting, setCasting] = useState(false);
 
   // Voice settings state
   const [voice, setVoice] = useState("marina");
@@ -235,6 +299,80 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
       setSaving(false);
     }
   };
+
+  // ── Auto-cast voices for all characters ─────────────────
+  const handleAutoCast = async () => {
+    if (characters.length === 0) return;
+    setCasting(true);
+    try {
+      // Track used voice IDs to avoid duplicates where possible
+      const usedVoices = new Set<string>();
+      const updates: { id: string; voice_config: BookCharacter["voice_config"] }[] = [];
+
+      for (const ch of characters) {
+        let voiceId = matchVoice(ch.gender, ch.age_group);
+
+        // Try to avoid duplicates: pick alternate from same gender
+        const genderVoices = YANDEX_VOICES.filter(v =>
+          ch.gender !== "unknown" ? v.gender === ch.gender : true
+        );
+        if (usedVoices.has(voiceId) && genderVoices.length > 1) {
+          const alt = genderVoices.find(v => !usedVoices.has(v.id));
+          if (alt) voiceId = alt.id;
+        }
+        usedVoices.add(voiceId);
+
+        const roleId = matchRole(voiceId, ch.temperament);
+        const vc: BookCharacter["voice_config"] = {
+          provider: "yandex",
+          voice_id: voiceId,
+          role: roleId !== "neutral" ? roleId : undefined,
+          speed: 1.0,
+        };
+        updates.push({ id: ch.id, voice_config: vc });
+      }
+
+      // Batch save to DB
+      for (const u of updates) {
+        await supabase
+          .from("book_characters")
+          .update({ voice_config: u.voice_config, updated_at: new Date().toISOString() })
+          .eq("id", u.id);
+      }
+
+      // Update local state
+      setCharacters(prev => prev.map(c => {
+        const u = updates.find(x => x.id === c.id);
+        return u ? { ...c, voice_config: u.voice_config } : c;
+      }));
+
+      // Sync current selection
+      if (selectedId) {
+        const u = updates.find(x => x.id === selectedId);
+        if (u) {
+          setVoice(u.voice_config.voice_id || "marina");
+          setRole(u.voice_config.role || "neutral");
+          setSpeed(u.voice_config.speed ?? 1.0);
+          setPitch(u.voice_config.pitch ?? 0);
+          setVolume(u.voice_config.volume ?? 0);
+          setDirty(false);
+        }
+      }
+
+      toast.success(
+        isRu
+          ? `Голоса подобраны для ${updates.length} персонажей`
+          : `Voices matched for ${updates.length} characters`
+      );
+    } catch (e) {
+      console.error("Auto-cast error:", e);
+      toast.error(isRu ? "Ошибка подбора" : "Casting error");
+    } finally {
+      setCasting(false);
+    }
+  };
+
+  useImperativeHandle(ref, () => ({ autoCast: handleAutoCast, casting }), [characters, selectedId, casting]);
 
   // ── TTS Preview ─────────────────────────────────────────
   const handlePreview = async () => {
@@ -703,4 +841,4 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
       </div>
     </div>
   );
-}
+});
