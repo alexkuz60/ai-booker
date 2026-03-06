@@ -8,10 +8,11 @@ interface UseParserHelpersParams {
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
   selectedIdx: number | null;
   fileName: string;
+  bookId?: string;
 }
 
 export function useParserHelpers({
-  tocEntries, chapterResults, selectedIdx, fileName,
+  tocEntries, chapterResults, selectedIdx, fileName, bookId,
 }: UseParserHelpersParams) {
   const navigate = useNavigate();
 
@@ -131,9 +132,9 @@ export function useParserHelpers({
       chapterTitle = `${parent.title} (Часть ${partNumber})`;
     }
 
-    saveStudioChapter({ chapterTitle, bookTitle: fileName.replace('.pdf', ''), scenes: allScenes });
+    saveStudioChapter({ chapterTitle, bookTitle: fileName.replace('.pdf', ''), bookId, scenes: allScenes });
     navigate("/studio");
-  }, [tocEntries, chapterResults, fileName, navigate]);
+  }, [tocEntries, chapterResults, fileName, bookId, navigate]);
 
   // Part grouping
   const { partGroups, partlessIndices } = useMemo(() => {
