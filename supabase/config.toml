@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.openrouter-proxy]
 verify_jwt = false
+
+[functions.yandex-tts]
+verify_jwt = false

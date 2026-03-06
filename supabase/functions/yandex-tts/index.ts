@@ -6,6 +6,98 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+/**
+ * Generate a JWT signed with the service account's RSA private key,
+ * then exchange it for an IAM token via Yandex Cloud API.
+ */
+async function getIamToken(): Promise<string> {
+  const keyId = Deno.env.get("YANDEX_SA_KEY_ID")!;
+  const serviceAccountId = Deno.env.get("YANDEX_SA_SERVICE_ACCOUNT_ID")!;
+  const privateKeyPem = Deno.env.get("YANDEX_SA_PRIVATE_KEY")!;
+
+  const now = Math.floor(Date.now() / 1000);
+
+  // JWT header & payload
+  const header = { alg: "PS256", typ: "JWT", kid: keyId };
+  const payload = {
+    iss: serviceAccountId,
+    aud: "https://iam.api.cloud.yandex.net/iam/v1/tokens",
+    iat: now,
+    exp: now + 3600,
+  };
+
+  const enc = (obj: unknown) => {
+    const json = new TextEncoder().encode(JSON.stringify(obj));
+    return btoa(String.fromCharCode(...json))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+  };
+
+  const headerB64 = enc(header);
+  const payloadB64 = enc(payload);
+  const signingInput = `${headerB64}.${payloadB64}`;
+
+  // Import RSA private key
+  const pemBody = privateKeyPem
+    .replace(/-----BEGIN PRIVATE KEY-----/, "")
+    .replace(/-----END PRIVATE KEY-----/, "")
+    .replace(/\s/g, "");
+  const binaryDer = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8",
+    binaryDer,
+    { name: "RSA-PSS", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  // Sign
+  const signature = await crypto.subtle.sign(
+    { name: "RSA-PSS", saltLength: 32 },
+    cryptoKey,
+    new TextEncoder().encode(signingInput)
+  );
+
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+  const jwt = `${signingInput}.${sigB64}`;
+
+  // Exchange JWT for IAM token
+  const resp = await fetch("https://iam.api.cloud.yandex.net/iam/v1/tokens", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jwt }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    console.error("IAM token error:", resp.status, errText);
+    throw new Error(`Failed to get IAM token: ${resp.status} ${errText}`);
+  }
+
+  const data = await resp.json();
+  return data.iamToken;
+}
+
+// Simple in-memory IAM token cache
+let cachedToken: { token: string; expiresAt: number } | null = null;
+
+async function getCachedIamToken(): Promise<string> {
+  const now = Date.now();
+  // Refresh 5 min before expiry
+  if (cachedToken && cachedToken.expiresAt > now + 5 * 60 * 1000) {
+    return cachedToken.token;
+  }
+  const token = await getIamToken();
+  cachedToken = { token, expiresAt: now + 3600 * 1000 };
+  return token;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -47,23 +139,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── Get user's Yandex SpeechKit API key from profile ──
-    const { data: keysData, error: keysErr } = await supabase.rpc("get_my_api_keys");
-    if (keysErr) {
-      console.error("Failed to get API keys:", keysErr);
-      return new Response(
-        JSON.stringify({ error: isRu ? "Не удалось получить API-ключи." : "Failed to retrieve API keys." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const apiKey = (keysData as Record<string, string>)?.yandex_speechkit;
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: isRu ? "API-ключ Yandex SpeechKit не найден в профиле." : "Yandex SpeechKit API key not found in profile." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // ── Get IAM token from service account ──
+    const iamToken = await getCachedIamToken();
 
     // ── Call Yandex SpeechKit v1 ──
     const selectedVoice = voice || "alena";
@@ -78,17 +155,12 @@ Deno.serve(async (req) => {
     formData.append("sampleRateHertz", "48000");
     formData.append("speed", selectedSpeed);
 
-    // Determine auth header format: if key already has a known prefix, use as-is
-    const authValue = apiKey.startsWith("Api-Key ") || apiKey.startsWith("Bearer ")
-      ? apiKey
-      : `Api-Key ${apiKey}`;
-
     console.log("Yandex TTS request:", {
       voice: selectedVoice,
       lang: selectedLang,
       speed: selectedSpeed,
       textLen: text.length,
-      authPrefix: authValue.substring(0, 12) + "...",
+      authType: "IAM token (service account)",
     });
 
     const response = await fetch(
@@ -96,7 +168,7 @@ Deno.serve(async (req) => {
       {
         method: "POST",
         headers: {
-          "Authorization": authValue,
+          "Authorization": `Bearer ${iamToken}`,
         },
         body: formData,
       }
@@ -106,14 +178,19 @@ Deno.serve(async (req) => {
       const errText = await response.text();
       console.error("Yandex SpeechKit error:", response.status, errText);
 
+      // If 401, invalidate cached token
+      if (response.status === 401) {
+        cachedToken = null;
+      }
+
       const msgs: Record<number, { ru: string; en: string }> = {
         401: {
-          ru: "Yandex SpeechKit: неверный API-ключ. Проверьте ключ в профиле.",
-          en: "Yandex SpeechKit: invalid API key. Check the key in your profile.",
+          ru: "Yandex SpeechKit: ошибка авторизации. Проверьте сервисный аккаунт.",
+          en: "Yandex SpeechKit: auth error. Check service account.",
         },
         403: {
-          ru: "Yandex SpeechKit: доступ запрещён. Проверьте права и folder ID.",
-          en: "Yandex SpeechKit: access forbidden. Check permissions and folder ID.",
+          ru: "Yandex SpeechKit: доступ запрещён. Проверьте права сервисного аккаунта.",
+          en: "Yandex SpeechKit: access forbidden. Check service account permissions.",
         },
         429: {
           ru: "Yandex SpeechKit: превышен лимит запросов. Попробуйте позже.",
@@ -129,7 +206,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // v1 returns raw audio bytes directly
     const audioBytes = new Uint8Array(await response.arrayBuffer());
 
     return new Response(audioBytes, {
