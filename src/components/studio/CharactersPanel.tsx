@@ -396,15 +396,17 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
                   <div className="flex flex-wrap gap-2 mb-2">
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Badge
-                          variant="outline"
-                          className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
-                            selectedChar.gender === "unknown" ? "border-dashed border-warning text-warning" : ""
-                          }`}
-                        >
-                          {GENDER_LABELS[selectedChar.gender]?.[isRu ? "ru" : "en"] ?? selectedChar.gender}
-                          {selectedChar.gender === "unknown" && " ▾"}
-                        </Badge>
+                        <button type="button" className="inline-flex items-center">
+                          <Badge
+                            variant="outline"
+                            className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
+                              selectedChar.gender === "unknown" ? "border-dashed border-warning text-warning" : ""
+                            }`}
+                          >
+                            {GENDER_LABELS[selectedChar.gender]?.[isRu ? "ru" : "en"] ?? selectedChar.gender}
+                            {selectedChar.gender === "unknown" && " ▾"}
+                          </Badge>
+                        </button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-1.5" align="start">
                         <div className="grid gap-0.5">
@@ -442,15 +444,17 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
                     </Popover>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Badge
-                          variant="outline"
-                          className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
-                            selectedChar.age_group === "unknown" ? "border-dashed border-warning text-warning" : ""
-                          }`}
-                        >
-                          {getAgeLabel(selectedChar.age_group, selectedChar.gender, isRu)}
-                          {selectedChar.age_group === "unknown" && " ▾"}
-                        </Badge>
+                        <button type="button" className="inline-flex items-center">
+                          <Badge
+                            variant="outline"
+                            className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
+                              selectedChar.age_group === "unknown" ? "border-dashed border-warning text-warning" : ""
+                            }`}
+                          >
+                            {getAgeLabel(selectedChar.age_group, selectedChar.gender, isRu)}
+                            {selectedChar.age_group === "unknown" && " ▾"}
+                          </Badge>
+                        </button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-1.5" align="start">
                         <div className="grid gap-0.5">
@@ -488,16 +492,18 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
                     </Popover>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Badge
-                          variant="secondary"
-                          className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
-                            !selectedChar.temperament ? "border-dashed border-warning text-warning" : ""
-                          }`}
-                        >
-                          {selectedChar.temperament
-                            ? (TEMPERAMENT_LABELS[selectedChar.temperament]?.[isRu ? "ru" : "en"] ?? selectedChar.temperament)
-                            : (isRu ? "Темперамент ▾" : "Temperament ▾")}
-                        </Badge>
+                        <button type="button" className="inline-flex items-center">
+                          <Badge
+                            variant="secondary"
+                            className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
+                              !selectedChar.temperament ? "border-dashed border-warning text-warning" : ""
+                            }`}
+                          >
+                            {selectedChar.temperament
+                              ? (TEMPERAMENT_LABELS[selectedChar.temperament]?.[isRu ? "ru" : "en"] ?? selectedChar.temperament)
+                              : (isRu ? "Темперамент ▾" : "Temperament ▾")}
+                          </Badge>
+                        </button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-1.5" align="start">
                         <div className="grid gap-0.5">
