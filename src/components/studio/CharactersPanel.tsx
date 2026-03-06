@@ -444,7 +444,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         return;
       }
 
-      const updates: { id: string; voice_config: BookCharacter["voice_config"] }[] = [];
+      const updates: { id: string; voice_config: BookCharacter["voice_config"]; gender?: string }[] = [];
 
       for (const ch of toCast) {
         let voiceId: string;
@@ -471,6 +471,10 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         }
         usedVoices.add(voiceId);
 
+        // Sync gender from the chosen voice
+        const chosenVoice = YANDEX_VOICES.find(v => v.id === voiceId);
+        const syncedGender = chosenVoice ? chosenVoice.gender : ch.gender;
+
         const vc: BookCharacter["voice_config"] = {
           provider: "yandex",
           voice_id: voiceId,
@@ -478,21 +482,26 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
           speed: 1.0,
           is_extra: ch.voice_config?.is_extra,
         };
-        updates.push({ id: ch.id, voice_config: vc });
+        updates.push({ id: ch.id, voice_config: vc, gender: syncedGender });
       }
 
-      // Batch save to DB
+      // Batch save to DB (voice_config + gender sync)
       for (const u of updates) {
+        const updateData: Record<string, unknown> = {
+          voice_config: u.voice_config,
+          updated_at: new Date().toISOString(),
+        };
+        if (u.gender) updateData.gender = u.gender;
         await supabase
           .from("book_characters")
-          .update({ voice_config: u.voice_config, updated_at: new Date().toISOString() })
+          .update(updateData)
           .eq("id", u.id);
       }
 
       // Update local state
       setCharacters(prev => prev.map(c => {
         const u = updates.find(x => x.id === c.id);
-        return u ? { ...c, voice_config: u.voice_config } : c;
+        return u ? { ...c, voice_config: u.voice_config, gender: u.gender ?? c.gender } : c;
       }));
 
       // Sync current selection
