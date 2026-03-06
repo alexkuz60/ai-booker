@@ -1,15 +1,11 @@
 import type { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { usePageHeader } from "@/hooks/usePageHeader";
 
-interface AppLayoutProps {
-  children: ReactNode;
-  title?: string;
-  subtitle?: string;
-  headerRight?: ReactNode;
-}
+export function AppLayout({ children }: { children: ReactNode }) {
+  const { title, subtitle, headerRight } = usePageHeader();
 
-export function AppLayout({ children, title, subtitle, headerRight }: AppLayoutProps) {
   return (
     <SidebarProvider defaultOpen={false}>
       <div className="h-screen flex w-full overflow-hidden">
