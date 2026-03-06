@@ -101,7 +101,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
         <TabsContent value="sounds" className="flex-1 mt-4 min-h-0">
           <div className="rounded-lg border border-border bg-card/50 h-full flex items-center justify-center">
             <p className="text-sm text-muted-foreground font-body">
-              {isRu ? "Конкретные звуковые эффекты" : "Sound effects"}
+              {isRu ? "Таблица готовых аудио глав" : "Finished audio chapters"}
             </p>
           </div>
         </TabsContent>
