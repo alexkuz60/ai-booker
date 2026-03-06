@@ -170,9 +170,8 @@ export function StudioTimeline({
   onSelectCharacter,
 }: StudioTimelineProps) {
   const [mode, setMode] = useState<"scene" | "chapter">("scene");
-  const duration = mode === "scene"
-    ? (sceneDurationSec && sceneDurationSec > 0 ? sceneDurationSec : 60)
-    : (chapterDurationSec && chapterDurationSec > 0 ? chapterDurationSec : 180);
+
+  // ── Real clips from segments ──────────────────────────────
 
   // ── Character tracks ──────────────────────────────────────
   const [charTracks, setCharTracks] = useState<TimelineTrackData[]>([]);
@@ -228,11 +227,18 @@ export function StudioTimeline({
     })();
   }, [bookId, sceneId, chapterSceneIds?.join(","), mode]);
 
-  // ── Real clips from segments ──────────────────────────────
+  // ── Real clips from segments (moved above duration calc) ──
   const { clips: timelineClips } = useTimelineClips(contextSceneIds, speakerToCharId);
 
   // ── Audio player ──────────────────────────────────────────
   const player = useTimelinePlayer(timelineClips);
+
+  // ── Duration: prefer actual clip data, fallback to estimate ──
+  const clipsDuration = player.totalDuration;
+  const estimateDuration = mode === "scene"
+    ? (sceneDurationSec && sceneDurationSec > 0 ? sceneDurationSec : 60)
+    : (chapterDurationSec && chapterDurationSec > 0 ? chapterDurationSec : 180);
+  const duration = clipsDuration > 0 ? clipsDuration : estimateDuration;
 
   // Group clips by track ID
   const clipsByTrack = useMemo(() => {
