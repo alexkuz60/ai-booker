@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.yandex-tts]
 verify_jwt = false
+
+[functions.profile-characters]
+verify_jwt = false
