@@ -200,6 +200,7 @@ Deno.serve(async (req) => {
           { role: "user", content: userPrompt },
         ],
         temperature: 0.3,
+        max_tokens: 4096,
         tools: [{
           type: "function",
           function: {
@@ -260,16 +261,25 @@ Deno.serve(async (req) => {
       try {
         const parsed = JSON.parse(toolCall.function.arguments);
         profiles = parsed.characters;
-      } catch {
+      } catch (parseErr) {
+        console.error("Failed to parse tool_calls arguments:", toolCall.function.arguments?.slice(0, 200));
         // Fallback: parse from content
-        let raw = aiData.choices?.[0]?.message?.content || "";
-        raw = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        const raw = (aiData.choices?.[0]?.message?.content || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        if (!raw) {
+          return new Response(JSON.stringify({ error: "AI returned empty response" }), {
+            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         profiles = JSON.parse(raw).characters;
       }
     } else {
-      // Fallback: parse from content
-      let raw = aiData.choices?.[0]?.message?.content || "";
-      raw = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      const raw = (aiData.choices?.[0]?.message?.content || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      if (!raw) {
+        console.error("AI response has no tool_calls and no content:", JSON.stringify(aiData.choices?.[0]?.message).slice(0, 300));
+        return new Response(JSON.stringify({ error: "AI returned empty response" }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const parsed = JSON.parse(raw);
       profiles = parsed.characters || parsed;
     }
