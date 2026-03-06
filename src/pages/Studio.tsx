@@ -36,7 +36,16 @@ const Studio = () => {
     return estimateSceneDuration(chapter.scenes[selectedSceneIdx]);
   }, [chapter, selectedSceneIdx]);
 
-  // Resolve scene DB IDs and bookId on load if missing
+  // Persist selected scene index
+  useEffect(() => {
+    if (selectedSceneIdx !== null) {
+      sessionStorage.setItem("studio_selected_scene_idx", String(selectedSceneIdx));
+    } else {
+      sessionStorage.removeItem("studio_selected_scene_idx");
+    }
+  }, [selectedSceneIdx]);
+
+
   useEffect(() => {
     if (!chapter) return;
     const needIds = chapter.scenes.some(s => !s.id);
