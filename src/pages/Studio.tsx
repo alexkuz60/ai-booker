@@ -18,7 +18,10 @@ import { usePageHeader } from "@/hooks/usePageHeader";
 const Studio = () => {
   const { isRu } = useLanguage();
   const [chapter, setChapter] = useState<StudioChapter | null>(() => loadStudioChapter());
-  const [selectedSceneIdx, setSelectedSceneIdx] = useState<number | null>(null);
+  const [selectedSceneIdx, setSelectedSceneIdx] = useState<number | null>(() => {
+    const saved = sessionStorage.getItem("studio_selected_scene_idx");
+    return saved !== null ? Number(saved) : null;
+  });
   const [sceneContent, setSceneContent] = useState<string | null>(null);
   const [segmentedSceneIds, setSegmentedSceneIds] = useState<Set<string>>(new Set());
   const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
@@ -33,7 +36,16 @@ const Studio = () => {
     return estimateSceneDuration(chapter.scenes[selectedSceneIdx]);
   }, [chapter, selectedSceneIdx]);
 
-  // Resolve scene DB IDs and bookId on load if missing
+  // Persist selected scene index
+  useEffect(() => {
+    if (selectedSceneIdx !== null) {
+      sessionStorage.setItem("studio_selected_scene_idx", String(selectedSceneIdx));
+    } else {
+      sessionStorage.removeItem("studio_selected_scene_idx");
+    }
+  }, [selectedSceneIdx]);
+
+
   useEffect(() => {
     if (!chapter) return;
     const needIds = chapter.scenes.some(s => !s.id);
