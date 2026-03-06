@@ -444,7 +444,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         return;
       }
 
-      const updates: { id: string; voice_config: BookCharacter["voice_config"] }[] = [];
+      const updates: { id: string; voice_config: BookCharacter["voice_config"]; gender?: string }[] = [];
 
       for (const ch of toCast) {
         let voiceId: string;
