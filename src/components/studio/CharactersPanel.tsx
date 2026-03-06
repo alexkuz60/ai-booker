@@ -182,7 +182,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
   // ── Load characters from DB ─────────────────────────────
   const loadCharacters = useCallback(async () => {
-    if (!bookId) { setCharacters([]); return; }
+    if (!bookId) { setCharacters([]); setSceneCharIds(new Set()); return; }
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -192,20 +192,22 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         .order("sort_order");
       if (error) throw error;
 
+      let scIds = new Set<string>();
       if (sceneId && data && data.length > 0) {
         const { data: appearances } = await supabase
           .from("character_appearances")
           .select("character_id")
           .eq("scene_id", sceneId);
-        const sceneCharIds = new Set(appearances?.map(a => a.character_id) || []);
+        scIds = new Set(appearances?.map(a => a.character_id) || []);
         const sorted = [
-          ...data.filter(c => sceneCharIds.has(c.id)),
-          ...data.filter(c => !sceneCharIds.has(c.id)),
+          ...data.filter(c => scIds.has(c.id)),
+          ...data.filter(c => !scIds.has(c.id)),
         ];
         setCharacters(sorted.map(c => ({ ...c, voice_config: (c.voice_config as BookCharacter["voice_config"]) || {} })));
       } else {
         setCharacters((data || []).map(c => ({ ...c, voice_config: (c.voice_config as BookCharacter["voice_config"]) || {} })));
       }
+      setSceneCharIds(scIds);
     } catch (e) {
       console.error("Load characters error:", e);
     } finally {
@@ -214,6 +216,14 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   }, [bookId, sceneId]);
 
   useEffect(() => { loadCharacters(); }, [loadCharacters]);
+
+  // Filtered character list
+  const filteredCharacters = useMemo(() => {
+    if (filterMode === "scene" && sceneCharIds.size > 0) {
+      return characters.filter(c => sceneCharIds.has(c.id));
+    }
+    return characters;
+  }, [characters, filterMode, sceneCharIds]);
 
   // ── Sync voice settings when character selected ─────────
   useEffect(() => {
