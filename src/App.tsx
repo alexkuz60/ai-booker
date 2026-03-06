@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import { AppLayout } from "@/components/AppLayout";
+import { PageHeaderProvider } from "@/hooks/usePageHeader";
 import Home from "./pages/Home";
 import Parser from "./pages/Parser";
 import Studio from "./pages/Studio";
@@ -32,17 +33,19 @@ function ProtectedRoutes() {
   if (!user) return <Navigate to="/auth" replace />;
 
   return (
-    <AppLayout>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/parser" element={<Parser />} />
-        <Route path="/studio" element={<Studio />} />
-        <Route path="/narrators" element={<Narrators />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </AppLayout>
+    <PageHeaderProvider>
+      <AppLayout>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/parser" element={<Parser />} />
+          <Route path="/studio" element={<Studio />} />
+          <Route path="/narrators" element={<Narrators />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </AppLayout>
+    </PageHeaderProvider>
   );
 }
 
