@@ -405,6 +405,91 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
   useImperativeHandle(ref, () => ({ autoCast: handleAutoCast, incrementalProfile: handleIncrementalProfile, casting, profiling }), [characters, selectedId, casting, profiling, chapterSceneIds]);
 
+  // ── Merge characters ────────────────────────────────────
+  const handleMerge = async () => {
+    if (selectedIds.size < 2) {
+      toast.warning(isRu ? "Выберите минимум 2 персонажа" : "Select at least 2 characters");
+      return;
+    }
+    setMerging(true);
+    try {
+      // Order: first selected in list order becomes primary
+      const ordered = characters.filter(c => selectedIds.has(c.id));
+      const primary = ordered[0];
+      const others = ordered.slice(1);
+
+      // Collect aliases: primary aliases + other names + other aliases
+      const newAliases = [
+        ...primary.aliases,
+        ...others.flatMap(c => [c.name, ...c.aliases]),
+      ].filter((v, i, a) => a.indexOf(v) === i && v !== primary.name);
+
+      // Update primary character
+      const { error: updateErr } = await supabase
+        .from("book_characters")
+        .update({ aliases: newAliases, updated_at: new Date().toISOString() })
+        .eq("id", primary.id);
+      if (updateErr) throw updateErr;
+
+      // Update character_appearances: reassign merged characters' appearances to primary
+      for (const other of others) {
+        const { data: appearances } = await supabase
+          .from("character_appearances")
+          .select("*")
+          .eq("character_id", other.id);
+        if (appearances?.length) {
+          for (const app of appearances) {
+            // Check if primary already has an appearance in this scene
+            const { data: existing } = await supabase
+              .from("character_appearances")
+              .select("id, segment_ids")
+              .eq("character_id", primary.id)
+              .eq("scene_id", app.scene_id)
+              .maybeSingle();
+            if (existing) {
+              // Merge segment_ids
+              const mergedSegments = [...new Set([...existing.segment_ids, ...app.segment_ids])];
+              await supabase.from("character_appearances").update({ segment_ids: mergedSegments }).eq("id", existing.id);
+              await supabase.from("character_appearances").delete().eq("id", app.id);
+            } else {
+              await supabase.from("character_appearances").update({ character_id: primary.id }).eq("id", app.id);
+            }
+          }
+        }
+        // Delete the merged character
+        await supabase.from("book_characters").delete().eq("id", other.id);
+      }
+
+      toast.success(
+        isRu
+          ? `${others.length} персонаж(ей) объединено с "${primary.name}"`
+          : `${others.length} character(s) merged into "${primary.name}"`
+      );
+      setMultiSelect(false);
+      setSelectedIds(new Set());
+      setSelectedId(primary.id);
+      await loadCharacters();
+    } catch (e) {
+      console.error("Merge error:", e);
+      toast.error(isRu ? "Ошибка объединения" : "Merge error");
+    } finally {
+      setMerging(false);
+    }
+  };
+
+  const toggleMultiSelect = () => {
+    setMultiSelect(prev => !prev);
+    setSelectedIds(new Set());
+  };
+
+  const toggleCharInSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   // ── TTS Preview ─────────────────────────────────────────
   const handlePreview = async () => {
     if (playing && audioRef) {
