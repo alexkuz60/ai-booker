@@ -36,7 +36,7 @@ interface RawPhrase {
  */
 export function useTimelineClips(
   sceneIds: string[],
-  characterMap: Map<string, string> // speaker name -> character ID
+  characterMap: Map<string, string> // speaker name (lowercase) -> character ID
 ) {
   const [clips, setClips] = useState<TimelineClip[]>([]);
   const [loading, setLoading] = useState(false);
@@ -129,10 +129,11 @@ export function useTimelineClips(
             durationSec = Math.max(0.5, totalChars / CHARS_PER_SEC);
           }
 
-          // Determine track ID
+          // Determine track ID (case-insensitive speaker lookup)
           let trackId = "narrator-fallback";
-          if (seg.speaker && characterMap.has(seg.speaker)) {
-            trackId = `char-${characterMap.get(seg.speaker)}`;
+          const speakerKey = seg.speaker?.toLowerCase();
+          if (speakerKey && characterMap.has(speakerKey)) {
+            trackId = `char-${characterMap.get(speakerKey)}`;
           } else if (seg.segment_type === "narrator" || seg.segment_type === "first_person") {
             trackId = "narrator-fallback";
           }
