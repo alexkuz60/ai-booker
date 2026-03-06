@@ -1,10 +1,11 @@
 import { useState, useRef } from "react";
-import { Users, Wind, Volume2, Film, Wand2, Loader2 } from "lucide-react";
+import { Users, Wind, Headphones, Film, Wand2, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { StoryboardPanel } from "./StoryboardPanel";
 import { CharactersPanel, type CharactersPanelHandle } from "./CharactersPanel";
 import { AtmospherePanel } from "./AtmospherePanel";
+import { FinishedChaptersPanel } from "./FinishedChaptersPanel";
 
 interface StudioWorkspaceProps {
   isRu: boolean;
@@ -47,8 +48,8 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
               <Wind className="h-3.5 w-3.5" />
               <span className="font-body text-sm">{isRu ? "Атмосфера" : "Atmosphere"}</span>
             </TabsTrigger>
-            <TabsTrigger value="sounds" className="gap-1.5">
-              <Volume2 className="h-3.5 w-3.5" />
+            <TabsTrigger value="finished" className="gap-1.5">
+              <Headphones className="h-3.5 w-3.5" />
               <span className="font-body text-sm">{isRu ? "Готовые главы" : "Finished Chapters"}</span>
             </TabsTrigger>
           </TabsList>
@@ -98,11 +99,9 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
           </div>
         </TabsContent>
 
-        <TabsContent value="sounds" className="flex-1 mt-4 min-h-0">
-          <div className="rounded-lg border border-border bg-card/50 h-full flex items-center justify-center">
-            <p className="text-sm text-muted-foreground font-body">
-              {isRu ? "Таблица готовых аудио глав" : "Finished audio chapters"}
-            </p>
+        <TabsContent value="finished" className="flex-1 mt-4 min-h-0">
+          <div className="rounded-lg border border-border bg-card/50 h-full overflow-hidden">
+            <FinishedChaptersPanel isRu={isRu} bookId={bookId} />
           </div>
         </TabsContent>
       </Tabs>
