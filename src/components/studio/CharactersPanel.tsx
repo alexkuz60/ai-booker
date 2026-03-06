@@ -278,11 +278,11 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
   // Filtered character list
   const filteredCharacters = useMemo(() => {
-    if (filterMode === "scene" && sceneCharIds.size > 0) {
+    if (filterMode === "scene" && sceneId) {
       return characters.filter(c => sceneCharIds.has(c.id));
     }
     return characters;
-  }, [characters, filterMode, sceneCharIds]);
+  }, [characters, filterMode, sceneCharIds, sceneId]);
 
   // ── Sync voice settings when character selected ─────────
   useEffect(() => {
