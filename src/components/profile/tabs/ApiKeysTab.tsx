@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Key, Mic2, Brain, Loader2, Check } from 'lucide-react';
+import { Key, Mic2, Brain, Loader2, Check, Square, Volume2 } from 'lucide-react';
 import { ApiKeyField } from '@/components/profile/ApiKeyField';
 import { getProfileText } from '../i18n';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const TTS_PROVIDERS = [
   { provider: 'elevenlabs', labelKey: 'elevenlabs', placeholder: 'sk_...', hint: { ru: 'elevenlabs.io', en: 'elevenlabs.io', url: 'https://elevenlabs.io/app/settings/api-keys' } },
@@ -38,6 +40,89 @@ function renderHint(p: typeof TTS_PROVIDERS[number], isRu: boolean) {
   );
 }
 
+function TtsTestButton({ isRu }: { isRu: boolean }) {
+  const [testing, setTesting] = useState(false);
+  const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+
+  const handleTest = async () => {
+    if (playing && audioRef) {
+      audioRef.pause();
+      audioRef.currentTime = 0;
+      setPlaying(false);
+      return;
+    }
+
+    setTesting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error(isRu ? 'Необходимо авторизоваться' : 'Please sign in');
+        return;
+      }
+
+      const text = isRu
+        ? 'Привет! Это тестовое сообщение от AI Booker.'
+        : 'Hello! This is a test message from AI Booker.';
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ text, voiceId: 'JBFqnCBsd6RMkjVDRZzb' }),
+        }
+      );
+
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error(err || `HTTP ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      setAudioRef(audio);
+      setPlaying(true);
+      audio.onended = () => {
+        setPlaying(false);
+        URL.revokeObjectURL(url);
+      };
+      await audio.play();
+      toast.success(isRu ? 'TTS работает!' : 'TTS is working!');
+    } catch (e) {
+      console.error('TTS test error:', e);
+      toast.error(isRu ? 'Ошибка TTS' : 'TTS error');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={handleTest}
+      disabled={testing}
+      className="h-8 gap-1.5 text-xs"
+    >
+      {testing ? (
+        <Loader2 className="h-3 w-3 animate-spin" />
+      ) : playing ? (
+        <Square className="h-3 w-3" />
+      ) : (
+        <Volume2 className="h-3 w-3" />
+      )}
+      {isRu ? 'Тест' : 'Test'}
+    </Button>
+  );
+}
+
 export function ApiKeysTab({ apiKeys, saving, isRu, onKeyChange, onSave }: ApiKeysTabProps) {
   const p = (key: string) => getProfileText(key, isRu);
 
@@ -57,15 +142,25 @@ export function ApiKeysTab({ apiKeys, saving, isRu, onKeyChange, onSave }: ApiKe
         </div>
 
         {TTS_PROVIDERS.map(prov => (
-          <ApiKeyField
-            key={prov.provider}
-            provider={prov.provider}
-            label={p(prov.labelKey)}
-            value={apiKeys[prov.provider] || ''}
-            onChange={(v) => onKeyChange(prov.provider, v)}
-            placeholder={prov.placeholder}
-            hint={renderHint(prov, isRu)}
-          />
+          <div key={prov.provider} className="space-y-2">
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <ApiKeyField
+                  provider={prov.provider}
+                  label={p(prov.labelKey)}
+                  value={apiKeys[prov.provider] || ''}
+                  onChange={(v) => onKeyChange(prov.provider, v)}
+                  placeholder={prov.placeholder}
+                  hint={renderHint(prov, isRu)}
+                />
+              </div>
+              {prov.provider === 'elevenlabs' && (
+                <div className="pb-6">
+                  <TtsTestButton isRu={isRu} />
+                </div>
+              )}
+            </div>
+          </div>
         ))}
 
         <Separator className="my-6" />
