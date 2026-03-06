@@ -46,6 +46,7 @@ export function AppSidebar() {
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
 
   return (
+    <>
     <Sidebar collapsible="icon" className="border-r border-border bg-sidebar">
       {/* Logo */}
       <SidebarHeader className="px-3 py-4">
