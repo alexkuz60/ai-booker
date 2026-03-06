@@ -644,7 +644,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
             </span>
             <div className="flex items-center gap-1">
               {/* Filter toggle */}
-              {sceneId && sceneCharIds.size > 0 && (
+              {sceneId && (
                 <Button
                   variant={filterMode === "scene" ? "secondary" : "ghost"}
                   size="icon"
