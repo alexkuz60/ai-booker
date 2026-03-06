@@ -113,16 +113,15 @@ export const TIMELINE_HEADER_HEIGHT = 41;
 
 interface StudioTimelineProps {
   isRu: boolean;
-  /** Estimated scene duration in seconds */
   sceneDurationSec?: number;
-  /** Estimated chapter duration in seconds */
   chapterDurationSec?: number;
-  /** Currently selected scene ID */
   sceneId?: string | null;
-  /** Book ID for loading characters */
   bookId?: string | null;
-  /** All scene IDs in the chapter */
   chapterSceneIds?: string[];
+  /** Currently selected character ID (synced with CharactersPanel) */
+  selectedCharacterId?: string | null;
+  /** Callback when a track is clicked */
+  onSelectCharacter?: (characterId: string | null) => void;
 }
 
 export function StudioTimeline({
@@ -132,6 +131,8 @@ export function StudioTimeline({
   sceneId,
   bookId,
   chapterSceneIds,
+  selectedCharacterId,
+  onSelectCharacter,
 }: StudioTimelineProps) {
   const [mode, setMode] = useState<"scene" | "chapter">("scene");
   const duration = mode === "scene"
@@ -389,12 +390,26 @@ export function StudioTimeline({
         <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
           <div className="w-28 shrink-0 border-r border-border flex flex-col">
             <div className="h-6 border-b border-border" />
-            {allTracks.map((track) => (
-              <div key={track.id} className="h-10 flex items-center px-3 border-b border-border/50">
-                <div className="w-2 h-2 rounded-full shrink-0 mr-2" style={{ backgroundColor: track.color }} />
-                <span className="text-xs text-muted-foreground font-body truncate">{track.label}</span>
-              </div>
-            ))}
+            {allTracks.map((track) => {
+              const charId = track.id.startsWith("char-") ? track.id.slice(5) : null;
+              const isSelected = charId != null && charId === selectedCharacterId;
+              return (
+                <div
+                  key={track.id}
+                  className={`h-10 flex items-center px-3 border-b border-border/50 cursor-pointer transition-colors ${
+                    isSelected ? "bg-accent/20" : "hover:bg-muted/30"
+                  }`}
+                  onClick={() => {
+                    if (charId && onSelectCharacter) {
+                      onSelectCharacter(isSelected ? null : charId);
+                    }
+                  }}
+                >
+                  <div className="w-2 h-2 rounded-full shrink-0 mr-2" style={{ backgroundColor: track.color }} />
+                  <span className={`text-xs font-body truncate ${isSelected ? "text-foreground font-medium" : "text-muted-foreground"}`}>{track.label}</span>
+                </div>
+              );
+            })}
           </div>
           <ScrollArea className="flex-1">
             <div className="min-w-full">

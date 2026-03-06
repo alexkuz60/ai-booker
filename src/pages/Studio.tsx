@@ -22,6 +22,7 @@ const Studio = () => {
   const [sceneContent, setSceneContent] = useState<string | null>(null);
   const [segmentedSceneIds, setSegmentedSceneIds] = useState<Set<string>>(new Set());
   const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
+  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const chapterSceneIds = chapter?.scenes.map(s => s.id).filter(Boolean) as string[] | undefined;
 
   const selectedScene = chapter && selectedSceneIdx !== null ? chapter.scenes[selectedSceneIdx] : null;
@@ -176,6 +177,8 @@ const Studio = () => {
                 bookId={bookId}
                 chapterSceneIds={chapterSceneIds}
                 onSegmented={onSegmented}
+                selectedCharacterId={selectedCharacterId}
+                onSelectCharacter={setSelectedCharacterId}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
@@ -189,6 +192,8 @@ const Studio = () => {
           sceneId={selectedScene?.id ?? null}
           bookId={bookId}
           chapterSceneIds={chapterSceneIds}
+          selectedCharacterId={selectedCharacterId}
+          onSelectCharacter={setSelectedCharacterId}
         />
       </div>
     </motion.div>
