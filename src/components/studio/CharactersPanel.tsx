@@ -29,6 +29,7 @@ interface BookCharacter {
     speed?: number;
     pitch?: number;
     volume?: number;
+    is_extra?: boolean;
   };
   color: string | null;
   sort_order: number;
@@ -174,9 +175,6 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   // Segment counts per character (for "extras" detection)
   const [segmentCounts, setSegmentCounts] = useState<Map<string, number>>(new Map());
 
-  // Manual extras override: charId → true (forced extra) | false (forced non-extra)
-  const [extrasOverride, setExtrasOverride] = useState<Map<string, boolean>>(new Map());
-
   // Multi-select & merge
   const [multiSelect, setMultiSelect] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -200,20 +198,27 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const selectedChar = characters.find(c => c.id === selectedId);
   const hasProfiles = characters.some(c => c.description);
 
-  /** A character is "extras" if manually overridden or has ≤1 dialogue segment */
   const isExtra = useCallback((charId: string) => {
-    if (extrasOverride.has(charId)) return extrasOverride.get(charId)!;
+    const ch = characters.find(c => c.id === charId);
+    if (ch?.voice_config?.is_extra !== undefined) return ch.voice_config.is_extra;
     return (segmentCounts.get(charId) ?? 0) <= 1;
-  }, [segmentCounts, extrasOverride]);
+  }, [characters, segmentCounts]);
 
-  const toggleExtra = useCallback((charId: string) => {
-    setExtrasOverride(prev => {
-      const next = new Map(prev);
-      const current = isExtra(charId);
-      next.set(charId, !current);
-      return next;
-    });
-  }, [isExtra]);
+  const toggleExtra = useCallback(async (charId: string) => {
+    const newVal = !isExtra(charId);
+    // Update local state immediately
+    setCharacters(prev => prev.map(c =>
+      c.id === charId ? { ...c, voice_config: { ...c.voice_config, is_extra: newVal } } : c
+    ));
+    // Persist to DB
+    const ch = characters.find(c => c.id === charId);
+    if (ch) {
+      await supabase
+        .from("book_characters")
+        .update({ voice_config: { ...ch.voice_config, is_extra: newVal }, updated_at: new Date().toISOString() })
+        .eq("id", charId);
+    }
+  }, [isExtra, characters]);
 
   // ── Load characters from DB ─────────────────────────────
   const loadCharacters = useCallback(async () => {
@@ -360,6 +365,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     if (!selectedId) return;
     setSaving(true);
     try {
+      const currentChar = characters.find(c => c.id === selectedId);
       const voiceConfig = {
         provider: "yandex",
         voice_id: voice,
@@ -367,6 +373,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         speed,
         pitch: pitch !== 0 ? pitch : undefined,
         volume: volume !== 0 ? volume : undefined,
+        is_extra: currentChar?.voice_config?.is_extra,
       };
       const { error } = await supabase
         .from("book_characters")
@@ -436,6 +443,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
           voice_id: voiceId,
           role: roleId !== "neutral" ? roleId : undefined,
           speed: 1.0,
+          is_extra: ch.voice_config?.is_extra,
         };
         updates.push({ id: ch.id, voice_config: vc });
       }
