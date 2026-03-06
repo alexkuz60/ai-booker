@@ -48,6 +48,14 @@ const AGE_LABELS: Record<string, { ru: string; en: string }> = {
   unknown: { ru: "Не определён", en: "Unknown" },
 };
 
+const TEMPERAMENT_LABELS: Record<string, { ru: string; en: string }> = {
+  sanguine: { ru: "Сангвиник", en: "Sanguine" },
+  choleric: { ru: "Холерик", en: "Choleric" },
+  melancholic: { ru: "Меланхолик", en: "Melancholic" },
+  phlegmatic: { ru: "Флегматик", en: "Phlegmatic" },
+  mixed: { ru: "Смешанный", en: "Mixed" },
+};
+
 // ─── Component ───────────────────────────────────────────
 
 interface CharactersPanelProps {
@@ -344,7 +352,7 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
                     )}
                     {ch.temperament && (
                       <span className="text-[10px] text-muted-foreground/50 truncate">
-                        {ch.temperament}
+                        {TEMPERAMENT_LABELS[ch.temperament]?.[isRu ? "ru" : "en"] ?? ch.temperament}
                       </span>
                     )}
                   </div>
@@ -378,7 +386,7 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
                     </Badge>
                     {selectedChar.temperament && (
                       <Badge variant="secondary" className="text-xs">
-                        {selectedChar.temperament}
+                        {TEMPERAMENT_LABELS[selectedChar.temperament]?.[isRu ? "ru" : "en"] ?? selectedChar.temperament}
                       </Badge>
                     )}
                   </div>
