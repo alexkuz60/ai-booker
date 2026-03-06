@@ -350,6 +350,28 @@ export function useBookManager({ userId, isRu }: UseBookManagerParams) {
       setBookId(book.id);
       sessionStorage.setItem(ACTIVE_BOOK_KEY, book.id);
 
+      // Add default characters: Narrator and Commentator
+      await supabase.from('book_characters').insert([
+        {
+          book_id: book.id,
+          name: isRu ? 'Рассказчик' : 'Narrator',
+          gender: 'male',
+          age_group: 'adult',
+          description: isRu ? 'Голос повествования от третьего лица' : 'Third-person narration voice',
+          sort_order: -2,
+          voice_config: { provider: 'yandex' },
+        },
+        {
+          book_id: book.id,
+          name: isRu ? 'Комментатор' : 'Commentator',
+          gender: 'male',
+          age_group: 'adult',
+          description: isRu ? 'Озвучивание сносок и комментариев' : 'Footnote and commentary voice',
+          sort_order: -1,
+          voice_config: { provider: 'yandex' },
+        },
+      ]);
+
       const uniqueParts = [...new Set(chapters.map(c => c.partTitle).filter(Boolean))] as string[];
       const newPartIdMap = new Map<string, string>();
       for (let i = 0; i < uniqueParts.length; i++) {

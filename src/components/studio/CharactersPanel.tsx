@@ -733,7 +733,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
               <Users className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
               <p className="text-xs text-muted-foreground">
                 {filterMode === "scene"
-                  ? (isRu ? "В этой сцене нет персонажей" : "No characters in this scene")
+                  ? (isRu ? "Повествовательная сцена — нет персонажей с диалогами. Используйте Рассказчика и Комментатора." : "Narrative scene — no dialogue characters. Use Narrator and Commentator.")
                   : (isRu ? "Персонажи появятся после сегментации сцен" : "Characters will appear after scene segmentation")}
               </p>
             </div>
