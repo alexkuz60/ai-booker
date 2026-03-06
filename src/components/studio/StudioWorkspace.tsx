@@ -15,7 +15,7 @@ interface StudioWorkspaceProps {
 
 export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, bookId, onSegmented }: StudioWorkspaceProps) {
   const [activeTab, setActiveTab] = useState("storyboard");
-  const charactersPanelRef = useRef<{ autoCast: () => Promise<void>; casting: boolean } | null>(null);
+  const charactersPanelRef = useRef<CharactersPanelHandle | null>(null);
   const [castingExternal, setCastingExternal] = useState(false);
 
   const handleAutoCast = async () => {
