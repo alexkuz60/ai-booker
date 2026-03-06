@@ -301,6 +301,22 @@ export function StoryboardPanel({
     })();
   }, [bookId]);
 
+  // Load audio status for segments
+  const loadAudioStatus = useCallback(async (segIds: string[]) => {
+    if (segIds.length === 0) { setAudioStatus(new Map()); return; }
+    const { data } = await supabase
+      .from("segment_audio")
+      .select("segment_id, status, duration_ms")
+      .in("segment_id", segIds);
+    const map = new Map<string, { status: string; durationMs: number }>();
+    if (data) {
+      for (const a of data) {
+        map.set(a.segment_id, { status: a.status, durationMs: a.duration_ms });
+      }
+    }
+    setAudioStatus(map);
+  }, []);
+
   // Load existing segments from DB, then apply saved type→character mappings
   const loadSegments = useCallback(async (sid: string) => {
     setLoading(true);
