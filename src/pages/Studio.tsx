@@ -21,6 +21,7 @@ const Studio = () => {
   const [selectedSceneIdx, setSelectedSceneIdx] = useState<number | null>(null);
   const [sceneContent, setSceneContent] = useState<string | null>(null);
   const [segmentedSceneIds, setSegmentedSceneIds] = useState<Set<string>>(new Set());
+  const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
 
   const selectedScene = chapter && selectedSceneIdx !== null ? chapter.scenes[selectedSceneIdx] : null;
 
