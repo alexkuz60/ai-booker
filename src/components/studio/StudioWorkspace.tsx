@@ -1,6 +1,7 @@
 import { Users, Wind, Volume2, Film } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StoryboardPanel } from "./StoryboardPanel";
+import { CharactersPanel } from "./CharactersPanel";
 
 interface StudioWorkspaceProps {
   isRu: boolean;
@@ -44,10 +45,8 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, o
         </TabsContent>
 
         <TabsContent value="narrators" className="flex-1 mt-4 min-h-0">
-          <div className="rounded-lg border border-border bg-card/50 h-full flex items-center justify-center">
-            <p className="text-sm text-muted-foreground font-body">
-              {isRu ? "Управление персонажами для выбранного раздела" : "Character management for selected section"}
-            </p>
+          <div className="rounded-lg border border-border bg-card/50 h-full overflow-hidden">
+            <CharactersPanel isRu={isRu} />
           </div>
         </TabsContent>
 
