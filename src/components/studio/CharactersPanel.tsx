@@ -839,4 +839,4 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       </div>
     </div>
   );
-}
+});
