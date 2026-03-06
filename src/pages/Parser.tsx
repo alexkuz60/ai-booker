@@ -51,7 +51,7 @@ export default function Parser() {
   });
 
   const {
-    step, setStep, books, loadingLibrary, fileName, errorMsg,
+    step, setStep, books, loadingLibrary, fileName, errorMsg, bookId,
     chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
     partIdMap, chapterResults, setChapterResults, fileInputRef,
     openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset,
@@ -70,7 +70,7 @@ export default function Parser() {
     analyzedCount, totalScenes,
     isChapterFullyDone, sendToStudio,
     partGroups, partlessIndices,
-  } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName });
+  } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName, bookId: bookId ?? undefined });
 
   // Persist nav state to sessionStorage
   useEffect(() => {

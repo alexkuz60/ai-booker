@@ -21,6 +21,7 @@ const Studio = () => {
   const [selectedSceneIdx, setSelectedSceneIdx] = useState<number | null>(null);
   const [sceneContent, setSceneContent] = useState<string | null>(null);
   const [segmentedSceneIds, setSegmentedSceneIds] = useState<Set<string>>(new Set());
+  const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
 
   const selectedScene = chapter && selectedSceneIdx !== null ? chapter.scenes[selectedSceneIdx] : null;
 
@@ -30,31 +31,41 @@ const Studio = () => {
     return estimateSceneDuration(chapter.scenes[selectedSceneIdx]);
   }, [chapter, selectedSceneIdx]);
 
-  // Resolve scene DB IDs on load if missing
+  // Resolve scene DB IDs and bookId on load if missing
   useEffect(() => {
-    if (!chapter || chapter.scenes.every(s => s.id)) return;
+    if (!chapter) return;
+    const needIds = chapter.scenes.some(s => !s.id);
+    const needBookId = !bookId;
+    if (!needIds && !needBookId) return;
+
     (async () => {
-      // Find scenes by matching chapter title and scene numbers
       const { data: dbChapters } = await supabase
         .from("book_chapters")
-        .select("id, title")
+        .select("id, title, book_id")
         .ilike("title", chapter.chapterTitle);
       if (!dbChapters?.length) return;
 
-      const chapterIds = dbChapters.map(c => c.id);
-      const { data: dbScenes } = await supabase
-        .from("book_scenes")
-        .select("id, chapter_id, scene_number, content")
-        .in("chapter_id", chapterIds)
-        .order("scene_number");
-      if (!dbScenes?.length) return;
+      // Resolve bookId
+      if (needBookId && dbChapters[0]?.book_id) {
+        setBookId(dbChapters[0].book_id);
+      }
 
-      const updated = { ...chapter, scenes: chapter.scenes.map(s => {
-        if (s.id) return s;
-        const match = dbScenes.find(db => db.scene_number === s.scene_number);
-        return match ? { ...s, id: match.id } : s;
-      })};
-      setChapter(updated);
+      if (needIds) {
+        const chapterIds = dbChapters.map(c => c.id);
+        const { data: dbScenes } = await supabase
+          .from("book_scenes")
+          .select("id, chapter_id, scene_number, content")
+          .in("chapter_id", chapterIds)
+          .order("scene_number");
+        if (!dbScenes?.length) return;
+
+        const updated = { ...chapter, scenes: chapter.scenes.map(s => {
+          if (s.id) return s;
+          const match = dbScenes.find(db => db.scene_number === s.scene_number);
+          return match ? { ...s, id: match.id } : s;
+        })};
+        setChapter(updated);
+      }
     })();
   }, [chapter?.chapterTitle]);
 
@@ -161,6 +172,7 @@ const Studio = () => {
                 isRu={isRu}
                 selectedSceneId={selectedScene?.id ?? null}
                 selectedSceneContent={sceneContent}
+                bookId={bookId}
                 onSegmented={onSegmented}
               />
             </ResizablePanel>

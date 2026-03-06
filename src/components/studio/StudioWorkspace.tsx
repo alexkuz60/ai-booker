@@ -7,10 +7,11 @@ interface StudioWorkspaceProps {
   isRu: boolean;
   selectedSceneId?: string | null;
   selectedSceneContent?: string | null;
+  bookId?: string | null;
   onSegmented?: (sceneId: string) => void;
 }
 
-export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, onSegmented }: StudioWorkspaceProps) {
+export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, bookId, onSegmented }: StudioWorkspaceProps) {
   return (
     <div className="h-full min-h-0 flex flex-col p-4">
       <Tabs defaultValue="storyboard" className="flex-1 flex flex-col min-h-0">
@@ -46,7 +47,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, o
 
         <TabsContent value="narrators" className="flex-1 mt-4 min-h-0">
           <div className="rounded-lg border border-border bg-card/50 h-full overflow-hidden">
-            <CharactersPanel isRu={isRu} />
+            <CharactersPanel isRu={isRu} bookId={bookId} sceneId={selectedSceneId} />
           </div>
         </TabsContent>
 

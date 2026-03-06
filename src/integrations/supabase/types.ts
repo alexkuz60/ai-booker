@@ -71,6 +71,65 @@ export type Database = {
           },
         ]
       }
+      book_characters: {
+        Row: {
+          age_group: string
+          aliases: string[]
+          book_id: string
+          color: string | null
+          created_at: string
+          description: string | null
+          gender: string
+          id: string
+          name: string
+          sort_order: number
+          speech_style: string | null
+          temperament: string | null
+          updated_at: string
+          voice_config: Json
+        }
+        Insert: {
+          age_group?: string
+          aliases?: string[]
+          book_id: string
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          gender?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          speech_style?: string | null
+          temperament?: string | null
+          updated_at?: string
+          voice_config?: Json
+        }
+        Update: {
+          age_group?: string
+          aliases?: string[]
+          book_id?: string
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          gender?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          speech_style?: string | null
+          temperament?: string | null
+          updated_at?: string
+          voice_config?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_characters_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       book_parts: {
         Row: {
           book_id: string
@@ -182,6 +241,45 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      character_appearances: {
+        Row: {
+          character_id: string
+          id: string
+          role_in_scene: string
+          scene_id: string
+          segment_ids: string[]
+        }
+        Insert: {
+          character_id: string
+          id?: string
+          role_in_scene?: string
+          scene_id: string
+          segment_ids?: string[]
+        }
+        Update: {
+          character_id?: string
+          id?: string
+          role_in_scene?: string
+          scene_id?: string
+          segment_ids?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_appearances_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "book_characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_appearances_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "book_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

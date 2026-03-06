@@ -26,10 +26,89 @@ interface AISegment {
 
 // Split text into sentences using punctuation rules
 function splitPhrases(text: string): string[] {
-  // Split on sentence-ending punctuation, keeping the delimiter
   const raw = text.match(/[^.!?…]+[.!?…]+[")»\\]]*|[^.!?…]+$/g);
   if (!raw) return [text.trim()].filter(Boolean);
   return raw.map((s) => s.trim()).filter(Boolean);
+}
+
+// ── Character extraction helper ──────────────────────────
+// Resolve book_id from scene_id, upsert characters, create appearances
+async function extractCharacters(
+  supabase: ReturnType<typeof createClient>,
+  sceneId: string,
+  segments: Array<{ segment_id: string; segment_type: string; speaker: string | null }>
+) {
+  // Find book_id via scene → chapter → book
+  const { data: scene } = await supabase
+    .from("book_scenes")
+    .select("chapter_id")
+    .eq("id", sceneId)
+    .single();
+  if (!scene) return;
+
+  const { data: chapter } = await supabase
+    .from("book_chapters")
+    .select("book_id")
+    .eq("id", scene.chapter_id)
+    .single();
+  if (!chapter) return;
+
+  const bookId = chapter.book_id;
+
+  // Collect unique speakers from dialogue/first_person segments
+  const speakerSegments = new Map<string, string[]>(); // name → segment_ids
+  for (const seg of segments) {
+    if (seg.speaker && ["dialogue", "first_person"].includes(seg.segment_type)) {
+      const name = seg.speaker.trim();
+      if (!name) continue;
+      const ids = speakerSegments.get(name) || [];
+      ids.push(seg.segment_id);
+      speakerSegments.set(name, ids);
+    }
+  }
+
+  if (speakerSegments.size === 0) return;
+
+  // Upsert each character and create appearance
+  for (const [name, segmentIds] of speakerSegments) {
+    // Upsert character (on conflict book_id+name do nothing)
+    const { data: existing } = await supabase
+      .from("book_characters")
+      .select("id")
+      .eq("book_id", bookId)
+      .eq("name", name)
+      .maybeSingle();
+
+    let characterId: string;
+    if (existing) {
+      characterId = existing.id;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("book_characters")
+        .insert({ book_id: bookId, name })
+        .select("id")
+        .single();
+      if (error || !inserted) {
+        console.error("Failed to insert character:", name, error);
+        continue;
+      }
+      characterId = inserted.id;
+    }
+
+    // Upsert appearance (on conflict character_id+scene_id update segment_ids)
+    const { error: appErr } = await supabase
+      .from("character_appearances")
+      .upsert(
+        {
+          character_id: characterId,
+          scene_id: sceneId,
+          role_in_scene: "speaker",
+          segment_ids: segmentIds,
+        },
+        { onConflict: "character_id,scene_id" }
+      );
+    if (appErr) console.error("Failed to upsert appearance:", appErr);
+  }
 }
 
 Deno.serve(async (req) => {
@@ -112,7 +191,6 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
 
     const aiData = await aiRes.json();
     let raw = aiData.choices?.[0]?.message?.content || "";
-    // Strip markdown fences if present
     raw = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
 
     let segments: AISegment[];
@@ -156,6 +234,9 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
       ) || []
     );
     await supabase.from("scene_segments").delete().eq("scene_id", scene_id);
+
+    // Also clean up old character appearances for this scene
+    await supabase.from("character_appearances").delete().eq("scene_id", scene_id);
 
     // Insert segments and phrases
     const result: Array<{
@@ -211,6 +292,13 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
           text: p.text,
         })),
       });
+    }
+
+    // ── Extract characters (fire-and-forget, don't block response) ──
+    try {
+      await extractCharacters(supabase, scene_id, result);
+    } catch (charErr) {
+      console.error("Character extraction error (non-fatal):", charErr);
     }
 
     return new Response(JSON.stringify({ segments: result }), {
