@@ -359,6 +359,44 @@ export type Database = {
         }
         Relationships: []
       }
+      scene_playlists: {
+        Row: {
+          created_at: string
+          id: string
+          scene_id: string
+          segments: Json
+          status: string
+          total_duration_ms: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          scene_id: string
+          segments?: Json
+          status?: string
+          total_duration_ms?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          scene_id?: string
+          segments?: Json
+          status?: string
+          total_duration_ms?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scene_playlists_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: true
+            referencedRelation: "book_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scene_segments: {
         Row: {
           created_at: string
