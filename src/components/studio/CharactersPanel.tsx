@@ -471,6 +471,10 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         }
         usedVoices.add(voiceId);
 
+        // Sync gender from the chosen voice
+        const chosenVoice = YANDEX_VOICES.find(v => v.id === voiceId);
+        const syncedGender = chosenVoice ? chosenVoice.gender : ch.gender;
+
         const vc: BookCharacter["voice_config"] = {
           provider: "yandex",
           voice_id: voiceId,
@@ -478,7 +482,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
           speed: 1.0,
           is_extra: ch.voice_config?.is_extra,
         };
-        updates.push({ id: ch.id, voice_config: vc });
+        updates.push({ id: ch.id, voice_config: vc, gender: syncedGender });
       }
 
       // Batch save to DB
