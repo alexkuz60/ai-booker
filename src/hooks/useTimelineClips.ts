@@ -87,7 +87,7 @@ export function useTimelineClips(
       // Build audio duration map
       const audioDurationMap = new Map<string, { durationMs: number; audioPath: string }>();
       if (audioData) {
-        for (const a of audioData as any[]) {
+        for (const a of audioData) {
           audioDurationMap.set(a.segment_id, {
             durationMs: a.duration_ms,
             audioPath: a.audio_path,
