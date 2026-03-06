@@ -345,17 +345,6 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     if (newVoice?.roles && !newVoice.roles.includes(role)) {
       setRole(newVoice.roles[0] || "neutral");
     }
-    // Sync character gender to match voice gender
-    if (newVoice && selectedChar && newVoice.gender !== selectedChar.gender) {
-      const charId = selectedChar.id;
-      setCharacters(prev => prev.map(c =>
-        c.id === charId ? { ...c, gender: newVoice.gender } : c
-      ));
-      supabase.from("book_characters")
-        .update({ gender: newVoice.gender, updated_at: new Date().toISOString() })
-        .eq("id", charId)
-        .then();
-    }
   };
 
   // ── AI Profiling (full or incremental) ───────────────
