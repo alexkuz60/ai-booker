@@ -436,6 +436,44 @@ export type Database = {
           },
         ]
       }
+      segment_audio: {
+        Row: {
+          audio_path: string
+          created_at: string
+          duration_ms: number
+          id: string
+          segment_id: string
+          status: string
+          voice_config: Json
+        }
+        Insert: {
+          audio_path: string
+          created_at?: string
+          duration_ms?: number
+          id?: string
+          segment_id: string
+          status?: string
+          voice_config?: Json
+        }
+        Update: {
+          audio_path?: string
+          created_at?: string
+          duration_ms?: number
+          id?: string
+          segment_id?: string
+          status?: string
+          voice_config?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "segment_audio_segment_id_fkey"
+            columns: ["segment_id"]
+            isOneToOne: true
+            referencedRelation: "scene_segments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       segment_phrases: {
         Row: {
           created_at: string
