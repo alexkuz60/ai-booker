@@ -220,17 +220,42 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     }
   }, [isExtra, characters]);
 
+  // ── Ensure system characters exist ──────────────────────
+  const ensureSystemCharacters = useCallback(async (bookId: string, existing: string[]) => {
+    const systemDefs = [
+      { name: isRu ? "Рассказчик" : "Narrator", nameAlt: isRu ? "Narrator" : "Рассказчик", sort_order: -2, description: isRu ? "Голос повествования от третьего лица" : "Third-person narration voice" },
+      { name: isRu ? "Комментатор" : "Commentator", nameAlt: isRu ? "Commentator" : "Комментатор", sort_order: -1, description: isRu ? "Озвучивание сносок и комментариев" : "Footnote and commentary voice" },
+    ];
+    const toCreate = systemDefs.filter(d => !existing.includes(d.name) && !existing.includes(d.nameAlt));
+    if (toCreate.length === 0) return false;
+    await supabase.from("book_characters").insert(
+      toCreate.map(d => ({
+        book_id: bookId, name: d.name, gender: "male", age_group: "adult",
+        description: d.description, sort_order: d.sort_order, voice_config: { provider: "yandex" },
+      }))
+    );
+    return true;
+  }, [isRu]);
+
   // ── Load characters from DB ─────────────────────────────
   const loadCharacters = useCallback(async () => {
     if (!bookId) { setCharacters([]); setSceneCharIds(new Set()); setSegmentCounts(new Map()); return; }
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from("book_characters")
         .select("*")
         .eq("book_id", bookId)
         .order("sort_order");
       if (error) throw error;
+
+      // Auto-create system characters if missing
+      const names = (data || []).map(c => c.name);
+      const created = await ensureSystemCharacters(bookId, names);
+      if (created) {
+        const res = await supabase.from("book_characters").select("*").eq("book_id", bookId).order("sort_order");
+        data = res.data;
+      }
 
       // Load all appearances to count total segments per character
       const charIds = (data || []).map(c => c.id);
