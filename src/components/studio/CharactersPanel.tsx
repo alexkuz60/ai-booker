@@ -183,9 +183,12 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const selectedChar = characters.find(c => c.id === selectedId);
   const hasProfiles = characters.some(c => c.description);
 
+  /** A character is "extras" (массовка) if they have ≤1 dialogue segment total */
+  const isExtra = useCallback((charId: string) => (segmentCounts.get(charId) ?? 0) <= 1, [segmentCounts]);
+
   // ── Load characters from DB ─────────────────────────────
   const loadCharacters = useCallback(async () => {
-    if (!bookId) { setCharacters([]); setSceneCharIds(new Set()); return; }
+    if (!bookId) { setCharacters([]); setSceneCharIds(new Set()); setSegmentCounts(new Map()); return; }
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -194,6 +197,25 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         .eq("book_id", bookId)
         .order("sort_order");
       if (error) throw error;
+
+      // Load all appearances to count total segments per character
+      const charIds = (data || []).map(c => c.id);
+      const counts = new Map<string, number>();
+      if (charIds.length > 0) {
+        for (let i = 0; i < charIds.length; i += 200) {
+          const batch = charIds.slice(i, i + 200);
+          const { data: apps } = await supabase
+            .from("character_appearances")
+            .select("character_id, segment_ids")
+            .in("character_id", batch);
+          if (apps) {
+            for (const a of apps) {
+              counts.set(a.character_id, (counts.get(a.character_id) ?? 0) + (a.segment_ids?.length ?? 0));
+            }
+          }
+        }
+      }
+      setSegmentCounts(counts);
 
       let scIds = new Set<string>();
       if (sceneId && data && data.length > 0) {
