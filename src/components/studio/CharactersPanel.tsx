@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Users, Volume2, Loader2, Square, Play, RotateCcw, Save, Sparkles, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -39,14 +40,25 @@ const GENDER_LABELS: Record<string, { ru: string; en: string }> = {
   unknown: { ru: "Не определён", en: "Unknown" },
 };
 
-const AGE_LABELS: Record<string, { ru: string; en: string }> = {
-  child: { ru: "Ребёнок", en: "Child" },
-  teen: { ru: "Подросток", en: "Teen" },
-  young: { ru: "Молодой", en: "Young" },
-  adult: { ru: "Взрослый", en: "Adult" },
-  elder: { ru: "Пожилой", en: "Elder" },
-  unknown: { ru: "Не определён", en: "Unknown" },
+const AGE_LABELS: Record<string, { ru: { m: string; f: string; u: string }; en: { m: string; f: string; u: string } }> = {
+  infant:  { ru: { m: "Младенец", f: "Младенец", u: "Младенец" },       en: { m: "Infant", f: "Infant", u: "Infant" } },
+  child:   { ru: { m: "Мальчик", f: "Девочка", u: "Ребёнок" },         en: { m: "Boy", f: "Girl", u: "Child" } },
+  teen:    { ru: { m: "Подросток", f: "Подросток", u: "Подросток" },    en: { m: "Teen boy", f: "Teen girl", u: "Teen" } },
+  young:   { ru: { m: "Юноша", f: "Девушка", u: "Молодой" },           en: { m: "Young man", f: "Young woman", u: "Young" } },
+  adult:   { ru: { m: "Мужчина", f: "Женщина", u: "Взрослый" },        en: { m: "Man", f: "Woman", u: "Adult" } },
+  elder:   { ru: { m: "Пожилой", f: "Пожилая", u: "Пожилой" },         en: { m: "Old man", f: "Old woman", u: "Elder" } },
+  unknown: { ru: { m: "Не определён", f: "Не определён", u: "Не определён" }, en: { m: "Unknown", f: "Unknown", u: "Unknown" } },
 };
+
+const AGE_OPTIONS = ["infant", "child", "teen", "young", "adult", "elder"] as const;
+
+function getAgeLabel(ageGroup: string, gender: string, isRu: boolean): string {
+  const entry = AGE_LABELS[ageGroup];
+  if (!entry) return ageGroup;
+  const lang = isRu ? "ru" : "en";
+  const g = gender === "male" ? "m" : gender === "female" ? "f" : "u";
+  return entry[lang][g];
+}
 
 const TEMPERAMENT_LABELS: Record<string, { ru: string; en: string }> = {
   sanguine: { ru: "Сангвиник", en: "Sanguine" },
@@ -381,9 +393,52 @@ export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps)
                     <Badge variant="outline" className="text-xs">
                       {GENDER_LABELS[selectedChar.gender]?.[isRu ? "ru" : "en"] ?? selectedChar.gender}
                     </Badge>
-                    <Badge variant="outline" className="text-xs">
-                      {AGE_LABELS[selectedChar.age_group]?.[isRu ? "ru" : "en"] ?? selectedChar.age_group}
-                    </Badge>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
+                            selectedChar.age_group === "unknown" ? "border-dashed border-warning text-warning" : ""
+                          }`}
+                        >
+                          {getAgeLabel(selectedChar.age_group, selectedChar.gender, isRu)}
+                          {selectedChar.age_group === "unknown" && " ▾"}
+                        </Badge>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-1.5" align="start">
+                        <div className="grid gap-0.5">
+                          {AGE_OPTIONS.map(age => (
+                            <button
+                              key={age}
+                              className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${
+                                selectedChar.age_group === age
+                                  ? "bg-accent text-accent-foreground"
+                                  : "hover:bg-muted text-foreground"
+                              }`}
+                              onClick={async () => {
+                                const charId = selectedChar.id;
+                                setCharacters(prev => prev.map(c =>
+                                  c.id === charId ? { ...c, age_group: age } : c
+                                ));
+                                try {
+                                  const { error } = await supabase
+                                    .from("book_characters")
+                                    .update({ age_group: age, updated_at: new Date().toISOString() })
+                                    .eq("id", charId);
+                                  if (error) throw error;
+                                  toast.success(isRu ? "Возраст сохранён" : "Age saved");
+                                } catch {
+                                  toast.error(isRu ? "Ошибка сохранения" : "Save error");
+                                  loadCharacters();
+                                }
+                              }}
+                            >
+                              {getAgeLabel(age, selectedChar.gender, isRu)}
+                            </button>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                     {selectedChar.temperament && (
                       <Badge variant="secondary" className="text-xs">
                         {TEMPERAMENT_LABELS[selectedChar.temperament]?.[isRu ? "ru" : "en"] ?? selectedChar.temperament}
