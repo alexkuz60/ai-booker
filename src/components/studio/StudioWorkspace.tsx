@@ -10,10 +10,11 @@ interface StudioWorkspaceProps {
   selectedSceneId?: string | null;
   selectedSceneContent?: string | null;
   bookId?: string | null;
+  chapterSceneIds?: string[];
   onSegmented?: (sceneId: string) => void;
 }
 
-export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, bookId, onSegmented }: StudioWorkspaceProps) {
+export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, bookId, chapterSceneIds, onSegmented }: StudioWorkspaceProps) {
   const [activeTab, setActiveTab] = useState("storyboard");
   const charactersPanelRef = useRef<CharactersPanelHandle | null>(null);
   const [castingExternal, setCastingExternal] = useState(false);
@@ -22,6 +23,8 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
     if (charactersPanelRef.current) {
       setCastingExternal(true);
       await charactersPanelRef.current.autoCast();
+      // Chain incremental profiling after voice assignment
+      await charactersPanelRef.current.incrementalProfile();
       setCastingExternal(false);
     }
   };
@@ -81,6 +84,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
               isRu={isRu}
               bookId={bookId}
               sceneId={selectedSceneId}
+              chapterSceneIds={chapterSceneIds}
             />
           </div>
         </TabsContent>
