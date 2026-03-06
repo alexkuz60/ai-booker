@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, UserPlus, Volume2, Loader2, Square, Play } from "lucide-react";
+import { Users, UserPlus, Volume2, Loader2, Square, Play, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
