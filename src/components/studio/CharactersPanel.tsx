@@ -138,7 +138,12 @@ interface CharactersPanelProps {
   sceneId?: string | null;
 }
 
-export function CharactersPanel({ isRu, bookId, sceneId }: CharactersPanelProps) {
+export interface CharactersPanelHandle {
+  autoCast: () => Promise<void>;
+  casting: boolean;
+}
+
+export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanelProps>(function CharactersPanel({ isRu, bookId, sceneId }, ref) {
   const [characters, setCharacters] = useState<BookCharacter[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
