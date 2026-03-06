@@ -13,6 +13,7 @@ import { StudioWorkspace } from "@/components/studio/StudioWorkspace";
 import { StudioTimeline, TIMELINE_HEADER_HEIGHT } from "@/components/studio/StudioTimeline";
 import { estimateChapterDuration, estimateSceneDuration } from "@/lib/durationEstimate";
 import { supabase } from "@/integrations/supabase/client";
+import { usePageHeader } from "@/hooks/usePageHeader";
 
 const Studio = () => {
   const { isRu } = useLanguage();
@@ -97,44 +98,42 @@ const Studio = () => {
     setSegmentedSceneIds(prev => new Set(prev).add(sceneId));
   }, []);
 
+  const { setPageHeader } = usePageHeader();
+
+  const studioTitle = isRu ? "Студия" : "Studio";
+  const studioSubtitle = chapter
+    ? `${chapter.bookTitle} → ${chapter.chapterTitle}`
+    : (isRu ? "Рабочая панель" : "Workspace");
+
+  const headerRight = chapterEstimate && chapterEstimate.chars > 0 ? (
+    <div className="flex items-center gap-3 text-sm font-body">
+      <div className="flex items-center gap-1.5 text-muted-foreground">
+        <Clock className="h-4 w-4" />
+        <span className="font-medium text-foreground">{chapterEstimate.formatted}</span>
+        <span className="text-xs">
+          ({chapterEstimate.chars.toLocaleString()} {isRu ? "сим." : "chars"})
+        </span>
+      </div>
+      {sceneEstimate && sceneEstimate.chars > 0 && (
+        <div className="text-xs text-muted-foreground border-l border-border pl-3">
+          {isRu ? "Сцена" : "Scene"}: <span className="font-medium text-foreground">{sceneEstimate.formatted}</span>
+          <span className="ml-1">({sceneEstimate.chars.toLocaleString()} {isRu ? "сим." : "ch."})</span>
+        </div>
+      )}
+    </div>
+  ) : undefined;
+
+  useEffect(() => {
+    setPageHeader({ title: studioTitle, subtitle: studioSubtitle, headerRight });
+    return () => setPageHeader({});
+  }, [studioTitle, studioSubtitle, chapterEstimate?.formatted, sceneEstimate?.formatted]);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="flex flex-col h-[calc(100vh-3rem)] min-h-0 overflow-hidden"
     >
-      {/* Header */}
-      <div className="px-6 py-3 border-b border-border shrink-0">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-display text-2xl font-bold text-foreground">
-              {isRu ? "Студия" : "Studio"}
-            </h1>
-            <p className="text-sm text-muted-foreground font-body">
-              {chapter
-                ? `${chapter.bookTitle} → ${chapter.chapterTitle}`
-                : (isRu ? "Рабочая панель" : "Workspace")}
-            </p>
-          </div>
-          {chapterEstimate && chapterEstimate.chars > 0 && (
-            <div className="flex items-center gap-3 text-sm font-body">
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <Clock className="h-4 w-4" />
-                <span className="font-medium text-foreground">{chapterEstimate.formatted}</span>
-                <span className="text-xs">
-                  ({chapterEstimate.chars.toLocaleString()} {isRu ? "сим." : "chars"})
-                </span>
-              </div>
-              {sceneEstimate && sceneEstimate.chars > 0 && (
-                <div className="text-xs text-muted-foreground border-l border-border pl-3">
-                  {isRu ? "Сцена" : "Scene"}: <span className="font-medium text-foreground">{sceneEstimate.formatted}</span>
-                  <span className="ml-1">({sceneEstimate.chars.toLocaleString()} {isRu ? "сим." : "ch."})</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* Body: upper workspace + bottom timeline */}
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
