@@ -700,7 +700,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                     if (multiSelect) {
                       toggleCharInSelection(ch.id);
                     } else {
-                      setSelectedId(ch.id);
+                      handleSelectCharacter(ch.id);
                     }
                   }}
                   className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
