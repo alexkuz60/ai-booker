@@ -215,5 +215,7 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
+    <AssistantChat open={assistantOpen} onOpenChange={setAssistantOpen} />
+    </>
   );
 }
