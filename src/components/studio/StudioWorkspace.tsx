@@ -16,12 +16,27 @@ interface StudioWorkspaceProps {
   onSegmented?: (sceneId: string) => void;
   selectedCharacterId?: string | null;
   onSelectCharacter?: (characterId: string | null) => void;
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
-export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter }: StudioWorkspaceProps) {
-  const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem("studio_active_tab") || "storyboard");
+export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter, activeTab: externalTab, onTabChange }: StudioWorkspaceProps) {
+  const [activeTab, setActiveTabLocal] = useState(() => externalTab || sessionStorage.getItem("studio_active_tab") || "storyboard");
   const charactersPanelRef = useRef<CharactersPanelHandle | null>(null);
   const [castingExternal, setCastingExternal] = useState(false);
+
+  // Sync external tab prop
+  useEffect(() => {
+    if (externalTab && externalTab !== activeTab) {
+      setActiveTabLocal(externalTab);
+    }
+  }, [externalTab]);
+
+  const handleTabChange = (v: string) => {
+    setActiveTabLocal(v);
+    sessionStorage.setItem("studio_active_tab", v);
+    onTabChange?.(v);
+  };
 
   const handleAutoCast = async () => {
     if (charactersPanelRef.current) {
