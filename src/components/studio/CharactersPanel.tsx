@@ -632,6 +632,142 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     });
   };
 
+  // ── Auto-clean duplicates ──────────────────────────────
+  const [cleaningDupes, setCleaningDupes] = useState(false);
+
+  const handleAutoCleanDuplicates = useCallback(async () => {
+    if (characters.length < 2) return;
+    setCleaningDupes(true);
+    try {
+      // Build name→character index (lowercase)
+      const nameMap = new Map<string, BookCharacter[]>();
+      for (const ch of characters) {
+        const names = [ch.name, ...ch.aliases].map(n => n.toLowerCase().trim()).filter(Boolean);
+        for (const n of names) {
+          const arr = nameMap.get(n) || [];
+          if (!arr.find(c => c.id === ch.id)) arr.push(ch);
+          nameMap.set(n, arr);
+        }
+      }
+
+      // Find duplicate groups using union-find
+      const parentMap = new Map<string, string>();
+      const find = (id: string): string => {
+        if (!parentMap.has(id)) parentMap.set(id, id);
+        if (parentMap.get(id) !== id) parentMap.set(id, find(parentMap.get(id)!));
+        return parentMap.get(id)!;
+      };
+      const union = (a: string, b: string) => {
+        parentMap.set(find(a), find(b));
+      };
+
+      for (const [, group] of nameMap) {
+        if (group.length > 1) {
+          for (let i = 1; i < group.length; i++) {
+            union(group[0].id, group[i].id);
+          }
+        }
+      }
+
+      // Collect groups of size > 1
+      const groups = new Map<string, BookCharacter[]>();
+      for (const ch of characters) {
+        const root = find(ch.id);
+        const arr = groups.get(root) || [];
+        arr.push(ch);
+        groups.set(root, arr);
+      }
+
+      const dupeGroups = [...groups.values()].filter(g => g.length > 1);
+      if (dupeGroups.length === 0) {
+        toast.info(isRu ? "Дубликатов не найдено" : "No duplicates found");
+        setCleaningDupes(false);
+        return;
+      }
+
+      let totalMerged = 0;
+
+      for (const group of dupeGroups) {
+        // Pick primary: prefer system chars, then highest segment count, then first by sort_order
+        const sorted = [...group].sort((a, b) => {
+          const aSystem = SYSTEM_NAMES.has(a.name) ? 1 : 0;
+          const bSystem = SYSTEM_NAMES.has(b.name) ? 1 : 0;
+          if (aSystem !== bSystem) return bSystem - aSystem;
+          const aCount = segmentCounts.get(a.id) ?? 0;
+          const bCount = segmentCounts.get(b.id) ?? 0;
+          if (aCount !== bCount) return bCount - aCount;
+          return a.sort_order - b.sort_order;
+        });
+
+        const primary = sorted[0];
+        const others = sorted.slice(1);
+
+        // Collect aliases
+        const newAliases = [
+          ...primary.aliases,
+          ...others.flatMap(c => [c.name, ...c.aliases]),
+        ].filter((v, i, a) => a.indexOf(v) === i && v.toLowerCase() !== primary.name.toLowerCase());
+
+        // Update primary
+        await supabase
+          .from("book_characters")
+          .update({ aliases: newAliases, updated_at: new Date().toISOString() })
+          .eq("id", primary.id);
+
+        // Reassign appearances and delete others
+        for (const other of others) {
+          const { data: appearances } = await supabase
+            .from("character_appearances")
+            .select("*")
+            .eq("character_id", other.id);
+          if (appearances?.length) {
+            for (const app of appearances) {
+              const { data: existing } = await supabase
+                .from("character_appearances")
+                .select("id, segment_ids")
+                .eq("character_id", primary.id)
+                .eq("scene_id", app.scene_id)
+                .maybeSingle();
+              if (existing) {
+                const mergedSegments = [...new Set([...existing.segment_ids, ...app.segment_ids])];
+                await supabase.from("character_appearances").update({ segment_ids: mergedSegments }).eq("id", existing.id);
+                await supabase.from("character_appearances").delete().eq("id", app.id);
+              } else {
+                await supabase.from("character_appearances").update({ character_id: primary.id }).eq("id", app.id);
+              }
+            }
+          }
+          // Update scene_segments speaker references
+          await supabase
+            .from("scene_segments")
+            .update({ speaker: primary.name })
+            .eq("speaker", other.name);
+          // Also update for aliases of the other character
+          for (const alias of other.aliases) {
+            await supabase
+              .from("scene_segments")
+              .update({ speaker: primary.name })
+              .eq("speaker", alias);
+          }
+          await supabase.from("book_characters").delete().eq("id", other.id);
+          totalMerged++;
+        }
+      }
+
+      toast.success(
+        isRu
+          ? `Объединено ${totalMerged} дубликат(ов) в ${dupeGroups.length} группах`
+          : `Merged ${totalMerged} duplicate(s) in ${dupeGroups.length} groups`
+      );
+      await loadCharacters();
+    } catch (e) {
+      console.error("Auto-clean duplicates error:", e);
+      toast.error(isRu ? "Ошибка очистки дубликатов" : "Duplicate cleanup error");
+    } finally {
+      setCleaningDupes(false);
+    }
+  }, [characters, segmentCounts, SYSTEM_NAMES, isRu, loadCharacters]);
+
   // ── TTS Preview ─────────────────────────────────────────
   const handlePreview = async () => {
     if (playing && audioRef) {
