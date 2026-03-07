@@ -387,6 +387,11 @@ Deno.serve(async (req) => {
         console.log(`Unassigned segment ${seg.id}: random voice=${voiceConfig.voice}, role=${voiceConfig.role}`);
       }
 
+      const isV3Voice = V3_ONLY_VOICES.has(voiceConfig.voice);
+      const apiVersion = isV3Voice ? "v3" : "v1";
+      const estimatedChunks = isV3Voice ? Math.max(1, Math.ceil(text.length / 240)) : 1;
+      console.log(`▶ Segment ${i + 1}/${segments.length} [${seg.id}]: speaker=${seg.speaker || seg.segment_type}, api=${apiVersion}, voice=${voiceConfig.voice}, chars=${text.length}, chunks≈${estimatedChunks}${hasInlineNarrations ? `, narrations=${inlineNarrations.length}` : ""}`);
+
       try {
         let dialogueDurationMs: number;
         let dialogueAudio: Uint8Array;
