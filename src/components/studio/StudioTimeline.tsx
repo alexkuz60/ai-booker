@@ -503,7 +503,7 @@ export function StudioTimeline({
                 max={100}
                 value={player.volume}
                 onChange={e => player.changeVolume(Number(e.target.value))}
-                className="w-16 h-1 accent-primary cursor-pointer"
+                className="w-12 h-0.5 accent-primary cursor-pointer"
                 title={`${player.volume}%`}
               />
             </div>
