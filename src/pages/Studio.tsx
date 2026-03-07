@@ -26,6 +26,7 @@ const Studio = () => {
   } = useStudioSession();
 
   const [sceneContent, setSceneContent] = useState<string | null>(null);
+  const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   const [segmentedSceneIds, setSegmentedSceneIds] = useState<Set<string>>(new Set());
   const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
@@ -194,6 +195,8 @@ const Studio = () => {
                 onSelectCharacter={setSelectedCharacterId}
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
+                selectedSegmentId={selectedSegmentId}
+                onSelectSegment={setSelectedSegmentId}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
@@ -210,6 +213,8 @@ const Studio = () => {
           selectedCharacterId={selectedCharacterId}
           onSelectCharacter={setSelectedCharacterId}
           onSelectSceneIdx={setSelectedSceneIdx}
+          selectedSegmentId={selectedSegmentId}
+          onSelectSegment={setSelectedSegmentId}
         />
       </div>
     </motion.div>
