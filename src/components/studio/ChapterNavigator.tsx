@@ -108,6 +108,8 @@ export function ChapterNavigator({
                           <Film className="h-3 w-3 text-primary shrink-0" />
                         </span>
                       ) : null}
+                      <span className="text-[11px] text-muted-foreground font-mono shrink-0" title={`${est.chars} ${isRu ? "сим." : "chars"}`}>
+                        {est.formatted}
                       </span>
                     </button>
                   );
