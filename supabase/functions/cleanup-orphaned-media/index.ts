@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
     const dryRun = body.dry_run !== false;
     const bucket = "user-media";
 
-    const results: { deleted: string[]; errors: string[]; scanned: number } = {
+    const results: { deleted: Array<{ path: string; size: number }>; errors: string[]; scanned: number } = {
       deleted: [],
       errors: [],
       scanned: 0,
@@ -88,23 +88,28 @@ Deno.serve(async (req) => {
           .list(scenePath, { limit: 1000 });
         if (!audioFiles) continue;
 
-        const files = audioFiles.filter((f) => f.id);
-        results.scanned += files.length;
+        const allFiles = audioFiles.filter((f) => f.id);
+        results.scanned += allFiles.length;
 
-        const orphaned = files
-          .map((f) => `${scenePath}/${f.name}`)
-          .filter((p) => !validPaths.has(p));
+        const orphanedFiles = allFiles
+          .filter((f) => !validPaths.has(`${scenePath}/${f.name}`));
 
-        if (orphaned.length > 0) {
+        const orphanedEntries = orphanedFiles.map((f) => ({
+          path: `${scenePath}/${f.name}`,
+          size: f.metadata?.size ?? 0,
+        }));
+
+        if (orphanedEntries.length > 0) {
           if (!dryRun) {
-            const { error: rmErr } = await supabaseAdmin.storage.from(bucket).remove(orphaned);
+            const paths = orphanedEntries.map((e) => e.path);
+            const { error: rmErr } = await supabaseAdmin.storage.from(bucket).remove(paths);
             if (rmErr) {
-              results.errors.push(...orphaned.map((p) => `${p}: ${rmErr.message}`));
+              results.errors.push(...paths.map((p) => `${p}: ${rmErr.message}`));
             } else {
-              results.deleted.push(...orphaned);
+              results.deleted.push(...orphanedEntries);
             }
           } else {
-            results.deleted.push(...orphaned);
+            results.deleted.push(...orphanedEntries);
           }
         }
       }
