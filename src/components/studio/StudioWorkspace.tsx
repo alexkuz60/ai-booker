@@ -100,6 +100,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
               onSegmented={onSegmented}
               selectedSegmentId={selectedSegmentId ?? null}
               onSelectSegment={onSelectSegment}
+              onSynthesizingChange={onSynthesizingChange}
             />
           </div>
         </TabsContent>
