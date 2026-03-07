@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, Play, CheckCircle2, XCircle, Search } from "lucide-react";
+import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, Play, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -17,12 +17,18 @@ interface Phrase {
   text: string;
 }
 
+interface InlineNarration {
+  text: string;
+  insert_after: string;
+}
+
 interface Segment {
   segment_id: string;
   segment_number: number;
   segment_type: string;
   speaker: string | null;
   phrases: Phrase[];
+  inline_narrations?: InlineNarration[];
 }
 
 interface CharacterOption {
@@ -340,9 +346,11 @@ export function StoryboardPanel({
   const [analyzing, setAnalyzing] = useState(false);
   const [synthesizing, setSynthesizing] = useState(false);
   const [synthProgress, setSynthProgress] = useState("");
+  const [detecting, setDetecting] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [characters, setCharacters] = useState<CharacterOption[]>([]);
   const [audioStatus, setAudioStatus] = useState<Map<string, { status: string; durationMs: number }>>(new Map());
+  const [inlineNarrationSegIds, setInlineNarrationSegIds] = useState<Set<string>>(new Set());
 
   // Scroll selected segment into view when set externally (from timeline)
   useEffect(() => {
@@ -386,7 +394,7 @@ export function StoryboardPanel({
     try {
       const { data: segs, error: segErr } = await supabase
         .from("scene_segments")
-        .select("id, segment_number, segment_type, speaker")
+        .select("id, segment_number, segment_type, speaker, metadata")
         .eq("scene_id", sid)
         .order("segment_number");
 
@@ -440,12 +448,15 @@ export function StoryboardPanel({
           speaker = typeSpeakerMap.get(s.segment_type)!;
           needUpdate.push(s.id);
         }
+        const meta = (s.metadata ?? {}) as Record<string, unknown>;
+        const inlineNarr = Array.isArray(meta.inline_narrations) ? meta.inline_narrations as InlineNarration[] : undefined;
         return {
           segment_id: s.id,
           segment_number: s.segment_number,
           segment_type: s.segment_type,
           speaker,
           phrases: phraseMap.get(s.id) || [],
+          inline_narrations: inlineNarr,
         };
       });
 
@@ -462,6 +473,9 @@ export function StoryboardPanel({
       }
 
       setSegments(builtSegments);
+      // Track which segments have inline narrations
+      const inlineIds = new Set(builtSegments.filter(s => s.inline_narrations && s.inline_narrations.length > 0).map(s => s.segment_id));
+      setInlineNarrationSegIds(inlineIds);
       setLoaded(true);
       // Load audio status
       loadAudioStatus(builtSegments.map(s => s.segment_id));
@@ -627,6 +641,34 @@ export function StoryboardPanel({
     setSynthProgress("");
   }, [sceneId, segments, isRu, onSegmented, loadAudioStatus]);
 
+  // ── Detect inline narrations (batch) ──
+  const dialogueCount = segments.filter(s => s.segment_type === "dialogue").length;
+  const runDetectNarrations = useCallback(async () => {
+    if (!sceneId || dialogueCount === 0) return;
+    setDetecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("detect-inline-narrations", {
+        body: { scene_id: sceneId, language: isRu ? "ru" : "en" },
+      });
+      if (error) throw error;
+      const det = data as { detected: number; segments_updated: number; message?: string };
+      if (det.detected > 0) {
+        toast.success(
+          isRu
+            ? `Найдено ${det.detected} вставок в ${det.segments_updated} фрагментах`
+            : `Found ${det.detected} insertions in ${det.segments_updated} segments`
+        );
+        await loadSegments(sceneId);
+      } else {
+        toast.info(det.message || (isRu ? "Вставок не найдено" : "No insertions found"));
+      }
+    } catch (err: any) {
+      console.error("Detection failed:", err);
+      toast.error(isRu ? "Ошибка поиска вставок" : "Detection failed");
+    }
+    setDetecting(false);
+  }, [sceneId, dialogueCount, isRu, loadSegments]);
+
   // ── No scene selected ──
   if (!sceneId) {
     return (
@@ -674,6 +716,11 @@ export function StoryboardPanel({
       <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
         <span className="text-xs text-muted-foreground font-body">
           {segments.length} {isRu ? "фрагм." : "seg."} · {totalPhrases} {isRu ? "фраз" : "phrases"}
+          {inlineNarrationSegIds.size > 0 && (
+            <span className="ml-1.5 text-accent-foreground">
+              · <MessageCircle className="inline h-3 w-3 -mt-0.5" /> {inlineNarrationSegIds.size}
+            </span>
+          )}
         </span>
         <div className="flex items-center gap-1.5">
           <Button
@@ -688,6 +735,19 @@ export function StoryboardPanel({
               ? (synthProgress || (isRu ? "Синтез…" : "Synth…"))
               : (isRu ? "Синтез сцены" : "Synthesize")}
           </Button>
+          {dialogueCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={runDetectNarrations}
+              disabled={detecting || analyzing || synthesizing}
+              className="gap-1.5 h-7 text-xs"
+              title={isRu ? "Поиск авторских вставок в диалогах" : "Detect narrator insertions in dialogues"}
+            >
+              {detecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <ScanSearch className="h-3 w-3" />}
+              {detecting ? (isRu ? "Поиск…" : "Detecting…") : (isRu ? "Вставки" : "Narrations")}
+            </Button>
+          )}
           <Button variant="ghost" size="sm" onClick={runAnalysis} disabled={analyzing || !sceneContent} className="gap-1.5 h-7 text-xs">
             {analyzing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
             {isRu ? "Переанализ" : "Re-analyze"}
@@ -739,10 +799,36 @@ export function StoryboardPanel({
                       </span>
                     );
                   })()}
+                  {/* Inline narration indicator */}
+                  {seg.inline_narrations && seg.inline_narrations.length > 0 && (
+                    <span
+                      className="inline-flex items-center gap-0.5 text-[10px] text-accent-foreground font-mono"
+                      title={isRu
+                        ? `${seg.inline_narrations.length} авторская вставка`
+                        : `${seg.inline_narrations.length} narrator insertion(s)`}
+                    >
+                      <MessageCircle className="h-3 w-3" />
+                      {seg.inline_narrations.length}
+                    </span>
+                  )}
                   <span className="ml-auto text-[10px] text-muted-foreground font-mono">
                     #{seg.segment_number}
                   </span>
                 </div>
+                {/* Inline narrations detail */}
+                {seg.inline_narrations && seg.inline_narrations.length > 0 && (
+                  <div className="px-3 py-1 bg-accent/10 border-b border-border/30">
+                    {seg.inline_narrations.map((n, idx) => (
+                      <div key={idx} className="text-[10px] text-muted-foreground font-body flex items-start gap-1">
+                        <BookOpen className="h-3 w-3 mt-0.5 shrink-0 text-accent-foreground" />
+                        <span className="italic">«{n.text}»</span>
+                        <span className="text-muted-foreground/60 shrink-0">
+                          → {isRu ? "после" : "after"} «{n.insert_after.slice(0, 20)}…»
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {/* Phrases */}
                 <div className="divide-y divide-border/30">
                   {seg.phrases.map((ph) => (
