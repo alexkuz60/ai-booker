@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2 } from "lucide-react";
+import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +44,7 @@ export function ChapterNavigator({
   segmentedSceneIds?: Set<string>;
   renderedSceneIds?: Set<string>;
   fullyRenderedSceneIds?: Set<string>;
+  staleAudioSceneIds?: Set<string>;
 }) {
   const [chapterOpen, setChapterOpen] = useState(true);
 
@@ -101,6 +102,11 @@ export function ChapterNavigator({
                         {isRu ? (SCENE_TYPE_RU[scene.scene_type] || scene.scene_type) : scene.scene_type}
                       </span>
                       <span className="truncate flex-1">{scene.title}</span>
+                      {staleAudioSceneIds?.has(scene.id || "") && (
+                        <span title={isRu ? "Голос изменился — аудио устарело" : "Voice changed — audio outdated"}>
+                          <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0" />
+                        </span>
+                      )}
                       {fullyRenderedSceneIds?.has(scene.id || "") ? (
                         <span title={isRu ? "Все клипы готовы" : "All clips ready"}>
                           <Volume2 className="h-3 w-3 text-foreground shrink-0" />
