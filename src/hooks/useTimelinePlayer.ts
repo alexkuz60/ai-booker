@@ -64,8 +64,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     const pos = clipOffsetRef.current + elapsed;
     setPositionSec(pos);
 
-    if (pos >= totalDuration) {
-      // Reached end
+    if (pos >= totalDurationRef.current) {
       setState("stopped");
       stateRef.current = "stopped";
       setPositionSec(0);
@@ -74,7 +73,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     }
 
     rafRef.current = requestAnimationFrame(updatePosition);
-  }, [totalDuration]);
+  }, []);
 
   const playClip = useCallback(async (index: number) => {
     if (index >= audioClips.length) {
