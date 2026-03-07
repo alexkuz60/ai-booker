@@ -27,6 +27,10 @@ const Studio = () => {
 
   const [sceneContent, setSceneContent] = useState<string | null>(null);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
+  const handleSelectSegmentFromTimeline = useCallback((segmentId: string | null) => {
+    setSelectedSegmentId(segmentId);
+    if (segmentId) setActiveTab("storyboard");
+  }, [setActiveTab]);
   const [segmentedSceneIds, setSegmentedSceneIds] = useState<Set<string>>(new Set());
   const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
