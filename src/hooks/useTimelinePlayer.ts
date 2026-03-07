@@ -12,13 +12,17 @@ export type PlayerState = "stopped" | "playing" | "paused";
 export function useTimelinePlayer(clips: TimelineClip[]) {
   const [state, setState] = useState<PlayerState>("stopped");
   const [positionSec, setPositionSec] = useState(0);
+  const [volume, setVolume] = useState(() => {
+    try { const v = Number(localStorage.getItem("timeline-volume")); return Number.isFinite(v) ? v : 80; } catch { return 80; }
+  });
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const rafRef = useRef<number>(0);
   const clipIndexRef = useRef(0);
-  const clipStartTimeRef = useRef(0); // wall-clock when current clip started
-  const clipOffsetRef = useRef(0);    // timeline offset of current clip start
+  const clipStartTimeRef = useRef(0);
+  const clipOffsetRef = useRef(0);
   const stateRef = useRef<PlayerState>("stopped");
   const pausedAtRef = useRef(0);
+  const volumeRef = useRef(volume);
 
   // Sort clips with audio by start time
   const audioClips = clips
@@ -250,11 +254,27 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     }
   }, [totalDuration, audioClips, getSignedUrl, playClip, updatePosition]);
 
+  const changeVolume = useCallback((v: number) => {
+    const clamped = Math.max(0, Math.min(100, v));
+    setVolume(clamped);
+    volumeRef.current = clamped;
+    localStorage.setItem("timeline-volume", String(clamped));
+    if (audioRef.current) audioRef.current.volume = clamped / 100;
+  }, []);
+
+  // Sync volume to current audio element
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume / 100;
+    volumeRef.current = volume;
+  }, [volume]);
+
   return {
     state,
     positionSec,
     totalDuration,
     hasAudio: audioClips.length > 0,
+    volume,
+    changeVolume,
     play,
     pause,
     stop,
