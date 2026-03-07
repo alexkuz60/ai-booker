@@ -141,18 +141,31 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     if (stateRef.current === "playing") return;
 
     if (stateRef.current === "paused") {
-      // Resume
       stateRef.current = "playing";
       setState("playing");
       clipStartTimeRef.current = performance.now();
       clipOffsetRef.current = pausedAtRef.current;
+
       if (audioRef.current) {
         audioRef.current.play().catch((err) => {
           console.error("[TimelinePlayer] resume play() failed:", err);
           toast.error("Не удалось возобновить воспроизведение");
         });
+        rafRef.current = requestAnimationFrame(updatePosition);
+        return;
       }
-      rafRef.current = requestAnimationFrame(updatePosition);
+
+      // No active audio element (e.g. after seek/stop) — start from current paused position
+      const ac = audioClipsRef.current;
+      const idx = ac.findIndex(
+        c => c.startSec <= pausedAtRef.current && pausedAtRef.current < c.startSec + c.durationSec
+      );
+      if (idx >= 0) {
+        seek(pausedAtRef.current);
+      } else {
+        const nextIdx = ac.findIndex(c => c.startSec > pausedAtRef.current);
+        playClip(nextIdx >= 0 ? nextIdx : ac.length);
+      }
       return;
     }
 
