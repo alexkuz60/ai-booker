@@ -198,15 +198,12 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       return;
     }
 
-    // Start from beginning (or from current position if stopped mid-way)
+    // Start from beginning via seek path (same logic as manual reposition)
     stateRef.current = "playing";
     setState("playing");
-    clipOffsetRef.current = 0;
-    clipStartTimeRef.current = performance.now();
+    pausedAtRef.current = 0;
     setPositionSec(0);
-
-    // Find first audio clip
-    playClip(0);
+    seek(0);
   }, [playClip, updatePosition]);
 
   const pause = useCallback(() => {
