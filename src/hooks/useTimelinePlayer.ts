@@ -7,7 +7,8 @@ export type PlayerState = "stopped" | "playing" | "paused";
 
 /**
  * Manages sequential playback of timeline audio clips.
- * Returns current playback position in seconds and transport controls.
+ * Main (sequential) clips play one after another.
+ * Overlay clips (inline narrations) fire concurrently at their scheduled time.
  */
 export function useTimelinePlayer(clips: TimelineClip[]) {
   const [state, setState] = useState<PlayerState>("stopped");
@@ -17,6 +18,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
   });
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const overlayAudiosRef = useRef<HTMLAudioElement[]>([]);
+  const overlayTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const rafRef = useRef<number>(0);
   const clipIndexRef = useRef(0);
   const clipStartTimeRef = useRef(0);
@@ -28,7 +30,6 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
   const overlayClipsRef = useRef<TimelineClip[]>([]);
 
   // Separate main sequential clips from inline narration overlays
-  // Overlay clips have IDs like "{segId}_narrator_{n}" and sit INSIDE a parent clip's time range
   const isOverlayClip = (c: TimelineClip) => c.id.includes("_narrator_");
 
   const mainClips = clips
@@ -39,12 +40,8 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     .filter(c => c.hasAudio && c.audioPath && isOverlayClip(c))
     .sort((a, b) => a.startSec - b.startSec);
 
-  // Keep refs in sync
   mainClipsRef.current = mainClips;
   overlayClipsRef.current = overlayClips;
-
-  // For external consumers, expose all audio clips
-  const audioClips = [...mainClips, ...overlayClips].sort((a, b) => a.startSec - b.startSec);
 
   const totalDuration = clips.length > 0
     ? Math.max(...clips.map(c => c.startSec + c.durationSec))
@@ -52,16 +49,23 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
   const totalDurationRef = useRef(totalDuration);
   totalDurationRef.current = totalDuration;
 
+  const stopOverlays = useCallback(() => {
+    for (const a of overlayAudiosRef.current) {
+      try { a.pause(); } catch {}
+    }
+    overlayAudiosRef.current = [];
+    for (const t of overlayTimersRef.current) clearTimeout(t);
+    overlayTimersRef.current = [];
+  }, []);
+
   // Cleanup
   useEffect(() => {
     return () => {
       cancelAnimationFrame(rafRef.current);
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+      stopOverlays();
     };
-  }, []);
+  }, [stopOverlays]);
 
   const getSignedUrl = useCallback(async (path: string): Promise<string | null> => {
     const { data, error } = await supabase.storage
@@ -70,6 +74,29 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     if (error || !data?.signedUrl) return null;
     return data.signedUrl;
   }, []);
+
+  /** Schedule overlay clips that fall within [fromSec, toSec) relative to current playback start */
+  const scheduleOverlays = useCallback((fromSec: number) => {
+    const oc = overlayClipsRef.current;
+    for (const overlay of oc) {
+      if (overlay.startSec < fromSec - 0.1) continue; // already passed
+      const delayMs = (overlay.startSec - fromSec) * 1000;
+      const timer = setTimeout(async () => {
+        if (stateRef.current !== "playing") return;
+        const url = await getSignedUrl(overlay.audioPath!);
+        if (!url || stateRef.current !== "playing") return;
+        const audio = new Audio();
+        audio.crossOrigin = "anonymous";
+        audio.volume = volumeRef.current / 100;
+        audio.src = url;
+        overlayAudiosRef.current.push(audio);
+        try { await audio.play(); } catch (e) {
+          console.warn("[TimelinePlayer] overlay play failed:", e);
+        }
+      }, Math.max(0, delayMs));
+      overlayTimersRef.current.push(timer);
+    }
+  }, [getSignedUrl]);
 
   const updatePosition = useCallback(() => {
     if (stateRef.current !== "playing") return;
@@ -82,15 +109,17 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       stateRef.current = "stopped";
       setPositionSec(0);
       if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+      stopOverlays();
       return;
     }
 
     rafRef.current = requestAnimationFrame(updatePosition);
-  }, []);
+  }, [stopOverlays]);
 
   const playClip = useCallback(async (index: number) => {
-    const ac = audioClipsRef.current;
+    const ac = mainClipsRef.current;
     if (index >= ac.length) {
+      // All main clips done — let position continue until totalDuration
       clipOffsetRef.current = ac.length > 0
         ? ac[ac.length - 1].startSec + ac[ac.length - 1].durationSec
         : 0;
@@ -103,6 +132,8 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     clipIndexRef.current = index;
 
     const currentPos = clipOffsetRef.current;
+
+    // Wait for gap between clips (silence)
     if (clip.startSec > currentPos + 0.05) {
       clipStartTimeRef.current = performance.now();
       const gapMs = (clip.startSec - currentPos) * 1000;
@@ -159,17 +190,24 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       clipStartTimeRef.current = performance.now();
       clipOffsetRef.current = pausedAtRef.current;
 
+      // Re-schedule overlays from paused position
+      scheduleOverlays(pausedAtRef.current);
+
       if (audioRef.current) {
         audioRef.current.play().catch((err) => {
           console.error("[TimelinePlayer] resume play() failed:", err);
           toast.error("Не удалось возобновить воспроизведение");
         });
+        // Resume overlay audios
+        for (const a of overlayAudiosRef.current) {
+          try { a.play(); } catch {}
+        }
         rafRef.current = requestAnimationFrame(updatePosition);
         return;
       }
 
-      // No active audio element (e.g. after seek/stop) — start from current paused position
-      const ac = audioClipsRef.current;
+      // No active audio element — start from current paused position
+      const ac = mainClipsRef.current;
       const idx = ac.findIndex(
         c => c.startSec <= pausedAtRef.current && pausedAtRef.current < c.startSec + c.durationSec
       );
@@ -211,16 +249,20 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       return;
     }
 
-    // Start from first clip with audio (skip leading silent estimate-only area)
-    const firstAudioStart = audioClipsRef.current[0]?.startSec ?? 0;
+    // Start from first main clip
+    const firstAudioStart = mainClipsRef.current[0]?.startSec ?? 0;
     stateRef.current = "playing";
     setState("playing");
     pausedAtRef.current = firstAudioStart;
     clipOffsetRef.current = firstAudioStart;
     clipStartTimeRef.current = performance.now();
     setPositionSec(firstAudioStart);
+
+    // Schedule all overlay clips
+    scheduleOverlays(firstAudioStart);
+
     playClip(0);
-  }, [playClip]);
+  }, [playClip, scheduleOverlays]);
 
   const pause = useCallback(() => {
     if (stateRef.current !== "playing") return;
@@ -231,6 +273,13 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     if (audioRef.current) {
       audioRef.current.pause();
     }
+    // Pause overlays
+    for (const a of overlayAudiosRef.current) {
+      try { a.pause(); } catch {}
+    }
+    // Cancel pending overlay timers
+    for (const t of overlayTimersRef.current) clearTimeout(t);
+    overlayTimersRef.current = [];
   }, [positionSec]);
 
   const stop = useCallback(() => {
@@ -244,7 +293,8 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       audioRef.current.pause();
       audioRef.current = null;
     }
-  }, []);
+    stopOverlays();
+  }, [stopOverlays]);
 
   const seek = useCallback((toSec: number) => {
     const clamped = Math.max(0, Math.min(toSec, totalDurationRef.current));
@@ -253,6 +303,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       audioRef.current.pause();
       audioRef.current = null;
     }
+    stopOverlays();
 
     setPositionSec(clamped);
     pausedAtRef.current = clamped;
@@ -260,7 +311,10 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     clipStartTimeRef.current = performance.now();
 
     if (stateRef.current === "playing") {
-      const ac = audioClipsRef.current;
+      // Re-schedule overlays from new position
+      scheduleOverlays(clamped);
+
+      const ac = mainClipsRef.current;
       const idx = ac.findIndex(
         c => c.startSec <= clamped && clamped < c.startSec + c.durationSec
       );
@@ -308,7 +362,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
         setState("paused");
       }
     }
-  }, [getSignedUrl, playClip, updatePosition]);
+  }, [getSignedUrl, playClip, updatePosition, stopOverlays, scheduleOverlays]);
 
   const changeVolume = useCallback((v: number) => {
     const clamped = Math.max(0, Math.min(100, v));
@@ -316,9 +370,12 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     volumeRef.current = clamped;
     localStorage.setItem("timeline-volume", String(clamped));
     if (audioRef.current) audioRef.current.volume = clamped / 100;
+    for (const a of overlayAudiosRef.current) {
+      a.volume = clamped / 100;
+    }
   }, []);
 
-  // Sync volume to current audio element
+  // Sync volume
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume / 100;
     volumeRef.current = volume;
@@ -328,7 +385,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     state,
     positionSec,
     totalDuration,
-    hasAudio: audioClips.length > 0,
+    hasAudio: mainClips.length > 0,
     volume,
     changeVolume,
     play,
