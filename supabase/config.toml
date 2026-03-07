@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.assistant-chat]
 verify_jwt = false
+
+[functions.detect-inline-narrations]
+verify_jwt = false
