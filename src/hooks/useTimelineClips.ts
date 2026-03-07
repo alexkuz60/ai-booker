@@ -3,6 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 
 const CHARS_PER_SEC = 14;
 
+const SEGMENT_TYPE_LABELS: Record<string, string> = {
+  narrator: "Рассказчик",
+  first_person: "От первого лица",
+  dialogue: "Диалог",
+  inner_thought: "Мысли",
+  epigraph: "Эпиграф",
+  lyric: "Стихи",
+  footnote: "Комментатор",
+};
+
 export interface TimelineClip {
   id: string;
   trackId: string; // "char-{characterId}" or "narrator-fallback"
