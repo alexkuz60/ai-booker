@@ -38,12 +38,13 @@ interface InlineNarrationAudio {
  */
 export function useTimelineClips(
   sceneIds: string[],
-  characterMap: Map<string, string> // speaker name (lowercase) -> character ID
+  characterMap: Map<string, string>, // speaker name (lowercase) -> character ID
+  refreshToken: number = 0,
 ) {
   const [clips, setClips] = useState<TimelineClip[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const key = sceneIds.join(",") + "|" + [...characterMap.entries()].map(([k, v]) => `${k}:${v}`).join(",");
+  const key = sceneIds.join(",") + "|" + [...characterMap.entries()].map(([k, v]) => `${k}:${v}`).join(",") + "|" + refreshToken;
 
   useEffect(() => {
     if (sceneIds.length === 0) {

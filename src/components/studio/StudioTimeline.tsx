@@ -181,6 +181,7 @@ interface StudioTimelineProps {
   selectedSegmentId?: string | null;
   onSelectSegment?: (segmentId: string | null) => void;
   synthesizingSegmentIds?: Set<string>;
+  clipsRefreshToken?: number;
 }
 
 export function StudioTimeline({
@@ -197,6 +198,7 @@ export function StudioTimeline({
   selectedSegmentId,
   onSelectSegment,
   synthesizingSegmentIds,
+  clipsRefreshToken = 0,
 }: StudioTimelineProps) {
   const [mode, setMode] = useState<"scene" | "chapter">("scene");
 
@@ -257,7 +259,7 @@ export function StudioTimeline({
   }, [bookId, sceneId, chapterSceneIds?.join(","), mode]);
 
   // ── Real clips from segments (moved above duration calc) ──
-  const { clips: timelineClips } = useTimelineClips(contextSceneIds, speakerToCharId);
+  const { clips: timelineClips } = useTimelineClips(contextSceneIds, speakerToCharId, clipsRefreshToken);
 
   // ── Audio player ──────────────────────────────────────────
   const player = useTimelinePlayer(timelineClips);
