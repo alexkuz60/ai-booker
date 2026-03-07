@@ -3,6 +3,7 @@ import {
   HardDrive, FolderOpen, FileAudio, Search, Loader2, Trash2, Eye,
   Download, RefreshCw, Upload, Music, Waves, CloudRain, AudioLines,
   FileText, File, FileImage, ChevronDown, ChevronRight, FolderClosed,
+  Ghost, ScanSearch, Trash,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
