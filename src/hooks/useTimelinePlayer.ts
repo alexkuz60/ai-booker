@@ -141,18 +141,60 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     if (stateRef.current === "playing") return;
 
     if (stateRef.current === "paused") {
-      // Resume
       stateRef.current = "playing";
       setState("playing");
       clipStartTimeRef.current = performance.now();
       clipOffsetRef.current = pausedAtRef.current;
+
       if (audioRef.current) {
         audioRef.current.play().catch((err) => {
           console.error("[TimelinePlayer] resume play() failed:", err);
           toast.error("Не удалось возобновить воспроизведение");
         });
+        rafRef.current = requestAnimationFrame(updatePosition);
+        return;
       }
-      rafRef.current = requestAnimationFrame(updatePosition);
+
+      // No active audio element (e.g. after seek/stop) — start from current paused position
+      const ac = audioClipsRef.current;
+      const idx = ac.findIndex(
+        c => c.startSec <= pausedAtRef.current && pausedAtRef.current < c.startSec + c.durationSec
+      );
+      if (idx >= 0) {
+        const clip = ac[idx];
+        const offsetInClip = pausedAtRef.current - clip.startSec;
+        (async () => {
+          const url = await getSignedUrl(clip.audioPath!);
+          if (!url || stateRef.current !== "playing") return;
+          const audio = new Audio();
+          audio.crossOrigin = "anonymous";
+          audio.preload = "auto";
+          audio.volume = volumeRef.current / 100;
+          audio.src = url;
+          audioRef.current = audio;
+          audio.currentTime = Math.max(0, offsetInClip);
+          audio.onended = () => {
+            if (stateRef.current !== "playing") return;
+            clipOffsetRef.current = clip.startSec + clip.durationSec;
+            clipStartTimeRef.current = performance.now();
+            playClip(idx + 1);
+          };
+          audio.onerror = () => {
+            if (stateRef.current !== "playing") return;
+            playClip(idx + 1);
+          };
+          try {
+            await audio.play();
+            rafRef.current = requestAnimationFrame(updatePosition);
+          } catch (err) {
+            console.error("[TimelinePlayer] resume seek play() failed:", err);
+            toast.error("Не удалось возобновить воспроизведение");
+          }
+        })();
+      } else {
+        const nextIdx = ac.findIndex(c => c.startSec > pausedAtRef.current);
+        playClip(nextIdx >= 0 ? nextIdx : ac.length);
+      }
       return;
     }
 
