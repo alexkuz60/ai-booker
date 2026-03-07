@@ -366,6 +366,19 @@ Deno.serve(async (req) => {
       const seg = segments[i];
       const text = segmentTexts[i];
 
+      // Skip segments not in filter (if filter specified)
+      if (filterSet && !filterSet.has(seg.id)) {
+        // Include cached result for playlist completeness
+        const cached = existingAudioMap.get(seg.id);
+        results.push({
+          segment_id: seg.id,
+          status: cached ? "ready" : "skipped",
+          duration_ms: cached?.duration_ms ?? 0,
+          audio_path: cached?.audio_path ?? "",
+        });
+        continue;
+      }
+
       if (!text.trim()) {
         results.push({ segment_id: seg.id, status: "skipped", duration_ms: 0, audio_path: "" });
         continue;
