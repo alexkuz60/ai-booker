@@ -387,6 +387,11 @@ Deno.serve(async (req) => {
         console.log(`Unassigned segment ${seg.id}: random voice=${voiceConfig.voice}, role=${voiceConfig.role}`);
       }
 
+      const isV3Voice = V3_ONLY_VOICES.has(voiceConfig.voice);
+      const apiVersion = isV3Voice ? "v3" : "v1";
+      const estimatedChunks = isV3Voice ? Math.max(1, Math.ceil(text.length / 240)) : 1;
+      console.log(`▶ Segment ${i + 1}/${segments.length} [${seg.id}]: speaker=${seg.speaker || seg.segment_type}, api=${apiVersion}, voice=${voiceConfig.voice}, chars=${text.length}, chunks≈${estimatedChunks}${hasInlineNarrations ? `, narrations=${inlineNarrations.length}` : ""}`);
+
       try {
         let dialogueDurationMs: number;
         let dialogueAudio: Uint8Array;
@@ -441,7 +446,7 @@ Deno.serve(async (req) => {
           // PASS 2: Synthesize dialogue
           // For v3-only voices: plain text (yandex-tts handles auto-splitting at sentence boundaries)
           // For v1 voices: SSML with <break> pauses baked in
-          const isV3Voice = V3_ONLY_VOICES.has(voiceConfig.voice);
+          // isV3Voice already computed above
 
           if (narrationResults.length > 0) {
             let dialogueResult: { audio: Uint8Array; durationMs: number } | { error: string };
@@ -573,7 +578,7 @@ Deno.serve(async (req) => {
         }
 
         // Upsert segment_audio record
-        const isV3Voice = V3_ONLY_VOICES.has(voiceConfig.voice);
+        // isV3Voice already computed above
         await supabaseAdmin.from("segment_audio").upsert(
           {
             segment_id: seg.id,
@@ -609,7 +614,7 @@ Deno.serve(async (req) => {
           inline_narrations: narrationResults.length > 0 ? narrationResults : undefined,
         });
 
-        console.log(`Synthesized segment ${i + 1}/${segments.length}: ${seg.speaker || seg.segment_type}, ${dialogueDurationMs}ms${narrationResults.length > 0 ? ` (+${narrationResults.length} narrator overlays)` : ""}`);
+        console.log(`✅ Segment ${i + 1}/${segments.length}: ${seg.speaker || seg.segment_type}, api=${apiVersion}, chunks≈${estimatedChunks}, ${text.length}ch → ${dialogueDurationMs}ms, audio=${dialogueAudio.length}B${narrationResults.length > 0 ? ` (+${narrationResults.length} narrator overlays)` : ""}`);
 
       } catch (err) {
         console.error(`Error synthesizing segment ${seg.id}:`, err);
