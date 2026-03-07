@@ -607,7 +607,7 @@ export function StudioTimeline({
             >
               <TimelineRuler zoom={zoom} duration={duration} />
               {allTracks.map((track) => (
-                <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} clips={clipsByTrack.get(track.id)} />
+                <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} clips={clipsByTrack.get(track.id)} selectedSegmentId={selectedSegmentId} onSelectSegment={onSelectSegment} />
               ))}
               <Playhead positionSec={player.positionSec} zoom={zoom} />
             </div>
