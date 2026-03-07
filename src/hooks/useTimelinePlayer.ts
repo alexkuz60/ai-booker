@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 
 export type PlayerState = "stopped" | "playing" | "paused";
@@ -95,7 +96,10 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     const url = await getSignedUrl(clip.audioPath!);
     if (!url || stateRef.current !== "playing") return;
 
-    const audio = new Audio(url);
+    const audio = new Audio();
+    audio.crossOrigin = "anonymous";
+    audio.preload = "auto";
+    audio.src = url;
     audioRef.current = audio;
 
     audio.onended = () => {
@@ -105,7 +109,8 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       playClip(index + 1);
     };
 
-    audio.onerror = () => {
+    audio.onerror = (e) => {
+      console.error("[TimelinePlayer] Audio load error for clip", index, e);
       // Skip broken clips
       if (stateRef.current !== "playing") return;
       clipOffsetRef.current = clip.startSec + clip.durationSec;
@@ -116,9 +121,11 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     try {
       await audio.play();
       rafRef.current = requestAnimationFrame(updatePosition);
-    } catch {
-      // Autoplay blocked — skip
-      playClip(index + 1);
+    } catch (err) {
+      console.error("[TimelinePlayer] play() failed:", err);
+      toast.error("Не удалось воспроизвести аудио. Проверьте настройки браузера.");
+      setState("stopped");
+      stateRef.current = "stopped";
     }
   }, [audioClips, getSignedUrl, updatePosition]);
 
@@ -132,7 +139,10 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       clipStartTimeRef.current = performance.now();
       clipOffsetRef.current = pausedAtRef.current;
       if (audioRef.current) {
-        audioRef.current.play();
+        audioRef.current.play().catch((err) => {
+          console.error("[TimelinePlayer] resume play() failed:", err);
+          toast.error("Не удалось возобновить воспроизведение");
+        });
       }
       rafRef.current = requestAnimationFrame(updatePosition);
       return;
@@ -200,7 +210,10 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
         (async () => {
           const url = await getSignedUrl(clip.audioPath!);
           if (!url || stateRef.current !== "playing") return;
-          const audio = new Audio(url);
+          const audio = new Audio();
+          audio.crossOrigin = "anonymous";
+          audio.preload = "auto";
+          audio.src = url;
           audioRef.current = audio;
           audio.currentTime = offsetInClip;
           audio.onended = () => {
@@ -218,8 +231,9 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
           try {
             await audio.play();
             rafRef.current = requestAnimationFrame(updatePosition);
-          } catch {
-            playClip(idx + 1);
+          } catch (err) {
+            console.error("[TimelinePlayer] seek play() failed:", err);
+            toast.error("Не удалось воспроизвести аудио");
           }
         })();
       } else {
