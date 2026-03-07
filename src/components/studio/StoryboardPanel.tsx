@@ -227,38 +227,13 @@ function SpeakerBadge({ speaker, characters, isRu, onChange }: {
           </Badge>
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-48 p-1" align="start">
-        <div className="space-y-0.5 max-h-52 overflow-y-auto">
-          <button
-            onClick={() => { onChange(null); setOpen(false); }}
-            className={cn(
-              "w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs font-body transition-colors text-left",
-              !speaker ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
-            )}
-          >
-            <HelpCircle className="h-3 w-3 shrink-0 text-orange-400" />
-            {isRu ? "Не назначен" : "Unassigned"}
-          </button>
-          {characters.map((ch) => {
-            const isActive = ch.name === speaker;
-            return (
-              <button
-                key={ch.id}
-                onClick={() => { onChange(ch.name); setOpen(false); }}
-                className={cn(
-                  "w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs font-body transition-colors text-left",
-                  isActive ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
-                )}
-              >
-                {ch.color && (
-                  <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: ch.color }} />
-                )}
-                {!ch.color && <User className="h-3 w-3 shrink-0" />}
-                {ch.name}
-              </button>
-            );
-          })}
-        </div>
+      <PopoverContent className="w-52 p-1" align="start">
+        <SpeakerSearchList
+          speaker={speaker}
+          characters={characters}
+          isRu={isRu}
+          onChange={(v) => { onChange(v); setOpen(false); }}
+        />
       </PopoverContent>
     </Popover>
   );
