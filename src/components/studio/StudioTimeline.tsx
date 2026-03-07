@@ -539,8 +539,8 @@ export function StudioTimeline({
         </div>
       </div>
 
-      {/* Tracks */}
-      {!collapsed && (
+      {/* Tracks — Scene mode */}
+      {!collapsed && mode === "scene" && (
         <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
           <div className="w-28 shrink-0 border-r border-border flex flex-col">
             <div className="h-6 border-b border-border" />
@@ -579,7 +579,61 @@ export function StudioTimeline({
               {allTracks.map((track) => (
                 <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} clips={clipsByTrack.get(track.id)} />
               ))}
-              {/* Playhead */}
+              <Playhead positionSec={player.positionSec} zoom={zoom} />
+            </div>
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* Tracks — Chapter mode: single scenes track */}
+      {!collapsed && mode === "chapter" && (
+        <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
+          <div className="w-28 shrink-0 border-r border-border flex flex-col">
+            <div className="h-6 border-b border-border" />
+            <div className="h-10 flex items-center px-3 border-b border-border/50">
+              <Film className="h-3 w-3 shrink-0 mr-2 text-muted-foreground" />
+              <span className="text-xs font-body text-muted-foreground">{isRu ? "Сцены" : "Scenes"}</span>
+            </div>
+          </div>
+          <ScrollArea className="flex-1">
+            <div className="min-w-full relative">
+              <TimelineRuler zoom={zoom} duration={duration} />
+              <div className="flex h-10 border-b border-border/50 relative" style={{ width: `${duration * zoom * 4}px` }}>
+                {chapterSceneClips.map((sc, i) => {
+                  const widthPx = sc.durationSec * zoom * 4;
+                  const colorIdx = i % NARRATOR_COLORS.length;
+                  return (
+                    <div
+                      key={sc.sceneId}
+                      className={`absolute top-1 bottom-1 rounded-sm cursor-pointer transition-opacity ${
+                        sc.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-50 hover:opacity-70"
+                      }`}
+                      style={{
+                        left: `${sc.startSec * zoom * 4}px`,
+                        width: `${widthPx}px`,
+                        backgroundColor: NARRATOR_COLORS[colorIdx],
+                        backgroundImage: sc.hasAudio
+                          ? undefined
+                          : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
+                      }}
+                      title={`${sc.label} (${sc.durationSec.toFixed(1)}s)${sc.hasAudio ? " 🔊" : ""} — ${isRu ? "двойной клик → сцена" : "double-click to open"}`}
+                      onDoubleClick={() => {
+                        if (onSelectSceneIdx) {
+                          onSelectSceneIdx(sc.sceneIdx);
+                          setMode("scene");
+                          setZoomOverride(null);
+                        }
+                      }}
+                    >
+                      {widthPx > 50 && (
+                        <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
+                          {sc.hasAudio ? "🔊 " : ""}{sc.label}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
               <Playhead positionSec={player.positionSec} zoom={zoom} />
             </div>
           </ScrollArea>
