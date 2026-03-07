@@ -103,6 +103,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     const audio = new Audio();
     audio.crossOrigin = "anonymous";
     audio.preload = "auto";
+    audio.volume = volumeRef.current / 100;
     audio.src = url;
     audioRef.current = audio;
 
