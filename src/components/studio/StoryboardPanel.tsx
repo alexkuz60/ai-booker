@@ -641,6 +641,34 @@ export function StoryboardPanel({
     setSynthProgress("");
   }, [sceneId, segments, isRu, onSegmented, loadAudioStatus]);
 
+  // ── Detect inline narrations (batch) ──
+  const dialogueCount = segments.filter(s => s.segment_type === "dialogue").length;
+  const runDetectNarrations = useCallback(async () => {
+    if (!sceneId || dialogueCount === 0) return;
+    setDetecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("detect-inline-narrations", {
+        body: { scene_id: sceneId, language: isRu ? "ru" : "en" },
+      });
+      if (error) throw error;
+      const det = data as { detected: number; segments_updated: number; message?: string };
+      if (det.detected > 0) {
+        toast.success(
+          isRu
+            ? `Найдено ${det.detected} вставок в ${det.segments_updated} фрагментах`
+            : `Found ${det.detected} insertions in ${det.segments_updated} segments`
+        );
+        await loadSegments(sceneId);
+      } else {
+        toast.info(det.message || (isRu ? "Вставок не найдено" : "No insertions found"));
+      }
+    } catch (err: any) {
+      console.error("Detection failed:", err);
+      toast.error(isRu ? "Ошибка поиска вставок" : "Detection failed");
+    }
+    setDetecting(false);
+  }, [sceneId, dialogueCount, isRu, loadSegments]);
+
   // ── No scene selected ──
   if (!sceneId) {
     return (
