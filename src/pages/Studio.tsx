@@ -45,6 +45,7 @@ const Studio = () => {
   }, [synthesizingSegmentIds]);
   const [renderedSceneIds, setRenderedSceneIds] = useState<Set<string>>(new Set());
   const [fullyRenderedSceneIds, setFullyRenderedSceneIds] = useState<Set<string>>(new Set());
+  const [staleAudioSceneIds, setStaleAudioSceneIds] = useState<Set<string>>(new Set());
   const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const chapterSceneIds = chapter?.scenes.map(s => s.id).filter(Boolean) as string[] | undefined;
@@ -94,7 +95,7 @@ const Studio = () => {
     })();
   }, [chapter?.chapterTitle]);
 
-  // Check which scenes already have segments and which have audio rendered
+  // Check which scenes already have segments, audio rendered, and stale audio
   useEffect(() => {
     if (!chapter) return;
     const ids = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
@@ -102,7 +103,7 @@ const Studio = () => {
     (async () => {
       const { data: segData } = await supabase
         .from("scene_segments")
-        .select("id, scene_id")
+        .select("id, scene_id, speaker")
         .in("scene_id", ids);
 
       if (!segData?.length) return;
@@ -112,14 +113,34 @@ const Studio = () => {
       const segIds = segData.map(s => s.id);
       const { data: audioData } = await supabase
         .from("segment_audio")
-        .select("segment_id")
+        .select("segment_id, voice_config")
         .in("segment_id", segIds)
         .eq("status", "ready");
 
+      // Load current character voice configs for staleness check
+      const currentBookId = bookId ?? chapter.bookId;
+      let charVoiceMap = new Map<string, Record<string, unknown>>();
+      if (currentBookId) {
+        const { data: chars } = await supabase
+          .from("book_characters")
+          .select("name, aliases, voice_config")
+          .eq("book_id", currentBookId);
+        if (chars) {
+          for (const c of chars) {
+            const vc = (c.voice_config || {}) as Record<string, unknown>;
+            charVoiceMap.set((c.name || "").toLowerCase(), vc);
+            for (const a of (c.aliases || [])) {
+              charVoiceMap.set((a as string).toLowerCase(), vc);
+            }
+          }
+        }
+      }
+
       if (audioData?.length) {
         const segToScene = new Map(segData.map(s => [s.id, s.scene_id]));
+        const segToSpeaker = new Map(segData.map(s => [s.id, s.speaker]));
         const rendered = new Set<string>();
-        // Count segments per scene and audio-ready per scene
+        const stale = new Set<string>();
         const segCountByScene = new Map<string, number>();
         const audioCountByScene = new Map<string, number>();
         for (const s of segData) {
@@ -130,9 +151,21 @@ const Studio = () => {
           if (sceneId) {
             rendered.add(sceneId);
             audioCountByScene.set(sceneId, (audioCountByScene.get(sceneId) ?? 0) + 1);
+            // Check staleness: compare saved voice_config with current character voice_config
+            const speaker = segToSpeaker.get(a.segment_id);
+            if (speaker && charVoiceMap.size > 0) {
+              const currentVc = charVoiceMap.get(speaker.toLowerCase());
+              if (currentVc) {
+                const savedVc = (a.voice_config || {}) as Record<string, unknown>;
+                const keys = ["voice", "role", "speed", "pitchShift", "volume"];
+                const changed = keys.some(k => String(currentVc[k] ?? "") !== String(savedVc[k] ?? ""));
+                if (changed) stale.add(sceneId);
+              }
+            }
           }
         }
         setRenderedSceneIds(rendered);
+        setStaleAudioSceneIds(stale);
         const fully = new Set<string>();
         for (const [sceneId, total] of segCountByScene) {
           if ((audioCountByScene.get(sceneId) ?? 0) >= total) fully.add(sceneId);
@@ -140,7 +173,7 @@ const Studio = () => {
         setFullyRenderedSceneIds(fully);
       }
     })();
-  }, [chapter?.scenes.map(s => s.id).join(",")]);
+  }, [chapter?.scenes.map(s => s.id).join(","), bookId, clipsRefreshToken]);
 
   // Load scene content: prefer in-memory, fallback to DB
   useEffect(() => {
@@ -228,6 +261,7 @@ const Studio = () => {
                   segmentedSceneIds={segmentedSceneIds}
                   renderedSceneIds={renderedSceneIds}
                   fullyRenderedSceneIds={fullyRenderedSceneIds}
+                  staleAudioSceneIds={staleAudioSceneIds}
                 />
               ) : (
                 <EmptyNavigator isRu={isRu} />
