@@ -866,7 +866,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-2 gap-1 text-[10px]"
+                    className="h-6 px-2 gap-1 text-xs"
                     onClick={handleProfile}
                     disabled={profiling}
                   >
