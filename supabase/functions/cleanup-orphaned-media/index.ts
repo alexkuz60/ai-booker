@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 Deno.serve(async (req) => {
@@ -20,17 +20,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAdmin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    // Verify caller is admin
-    const supabaseUser = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
     const { data: userData } = await supabaseUser.auth.getUser();
     if (!userData?.user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -39,148 +34,96 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
-      _user_id: userData.user.id,
-      _role: "admin",
-    });
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Admin only" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const userId = userData.user.id;
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", { _user_id: userId, _role: "admin" });
 
     const body = await req.json().catch(() => ({}));
-    const dryRun = body.dry_run !== false; // default: dry run
-
+    const dryRun = body.dry_run !== false;
     const bucket = "user-media";
+
     const results: { deleted: string[]; errors: string[]; scanned: number } = {
       deleted: [],
       errors: [],
       scanned: 0,
     };
 
-    // 1. Clean up legacy `tts/<user_id>/...` paths (moved to `<user_id>/tts/...`)
-    const { data: legacyFiles, error: listErr } = await supabaseAdmin.storage
-      .from(bucket)
-      .list("tts", { limit: 1000 });
-
-    if (listErr) {
-      console.error("Error listing tts/ prefix:", listErr);
-    }
-
-    // tts/ contains user-id subfolders
-    if (legacyFiles) {
-      for (const folder of legacyFiles) {
-        if (!folder.id) {
-          // It's a folder — list its contents recursively
-          const { data: sceneFiles } = await supabaseAdmin.storage
-            .from(bucket)
-            .list(`tts/${folder.name}`, { limit: 1000 });
-
-          if (sceneFiles) {
-            for (const sceneFolder of sceneFiles) {
-              if (!sceneFolder.id) {
-                const { data: segments } = await supabaseAdmin.storage
-                  .from(bucket)
-                  .list(`tts/${folder.name}/${sceneFolder.name}`, {
-                    limit: 1000,
-                  });
-
-                if (segments) {
-                  const paths = segments
-                    .filter((f) => f.id)
-                    .map(
-                      (f) =>
-                        `tts/${folder.name}/${sceneFolder.name}/${f.name}`
-                    );
-                  results.scanned += paths.length;
-
-                  if (!dryRun && paths.length > 0) {
-                    const { data: removed, error: rmErr } =
-                      await supabaseAdmin.storage.from(bucket).remove(paths);
-                    if (rmErr) {
-                      results.errors.push(
-                        ...paths.map((p) => `${p}: ${rmErr.message}`)
-                      );
-                    } else {
-                      results.deleted.push(...paths);
-                    }
-                  } else {
-                    results.deleted.push(...paths); // in dry run, show what would be deleted
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // 2. Find orphaned files in <user_id>/tts/ that have no matching segment_audio record
+    // Load all valid audio paths from segment_audio
     const { data: allAudioPaths } = await supabaseAdmin
       .from("segment_audio")
       .select("audio_path")
       .eq("status", "ready");
 
     const validPaths = new Set(
-      (allAudioPaths ?? []).map((r: { audio_path: string }) => r.audio_path)
+      (allAudioPaths ?? []).map((r: { audio_path: string }) => r.audio_path),
     );
 
-    // List all users' tts folders
-    const { data: topLevel } = await supabaseAdmin.storage
-      .from(bucket)
-      .list("", { limit: 1000 });
+    // Determine which user folders to scan
+    const foldersToScan: string[] = [];
 
-    if (topLevel) {
-      for (const userFolder of topLevel) {
-        if (userFolder.id || userFolder.name === "tts") continue; // skip files and legacy tts/
+    if (isAdmin) {
+      // Admin: scan ALL user folders + legacy tts/ prefix
+      const { data: topLevel } = await supabaseAdmin.storage.from(bucket).list("", { limit: 1000 });
+      if (topLevel) {
+        for (const entry of topLevel) {
+          if (!entry.id) foldersToScan.push(entry.name); // folders only
+        }
+      }
+    } else {
+      // Regular user: only their own folder
+      foldersToScan.push(userId);
+    }
 
-        const { data: userSubs } = await supabaseAdmin.storage
+    // Helper: scan a tts/ subfolder and find orphans
+    async function scanTtsFolder(prefix: string) {
+      const { data: sceneFolders } = await supabaseAdmin.storage
+        .from(bucket)
+        .list(prefix, { limit: 1000 });
+      if (!sceneFolders) return;
+
+      for (const sf of sceneFolders) {
+        if (sf.id) continue; // skip files, only folders
+        const scenePath = `${prefix}/${sf.name}`;
+        const { data: audioFiles } = await supabaseAdmin.storage
           .from(bucket)
-          .list(userFolder.name, { limit: 100 });
+          .list(scenePath, { limit: 1000 });
+        if (!audioFiles) continue;
 
-        const ttsSub = userSubs?.find((s) => s.name === "tts");
-        if (!ttsSub) continue;
+        const files = audioFiles.filter((f) => f.id);
+        results.scanned += files.length;
 
-        // List scene folders
-        const { data: sceneFolders } = await supabaseAdmin.storage
-          .from(bucket)
-          .list(`${userFolder.name}/tts`, { limit: 1000 });
+        const orphaned = files
+          .map((f) => `${scenePath}/${f.name}`)
+          .filter((p) => !validPaths.has(p));
 
-        if (!sceneFolders) continue;
-
-        for (const sf of sceneFolders) {
-          if (sf.id) continue;
-          const { data: audioFiles } = await supabaseAdmin.storage
-            .from(bucket)
-            .list(`${userFolder.name}/tts/${sf.name}`, { limit: 1000 });
-
-          if (!audioFiles) continue;
-
-          const orphaned = audioFiles
-            .filter((f) => f.id)
-            .map((f) => `${userFolder.name}/tts/${sf.name}/${f.name}`)
-            .filter((p) => !validPaths.has(p));
-
-          results.scanned += audioFiles.filter((f) => f.id).length;
-
-          if (orphaned.length > 0) {
-            if (!dryRun) {
-              const { error: rmErr } = await supabaseAdmin.storage
-                .from(bucket)
-                .remove(orphaned);
-              if (rmErr) {
-                results.errors.push(
-                  ...orphaned.map((p) => `${p}: ${rmErr.message}`)
-                );
-              } else {
-                results.deleted.push(...orphaned);
-              }
+        if (orphaned.length > 0) {
+          if (!dryRun) {
+            const { error: rmErr } = await supabaseAdmin.storage.from(bucket).remove(orphaned);
+            if (rmErr) {
+              results.errors.push(...orphaned.map((p) => `${p}: ${rmErr.message}`));
             } else {
               results.deleted.push(...orphaned);
             }
+          } else {
+            results.deleted.push(...orphaned);
           }
+        }
+      }
+    }
+
+    for (const folder of foldersToScan) {
+      if (folder === "tts") {
+        // Legacy tts/<user_id>/... structure — admin only
+        const { data: userSubs } = await supabaseAdmin.storage.from(bucket).list("tts", { limit: 1000 });
+        if (userSubs) {
+          for (const sub of userSubs) {
+            if (!sub.id) await scanTtsFolder(`tts/${sub.name}`);
+          }
+        }
+      } else {
+        // Standard <user_id>/tts/... structure
+        const { data: subs } = await supabaseAdmin.storage.from(bucket).list(folder, { limit: 100 });
+        if (subs?.find((s) => s.name === "tts")) {
+          await scanTtsFolder(`${folder}/tts`);
         }
       }
     }
@@ -188,23 +131,19 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         dry_run: dryRun,
+        scope: isAdmin ? "all" : "own",
         scanned: results.scanned,
         [dryRun ? "would_delete" : "deleted"]: results.deleted.length,
         files: results.deleted,
         errors: results.errors,
       }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
     console.error("Cleanup error:", err);
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : "Unknown" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
