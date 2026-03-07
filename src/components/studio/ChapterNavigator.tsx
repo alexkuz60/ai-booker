@@ -34,6 +34,7 @@ export function ChapterNavigator({
   onSelectScene,
   isRu,
   segmentedSceneIds,
+  renderedSceneIds,
 }: {
   chapter: StudioChapter;
   selectedSceneIdx: number | null;
@@ -99,12 +100,14 @@ export function ChapterNavigator({
                       </span>
                       <span className="truncate flex-1">{scene.title}</span>
                       {renderedSceneIds?.has(scene.id || "") ? (
-                        <Volume2 className="h-3 w-3 text-green-400 shrink-0" title={isRu ? "Аудио готово" : "Audio ready"} />
+                        <span title={isRu ? "Аудио готово" : "Audio ready"}>
+                          <Volume2 className="h-3 w-3 text-green-400 shrink-0" />
+                        </span>
                       ) : segmentedSceneIds?.has(scene.id || "") ? (
-                        <Film className="h-3 w-3 text-primary shrink-0" title={isRu ? "Сегментировано" : "Segmented"} />
+                        <span title={isRu ? "Сегментировано" : "Segmented"}>
+                          <Film className="h-3 w-3 text-primary shrink-0" />
+                        </span>
                       ) : null}
-                      <span className="text-[11px] text-muted-foreground font-mono shrink-0" title={`${est.chars} ${isRu ? "сим." : "chars"}`}>
-                        {est.formatted}
                       </span>
                     </button>
                   );
