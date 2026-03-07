@@ -541,6 +541,11 @@ export function StoryboardPanel({
 
   // Update segment type in DB
   const updateSegmentType = useCallback(async (segmentId: string, newType: string) => {
+    const targetSeg = segments.find(s => s.segment_id === segmentId);
+    if (!targetSeg) return;
+    const oldType = targetSeg.segment_type;
+    const oldSpeaker = targetSeg.speaker;
+
     setSegments(prev => prev.map(seg =>
       seg.segment_id === segmentId ? { ...seg, segment_type: newType } : seg
     ));
@@ -550,8 +555,46 @@ export function StoryboardPanel({
       .eq("id", segmentId);
     if (error) {
       toast.error(isRu ? "Ошибка сохранения типа" : "Failed to save type");
+      return;
     }
-  }, [isRu]);
+
+    if (!sceneId) return;
+
+    // If old type was propagatable, check if any segments of that old type remain
+    if (PROPAGATE_TYPES.has(oldType) && oldType !== newType) {
+      const remainingOfOldType = segments.filter(
+        s => s.segment_type === oldType && s.segment_id !== segmentId
+      );
+      if (remainingOfOldType.length === 0) {
+        // No more segments of old type — clean up scene_type_mapping
+        await supabase
+          .from("scene_type_mappings" as any)
+          .delete()
+          .eq("scene_id", sceneId)
+          .eq("segment_type", oldType);
+      }
+
+      // Check if old speaker still has any segments in this scene
+      if (oldSpeaker) {
+        const updatedSegments = segments.map(seg =>
+          seg.segment_id === segmentId ? { ...seg, segment_type: newType } : seg
+        );
+        const oldSpeakerStillUsed = updatedSegments.some(
+          s => s.speaker === oldSpeaker && s.segment_id !== segmentId
+        );
+        if (!oldSpeakerStillUsed) {
+          const oldCharRecord = characters.find(c => c.name === oldSpeaker);
+          if (oldCharRecord) {
+            await supabase
+              .from("character_appearances")
+              .delete()
+              .eq("character_id", oldCharRecord.id)
+              .eq("scene_id", sceneId);
+          }
+        }
+      }
+    }
+  }, [isRu, segments, sceneId, characters]);
 
   // Update speaker in DB
   // Update speaker — propagate to all segments of same type ONLY for non-dialogue types
