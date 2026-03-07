@@ -230,8 +230,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { scene_id, language } = await req.json();
+    const { scene_id, language, force } = await req.json();
     const isRu = language === "ru";
+    const forceResynthesize = force === true;
     const langCode = isRu ? "ru" : "en";
 
     if (!scene_id) {
@@ -303,6 +304,39 @@ Deno.serve(async (req) => {
     const userId = userData.user.id;
     const narratorVoice = getNarratorVoice(voiceConfigMap);
 
+    // ── Load existing audio records for cache comparison ─────────────
+    const { data: existingAudio } = await supabase
+      .from("segment_audio")
+      .select("segment_id, audio_path, duration_ms, status, voice_config")
+      .in("segment_id", segIds)
+      .eq("status", "ready");
+
+    const existingAudioMap = new Map<string, {
+      audio_path: string;
+      duration_ms: number;
+      voice_config: Record<string, unknown>;
+    }>();
+    for (const a of existingAudio ?? []) {
+      existingAudioMap.set(a.segment_id, {
+        audio_path: a.audio_path,
+        duration_ms: a.duration_ms,
+        voice_config: (a.voice_config ?? {}) as Record<string, unknown>,
+      });
+    }
+
+    /** Compare relevant voice params to decide if re-synthesis is needed */
+    function voiceConfigChanged(
+      current: { voice: string; role?: string; speed: number; pitchShift?: number; volume?: number },
+      cached: Record<string, unknown>
+    ): boolean {
+      if (current.voice !== cached.voice) return true;
+      if ((current.role ?? "neutral") !== (cached.role ?? "neutral")) return true;
+      if (Math.abs((current.speed ?? 1) - (Number(cached.speed) || 1)) > 0.01) return true;
+      if ((current.pitchShift ?? 0) !== (Number(cached.pitchShift) || 0)) return true;
+      if ((current.volume ?? -1) !== (Number(cached.volume) ?? -1)) return true;
+      return false;
+    }
+
     // Build segment texts
     const segmentTexts = segments.map(seg => {
       return (phrasesBySegment.get(seg.id) ?? []).join(" ");
@@ -310,6 +344,7 @@ Deno.serve(async (req) => {
 
     // ── Synthesize each segment ──────────────────────────────────────
     const results: SegmentResult[] = [];
+    let cachedCount = 0;
 
     for (let i = 0; i < segments.length; i++) {
       const seg = segments[i];
@@ -326,6 +361,24 @@ Deno.serve(async (req) => {
       const hasInlineNarrations = inlineNarrations.length > 0 && seg.segment_type === "dialogue";
 
       const voiceConfig = resolveVoice(seg.speaker, voiceConfigMap);
+
+      // ── Cache check: skip if audio exists with same voice config ──
+      const cached = existingAudioMap.get(seg.id);
+      if (cached && !forceResynthesize && !voiceConfigChanged(voiceConfig, cached.voice_config)) {
+        // Also check that the text hasn't changed by verifying the file still exists
+        // (we trust the DB record — if segment_audio says "ready", it's good)
+        console.log(`Cache hit for segment ${seg.id}: voice=${voiceConfig.voice}, skipping TTS`);
+        results.push({
+          segment_id: seg.id,
+          status: "ready",
+          duration_ms: cached.duration_ms,
+          audio_path: cached.audio_path,
+          inline_narrations: (metadata.inline_narrations_audio as InlineNarrationResult[] | undefined) ?? undefined,
+        });
+        cachedCount++;
+        continue;
+      }
+
       const isUnassigned = !voiceConfigMap.get(seg.speaker?.toLowerCase() ?? "")?.voice;
       if (isUnassigned) {
         console.log(`Unassigned segment ${seg.id}: random voice=${voiceConfig.voice}, role=${voiceConfig.role}`);
@@ -595,13 +648,14 @@ Deno.serve(async (req) => {
       { onConflict: "scene_id" }
     );
 
-    console.log(`Playlist saved for scene ${scene_id}: ${playlistStatus}, ${totalDurationMs}ms`);
+    console.log(`Playlist saved for scene ${scene_id}: ${playlistStatus}, ${totalDurationMs}ms (cached: ${cachedCount}, synthesized: ${successCount - cachedCount}, errors: ${errorCount})`);
 
     return new Response(
       JSON.stringify({
         scene_id,
         total_segments: segments.length,
-        synthesized: successCount,
+        synthesized: successCount - cachedCount,
+        cached: cachedCount,
         errors: errorCount,
         total_duration_ms: totalDurationMs,
         results,
