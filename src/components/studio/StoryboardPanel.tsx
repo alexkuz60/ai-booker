@@ -463,7 +463,7 @@ export function StoryboardPanel({
         };
       });
 
-      // Persist auto-applied speakers
+      // Persist auto-applied speakers and ensure character_appearances exist
       if (needUpdate.length > 0) {
         for (const [type, name] of typeSpeakerMap) {
           const ids = builtSegments
@@ -471,6 +471,25 @@ export function StoryboardPanel({
             .map(s => s.segment_id);
           if (ids.length > 0) {
             await supabase.from("scene_segments").update({ speaker: name }).in("id", ids);
+            // Ensure character_appearances record exists so the character shows in scene list & timeline
+            const charRecord = characters.find(c => c.name === name);
+            if (charRecord && sid) {
+              const { data: existing } = await supabase
+                .from("character_appearances")
+                .select("id, segment_ids")
+                .eq("character_id", charRecord.id)
+                .eq("scene_id", sid)
+                .maybeSingle();
+              if (existing) {
+                const merged = [...new Set([...existing.segment_ids, ...ids])];
+                await supabase.from("character_appearances").update({ segment_ids: merged }).eq("id", existing.id);
+              } else {
+                await supabase.from("character_appearances").upsert(
+                  { character_id: charRecord.id, scene_id: sid, role_in_scene: "speaker", segment_ids: ids },
+                  { onConflict: "character_id,scene_id" }
+                );
+              }
+            }
           }
         }
       }
