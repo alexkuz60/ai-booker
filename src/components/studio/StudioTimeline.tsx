@@ -146,6 +146,15 @@ export const TIMELINE_HEADER_HEIGHT = 41;
 
 // ─── Main component ─────────────────────────────────────────
 
+interface ChapterSceneClip {
+  sceneId: string;
+  sceneIdx: number;
+  label: string;
+  startSec: number;
+  durationSec: number;
+  hasAudio: boolean;
+}
+
 interface StudioTimelineProps {
   isRu: boolean;
   sceneDurationSec?: number;
@@ -153,10 +162,13 @@ interface StudioTimelineProps {
   sceneId?: string | null;
   bookId?: string | null;
   chapterSceneIds?: string[];
+  chapterScenes?: { id?: string; scene_number: number; title: string }[];
   /** Currently selected character ID (synced with CharactersPanel) */
   selectedCharacterId?: string | null;
   /** Callback when a track is clicked */
   onSelectCharacter?: (characterId: string | null) => void;
+  /** Callback when a scene is selected (double-click in chapter mode) */
+  onSelectSceneIdx?: (idx: number) => void;
 }
 
 export function StudioTimeline({
@@ -166,8 +178,10 @@ export function StudioTimeline({
   sceneId,
   bookId,
   chapterSceneIds,
+  chapterScenes,
   selectedCharacterId,
   onSelectCharacter,
+  onSelectSceneIdx,
 }: StudioTimelineProps) {
   const [mode, setMode] = useState<"scene" | "chapter">("scene");
 
@@ -233,14 +247,7 @@ export function StudioTimeline({
   // ── Audio player ──────────────────────────────────────────
   const player = useTimelinePlayer(timelineClips);
 
-  // ── Duration: prefer actual clip data, fallback to estimate ──
-  const clipsDuration = player.totalDuration;
-  const estimateDuration = mode === "scene"
-    ? (sceneDurationSec && sceneDurationSec > 0 ? sceneDurationSec : 60)
-    : (chapterDurationSec && chapterDurationSec > 0 ? chapterDurationSec : 180);
-  const duration = clipsDuration > 0 ? clipsDuration : estimateDuration;
-
-  // Group clips by track ID
+  // Group clips by track ID (scene mode)
   const clipsByTrack = useMemo(() => {
     const map = new Map<string, TimelineClip[]>();
     for (const clip of timelineClips) {
@@ -251,14 +258,71 @@ export function StudioTimeline({
     return map;
   }, [timelineClips]);
 
-  // Auto-add narrator-fallback track if clips reference it
+  // ── Chapter mode: build scene-level clips ─────────────────
+  const chapterSceneClips = useMemo<ChapterSceneClip[]>(() => {
+    if (mode !== "chapter" || !chapterSceneIds?.length) return [];
+
+    const clipsByScene = new Map<string, TimelineClip[]>();
+    for (const c of timelineClips) {
+      const list = clipsByScene.get(c.sceneId) ?? [];
+      list.push(c);
+      clipsByScene.set(c.sceneId, list);
+    }
+
+    const DEFAULT_SCENE_SEC = 30;
+    const result: ChapterSceneClip[] = [];
+    let offset = 0;
+
+    for (let i = 0; i < chapterSceneIds.length; i++) {
+      const sid = chapterSceneIds[i];
+      const sceneInfo = chapterScenes?.[i];
+      const sceneClips = clipsByScene.get(sid);
+
+      let sceneDuration: number;
+      let hasAudio = false;
+
+      if (sceneClips?.length) {
+        sceneDuration = sceneClips.reduce((sum, c) => sum + c.durationSec, 0);
+        hasAudio = sceneClips.some(c => c.hasAudio);
+      } else {
+        sceneDuration = DEFAULT_SCENE_SEC;
+      }
+
+      result.push({
+        sceneId: sid,
+        sceneIdx: i,
+        label: sceneInfo?.title || `${isRu ? "Сцена" : "Scene"} ${sceneInfo?.scene_number ?? i + 1}`,
+        startSec: offset,
+        durationSec: sceneDuration,
+        hasAudio,
+      });
+
+      offset += sceneDuration;
+    }
+
+    return result;
+  }, [mode, chapterSceneIds, chapterScenes, timelineClips, isRu]);
+
+  // ── Duration: prefer actual clip data, fallback to estimate ──
+  const clipsDuration = mode === "chapter"
+    ? (chapterSceneClips.length > 0
+        ? chapterSceneClips[chapterSceneClips.length - 1].startSec + chapterSceneClips[chapterSceneClips.length - 1].durationSec
+        : 0)
+    : player.totalDuration;
+  const estimateDuration = mode === "scene"
+    ? (sceneDurationSec && sceneDurationSec > 0 ? sceneDurationSec : 60)
+    : (chapterDurationSec && chapterDurationSec > 0 ? chapterDurationSec : 180);
+  const duration = clipsDuration > 0 ? clipsDuration : estimateDuration;
+
+  // Auto-add narrator-fallback track if clips reference it (scene mode only)
   const allTracks = useMemo(() => {
+    if (mode === "chapter") return FIXED_TRACKS;
     const hasNarratorFallback = timelineClips.some(c => c.trackId === "narrator-fallback");
     const narratorTrack: TimelineTrackData[] = hasNarratorFallback
       ? [{ id: "narrator-fallback", label: isRu ? "Рассказчик" : "Narrator", color: "hsl(var(--primary))", type: "narrator" }]
       : [];
     return [...narratorTrack, ...charTracks, ...FIXED_TRACKS];
-  }, [charTracks, timelineClips, isRu]);
+  }, [charTracks, timelineClips, isRu, mode]);
 
   // ── Layout / zoom ─────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
@@ -475,8 +539,8 @@ export function StudioTimeline({
         </div>
       </div>
 
-      {/* Tracks */}
-      {!collapsed && (
+      {/* Tracks — Scene mode */}
+      {!collapsed && mode === "scene" && (
         <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
           <div className="w-28 shrink-0 border-r border-border flex flex-col">
             <div className="h-6 border-b border-border" />
@@ -515,7 +579,61 @@ export function StudioTimeline({
               {allTracks.map((track) => (
                 <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} clips={clipsByTrack.get(track.id)} />
               ))}
-              {/* Playhead */}
+              <Playhead positionSec={player.positionSec} zoom={zoom} />
+            </div>
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* Tracks — Chapter mode: single scenes track */}
+      {!collapsed && mode === "chapter" && (
+        <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
+          <div className="w-28 shrink-0 border-r border-border flex flex-col">
+            <div className="h-6 border-b border-border" />
+            <div className="h-10 flex items-center px-3 border-b border-border/50">
+              <Film className="h-3 w-3 shrink-0 mr-2 text-muted-foreground" />
+              <span className="text-xs font-body text-muted-foreground">{isRu ? "Сцены" : "Scenes"}</span>
+            </div>
+          </div>
+          <ScrollArea className="flex-1">
+            <div className="min-w-full relative">
+              <TimelineRuler zoom={zoom} duration={duration} />
+              <div className="flex h-10 border-b border-border/50 relative" style={{ width: `${duration * zoom * 4}px` }}>
+                {chapterSceneClips.map((sc, i) => {
+                  const widthPx = sc.durationSec * zoom * 4;
+                  const colorIdx = i % NARRATOR_COLORS.length;
+                  return (
+                    <div
+                      key={sc.sceneId}
+                      className={`absolute top-1 bottom-1 rounded-sm cursor-pointer transition-opacity ${
+                        sc.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-50 hover:opacity-70"
+                      }`}
+                      style={{
+                        left: `${sc.startSec * zoom * 4}px`,
+                        width: `${widthPx}px`,
+                        backgroundColor: NARRATOR_COLORS[colorIdx],
+                        backgroundImage: sc.hasAudio
+                          ? undefined
+                          : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
+                      }}
+                      title={`${sc.label} (${sc.durationSec.toFixed(1)}s)${sc.hasAudio ? " 🔊" : ""} — ${isRu ? "двойной клик → сцена" : "double-click to open"}`}
+                      onDoubleClick={() => {
+                        if (onSelectSceneIdx) {
+                          onSelectSceneIdx(sc.sceneIdx);
+                          setMode("scene");
+                          setZoomOverride(null);
+                        }
+                      }}
+                    >
+                      {widthPx > 50 && (
+                        <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
+                          {sc.hasAudio ? "🔊 " : ""}{sc.label}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
               <Playhead positionSec={player.positionSec} zoom={zoom} />
             </div>
           </ScrollArea>
