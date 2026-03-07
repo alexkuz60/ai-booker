@@ -799,10 +799,36 @@ export function StoryboardPanel({
                       </span>
                     );
                   })()}
+                  {/* Inline narration indicator */}
+                  {seg.inline_narrations && seg.inline_narrations.length > 0 && (
+                    <span
+                      className="inline-flex items-center gap-0.5 text-[10px] text-accent-foreground font-mono"
+                      title={isRu
+                        ? `${seg.inline_narrations.length} авторская вставка`
+                        : `${seg.inline_narrations.length} narrator insertion(s)`}
+                    >
+                      <MessageCircle className="h-3 w-3" />
+                      {seg.inline_narrations.length}
+                    </span>
+                  )}
                   <span className="ml-auto text-[10px] text-muted-foreground font-mono">
                     #{seg.segment_number}
                   </span>
                 </div>
+                {/* Inline narrations detail */}
+                {seg.inline_narrations && seg.inline_narrations.length > 0 && (
+                  <div className="px-3 py-1 bg-accent/10 border-b border-border/30">
+                    {seg.inline_narrations.map((n, idx) => (
+                      <div key={idx} className="text-[10px] text-muted-foreground font-body flex items-start gap-1">
+                        <BookOpen className="h-3 w-3 mt-0.5 shrink-0 text-accent-foreground" />
+                        <span className="italic">«{n.text}»</span>
+                        <span className="text-muted-foreground/60 shrink-0">
+                          → {isRu ? "после" : "after"} «{n.insert_after.slice(0, 20)}…»
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {/* Phrases */}
                 <div className="divide-y divide-border/30">
                   {seg.phrases.map((ph) => (
