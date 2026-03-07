@@ -14,10 +14,6 @@ export interface TimelineClip {
   hasAudio: boolean;
   audioPath?: string;
   sceneId: string;
-  /** True if this clip is a narrator overlay on a dialogue segment */
-  isOverlay?: boolean;
-  /** Parent segment ID for overlay clips */
-  parentSegmentId?: string;
 }
 
 interface RawPhrase {
@@ -177,8 +173,6 @@ export function useTimelineClips(
               hasAudio: true,
               audioPath: narr.audio_path,
               sceneId,
-              isOverlay: true,
-              parentSegmentId: seg.id,
             });
           }
 
