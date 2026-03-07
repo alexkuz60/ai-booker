@@ -591,6 +591,7 @@ function OrphanedFilesSection({ isRu, userId, onPreview }: { isRu: boolean; user
                   >
                     <FileAudio className="h-4 w-4 text-muted-foreground shrink-0" />
                     <span className="text-sm truncate flex-1 min-w-0" title={orphan.path}>{orphan.name}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">{formatBytes(orphan.size)}</span>
                     <span className="text-[10px] text-muted-foreground truncate max-w-[150px] hidden sm:block" title={orphan.path}>
                       {orphan.path.split('/').slice(0, -1).join('/')}
                     </span>
