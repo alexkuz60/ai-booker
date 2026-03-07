@@ -149,6 +149,7 @@ export function useTimelineClips(
             segmentType: seg.segment_type,
             hasAudio: !!audioInfo,
             audioPath: audioInfo?.audioPath,
+            sceneId,
           });
 
           sceneOffset += durationSec;
