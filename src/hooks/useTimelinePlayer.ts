@@ -76,20 +76,19 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
   }, []);
 
   const playClip = useCallback(async (index: number) => {
-    if (index >= audioClips.length) {
-      // No more audio clips — continue timeline until total duration
-      clipOffsetRef.current = audioClips.length > 0
-        ? audioClips[audioClips.length - 1].startSec + audioClips[audioClips.length - 1].durationSec
+    const ac = audioClipsRef.current;
+    if (index >= ac.length) {
+      clipOffsetRef.current = ac.length > 0
+        ? ac[ac.length - 1].startSec + ac[ac.length - 1].durationSec
         : 0;
       clipStartTimeRef.current = performance.now();
       rafRef.current = requestAnimationFrame(updatePosition);
       return;
     }
 
-    const clip = audioClips[index];
+    const clip = ac[index];
     clipIndexRef.current = index;
 
-    // If there's a gap before this clip, wait through it
     const currentPos = clipOffsetRef.current;
     if (clip.startSec > currentPos + 0.05) {
       clipStartTimeRef.current = performance.now();
@@ -121,7 +120,6 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
 
     audio.onerror = (e) => {
       console.error("[TimelinePlayer] Audio load error for clip", index, e);
-      // Skip broken clips
       if (stateRef.current !== "playing") return;
       clipOffsetRef.current = clip.startSec + clip.durationSec;
       clipStartTimeRef.current = performance.now();
@@ -137,7 +135,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       setState("stopped");
       stateRef.current = "stopped";
     }
-  }, [audioClips, getSignedUrl, updatePosition]);
+  }, [getSignedUrl, updatePosition]);
 
   const play = useCallback(() => {
     if (stateRef.current === "playing") return;
