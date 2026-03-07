@@ -192,8 +192,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
   }, []);
 
   const seek = useCallback((toSec: number) => {
-    const clamped = Math.max(0, Math.min(toSec, totalDuration));
-    // Stop current audio
+    const clamped = Math.max(0, Math.min(toSec, totalDurationRef.current));
     cancelAnimationFrame(rafRef.current);
     if (audioRef.current) {
       audioRef.current.pause();
@@ -206,13 +205,12 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     clipStartTimeRef.current = performance.now();
 
     if (stateRef.current === "playing") {
-      // Find the audio clip that contains this position
-      const idx = audioClips.findIndex(
+      const ac = audioClipsRef.current;
+      const idx = ac.findIndex(
         c => c.startSec <= clamped && clamped < c.startSec + c.durationSec
       );
       if (idx >= 0) {
-        // Seek within this clip
-        const clip = audioClips[idx];
+        const clip = ac[idx];
         const offsetInClip = clamped - clip.startSec;
         clipIndexRef.current = idx;
         (async () => {
@@ -246,18 +244,16 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
           }
         })();
       } else {
-        // Position is in a gap — find next clip
-        const nextIdx = audioClips.findIndex(c => c.startSec > clamped);
-        playClip(nextIdx >= 0 ? nextIdx : audioClips.length);
+        const nextIdx = ac.findIndex(c => c.startSec > clamped);
+        playClip(nextIdx >= 0 ? nextIdx : ac.length);
       }
     } else {
-      // If paused or stopped, just update position
       if (stateRef.current === "stopped") {
         stateRef.current = "paused";
         setState("paused");
       }
     }
-  }, [totalDuration, audioClips, getSignedUrl, playClip, updatePosition]);
+  }, [getSignedUrl, playClip, updatePosition]);
 
   const changeVolume = useCallback((v: number) => {
     const clamped = Math.max(0, Math.min(100, v));
