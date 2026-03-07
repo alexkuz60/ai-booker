@@ -13,6 +13,7 @@ export interface TimelineClip {
   segmentType: string;
   hasAudio: boolean;
   audioPath?: string;
+  sceneId: string;
 }
 
 interface RawSegment {
