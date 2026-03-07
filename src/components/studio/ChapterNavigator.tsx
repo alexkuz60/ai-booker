@@ -40,6 +40,7 @@ export function ChapterNavigator({
   onSelectScene: (idx: number | null) => void;
   isRu: boolean;
   segmentedSceneIds?: Set<string>;
+  renderedSceneIds?: Set<string>;
 }) {
   const [chapterOpen, setChapterOpen] = useState(true);
 
