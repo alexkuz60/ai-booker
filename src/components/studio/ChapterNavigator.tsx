@@ -98,6 +98,28 @@ export function ChapterNavigator({
           <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider font-body">
             {isRu ? "Глава" : "Chapter"}
           </span>
+          {staleCount > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="ml-auto h-6 px-2 text-[11px] gap-1 text-yellow-500 border-yellow-500/30 hover:bg-yellow-500/10"
+              disabled={batchRunning}
+              onClick={handleBatchResynth}
+              title={isRu ? `Ре-синтез ${staleCount} устаревших сцен` : `Re-synthesize ${staleCount} stale scenes`}
+            >
+              {batchRunning ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>{batchProgress}</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-3 w-3" />
+                  <span>{staleCount}</span>
+                </>
+              )}
+            </Button>
+          )}
         </div>
         <p className="text-xs text-muted-foreground mt-0.5 truncate">
           {chapter.bookTitle}
