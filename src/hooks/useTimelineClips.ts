@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 const CHARS_PER_SEC = 14;
 
 export interface TimelineClip {
   id: string;
-  trackId: string; // "char-{characterId}" or "narrator"
+  trackId: string; // "char-{characterId}" or "narrator-fallback"
   speaker: string | null;
   startSec: number;
   durationSec: number;
@@ -14,14 +14,10 @@ export interface TimelineClip {
   hasAudio: boolean;
   audioPath?: string;
   sceneId: string;
-}
-
-interface RawSegment {
-  id: string;
-  segment_number: number;
-  segment_type: string;
-  speaker: string | null;
-  scene_id: string;
+  /** True if this clip is a narrator overlay on a dialogue segment */
+  isOverlay?: boolean;
+  /** Parent segment ID for overlay clips */
+  parentSegmentId?: string;
 }
 
 interface RawPhrase {
@@ -31,9 +27,18 @@ interface RawPhrase {
   text: string;
 }
 
+interface InlineNarrationAudio {
+  text: string;
+  insert_after: string;
+  audio_path: string;
+  duration_ms: number;
+  offset_ms: number;
+}
+
 /**
  * Load real clips for timeline from scene_segments + segment_phrases.
  * Uses actual durations from segment_audio when available, falls back to char-based estimate.
+ * Supports inline narration overlays from segment metadata.
  */
 export function useTimelineClips(
   sceneIds: string[],
@@ -54,10 +59,10 @@ export function useTimelineClips(
     setLoading(true);
 
     (async () => {
-      // Load segments for these scenes
+      // Load segments for these scenes (including metadata for inline narrations)
       const { data: segments } = await supabase
         .from("scene_segments")
-        .select("id, segment_number, segment_type, speaker, scene_id")
+        .select("id, segment_number, segment_type, speaker, scene_id, metadata")
         .in("scene_id", sceneIds)
         .order("scene_id")
         .order("segment_number");
@@ -121,16 +126,14 @@ export function useTimelineClips(
           let durationSec: number;
 
           if (audioInfo && audioInfo.durationMs > 0) {
-            // Use real audio duration
             durationSec = audioInfo.durationMs / 1000;
           } else {
-            // Fallback: estimate from text
             const segPhrases = phrasesBySegment.get(seg.id) ?? [];
             const totalChars = segPhrases.reduce((sum, p) => sum + p.text.length, 0);
             durationSec = Math.max(0.5, totalChars / CHARS_PER_SEC);
           }
 
-          // Determine track ID (case-insensitive speaker lookup)
+          // Determine track ID
           let trackId = "narrator-fallback";
           const speakerKey = seg.speaker?.toLowerCase();
           if (speakerKey && characterMap.has(speakerKey)) {
@@ -151,6 +154,33 @@ export function useTimelineClips(
             audioPath: audioInfo?.audioPath,
             sceneId,
           });
+
+          // ── Inline narration overlay clips ──────────────────
+          const metadata = (seg.metadata ?? {}) as Record<string, unknown>;
+          const inlineNarrAudio = (metadata.inline_narrations_audio ?? []) as InlineNarrationAudio[];
+
+          for (let n = 0; n < inlineNarrAudio.length; n++) {
+            const narr = inlineNarrAudio[n];
+            if (!narr.audio_path || !narr.duration_ms) continue;
+
+            const narrStartSec = sceneOffset + (narr.offset_ms / 1000);
+            const narrDurationSec = narr.duration_ms / 1000;
+
+            result.push({
+              id: `${seg.id}_narrator_${n}`,
+              trackId: "narrator-fallback",
+              speaker: null,
+              startSec: narrStartSec,
+              durationSec: narrDurationSec,
+              label: narr.text.slice(0, 30),
+              segmentType: "narrator",
+              hasAudio: true,
+              audioPath: narr.audio_path,
+              sceneId,
+              isOverlay: true,
+              parentSegmentId: seg.id,
+            });
+          }
 
           sceneOffset += durationSec;
         }

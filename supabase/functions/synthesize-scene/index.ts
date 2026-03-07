@@ -6,11 +6,177 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-/**
- * synthesize-scene: iterate segments of a scene, call yandex-tts for each,
- * store audio in user-media bucket, save metadata to segment_audio.
- * Supports previous_text/next_text context for stitching.
- */
+// ── Types ────────────────────────────────────────────────────────────
+
+interface InlineNarration {
+  text: string;
+  insert_after: string;
+}
+
+interface InlineNarrationResult {
+  text: string;
+  insert_after: string;
+  audio_path: string;
+  duration_ms: number;
+  offset_ms: number; // position in the dialogue timeline where narrator starts
+}
+
+interface SegmentResult {
+  segment_id: string;
+  status: string;
+  duration_ms: number;
+  audio_path: string;
+  error?: string;
+  inline_narrations?: InlineNarrationResult[];
+}
+
+// ── Voice helpers ────────────────────────────────────────────────────
+
+const voiceRolesMap: Record<string, string[]> = {
+  alena: ["neutral", "good"], filipp: ["neutral"], ermil: ["neutral", "good"],
+  jane: ["neutral", "good", "evil"], madirus: ["neutral"], omazh: ["neutral", "evil"],
+  zahar: ["neutral", "good"], dasha: ["neutral", "friendly", "strict"],
+  julia: ["neutral", "strict"], lera: ["neutral", "friendly"],
+  masha: ["neutral", "friendly", "strict"], marina: ["neutral", "whisper", "friendly"],
+  alexander: ["neutral", "good"], kirill: ["neutral", "strict", "good"],
+  anton: ["neutral", "good"],
+};
+
+function randomVoiceConfig() {
+  const voices = Object.keys(voiceRolesMap);
+  const voice = voices[Math.floor(Math.random() * voices.length)];
+  const roles = voiceRolesMap[voice];
+  const role = roles[Math.floor(Math.random() * roles.length)];
+  const speed = Math.round((0.9 + Math.random() * 0.3) * 100) / 100;
+  const pitchShift = Math.floor(Math.random() * 400) - 200;
+  return { voice, role, speed, pitchShift, volume: undefined as number | undefined };
+}
+
+function resolveVoice(
+  speaker: string | null,
+  voiceConfigMap: Map<string, Record<string, unknown>>
+) {
+  const vc = speaker
+    ? voiceConfigMap.get(speaker.toLowerCase()) ?? {}
+    : {};
+
+  if ((vc as Record<string, unknown>).voice) {
+    return {
+      voice: (vc as Record<string, unknown>).voice as string,
+      role: (vc as Record<string, unknown>).role as string | undefined,
+      speed: ((vc as Record<string, unknown>).speed as number) || 1.0,
+      pitchShift: (vc as Record<string, unknown>).pitchShift as number | undefined,
+      volume: (vc as Record<string, unknown>).volume as number | undefined,
+    };
+  }
+  return randomVoiceConfig();
+}
+
+// ── TTS call helper ──────────────────────────────────────────────────
+
+async function callTts(
+  yandexTtsUrl: string,
+  authHeader: string,
+  params: {
+    text?: string;
+    ssml?: string;
+    voice: string;
+    role?: string;
+    speed: number;
+    pitchShift?: number;
+    volume?: number;
+    lang: string;
+  }
+): Promise<{ audio: Uint8Array; durationMs: number } | { error: string }> {
+  const body: Record<string, unknown> = {
+    voice: params.voice,
+    role: params.role,
+    speed: params.speed,
+    pitchShift: params.pitchShift,
+    volume: params.volume,
+    lang: params.lang,
+  };
+  if (params.ssml) {
+    body.ssml = params.ssml;
+  } else {
+    body.text = params.text;
+  }
+
+  const resp = await fetch(yandexTtsUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: authHeader,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    const errBody = await resp.text();
+    return { error: `TTS ${resp.status}: ${errBody}` };
+  }
+
+  const audioBuffer = await resp.arrayBuffer();
+  const audio = new Uint8Array(audioBuffer);
+  // Estimate duration from MP3 size (≈16kB/s at 128kbps)
+  const durationMs = Math.round((audio.length / 16000) * 1000);
+  return { audio, durationMs };
+}
+
+// ── SSML builder for dialogue with inline narration pauses ───────────
+
+function buildDialogueSsml(
+  dialogueText: string,
+  narrations: Array<{ insert_after: string; duration_ms: number }>
+): string {
+  // Sort narrations by position in text (find insert_after location)
+  const sorted = narrations
+    .map((n) => {
+      const idx = dialogueText.indexOf(n.insert_after);
+      return { ...n, charIdx: idx >= 0 ? idx + n.insert_after.length : -1 };
+    })
+    .filter((n) => n.charIdx >= 0)
+    .sort((a, b) => a.charIdx - b.charIdx);
+
+  if (sorted.length === 0) {
+    return `<speak>${escapeXml(dialogueText)}</speak>`;
+  }
+
+  let ssml = "<speak>";
+  let lastIdx = 0;
+  for (const n of sorted) {
+    ssml += escapeXml(dialogueText.slice(lastIdx, n.charIdx));
+    ssml += ` <break time="${n.duration_ms}ms"/> `;
+    lastIdx = n.charIdx;
+  }
+  ssml += escapeXml(dialogueText.slice(lastIdx));
+  ssml += "</speak>";
+  return ssml;
+}
+
+function escapeXml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// ── Narrator voice for inline narrations ─────────────────────────────
+
+function getNarratorVoice(voiceConfigMap: Map<string, Record<string, unknown>>) {
+  // Try to find a narrator voice config
+  const narratorVc = voiceConfigMap.get("narrator") ?? voiceConfigMap.get("рассказчик");
+  if (narratorVc && (narratorVc as Record<string, unknown>).voice) {
+    return {
+      voice: (narratorVc as Record<string, unknown>).voice as string,
+      role: (narratorVc as Record<string, unknown>).role as string | undefined,
+      speed: ((narratorVc as Record<string, unknown>).speed as number) || 1.0,
+      pitchShift: (narratorVc as Record<string, unknown>).pitchShift as number | undefined,
+      volume: (narratorVc as Record<string, unknown>).volume as number | undefined,
+    };
+  }
+  // Default narrator voice
+  return { voice: "alena", role: "neutral", speed: 1.0, pitchShift: undefined, volume: undefined };
+}
+
+// ── Main handler ─────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -33,7 +199,6 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    // Service-role client for storage uploads & segment_audio writes (bypasses RLS)
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
     const token = authHeader.replace("Bearer ", "");
@@ -45,12 +210,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Admin-only (same as yandex-tts)
+    // Admin-only
     const { data: roleData } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userData.user.id)
-      .eq("role", "admin")
+      .from("user_roles").select("role")
+      .eq("user_id", userData.user.id).eq("role", "admin")
       .maybeSingle();
 
     if (!roleData) {
@@ -62,6 +225,7 @@ Deno.serve(async (req) => {
 
     const { scene_id, language } = await req.json();
     const isRu = language === "ru";
+    const langCode = isRu ? "ru" : "en";
 
     if (!scene_id) {
       return new Response(
@@ -70,10 +234,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Load segments + phrases
+    // Load segments + phrases + metadata
     const { data: segments, error: segErr } = await supabase
       .from("scene_segments")
-      .select("id, segment_number, segment_type, speaker")
+      .select("id, segment_number, segment_type, speaker, metadata")
       .eq("scene_id", scene_id)
       .order("segment_number");
 
@@ -105,26 +269,16 @@ Deno.serve(async (req) => {
     const voiceConfigMap = new Map<string, Record<string, unknown>>();
 
     if (speakerNames.length > 0) {
-      // Get book_id from scene
       const { data: sceneData } = await supabase
-        .from("book_scenes")
-        .select("chapter_id")
-        .eq("id", scene_id)
-        .single();
-
+        .from("book_scenes").select("chapter_id").eq("id", scene_id).single();
       if (sceneData) {
         const { data: chapterData } = await supabase
-          .from("book_chapters")
-          .select("book_id")
-          .eq("id", sceneData.chapter_id)
-          .single();
-
+          .from("book_chapters").select("book_id").eq("id", sceneData.chapter_id).single();
         if (chapterData) {
           const { data: chars } = await supabase
             .from("book_characters")
             .select("name, voice_config, aliases")
             .eq("book_id", chapterData.book_id);
-
           if (chars) {
             for (const c of chars) {
               const vc = (c.voice_config || {}) as Record<string, unknown>;
@@ -138,134 +292,196 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Synthesize each segment sequentially
-    const results: Array<{
-      segment_id: string;
-      status: string;
-      duration_ms: number;
-      audio_path: string;
-      error?: string;
-    }> = [];
+    const yandexTtsUrl = `${supabaseUrl}/functions/v1/yandex-tts`;
+    const userId = userData.user.id;
+    const narratorVoice = getNarratorVoice(voiceConfigMap);
 
-    // Build segment texts for stitching context
+    // Build segment texts
     const segmentTexts = segments.map(seg => {
-      const segPhrases = phrasesBySegment.get(seg.id) ?? [];
-      return segPhrases.join(" ");
+      return (phrasesBySegment.get(seg.id) ?? []).join(" ");
     });
 
-    const yandexTtsUrl = `${supabaseUrl}/functions/v1/yandex-tts`;
+    // ── Synthesize each segment ──────────────────────────────────────
+    const results: SegmentResult[] = [];
 
     for (let i = 0; i < segments.length; i++) {
       const seg = segments[i];
       const text = segmentTexts[i];
 
       if (!text.trim()) {
-        results.push({
-          segment_id: seg.id,
-          status: "skipped",
-          duration_ms: 0,
-          audio_path: "",
-        });
+        results.push({ segment_id: seg.id, status: "skipped", duration_ms: 0, audio_path: "" });
         continue;
       }
 
-      // Resolve voice config — random for unassigned speakers
-      const vc = seg.speaker
-        ? voiceConfigMap.get(seg.speaker.toLowerCase()) ?? {}
-        : {};
+      // Check for inline narrations in metadata
+      const metadata = (seg.metadata ?? {}) as Record<string, unknown>;
+      const inlineNarrations = (metadata.inline_narrations ?? []) as InlineNarration[];
+      const hasInlineNarrations = inlineNarrations.length > 0 && seg.segment_type === "dialogue";
 
-      const hasVoice = !!(vc as Record<string, unknown>).voice;
-      let voice: string;
-      let role: string | undefined;
-      let speed: number;
-      let pitchShift: number | undefined;
-      let volume: number | undefined;
-
-      if (hasVoice) {
-        voice = (vc as Record<string, unknown>).voice as string;
-        role = (vc as Record<string, unknown>).role as string | undefined;
-        speed = ((vc as Record<string, unknown>).speed as number) || 1.0;
-        pitchShift = (vc as Record<string, unknown>).pitchShift as number | undefined;
-        volume = (vc as Record<string, unknown>).volume as number | undefined;
-      } else {
-        // Random voice with validated role from Yandex SpeechKit registry
-        const voiceRolesMap: Record<string, string[]> = {
-          alena: ["neutral", "good"], filipp: ["neutral"], ermil: ["neutral", "good"],
-          jane: ["neutral", "good", "evil"], madirus: ["neutral"], omazh: ["neutral", "evil"],
-          zahar: ["neutral", "good"], dasha: ["neutral", "friendly", "strict"],
-          julia: ["neutral", "strict"], lera: ["neutral", "friendly"],
-          masha: ["neutral", "friendly", "strict"], marina: ["neutral", "whisper", "friendly"],
-          alexander: ["neutral", "good"], kirill: ["neutral", "strict", "good"],
-          anton: ["neutral", "good"],
-        };
-        const randomVoices = Object.keys(voiceRolesMap);
-        voice = randomVoices[Math.floor(Math.random() * randomVoices.length)];
-        const validRoles = voiceRolesMap[voice];
-        role = validRoles[Math.floor(Math.random() * validRoles.length)];
-        speed = 0.9 + Math.random() * 0.3; // 0.9–1.2
-        speed = Math.round(speed * 100) / 100;
-        pitchShift = Math.floor(Math.random() * 400) - 200; // -200..+200 Hz
-        volume = undefined;
-        console.log(`Unassigned segment ${seg.id}: random voice=${voice}, role=${role}, speed=${speed}, pitch=${pitchShift}`);
+      const voiceConfig = resolveVoice(seg.speaker, voiceConfigMap);
+      const isUnassigned = !voiceConfigMap.get(seg.speaker?.toLowerCase() ?? "")?.voice;
+      if (isUnassigned) {
+        console.log(`Unassigned segment ${seg.id}: random voice=${voiceConfig.voice}, role=${voiceConfig.role}`);
       }
 
       try {
-        // Call yandex-tts
-        const ttsResp = await fetch(yandexTtsUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: authHeader,
-          },
-          body: JSON.stringify({
-            text,
-            voice,
-            role,
-            speed,
-            pitchShift,
-            volume,
-            lang: isRu ? "ru" : "en",
-          }),
-        });
+        let dialogueDurationMs: number;
+        let dialogueAudio: Uint8Array;
+        const narrationResults: InlineNarrationResult[] = [];
 
-        if (!ttsResp.ok) {
-          const errBody = await ttsResp.text();
-          console.error(`TTS failed for segment ${seg.id}:`, ttsResp.status, errBody);
-          results.push({
-            segment_id: seg.id,
-            status: "error",
-            duration_ms: 0,
-            audio_path: "",
-            error: `TTS ${ttsResp.status}`,
+        if (hasInlineNarrations) {
+          // ── TWO-PASS SYNTHESIS ──────────────────────────────
+
+          // PASS 1: Synthesize each narrator insertion → get exact duration
+          let offsetAccumulator = 0;
+          for (let n = 0; n < inlineNarrations.length; n++) {
+            const narr = inlineNarrations[n];
+            console.log(`Pass 1: narrator insertion "${narr.text}" for segment ${seg.id}`);
+
+            const narrResult = await callTts(yandexTtsUrl, authHeader, {
+              text: narr.text,
+              voice: narratorVoice.voice,
+              role: narratorVoice.role,
+              speed: narratorVoice.speed,
+              pitchShift: narratorVoice.pitchShift,
+              volume: narratorVoice.volume,
+              lang: langCode,
+            });
+
+            if ("error" in narrResult) {
+              console.error(`Narrator TTS failed for "${narr.text}":`, narrResult.error);
+              continue;
+            }
+
+            // Upload narrator audio
+            const narrPath = `${userId}/tts/${scene_id}/${seg.id}_narrator_${n}.mp3`;
+            await supabaseAdmin.storage.from("user-media").upload(
+              narrPath, narrResult.audio, { contentType: "audio/mpeg", upsert: true }
+            );
+
+            // Estimate the offset: character position in dialogue text
+            const insertIdx = text.indexOf(narr.insert_after);
+            const charsBefore = insertIdx >= 0 ? insertIdx + narr.insert_after.length : 0;
+            // Rough estimate: chars before / total chars * total estimated duration
+            // We'll refine offset_ms after we know the actual dialogue duration
+            narrationResults.push({
+              text: narr.text,
+              insert_after: narr.insert_after,
+              audio_path: narrPath,
+              duration_ms: narrResult.durationMs,
+              offset_ms: 0, // will be calculated after dialogue synthesis
+            });
+
+            offsetAccumulator += narrResult.durationMs;
+          }
+
+          // PASS 2: Synthesize dialogue with SSML <break> pauses
+          if (narrationResults.length > 0) {
+            const ssml = buildDialogueSsml(
+              text,
+              narrationResults.map(nr => ({
+                insert_after: nr.insert_after,
+                duration_ms: nr.duration_ms,
+              }))
+            );
+
+            console.log(`Pass 2: dialogue SSML for segment ${seg.id}, ${ssml.length} chars`);
+
+            // Force v1 for SSML — use a simpler voice (no role/pitch) to ensure compatibility
+            const dialogueResult = await callTts(yandexTtsUrl, authHeader, {
+              ssml,
+              voice: voiceConfig.voice,
+              speed: voiceConfig.speed,
+              lang: langCode,
+            });
+
+            if ("error" in dialogueResult) {
+              console.error(`Dialogue SSML TTS failed for segment ${seg.id}:`, dialogueResult.error);
+              // Fallback: synthesize without SSML
+              const fallbackResult = await callTts(yandexTtsUrl, authHeader, {
+                text,
+                voice: voiceConfig.voice,
+                role: voiceConfig.role,
+                speed: voiceConfig.speed,
+                pitchShift: voiceConfig.pitchShift,
+                volume: voiceConfig.volume,
+                lang: langCode,
+              });
+              if ("error" in fallbackResult) {
+                results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: fallbackResult.error });
+                continue;
+              }
+              dialogueAudio = fallbackResult.audio;
+              dialogueDurationMs = fallbackResult.durationMs;
+            } else {
+              dialogueAudio = dialogueResult.audio;
+              dialogueDurationMs = dialogueResult.durationMs;
+            }
+          } else {
+            // No narrations succeeded — just synthesize plain text
+            const plainResult = await callTts(yandexTtsUrl, authHeader, {
+              text,
+              voice: voiceConfig.voice,
+              role: voiceConfig.role,
+              speed: voiceConfig.speed,
+              pitchShift: voiceConfig.pitchShift,
+              volume: voiceConfig.volume,
+              lang: langCode,
+            });
+            if ("error" in plainResult) {
+              results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: plainResult.error });
+              continue;
+            }
+            dialogueAudio = plainResult.audio;
+            dialogueDurationMs = plainResult.durationMs;
+          }
+
+          // Calculate narrator offsets based on dialogue character positions
+          const totalChars = text.length;
+          for (const nr of narrationResults) {
+            const insertIdx = text.indexOf(nr.insert_after);
+            const charPos = insertIdx >= 0 ? insertIdx + nr.insert_after.length : 0;
+            // Scale position proportionally to actual duration
+            // (the dialogue audio already has pauses baked in, so offset = proportional position)
+            nr.offset_ms = Math.round((charPos / totalChars) * dialogueDurationMs);
+          }
+
+        } else {
+          // ── STANDARD SINGLE-PASS SYNTHESIS ────────────────
+          const result = await callTts(yandexTtsUrl, authHeader, {
+            text,
+            voice: voiceConfig.voice,
+            role: voiceConfig.role,
+            speed: voiceConfig.speed,
+            pitchShift: voiceConfig.pitchShift,
+            volume: voiceConfig.volume,
+            lang: langCode,
           });
-          continue;
+
+          if ("error" in result) {
+            results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: result.error });
+            continue;
+          }
+          dialogueAudio = result.audio;
+          dialogueDurationMs = result.durationMs;
         }
 
-        const audioBuffer = await ttsResp.arrayBuffer();
-        const audioBytes = new Uint8Array(audioBuffer);
-
-        // Estimate duration from MP3 size (approx 16kB/s at 128kbps)
-        const durationMs = Math.round((audioBytes.length / 16000) * 1000);
-
-        // Upload to storage
-        const storagePath = `${userData.user.id}/tts/${scene_id}/${seg.id}.mp3`;
+        // Upload main audio
+        const storagePath = `${userId}/tts/${scene_id}/${seg.id}.mp3`;
         const { error: uploadErr } = await supabaseAdmin.storage
           .from("user-media")
-          .upload(storagePath, audioBytes, {
-            contentType: "audio/mpeg",
-            upsert: true,
-          });
+          .upload(storagePath, dialogueAudio, { contentType: "audio/mpeg", upsert: true });
 
         if (uploadErr) {
           console.error(`Upload failed for segment ${seg.id}:`, uploadErr);
-          results.push({
-            segment_id: seg.id,
-            status: "error",
-            duration_ms: 0,
-            audio_path: "",
-            error: "Upload failed",
-          });
+          results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: "Upload failed" });
           continue;
+        }
+
+        // Update segment metadata with narrator audio info
+        const updatedMetadata = { ...metadata };
+        if (narrationResults.length > 0) {
+          updatedMetadata.inline_narrations_audio = narrationResults;
         }
 
         // Upsert segment_audio record
@@ -273,21 +489,37 @@ Deno.serve(async (req) => {
           {
             segment_id: seg.id,
             audio_path: storagePath,
-            duration_ms: durationMs,
+            duration_ms: dialogueDurationMs,
             status: "ready",
-            voice_config: { voice, role, speed, pitchShift, volume },
+            voice_config: {
+              voice: voiceConfig.voice,
+              role: voiceConfig.role,
+              speed: voiceConfig.speed,
+              pitchShift: voiceConfig.pitchShift,
+              volume: voiceConfig.volume,
+            },
           },
           { onConflict: "segment_id" }
         );
 
+        // Update segment metadata with inline narration audio info
+        if (narrationResults.length > 0) {
+          await supabaseAdmin
+            .from("scene_segments")
+            .update({ metadata: updatedMetadata })
+            .eq("id", seg.id);
+        }
+
         results.push({
           segment_id: seg.id,
           status: "ready",
-          duration_ms: durationMs,
+          duration_ms: dialogueDurationMs,
           audio_path: storagePath,
+          inline_narrations: narrationResults.length > 0 ? narrationResults : undefined,
         });
 
-        console.log(`Synthesized segment ${i + 1}/${segments.length}: ${seg.speaker || seg.segment_type}, ${durationMs}ms`);
+        console.log(`Synthesized segment ${i + 1}/${segments.length}: ${seg.speaker || seg.segment_type}, ${dialogueDurationMs}ms${narrationResults.length > 0 ? ` (+${narrationResults.length} narrator overlays)` : ""}`);
+
       } catch (err) {
         console.error(`Error synthesizing segment ${seg.id}:`, err);
         results.push({
@@ -304,7 +536,7 @@ Deno.serve(async (req) => {
     const successCount = results.filter(r => r.status === "ready").length;
     const errorCount = results.filter(r => r.status === "error").length;
 
-    // Save playlist snapshot to scene_playlists
+    // Save playlist snapshot
     const playlistSegments = results.map((r, idx) => ({
       segment_id: r.segment_id,
       segment_number: segments[idx].segment_number,
@@ -313,6 +545,7 @@ Deno.serve(async (req) => {
       audio_path: r.audio_path || null,
       duration_ms: r.duration_ms,
       status: r.status,
+      inline_narrations: r.inline_narrations || null,
     }));
 
     const playlistStatus = errorCount === 0 ? "ready" : successCount > 0 ? "partial" : "error";
