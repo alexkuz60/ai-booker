@@ -33,6 +33,7 @@ const Studio = () => {
   }, [setActiveTab]);
   const [segmentedSceneIds, setSegmentedSceneIds] = useState<Set<string>>(new Set());
   const [renderedSceneIds, setRenderedSceneIds] = useState<Set<string>>(new Set());
+  const [fullyRenderedSceneIds, setFullyRenderedSceneIds] = useState<Set<string>>(new Set());
   const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const chapterSceneIds = chapter?.scenes.map(s => s.id).filter(Boolean) as string[] | undefined;
@@ -107,11 +108,25 @@ const Studio = () => {
       if (audioData?.length) {
         const segToScene = new Map(segData.map(s => [s.id, s.scene_id]));
         const rendered = new Set<string>();
+        // Count segments per scene and audio-ready per scene
+        const segCountByScene = new Map<string, number>();
+        const audioCountByScene = new Map<string, number>();
+        for (const s of segData) {
+          segCountByScene.set(s.scene_id, (segCountByScene.get(s.scene_id) ?? 0) + 1);
+        }
         for (const a of audioData) {
           const sceneId = segToScene.get(a.segment_id);
-          if (sceneId) rendered.add(sceneId);
+          if (sceneId) {
+            rendered.add(sceneId);
+            audioCountByScene.set(sceneId, (audioCountByScene.get(sceneId) ?? 0) + 1);
+          }
         }
         setRenderedSceneIds(rendered);
+        const fully = new Set<string>();
+        for (const [sceneId, total] of segCountByScene) {
+          if ((audioCountByScene.get(sceneId) ?? 0) >= total) fully.add(sceneId);
+        }
+        setFullyRenderedSceneIds(fully);
       }
     })();
   }, [chapter?.scenes.map(s => s.id).join(",")]);
@@ -199,6 +214,7 @@ const Studio = () => {
                   isRu={isRu}
                   segmentedSceneIds={segmentedSceneIds}
                   renderedSceneIds={renderedSceneIds}
+                  fullyRenderedSceneIds={fullyRenderedSceneIds}
                 />
               ) : (
                 <EmptyNavigator isRu={isRu} />

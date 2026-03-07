@@ -35,6 +35,7 @@ export function ChapterNavigator({
   isRu,
   segmentedSceneIds,
   renderedSceneIds,
+  fullyRenderedSceneIds,
 }: {
   chapter: StudioChapter;
   selectedSceneIdx: number | null;
@@ -42,6 +43,7 @@ export function ChapterNavigator({
   isRu: boolean;
   segmentedSceneIds?: Set<string>;
   renderedSceneIds?: Set<string>;
+  fullyRenderedSceneIds?: Set<string>;
 }) {
   const [chapterOpen, setChapterOpen] = useState(true);
 
@@ -99,9 +101,13 @@ export function ChapterNavigator({
                         {isRu ? (SCENE_TYPE_RU[scene.scene_type] || scene.scene_type) : scene.scene_type}
                       </span>
                       <span className="truncate flex-1">{scene.title}</span>
-                      {renderedSceneIds?.has(scene.id || "") ? (
-                        <span title={isRu ? "Аудио готово" : "Audio ready"}>
-                          <Volume2 className="h-3 w-3 text-green-400 shrink-0" />
+                      {fullyRenderedSceneIds?.has(scene.id || "") ? (
+                        <span title={isRu ? "Все клипы готовы" : "All clips ready"}>
+                          <Volume2 className="h-3 w-3 text-foreground shrink-0" />
+                        </span>
+                      ) : renderedSceneIds?.has(scene.id || "") ? (
+                        <span title={isRu ? "Частично отрендерено" : "Partially rendered"}>
+                          <Volume2 className="h-3 w-3 text-muted-foreground shrink-0" strokeWidth={1.5} />
                         </span>
                       ) : segmentedSceneIds?.has(scene.id || "") ? (
                         <span title={isRu ? "Сегментировано" : "Segmented"}>
