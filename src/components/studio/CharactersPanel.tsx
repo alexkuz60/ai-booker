@@ -899,20 +899,32 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
             </Button>
           )}
           {!multiSelect && characters.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full gap-1.5 text-xs"
-              onClick={handleProfile}
-              disabled={profiling}
-            >
-              {profiling ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-              {profiling
-                ? (isRu ? "Анализ..." : "Profiling...")
-                : hasProfiles
-                  ? (isRu ? "Обновить профайлы" : "Re-profile")
-                  : (isRu ? "AI-профайлинг" : "AI Profile")}
-            </Button>
+            <div className="flex gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 gap-1.5 text-xs"
+                onClick={handleProfile}
+                disabled={profiling || cleaningDupes}
+              >
+                {profiling ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                {profiling
+                  ? (isRu ? "Анализ..." : "Profiling...")
+                  : hasProfiles
+                    ? (isRu ? "Обновить профайлы" : "Re-profile")
+                    : (isRu ? "AI-профайлинг" : "AI Profile")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 text-xs px-2"
+                onClick={handleAutoCleanDuplicates}
+                disabled={cleaningDupes || profiling}
+                title={isRu ? "Найти и объединить дубликаты" : "Find & merge duplicates"}
+              >
+                {cleaningDupes ? <Loader2 className="h-3 w-3 animate-spin" /> : <SearchCheck className="h-3 w-3" />}
+              </Button>
+            </div>
           )}
         </div>
 
