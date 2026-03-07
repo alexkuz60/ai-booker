@@ -332,6 +332,7 @@ export function StoryboardPanel({
   onSegmented,
   selectedSegmentId,
   onSelectSegment,
+  onSynthesizingChange,
 }: {
   sceneId: string | null;
   sceneContent: string | null;
