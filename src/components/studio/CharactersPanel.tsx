@@ -774,7 +774,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
               {profiling
                 ? (isRu ? "Анализ..." : "Profiling...")
                 : hasProfiles
-                  ? (isRu ? "Обновить профили" : "Re-profile")
+                  ? (isRu ? "Обновить профайлы" : "Re-profile")
                   : (isRu ? "AI-профайлинг" : "AI Profile")}
             </Button>
           )}
@@ -858,9 +858,23 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         <div className="flex-1 min-w-0 border-r border-border">
           <ScrollArea className="h-full">
             <div className="p-4 space-y-4">
-              <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider">
-                {isRu ? "Профайл" : "Profile"}
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider">
+                  {isRu ? "Профайл" : "Profile"}
+                </h3>
+                {selectedChar && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 gap-1 text-[10px]"
+                    onClick={handleProfile}
+                    disabled={profiling}
+                  >
+                    {profiling ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                    {isRu ? "Обновить профайл" : "Re-profile"}
+                  </Button>
+                )}
+              </div>
 
               {selectedChar ? (
                 <>
