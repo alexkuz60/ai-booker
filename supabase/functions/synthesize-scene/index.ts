@@ -586,6 +586,7 @@ Deno.serve(async (req) => {
               speed: voiceConfig.speed,
               pitchShift: voiceConfig.pitchShift,
               volume: voiceConfig.volume,
+              textLength: text.length,
               apiVersion: isV3Voice ? "v3" : "v1",
             },
           },
