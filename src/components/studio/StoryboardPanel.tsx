@@ -606,8 +606,8 @@ export function StoryboardPanel({
         : SEGMENT_CONFIG[targetSeg.segment_type]?.label_en;
       toast.success(
         isRu
-          ? `«${typeLabel}» → ${newSpeaker || "?"} (${sameTypeIds.length} фрагм.)`
-          : `"${typeLabel}" → ${newSpeaker || "?"} (${sameTypeIds.length} seg.)`
+          ? `«${typeLabel}» → ${newSpeaker || "?"} (${affectedIds.length} фрагм.)`
+          : `"${typeLabel}" → ${newSpeaker || "?"} (${affectedIds.length} seg.)`
       );
     }
   }, [isRu, segments, sceneId, characters]);
