@@ -67,6 +67,7 @@ function TimelineTrack({
   clips: realClips,
   selectedSegmentId,
   onSelectSegment,
+  synthesizingSegmentIds,
 }: {
   track: TimelineTrackData;
   zoom: number;
@@ -74,6 +75,7 @@ function TimelineTrack({
   clips?: TimelineClip[];
   selectedSegmentId?: string | null;
   onSelectSegment?: (segmentId: string | null) => void;
+  synthesizingSegmentIds?: Set<string>;
 }) {
   const clips = realClips && realClips.length > 0
     ? realClips.map(c => ({
