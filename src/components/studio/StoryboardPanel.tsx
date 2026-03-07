@@ -332,6 +332,7 @@ export function StoryboardPanel({
   onSegmented,
   selectedSegmentId,
   onSelectSegment,
+  onSynthesizingChange,
 }: {
   sceneId: string | null;
   sceneContent: string | null;
@@ -340,6 +341,7 @@ export function StoryboardPanel({
   onSegmented?: (sceneId: string) => void;
   selectedSegmentId?: string | null;
   onSelectSegment?: (segmentId: string | null) => void;
+  onSynthesizingChange?: (ids: Set<string>) => void;
 }) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -608,7 +610,9 @@ export function StoryboardPanel({
   // ── Synthesize scene ──
   const runSynthesis = useCallback(async () => {
     if (!sceneId || segments.length === 0) return;
+    const allIds = new Set(segments.map(s => s.segment_id));
     setSynthesizing(true);
+    onSynthesizingChange?.(allIds);
     setSynthProgress(isRu ? "Запуск синтеза…" : "Starting synthesis…");
     try {
       const { data, error } = await supabase.functions.invoke("synthesize-scene", {
@@ -639,13 +643,15 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка синтеза" : "Synthesis failed");
     }
     setSynthesizing(false);
+    onSynthesizingChange?.(new Set());
     setSynthProgress("");
-  }, [sceneId, segments, isRu, onSegmented, loadAudioStatus]);
+  }, [sceneId, segments, isRu, onSegmented, loadAudioStatus, onSynthesizingChange]);
 
   // ── Re-synthesize single segment (force) ──
   const resynthSegment = useCallback(async (segmentId: string) => {
     if (!sceneId) return;
     setResynthSegId(segmentId);
+    onSynthesizingChange?.(new Set([segmentId]));
     try {
       // Delete existing audio record to force re-synthesis
       await supabase.from("segment_audio").delete().eq("segment_id", segmentId);
@@ -661,7 +667,8 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка ре-синтеза" : "Re-synthesis failed");
     }
     setResynthSegId(null);
-  }, [sceneId, isRu, onSegmented, loadAudioStatus, segments]);
+    onSynthesizingChange?.(new Set());
+  }, [sceneId, isRu, onSegmented, loadAudioStatus, segments, onSynthesizingChange]);
 
   const dialogueCount = segments.filter(s => s.segment_type === "dialogue").length;
   const runDetectNarrations = useCallback(async () => {

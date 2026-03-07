@@ -32,6 +32,7 @@ const Studio = () => {
     if (segmentId) setActiveTab("storyboard");
   }, [setActiveTab]);
   const [segmentedSceneIds, setSegmentedSceneIds] = useState<Set<string>>(new Set());
+  const [synthesizingSegmentIds, setSynthesizingSegmentIds] = useState<Set<string>>(new Set());
   const [renderedSceneIds, setRenderedSceneIds] = useState<Set<string>>(new Set());
   const [fullyRenderedSceneIds, setFullyRenderedSceneIds] = useState<Set<string>>(new Set());
   const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
@@ -237,6 +238,7 @@ const Studio = () => {
                 onTabChange={setActiveTab}
                 selectedSegmentId={selectedSegmentId}
                 onSelectSegment={setSelectedSegmentId}
+                onSynthesizingChange={setSynthesizingSegmentIds}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
@@ -255,6 +257,7 @@ const Studio = () => {
           onSelectSceneIdx={setSelectedSceneIdx}
           selectedSegmentId={selectedSegmentId}
           onSelectSegment={handleSelectSegmentFromTimeline}
+          synthesizingSegmentIds={synthesizingSegmentIds}
         />
       </div>
     </motion.div>
