@@ -1,27 +1,30 @@
 import { motion } from "framer-motion";
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Clock } from "lucide-react";
+import { Clock, Loader2 } from "lucide-react";
 import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { loadStudioChapter, type StudioChapter, type StudioScene } from "@/lib/studioChapter";
+import { type StudioChapter } from "@/lib/studioChapter";
 import { useLanguage } from "@/hooks/useLanguage";
 import { ChapterNavigator, EmptyNavigator } from "@/components/studio/ChapterNavigator";
 import { StudioWorkspace } from "@/components/studio/StudioWorkspace";
-import { StudioTimeline, TIMELINE_HEADER_HEIGHT } from "@/components/studio/StudioTimeline";
+import { StudioTimeline } from "@/components/studio/StudioTimeline";
 import { estimateChapterDuration, estimateSceneDuration } from "@/lib/durationEstimate";
 import { supabase } from "@/integrations/supabase/client";
 import { usePageHeader } from "@/hooks/usePageHeader";
+import { useStudioSession } from "@/hooks/useStudioSession";
 
 const Studio = () => {
   const { isRu } = useLanguage();
-  const [chapter, setChapter] = useState<StudioChapter | null>(() => loadStudioChapter());
-  const [selectedSceneIdx, setSelectedSceneIdx] = useState<number | null>(() => {
-    const saved = sessionStorage.getItem("studio_selected_scene_idx");
-    return saved !== null ? Number(saved) : null;
-  });
+  const {
+    chapter, setChapter,
+    selectedSceneIdx, setSelectedSceneIdx,
+    activeTab, setActiveTab,
+    restored,
+  } = useStudioSession();
+
   const [sceneContent, setSceneContent] = useState<string | null>(null);
   const [segmentedSceneIds, setSegmentedSceneIds] = useState<Set<string>>(new Set());
   const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
@@ -36,16 +39,7 @@ const Studio = () => {
     return estimateSceneDuration(chapter.scenes[selectedSceneIdx]);
   }, [chapter, selectedSceneIdx]);
 
-  // Persist selected scene index
-  useEffect(() => {
-    if (selectedSceneIdx !== null) {
-      sessionStorage.setItem("studio_selected_scene_idx", String(selectedSceneIdx));
-    } else {
-      sessionStorage.removeItem("studio_selected_scene_idx");
-    }
-  }, [selectedSceneIdx]);
-
-
+  // Resolve scene IDs and bookId from DB
   useEffect(() => {
     if (!chapter) return;
     const needIds = chapter.scenes.some(s => !s.id);
@@ -59,7 +53,6 @@ const Studio = () => {
         .ilike("title", chapter.chapterTitle);
       if (!dbChapters?.length) return;
 
-      // Resolve bookId
       if (needBookId && dbChapters[0]?.book_id) {
         setBookId(dbChapters[0].book_id);
       }
@@ -103,7 +96,6 @@ const Studio = () => {
   useEffect(() => {
     setSceneContent(null);
     if (!selectedScene) return;
-    // Use content already in sessionStorage if available
     if (selectedScene.content) {
       setSceneContent(selectedScene.content);
       return;
@@ -153,16 +145,25 @@ const Studio = () => {
     return () => setPageHeader({});
   }, [studioTitle, studioSubtitle, chapterEstimate?.formatted, sceneEstimate?.formatted]);
 
+  // Show loading while restoring session
+  if (!restored) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-3rem)]">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span className="text-sm font-body">{isRu ? "Восстановление сессии…" : "Restoring session…"}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="flex flex-col h-[calc(100vh-3rem)] min-h-0 overflow-hidden"
     >
-
-      {/* Body: upper workspace + bottom timeline */}
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-        {/* Upper: Navigator + Tabs */}
         <div className="flex-1 min-h-0 overflow-hidden">
           <ResizablePanelGroup direction="horizontal" className="h-full min-h-0" autoSaveId="studio-h-panels">
             <ResizablePanel defaultSize={30} minSize={15} maxSize={50} className="min-h-0">
@@ -191,12 +192,13 @@ const Studio = () => {
                 onSegmented={onSegmented}
                 selectedCharacterId={selectedCharacterId}
                 onSelectCharacter={setSelectedCharacterId}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
         </div>
 
-        {/* Bottom: Timeline */}
         <StudioTimeline
           isRu={isRu}
           sceneDurationSec={sceneEstimate?.sec}
