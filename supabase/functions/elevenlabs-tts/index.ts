@@ -47,10 +47,19 @@ Deno.serve(async (req) => {
       );
     }
 
-    const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
+    // Try user's own API key first, fallback to server key
+    let ELEVENLABS_API_KEY: string | undefined;
+    try {
+      const { data: apiKeys } = await supabase.rpc("get_my_api_keys");
+      ELEVENLABS_API_KEY = (apiKeys as Record<string, string>)?.elevenlabs;
+    } catch {}
+    if (!ELEVENLABS_API_KEY) {
+      ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
+    }
+
     if (!ELEVENLABS_API_KEY) {
       return new Response(
-        JSON.stringify({ error: isRu ? "API-ключ ElevenLabs не настроен на сервере." : "ElevenLabs API key not configured." }),
+        JSON.stringify({ error: isRu ? "API-ключ ElevenLabs не настроен." : "ElevenLabs API key not configured." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

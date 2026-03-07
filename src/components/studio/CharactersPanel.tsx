@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { YANDEX_VOICES, ROLE_LABELS } from "@/config/yandexVoices";
+import { ELEVENLABS_VOICES } from "@/config/elevenlabsVoices";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -180,13 +182,25 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [merging, setMerging] = useState(false);
 
-  // Voice settings state
+  // Voice settings state — Yandex
   const [voice, setVoice] = useState("marina");
   const [role, setRole] = useState("neutral");
   const [pitch, setPitch] = useState(0);
   const [speed, setSpeed] = useState(1.0);
   const [volume, setVolume] = useState(0);
   const [dirty, setDirty] = useState(false);
+
+  // Voice settings state — ElevenLabs
+  const [elVoice, setElVoice] = useState("JBFqnCBsd6RMkjVDRZzb");
+  const [elStability, setElStability] = useState(0.5);
+  const [elSimilarity, setElSimilarity] = useState(0.75);
+  const [elStyle, setElStyle] = useState(0.4);
+  const [elSpeed, setElSpeed] = useState(0.95);
+  const [voiceProvider, setVoiceProvider] = useState<"yandex" | "elevenlabs">("yandex");
+
+  // ElevenLabs credits
+  const [elCredits, setElCredits] = useState<{ used: number; limit: number; tier: string } | null>(null);
+  const [elCreditsLoading, setElCreditsLoading] = useState(false);
 
   const [testing, setTesting] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -329,19 +343,30 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   useEffect(() => {
     if (!selectedChar) return;
     const vc = selectedChar.voice_config;
-    let voiceId = vc.voice_id || "marina";
-    // If saved voice gender doesn't match character gender, re-match
-    const savedVoice = YANDEX_VOICES.find(v => v.id === voiceId);
-    if (savedVoice && selectedChar.gender !== "unknown" && savedVoice.gender !== selectedChar.gender) {
-      voiceId = matchVoice(selectedChar.gender, selectedChar.age_group);
+    const provider = (vc.provider as string) || "yandex";
+    setVoiceProvider(provider === "elevenlabs" ? "elevenlabs" : "yandex");
+
+    if (provider === "elevenlabs") {
+      setElVoice(vc.voice_id || "JBFqnCBsd6RMkjVDRZzb");
+      setElStability((vc as any).stability ?? 0.5);
+      setElSimilarity((vc as any).similarity_boost ?? 0.75);
+      setElStyle((vc as any).style ?? 0.4);
+      setElSpeed(vc.speed ?? 0.95);
+      setDirty(false);
+    } else {
+      let voiceId = vc.voice_id || "marina";
+      const savedVoice = YANDEX_VOICES.find(v => v.id === voiceId);
+      if (savedVoice && selectedChar.gender !== "unknown" && savedVoice.gender !== selectedChar.gender) {
+        voiceId = matchVoice(selectedChar.gender, selectedChar.age_group);
+      }
+      setVoice(voiceId);
+      const currentVoice = YANDEX_VOICES.find(v => v.id === voiceId);
+      setRole(currentVoice?.roles?.includes(vc.role || "") ? (vc.role || "neutral") : (currentVoice?.roles?.[0] || vc.role || "neutral"));
+      setSpeed(vc.speed ?? 1.0);
+      setPitch(vc.pitch ?? 0);
+      setVolume(vc.volume ?? 0);
+      setDirty(voiceId !== (vc.voice_id || "marina"));
     }
-    setVoice(voiceId);
-    const currentVoice = YANDEX_VOICES.find(v => v.id === voiceId);
-    setRole(currentVoice?.roles?.includes(vc.role || "") ? (vc.role || "neutral") : (currentVoice?.roles?.[0] || vc.role || "neutral"));
-    setSpeed(vc.speed ?? 1.0);
-    setPitch(vc.pitch ?? 0);
-    setVolume(vc.volume ?? 0);
-    setDirty(voiceId !== (vc.voice_id || "marina")); // mark dirty if voice was re-matched
   }, [selectedId]);
 
   const markDirty = () => setDirty(true);
@@ -414,15 +439,25 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     setSaving(true);
     try {
       const currentChar = characters.find(c => c.id === selectedId);
-      const voiceConfig = {
-        provider: "yandex",
-        voice_id: voice,
-        role: role !== "neutral" ? role : undefined,
-        speed,
-        pitch: pitch !== 0 ? pitch : undefined,
-        volume: volume !== 0 ? volume : undefined,
-        is_extra: currentChar?.voice_config?.is_extra,
-      };
+      const voiceConfig = voiceProvider === "elevenlabs"
+        ? {
+            provider: "elevenlabs",
+            voice_id: elVoice,
+            stability: elStability,
+            similarity_boost: elSimilarity,
+            style: elStyle,
+            speed: elSpeed,
+            is_extra: currentChar?.voice_config?.is_extra,
+          }
+        : {
+            provider: "yandex",
+            voice_id: voice,
+            role: role !== "neutral" ? role : undefined,
+            speed,
+            pitch: pitch !== 0 ? pitch : undefined,
+            volume: volume !== 0 ? volume : undefined,
+            is_extra: currentChar?.voice_config?.is_extra,
+          };
       const { error } = await supabase
         .from("book_characters")
         .update({ voice_config: voiceConfig, updated_at: new Date().toISOString() })
@@ -768,6 +803,40 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     }
   }, [characters, segmentCounts, SYSTEM_NAMES, isRu, loadCharacters]);
 
+  // ── Load ElevenLabs credits ──────────────────────────────
+  const loadElCredits = useCallback(async () => {
+    setElCreditsLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-credits`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setElCredits({ used: data.character_count, limit: data.character_limit, tier: data.tier });
+      }
+    } catch (e) {
+      console.error("Credits load error:", e);
+    } finally {
+      setElCreditsLoading(false);
+    }
+  }, []);
+
+  // Load credits when switching to ElevenLabs tab
+  useEffect(() => {
+    if (voiceProvider === "elevenlabs" && !elCredits && !elCreditsLoading) {
+      loadElCredits();
+    }
+  }, [voiceProvider]);
+
   // ── TTS Preview ─────────────────────────────────────────
   const handlePreview = async () => {
     if (playing && audioRef) {
@@ -785,25 +854,45 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         ? "Здравствуйте. Это предварительное прослушивание голоса для вашего персонажа."
         : "Hello. This is a voice preview for your character.";
 
-      const body: Record<string, unknown> = {
-        text: testText, voice, lang: selectedVoice?.lang === "en" ? "en" : "ru", speed,
-        role: role !== "neutral" ? role : undefined,
-        pitchShift: pitch !== 0 ? pitch : undefined,
-        volume: volume !== 0 ? volume : undefined,
-      };
+      let response: Response;
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/yandex-tts`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify(body),
-        }
-      );
+      if (voiceProvider === "elevenlabs") {
+        response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              text: testText,
+              voiceId: elVoice,
+              lang: isRu ? "ru" : "en",
+            }),
+          }
+        );
+      } else {
+        const body: Record<string, unknown> = {
+          text: testText, voice, lang: selectedVoice?.lang === "en" ? "en" : "ru", speed,
+          role: role !== "neutral" ? role : undefined,
+          pitchShift: pitch !== 0 ? pitch : undefined,
+          volume: volume !== 0 ? volume : undefined,
+        };
+        response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/yandex-tts`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(body),
+          }
+        );
+      }
 
       if (!response.ok) {
         let errMsg = `HTTP ${response.status}`;
@@ -1231,101 +1320,218 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                 {isRu ? "Голос" : "Voice"}
               </h3>
 
-              <div>
-                <p className="text-xs text-muted-foreground mb-3">
-                  {isRu ? "Yandex SpeechKit · предпрослушивание" : "Yandex SpeechKit · preview"}
-                </p>
-              </div>
+              <Tabs value={voiceProvider} onValueChange={(v) => { setVoiceProvider(v as "yandex" | "elevenlabs"); markDirty(); }}>
+                <TabsList className="w-full">
+                  <TabsTrigger value="yandex" className="flex-1 text-xs">Yandex SpeechKit</TabsTrigger>
+                  <TabsTrigger value="elevenlabs" className="flex-1 text-xs">ElevenLabs</TabsTrigger>
+                </TabsList>
 
-              {/* Voice selector */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {isRu ? "Голос" : "Voice"}
-                </label>
-                <Select value={voice} onValueChange={handleVoiceChange}>
-                  <SelectTrigger className="bg-secondary border-border">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-card border-border">
-                    {YANDEX_VOICES.map(v => (
-                      <SelectItem key={v.id} value={v.id}>
-                        <div className="flex items-center gap-2">
-                          <span>{isRu ? v.name.ru : v.name.en}</span>
-                          <Badge variant="outline" className="text-[10px] px-1 py-0">
-                            {v.gender === "female" ? "♀" : "♂"}
-                          </Badge>
-                          {v.apiVersion === "v3" && (
-                            <Badge variant="secondary" className="text-[10px] px-1 py-0">v3</Badge>
-                          )}
+                {/* ─── Yandex Tab ─── */}
+                <TabsContent value="yandex" className="space-y-4 mt-3">
+                  {/* Voice selector */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      {isRu ? "Голос" : "Voice"}
+                    </label>
+                    <Select value={voice} onValueChange={handleVoiceChange}>
+                      <SelectTrigger className="bg-secondary border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        {YANDEX_VOICES.map(v => (
+                          <SelectItem key={v.id} value={v.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{isRu ? v.name.ru : v.name.en}</span>
+                              <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                {v.gender === "female" ? "♀" : "♂"}
+                              </Badge>
+                              {v.apiVersion === "v3" && (
+                                <Badge variant="secondary" className="text-[10px] px-1 py-0">v3</Badge>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Role */}
+                  {availableRoles.length > 1 && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        {isRu ? "Амплуа" : "Role"}
+                      </label>
+                      <Select value={role} onValueChange={v => { setRole(v); markDirty(); }}>
+                        <SelectTrigger className="bg-secondary border-border">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-card border-border">
+                          {availableRoles.map(r => (
+                            <SelectItem key={r} value={r}>
+                              {ROLE_LABELS[r]?.[isRu ? "ru" : "en"] ?? r}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Speed */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Скорость" : "Speed"}</label>
+                      <span className="text-xs text-muted-foreground tabular-nums">{speed.toFixed(1)}×</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Slider min={0.3} max={2.0} step={0.1} value={[speed]} onValueChange={([v]) => { setSpeed(v); markDirty(); }} className="flex-1" />
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setSpeed(1.0); markDirty(); }} disabled={speed === 1.0}>
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Pitch */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Тон (pitch)" : "Pitch"}</label>
+                      <span className="text-xs text-muted-foreground tabular-nums">{pitch > 0 ? "+" : ""}{pitch} Hz</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Slider min={-500} max={500} step={50} value={[pitch]} onValueChange={([v]) => { setPitch(v); markDirty(); }} className="flex-1" />
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setPitch(0); markDirty(); }} disabled={pitch === 0}>
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Volume */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Громкость" : "Volume"}</label>
+                      <span className="text-xs text-muted-foreground tabular-nums">{volume > 0 ? "+" : ""}{volume} dB</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Slider min={-15} max={15} step={1} value={[volume]} onValueChange={([v]) => { setVolume(v); markDirty(); }} className="flex-1" />
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setVolume(0); markDirty(); }} disabled={volume === 0}>
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* ─── ElevenLabs Tab ─── */}
+                <TabsContent value="elevenlabs" className="space-y-4 mt-3">
+                  {/* Credits info */}
+                  {elCredits && (
+                    <div className="rounded-md border border-border bg-muted/30 p-2.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">
+                          {isRu ? "Кредиты" : "Credits"}: <span className="font-semibold text-foreground capitalize">{elCredits.tier}</span>
+                        </span>
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={loadElCredits} disabled={elCreditsLoading}>
+                          <RotateCcw className={`h-3 w-3 ${elCreditsLoading ? "animate-spin" : ""}`} />
+                        </Button>
+                      </div>
+                      <div className="mt-1.5">
+                        <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                          <span>{elCredits.used.toLocaleString()} / {elCredits.limit.toLocaleString()}</span>
+                          <span>{Math.round((elCredits.used / elCredits.limit) * 100)}%</span>
                         </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-primary transition-all"
+                            style={{ width: `${Math.min(100, (elCredits.used / elCredits.limit) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-              {/* Role */}
-              {availableRoles.length > 1 && (
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    {isRu ? "Амплуа" : "Role"}
-                  </label>
-                  <Select value={role} onValueChange={v => { setRole(v); markDirty(); }}>
-                    <SelectTrigger className="bg-secondary border-border">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                      {availableRoles.map(r => (
-                        <SelectItem key={r} value={r}>
-                          {ROLE_LABELS[r]?.[isRu ? "ru" : "en"] ?? r}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+                  {/* Voice selector */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      {isRu ? "Голос" : "Voice"}
+                    </label>
+                    <Select value={elVoice} onValueChange={v => { setElVoice(v); markDirty(); }}>
+                      <SelectTrigger className="bg-secondary border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border max-h-64">
+                        {ELEVENLABS_VOICES.map(v => (
+                          <SelectItem key={v.id} value={v.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{v.name}</span>
+                              <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                {v.gender === "female" ? "♀" : "♂"}
+                              </Badge>
+                              <span className="text-[10px] text-muted-foreground">
+                                {isRu ? v.description.ru : v.description.en}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              {/* Speed */}
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Скорость" : "Speed"}</label>
-                  <span className="text-xs text-muted-foreground tabular-nums">{speed.toFixed(1)}×</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Slider min={0.3} max={2.0} step={0.1} value={[speed]} onValueChange={([v]) => { setSpeed(v); markDirty(); }} className="flex-1" />
-                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setSpeed(1.0); markDirty(); }} disabled={speed === 1.0}>
-                    <RotateCcw className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
+                  {/* Stability */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Стабильность" : "Stability"}</label>
+                      <span className="text-xs text-muted-foreground tabular-nums">{(elStability * 100).toFixed(0)}%</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Slider min={0} max={1} step={0.05} value={[elStability]} onValueChange={([v]) => { setElStability(v); markDirty(); }} className="flex-1" />
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setElStability(0.5); markDirty(); }} disabled={elStability === 0.5}>
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground/60">{isRu ? "Ниже = выразительнее, выше = стабильнее" : "Lower = more expressive, higher = more consistent"}</p>
+                  </div>
 
-              {/* Pitch */}
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Тон (pitch)" : "Pitch"}</label>
-                  <span className="text-xs text-muted-foreground tabular-nums">{pitch > 0 ? "+" : ""}{pitch} Hz</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Slider min={-500} max={500} step={50} value={[pitch]} onValueChange={([v]) => { setPitch(v); markDirty(); }} className="flex-1" />
-                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setPitch(0); markDirty(); }} disabled={pitch === 0}>
-                    <RotateCcw className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
+                  {/* Similarity Boost */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Схожесть" : "Similarity"}</label>
+                      <span className="text-xs text-muted-foreground tabular-nums">{(elSimilarity * 100).toFixed(0)}%</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Slider min={0} max={1} step={0.05} value={[elSimilarity]} onValueChange={([v]) => { setElSimilarity(v); markDirty(); }} className="flex-1" />
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setElSimilarity(0.75); markDirty(); }} disabled={elSimilarity === 0.75}>
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
 
-              {/* Volume */}
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Громкость" : "Volume"}</label>
-                  <span className="text-xs text-muted-foreground tabular-nums">{volume > 0 ? "+" : ""}{volume} dB</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Slider min={-15} max={15} step={1} value={[volume]} onValueChange={([v]) => { setVolume(v); markDirty(); }} className="flex-1" />
-                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setVolume(0); markDirty(); }} disabled={volume === 0}>
-                    <RotateCcw className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
+                  {/* Style */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Стиль" : "Style"}</label>
+                      <span className="text-xs text-muted-foreground tabular-nums">{(elStyle * 100).toFixed(0)}%</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Slider min={0} max={1} step={0.05} value={[elStyle]} onValueChange={([v]) => { setElStyle(v); markDirty(); }} className="flex-1" />
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setElStyle(0.4); markDirty(); }} disabled={elStyle === 0.4}>
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Speed */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Скорость" : "Speed"}</label>
+                      <span className="text-xs text-muted-foreground tabular-nums">{elSpeed.toFixed(2)}×</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Slider min={0.7} max={1.2} step={0.05} value={[elSpeed]} onValueChange={([v]) => { setElSpeed(v); markDirty(); }} className="flex-1" />
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setElSpeed(0.95); markDirty(); }} disabled={elSpeed === 0.95}>
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </TabsContent>
+              </Tabs>
 
               <Separator />
 
