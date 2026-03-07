@@ -367,7 +367,7 @@ Deno.serve(async (req) => {
 
       // ── Cache check: skip if audio exists with same voice config ──
       const cached = existingAudioMap.get(seg.id);
-      if (cached && !forceResynthesize && !voiceConfigChanged(voiceConfig, cached.voice_config)) {
+      if (cached && !forceResynthesize && !voiceConfigChanged(voiceConfig, cached.voice_config, text.length)) {
         // Also check that the text hasn't changed by verifying the file still exists
         // (we trust the DB record — if segment_audio says "ready", it's good)
         console.log(`Cache hit for segment ${seg.id}: voice=${voiceConfig.voice}, skipping TTS`);
