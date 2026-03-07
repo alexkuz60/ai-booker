@@ -88,24 +88,27 @@ const Studio = () => {
     const ids = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
     if (ids.length === 0) return;
     (async () => {
-      const [{ data: segData }, { data: audioData }] = await Promise.all([
-        supabase
-          .from("scene_segments")
-          .select("scene_id")
-          .in("scene_id", ids),
-        supabase
-          .from("segment_audio")
-          .select("segment_id, status, scene_segments!inner(scene_id)")
-          .in("scene_segments.scene_id", ids)
-          .eq("status", "ready"),
-      ]);
-      if (segData) {
-        setSegmentedSceneIds(new Set(segData.map(d => d.scene_id)));
-      }
-      if (audioData) {
+      const { data: segData } = await supabase
+        .from("scene_segments")
+        .select("id, scene_id")
+        .in("scene_id", ids);
+
+      if (!segData?.length) return;
+
+      setSegmentedSceneIds(new Set(segData.map(d => d.scene_id)));
+
+      const segIds = segData.map(s => s.id);
+      const { data: audioData } = await supabase
+        .from("segment_audio")
+        .select("segment_id")
+        .in("segment_id", segIds)
+        .eq("status", "ready");
+
+      if (audioData?.length) {
+        const segToScene = new Map(segData.map(s => [s.id, s.scene_id]));
         const rendered = new Set<string>();
         for (const a of audioData) {
-          const sceneId = (a as any).scene_segments?.scene_id;
+          const sceneId = segToScene.get(a.segment_id);
           if (sceneId) rendered.add(sceneId);
         }
         setRenderedSceneIds(rendered);
