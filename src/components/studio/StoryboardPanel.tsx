@@ -832,6 +832,19 @@ export function StoryboardPanel({
                       {seg.inline_narrations.length}
                     </span>
                   )}
+                  {/* Re-synth button */}
+                  {audioStatus.get(seg.segment_id) && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); resynthSegment(seg.segment_id); }}
+                      disabled={resynthSegId === seg.segment_id || synthesizing}
+                      className="ml-1 p-0.5 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
+                      title={isRu ? "Ре-синтез блока" : "Re-synthesize segment"}
+                    >
+                      {resynthSegId === seg.segment_id
+                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                        : <RefreshCw className="h-3 w-3" />}
+                    </button>
+                  )}
                   <span className="ml-auto text-[10px] text-muted-foreground font-mono">
                     #{seg.segment_number}
                   </span>
