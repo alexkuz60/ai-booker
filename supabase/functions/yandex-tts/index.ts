@@ -130,45 +130,60 @@ async function synthesizeV1(
   return { audio: new Uint8Array(await response.arrayBuffer()), contentType: "audio/mpeg" };
 }
 
+// ─── V3 text splitter (≤250 chars at sentence boundaries) ─────────
+
+const V3_MAX_CHARS = 240; // slightly under 250 for safety
+
+function splitTextForV3(text: string): string[] {
+  if (text.length <= V3_MAX_CHARS) return [text];
+
+  const chunks: string[] = [];
+  let remaining = text;
+
+  while (remaining.length > V3_MAX_CHARS) {
+    // Find the last sentence boundary within the limit
+    const window = remaining.slice(0, V3_MAX_CHARS);
+    // Try sentence-ending punctuation first: . ! ? … ; then comma/dash
+    let splitIdx = -1;
+    for (const sep of [/[.!?…]\s/g, /[;]\s/g, /[,]\s/g, /[—–\-]\s/g, /\s/g]) {
+      let lastMatch = -1;
+      let m: RegExpExecArray | null;
+      sep.lastIndex = 0;
+      while ((m = sep.exec(window)) !== null) {
+        // prefer splitting after at least 60 chars
+        if (m.index >= 60) lastMatch = m.index + m[0].length;
+        else if (lastMatch === -1) lastMatch = m.index + m[0].length;
+      }
+      if (lastMatch > 0) { splitIdx = lastMatch; break; }
+    }
+
+    if (splitIdx <= 0) splitIdx = V3_MAX_CHARS; // fallback: hard cut
+
+    chunks.push(remaining.slice(0, splitIdx).trim());
+    remaining = remaining.slice(splitIdx).trim();
+  }
+
+  if (remaining) chunks.push(remaining);
+  return chunks;
+}
+
 // ─── V3 Synthesis (REST JSON, utteranceSynthesis) ─────────────────
 
-async function synthesizeV3(
+async function synthesizeV3Single(
   iamToken: string,
-  params: TtsParams,
-): Promise<{ audio: Uint8Array; contentType: string }> {
-  const folderId = Deno.env.get("YANDEX_FOLDER_ID")!;
-
-  // Build hints array — each hint is a single-key object
-  const hints: Record<string, unknown>[] = [
-    { voice: params.voice },
-    { speed: params.speed },
-  ];
-  if (params.role) hints.push({ role: params.role });
-  if (params.pitchShift !== undefined && params.pitchShift !== 0) {
-    hints.push({ pitch_shift: params.pitchShift });
-  }
-  if (params.volume !== undefined) {
-    hints.push({ volume: params.volume });
-  }
-
+  folderId: string,
+  text: string,
+  hints: Record<string, unknown>[],
+): Promise<Uint8Array> {
   const body = {
-    text: params.text,
+    text,
     hints,
     output_audio_spec: {
       container_audio: { container_audio_type: "MP3" },
     },
     loudness_normalization_type: "LUFS",
-    unsafe_mode: true,  // auto-split long texts
+    unsafe_mode: true,
   };
-
-  console.log("Yandex TTS v3 request:", {
-    voice: params.voice,
-    role: params.role,
-    speed: params.speed,
-    pitchShift: params.pitchShift,
-    volume: params.volume,
-    textLen: params.text.length,
-  });
 
   const response = await fetch(
     "https://tts.api.cloud.yandex.net:443/tts/v3/utteranceSynthesis",
@@ -189,7 +204,6 @@ async function synthesizeV3(
     throw new YandexTtsError(response.status, errText);
   }
 
-  // V3 REST returns newline-delimited JSON, each with result.audioChunk.data (base64)
   const responseText = await response.text();
   const audioChunks: Uint8Array[] = [];
 
@@ -207,13 +221,70 @@ async function synthesizeV3(
     }
   }
 
-  // Concatenate all audio chunks
   const totalLen = audioChunks.reduce((sum, c) => sum + c.length, 0);
   const combined = new Uint8Array(totalLen);
   let offset = 0;
   for (const chunk of audioChunks) {
     combined.set(chunk, offset);
     offset += chunk.length;
+  }
+
+  return combined;
+}
+
+async function synthesizeV3(
+  iamToken: string,
+  params: TtsParams,
+): Promise<{ audio: Uint8Array; contentType: string }> {
+  const folderId = Deno.env.get("YANDEX_FOLDER_ID")!;
+
+  const hints: Record<string, unknown>[] = [
+    { voice: params.voice },
+    { speed: params.speed },
+  ];
+  if (params.role) hints.push({ role: params.role });
+  if (params.pitchShift !== undefined && params.pitchShift !== 0) {
+    hints.push({ pitch_shift: params.pitchShift });
+  }
+  if (params.volume !== undefined) {
+    hints.push({ volume: params.volume });
+  }
+
+  // Split text into v3-safe chunks at sentence boundaries
+  const chunks = splitTextForV3(params.text);
+
+  console.log("Yandex TTS v3 request:", {
+    voice: params.voice,
+    role: params.role,
+    speed: params.speed,
+    pitchShift: params.pitchShift,
+    volume: params.volume,
+    textLen: params.text.length,
+    chunks: chunks.length,
+    chunkLens: chunks.map(c => c.length),
+  });
+
+  // Synthesize each chunk sequentially to preserve order
+  const allAudio: Uint8Array[] = [];
+  for (const chunk of chunks) {
+    const audio = await synthesizeV3Single(iamToken, folderId, chunk, hints);
+    if (audio.length === 0) {
+      console.warn(`V3 empty audio for chunk (${chunk.length} chars): "${chunk.slice(0, 50)}..."`);
+    }
+    allAudio.push(audio);
+  }
+
+  // Concatenate MP3 frames (MP3 is a streaming format, concat works)
+  const totalLen = allAudio.reduce((sum, a) => sum + a.length, 0);
+  const combined = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const a of allAudio) {
+    combined.set(a, offset);
+    offset += a.length;
+  }
+
+  if (combined.length === 0) {
+    throw new YandexTtsError(500, "V3 synthesis returned empty audio for all chunks");
   }
 
   return { audio: combined, contentType: "audio/mpeg" };
@@ -317,19 +388,26 @@ Deno.serve(async (req) => {
     const selectedVolume = volume ?? undefined;
 
     // Auto-detect API version:
-    // - SSML forces v1 (v3 doesn't support SSML via REST the same way)
-    // - Explicit apiVersion/api_version wins
+    // - v3-only voices ALWAYS use v3 (never fall back to v1)
+    // - SSML forces v1, but only for non-v3-only voices
+    // - Explicit apiVersion/api_version wins (unless v3-only voice)
     // - v3 if pitch/volume/role requested, or voice is v3-only
     // - Otherwise v1
+    const isV3Only = V3_ONLY_VOICES.has(selectedVoice);
     let ver: "v1" | "v3" = (apiVersion || api_version) as "v1" | "v3" || "v1";
-    if (ssml) {
-      ver = "v1"; // SSML only supported in v1 REST
+
+    if (isV3Only) {
+      ver = "v3"; // NEVER downgrade v3-only voices to v1
+      if (ssml) {
+        console.warn(`SSML requested for v3-only voice "${selectedVoice}", ignoring SSML — using plain text with v3`);
+      }
+    } else if (ssml) {
+      ver = "v1"; // SSML only supported in v1
     } else {
       const needsV3 =
         selectedPitch !== undefined ||
         selectedVolume !== undefined ||
-        selectedRole !== undefined ||
-        V3_ONLY_VOICES.has(selectedVoice);
+        selectedRole !== undefined;
       if (!apiVersion && !api_version && needsV3) ver = "v3";
     }
 
