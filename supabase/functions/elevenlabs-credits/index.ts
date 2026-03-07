@@ -28,30 +28,32 @@ Deno.serve(async (req) => {
     );
 
     const token = authHeader.replace("Bearer ", "");
-    const { data, error: claimsErr } = await supabase.auth.getUser(token);
-    if (claimsErr || !data?.user) {
+    const { data: claimsData, error: claimsErr } = await supabase.auth.getClaims(token);
+    if (claimsErr || !claimsData?.claims) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Get user's ElevenLabs API key from profile
-    const { data: apiKeys } = await supabase.rpc("get_my_api_keys");
-    const elevenLabsKey = (apiKeys as Record<string, string>)?.elevenlabs;
-
-    if (!elevenLabsKey) {
-      // Fall back to server key
-      const serverKey = Deno.env.get("ELEVENLABS_API_KEY");
-      if (!serverKey) {
-        return new Response(
-          JSON.stringify({ error: "No ElevenLabs API key configured" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+    // Get user's ElevenLabs API key from profile, fallback to server key
+    let apiKey: string | undefined;
+    try {
+      const { data: apiKeys, error: rpcErr } = await supabase.rpc("get_my_api_keys");
+      if (!rpcErr) {
+        apiKey = (apiKeys as Record<string, string> | null)?.elevenlabs;
       }
+    } catch {}
+    if (!apiKey) {
+      apiKey = Deno.env.get("ELEVENLABS_API_KEY");
     }
 
-    const apiKey = elevenLabsKey || Deno.env.get("ELEVENLABS_API_KEY")!;
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ error: "No ElevenLabs API key configured" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const response = await fetch("https://api.elevenlabs.io/v1/user/subscription", {
       headers: { "xi-api-key": apiKey },
