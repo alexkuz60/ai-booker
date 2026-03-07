@@ -30,6 +30,13 @@ interface SegmentResult {
   inline_narrations?: InlineNarrationResult[];
 }
 
+// ── V3-only voices (cannot use SSML / v1) ────────────────────────────
+const V3_ONLY_VOICES = new Set([
+  "dasha", "julia", "lera", "masha", "alexander", "kirill", "anton",
+  "saule_ru", "zamira_ru", "zhanar_ru", "yulduz_ru",
+  "naomi", "saule", "zhanar", "zamira", "yulduz",
+]);
+
 // ── Voice helpers ────────────────────────────────────────────────────
 
 const voiceRolesMap: Record<string, string[]> = {
@@ -375,29 +382,47 @@ Deno.serve(async (req) => {
             offsetAccumulator += narrResult.durationMs;
           }
 
-          // PASS 2: Synthesize dialogue with SSML <break> pauses
+          // PASS 2: Synthesize dialogue
+          // For v3-only voices: plain text (yandex-tts handles auto-splitting at sentence boundaries)
+          // For v1 voices: SSML with <break> pauses baked in
+          const isV3Voice = V3_ONLY_VOICES.has(voiceConfig.voice);
+
           if (narrationResults.length > 0) {
-            const ssml = buildDialogueSsml(
-              text,
-              narrationResults.map(nr => ({
-                insert_after: nr.insert_after,
-                duration_ms: nr.duration_ms,
-              }))
-            );
+            let dialogueResult: { audio: Uint8Array; durationMs: number } | { error: string };
 
-            console.log(`Pass 2: dialogue SSML for segment ${seg.id}, ${ssml.length} chars`);
-
-            // Force v1 for SSML — use a simpler voice (no role/pitch) to ensure compatibility
-            const dialogueResult = await callTts(yandexTtsUrl, authHeader, {
-              ssml,
-              voice: voiceConfig.voice,
-              speed: voiceConfig.speed,
-              lang: langCode,
-            });
+            if (isV3Voice) {
+              // V3: synthesize plain text — narrator overlays are separate audio tracks
+              console.log(`Pass 2 (v3): plain text for segment ${seg.id}, ${text.length} chars`);
+              dialogueResult = await callTts(yandexTtsUrl, authHeader, {
+                text,
+                voice: voiceConfig.voice,
+                role: voiceConfig.role,
+                speed: voiceConfig.speed,
+                pitchShift: voiceConfig.pitchShift,
+                volume: voiceConfig.volume,
+                lang: langCode,
+              });
+            } else {
+              // V1: use SSML with <break> pauses for narrator insertions
+              const ssml = buildDialogueSsml(
+                text,
+                narrationResults.map(nr => ({
+                  insert_after: nr.insert_after,
+                  duration_ms: nr.duration_ms,
+                }))
+              );
+              console.log(`Pass 2 (v1 SSML): segment ${seg.id}, ${ssml.length} chars`);
+              dialogueResult = await callTts(yandexTtsUrl, authHeader, {
+                ssml,
+                voice: voiceConfig.voice,
+                speed: voiceConfig.speed,
+                lang: langCode,
+              });
+            }
 
             if ("error" in dialogueResult) {
-              console.error(`Dialogue SSML TTS failed for segment ${seg.id}:`, dialogueResult.error);
-              // Fallback: synthesize without SSML
+              console.error(`Dialogue TTS failed for segment ${seg.id}:`, dialogueResult.error);
+              // Fallback: synthesize plain text without any special handling
               const fallbackResult = await callTts(yandexTtsUrl, authHeader, {
                 text,
                 voice: voiceConfig.voice,
@@ -464,6 +489,13 @@ Deno.serve(async (req) => {
           }
           dialogueAudio = result.audio;
           dialogueDurationMs = result.durationMs;
+        }
+
+        // Validate audio is not empty
+        if (!dialogueAudio || dialogueAudio.length === 0) {
+          console.error(`Empty audio returned for segment ${seg.id} (voice=${voiceConfig.voice})`);
+          results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: "Empty audio returned from TTS" });
+          continue;
         }
 
         // Upload main audio
