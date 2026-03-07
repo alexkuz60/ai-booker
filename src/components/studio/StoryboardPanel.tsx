@@ -598,6 +598,29 @@ export function StoryboardPanel({
       }
     }
 
+    // Upsert character_appearances so the character appears in "scene characters"
+    if (sceneId && newSpeaker) {
+      const charRecord = characters.find(c => c.name === newSpeaker);
+      if (charRecord) {
+        const { data: existing } = await supabase
+          .from("character_appearances")
+          .select("id, segment_ids")
+          .eq("character_id", charRecord.id)
+          .eq("scene_id", sceneId)
+          .maybeSingle();
+
+        if (existing) {
+          const merged = [...new Set([...existing.segment_ids, ...affectedIds])];
+          await supabase.from("character_appearances").update({ segment_ids: merged }).eq("id", existing.id);
+        } else {
+          await supabase.from("character_appearances").upsert(
+            { character_id: charRecord.id, scene_id: sceneId, role_in_scene: "speaker", segment_ids: affectedIds },
+            { onConflict: "character_id,scene_id" }
+          );
+        }
+      }
+    }
+
     if (error) {
       toast.error(isRu ? "Ошибка сохранения персонажа" : "Failed to save speaker");
     } else if (affectedIds.length > 1) {
