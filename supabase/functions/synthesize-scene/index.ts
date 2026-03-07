@@ -166,9 +166,31 @@ function escapeXml(s: string): string {
 }
 
 // ── Narrator voice for inline narrations ─────────────────────────────
+// If scene has first_person segments with a speaker, use that character's voice
+// (the scene is narrated from their perspective). Otherwise fall back to Narrator/Рассказчик.
 
-function getNarratorVoice(voiceConfigMap: Map<string, Record<string, unknown>>) {
-  // Try to find a narrator voice config
+function getNarratorVoice(
+  voiceConfigMap: Map<string, Record<string, unknown>>,
+  segments?: Array<{ segment_type: string; speaker: string | null }>
+) {
+  // Check if scene has a first-person narrator
+  if (segments) {
+    const fpSeg = segments.find(s => s.segment_type === "first_person" && s.speaker);
+    if (fpSeg && fpSeg.speaker) {
+      const fpVc = voiceConfigMap.get(fpSeg.speaker.toLowerCase());
+      if (fpVc && fpVc.voice) {
+        return {
+          voice: fpVc.voice as string,
+          role: fpVc.role as string | undefined,
+          speed: (fpVc.speed as number) || 1.0,
+          pitchShift: fpVc.pitchShift as number | undefined,
+          volume: fpVc.volume as number | undefined,
+        };
+      }
+    }
+  }
+
+  // Fall back to narrator character voice
   const narratorVc = voiceConfigMap.get("narrator") ?? voiceConfigMap.get("рассказчик");
   if (narratorVc && (narratorVc as Record<string, unknown>).voice) {
     return {
@@ -305,7 +327,7 @@ Deno.serve(async (req) => {
 
     const yandexTtsUrl = `${supabaseUrl}/functions/v1/yandex-tts`;
     const userId = userData.user.id;
-    const narratorVoice = getNarratorVoice(voiceConfigMap);
+    const narratorVoice = getNarratorVoice(voiceConfigMap, segments);
 
     // ── Load existing audio records for cache comparison ─────────────
     const { data: existingAudio } = await supabase
