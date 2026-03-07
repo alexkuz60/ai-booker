@@ -635,9 +635,9 @@ export function StudioTimeline({
                   return (
                     <div
                       key={sc.sceneId}
-                      className={`absolute top-1 bottom-1 rounded-sm cursor-pointer transition-opacity ${
+                      className={`absolute top-1 bottom-1 rounded-sm cursor-pointer transition-all ${
                         sc.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-50 hover:opacity-70"
-                      }`}
+                      } ${sc.sceneId === sceneId ? "ring-2 ring-primary ring-offset-1 ring-offset-background opacity-100 z-10" : ""}`}
                       style={{
                         left: `${sc.startSec * zoom * 4}px`,
                         width: `${widthPx}px`,
