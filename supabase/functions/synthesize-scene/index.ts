@@ -324,19 +324,29 @@ Deno.serve(async (req) => {
       });
     }
 
-    /** Compare relevant voice params + text length to decide if re-synthesis is needed */
+    /** Fast FNV-1a 32-bit hash for text comparison */
+    function hashText(s: string): string {
+      let h = 0x811c9dc5;
+      for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 0x01000193);
+      }
+      return (h >>> 0).toString(36);
+    }
+
+    /** Compare relevant voice params + text hash to decide if re-synthesis is needed */
     function voiceConfigChanged(
       current: { voice: string; role?: string; speed: number; pitchShift?: number; volume?: number },
       cached: Record<string, unknown>,
-      currentTextLength: number
+      currentTextHash: string
     ): boolean {
       if (current.voice !== cached.voice) return true;
       if ((current.role ?? "neutral") !== (cached.role ?? "neutral")) return true;
       if (Math.abs((current.speed ?? 1) - (Number(cached.speed) || 1)) > 0.01) return true;
       if ((current.pitchShift ?? 0) !== (Number(cached.pitchShift) || 0)) return true;
       if ((current.volume ?? -1) !== (Number(cached.volume) ?? -1)) return true;
-      // Text edited? Compare char count
-      if (currentTextLength !== (Number(cached.textLength) || 0)) return true;
+      // Text edited? Compare hash (catches any change, not just length)
+      if (currentTextHash !== (cached.textHash ?? "")) return true;
       return false;
     }
 
@@ -367,7 +377,7 @@ Deno.serve(async (req) => {
 
       // ── Cache check: skip if audio exists with same voice config ──
       const cached = existingAudioMap.get(seg.id);
-      if (cached && !forceResynthesize && !voiceConfigChanged(voiceConfig, cached.voice_config, text.length)) {
+      if (cached && !forceResynthesize && !voiceConfigChanged(voiceConfig, cached.voice_config, hashText(text))) {
         // Also check that the text hasn't changed by verifying the file still exists
         // (we trust the DB record — if segment_audio says "ready", it's good)
         console.log(`Cache hit for segment ${seg.id}: voice=${voiceConfig.voice}, skipping TTS`);
@@ -591,7 +601,7 @@ Deno.serve(async (req) => {
               speed: voiceConfig.speed,
               pitchShift: voiceConfig.pitchShift,
               volume: voiceConfig.volume,
-              textLength: text.length,
+              textHash: hashText(text),
               apiVersion: isV3Voice ? "v3" : "v1",
             },
           },
