@@ -819,9 +819,9 @@ export function StoryboardPanel({
                 {seg.inline_narrations && seg.inline_narrations.length > 0 && (
                   <div className="px-3 py-1 bg-accent/10 border-b border-border/30">
                     {seg.inline_narrations.map((n, idx) => (
-                      <div key={idx} className="text-[10px] text-muted-foreground font-body flex items-start gap-1">
-                        <BookOpen className="h-3 w-3 mt-0.5 shrink-0 text-accent-foreground" />
-                        <span className="italic">«{n.text}»</span>
+                      <div key={idx} className="text-sm font-body flex items-start gap-1 leading-relaxed">
+                        <BookOpen className="h-3 w-3 mt-1 shrink-0 text-yellow-400/70" />
+                        <span className="text-yellow-300/70">«{n.text}»</span>
                         <span className="text-muted-foreground/60 shrink-0">
                           → {isRu ? "после" : "after"} «{n.insert_after.slice(0, 20)}…»
                         </span>
