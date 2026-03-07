@@ -471,8 +471,8 @@ function OrphanedFilesSection({ isRu, userId, onPreview }: { isRu: boolean; user
         return;
       }
       setTotalScanned(data.scanned ?? 0);
-      const files: string[] = data.files ?? [];
-      setOrphans(files.map(p => ({ path: p, name: p.split('/').pop() ?? p })));
+      const files: Array<{ path: string; size: number }> = data.files ?? [];
+      setOrphans(files.map(f => ({ path: f.path ?? f, name: (f.path ?? f).split('/').pop() ?? '', size: f.size ?? 0 })));
       setScanned(true);
     } finally {
       setScanning(false);
