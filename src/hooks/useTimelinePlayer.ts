@@ -161,7 +161,36 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
         c => c.startSec <= pausedAtRef.current && pausedAtRef.current < c.startSec + c.durationSec
       );
       if (idx >= 0) {
-        seek(pausedAtRef.current);
+        const clip = ac[idx];
+        const offsetInClip = pausedAtRef.current - clip.startSec;
+        (async () => {
+          const url = await getSignedUrl(clip.audioPath!);
+          if (!url || stateRef.current !== "playing") return;
+          const audio = new Audio();
+          audio.crossOrigin = "anonymous";
+          audio.preload = "auto";
+          audio.volume = volumeRef.current / 100;
+          audio.src = url;
+          audioRef.current = audio;
+          audio.currentTime = Math.max(0, offsetInClip);
+          audio.onended = () => {
+            if (stateRef.current !== "playing") return;
+            clipOffsetRef.current = clip.startSec + clip.durationSec;
+            clipStartTimeRef.current = performance.now();
+            playClip(idx + 1);
+          };
+          audio.onerror = () => {
+            if (stateRef.current !== "playing") return;
+            playClip(idx + 1);
+          };
+          try {
+            await audio.play();
+            rafRef.current = requestAnimationFrame(updatePosition);
+          } catch (err) {
+            console.error("[TimelinePlayer] resume seek play() failed:", err);
+            toast.error("Не удалось возобновить воспроизведение");
+          }
+        })();
       } else {
         const nextIdx = ac.findIndex(c => c.startSec > pausedAtRef.current);
         playClip(nextIdx >= 0 ? nextIdx : ac.length);
