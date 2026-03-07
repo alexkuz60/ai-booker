@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Users, Wind, Headphones, Film, Wand2, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -50,7 +50,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
 
   return (
     <div className="h-full min-h-0 flex flex-col p-4">
-      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); sessionStorage.setItem("studio_active_tab", v); }} className="flex-1 flex flex-col min-h-0">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 flex flex-col min-h-0">
         <div className="flex items-center justify-between shrink-0">
           <TabsList className="w-fit">
             <TabsTrigger value="storyboard" className="gap-1.5">
