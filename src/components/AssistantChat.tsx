@@ -5,19 +5,51 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Loader2, Bot, User, Trash2 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useLocation } from "react-router-dom";
+import { loadStudioChapter } from "@/lib/studioChapter";
 import { toast } from "sonner";
 
 type Msg = { role: "user" | "assistant"; content: string };
+
+export interface AssistantContext {
+  currentPage: string;
+  bookTitle?: string;
+  chapterTitle?: string;
+  sceneIndex?: number | null;
+  activeTab?: string;
+  totalScenes?: number;
+}
+
+function gatherContext(pathname: string): AssistantContext {
+  const ctx: AssistantContext = { currentPage: pathname };
+
+  const chapter = loadStudioChapter();
+  if (chapter) {
+    ctx.bookTitle = chapter.bookTitle || undefined;
+    ctx.chapterTitle = chapter.chapterTitle || undefined;
+    ctx.totalScenes = chapter.scenes?.length || 0;
+  }
+
+  const savedIdx = sessionStorage.getItem("studio_selected_scene_idx");
+  if (savedIdx !== null) ctx.sceneIndex = Number(savedIdx);
+
+  const savedTab = sessionStorage.getItem("studio_active_tab");
+  if (savedTab) ctx.activeTab = savedTab;
+
+  return ctx;
+}
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/assistant-chat`;
 
 async function streamChat({
   messages,
+  context,
   onDelta,
   onDone,
   onError,
 }: {
   messages: Msg[];
+  context: AssistantContext;
   onDelta: (t: string) => void;
   onDone: () => void;
   onError: (e: string) => void;
@@ -28,7 +60,7 @@ async function streamChat({
       "Content-Type": "application/json",
       Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
     },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, context }),
   });
 
   if (!resp.ok) {
@@ -66,6 +98,7 @@ async function streamChat({
 
 export function AssistantChat({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const { isRu } = useLanguage();
+  const location = useLocation();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -107,6 +140,7 @@ export function AssistantChat({ open, onOpenChange }: { open: boolean; onOpenCha
 
     await streamChat({
       messages: updated,
+      context: gatherContext(location.pathname),
       onDelta: upsert,
       onDone: () => setLoading(false),
       onError: (e) => { toast.error(e); setLoading(false); },

@@ -44,9 +44,26 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages } = await req.json();
+    const { messages, context } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    // Build dynamic context block
+    let contextBlock = "";
+    if (context && typeof context === "object") {
+      const parts: string[] = [];
+      if (context.currentPage) parts.push(`Текущая страница: ${context.currentPage}`);
+      if (context.bookTitle) parts.push(`Открытая книга: «${context.bookTitle}»`);
+      if (context.chapterTitle) parts.push(`Глава: «${context.chapterTitle}»`);
+      if (context.totalScenes != null) parts.push(`Сцен в главе: ${context.totalScenes}`);
+      if (context.sceneIndex != null) parts.push(`Выбрана сцена #${context.sceneIndex + 1}`);
+      if (context.activeTab) parts.push(`Активная вкладка Студии: ${context.activeTab}`);
+      if (parts.length) {
+        contextBlock = `\n\n## Текущее состояние пользователя\n${parts.join("\n")}`;
+      }
+    }
+
+    const systemContent = SYSTEM_PROMPT + contextBlock;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -57,7 +74,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: systemContent },
           ...messages,
         ],
         stream: true,
