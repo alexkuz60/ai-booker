@@ -198,16 +198,16 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       return;
     }
 
-    // Start from beginning (or from current position if stopped mid-way)
+    // Start from first clip with audio (skip leading silent estimate-only area)
+    const firstAudioStart = audioClipsRef.current[0]?.startSec ?? 0;
     stateRef.current = "playing";
     setState("playing");
-    clipOffsetRef.current = 0;
+    pausedAtRef.current = firstAudioStart;
+    clipOffsetRef.current = firstAudioStart;
     clipStartTimeRef.current = performance.now();
-    setPositionSec(0);
-
-    // Find first audio clip
+    setPositionSec(firstAudioStart);
     playClip(0);
-  }, [playClip, updatePosition]);
+  }, [playClip]);
 
   const pause = useCallback(() => {
     if (stateRef.current !== "playing") return;
