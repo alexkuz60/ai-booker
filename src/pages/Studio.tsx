@@ -163,6 +163,8 @@ const Studio = () => {
 
   const onSegmented = useCallback((sceneId: string) => {
     setSegmentedSceneIds(prev => new Set(prev).add(sceneId));
+    // Always refresh clips when segmentation/synthesis completes
+    setClipsRefreshToken(t => t + 1);
   }, []);
 
   const { setPageHeader } = usePageHeader();
