@@ -324,16 +324,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    /** Compare relevant voice params to decide if re-synthesis is needed */
+    /** Compare relevant voice params + text length to decide if re-synthesis is needed */
     function voiceConfigChanged(
       current: { voice: string; role?: string; speed: number; pitchShift?: number; volume?: number },
-      cached: Record<string, unknown>
+      cached: Record<string, unknown>,
+      currentTextLength: number
     ): boolean {
       if (current.voice !== cached.voice) return true;
       if ((current.role ?? "neutral") !== (cached.role ?? "neutral")) return true;
       if (Math.abs((current.speed ?? 1) - (Number(cached.speed) || 1)) > 0.01) return true;
       if ((current.pitchShift ?? 0) !== (Number(cached.pitchShift) || 0)) return true;
       if ((current.volume ?? -1) !== (Number(cached.volume) ?? -1)) return true;
+      // Text edited? Compare char count
+      if (currentTextLength !== (Number(cached.textLength) || 0)) return true;
       return false;
     }
 
