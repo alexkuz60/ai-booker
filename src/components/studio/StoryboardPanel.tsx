@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, Play, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle } from "lucide-react";
+import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, Play, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -347,6 +347,7 @@ export function StoryboardPanel({
   const [synthesizing, setSynthesizing] = useState(false);
   const [synthProgress, setSynthProgress] = useState("");
   const [detecting, setDetecting] = useState(false);
+  const [resynthSegId, setResynthSegId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [characters, setCharacters] = useState<CharacterOption[]>([]);
   const [audioStatus, setAudioStatus] = useState<Map<string, { status: string; durationMs: number }>>(new Map());
@@ -641,7 +642,27 @@ export function StoryboardPanel({
     setSynthProgress("");
   }, [sceneId, segments, isRu, onSegmented, loadAudioStatus]);
 
-  // ── Detect inline narrations (batch) ──
+  // ── Re-synthesize single segment (force) ──
+  const resynthSegment = useCallback(async (segmentId: string) => {
+    if (!sceneId) return;
+    setResynthSegId(segmentId);
+    try {
+      // Delete existing audio record to force re-synthesis
+      await supabase.from("segment_audio").delete().eq("segment_id", segmentId);
+      const { data, error } = await supabase.functions.invoke("synthesize-scene", {
+        body: { scene_id: sceneId, language: isRu ? "ru" : "en", force: true, segment_ids: [segmentId] },
+      });
+      if (error) throw error;
+      toast.success(isRu ? "Блок пересинтезирован" : "Segment re-synthesized");
+      onSegmented?.(sceneId);
+      loadAudioStatus(segments.map(s => s.segment_id));
+    } catch (err: any) {
+      console.error("Re-synth failed:", err);
+      toast.error(isRu ? "Ошибка ре-синтеза" : "Re-synthesis failed");
+    }
+    setResynthSegId(null);
+  }, [sceneId, isRu, onSegmented, loadAudioStatus, segments]);
+
   const dialogueCount = segments.filter(s => s.segment_type === "dialogue").length;
   const runDetectNarrations = useCallback(async () => {
     if (!sceneId || dialogueCount === 0) return;
@@ -810,6 +831,19 @@ export function StoryboardPanel({
                       <MessageCircle className="h-3 w-3" />
                       {seg.inline_narrations.length}
                     </span>
+                  )}
+                  {/* Re-synth button */}
+                  {audioStatus.get(seg.segment_id) && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); resynthSegment(seg.segment_id); }}
+                      disabled={resynthSegId === seg.segment_id || synthesizing}
+                      className="ml-1 p-0.5 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
+                      title={isRu ? "Ре-синтез блока" : "Re-synthesize segment"}
+                    >
+                      {resynthSegId === seg.segment_id
+                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                        : <RefreshCw className="h-3 w-3" />}
+                    </button>
                   )}
                   <span className="ml-auto text-[10px] text-muted-foreground font-mono">
                     #{seg.segment_number}
