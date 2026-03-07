@@ -347,6 +347,7 @@ export function StoryboardPanel({
   const [synthesizing, setSynthesizing] = useState(false);
   const [synthProgress, setSynthProgress] = useState("");
   const [detecting, setDetecting] = useState(false);
+  const [resynthSegId, setResynthSegId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [characters, setCharacters] = useState<CharacterOption[]>([]);
   const [audioStatus, setAudioStatus] = useState<Map<string, { status: string; durationMs: number }>>(new Map());
