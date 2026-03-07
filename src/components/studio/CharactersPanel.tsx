@@ -182,13 +182,25 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [merging, setMerging] = useState(false);
 
-  // Voice settings state
+  // Voice settings state — Yandex
   const [voice, setVoice] = useState("marina");
   const [role, setRole] = useState("neutral");
   const [pitch, setPitch] = useState(0);
   const [speed, setSpeed] = useState(1.0);
   const [volume, setVolume] = useState(0);
   const [dirty, setDirty] = useState(false);
+
+  // Voice settings state — ElevenLabs
+  const [elVoice, setElVoice] = useState("JBFqnCBsd6RMkjVDRZzb");
+  const [elStability, setElStability] = useState(0.5);
+  const [elSimilarity, setElSimilarity] = useState(0.75);
+  const [elStyle, setElStyle] = useState(0.4);
+  const [elSpeed, setElSpeed] = useState(0.95);
+  const [voiceProvider, setVoiceProvider] = useState<"yandex" | "elevenlabs">("yandex");
+
+  // ElevenLabs credits
+  const [elCredits, setElCredits] = useState<{ used: number; limit: number; tier: string } | null>(null);
+  const [elCreditsLoading, setElCreditsLoading] = useState(false);
 
   const [testing, setTesting] = useState(false);
   const [playing, setPlaying] = useState(false);
