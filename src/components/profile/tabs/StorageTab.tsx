@@ -445,6 +445,7 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
 type OrphanedFile = {
   path: string;
   name: string;
+  size: number;
   url?: string;
 };
 
