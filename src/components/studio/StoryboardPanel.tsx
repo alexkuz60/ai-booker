@@ -716,6 +716,11 @@ export function StoryboardPanel({
       <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
         <span className="text-xs text-muted-foreground font-body">
           {segments.length} {isRu ? "фрагм." : "seg."} · {totalPhrases} {isRu ? "фраз" : "phrases"}
+          {inlineNarrationSegIds.size > 0 && (
+            <span className="ml-1.5 text-accent-foreground">
+              · <MessageCircle className="inline h-3 w-3 -mt-0.5" /> {inlineNarrationSegIds.size}
+            </span>
+          )}
         </span>
         <div className="flex items-center gap-1.5">
           <Button
@@ -730,6 +735,19 @@ export function StoryboardPanel({
               ? (synthProgress || (isRu ? "Синтез…" : "Synth…"))
               : (isRu ? "Синтез сцены" : "Synthesize")}
           </Button>
+          {dialogueCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={runDetectNarrations}
+              disabled={detecting || analyzing || synthesizing}
+              className="gap-1.5 h-7 text-xs"
+              title={isRu ? "Поиск авторских вставок в диалогах" : "Detect narrator insertions in dialogues"}
+            >
+              {detecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <ScanSearch className="h-3 w-3" />}
+              {detecting ? (isRu ? "Поиск…" : "Detecting…") : (isRu ? "Вставки" : "Narrations")}
+            </Button>
+          )}
           <Button variant="ghost" size="sm" onClick={runAnalysis} disabled={analyzing || !sceneContent} className="gap-1.5 h-7 text-xs">
             {analyzing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
             {isRu ? "Переанализ" : "Re-analyze"}
