@@ -598,6 +598,27 @@ export function StoryboardPanel({
       }
     }
 
+    // Remove old character from character_appearances if they no longer have any segments in this scene
+    if (sceneId && targetSeg.speaker && targetSeg.speaker !== newSpeaker) {
+      const oldCharRecord = characters.find(c => c.name === targetSeg.speaker);
+      if (oldCharRecord) {
+        // Check if old speaker still has other segments in this scene (after the update)
+        const updatedSegments = segments.map(seg =>
+          affectedIds.includes(seg.segment_id) ? { ...seg, speaker: newSpeaker } : seg
+        );
+        const oldSpeakerStillUsed = updatedSegments.some(
+          s => s.speaker === targetSeg.speaker && !affectedIds.includes(s.segment_id)
+        );
+        if (!oldSpeakerStillUsed) {
+          await supabase
+            .from("character_appearances")
+            .delete()
+            .eq("character_id", oldCharRecord.id)
+            .eq("scene_id", sceneId);
+        }
+      }
+    }
+
     // Upsert character_appearances so the character appears in "scene characters"
     if (sceneId && newSpeaker) {
       const charRecord = characters.find(c => c.name === newSpeaker);
@@ -893,9 +914,20 @@ export function StoryboardPanel({
                     #{seg.segment_number}
                   </span>
                 </div>
+                {/* Phrases */}
+                <div className="divide-y divide-border/30">
+                  {seg.phrases.map((ph) => (
+                    <EditablePhrase
+                      key={ph.phrase_id}
+                      phrase={ph}
+                      isRu={isRu}
+                      onSave={savePhrase}
+                    />
+                  ))}
+                </div>
                 {/* Inline narrations detail */}
                 {seg.inline_narrations && seg.inline_narrations.length > 0 && (
-                  <div className="px-3 py-1 bg-accent/10 border-b border-border/30">
+                  <div className="px-3 py-1 bg-accent/10 border-t border-border/30">
                     {seg.inline_narrations.map((n, idx) => (
                       <div key={idx} className="text-sm font-body flex items-start gap-1 leading-relaxed">
                         <BookOpen className="h-3 w-3 mt-1 shrink-0 text-yellow-400/70" />
@@ -908,17 +940,6 @@ export function StoryboardPanel({
                     ))}
                   </div>
                 )}
-                {/* Phrases */}
-                <div className="divide-y divide-border/30">
-                  {seg.phrases.map((ph) => (
-                    <EditablePhrase
-                      key={ph.phrase_id}
-                      phrase={ph}
-                      isRu={isRu}
-                      onSave={savePhrase}
-                    />
-                  ))}
-                </div>
               </div>
             );
           })}
