@@ -178,8 +178,10 @@ export function StudioTimeline({
   sceneId,
   bookId,
   chapterSceneIds,
+  chapterScenes,
   selectedCharacterId,
   onSelectCharacter,
+  onSelectSceneIdx,
 }: StudioTimelineProps) {
   const [mode, setMode] = useState<"scene" | "chapter">("scene");
 
