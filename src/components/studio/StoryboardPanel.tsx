@@ -340,6 +340,7 @@ export function StoryboardPanel({
   onSegmented?: (sceneId: string) => void;
   selectedSegmentId?: string | null;
   onSelectSegment?: (segmentId: string | null) => void;
+  onSynthesizingChange?: (ids: Set<string>) => void;
 }) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(false);
