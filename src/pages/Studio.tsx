@@ -32,6 +32,7 @@ const Studio = () => {
     if (segmentId) setActiveTab("storyboard");
   }, [setActiveTab]);
   const [segmentedSceneIds, setSegmentedSceneIds] = useState<Set<string>>(new Set());
+  const [synthesizingSegmentIds, setSynthesizingSegmentIds] = useState<Set<string>>(new Set());
   const [renderedSceneIds, setRenderedSceneIds] = useState<Set<string>>(new Set());
   const [fullyRenderedSceneIds, setFullyRenderedSceneIds] = useState<Set<string>>(new Set());
   const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
