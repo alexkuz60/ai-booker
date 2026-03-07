@@ -439,15 +439,25 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     setSaving(true);
     try {
       const currentChar = characters.find(c => c.id === selectedId);
-      const voiceConfig = {
-        provider: "yandex",
-        voice_id: voice,
-        role: role !== "neutral" ? role : undefined,
-        speed,
-        pitch: pitch !== 0 ? pitch : undefined,
-        volume: volume !== 0 ? volume : undefined,
-        is_extra: currentChar?.voice_config?.is_extra,
-      };
+      const voiceConfig = voiceProvider === "elevenlabs"
+        ? {
+            provider: "elevenlabs",
+            voice_id: elVoice,
+            stability: elStability,
+            similarity_boost: elSimilarity,
+            style: elStyle,
+            speed: elSpeed,
+            is_extra: currentChar?.voice_config?.is_extra,
+          }
+        : {
+            provider: "yandex",
+            voice_id: voice,
+            role: role !== "neutral" ? role : undefined,
+            speed,
+            pitch: pitch !== 0 ? pitch : undefined,
+            volume: volume !== 0 ? volume : undefined,
+            is_extra: currentChar?.voice_config?.is_extra,
+          };
       const { error } = await supabase
         .from("book_characters")
         .update({ voice_config: voiceConfig, updated_at: new Date().toISOString() })
