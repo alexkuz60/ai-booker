@@ -146,6 +146,15 @@ export const TIMELINE_HEADER_HEIGHT = 41;
 
 // ─── Main component ─────────────────────────────────────────
 
+interface ChapterSceneClip {
+  sceneId: string;
+  sceneIdx: number;
+  label: string;
+  startSec: number;
+  durationSec: number;
+  hasAudio: boolean;
+}
+
 interface StudioTimelineProps {
   isRu: boolean;
   sceneDurationSec?: number;
@@ -153,10 +162,13 @@ interface StudioTimelineProps {
   sceneId?: string | null;
   bookId?: string | null;
   chapterSceneIds?: string[];
+  chapterScenes?: { id?: string; scene_number: number; title: string }[];
   /** Currently selected character ID (synced with CharactersPanel) */
   selectedCharacterId?: string | null;
   /** Callback when a track is clicked */
   onSelectCharacter?: (characterId: string | null) => void;
+  /** Callback when a scene is selected (double-click in chapter mode) */
+  onSelectSceneIdx?: (idx: number) => void;
 }
 
 export function StudioTimeline({
