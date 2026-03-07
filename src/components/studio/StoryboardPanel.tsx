@@ -272,12 +272,16 @@ export function StoryboardPanel({
   isRu,
   bookId,
   onSegmented,
+  selectedSegmentId,
+  onSelectSegment,
 }: {
   sceneId: string | null;
   sceneContent: string | null;
   isRu: boolean;
   bookId: string | null;
   onSegmented?: (sceneId: string) => void;
+  selectedSegmentId?: string | null;
+  onSelectSegment?: (segmentId: string | null) => void;
 }) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -287,6 +291,13 @@ export function StoryboardPanel({
   const [loaded, setLoaded] = useState(false);
   const [characters, setCharacters] = useState<CharacterOption[]>([]);
   const [audioStatus, setAudioStatus] = useState<Map<string, { status: string; durationMs: number }>>(new Map());
+
+  // Scroll selected segment into view when set externally (from timeline)
+  useEffect(() => {
+    if (!selectedSegmentId) return;
+    const el = document.getElementById(`storyboard-seg-${selectedSegmentId}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [selectedSegmentId]);
 
   // Load characters for the book
   useEffect(() => {
@@ -634,8 +645,18 @@ export function StoryboardPanel({
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-3 space-y-2">
           {segments.map((seg) => {
+            const isSelected = selectedSegmentId === seg.segment_id;
             return (
-              <div key={seg.segment_id} className="rounded-lg border border-border bg-card/50 overflow-hidden">
+              <div
+                key={seg.segment_id}
+                id={`storyboard-seg-${seg.segment_id}`}
+                className={`rounded-lg border overflow-hidden transition-all cursor-pointer ${
+                  isSelected
+                    ? "border-primary ring-2 ring-primary/30 bg-card"
+                    : "border-border bg-card/50"
+                }`}
+                onDoubleClick={() => onSelectSegment?.(seg.segment_id)}
+              >
                 {/* Segment header */}
                 <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 bg-muted/30">
                   <SegmentTypeBadge

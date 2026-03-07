@@ -65,14 +65,19 @@ function TimelineTrack({
   zoom,
   duration,
   clips: realClips,
+  selectedSegmentId,
+  onSelectSegment,
 }: {
   track: TimelineTrackData;
   zoom: number;
   duration: number;
   clips?: TimelineClip[];
+  selectedSegmentId?: string | null;
+  onSelectSegment?: (segmentId: string | null) => void;
 }) {
   const clips = realClips && realClips.length > 0
     ? realClips.map(c => ({
+        id: c.id,
         start: c.startSec,
         end: c.startSec + c.durationSec,
         label: c.label,
@@ -80,7 +85,7 @@ function TimelineTrack({
         hasAudio: c.hasAudio,
       }))
     : track.type === "atmosphere"
-      ? [{ start: 0, end: duration, label: track.label, type: "atmosphere", hasAudio: false }]
+      ? [{ id: "atm", start: 0, end: duration, label: track.label, type: "atmosphere", hasAudio: false }]
       : track.type === "sfx"
         ? []
         : [];
@@ -89,12 +94,13 @@ function TimelineTrack({
     <div className="flex h-10 border-b border-border/50 relative" style={{ width: `${duration * zoom * 4}px` }}>
       {clips.filter(c => c.start < c.end).map((clip, i) => {
         const widthPx = (clip.end - clip.start) * zoom * 4;
+        const isSelected = selectedSegmentId && clip.id === selectedSegmentId;
         return (
           <div
             key={i}
-            className={`absolute top-1 bottom-1 rounded-sm transition-opacity cursor-pointer ${
+            className={`absolute top-1 bottom-1 rounded-sm transition-all cursor-pointer ${
               clip.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-50 hover:opacity-70"
-            }`}
+            } ${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background opacity-100 z-10" : ""}`}
             style={{
               left: `${clip.start * zoom * 4}px`,
               width: `${widthPx}px`,
@@ -104,6 +110,7 @@ function TimelineTrack({
                 : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
             }}
             title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${clip.hasAudio ? " 🔊" : ""}`}
+            onDoubleClick={() => onSelectSegment?.(clip.id)}
           >
             {widthPx > 40 && (
               <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
@@ -163,12 +170,11 @@ interface StudioTimelineProps {
   bookId?: string | null;
   chapterSceneIds?: string[];
   chapterScenes?: { id?: string; scene_number: number; title: string }[];
-  /** Currently selected character ID (synced with CharactersPanel) */
   selectedCharacterId?: string | null;
-  /** Callback when a track is clicked */
   onSelectCharacter?: (characterId: string | null) => void;
-  /** Callback when a scene is selected (double-click in chapter mode) */
   onSelectSceneIdx?: (idx: number) => void;
+  selectedSegmentId?: string | null;
+  onSelectSegment?: (segmentId: string | null) => void;
 }
 
 export function StudioTimeline({
@@ -182,6 +188,8 @@ export function StudioTimeline({
   selectedCharacterId,
   onSelectCharacter,
   onSelectSceneIdx,
+  selectedSegmentId,
+  onSelectSegment,
 }: StudioTimelineProps) {
   const [mode, setMode] = useState<"scene" | "chapter">("scene");
 
@@ -599,7 +607,7 @@ export function StudioTimeline({
             >
               <TimelineRuler zoom={zoom} duration={duration} />
               {allTracks.map((track) => (
-                <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} clips={clipsByTrack.get(track.id)} />
+                <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} clips={clipsByTrack.get(track.id)} selectedSegmentId={selectedSegmentId} onSelectSegment={onSelectSegment} />
               ))}
               <Playhead positionSec={player.positionSec} zoom={zoom} />
             </div>

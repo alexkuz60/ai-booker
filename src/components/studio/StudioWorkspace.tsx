@@ -18,9 +18,11 @@ interface StudioWorkspaceProps {
   onSelectCharacter?: (characterId: string | null) => void;
   activeTab?: string;
   onTabChange?: (tab: string) => void;
+  selectedSegmentId?: string | null;
+  onSelectSegment?: (segmentId: string | null) => void;
 }
 
-export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter, activeTab: externalTab, onTabChange }: StudioWorkspaceProps) {
+export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter, activeTab: externalTab, onTabChange, selectedSegmentId, onSelectSegment }: StudioWorkspaceProps) {
   const [activeTab, setActiveTabLocal] = useState(() => externalTab || sessionStorage.getItem("studio_active_tab") || "storyboard");
   const charactersPanelRef = useRef<CharactersPanelHandle | null>(null);
   const [castingExternal, setCastingExternal] = useState(false);
@@ -95,6 +97,8 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
               isRu={isRu}
               bookId={bookId ?? null}
               onSegmented={onSegmented}
+              selectedSegmentId={selectedSegmentId ?? null}
+              onSelectSegment={onSelectSegment}
             />
           </div>
         </TabsContent>
