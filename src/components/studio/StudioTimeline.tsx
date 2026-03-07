@@ -247,17 +247,6 @@ export function StudioTimeline({
   // ── Audio player ──────────────────────────────────────────
   const player = useTimelinePlayer(timelineClips);
 
-  // ── Duration: prefer actual clip data, fallback to estimate ──
-  const clipsDuration = mode === "chapter"
-    ? (chapterSceneClips.length > 0
-        ? chapterSceneClips[chapterSceneClips.length - 1].startSec + chapterSceneClips[chapterSceneClips.length - 1].durationSec
-        : 0)
-    : player.totalDuration;
-  const estimateDuration = mode === "scene"
-    ? (sceneDurationSec && sceneDurationSec > 0 ? sceneDurationSec : 60)
-    : (chapterDurationSec && chapterDurationSec > 0 ? chapterDurationSec : 180);
-  const duration = clipsDuration > 0 ? clipsDuration : estimateDuration;
-
   // Group clips by track ID (scene mode)
   const clipsByTrack = useMemo(() => {
     const map = new Map<string, TimelineClip[]>();
@@ -273,7 +262,6 @@ export function StudioTimeline({
   const chapterSceneClips = useMemo<ChapterSceneClip[]>(() => {
     if (mode !== "chapter" || !chapterSceneIds?.length) return [];
 
-    // Group timeline clips by sceneId
     const clipsByScene = new Map<string, TimelineClip[]>();
     for (const c of timelineClips) {
       const list = clipsByScene.get(c.sceneId) ?? [];
@@ -281,7 +269,6 @@ export function StudioTimeline({
       clipsByScene.set(c.sceneId, list);
     }
 
-    const CHARS_PER_SEC = 14;
     const DEFAULT_SCENE_SEC = 30;
     const result: ChapterSceneClip[] = [];
     let offset = 0;
@@ -295,7 +282,6 @@ export function StudioTimeline({
       let hasAudio = false;
 
       if (sceneClips?.length) {
-        // Sum durations of all segments in this scene
         sceneDuration = sceneClips.reduce((sum, c) => sum + c.durationSec, 0);
         hasAudio = sceneClips.some(c => c.hasAudio);
       } else {
@@ -317,9 +303,20 @@ export function StudioTimeline({
     return result;
   }, [mode, chapterSceneIds, chapterScenes, timelineClips, isRu]);
 
+  // ── Duration: prefer actual clip data, fallback to estimate ──
+  const clipsDuration = mode === "chapter"
+    ? (chapterSceneClips.length > 0
+        ? chapterSceneClips[chapterSceneClips.length - 1].startSec + chapterSceneClips[chapterSceneClips.length - 1].durationSec
+        : 0)
+    : player.totalDuration;
+  const estimateDuration = mode === "scene"
+    ? (sceneDurationSec && sceneDurationSec > 0 ? sceneDurationSec : 60)
+    : (chapterDurationSec && chapterDurationSec > 0 ? chapterDurationSec : 180);
+  const duration = clipsDuration > 0 ? clipsDuration : estimateDuration;
+
   // Auto-add narrator-fallback track if clips reference it (scene mode only)
   const allTracks = useMemo(() => {
-    if (mode === "chapter") return FIXED_TRACKS; // chapter mode uses scene track, not character tracks
+    if (mode === "chapter") return FIXED_TRACKS;
     const hasNarratorFallback = timelineClips.some(c => c.trackId === "narrator-fallback");
     const narratorTrack: TimelineTrackData[] = hasNarratorFallback
       ? [{ id: "narrator-fallback", label: isRu ? "Рассказчик" : "Narrator", color: "hsl(var(--primary))", type: "narrator" }]
