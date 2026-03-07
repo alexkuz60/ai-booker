@@ -248,7 +248,7 @@ Deno.serve(async (req) => {
         const durationMs = Math.round((audioBytes.length / 16000) * 1000);
 
         // Upload to storage
-        const storagePath = `tts/${userData.user.id}/${scene_id}/${seg.id}.mp3`;
+        const storagePath = `${userData.user.id}/tts/${scene_id}/${seg.id}.mp3`;
         const { error: uploadErr } = await supabaseAdmin.storage
           .from("user-media")
           .upload(storagePath, audioBytes, {
