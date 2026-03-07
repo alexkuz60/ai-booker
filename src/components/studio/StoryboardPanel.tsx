@@ -394,7 +394,7 @@ export function StoryboardPanel({
     try {
       const { data: segs, error: segErr } = await supabase
         .from("scene_segments")
-        .select("id, segment_number, segment_type, speaker")
+        .select("id, segment_number, segment_type, speaker, metadata")
         .eq("scene_id", sid)
         .order("segment_number");
 
