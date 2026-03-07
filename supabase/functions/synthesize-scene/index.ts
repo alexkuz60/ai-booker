@@ -230,9 +230,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { scene_id, language, force } = await req.json();
+    const { scene_id, language, force, segment_ids: filterSegIds } = await req.json();
     const isRu = language === "ru";
     const forceResynthesize = force === true;
+    const filterSet = Array.isArray(filterSegIds) && filterSegIds.length > 0
+      ? new Set<string>(filterSegIds)
+      : null;
     const langCode = isRu ? "ru" : "en";
 
     if (!scene_id) {
