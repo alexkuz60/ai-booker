@@ -370,6 +370,9 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
           </ScrollArea>
         </div>
 
+        {/* ─── Orphaned Files Section ─── */}
+        <OrphanedFilesSection isRu={isRu} userId={userId} onPreview={handlePreview} />
+
         {/* Audio/Image preview dialog */}
         <Dialog open={!!preview} onOpenChange={open => !open && setPreview(null)}>
           <DialogContent className="max-w-2xl p-0 overflow-hidden bg-background/95 backdrop-blur">
