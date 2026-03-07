@@ -412,8 +412,8 @@ Deno.serve(async (req) => {
     }
 
     const params: TtsParams = {
-      text: text || "",
-      ssml: ssml || undefined,
+      text: isV3Only ? (text || ssml?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() || "") : (text || ""),
+      ssml: isV3Only ? undefined : (ssml || undefined),
       voice: selectedVoice,
       lang: selectedLang,
       speed: selectedSpeed,
