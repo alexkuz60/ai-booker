@@ -36,6 +36,7 @@ export function ChapterNavigator({
   segmentedSceneIds,
   renderedSceneIds,
   fullyRenderedSceneIds,
+  staleAudioSceneIds,
 }: {
   chapter: StudioChapter;
   selectedSceneIdx: number | null;
