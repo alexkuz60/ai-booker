@@ -18,10 +18,16 @@ const SEGMENT_TYPES = [
 
 type SegmentType = (typeof SEGMENT_TYPES)[number];
 
+interface InlineNarration {
+  text: string;
+  insert_after: string; // text fragment after which narrator is inserted
+}
+
 interface AISegment {
   type: SegmentType;
   speaker?: string;
   text: string;
+  inline_narrations?: InlineNarration[];
 }
 
 // Split text into sentences using punctuation rules
@@ -32,13 +38,11 @@ function splitPhrases(text: string): string[] {
 }
 
 // ── Character extraction helper ──────────────────────────
-// Resolve book_id from scene_id, upsert characters, create appearances
 async function extractCharacters(
   supabase: ReturnType<typeof createClient>,
   sceneId: string,
   segments: Array<{ segment_id: string; segment_type: string; speaker: string | null }>
 ) {
-  // Find book_id via scene → chapter → book
   const { data: scene } = await supabase
     .from("book_scenes")
     .select("chapter_id")
@@ -55,8 +59,7 @@ async function extractCharacters(
 
   const bookId = chapter.book_id;
 
-  // Collect unique speakers from dialogue/first_person segments
-  const speakerSegments = new Map<string, string[]>(); // name → segment_ids
+  const speakerSegments = new Map<string, string[]>();
   for (const seg of segments) {
     if (seg.speaker && ["dialogue", "first_person"].includes(seg.segment_type)) {
       const name = seg.speaker.trim();
@@ -69,9 +72,7 @@ async function extractCharacters(
 
   if (speakerSegments.size === 0) return;
 
-  // Upsert each character and create appearance
   for (const [name, segmentIds] of speakerSegments) {
-    // Upsert character (on conflict book_id+name do nothing)
     const { data: existing } = await supabase
       .from("book_characters")
       .select("id")
@@ -95,7 +96,6 @@ async function extractCharacters(
       characterId = inserted.id;
     }
 
-    // Upsert appearance (on conflict character_id+scene_id update segment_ids)
     const { error: appErr } = await supabase
       .from("character_appearances")
       .upsert(
@@ -149,6 +149,7 @@ Each segment must have:
 - "type": one of ${SEGMENT_TYPES.join(", ")}
 - "speaker": string or null (only for dialogue / first_person)
 - "text": the exact text of the segment (preserve original wording)
+- "inline_narrations": array (optional, for dialogue only) — narrator insertions embedded within a character's speech
 
 Rules:
 - "narrator" = third-person narration, descriptions, action
@@ -159,6 +160,24 @@ Rules:
 - "epigraph" = epigraphs, quotes at the start
 - "footnote" = footnotes, author comments
 - Inline sound markers like [gunshot] should remain in the text as-is
+
+IMPORTANT — Inline narrator detection:
+When dialogue contains embedded narrator commentary (author words between dashes/commas), extract them as inline_narrations.
+Example input: «Родя, — тихо позвал он, — ты только не умирай, а?»
+Output:
+{
+  "type": "dialogue",
+  "speaker": "Разумихин",
+  "text": "Родя, ты только не умирай, а?",
+  "inline_narrations": [
+    { "text": "тихо позвал он", "insert_after": "Родя," }
+  ]
+}
+
+The "text" field must contain ONLY the character's spoken words (narrator parts removed).
+"insert_after" = the last spoken fragment before the narrator insertion.
+If there are multiple narrator insertions in one line, list them all in the array.
+If dialogue has no narrator insertions, omit inline_narrations or set to [].
 
 Return ONLY a JSON array of segments. No markdown, no explanation.`;
 
@@ -196,7 +215,7 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
     let segments: AISegment[];
     try {
       segments = JSON.parse(raw);
-    } catch (e) {
+    } catch {
       console.error("Failed to parse AI response:", raw);
       return new Response(
         JSON.stringify({ error: "AI returned an unstructured response. Please retry." }),
@@ -209,7 +228,7 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Verify user owns this scene (use user's token)
+    // Verify user owns this scene
     const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -234,8 +253,6 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
       ) || []
     );
     await supabase.from("scene_segments").delete().eq("scene_id", scene_id);
-
-    // Also clean up old character appearances for this scene
     await supabase.from("character_appearances").delete().eq("scene_id", scene_id);
 
     // Insert segments and phrases
@@ -245,11 +262,18 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
       segment_type: string;
       speaker: string | null;
       phrases: Array<{ phrase_id: string; phrase_number: number; text: string }>;
+      inline_narrations?: InlineNarration[];
     }> = [];
 
     for (let i = 0; i < segments.length; i++) {
       const seg = segments[i];
       const segType = SEGMENT_TYPES.includes(seg.type as SegmentType) ? seg.type : "narrator";
+
+      // Store inline_narrations in segment metadata
+      const metadata: Record<string, unknown> = {};
+      if (seg.inline_narrations && seg.inline_narrations.length > 0) {
+        metadata.inline_narrations = seg.inline_narrations;
+      }
 
       const { data: inserted, error: segErr } = await supabase
         .from("scene_segments")
@@ -258,6 +282,7 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
           segment_number: i + 1,
           segment_type: segType,
           speaker: seg.speaker || null,
+          metadata: Object.keys(metadata).length > 0 ? metadata : null,
         })
         .select("id")
         .single();
@@ -291,10 +316,11 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
           phrase_number: p.phrase_number,
           text: p.text,
         })),
+        inline_narrations: seg.inline_narrations,
       });
     }
 
-    // ── Extract characters (fire-and-forget, don't block response) ──
+    // ── Extract characters (non-fatal) ──
     try {
       await extractCharacters(supabase, scene_id, result);
     } catch (charErr) {
