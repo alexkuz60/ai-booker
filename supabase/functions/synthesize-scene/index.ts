@@ -491,6 +491,13 @@ Deno.serve(async (req) => {
           dialogueDurationMs = result.durationMs;
         }
 
+        // Validate audio is not empty
+        if (!dialogueAudio || dialogueAudio.length === 0) {
+          console.error(`Empty audio returned for segment ${seg.id} (voice=${voiceConfig.voice})`);
+          results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: "Empty audio returned from TTS" });
+          continue;
+        }
+
         // Upload main audio
         const storagePath = `${userId}/tts/${scene_id}/${seg.id}.mp3`;
         const { error: uploadErr } = await supabaseAdmin.storage
