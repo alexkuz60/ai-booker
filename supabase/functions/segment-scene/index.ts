@@ -72,13 +72,27 @@ async function extractCharacters(
 
   if (speakerSegments.size === 0) return;
 
+  // Pre-load ALL book characters once to match by name OR aliases
+  const { data: allChars } = await supabase
+    .from("book_characters")
+    .select("id, name, aliases")
+    .eq("book_id", bookId);
+
+  const bookChars = allChars || [];
+
+  function findCharacterByNameOrAlias(speakerName: string) {
+    const lower = speakerName.toLowerCase();
+    // Exact name match first
+    const byName = bookChars.find(c => c.name.toLowerCase() === lower);
+    if (byName) return byName;
+    // Then check aliases
+    return bookChars.find(c =>
+      (c.aliases || []).some((a: string) => a.toLowerCase() === lower)
+    ) || null;
+  }
+
   for (const [name, segmentIds] of speakerSegments) {
-    const { data: existing } = await supabase
-      .from("book_characters")
-      .select("id")
-      .eq("book_id", bookId)
-      .eq("name", name)
-      .maybeSingle();
+    const existing = findCharacterByNameOrAlias(name);
 
     let characterId: string;
     if (existing) {
@@ -87,13 +101,15 @@ async function extractCharacters(
       const { data: inserted, error } = await supabase
         .from("book_characters")
         .insert({ book_id: bookId, name })
-        .select("id")
+        .select("id, name, aliases")
         .single();
       if (error || !inserted) {
         console.error("Failed to insert character:", name, error);
         continue;
       }
       characterId = inserted.id;
+      // Add to local cache so subsequent speakers in this batch can match
+      bookChars.push(inserted);
     }
 
     const { error: appErr } = await supabase
