@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut, Maximize2, Layers, Film, Play, Pause, Square } from "lucide-react";
+import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut, Maximize2, Layers, Film, Play, Pause, Square, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
@@ -485,6 +485,28 @@ export function StudioTimeline({
             <span className="text-[11px] text-muted-foreground font-mono min-w-[70px] text-center tabular-nums">
               {formatTime(player.positionSec)} / {formatTime(player.totalDuration)}
             </span>
+            {/* Volume */}
+            <div className="flex items-center gap-1 ml-1">
+              <button
+                onClick={() => player.changeVolume(player.volume > 0 ? 0 : 80)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                title={isRu ? "Громкость" : "Volume"}
+              >
+                {player.volume === 0
+                  ? <VolumeX className="h-3.5 w-3.5" />
+                  : <Volume2 className="h-3.5 w-3.5" />
+                }
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={player.volume}
+                onChange={e => player.changeVolume(Number(e.target.value))}
+                className="w-16 h-1 accent-primary cursor-pointer"
+                title={`${player.volume}%`}
+              />
+            </div>
           </div>
 
           {/* Mode toggle */}
