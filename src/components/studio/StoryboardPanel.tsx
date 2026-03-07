@@ -642,7 +642,27 @@ export function StoryboardPanel({
     setSynthProgress("");
   }, [sceneId, segments, isRu, onSegmented, loadAudioStatus]);
 
-  // ── Detect inline narrations (batch) ──
+  // ── Re-synthesize single segment (force) ──
+  const resynthSegment = useCallback(async (segmentId: string) => {
+    if (!sceneId) return;
+    setResynthSegId(segmentId);
+    try {
+      // Delete existing audio record to force re-synthesis
+      await supabase.from("segment_audio").delete().eq("segment_id", segmentId);
+      const { data, error } = await supabase.functions.invoke("synthesize-scene", {
+        body: { scene_id: sceneId, language: isRu ? "ru" : "en", force: true, segment_ids: [segmentId] },
+      });
+      if (error) throw error;
+      toast.success(isRu ? "Блок пересинтезирован" : "Segment re-synthesized");
+      onSegmented?.(sceneId);
+      loadAudioStatus(segments.map(s => s.segment_id));
+    } catch (err: any) {
+      console.error("Re-synth failed:", err);
+      toast.error(isRu ? "Ошибка ре-синтеза" : "Re-synthesis failed");
+    }
+    setResynthSegId(null);
+  }, [sceneId, isRu, onSegmented, loadAudioStatus, segments]);
+
   const dialogueCount = segments.filter(s => s.segment_type === "dialogue").length;
   const runDetectNarrations = useCallback(async () => {
     if (!sceneId || dialogueCount === 0) return;
