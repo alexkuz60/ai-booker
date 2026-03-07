@@ -268,6 +268,7 @@ const Studio = () => {
           selectedSegmentId={selectedSegmentId}
           onSelectSegment={handleSelectSegmentFromTimeline}
           synthesizingSegmentIds={synthesizingSegmentIds}
+          clipsRefreshToken={clipsRefreshToken}
         />
       </div>
     </motion.div>
