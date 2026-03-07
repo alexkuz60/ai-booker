@@ -16,6 +16,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     try { const v = Number(localStorage.getItem("timeline-volume")); return Number.isFinite(v) ? v : 80; } catch { return 80; }
   });
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const overlayAudiosRef = useRef<HTMLAudioElement[]>([]);
   const rafRef = useRef<number>(0);
   const clipIndexRef = useRef(0);
   const clipStartTimeRef = useRef(0);
@@ -23,15 +24,27 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
   const stateRef = useRef<PlayerState>("stopped");
   const pausedAtRef = useRef(0);
   const volumeRef = useRef(volume);
-  const audioClipsRef = useRef<TimelineClip[]>([]);
+  const mainClipsRef = useRef<TimelineClip[]>([]);
+  const overlayClipsRef = useRef<TimelineClip[]>([]);
 
-  // Sort clips with audio by start time
-  const audioClips = clips
-    .filter(c => c.hasAudio && c.audioPath)
+  // Separate main sequential clips from inline narration overlays
+  // Overlay clips have IDs like "{segId}_narrator_{n}" and sit INSIDE a parent clip's time range
+  const isOverlayClip = (c: TimelineClip) => c.id.includes("_narrator_");
+
+  const mainClips = clips
+    .filter(c => c.hasAudio && c.audioPath && !isOverlayClip(c))
     .sort((a, b) => a.startSec - b.startSec);
 
-  // Keep ref in sync
-  audioClipsRef.current = audioClips;
+  const overlayClips = clips
+    .filter(c => c.hasAudio && c.audioPath && isOverlayClip(c))
+    .sort((a, b) => a.startSec - b.startSec);
+
+  // Keep refs in sync
+  mainClipsRef.current = mainClips;
+  overlayClipsRef.current = overlayClips;
+
+  // For external consumers, expose all audio clips
+  const audioClips = [...mainClips, ...overlayClips].sort((a, b) => a.startSec - b.startSec);
 
   const totalDuration = clips.length > 0
     ? Math.max(...clips.map(c => c.startSec + c.durationSec))
