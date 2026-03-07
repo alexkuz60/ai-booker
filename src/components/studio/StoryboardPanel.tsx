@@ -808,12 +808,15 @@ export function StoryboardPanel({
                     isRu={isRu}
                     onChange={(newType) => updateSegmentType(seg.segment_id, newType)}
                   />
-                  <SpeakerBadge
-                    speaker={seg.speaker}
-                    characters={characters}
-                    isRu={isRu}
-                    onChange={(newSpeaker) => updateSpeaker(seg.segment_id, newSpeaker)}
-                  />
+                  {/* Hide speaker badge for narrator/footnote — they use book-level system characters */}
+                  {seg.segment_type !== "narrator" && seg.segment_type !== "footnote" && (
+                    <SpeakerBadge
+                      speaker={seg.speaker}
+                      characters={characters}
+                      isRu={isRu}
+                      onChange={(newSpeaker) => updateSpeaker(seg.segment_id, newSpeaker)}
+                    />
+                  )}
                   {/* Audio status indicator */}
                   {(() => {
                     const audio = audioStatus.get(seg.segment_id);
