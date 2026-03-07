@@ -648,13 +648,14 @@ Deno.serve(async (req) => {
       { onConflict: "scene_id" }
     );
 
-    console.log(`Playlist saved for scene ${scene_id}: ${playlistStatus}, ${totalDurationMs}ms`);
+    console.log(`Playlist saved for scene ${scene_id}: ${playlistStatus}, ${totalDurationMs}ms (cached: ${cachedCount}, synthesized: ${successCount - cachedCount}, errors: ${errorCount})`);
 
     return new Response(
       JSON.stringify({
         scene_id,
         total_segments: segments.length,
-        synthesized: successCount,
+        synthesized: successCount - cachedCount,
+        cached: cachedCount,
         errors: errorCount,
         total_duration_ms: totalDurationMs,
         results,
