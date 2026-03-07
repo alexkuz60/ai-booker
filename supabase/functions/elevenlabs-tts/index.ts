@@ -104,11 +104,21 @@ Deno.serve(async (req) => {
       const errText = await response.text();
       console.error("ElevenLabs error:", response.status, errText);
 
+      let parsed: any = {};
+      try { parsed = JSON.parse(errText); } catch {}
+      const detail = parsed?.detail;
+      const isSignInRequired = detail?.code === "sign_in_required";
+
       const msgs: Record<number, { ru: string; en: string }> = {
-        401: {
-          ru: "ElevenLabs: неверный API-ключ или бесплатный тариф заблокирован. Требуется платный план.",
-          en: "ElevenLabs: invalid API key or free tier blocked. A paid plan may be required.",
-        },
+        401: isSignInRequired
+          ? {
+              ru: "ElevenLabs: бесплатный тариф заблокирован из облачной среды. Войдите на elevenlabs.io и повторите попытку, или используйте платный план.",
+              en: "ElevenLabs: free tier blocked from cloud environment. Sign in at elevenlabs.io and retry, or upgrade to a paid plan.",
+            }
+          : {
+              ru: "ElevenLabs: неверный API-ключ. Проверьте ключ в профиле.",
+              en: "ElevenLabs: invalid API key. Check your key in profile.",
+            },
         403: {
           ru: "ElevenLabs: доступ запрещён. Проверьте права API-ключа.",
           en: "ElevenLabs: access forbidden. Check your API key permissions.",
