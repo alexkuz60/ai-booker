@@ -517,6 +517,7 @@ Deno.serve(async (req) => {
         }
 
         // Upsert segment_audio record
+        const isV3Voice = V3_ONLY_VOICES.has(voiceConfig.voice);
         await supabaseAdmin.from("segment_audio").upsert(
           {
             segment_id: seg.id,
@@ -529,6 +530,7 @@ Deno.serve(async (req) => {
               speed: voiceConfig.speed,
               pitchShift: voiceConfig.pitchShift,
               volume: voiceConfig.volume,
+              apiVersion: isV3Voice ? "v3" : "v1",
             },
           },
           { onConflict: "segment_id" }
