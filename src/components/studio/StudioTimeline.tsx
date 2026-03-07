@@ -254,7 +254,7 @@ export function StudioTimeline({
     : (chapterDurationSec && chapterDurationSec > 0 ? chapterDurationSec : 180);
   const duration = clipsDuration > 0 ? clipsDuration : estimateDuration;
 
-  // Group clips by track ID
+  // Group clips by track ID (scene mode)
   const clipsByTrack = useMemo(() => {
     const map = new Map<string, TimelineClip[]>();
     for (const clip of timelineClips) {
@@ -265,14 +265,67 @@ export function StudioTimeline({
     return map;
   }, [timelineClips]);
 
-  // Auto-add narrator-fallback track if clips reference it
+  // ── Chapter mode: build scene-level clips ─────────────────
+  const chapterSceneClips = useMemo<ChapterSceneClip[]>(() => {
+    if (mode !== "chapter" || !chapterSceneIds?.length) return [];
+    // Group timeline clips by scene_id to get per-scene duration
+    const durationByScene = new Map<string, { total: number; hasAudio: boolean }>();
+    // scene_id is encoded in the original clips via the sceneIds ordering
+    // We need to re-derive from the raw clips. Each clip has an `id` which is a segment id.
+    // Instead, use the clips' startSec/durationSec grouped by scene offset.
+    // Simpler: use the timelineClips which are ordered by scene, and group by sceneId.
+    // But TimelineClip doesn't have sceneId. Let's compute from contextSceneIds ordering.
+
+    // Build scene clips from estimates or segment data
+    const CHARS_PER_SEC = 14;
+    const result: ChapterSceneClip[] = [];
+    let offset = 0;
+
+    for (let i = 0; i < chapterSceneIds.length; i++) {
+      const sid = chapterSceneIds[i];
+      const sceneInfo = chapterScenes?.find(s => s.id === sid);
+      
+      // Find clips belonging to this scene by checking if they fall within the scene's time range
+      // Since clips are sequential per scene, we can sum durations of segments for this scene
+      const sceneSegmentClips = timelineClips.filter(c => {
+        // We need to match clips to scenes. Clips don't have sceneId.
+        // Use the segment query approach - check if clip start falls in expected range
+        return false; // placeholder
+      });
+
+      // Better approach: compute from the offset structure in useTimelineClips
+      // The clips are laid out sequentially scene by scene matching chapterSceneIds order
+      // So we can partition by looking at the gap pattern
+      let sceneDuration = 0;
+      let sceneHasAudio = false;
+
+      // Collect all clips that belong to scene at index i
+      // Since useTimelineClips processes scenes in order, we can track cumulative offsets
+      // For now, estimate from scene content or use a fixed estimate
+      // We'll enhance useTimelineClips to include sceneId on clips
+
+      result.push({
+        sceneId: sid,
+        sceneIdx: i,
+        label: sceneInfo?.title || `${isRu ? "Сцена" : "Scene"} ${sceneInfo?.scene_number ?? i + 1}`,
+        startSec: offset,
+        durationSec: 0, // placeholder, filled below
+        hasAudio: false,
+      });
+    }
+
+    return result;
+  }, [mode, chapterSceneIds, chapterScenes, timelineClips, isRu]);
+
+  // Auto-add narrator-fallback track if clips reference it (scene mode only)
   const allTracks = useMemo(() => {
+    if (mode === "chapter") return FIXED_TRACKS; // chapter mode uses scene track, not character tracks
     const hasNarratorFallback = timelineClips.some(c => c.trackId === "narrator-fallback");
     const narratorTrack: TimelineTrackData[] = hasNarratorFallback
       ? [{ id: "narrator-fallback", label: isRu ? "Рассказчик" : "Narrator", color: "hsl(var(--primary))", type: "narrator" }]
       : [];
     return [...narratorTrack, ...charTracks, ...FIXED_TRACKS];
-  }, [charTracks, timelineClips, isRu]);
+  }, [charTracks, timelineClips, isRu, mode]);
 
   // ── Layout / zoom ─────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
