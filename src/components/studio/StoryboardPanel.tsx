@@ -123,8 +123,7 @@ function EditablePhrase({ phrase, isRu, onSave }: {
 
   return (
     <div
-      className="flex gap-2 px-3 py-1.5 hover:bg-accent/20 transition-colors group cursor-text"
-      onClick={() => setEditing(true)}
+      className="flex gap-2 px-3 py-1.5 hover:bg-accent/20 transition-colors group"
     >
       <span className="text-[10px] text-muted-foreground font-mono pt-0.5 shrink-0 w-5 text-right">
         {phrase.phrase_number}
@@ -132,7 +131,13 @@ function EditablePhrase({ phrase, isRu, onSave }: {
       <p className="text-sm font-body text-foreground leading-relaxed flex-1">
         {renderPhraseText(phrase.text)}
       </p>
-      <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
+      <button
+        onClick={() => setEditing(true)}
+        className="shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground cursor-pointer"
+        title={isRu ? "Редактировать" : "Edit"}
+      >
+        <Pencil className="h-3 w-3" />
+      </button>
     </div>
   );
 }
