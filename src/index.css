@@ -141,3 +141,21 @@
     color: hsl(var(--text-dim));
   }
 }
+
+/* Small volume slider thumb */
+.volume-slider-sm::-webkit-slider-thumb {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  -webkit-appearance: none;
+  background: hsl(var(--primary));
+  cursor: pointer;
+}
+.volume-slider-sm::-moz-range-thumb {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  background: hsl(var(--primary));
+  cursor: pointer;
+}
