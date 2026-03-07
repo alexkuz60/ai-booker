@@ -554,28 +554,33 @@ export function StoryboardPanel({
   }, [isRu]);
 
   // Update speaker in DB
-  // Update speaker — and propagate to all segments of same type in this scene
+  // Update speaker — propagate to all segments of same type ONLY for non-dialogue types
+  // Dialogue segments have individual speakers (different characters speak)
+  const PROPAGATE_TYPES = new Set(["narrator", "first_person", "inner_thought", "epigraph", "lyric", "footnote"]);
+
   const updateSpeaker = useCallback(async (segmentId: string, newSpeaker: string | null) => {
     const targetSeg = segments.find(s => s.segment_id === segmentId);
     if (!targetSeg) return;
 
-    const sameTypeIds = segments
-      .filter(s => s.segment_type === targetSeg.segment_type)
-      .map(s => s.segment_id);
+    const shouldPropagate = PROPAGATE_TYPES.has(targetSeg.segment_type);
 
-    // Update all segments of same type locally
+    const affectedIds = shouldPropagate
+      ? segments.filter(s => s.segment_type === targetSeg.segment_type).map(s => s.segment_id)
+      : [segmentId];
+
+    // Update locally
     setSegments(prev => prev.map(seg =>
-      sameTypeIds.includes(seg.segment_id) ? { ...seg, speaker: newSpeaker } : seg
+      affectedIds.includes(seg.segment_id) ? { ...seg, speaker: newSpeaker } : seg
     ));
 
-    // Persist segments to DB
+    // Persist to DB
     const { error } = await supabase
       .from("scene_segments")
       .update({ speaker: newSpeaker })
-      .in("id", sameTypeIds);
+      .in("id", affectedIds);
 
-    // Upsert or delete scene-level type→character mapping
-    if (sceneId) {
+    // Upsert or delete scene-level type→character mapping (only for propagatable types)
+    if (sceneId && shouldPropagate) {
       const charRecord = newSpeaker ? characters.find(c => c.name === newSpeaker) : null;
       if (charRecord) {
         await supabase
@@ -595,14 +600,14 @@ export function StoryboardPanel({
 
     if (error) {
       toast.error(isRu ? "Ошибка сохранения персонажа" : "Failed to save speaker");
-    } else if (sameTypeIds.length > 1) {
+    } else if (affectedIds.length > 1) {
       const typeLabel = isRu
         ? SEGMENT_CONFIG[targetSeg.segment_type]?.label_ru
         : SEGMENT_CONFIG[targetSeg.segment_type]?.label_en;
       toast.success(
         isRu
-          ? `«${typeLabel}» → ${newSpeaker || "?"} (${sameTypeIds.length} фрагм.)`
-          : `"${typeLabel}" → ${newSpeaker || "?"} (${sameTypeIds.length} seg.)`
+          ? `«${typeLabel}» → ${newSpeaker || "?"} (${affectedIds.length} фрагм.)`
+          : `"${typeLabel}" → ${newSpeaker || "?"} (${affectedIds.length} seg.)`
       );
     }
   }, [isRu, segments, sceneId, characters]);
