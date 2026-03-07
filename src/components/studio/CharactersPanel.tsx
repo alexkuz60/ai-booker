@@ -343,19 +343,30 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   useEffect(() => {
     if (!selectedChar) return;
     const vc = selectedChar.voice_config;
-    let voiceId = vc.voice_id || "marina";
-    // If saved voice gender doesn't match character gender, re-match
-    const savedVoice = YANDEX_VOICES.find(v => v.id === voiceId);
-    if (savedVoice && selectedChar.gender !== "unknown" && savedVoice.gender !== selectedChar.gender) {
-      voiceId = matchVoice(selectedChar.gender, selectedChar.age_group);
+    const provider = (vc.provider as string) || "yandex";
+    setVoiceProvider(provider === "elevenlabs" ? "elevenlabs" : "yandex");
+
+    if (provider === "elevenlabs") {
+      setElVoice(vc.voice_id || "JBFqnCBsd6RMkjVDRZzb");
+      setElStability((vc as any).stability ?? 0.5);
+      setElSimilarity((vc as any).similarity_boost ?? 0.75);
+      setElStyle((vc as any).style ?? 0.4);
+      setElSpeed(vc.speed ?? 0.95);
+      setDirty(false);
+    } else {
+      let voiceId = vc.voice_id || "marina";
+      const savedVoice = YANDEX_VOICES.find(v => v.id === voiceId);
+      if (savedVoice && selectedChar.gender !== "unknown" && savedVoice.gender !== selectedChar.gender) {
+        voiceId = matchVoice(selectedChar.gender, selectedChar.age_group);
+      }
+      setVoice(voiceId);
+      const currentVoice = YANDEX_VOICES.find(v => v.id === voiceId);
+      setRole(currentVoice?.roles?.includes(vc.role || "") ? (vc.role || "neutral") : (currentVoice?.roles?.[0] || vc.role || "neutral"));
+      setSpeed(vc.speed ?? 1.0);
+      setPitch(vc.pitch ?? 0);
+      setVolume(vc.volume ?? 0);
+      setDirty(voiceId !== (vc.voice_id || "marina"));
     }
-    setVoice(voiceId);
-    const currentVoice = YANDEX_VOICES.find(v => v.id === voiceId);
-    setRole(currentVoice?.roles?.includes(vc.role || "") ? (vc.role || "neutral") : (currentVoice?.roles?.[0] || vc.role || "neutral"));
-    setSpeed(vc.speed ?? 1.0);
-    setPitch(vc.pitch ?? 0);
-    setVolume(vc.volume ?? 0);
-    setDirty(voiceId !== (vc.voice_id || "marina")); // mark dirty if voice was re-matched
   }, [selectedId]);
 
   const markDirty = () => setDirty(true);
