@@ -28,8 +28,8 @@ Deno.serve(async (req) => {
     );
 
     const token = authHeader.replace("Bearer ", "");
-    const { data, error: claimsErr } = await supabase.auth.getUser(token);
-    if (claimsErr || !data?.user) {
+    const { data: claimsData, error: claimsErr } = await supabase.auth.getClaims(token);
+    if (claimsErr || !claimsData?.claims) {
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -50,11 +50,20 @@ Deno.serve(async (req) => {
     // Try user's own API key first, fallback to server key
     let ELEVENLABS_API_KEY: string | undefined;
     try {
-      const { data: apiKeys } = await supabase.rpc("get_my_api_keys");
-      ELEVENLABS_API_KEY = (apiKeys as Record<string, string>)?.elevenlabs;
-    } catch {}
+      const { data: apiKeys, error: rpcErr } = await supabase.rpc("get_my_api_keys");
+      if (rpcErr) {
+        console.error("RPC get_my_api_keys error:", rpcErr.message);
+      } else {
+        const keys = apiKeys as Record<string, string> | null;
+        ELEVENLABS_API_KEY = keys?.elevenlabs;
+        console.log("User ElevenLabs key found:", !!ELEVENLABS_API_KEY);
+      }
+    } catch (e) {
+      console.error("RPC call failed:", e);
+    }
     if (!ELEVENLABS_API_KEY) {
       ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
+      console.log("Using server ElevenLabs key:", !!ELEVENLABS_API_KEY);
     }
 
     if (!ELEVENLABS_API_KEY) {
