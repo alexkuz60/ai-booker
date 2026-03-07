@@ -55,8 +55,11 @@ Deno.serve(async (req) => {
         console.error("RPC get_my_api_keys error:", rpcErr.message);
       } else {
         const keys = apiKeys as Record<string, string> | null;
-        ELEVENLABS_API_KEY = keys?.elevenlabs;
-        console.log("User ElevenLabs key found:", !!ELEVENLABS_API_KEY);
+        const rawKey = keys?.elevenlabs;
+        if (rawKey) {
+          ELEVENLABS_API_KEY = rawKey.trim();
+          console.log("User ElevenLabs key found, length:", ELEVENLABS_API_KEY.length, "prefix:", ELEVENLABS_API_KEY.substring(0, 5));
+        }
       }
     } catch (e) {
       console.error("RPC call failed:", e);
