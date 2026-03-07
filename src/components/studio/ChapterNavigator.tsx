@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle } from "lucide-react";
+import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { StudioChapter } from "@/lib/studioChapter";
 import { estimateSceneDuration } from "@/lib/durationEstimate";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 // ─── Scene type colors (same as Parser) ─────────────────────
 export const SCENE_TYPE_COLORS: Record<string, string> = {
@@ -37,6 +40,7 @@ export function ChapterNavigator({
   renderedSceneIds,
   fullyRenderedSceneIds,
   staleAudioSceneIds,
+  onBatchResynthDone,
 }: {
   chapter: StudioChapter;
   selectedSceneIdx: number | null;
@@ -46,8 +50,45 @@ export function ChapterNavigator({
   renderedSceneIds?: Set<string>;
   fullyRenderedSceneIds?: Set<string>;
   staleAudioSceneIds?: Set<string>;
+  onBatchResynthDone?: () => void;
 }) {
   const [chapterOpen, setChapterOpen] = useState(true);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchProgress, setBatchProgress] = useState("");
+
+  const staleCount = staleAudioSceneIds?.size ?? 0;
+
+  const handleBatchResynth = async () => {
+    if (!staleAudioSceneIds || staleCount === 0) return;
+    setBatchRunning(true);
+    const staleIds = [...staleAudioSceneIds];
+    let done = 0;
+    let errors = 0;
+    for (const sceneId of staleIds) {
+      done++;
+      setBatchProgress(`${done}/${staleIds.length}`);
+      try {
+        const { error } = await supabase.functions.invoke("synthesize-scene", {
+          body: { scene_id: sceneId, language: isRu ? "ru" : "en", force: true },
+        });
+        if (error) {
+          console.error("Batch resynth error for scene", sceneId, error);
+          errors++;
+        }
+      } catch (e) {
+        console.error("Batch resynth exception for scene", sceneId, e);
+        errors++;
+      }
+    }
+    setBatchRunning(false);
+    setBatchProgress("");
+    onBatchResynthDone?.();
+    if (errors === 0) {
+      toast.success(isRu ? `Ре-синтез завершён: ${staleIds.length} сцен` : `Re-synthesis complete: ${staleIds.length} scenes`);
+    } else {
+      toast.warning(isRu ? `Ре-синтез: ${staleIds.length - errors} ок, ${errors} ошибок` : `Re-synthesis: ${staleIds.length - errors} ok, ${errors} errors`);
+    }
+  };
 
   return (
     <div className="h-full flex flex-col border-r border-border">
@@ -57,6 +98,28 @@ export function ChapterNavigator({
           <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider font-body">
             {isRu ? "Глава" : "Chapter"}
           </span>
+          {staleCount > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="ml-auto h-6 px-2 text-[11px] gap-1 text-yellow-500 border-yellow-500/30 hover:bg-yellow-500/10"
+              disabled={batchRunning}
+              onClick={handleBatchResynth}
+              title={isRu ? `Ре-синтез ${staleCount} устаревших сцен` : `Re-synthesize ${staleCount} stale scenes`}
+            >
+              {batchRunning ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>{batchProgress}</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-3 w-3" />
+                  <span>{staleCount}</span>
+                </>
+              )}
+            </Button>
+          )}
         </div>
         <p className="text-xs text-muted-foreground mt-0.5 truncate">
           {chapter.bookTitle}
