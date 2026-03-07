@@ -448,12 +448,15 @@ export function StoryboardPanel({
           speaker = typeSpeakerMap.get(s.segment_type)!;
           needUpdate.push(s.id);
         }
+        const meta = (s.metadata ?? {}) as Record<string, unknown>;
+        const inlineNarr = Array.isArray(meta.inline_narrations) ? meta.inline_narrations as InlineNarration[] : undefined;
         return {
           segment_id: s.id,
           segment_number: s.segment_number,
           segment_type: s.segment_type,
           speaker,
           phrases: phraseMap.get(s.id) || [],
+          inline_narrations: inlineNarr,
         };
       });
 
