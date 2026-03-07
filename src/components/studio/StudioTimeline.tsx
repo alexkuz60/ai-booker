@@ -97,29 +97,32 @@ function TimelineTrack({
       {clips.filter(c => c.start < c.end).map((clip, i) => {
         const widthPx = (clip.end - clip.start) * zoom * 4;
         const isSelected = selectedSegmentId && clip.id === selectedSegmentId;
-        return (
-          <div
-            key={i}
-            className={`absolute top-1 bottom-1 rounded-sm transition-all cursor-pointer ${
-              clip.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-50 hover:opacity-70"
-            } ${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background opacity-100 z-10" : ""}`}
-            style={{
-              left: `${clip.start * zoom * 4}px`,
-              width: `${widthPx}px`,
-              backgroundColor: track.color,
-              backgroundImage: clip.hasAudio
-                ? undefined
-                : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
-            }}
-            title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${clip.hasAudio ? " 🔊" : ""}`}
-            onDoubleClick={() => onSelectSegment?.(clip.id)}
-          >
-            {widthPx > 40 && (
-              <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
-                {clip.hasAudio ? "🔊 " : ""}{clip.label}
-              </span>
-            )}
-          </div>
+          const isSynthesizing = synthesizingSegmentIds?.has(clip.id);
+          return (
+            <div
+              key={i}
+              className={`absolute top-1 bottom-1 rounded-sm transition-all cursor-pointer ${
+                clip.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-50 hover:opacity-70"
+              } ${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background opacity-100 z-10" : ""} ${isSynthesizing ? "synth-oscilloscope" : ""}`}
+              style={{
+                left: `${clip.start * zoom * 4}px`,
+                width: `${widthPx}px`,
+                backgroundColor: track.color,
+                backgroundImage: isSynthesizing
+                  ? undefined
+                  : clip.hasAudio
+                    ? undefined
+                    : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
+              }}
+              title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${clip.hasAudio ? " 🔊" : ""}${isSynthesizing ? " ⏳" : ""}`}
+              onDoubleClick={() => onSelectSegment?.(clip.id)}
+            >
+              {widthPx > 40 && (
+                <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
+                  {isSynthesizing ? "⏳ " : clip.hasAudio ? "🔊 " : ""}{clip.label}
+                </span>
+              )}
+            </div>
         );
       })}
     </div>
@@ -177,6 +180,7 @@ interface StudioTimelineProps {
   onSelectSceneIdx?: (idx: number) => void;
   selectedSegmentId?: string | null;
   onSelectSegment?: (segmentId: string | null) => void;
+  synthesizingSegmentIds?: Set<string>;
 }
 
 export function StudioTimeline({
@@ -192,6 +196,7 @@ export function StudioTimeline({
   onSelectSceneIdx,
   selectedSegmentId,
   onSelectSegment,
+  synthesizingSegmentIds,
 }: StudioTimelineProps) {
   const [mode, setMode] = useState<"scene" | "chapter">("scene");
 
@@ -609,7 +614,7 @@ export function StudioTimeline({
             >
               <TimelineRuler zoom={zoom} duration={duration} />
               {allTracks.map((track) => (
-                <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} clips={clipsByTrack.get(track.id)} selectedSegmentId={selectedSegmentId} onSelectSegment={onSelectSegment} />
+                <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} clips={clipsByTrack.get(track.id)} selectedSegmentId={selectedSegmentId} onSelectSegment={onSelectSegment} synthesizingSegmentIds={synthesizingSegmentIds} />
               ))}
               <Playhead positionSec={player.positionSec} zoom={zoom} />
             </div>
