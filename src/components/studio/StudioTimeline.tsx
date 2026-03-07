@@ -248,7 +248,11 @@ export function StudioTimeline({
   const player = useTimelinePlayer(timelineClips);
 
   // ── Duration: prefer actual clip data, fallback to estimate ──
-  const clipsDuration = player.totalDuration;
+  const clipsDuration = mode === "chapter"
+    ? (chapterSceneClips.length > 0
+        ? chapterSceneClips[chapterSceneClips.length - 1].startSec + chapterSceneClips[chapterSceneClips.length - 1].durationSec
+        : 0)
+    : player.totalDuration;
   const estimateDuration = mode === "scene"
     ? (sceneDurationSec && sceneDurationSec > 0 ? sceneDurationSec : 60)
     : (chapterDurationSec && chapterDurationSec > 0 ? chapterDurationSec : 180);
