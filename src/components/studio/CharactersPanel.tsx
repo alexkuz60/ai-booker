@@ -803,6 +803,40 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     }
   }, [characters, segmentCounts, SYSTEM_NAMES, isRu, loadCharacters]);
 
+  // ── Load ElevenLabs credits ──────────────────────────────
+  const loadElCredits = useCallback(async () => {
+    setElCreditsLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-credits`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setElCredits({ used: data.character_count, limit: data.character_limit, tier: data.tier });
+      }
+    } catch (e) {
+      console.error("Credits load error:", e);
+    } finally {
+      setElCreditsLoading(false);
+    }
+  }, []);
+
+  // Load credits when switching to ElevenLabs tab
+  useEffect(() => {
+    if (voiceProvider === "elevenlabs" && !elCredits && !elCreditsLoading) {
+      loadElCredits();
+    }
+  }, [voiceProvider]);
+
   // ── TTS Preview ─────────────────────────────────────────
   const handlePreview = async () => {
     if (playing && audioRef) {
@@ -820,25 +854,45 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         ? "Здравствуйте. Это предварительное прослушивание голоса для вашего персонажа."
         : "Hello. This is a voice preview for your character.";
 
-      const body: Record<string, unknown> = {
-        text: testText, voice, lang: selectedVoice?.lang === "en" ? "en" : "ru", speed,
-        role: role !== "neutral" ? role : undefined,
-        pitchShift: pitch !== 0 ? pitch : undefined,
-        volume: volume !== 0 ? volume : undefined,
-      };
+      let response: Response;
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/yandex-tts`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify(body),
-        }
-      );
+      if (voiceProvider === "elevenlabs") {
+        response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              text: testText,
+              voiceId: elVoice,
+              lang: isRu ? "ru" : "en",
+            }),
+          }
+        );
+      } else {
+        const body: Record<string, unknown> = {
+          text: testText, voice, lang: selectedVoice?.lang === "en" ? "en" : "ru", speed,
+          role: role !== "neutral" ? role : undefined,
+          pitchShift: pitch !== 0 ? pitch : undefined,
+          volume: volume !== 0 ? volume : undefined,
+        };
+        response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/yandex-tts`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(body),
+          }
+        );
+      }
 
       if (!response.ok) {
         let errMsg = `HTTP ${response.status}`;
