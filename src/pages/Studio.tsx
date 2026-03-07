@@ -32,6 +32,7 @@ const Studio = () => {
     if (segmentId) setActiveTab("storyboard");
   }, [setActiveTab]);
   const [segmentedSceneIds, setSegmentedSceneIds] = useState<Set<string>>(new Set());
+  const [renderedSceneIds, setRenderedSceneIds] = useState<Set<string>>(new Set());
   const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const chapterSceneIds = chapter?.scenes.map(s => s.id).filter(Boolean) as string[] | undefined;
@@ -81,18 +82,36 @@ const Studio = () => {
     })();
   }, [chapter?.chapterTitle]);
 
-  // Check which scenes already have segments
+  // Check which scenes already have segments and which have audio rendered
   useEffect(() => {
     if (!chapter) return;
     const ids = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
     if (ids.length === 0) return;
     (async () => {
-      const { data } = await supabase
+      const { data: segData } = await supabase
         .from("scene_segments")
-        .select("scene_id")
+        .select("id, scene_id")
         .in("scene_id", ids);
-      if (data) {
-        setSegmentedSceneIds(new Set(data.map(d => d.scene_id)));
+
+      if (!segData?.length) return;
+
+      setSegmentedSceneIds(new Set(segData.map(d => d.scene_id)));
+
+      const segIds = segData.map(s => s.id);
+      const { data: audioData } = await supabase
+        .from("segment_audio")
+        .select("segment_id")
+        .in("segment_id", segIds)
+        .eq("status", "ready");
+
+      if (audioData?.length) {
+        const segToScene = new Map(segData.map(s => [s.id, s.scene_id]));
+        const rendered = new Set<string>();
+        for (const a of audioData) {
+          const sceneId = segToScene.get(a.segment_id);
+          if (sceneId) rendered.add(sceneId);
+        }
+        setRenderedSceneIds(rendered);
       }
     })();
   }, [chapter?.scenes.map(s => s.id).join(",")]);
@@ -179,6 +198,7 @@ const Studio = () => {
                   onSelectScene={setSelectedSceneIdx}
                   isRu={isRu}
                   segmentedSceneIds={segmentedSceneIds}
+                  renderedSceneIds={renderedSceneIds}
                 />
               ) : (
                 <EmptyNavigator isRu={isRu} />

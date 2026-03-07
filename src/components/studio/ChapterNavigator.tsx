@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, ChevronDown, Clapperboard, Film } from "lucide-react";
+import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
@@ -34,12 +34,14 @@ export function ChapterNavigator({
   onSelectScene,
   isRu,
   segmentedSceneIds,
+  renderedSceneIds,
 }: {
   chapter: StudioChapter;
   selectedSceneIdx: number | null;
   onSelectScene: (idx: number | null) => void;
   isRu: boolean;
   segmentedSceneIds?: Set<string>;
+  renderedSceneIds?: Set<string>;
 }) {
   const [chapterOpen, setChapterOpen] = useState(true);
 
@@ -97,9 +99,15 @@ export function ChapterNavigator({
                         {isRu ? (SCENE_TYPE_RU[scene.scene_type] || scene.scene_type) : scene.scene_type}
                       </span>
                       <span className="truncate flex-1">{scene.title}</span>
-                      {segmentedSceneIds?.has(scene.id || "") && (
-                        <Film className="h-3 w-3 text-primary shrink-0" />
-                      )}
+                      {renderedSceneIds?.has(scene.id || "") ? (
+                        <span title={isRu ? "Аудио готово" : "Audio ready"}>
+                          <Volume2 className="h-3 w-3 text-green-400 shrink-0" />
+                        </span>
+                      ) : segmentedSceneIds?.has(scene.id || "") ? (
+                        <span title={isRu ? "Сегментировано" : "Segmented"}>
+                          <Film className="h-3 w-3 text-primary shrink-0" />
+                        </span>
+                      ) : null}
                       <span className="text-[11px] text-muted-foreground font-mono shrink-0" title={`${est.chars} ${isRu ? "сим." : "chars"}`}>
                         {est.formatted}
                       </span>
