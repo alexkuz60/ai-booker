@@ -238,6 +238,7 @@ const Studio = () => {
                 onTabChange={setActiveTab}
                 selectedSegmentId={selectedSegmentId}
                 onSelectSegment={setSelectedSegmentId}
+                onSynthesizingChange={setSynthesizingSegmentIds}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
@@ -256,6 +257,7 @@ const Studio = () => {
           onSelectSceneIdx={setSelectedSceneIdx}
           selectedSegmentId={selectedSegmentId}
           onSelectSegment={handleSelectSegmentFromTimeline}
+          synthesizingSegmentIds={synthesizingSegmentIds}
         />
       </div>
     </motion.div>
