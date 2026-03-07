@@ -292,6 +292,13 @@ export function StoryboardPanel({
   const [characters, setCharacters] = useState<CharacterOption[]>([]);
   const [audioStatus, setAudioStatus] = useState<Map<string, { status: string; durationMs: number }>>(new Map());
 
+  // Scroll selected segment into view when set externally (from timeline)
+  useEffect(() => {
+    if (!selectedSegmentId) return;
+    const el = document.getElementById(`storyboard-seg-${selectedSegmentId}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [selectedSegmentId]);
+
   // Load characters for the book
   useEffect(() => {
     if (!bookId) { setCharacters([]); return; }
