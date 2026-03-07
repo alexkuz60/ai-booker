@@ -218,7 +218,7 @@ const Studio = () => {
           onSelectCharacter={setSelectedCharacterId}
           onSelectSceneIdx={setSelectedSceneIdx}
           selectedSegmentId={selectedSegmentId}
-          onSelectSegment={setSelectedSegmentId}
+          onSelectSegment={handleSelectSegmentFromTimeline}
         />
       </div>
     </motion.div>
