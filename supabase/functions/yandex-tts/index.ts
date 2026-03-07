@@ -87,6 +87,7 @@ async function getCachedIamToken(): Promise<string> {
 
 interface TtsParams {
   text: string;
+  ssml?: string;      // SSML markup; if provided, used instead of text (v1 only)
   voice: string;
   lang: string;
   speed: number;
@@ -103,7 +104,12 @@ async function synthesizeV1(
 ): Promise<{ audio: Uint8Array; contentType: string }> {
   const folderId = Deno.env.get("YANDEX_FOLDER_ID")!;
   const form = new URLSearchParams();
-  form.append("text", params.text);
+  // Use SSML if provided, otherwise plain text
+  if (params.ssml) {
+    form.append("ssml", params.ssml);
+  } else {
+    form.append("text", params.text);
+  }
   form.append("lang", params.lang);
   form.append("voice", params.voice);
   form.append("folderId", folderId);
@@ -289,13 +295,14 @@ Deno.serve(async (req) => {
     // Parse request
     const body = await req.json();
     const {
-      text, voice, lang, speed,
+      text, ssml, voice, lang, speed,
       emotion, role, pitchShift, pitch_shift, volume,
       apiVersion, api_version,
     } = body;
 
     const isRu = lang === "ru";
-    if (!text || typeof text !== "string" || text.length > 5000) {
+    const inputText = ssml || text;
+    if (!inputText || typeof inputText !== "string" || inputText.length > 8000) {
       return new Response(
         JSON.stringify({ error: isRu ? "Текст до 5000 символов." : "Text must be under 5000 chars." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -310,19 +317,25 @@ Deno.serve(async (req) => {
     const selectedVolume = volume ?? undefined;
 
     // Auto-detect API version:
+    // - SSML forces v1 (v3 doesn't support SSML via REST the same way)
     // - Explicit apiVersion/api_version wins
     // - v3 if pitch/volume/role requested, or voice is v3-only
     // - Otherwise v1
     let ver: "v1" | "v3" = (apiVersion || api_version) as "v1" | "v3" || "v1";
-    const needsV3 =
-      selectedPitch !== undefined ||
-      selectedVolume !== undefined ||
-      selectedRole !== undefined ||
-      V3_ONLY_VOICES.has(selectedVoice);
-    if (!apiVersion && !api_version && needsV3) ver = "v3";
+    if (ssml) {
+      ver = "v1"; // SSML only supported in v1 REST
+    } else {
+      const needsV3 =
+        selectedPitch !== undefined ||
+        selectedVolume !== undefined ||
+        selectedRole !== undefined ||
+        V3_ONLY_VOICES.has(selectedVoice);
+      if (!apiVersion && !api_version && needsV3) ver = "v3";
+    }
 
     const params: TtsParams = {
-      text,
+      text: text || "",
+      ssml: ssml || undefined,
       voice: selectedVoice,
       lang: selectedLang,
       speed: selectedSpeed,
