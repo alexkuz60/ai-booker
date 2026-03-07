@@ -23,15 +23,21 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
   const stateRef = useRef<PlayerState>("stopped");
   const pausedAtRef = useRef(0);
   const volumeRef = useRef(volume);
+  const audioClipsRef = useRef<TimelineClip[]>([]);
 
   // Sort clips with audio by start time
   const audioClips = clips
     .filter(c => c.hasAudio && c.audioPath)
     .sort((a, b) => a.startSec - b.startSec);
 
+  // Keep ref in sync
+  audioClipsRef.current = audioClips;
+
   const totalDuration = clips.length > 0
     ? Math.max(...clips.map(c => c.startSec + c.durationSec))
     : 0;
+  const totalDurationRef = useRef(totalDuration);
+  totalDurationRef.current = totalDuration;
 
   // Cleanup
   useEffect(() => {
