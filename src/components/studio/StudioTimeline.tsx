@@ -268,50 +268,46 @@ export function StudioTimeline({
   // ── Chapter mode: build scene-level clips ─────────────────
   const chapterSceneClips = useMemo<ChapterSceneClip[]>(() => {
     if (mode !== "chapter" || !chapterSceneIds?.length) return [];
-    // Group timeline clips by scene_id to get per-scene duration
-    const durationByScene = new Map<string, { total: number; hasAudio: boolean }>();
-    // scene_id is encoded in the original clips via the sceneIds ordering
-    // We need to re-derive from the raw clips. Each clip has an `id` which is a segment id.
-    // Instead, use the clips' startSec/durationSec grouped by scene offset.
-    // Simpler: use the timelineClips which are ordered by scene, and group by sceneId.
-    // But TimelineClip doesn't have sceneId. Let's compute from contextSceneIds ordering.
 
-    // Build scene clips from estimates or segment data
+    // Group timeline clips by sceneId
+    const clipsByScene = new Map<string, TimelineClip[]>();
+    for (const c of timelineClips) {
+      const list = clipsByScene.get(c.sceneId) ?? [];
+      list.push(c);
+      clipsByScene.set(c.sceneId, list);
+    }
+
     const CHARS_PER_SEC = 14;
+    const DEFAULT_SCENE_SEC = 30;
     const result: ChapterSceneClip[] = [];
     let offset = 0;
 
     for (let i = 0; i < chapterSceneIds.length; i++) {
       const sid = chapterSceneIds[i];
-      const sceneInfo = chapterScenes?.find(s => s.id === sid);
-      
-      // Find clips belonging to this scene by checking if they fall within the scene's time range
-      // Since clips are sequential per scene, we can sum durations of segments for this scene
-      const sceneSegmentClips = timelineClips.filter(c => {
-        // We need to match clips to scenes. Clips don't have sceneId.
-        // Use the segment query approach - check if clip start falls in expected range
-        return false; // placeholder
-      });
+      const sceneInfo = chapterScenes?.[i];
+      const sceneClips = clipsByScene.get(sid);
 
-      // Better approach: compute from the offset structure in useTimelineClips
-      // The clips are laid out sequentially scene by scene matching chapterSceneIds order
-      // So we can partition by looking at the gap pattern
-      let sceneDuration = 0;
-      let sceneHasAudio = false;
+      let sceneDuration: number;
+      let hasAudio = false;
 
-      // Collect all clips that belong to scene at index i
-      // Since useTimelineClips processes scenes in order, we can track cumulative offsets
-      // For now, estimate from scene content or use a fixed estimate
-      // We'll enhance useTimelineClips to include sceneId on clips
+      if (sceneClips?.length) {
+        // Sum durations of all segments in this scene
+        sceneDuration = sceneClips.reduce((sum, c) => sum + c.durationSec, 0);
+        hasAudio = sceneClips.some(c => c.hasAudio);
+      } else {
+        sceneDuration = DEFAULT_SCENE_SEC;
+      }
 
       result.push({
         sceneId: sid,
         sceneIdx: i,
         label: sceneInfo?.title || `${isRu ? "Сцена" : "Scene"} ${sceneInfo?.scene_number ?? i + 1}`,
         startSec: offset,
-        durationSec: 0, // placeholder, filled below
-        hasAudio: false,
+        durationSec: sceneDuration,
+        hasAudio,
       });
+
+      offset += sceneDuration;
     }
 
     return result;
