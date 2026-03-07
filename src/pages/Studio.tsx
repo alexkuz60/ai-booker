@@ -204,8 +204,10 @@ const Studio = () => {
           sceneId={selectedScene?.id ?? null}
           bookId={bookId}
           chapterSceneIds={chapterSceneIds}
+          chapterScenes={chapter?.scenes.map(s => ({ id: s.id, scene_number: s.scene_number, title: s.title }))}
           selectedCharacterId={selectedCharacterId}
           onSelectCharacter={setSelectedCharacterId}
+          onSelectSceneIdx={setSelectedSceneIdx}
         />
       </div>
     </motion.div>
