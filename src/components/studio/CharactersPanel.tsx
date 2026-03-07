@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
-import { Users, UsersRound, Volume2, Loader2, Square, Play, RotateCcw, Save, Sparkles, User, Wand2, Filter, Merge, CheckSquare, X, Check } from "lucide-react";
+import { Users, UsersRound, Volume2, Loader2, Square, Play, RotateCcw, Save, Sparkles, User, Wand2, Filter, Merge, CheckSquare, X, Check, SearchCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
