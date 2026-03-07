@@ -308,13 +308,21 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
   // Filtered character list
   const filteredCharacters = useMemo(() => {
+    let list: BookCharacter[];
     if (filterMode === "scene" && sceneId) {
       const sceneChars = characters.filter(c => sceneCharIds.has(c.id));
-      if (sceneChars.length > 0) return sceneChars;
-      // Narrative scene — show system characters (Narrator / Commentator)
-      return characters.filter(c => SYSTEM_NAMES.has(c.name));
+      list = sceneChars.length > 0 ? sceneChars : characters.filter(c => SYSTEM_NAMES.has(c.name));
+    } else {
+      list = characters;
     }
-    return characters;
+    // System characters first (by sort_order), then alphabetical
+    return [...list].sort((a, b) => {
+      const aSys = SYSTEM_NAMES.has(a.name);
+      const bSys = SYSTEM_NAMES.has(b.name);
+      if (aSys !== bSys) return aSys ? -1 : 1;
+      if (aSys && bSys) return a.sort_order - b.sort_order;
+      return a.name.localeCompare(b.name);
+    });
   }, [characters, filterMode, sceneCharIds, sceneId, SYSTEM_NAMES]);
 
   // ── Sync voice settings when character selected ─────────
