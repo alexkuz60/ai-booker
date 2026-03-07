@@ -327,7 +327,7 @@ Deno.serve(async (req) => {
 
     const yandexTtsUrl = `${supabaseUrl}/functions/v1/yandex-tts`;
     const userId = userData.user.id;
-    const narratorVoice = getNarratorVoice(voiceConfigMap);
+    const narratorVoice = getNarratorVoice(voiceConfigMap, segments);
 
     // ── Load existing audio records for cache comparison ─────────────
     const { data: existingAudio } = await supabase
