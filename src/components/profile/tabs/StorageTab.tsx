@@ -3,6 +3,7 @@ import {
   HardDrive, FolderOpen, FileAudio, Search, Loader2, Trash2, Eye,
   Download, RefreshCw, Upload, Music, Waves, CloudRain, AudioLines,
   FileText, File, FileImage, ChevronDown, ChevronRight, FolderClosed,
+  Ghost, ScanSearch, Trash,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -369,6 +370,9 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
           </ScrollArea>
         </div>
 
+        {/* ─── Orphaned Files Section ─── */}
+        <OrphanedFilesSection isRu={isRu} userId={userId} onPreview={handlePreview} />
+
         {/* Audio/Image preview dialog */}
         <Dialog open={!!preview} onOpenChange={open => !open && setPreview(null)}>
           <DialogContent className="max-w-2xl p-0 overflow-hidden bg-background/95 backdrop-blur">
@@ -433,6 +437,209 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
         </AlertDialog>
       </div>
     </TooltipProvider>
+  );
+}
+
+/* ─── Orphaned Files Section ──────────────────────────────────────────────── */
+
+type OrphanedFile = {
+  path: string;
+  name: string;
+  url?: string;
+};
+
+function OrphanedFilesSection({ isRu, userId, onPreview }: { isRu: boolean; userId: string; onPreview: (file: StorageFile) => void }) {
+  const [orphans, setOrphans] = useState<OrphanedFile[]>([]);
+  const [scanning, setScanning] = useState(false);
+  const [scanned, setScanned] = useState(false);
+  const [totalScanned, setTotalScanned] = useState(0);
+  const [deleting, setDeleting] = useState<Set<string>>(new Set());
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [deleteAllTarget, setDeleteAllTarget] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+
+  const handleScan = async () => {
+    setScanning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('cleanup-orphaned-media', {
+        body: { dry_run: true },
+      });
+      if (error) {
+        toast.error(isRu ? 'Ошибка сканирования' : 'Scan error');
+        console.error(error);
+        return;
+      }
+      setTotalScanned(data.scanned ?? 0);
+      const files: string[] = data.files ?? [];
+      setOrphans(files.map(p => ({ path: p, name: p.split('/').pop() ?? p })));
+      setScanned(true);
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const handleDeleteOne = async (orphan: OrphanedFile) => {
+    setDeleting(prev => new Set(prev).add(orphan.path));
+    try {
+      const { error } = await supabase.storage.from('user-media').remove([orphan.path]);
+      if (error) {
+        toast.error(`${orphan.name}: ${error.message}`);
+      } else {
+        toast.success(`«${orphan.name}» ${isRu ? 'удалён' : 'deleted'}`);
+        setOrphans(prev => prev.filter(o => o.path !== orphan.path));
+      }
+    } finally {
+      setDeleting(prev => { const n = new Set(prev); n.delete(orphan.path); return n; });
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    setDeletingAll(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('cleanup-orphaned-media', {
+        body: { dry_run: false },
+      });
+      if (error) {
+        toast.error(isRu ? 'Ошибка очистки' : 'Cleanup error');
+      } else {
+        const count = data.deleted ?? 0;
+        toast.success(isRu ? `Удалено: ${count}` : `Deleted: ${count}`);
+        setOrphans([]);
+      }
+    } finally {
+      setDeletingAll(false);
+      setDeleteAllTarget(false);
+    }
+  };
+
+  const handlePreviewOrphan = async (orphan: OrphanedFile) => {
+    const asFile: StorageFile = {
+      id: orphan.path,
+      name: orphan.name,
+      category: 'orphaned',
+      size: 0,
+      mime_type: orphan.name.endsWith('.mp3') ? 'audio/mpeg' : orphan.name.endsWith('.wav') ? 'audio/wav' : 'audio/mpeg',
+      created_at: '',
+    };
+    onPreview(asFile);
+  };
+
+  return (
+    <div className="border rounded-md overflow-hidden">
+      <Collapsible open={!collapsed} onOpenChange={() => setCollapsed(c => !c)}>
+        <div className="flex items-center border-b border-border">
+          <CollapsibleTrigger asChild>
+            <button className="flex-1 flex items-center gap-2 px-4 py-3 text-left hover:bg-muted/40 transition-colors text-orange-400 border-orange-400/30">
+              {collapsed ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
+              <Ghost className="h-5 w-5 shrink-0" />
+              <span className="text-base font-semibold">{isRu ? 'Осиротевшие файлы' : 'Orphaned Files'}</span>
+              {scanned && <Badge variant="outline" className="ml-1 h-5 px-1.5 text-xs">{orphans.length}</Badge>}
+            </button>
+          </CollapsibleTrigger>
+          <div className="flex items-center gap-1 mr-2">
+            {scanned && orphans.length > 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    disabled={deletingAll}
+                    onClick={() => setDeleteAllTarget(true)}
+                  >
+                    {deletingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{isRu ? 'Удалить все' : 'Delete all'}</TooltipContent>
+              </Tooltip>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" disabled={scanning} onClick={handleScan}>
+                  {scanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanSearch className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{isRu ? 'Сканировать' : 'Scan'}</TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+
+        <CollapsibleContent>
+          {!scanned ? (
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground text-sm gap-2">
+              <ScanSearch className="h-6 w-6 opacity-40" />
+              <span>{isRu ? 'Нажмите 🔍 для сканирования' : 'Press 🔍 to scan'}</span>
+            </div>
+          ) : orphans.length === 0 ? (
+            <div className="flex items-center justify-center py-6 text-muted-foreground text-sm gap-2">
+              <FolderClosed className="h-4 w-4 opacity-40" />
+              <span>{isRu ? `Чисто! Просканировано: ${totalScanned}` : `Clean! Scanned: ${totalScanned}`}</span>
+            </div>
+          ) : (
+            <>
+              <div className="px-4 py-2 text-xs text-muted-foreground border-b border-border">
+                {isRu
+                  ? `Найдено ${orphans.length} осиротевших из ${totalScanned} просканированных`
+                  : `Found ${orphans.length} orphaned out of ${totalScanned} scanned`}
+              </div>
+              <div className="divide-y divide-border max-h-64 overflow-y-auto">
+                {orphans.map(orphan => (
+                  <div
+                    key={orphan.path}
+                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors group"
+                  >
+                    <FileAudio className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-sm truncate flex-1 min-w-0" title={orphan.path}>{orphan.name}</span>
+                    <span className="text-[10px] text-muted-foreground truncate max-w-[150px] hidden sm:block" title={orphan.path}>
+                      {orphan.path.split('/').slice(0, -1).join('/')}
+                    </span>
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handlePreviewOrphan(orphan)}>
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        disabled={deleting.has(orphan.path)}
+                        onClick={() => handleDeleteOne(orphan)}
+                      >
+                        {deleting.has(orphan.path)
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <Trash2 className="h-3.5 w-3.5" />}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Delete all confirmation */}
+      <AlertDialog open={deleteAllTarget} onOpenChange={open => !open && setDeleteAllTarget(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{isRu ? 'Удалить все осиротевшие файлы?' : 'Delete all orphaned files?'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isRu
+                ? `${orphans.length} файлов будут удалены безвозвратно.`
+                : `${orphans.length} files will be permanently deleted.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{isRu ? 'Отмена' : 'Cancel'}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDeleteAll}
+            >
+              {isRu ? 'Удалить все' : 'Delete all'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
 
