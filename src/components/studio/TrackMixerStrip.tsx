@@ -92,7 +92,7 @@ export function TrackMixerStrip({
       onClick={onClick}
     >
       {/* Column 1: Color dot + name — fixed width */}
-      <div className="flex items-center gap-2 w-[90px] shrink-0">
+      <div className="flex items-center gap-2 w-[100px] shrink-0">
         <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
         <span className={`text-xs font-body truncate ${isSelected ? "text-foreground font-semibold" : "text-foreground/80"}`}>
           {label}
@@ -125,7 +125,7 @@ export function TrackMixerStrip({
         </div>
 
         {/* Pan slider with L/R VU */}
-        <div className="w-[60px] shrink-0" onClick={(e) => e.stopPropagation()}>
+        <div className="w-[70px] shrink-0" onClick={(e) => e.stopPropagation()}>
           <VuSlider
             mode="pan"
             value={Math.round((mix?.pan ?? 0) * 100)}
