@@ -7,81 +7,12 @@ import { useTimelineClips, type TimelineClip } from "@/hooks/useTimelineClips";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { TrackMixerStrip } from "./TrackMixerStrip";
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
-import { getAudioEngine } from "@/lib/audioEngine";
 import { MasterMeterPanel } from "./MasterMeterPanel";
 import { MasterEffectsTabs } from "./MasterEffectsTabs";
-
-// ─── Master output level meter ──────────────────────────────
-
-function dbToLinear(db: number): number {
-  if (db <= -60) return 0;
-  if (db >= 0) return 1;
-  return Math.pow(10, db / 20);
-}
-
-function MasterMeter() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const engine = getAudioEngine();
-  const meterRef = useRef({ levelL: -60, levelR: -60 });
-
-  useEffect(() => {
-    let raf: number;
-    const draw = () => {
-      meterRef.current = engine.getMasterMeter();
-      const canvas = canvasRef.current;
-      if (!canvas) { raf = requestAnimationFrame(draw); return; }
-      const ctx = canvas.getContext("2d");
-      if (!ctx) { raf = requestAnimationFrame(draw); return; }
-
-      const dpr = window.devicePixelRatio || 1;
-      const w = canvas.clientWidth;
-      const h = canvas.clientHeight;
-      if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
-        canvas.width = w * dpr;
-        canvas.height = h * dpr;
-        ctx.scale(dpr, dpr);
-      }
-
-      ctx.clearRect(0, 0, w, h);
-
-      const linL = dbToLinear(meterRef.current.levelL);
-      const linR = dbToLinear(meterRef.current.levelR);
-      const barH = (h - 2) / 2;
-      const gap = 2;
-
-      // L channel
-      const wL = linL * w;
-      const gradL = ctx.createLinearGradient(0, 0, w, 0);
-      gradL.addColorStop(0, "hsl(140 60% 50%)");
-      gradL.addColorStop(0.7, "hsl(50 80% 55%)");
-      gradL.addColorStop(1, "hsl(0 70% 55%)");
-      ctx.fillStyle = gradL;
-      ctx.fillRect(0, 0, wL, barH);
-
-      // R channel
-      const wR = linR * w;
-      ctx.fillStyle = gradL;
-      ctx.fillRect(0, barH + gap, wR, barH);
-
-      // Background remainder
-      ctx.fillStyle = "hsla(0,0%,50%,0.15)";
-      ctx.fillRect(wL, 0, w - wL, barH);
-      ctx.fillRect(wR, barH + gap, w - wR, barH);
-
-      raf = requestAnimationFrame(draw);
-    };
-    raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
-  }, [engine]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="h-3.5 w-[48px] rounded-sm shrink-0 ml-1"
-      style={{ imageRendering: "pixelated" }}
-    />
-  );
-}
+import { TimelineMasterMeter } from "./TimelineMasterMeter";
+import { TimelineRuler } from "./TimelineRuler";
+import { TimelineTrack } from "./TimelineTrack";
+import { Playhead } from "./TimelinePlayhead";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -100,8 +31,6 @@ const FIXED_TRACKS: TimelineTrackData[] = [
 const TRACK_LABELS_WIDTH_COLLAPSED = 112;
 const TRACK_LABELS_WIDTH_EXPANDED = 360;
 
-// ─── Palette for character colors ───────────────────────────
-
 const NARRATOR_COLORS = [
   "hsl(var(--primary))",
   "hsl(var(--accent))",
@@ -114,122 +43,6 @@ const NARRATOR_COLORS = [
   "hsl(320 55% 50%)",
   "hsl(100 45% 45%)",
 ];
-
-// ─── Sub-components ─────────────────────────────────────────
-
-function TimelineRuler({ zoom, duration }: { zoom: number; duration: number }) {
-  const marks: number[] = [];
-  const step = Math.max(1, Math.round(10 / zoom));
-  for (let t = 0; t <= duration; t += step) marks.push(t);
-  const formatTime = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m}:${sec.toString().padStart(2, "0")}`;
-  };
-  return (
-    <div className="flex items-end h-6 border-b border-border relative" style={{ width: `${duration * zoom * 4}px` }}>
-      {marks.map((t) => (
-        <div key={t} className="absolute bottom-0 flex flex-col items-center" style={{ left: `${t * zoom * 4}px` }}>
-          <span className="text-[10px] text-muted-foreground font-body mb-0.5">{formatTime(t)}</span>
-          <div className="w-px h-2 bg-border" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TimelineTrack({
-  track,
-  zoom,
-  duration,
-  clips: realClips,
-  selectedSegmentId,
-  onSelectSegment,
-  synthesizingSegmentIds,
-}: {
-  track: TimelineTrackData;
-  zoom: number;
-  duration: number;
-  clips?: TimelineClip[];
-  selectedSegmentId?: string | null;
-  onSelectSegment?: (segmentId: string | null) => void;
-  synthesizingSegmentIds?: Set<string>;
-}) {
-  const clips = realClips && realClips.length > 0
-    ? realClips.map(c => ({
-        id: c.id,
-        start: c.startSec,
-        end: c.startSec + c.durationSec,
-        label: c.label,
-        type: c.segmentType,
-        hasAudio: c.hasAudio,
-      }))
-    : track.type === "atmosphere"
-      ? [{ id: "atm", start: 0, end: duration, label: track.label, type: "atmosphere", hasAudio: false }]
-      : track.type === "sfx"
-        ? []
-        : [];
-
-  return (
-    <div className="flex h-10 border-b border-border/50 relative" style={{ width: `${duration * zoom * 4}px` }}>
-      {clips.filter(c => c.start < c.end).map((clip, i) => {
-        const widthPx = (clip.end - clip.start) * zoom * 4;
-        const isSelected = selectedSegmentId && clip.id === selectedSegmentId;
-          const isSynthesizing = synthesizingSegmentIds?.has(clip.id);
-          return (
-            <div
-              key={i}
-              className={`absolute top-1 bottom-1 rounded-sm transition-all cursor-pointer ${
-                clip.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-50 hover:opacity-70"
-              } ${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background opacity-100 z-10" : ""} ${isSynthesizing ? "synth-oscilloscope" : ""}`}
-              style={{
-                left: `${clip.start * zoom * 4}px`,
-                width: `${widthPx}px`,
-                backgroundColor: track.color,
-                backgroundImage: isSynthesizing
-                  ? undefined
-                  : clip.hasAudio
-                    ? undefined
-                    : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
-              }}
-              title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${clip.hasAudio ? " 🔊" : ""}${isSynthesizing ? " ⏳" : ""}`}
-              onDoubleClick={() => onSelectSegment?.(clip.id)}
-            >
-              {widthPx > 40 && (
-                <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
-                  {isSynthesizing ? "⏳ " : clip.hasAudio ? "🔊 " : ""}{clip.label}
-                </span>
-              )}
-            </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── Playhead ───────────────────────────────────────────────
-
-function Playhead({ positionSec, zoom }: { positionSec: number; zoom: number }) {
-  const leftPx = positionSec * zoom * 4;
-  return (
-    <div
-      className="absolute top-0 bottom-0 pointer-events-none z-20"
-      style={{ left: `${leftPx}px` }}
-    >
-      {/* Triangle head */}
-      <div
-        className="absolute -top-0.5 -translate-x-1/2 w-0 h-0"
-        style={{
-          borderLeft: "5px solid transparent",
-          borderRight: "5px solid transparent",
-          borderTop: "6px solid hsl(var(--primary))",
-        }}
-      />
-      {/* Vertical line */}
-      <div className="absolute top-1 bottom-0 w-px bg-primary -translate-x-1/2" />
-    </div>
-  );
-}
 
 // ─── Constants ──────────────────────────────────────────────
 export const TIMELINE_HEADER_HEIGHT = 41;
