@@ -6,6 +6,7 @@
  */
 
 import { useRef, useEffect, useState, useCallback } from "react";
+import type { MasterMeterData } from "@/lib/audioEngine";
 import { getAudioEngine } from "@/lib/audioEngine";
 import { Sliders, Power } from "lucide-react";
 
@@ -50,9 +51,9 @@ function DbScale() {
   );
 }
 
-// ─── Single-channel meter bar (canvas) ──────────────────────
+// ─── Single-channel meter bar (canvas) with peak hold line ──
 
-function LargeMeterSingleChannel({ channel }: { channel: "L" | "R" }) {
+function LargeMeterSingleChannel({ channel, peakDb }: { channel: "L" | "R"; peakDb: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engine = getAudioEngine();
 
@@ -102,8 +103,19 @@ function LargeMeterSingleChannel({ channel }: { channel: "L" | "R" }) {
         ctx.fillRect(zeroX, 0, fillW - zeroX, h);
       }
 
+      // 0 dB reference line
       ctx.fillStyle = "hsla(0, 0%, 100%, 0.3)";
       ctx.fillRect(zeroX, 0, 1, h);
+
+      // Peak hold line
+      const pk = channel === "L" ? meter.peakL : meter.peakR;
+      const peakFrac = dbToFraction(pk);
+      if (peakFrac > 0) {
+        const peakX = peakFrac * w;
+        const isClip = pk >= 0;
+        ctx.fillStyle = isClip ? "hsl(0, 90%, 60%)" : "hsla(50, 100%, 80%, 0.9)";
+        ctx.fillRect(peakX - 1, 0, 2, h);
+      }
 
       raf = requestAnimationFrame(draw);
     };
@@ -114,7 +126,66 @@ function LargeMeterSingleChannel({ channel }: { channel: "L" | "R" }) {
   return <canvas ref={canvasRef} className="w-full h-full" />;
 }
 
-// ─── Plugin definitions ─────────────────────────────────────
+// ─── Peak readout (numeric dB) ──────────────────────────────
+
+function PeakReadout({ peakDb }: { peakDb: number }) {
+  const isClip = peakDb >= 0;
+  const display = peakDb <= DB_MIN
+    ? "-∞"
+    : `${peakDb >= 0 ? "+" : ""}${peakDb.toFixed(1)}`;
+
+  return (
+    <span
+      className={`font-mono text-[9px] leading-none w-8 text-right shrink-0 font-bold ${
+        isClip ? "text-destructive" : "text-foreground/70"
+      }`}
+      title="Peak hold (dB)"
+    >
+      {display}
+    </span>
+  );
+}
+// ─── Meter section with peak hold ───────────────────────────
+
+function PeakMeterSection() {
+  const engine = getAudioEngine();
+  const [peaks, setPeaks] = useState({ peakL: -Infinity, peakR: -Infinity });
+
+  useEffect(() => {
+    let raf: number;
+    const tick = () => {
+      const m = engine.getMasterMeter();
+      setPeaks({ peakL: m.peakL, peakR: m.peakR });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [engine]);
+
+  return (
+    <div className="flex flex-col gap-0">
+      <div className="flex items-center gap-1">
+        <span className="text-[9px] text-foreground/60 font-mono w-3 shrink-0 font-bold">L</span>
+        <div className="flex-1 h-5 rounded-sm overflow-hidden border border-border/40 bg-background/40">
+          <LargeMeterSingleChannel channel="L" peakDb={peaks.peakL} />
+        </div>
+        <PeakReadout peakDb={peaks.peakL} />
+      </div>
+      <div className="pl-4 pr-0 mr-9">
+        <DbScale />
+      </div>
+      <div className="flex items-center gap-1">
+        <span className="text-[9px] text-foreground/60 font-mono w-3 shrink-0 font-bold">R</span>
+        <div className="flex-1 h-5 rounded-sm overflow-hidden border border-border/40 bg-background/40">
+          <LargeMeterSingleChannel channel="R" peakDb={peaks.peakR} />
+        </div>
+        <PeakReadout peakDb={peaks.peakR} />
+      </div>
+    </div>
+  );
+}
+
+
 
 interface PluginSlot {
   id: "eq" | "comp" | "limit" | "reverb";
@@ -238,23 +309,7 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
       {/* Content */}
       <div className="flex-1 flex flex-col gap-1.5 p-2 min-h-0 overflow-auto">
         {/* Meter section */}
-        <div className="flex flex-col gap-0">
-          <div className="flex items-center gap-1">
-            <span className="text-[9px] text-foreground/60 font-mono w-3 shrink-0 font-bold">L</span>
-            <div className="flex-1 h-5 rounded-sm overflow-hidden border border-border/40 bg-background/40">
-              <LargeMeterSingleChannel channel="L" />
-            </div>
-          </div>
-          <div className="pl-4 pr-0">
-            <DbScale />
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-[9px] text-foreground/60 font-mono w-3 shrink-0 font-bold">R</span>
-            <div className="flex-1 h-5 rounded-sm overflow-hidden border border-border/40 bg-background/40">
-              <LargeMeterSingleChannel channel="R" />
-            </div>
-          </div>
-        </div>
+        <PeakMeterSection />
 
         {/* Pre-processing plugins (EQ, Comp, Limiter) */}
         <div className="flex flex-col gap-1 mt-1">
