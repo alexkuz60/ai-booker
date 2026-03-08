@@ -411,11 +411,32 @@ interface PluginSlot {
   labelRu: string;
 }
 
-const PLUGIN_SLOTS: PluginSlot[] = [
-  { id: "eq", label: "EQ", labelRu: "EQ" },
-  { id: "comp", label: "CMP", labelRu: "КМП" },
-  { id: "limit", label: "LIM", labelRu: "ЛИМ" },
-  { id: "reverb", label: "REV", labelRu: "РЕВ" },
+interface PluginGroup {
+  title: string;
+  titleRu: string;
+  slots: PluginSlot[];
+}
+
+const PLUGIN_GROUPS: PluginGroup[] = [
+  {
+    title: "Pre", titleRu: "Пре",
+    slots: [
+      { id: "eq", label: "EQ", labelRu: "EQ" },
+      { id: "comp", label: "CMP", labelRu: "КМП" },
+    ],
+  },
+  {
+    title: "Post", titleRu: "Пост",
+    slots: [
+      { id: "limit", label: "LIM", labelRu: "ЛИМ" },
+    ],
+  },
+  {
+    title: "Master", titleRu: "Мастер",
+    slots: [
+      { id: "reverb", label: "REV", labelRu: "РЕВ" },
+    ],
+  },
 ];
 
 // ─── Exported Panel (left sidebar: meter + vertical plugin bypass strip) ───
