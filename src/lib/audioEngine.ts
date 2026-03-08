@@ -304,14 +304,16 @@ class AudioEngine {
   private sfxBus: Tone.Channel;
   private masterBus: Tone.Channel;
 
-  // Master insert chain: EQ → Compressor → Limiter → Reverb (post)
+  // Master insert chain: EQ → Filters(5) → Compressor → Limiter → Reverb (post)
   private masterEQ: Tone.EQ3;
+  private masterFilters: Tone.Filter[] = [];
   private masterComp: Tone.Compressor;
   private masterLimiter: Tone.Limiter;
   private masterReverb: Tone.Reverb;
 
   // Bypass states for master chain
   private _masterEqBypassed = true;
+  private _masterFilterBypassed = true;
   private _masterCompBypassed = true;
   private _masterLimiterBypassed = true;
   private _masterReverbBypassed = true;
@@ -345,6 +347,17 @@ class AudioEngine {
 
     // Master insert chain nodes
     this.masterEQ = new Tone.EQ3({ low: 0, mid: 0, high: 0 });
+    // 5-band parametric filter
+    for (let i = 0; i < 5; i++) {
+      const def = this._filterBands[i];
+      this.masterFilters.push(new Tone.Filter({
+        frequency: def.frequency,
+        type: def.type,
+        Q: def.Q,
+        gain: def.gain,
+        rolloff: def.rolloff,
+      }));
+    }
     this.masterComp = new Tone.Compressor({ threshold: -18, ratio: 4, attack: 0.005, release: 0.15 });
     this.masterLimiter = new Tone.Limiter(-1);
     this.masterReverb = new Tone.Reverb({ decay: 2.0, wet: 0.12 });
@@ -357,9 +370,13 @@ class AudioEngine {
     // FFT analyzer (128 bins for smooth spectrum display)
     this.masterFFT = new Tone.FFT(128);
 
-    // Chain: MasterBus → EQ → Comp → Limiter → Reverb → Splitter → Meters + Destination
+    // Chain: MasterBus → EQ → Filter1→…→Filter5 → Comp → Limiter → Reverb → Splitter → Meters + Destination
     this.masterBus.connect(this.masterEQ);
-    this.masterEQ.connect(this.masterComp);
+    this.masterEQ.connect(this.masterFilters[0]);
+    for (let i = 0; i < 4; i++) {
+      this.masterFilters[i].connect(this.masterFilters[i + 1]);
+    }
+    this.masterFilters[4].connect(this.masterComp);
     this.masterComp.connect(this.masterLimiter);
     this.masterLimiter.connect(this.masterReverb);
     this.masterReverb.connect(this.masterSplitter);
@@ -378,6 +395,7 @@ class AudioEngine {
 
     // Apply initial bypass states (all bypassed by default)
     this.applyMasterEqBypass();
+    this.applyMasterFilterBypass();
     this.applyMasterCompBypass();
     this.applyMasterLimiterBypass();
     this.applyMasterReverbBypass();
