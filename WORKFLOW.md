@@ -520,6 +520,47 @@ PDF-файл
 
 ---
 
+## 11. Аудио-движок (AudioEngine) ✅
+
+**Модуль:** `src/lib/audioEngine.ts` — синглтон на базе Tone.js
+
+### Архитектура сигнальной цепочки
+
+```
+Player (моно TTS) → PreFX (компрессор, байпасс) → Channel (vol/pan) → Reverb (байпасс) → SplitMeter L/R → Bus
+                                                        └→ MeterMono
+
+VoiceBus ──┐
+AtmoBus  ──┼→ MasterBus → SplitMeter L/R → Destination
+SfxBus   ──┘
+```
+
+| Компонент | Реализация | Статус |
+|-----------|-----------|--------|
+| Transport | `Tone.Transport` — единый источник истины | ✅ |
+| Per-track Vol/Pan | `Tone.Channel` | ✅ |
+| Pre-FX контейнер | `Tone.Compressor` с байпассом (ratio=1) | ✅ |
+| Per-track Reverb | `Tone.Reverb` с wet-контролем и байпассом | ✅ |
+| Per-track Metering | `Tone.Meter` (моно) + `Tone.Split` → 2×`Tone.Meter` (L/R) | ✅ |
+| 3 суб-шины | Voice / Atmosphere / SFX → MasterBus | ✅ |
+| Master Metering | `Tone.Split` → 2×`Tone.Meter` (L/R) | ✅ |
+| Mute / Solo | Per-track, с авто-мьют при соло | ✅ |
+| Fade-in / Fade-out | Через автоматизацию Tone.js | ⬜ |
+| Envelope Editor | Визуальный редактор огибающих | ⬜ |
+| Post-FX контейнер | Мастер-эффекты (лимитер, EQ) | ⬜ |
+
+### UI микшера
+
+| Элемент | Расположение | Статус |
+|---------|-------------|--------|
+| VU-слайдер с метром | Компонент `VuSlider` (Canvas + rAF) | ✅ |
+| Микшер-стрип | `TrackMixerStrip` — сворачиваемый, в сайдбаре таймлайна | ✅ |
+| Развёрнутый режим | Vol + Pan слайдеры с VU, бейджи FX / RV | ✅ |
+| Свёрнутый режим | Только имя + цветная точка | ✅ |
+| Master L/R индикация | В хедере таймлайна | ⬜ |
+
+---
+
 ## Технический стек задействованных компонентов
 
 | Слой | Технология |
@@ -529,6 +570,7 @@ PDF-файл
 | AI-ассистент | Lovable AI Gateway (Gemini 3 Flash Preview) |
 | TTS | Yandex SpeechKit (v1/v3), ElevenLabs (Multilingual v2) |
 | SFX/Музыка | ElevenLabs (Sound Effects, Music) |
+| Аудио-движок | Tone.js (Transport, Channel, Reverb, Meter, Split) |
 | Хранение | Lovable Cloud (PostgreSQL + Storage) |
 | Аутентификация | Email + пароль, RLS-политики на все таблицы |
 | UI | React, Tailwind CSS, shadcn/ui, Framer Motion |
