@@ -356,26 +356,61 @@ export function SpectrumAnalyzer() {
 
   return (
     <div className="flex flex-col gap-0.5 h-full">
-      <div className="flex items-center justify-between shrink-0">
+      <div className="flex items-center justify-between shrink-0 flex-wrap gap-y-0.5">
         <span className="text-[9px] text-muted-foreground/50 font-body uppercase tracking-wider">
           Spectrum
         </span>
-        <div className="flex gap-0.5">
-          {SPECTRUM_MODES.map(m => (
-            <button
-              key={m.id}
-              onClick={() => setMode(m.id)}
-              className={`px-1.5 py-0.5 rounded text-[9px] font-mono leading-none transition-colors ${
-                mode === m.id
-                  ? "text-primary bg-primary/15"
-                  : "text-muted-foreground/40 hover:text-muted-foreground/70"
-              }`}
-              title={m.id}
-            >
-              {m.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-1.5">
+          {/* FFT Size selector */}
+          <div className="flex gap-0.5">
+            {FFT_SIZES.map(s => (
+              <button
+                key={s}
+                onClick={() => { setFftSize(s); smoothRef.current = null; }}
+                className={`px-1 py-0.5 rounded text-[8px] font-mono leading-none transition-colors ${
+                  fftSize === s
+                    ? "text-accent bg-accent/15"
+                    : "text-muted-foreground/30 hover:text-muted-foreground/60"
+                }`}
+                title={`FFT ${s}`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+          <span className="text-muted-foreground/20">│</span>
+          {/* Mode selector */}
+          <div className="flex gap-0.5">
+            {SPECTRUM_MODES.map(m => (
+              <button
+                key={m.id}
+                onClick={() => setMode(m.id)}
+                className={`px-1.5 py-0.5 rounded text-[9px] font-mono leading-none transition-colors ${
+                  mode === m.id
+                    ? "text-primary bg-primary/15"
+                    : "text-muted-foreground/40 hover:text-muted-foreground/70"
+                }`}
+                title={m.id}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
         </div>
+      </div>
+      {/* Smoothing slider */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <span className="text-[8px] text-muted-foreground/40 font-mono w-7 shrink-0">SMT</span>
+        <input
+          type="range"
+          min={0}
+          max={0.95}
+          step={0.05}
+          value={smoothing}
+          onChange={e => setSmoothing(Number(e.target.value))}
+          className="flex-1 h-2 accent-primary cursor-pointer"
+        />
+        <span className="text-[8px] text-muted-foreground/50 font-mono w-6 text-right">{(smoothing * 100).toFixed(0)}%</span>
       </div>
       <canvas
         ref={canvasRef}
