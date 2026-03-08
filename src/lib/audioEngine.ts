@@ -91,7 +91,9 @@ class EngineTrack {
 
   // Metering: mono (pre-pan) and stereo split (post-pan)
   private meterMono: Tone.Meter;
-  private meterSplit: Tone.Meter;
+  private splitter: Tone.Split;
+  private meterL: Tone.Meter;
+  private meterR: Tone.Meter;
 
   private _muted = false;
   private _solo = false;
@@ -131,10 +133,13 @@ class EngineTrack {
 
     // Meters
     this.meterMono = new Tone.Meter({ smoothing: 0.8 });
-    this.meterSplit = new Tone.Meter({ smoothing: 0.8, channels: 2 });
+    this.splitter = new Tone.Split();
+    this.meterL = new Tone.Meter({ smoothing: 0.8 });
+    this.meterR = new Tone.Meter({ smoothing: 0.8 });
 
-    // Chain: Player → PreFX → Channel → Reverb → MeterSplit → Bus
-    //                              └→ MeterMono (tap before pan via channel)
+    // Chain: Player → PreFX → Channel → Reverb → Splitter → MeterL/R
+    //                              └→ MeterMono
+    //        Reverb → Bus (main output)
     this.player = new Tone.Player({ url: config.url });
 
     // Wire signal chain
@@ -142,8 +147,11 @@ class EngineTrack {
     this.preFxNode.connect(this.channel);
     this.channel.connect(this.meterMono);
     this.channel.connect(this.reverbNode);
-    this.reverbNode.connect(this.meterSplit);
-    this.meterSplit.connect(bus);
+    this.reverbNode.connect(bus);
+    // Stereo metering tap
+    this.reverbNode.connect(this.splitter);
+    this.splitter.connect(this.meterL, 0);
+    this.splitter.connect(this.meterR, 1);
 
     // Apply bypass states
     this.applyPreFxBypass();
