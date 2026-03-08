@@ -314,10 +314,10 @@ export function SpectrumAnalyzer() {
         ctx.lineTo(barWidth / 2, h);
         ctx.closePath();
         const fillGrad = ctx.createLinearGradient(0, 0, 0, h);
-        fillGrad.addColorStop(0, "hsla(140, 70%, 50%, 0.35)");
-        fillGrad.addColorStop(0.3, "hsla(80, 70%, 48%, 0.2)");
-        fillGrad.addColorStop(0.7, "hsla(50, 80%, 50%, 0.08)");
-        fillGrad.addColorStop(1, "hsla(140, 60%, 35%, 0.01)");
+        fillGrad.addColorStop(0, "hsla(140, 70%, 50%, 0.95)");
+        fillGrad.addColorStop(0.3, "hsla(80, 70%, 48%, 0.7)");
+        fillGrad.addColorStop(0.7, "hsla(50, 80%, 50%, 0.4)");
+        fillGrad.addColorStop(1, "hsla(140, 60%, 35%, 0.25)");
         ctx.fillStyle = fillGrad;
         ctx.fill();
       } else if (currentMode === "mirror") {
