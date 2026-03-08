@@ -218,18 +218,120 @@ function CompPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
   );
 }
 
+function LimiterGraph({ threshold }: { threshold: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const dbMin = -60;
+    const dbMax = 0;
+    const range = dbMax - dbMin;
+    const toX = (db: number) => ((db - dbMin) / range) * w;
+    const toY = (db: number) => h - ((db - dbMin) / range) * h;
+
+    const computeOut = (input: number): number =>
+      input <= threshold ? input : threshold;
+
+    // Background
+    ctx.fillStyle = "hsla(0, 0%, 5%, 0.95)";
+    ctx.fillRect(0, 0, w, h);
+
+    // Grid
+    ctx.strokeStyle = "hsla(0, 0%, 100%, 0.07)";
+    ctx.lineWidth = 1;
+    for (let db = -48; db <= 0; db += 12) {
+      const x = toX(db); const y = toY(db);
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+
+    // Grid labels
+    ctx.fillStyle = "hsla(0, 0%, 100%, 0.2)";
+    ctx.font = "9px monospace";
+    ctx.textAlign = "center";
+    for (let db = -48; db <= 0; db += 12) ctx.fillText(`${db}`, toX(db), h - 3);
+    ctx.textAlign = "right";
+    for (let db = -48; db <= 0; db += 12) ctx.fillText(`${db}`, w - 3, toY(db) + 3);
+
+    // Unity line
+    ctx.strokeStyle = "hsla(0, 0%, 100%, 0.12)";
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(toX(dbMin), toY(dbMin)); ctx.lineTo(toX(dbMax), toY(dbMax)); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Threshold line
+    ctx.strokeStyle = "hsla(0, 70%, 55%, 0.3)";
+    ctx.setLineDash([2, 2]);
+    const ty = toY(threshold);
+    ctx.beginPath(); ctx.moveTo(0, ty); ctx.lineTo(w, ty); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Transfer curve
+    ctx.strokeStyle = "hsl(0, 70%, 60%)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i <= w; i++) {
+      const inputDb = dbMin + (i / w) * range;
+      const x = toX(inputDb);
+      const y = toY(computeOut(inputDb));
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Fill under curve
+    ctx.lineTo(toX(dbMax), toY(dbMin));
+    ctx.lineTo(toX(dbMin), toY(dbMin));
+    ctx.closePath();
+    const fillGrad = ctx.createLinearGradient(0, 0, 0, h);
+    fillGrad.addColorStop(0, "hsla(0, 70%, 50%, 0.15)");
+    fillGrad.addColorStop(1, "hsla(0, 70%, 50%, 0.02)");
+    ctx.fillStyle = fillGrad;
+    ctx.fill();
+
+    // Threshold label
+    ctx.fillStyle = "hsla(0, 70%, 65%, 0.8)";
+    ctx.font = "bold 9px monospace";
+    ctx.textAlign = "left";
+    ctx.fillText(`T: ${threshold} dB`, 4, ty - 4);
+  }, [threshold]);
+
+  return (
+    <div className="relative rounded-sm border border-border/40 overflow-hidden" style={{ aspectRatio: "1" }}>
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+    </div>
+  );
+}
+
 function LimitPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
   const engine = getAudioEngine();
   const params = engine.getMasterPluginParams();
   const [threshold, setThreshold] = useState(params.limiterThreshold);
 
   return (
-    <div className="flex flex-col gap-3 max-w-sm">
-      <span className="text-[10px] text-muted-foreground/60 font-body">
-        {isRu ? "Лимитер" : "Limiter"}
-      </span>
-      <ParamSlider label={isRu ? "Порог" : "Threshold"} value={threshold} min={-30} max={0} step={0.5} unit=" dB"
-        onChange={v => { setThreshold(v); engine.setMasterLimiterThreshold(v); }} disabled={disabled} />
+    <div className="flex gap-4 max-w-lg items-stretch">
+      <div className="w-36 shrink-0 flex">
+        <div className="w-full"><LimiterGraph threshold={threshold} /></div>
+      </div>
+      <div className="flex flex-col gap-3 min-w-0 w-32">
+        <span className="text-[10px] text-muted-foreground/60 font-body">
+          {isRu ? "Лимитер" : "Limiter"}
+        </span>
+        <ParamSlider label={isRu ? "Порог" : "Threshold"} value={threshold} min={-30} max={0} step={0.5} unit=" dB"
+          onChange={v => { setThreshold(v); engine.setMasterLimiterThreshold(v); }} disabled={disabled} />
+      </div>
     </div>
   );
 }
