@@ -3,7 +3,7 @@
  * Tab 1: FFT Spectrum Analyzer. Tabs 2-5: EQ, Compressor, Limiter, Reverb controls.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { getAudioEngine } from "@/lib/audioEngine";
 import { SpectrumAnalyzer } from "@/components/studio/MasterMeterPanel";
 import { Power } from "lucide-react";
