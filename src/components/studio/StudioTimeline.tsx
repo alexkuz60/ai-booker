@@ -822,9 +822,9 @@ export function StudioTimeline({
                 <Playhead positionSec={player.positionSec} zoom={zoom} />
               </div>
             </ScrollArea>
-            {/* FFT Spectrum Analyzer — fills remaining space to bottom */}
+            {/* Master Effects Tabs — FFT + EQ/CMP/LIM/REV */}
             <div className="flex-1 min-h-0 p-2">
-              <SpectrumAnalyzer />
+              <MasterEffectsTabs isRu={isRu} />
             </div>
           </div>
         </div>
