@@ -1,391 +1,159 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getAudioEngine, type EngineState, type TrackConfig } from "@/lib/audioEngine";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 
-export type PlayerState = "stopped" | "playing" | "paused";
+export type PlayerState = EngineState;
 
 /**
- * Manages sequential playback of timeline audio clips.
- * Main (sequential) clips play one after another.
- * Overlay clips (inline narrations) fire concurrently at their scheduled time.
+ * Manages playback of timeline audio clips via the Tone.js-based AudioEngine.
+ * Main clips and overlay clips are all scheduled on the Transport — no setTimeout hacks.
  */
 export function useTimelinePlayer(clips: TimelineClip[]) {
+  const engine = getAudioEngine();
+
   const [state, setState] = useState<PlayerState>("stopped");
   const [positionSec, setPositionSec] = useState(0);
-  const [volume, setVolume] = useState(() => {
-    try { const v = Number(localStorage.getItem("timeline-volume")); return Number.isFinite(v) ? v : 80; } catch { return 80; }
-  });
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const overlayAudiosRef = useRef<HTMLAudioElement[]>([]);
-  const overlayTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const rafRef = useRef<number>(0);
-  const clipIndexRef = useRef(0);
-  const clipStartTimeRef = useRef(0);
-  const clipOffsetRef = useRef(0);
-  const stateRef = useRef<PlayerState>("stopped");
-  const pausedAtRef = useRef(0);
-  const volumeRef = useRef(volume);
-  const mainClipsRef = useRef<TimelineClip[]>([]);
-  const overlayClipsRef = useRef<TimelineClip[]>([]);
-
-  // Separate main sequential clips from inline narration overlays
-  const isOverlayClip = (c: TimelineClip) => c.id.includes("_narrator_");
-
-  const mainClips = clips
-    .filter(c => c.hasAudio && c.audioPath && !isOverlayClip(c))
-    .sort((a, b) => a.startSec - b.startSec);
-
-  const overlayClips = clips
-    .filter(c => c.hasAudio && c.audioPath && isOverlayClip(c))
-    .sort((a, b) => a.startSec - b.startSec);
-
-  mainClipsRef.current = mainClips;
-  overlayClipsRef.current = overlayClips;
-
-  const totalDuration = clips.length > 0
-    ? Math.max(...clips.map(c => c.startSec + c.durationSec))
-    : 0;
-  const totalDurationRef = useRef(totalDuration);
-  totalDurationRef.current = totalDuration;
-
-  const stopOverlays = useCallback(() => {
-    for (const a of overlayAudiosRef.current) {
-      try { a.pause(); } catch {}
-    }
-    overlayAudiosRef.current = [];
-    for (const t of overlayTimersRef.current) clearTimeout(t);
-    overlayTimersRef.current = [];
-  }, []);
-
-  // Cleanup
-  useEffect(() => {
-    return () => {
-      cancelAnimationFrame(rafRef.current);
-      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-      stopOverlays();
-    };
-  }, [stopOverlays]);
-
-  const getSignedUrl = useCallback(async (path: string): Promise<string | null> => {
-    const { data, error } = await supabase.storage
-      .from("user-media")
-      .createSignedUrl(path, 3600);
-    if (error || !data?.signedUrl) return null;
-    return data.signedUrl;
-  }, []);
-
-  /** Schedule overlay clips that fall within [fromSec, toSec) relative to current playback start */
-  const scheduleOverlays = useCallback((fromSec: number) => {
-    const oc = overlayClipsRef.current;
-    for (const overlay of oc) {
-      if (overlay.startSec < fromSec - 0.1) continue; // already passed
-      const delayMs = (overlay.startSec - fromSec) * 1000;
-      const timer = setTimeout(async () => {
-        if (stateRef.current !== "playing") return;
-        const url = await getSignedUrl(overlay.audioPath!);
-        if (!url || stateRef.current !== "playing") return;
-        const audio = new Audio();
-        audio.crossOrigin = "anonymous";
-        audio.volume = volumeRef.current / 100;
-        audio.src = url;
-        overlayAudiosRef.current.push(audio);
-        try { await audio.play(); } catch (e) {
-          console.warn("[TimelinePlayer] overlay play failed:", e);
-        }
-      }, Math.max(0, delayMs));
-      overlayTimersRef.current.push(timer);
-    }
-  }, [getSignedUrl]);
-
-  const updatePosition = useCallback(() => {
-    if (stateRef.current !== "playing") return;
-    const elapsed = (performance.now() - clipStartTimeRef.current) / 1000;
-    const pos = clipOffsetRef.current + elapsed;
-    setPositionSec(pos);
-
-    if (pos >= totalDurationRef.current) {
-      setState("stopped");
-      stateRef.current = "stopped";
-      setPositionSec(0);
-      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-      stopOverlays();
-      return;
-    }
-
-    rafRef.current = requestAnimationFrame(updatePosition);
-  }, [stopOverlays]);
-
-  const playClip = useCallback(async (index: number) => {
-    const ac = mainClipsRef.current;
-    if (index >= ac.length) {
-      // All main clips done — let position continue until totalDuration
-      clipOffsetRef.current = ac.length > 0
-        ? ac[ac.length - 1].startSec + ac[ac.length - 1].durationSec
-        : 0;
-      clipStartTimeRef.current = performance.now();
-      rafRef.current = requestAnimationFrame(updatePosition);
-      return;
-    }
-
-    const clip = ac[index];
-    clipIndexRef.current = index;
-
-    const currentPos = clipOffsetRef.current;
-
-    // Wait for gap between clips (silence)
-    if (clip.startSec > currentPos + 0.05) {
-      clipStartTimeRef.current = performance.now();
-      const gapMs = (clip.startSec - currentPos) * 1000;
-      rafRef.current = requestAnimationFrame(updatePosition);
-      await new Promise(resolve => setTimeout(resolve, gapMs));
-      if (stateRef.current !== "playing") return;
-    }
-
-    clipOffsetRef.current = clip.startSec;
-    clipStartTimeRef.current = performance.now();
-
-    const url = await getSignedUrl(clip.audioPath!);
-    if (!url || stateRef.current !== "playing") return;
-
-    const audio = new Audio();
-    audio.crossOrigin = "anonymous";
-    audio.preload = "auto";
-    audio.volume = volumeRef.current / 100;
-    audio.src = url;
-    audioRef.current = audio;
-
-    audio.onended = () => {
-      if (stateRef.current !== "playing") return;
-      clipOffsetRef.current = clip.startSec + clip.durationSec;
-      clipStartTimeRef.current = performance.now();
-      playClip(index + 1);
-    };
-
-    audio.onerror = (e) => {
-      console.error("[TimelinePlayer] Audio load error for clip", index, e);
-      if (stateRef.current !== "playing") return;
-      clipOffsetRef.current = clip.startSec + clip.durationSec;
-      clipStartTimeRef.current = performance.now();
-      playClip(index + 1);
-    };
-
+  const [totalDuration, setTotalDuration] = useState(0);
+  const [volume, setVolumeState] = useState(() => {
     try {
-      await audio.play();
-      rafRef.current = requestAnimationFrame(updatePosition);
-    } catch (err) {
-      console.error("[TimelinePlayer] play() failed:", err);
-      toast.error("Не удалось воспроизвести аудио. Проверьте настройки браузера.");
-      setState("stopped");
-      stateRef.current = "stopped";
+      const v = Number(localStorage.getItem("timeline-volume"));
+      return Number.isFinite(v) ? v : 80;
+    } catch {
+      return 80;
     }
-  }, [getSignedUrl, updatePosition]);
+  });
 
-  const play = useCallback(() => {
-    if (stateRef.current === "playing") return;
+  // Track which clip set we've loaded to avoid redundant reloads
+  const loadedKeyRef = useRef<string>("");
 
-    if (stateRef.current === "paused") {
-      stateRef.current = "playing";
-      setState("playing");
-      clipStartTimeRef.current = performance.now();
-      clipOffsetRef.current = pausedAtRef.current;
+  const audioClips = clips.filter((c) => c.hasAudio && c.audioPath);
 
-      // Re-schedule overlays from paused position
-      scheduleOverlays(pausedAtRef.current);
+  // Subscribe to engine state
+  useEffect(() => {
+    const unsub = engine.subscribe((snap) => {
+      setState(snap.state);
+      setPositionSec(snap.positionSec);
+      setTotalDuration(snap.totalDuration);
+    });
+    return unsub;
+  }, [engine]);
 
-      if (audioRef.current) {
-        audioRef.current.play().catch((err) => {
-          console.error("[TimelinePlayer] resume play() failed:", err);
-          toast.error("Не удалось возобновить воспроизведение");
-        });
-        // Resume overlay audios
-        for (const a of overlayAudiosRef.current) {
-          try { a.play(); } catch {}
-        }
-        rafRef.current = requestAnimationFrame(updatePosition);
-        return;
-      }
+  // Build a stable key from clip ids + paths to detect changes
+  const clipsKey = audioClips
+    .map((c) => `${c.id}:${c.audioPath}:${c.startSec}:${c.durationSec}`)
+    .join("|");
 
-      // No active audio element — start from current paused position
-      const ac = mainClipsRef.current;
-      const idx = ac.findIndex(
-        c => c.startSec <= pausedAtRef.current && pausedAtRef.current < c.startSec + c.durationSec
-      );
-      if (idx >= 0) {
-        const clip = ac[idx];
-        const offsetInClip = pausedAtRef.current - clip.startSec;
-        (async () => {
-          const url = await getSignedUrl(clip.audioPath!);
-          if (!url || stateRef.current !== "playing") return;
-          const audio = new Audio();
-          audio.crossOrigin = "anonymous";
-          audio.preload = "auto";
-          audio.volume = volumeRef.current / 100;
-          audio.src = url;
-          audioRef.current = audio;
-          audio.currentTime = Math.max(0, offsetInClip);
-          audio.onended = () => {
-            if (stateRef.current !== "playing") return;
-            clipOffsetRef.current = clip.startSec + clip.durationSec;
-            clipStartTimeRef.current = performance.now();
-            playClip(idx + 1);
-          };
-          audio.onerror = () => {
-            if (stateRef.current !== "playing") return;
-            playClip(idx + 1);
-          };
-          try {
-            await audio.play();
-            rafRef.current = requestAnimationFrame(updatePosition);
-          } catch (err) {
-            console.error("[TimelinePlayer] resume seek play() failed:", err);
-            toast.error("Не удалось возобновить воспроизведение");
-          }
-        })();
-      } else {
-        const nextIdx = ac.findIndex(c => c.startSec > pausedAtRef.current);
-        playClip(nextIdx >= 0 ? nextIdx : ac.length);
-      }
+  // Load tracks into the engine when clips change
+  useEffect(() => {
+    if (clipsKey === loadedKeyRef.current) return;
+    loadedKeyRef.current = clipsKey;
+
+    if (audioClips.length === 0) {
+      engine.loadTracks([]);
       return;
     }
 
-    // Start from first main clip
-    const firstAudioStart = mainClipsRef.current[0]?.startSec ?? 0;
-    stateRef.current = "playing";
-    setState("playing");
-    pausedAtRef.current = firstAudioStart;
-    clipOffsetRef.current = firstAudioStart;
-    clipStartTimeRef.current = performance.now();
-    setPositionSec(firstAudioStart);
+    let cancelled = false;
 
-    // Schedule all overlay clips
-    scheduleOverlays(firstAudioStart);
+    const loadAll = async () => {
+      // Get signed URLs for all clips in parallel
+      const configs: TrackConfig[] = [];
 
-    playClip(0);
-  }, [playClip, scheduleOverlays]);
+      const urlResults = await Promise.all(
+        audioClips.map(async (clip) => {
+          const { data, error } = await supabase.storage
+            .from("user-media")
+            .createSignedUrl(clip.audioPath!, 3600);
+          if (error || !data?.signedUrl) return null;
+          return { clip, url: data.signedUrl };
+        })
+      );
+
+      if (cancelled) return;
+
+      for (const result of urlResults) {
+        if (!result) continue;
+        const { clip, url } = result;
+        const isOverlay = clip.id.includes("_narrator_");
+
+        configs.push({
+          id: clip.id,
+          url,
+          startSec: clip.startSec,
+          durationSec: clip.durationSec,
+          overlay: isOverlay,
+          volume: volume,
+        });
+      }
+
+      if (cancelled) return;
+
+      try {
+        await engine.loadTracks(configs);
+      } catch (err) {
+        console.error("[useTimelinePlayer] Failed to load tracks:", err);
+      }
+    };
+
+    loadAll();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clipsKey]);
+
+  // Sync master volume
+  useEffect(() => {
+    engine.setMasterVolume(volume);
+  }, [volume, engine]);
+
+  // Compute total duration from all clips (including non-audio for timeline width)
+  const computedTotalDuration =
+    clips.length > 0
+      ? Math.max(...clips.map((c) => c.startSec + c.durationSec))
+      : 0;
+
+  const play = useCallback(async () => {
+    try {
+      await engine.play();
+    } catch (err) {
+      console.error("[useTimelinePlayer] play failed:", err);
+      toast.error("Не удалось воспроизвести аудио. Проверьте настройки браузера.");
+    }
+  }, [engine]);
 
   const pause = useCallback(() => {
-    if (stateRef.current !== "playing") return;
-    stateRef.current = "paused";
-    setState("paused");
-    cancelAnimationFrame(rafRef.current);
-    pausedAtRef.current = positionSec;
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    // Pause overlays
-    for (const a of overlayAudiosRef.current) {
-      try { a.pause(); } catch {}
-    }
-    // Cancel pending overlay timers
-    for (const t of overlayTimersRef.current) clearTimeout(t);
-    overlayTimersRef.current = [];
-  }, [positionSec]);
+    engine.pause();
+  }, [engine]);
 
   const stop = useCallback(() => {
-    stateRef.current = "stopped";
-    setState("stopped");
-    cancelAnimationFrame(rafRef.current);
-    setPositionSec(0);
-    pausedAtRef.current = 0;
-    clipOffsetRef.current = 0;
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    stopOverlays();
-  }, [stopOverlays]);
+    engine.stop();
+  }, [engine]);
 
-  const seek = useCallback((toSec: number) => {
-    const clamped = Math.max(0, Math.min(toSec, totalDurationRef.current));
-    cancelAnimationFrame(rafRef.current);
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    stopOverlays();
+  const seek = useCallback(
+    (toSec: number) => {
+      engine.seek(toSec);
+    },
+    [engine]
+  );
 
-    setPositionSec(clamped);
-    pausedAtRef.current = clamped;
-    clipOffsetRef.current = clamped;
-    clipStartTimeRef.current = performance.now();
-
-    if (stateRef.current === "playing") {
-      // Re-schedule overlays from new position
-      scheduleOverlays(clamped);
-
-      const ac = mainClipsRef.current;
-      const idx = ac.findIndex(
-        c => c.startSec <= clamped && clamped < c.startSec + c.durationSec
-      );
-      if (idx >= 0) {
-        const clip = ac[idx];
-        const offsetInClip = clamped - clip.startSec;
-        clipIndexRef.current = idx;
-        (async () => {
-          const url = await getSignedUrl(clip.audioPath!);
-          if (!url || stateRef.current !== "playing") return;
-          const audio = new Audio();
-          audio.crossOrigin = "anonymous";
-          audio.preload = "auto";
-          audio.volume = volumeRef.current / 100;
-          audio.src = url;
-          audioRef.current = audio;
-          audio.currentTime = offsetInClip;
-          audio.onended = () => {
-            if (stateRef.current !== "playing") return;
-            clipOffsetRef.current = clip.startSec + clip.durationSec;
-            clipStartTimeRef.current = performance.now();
-            playClip(idx + 1);
-          };
-          audio.onerror = () => {
-            if (stateRef.current !== "playing") return;
-            clipOffsetRef.current = clip.startSec + clip.durationSec;
-            clipStartTimeRef.current = performance.now();
-            playClip(idx + 1);
-          };
-          try {
-            await audio.play();
-            rafRef.current = requestAnimationFrame(updatePosition);
-          } catch (err) {
-            console.error("[TimelinePlayer] seek play() failed:", err);
-            toast.error("Не удалось воспроизвести аудио");
-          }
-        })();
-      } else {
-        const nextIdx = ac.findIndex(c => c.startSec > clamped);
-        playClip(nextIdx >= 0 ? nextIdx : ac.length);
-      }
-    } else {
-      if (stateRef.current === "stopped") {
-        stateRef.current = "paused";
-        setState("paused");
-      }
-    }
-  }, [getSignedUrl, playClip, updatePosition, stopOverlays, scheduleOverlays]);
-
-  const changeVolume = useCallback((v: number) => {
-    const clamped = Math.max(0, Math.min(100, v));
-    setVolume(clamped);
-    volumeRef.current = clamped;
-    localStorage.setItem("timeline-volume", String(clamped));
-    if (audioRef.current) audioRef.current.volume = clamped / 100;
-    for (const a of overlayAudiosRef.current) {
-      a.volume = clamped / 100;
-    }
-  }, []);
-
-  // Sync volume
-  useEffect(() => {
-    if (audioRef.current) audioRef.current.volume = volume / 100;
-    volumeRef.current = volume;
-  }, [volume]);
+  const changeVolume = useCallback(
+    (v: number) => {
+      const clamped = Math.max(0, Math.min(100, v));
+      setVolumeState(clamped);
+      engine.setMasterVolume(clamped);
+    },
+    [engine]
+  );
 
   return {
     state,
     positionSec,
-    totalDuration,
-    hasAudio: mainClips.length > 0,
+    totalDuration: Math.max(computedTotalDuration, totalDuration),
+    hasAudio: audioClips.length > 0,
     volume,
     changeVolume,
     play,
