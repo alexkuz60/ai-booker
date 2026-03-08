@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { getAudioEngine } from "@/lib/audioEngine";
 import { SpectrumAnalyzer } from "@/components/studio/MasterMeterPanel";
 import { FilterPanel } from "@/components/studio/FilterPanel";
+import { MultibandCompPanel } from "@/components/studio/MultibandCompPanel";
 import { Power } from "lucide-react";
 
 // ─── Shared parameter slider ───────────────────────────────
@@ -355,14 +356,15 @@ function ReverbPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
 
 // ─── Tabs definition ────────────────────────────────────────
 
-type EffectTab = "spectrum" | "eq" | "filter" | "comp" | "limit" | "reverb";
+type EffectTab = "spectrum" | "eq" | "filter" | "mbc" | "comp" | "limit" | "reverb";
 
 const TABS: { id: EffectTab; label: string; labelRu: string }[] = [
   { id: "spectrum", label: "FFT", labelRu: "FFT" },
   { id: "eq", label: "EQ", labelRu: "EQ" },
+  { id: "filter", label: "FLT", labelRu: "ФЛТ" },
+  { id: "mbc", label: "MBC", labelRu: "МБК" },
   { id: "comp", label: "CMP", labelRu: "КМП" },
   { id: "limit", label: "LIM", labelRu: "ЛИМ" },
-  { id: "filter", label: "FLT", labelRu: "ФЛТ" },
   { id: "reverb", label: "REV", labelRu: "РЕВ" },
 ];
 
