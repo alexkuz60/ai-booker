@@ -339,8 +339,8 @@ export function SpectrumAnalyzer() {
       }
 
       // Frequency markers
-      ctx.fillStyle = "hsla(0, 0%, 100%, 0.15)";
-      ctx.font = "7px monospace";
+      ctx.fillStyle = "hsla(0, 0%, 100%, 0.7)";
+      ctx.font = "bold 10px monospace";
       ctx.textAlign = "center";
       const markers = [
         { bin: 2, label: "100" }, { bin: 6, label: "500" },
