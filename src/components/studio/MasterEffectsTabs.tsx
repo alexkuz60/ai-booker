@@ -200,7 +200,6 @@ function CompPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
       </div>
       {/* Sliders — half width */}
       <div className="flex flex-col gap-3 min-w-0 w-32">
-        </span>
         <ParamSlider label={isRu ? "Порог" : "Threshold"} value={threshold} min={-60} max={0} step={1} unit=" dB"
           onChange={v => { setThreshold(v); engine.setMasterCompThreshold(v); }} disabled={disabled} />
         <ParamSlider label={isRu ? "Соотн." : "Ratio"} value={ratio} min={1} max={20} step={0.5} unit=":1"
