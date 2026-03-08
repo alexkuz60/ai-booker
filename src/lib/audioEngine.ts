@@ -701,6 +701,9 @@ class AudioEngine {
 
   /** Resize FFT (must be power of 2). Reconnects to the same point in the chain. */
   setFFTSize(size: number): void {
+    if (this.masterFFT.size === size) return;
+    // Disconnect old node without disposing the upstream
+    try { this.masterReverb.disconnect(this.masterFFT); } catch { /* may already be disconnected */ }
     this.masterFFT.dispose();
     this.masterFFT = new Tone.FFT(size);
     this.masterReverb.connect(this.masterFFT);
