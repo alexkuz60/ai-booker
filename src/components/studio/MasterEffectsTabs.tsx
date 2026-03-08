@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getAudioEngine } from "@/lib/audioEngine";
 import { SpectrumAnalyzer } from "@/components/studio/MasterMeterPanel";
+import { FilterPanel } from "@/components/studio/FilterPanel";
 import { Power } from "lucide-react";
 
 // ─── Shared parameter slider ───────────────────────────────
@@ -354,11 +355,12 @@ function ReverbPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
 
 // ─── Tabs definition ────────────────────────────────────────
 
-type EffectTab = "spectrum" | "eq" | "comp" | "limit" | "reverb";
+type EffectTab = "spectrum" | "eq" | "filter" | "comp" | "limit" | "reverb";
 
 const TABS: { id: EffectTab; label: string; labelRu: string }[] = [
   { id: "spectrum", label: "FFT", labelRu: "FFT" },
   { id: "eq", label: "EQ", labelRu: "EQ" },
+  { id: "filter", label: "FLT", labelRu: "ФЛТ" },
   { id: "comp", label: "CMP", labelRu: "КМП" },
   { id: "limit", label: "LIM", labelRu: "ЛИМ" },
   { id: "reverb", label: "REV", labelRu: "РЕВ" },
@@ -379,7 +381,7 @@ export function MasterEffectsTabs({ isRu }: MasterEffectsTabsProps) {
 
   const [pluginStates, setPluginStates] = useState(() => {
     const s = engine.getMasterPluginState();
-    return { eq: s.eqBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed };
+    return { eq: s.eqBypassed, filter: s.filterBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed };
   });
 
   const [masterBypassed, setMasterBypassed] = useState(() => engine.getMasterPluginState().chainBypassed);
@@ -393,17 +395,18 @@ export function MasterEffectsTabs({ isRu }: MasterEffectsTabsProps) {
   useEffect(() => {
     const iv = setInterval(() => {
       const s = engine.getMasterPluginState();
-      setPluginStates({ eq: s.eqBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed });
+      setPluginStates({ eq: s.eqBypassed, filter: s.filterBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed });
       setMasterBypassed(s.chainBypassed);
     }, 500);
     return () => clearInterval(iv);
   }, [engine]);
 
-  const togglePlugin = useCallback((id: "eq" | "comp" | "limit" | "reverb") => {
+  const togglePlugin = useCallback((id: "eq" | "filter" | "comp" | "limit" | "reverb") => {
     setPluginStates(prev => {
       const newBypassed = !prev[id];
       switch (id) {
         case "eq": engine.setMasterEqBypassed(newBypassed); break;
+        case "filter": engine.setMasterFilterBypassed(newBypassed); break;
         case "comp": engine.setMasterCompBypassed(newBypassed); break;
         case "limit": engine.setMasterLimiterBypassed(newBypassed); break;
         case "reverb": engine.setMasterReverbBypassed(newBypassed); break;
@@ -423,7 +426,7 @@ export function MasterEffectsTabs({ isRu }: MasterEffectsTabsProps) {
       <div className="flex items-center gap-1 shrink-0 px-1">
         {TABS.map(tab => {
           const isActive = activeTab === tab.id;
-          const pluginId = tab.id === "spectrum" ? null : (tab.id as "eq" | "comp" | "limit" | "reverb");
+          const pluginId = tab.id === "spectrum" ? null : (tab.id as "eq" | "filter" | "comp" | "limit" | "reverb");
           const isBypassed = pluginId ? (masterBypassed || pluginStates[pluginId]) : false;
 
           return (
@@ -448,7 +451,7 @@ export function MasterEffectsTabs({ isRu }: MasterEffectsTabsProps) {
         {/* Per-plugin bypass for active plugin tab */}
         {activeTab !== "spectrum" && (
           <button
-            onClick={() => togglePlugin(activeTab as "eq" | "comp" | "limit" | "reverb")}
+            onClick={() => togglePlugin(activeTab as "eq" | "filter" | "comp" | "limit" | "reverb")}
             className={`ml-auto flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono uppercase leading-none transition-colors font-semibold ${
               pluginStates[activeTab as keyof typeof pluginStates]
                 ? "text-muted-foreground/40 bg-transparent border border-border/50"
