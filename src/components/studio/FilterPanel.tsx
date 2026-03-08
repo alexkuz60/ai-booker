@@ -511,11 +511,13 @@ export function FilterPanel({ isRu, disabled }: { isRu: boolean; disabled: boole
             value={band.frequency} min={20} max={20000}
             onChange={v => updateBand(selected, { frequency: v })} disabled={disabled}
           />
-          <FltSlider
-            label={isRu ? "Усил." : "Gain"}
-            value={band.gain} min={-24} max={24} step={0.5} unit=" dB"
-            onChange={v => updateBand(selected, { gain: v })} disabled={disabled}
-          />
+          {["peaking", "lowshelf", "highshelf"].includes(band.type) && (
+            <FltSlider
+              label={isRu ? "Усил." : "Gain"}
+              value={band.gain} min={-24} max={24} step={0.5} unit=" dB"
+              onChange={v => updateBand(selected, { gain: v })} disabled={disabled}
+            />
+          )}
           <FltSlider
             label="Q"
             value={band.Q} min={0.1} max={20} step={0.1}
