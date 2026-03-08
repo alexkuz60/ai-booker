@@ -403,6 +403,13 @@ class AudioEngine {
         rolloff: def.rolloff,
       }));
     }
+    this.masterMBC = new Tone.MultibandCompressor({
+      low: { threshold: this._mbcParams.low.threshold, ratio: this._mbcParams.low.ratio, attack: this._mbcParams.low.attack, release: this._mbcParams.low.release, knee: this._mbcParams.low.knee },
+      mid: { threshold: this._mbcParams.mid.threshold, ratio: this._mbcParams.mid.ratio, attack: this._mbcParams.mid.attack, release: this._mbcParams.mid.release, knee: this._mbcParams.mid.knee },
+      high: { threshold: this._mbcParams.high.threshold, ratio: this._mbcParams.high.ratio, attack: this._mbcParams.high.attack, release: this._mbcParams.high.release, knee: this._mbcParams.high.knee },
+      lowFrequency: this._mbcParams.lowFrequency,
+      highFrequency: this._mbcParams.highFrequency,
+    });
     this.masterComp = new Tone.Compressor({ threshold: -18, ratio: 4, attack: 0.005, release: 0.15 });
     this.masterLimiter = new Tone.Limiter(-1);
     this.masterReverb = new Tone.Reverb({ decay: 2.0, wet: 0.12 });
@@ -415,13 +422,14 @@ class AudioEngine {
     // FFT analyzer (128 bins for smooth spectrum display)
     this.masterFFT = new Tone.FFT(128);
 
-    // Chain: MasterBus → EQ → Filter1→…→Filter5 → Comp → Limiter → Reverb → Splitter → Meters + Destination
+    // Chain: MasterBus → EQ → Filter1→…→Filter5 → MBC → Comp → Limiter → Reverb → Splitter → Meters + Destination
     this.masterBus.connect(this.masterEQ);
     this.masterEQ.connect(this.masterFilters[0]);
     for (let i = 0; i < 4; i++) {
       this.masterFilters[i].connect(this.masterFilters[i + 1]);
     }
-    this.masterFilters[4].connect(this.masterComp);
+    this.masterFilters[4].connect(this.masterMBC);
+    this.masterMBC.connect(this.masterComp);
     this.masterComp.connect(this.masterLimiter);
     this.masterLimiter.connect(this.masterReverb);
     this.masterReverb.connect(this.masterSplitter);
@@ -441,6 +449,7 @@ class AudioEngine {
     // Apply initial bypass states (all bypassed by default)
     this.applyMasterEqBypass();
     this.applyMasterFilterBypass();
+    this.applyMasterMBCBypass();
     this.applyMasterCompBypass();
     this.applyMasterLimiterBypass();
     this.applyMasterReverbBypass();
