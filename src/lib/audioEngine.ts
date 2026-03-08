@@ -829,6 +829,34 @@ class AudioEngine {
     }
   }
 
+  private applyMasterMBCBypass(): void {
+    const bypassed = this._masterMBCBypassed || this._masterChainBypassed;
+    if (bypassed) {
+      this.masterMBC.low.ratio.value = 1;
+      this.masterMBC.mid.ratio.value = 1;
+      this.masterMBC.high.ratio.value = 1;
+    } else {
+      const p = this._mbcParams;
+      this.masterMBC.low.threshold.value = p.low.threshold;
+      this.masterMBC.low.ratio.value = p.low.ratio;
+      this.masterMBC.low.attack.value = p.low.attack;
+      this.masterMBC.low.release.value = p.low.release;
+      this.masterMBC.low.knee.value = p.low.knee;
+      this.masterMBC.mid.threshold.value = p.mid.threshold;
+      this.masterMBC.mid.ratio.value = p.mid.ratio;
+      this.masterMBC.mid.attack.value = p.mid.attack;
+      this.masterMBC.mid.release.value = p.mid.release;
+      this.masterMBC.mid.knee.value = p.mid.knee;
+      this.masterMBC.high.threshold.value = p.high.threshold;
+      this.masterMBC.high.ratio.value = p.high.ratio;
+      this.masterMBC.high.attack.value = p.high.attack;
+      this.masterMBC.high.release.value = p.high.release;
+      this.masterMBC.high.knee.value = p.high.knee;
+      this.masterMBC.lowFrequency.value = p.lowFrequency;
+      this.masterMBC.highFrequency.value = p.highFrequency;
+    }
+  }
+
   private applyMasterCompBypass(): void {
     if (this._masterCompBypassed || this._masterChainBypassed) {
       this.masterComp.ratio.value = 1;
@@ -864,6 +892,7 @@ class AudioEngine {
       localStorage.setItem(AudioEngine._LS_KEY, JSON.stringify({
         eqLow: this._eqLow, eqMid: this._eqMid, eqHigh: this._eqHigh,
         filterBands: this._filterBands,
+        mbcParams: this._mbcParams,
         compThreshold: this._compThreshold, compRatio: this._compRatio,
         compAttack: this._compAttack, compRelease: this._compRelease, compKnee: this._compKnee,
         limiterThreshold: this._limiterThreshold,
@@ -882,6 +911,14 @@ class AudioEngine {
   private _filterBands: FilterBandParams[] = (this._saved.filterBands as FilterBandParams[] | undefined)?.length === 5
     ? (this._saved.filterBands as FilterBandParams[])
     : [...DEFAULT_FILTER_BANDS];
+  // Multiband compressor params
+  private _mbcParams: MultibandCompParams = this._saved.mbcParams
+    ? { ...DEFAULT_MULTIBAND_COMP, ...this._saved.mbcParams,
+        low: { ...DEFAULT_MULTIBAND_COMP.low, ...(this._saved.mbcParams?.low ?? {}) },
+        mid: { ...DEFAULT_MULTIBAND_COMP.mid, ...(this._saved.mbcParams?.mid ?? {}) },
+        high: { ...DEFAULT_MULTIBAND_COMP.high, ...(this._saved.mbcParams?.high ?? {}) },
+      }
+    : { ...DEFAULT_MULTIBAND_COMP, low: { ...DEFAULT_MULTIBAND_COMP.low }, mid: { ...DEFAULT_MULTIBAND_COMP.mid }, high: { ...DEFAULT_MULTIBAND_COMP.high } };
   // Compressor params
   private _compThreshold = this._saved.compThreshold ?? -18;
   private _compRatio = this._saved.compRatio ?? 4;
