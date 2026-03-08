@@ -359,22 +359,22 @@ export function SpectrumAnalyzer() {
   }, [engine]);
 
   return (
-    <div className="flex flex-col gap-0.5 h-full">
-      <div className="flex items-center justify-between shrink-0 flex-wrap gap-y-0.5">
-        <span className="text-[9px] text-muted-foreground/50 font-body uppercase tracking-wider">
+    <div className="flex flex-col gap-1 h-full">
+      <div className="flex items-center justify-between shrink-0 flex-wrap gap-y-1">
+        <span className="text-xs text-foreground font-body uppercase tracking-wider font-semibold">
           Spectrum
         </span>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           {/* FFT Size selector */}
-          <div className="flex gap-0.5">
+          <div className="flex gap-1">
             {FFT_SIZES.map(s => (
               <button
                 key={s}
                 onClick={() => { setFftSize(s); smoothRef.current = null; }}
-                className={`px-1 py-0.5 rounded text-[8px] font-mono leading-none transition-colors ${
+                className={`px-1.5 py-0.5 rounded text-[10px] font-mono leading-none transition-colors ${
                   fftSize === s
-                    ? "text-accent bg-accent/15"
-                    : "text-muted-foreground/30 hover:text-muted-foreground/60"
+                    ? "text-foreground bg-accent/20 font-bold"
+                    : "text-foreground/50 hover:text-foreground/80"
                 }`}
                 title={`FFT ${s}`}
               >
@@ -382,17 +382,17 @@ export function SpectrumAnalyzer() {
               </button>
             ))}
           </div>
-          <span className="text-muted-foreground/20">│</span>
+          <span className="text-foreground/30">│</span>
           {/* Mode selector */}
-          <div className="flex gap-0.5">
+          <div className="flex gap-1">
             {SPECTRUM_MODES.map(m => (
               <button
                 key={m.id}
                 onClick={() => setMode(m.id)}
-                className={`px-1.5 py-0.5 rounded text-[9px] font-mono leading-none transition-colors ${
+                className={`px-2 py-0.5 rounded text-[11px] font-mono leading-none transition-colors ${
                   mode === m.id
-                    ? "text-primary bg-primary/15"
-                    : "text-muted-foreground/40 hover:text-muted-foreground/70"
+                    ? "text-foreground bg-primary/20 font-bold"
+                    : "text-foreground/50 hover:text-foreground/80"
                 }`}
                 title={m.id}
               >
@@ -403,8 +403,8 @@ export function SpectrumAnalyzer() {
         </div>
       </div>
       {/* Smoothing slider */}
-      <div className="flex items-center gap-1.5 shrink-0">
-        <span className="text-[8px] text-muted-foreground/40 font-mono w-7 shrink-0">SMT</span>
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="text-[10px] text-foreground/70 font-mono w-8 shrink-0 font-semibold">SMT</span>
         <input
           type="range"
           min={0}
@@ -414,7 +414,7 @@ export function SpectrumAnalyzer() {
           onChange={e => setSmoothing(Number(e.target.value))}
           className="flex-1 h-2 accent-primary cursor-pointer"
         />
-        <span className="text-[8px] text-muted-foreground/50 font-mono w-6 text-right">{(smoothing * 100).toFixed(0)}%</span>
+        <span className="text-[10px] text-foreground/70 font-mono w-8 text-right font-semibold">{(smoothing * 100).toFixed(0)}%</span>
       </div>
       <div className="flex-1 min-h-0 relative rounded-sm border border-border/40 overflow-hidden">
         <canvas

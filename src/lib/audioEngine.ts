@@ -695,7 +695,8 @@ class AudioEngine {
 
   /** Get FFT spectrum data as Float32Array (dB values, typically -100 to 0) */
   getFFTData(): Float32Array {
-    return this.masterFFT.getValue();
+    const data = this.masterFFT.getValue();
+    return new Float32Array(data);
   }
 
   /** Resize FFT (must be power of 2). Reconnects to the same point in the chain. */
