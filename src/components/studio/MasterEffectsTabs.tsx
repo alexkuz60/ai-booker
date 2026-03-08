@@ -360,9 +360,9 @@ type EffectTab = "spectrum" | "eq" | "filter" | "comp" | "limit" | "reverb";
 const TABS: { id: EffectTab; label: string; labelRu: string }[] = [
   { id: "spectrum", label: "FFT", labelRu: "FFT" },
   { id: "eq", label: "EQ", labelRu: "EQ" },
-  { id: "filter", label: "FLT", labelRu: "ФЛТ" },
   { id: "comp", label: "CMP", labelRu: "КМП" },
   { id: "limit", label: "LIM", labelRu: "ЛИМ" },
+  { id: "filter", label: "FLT", labelRu: "ФЛТ" },
   { id: "reverb", label: "REV", labelRu: "РЕВ" },
 ];
 

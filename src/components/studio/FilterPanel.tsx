@@ -1,22 +1,20 @@
 /**
- * FilterPanel — 5-band parametric filter UI with frequency response graph.
- * Each band: frequency, type, Q, gain, rolloff.
- * Canvas renders combined frequency response of all 5 bands.
+ * FilterPanel — 5-band parametric filter UI with frequency response graph + drag.
+ * Layout: graph left, controls right. Band dots are draggable (X=freq, Y=gain).
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { getAudioEngine, FilterBandParams, FilterType, FilterRolloff } from "@/lib/audioEngine";
 
-// ─── Band colors (HSL hues) ────────────────────────────────
+// ─── Band colors ───────────────────────────────────────────
 
 const BAND_COLORS = [
-  "hsl(200, 70%, 55%)",  // cyan
-  "hsl(140, 70%, 50%)",  // green
-  "hsl(50, 80%, 55%)",   // yellow
-  "hsl(25, 80%, 55%)",   // orange
-  "hsl(320, 70%, 55%)",  // magenta
+  "hsl(200, 70%, 55%)",
+  "hsl(140, 70%, 50%)",
+  "hsl(50, 80%, 55%)",
+  "hsl(25, 80%, 55%)",
+  "hsl(320, 70%, 55%)",
 ];
-
 const BAND_COLORS_DIM = [
   "hsla(200, 70%, 55%, 0.3)",
   "hsla(140, 70%, 50%, 0.3)",
@@ -27,51 +25,53 @@ const BAND_COLORS_DIM = [
 
 const FILTER_TYPES: FilterType[] = ["lowpass", "highpass", "bandpass", "lowshelf", "highshelf", "notch", "allpass", "peaking"];
 const ROLLOFFS: FilterRolloff[] = [-12, -24, -48, -96];
-
 const TYPE_LABELS: Record<FilterType, string> = {
   lowpass: "LP", highpass: "HP", bandpass: "BP",
   lowshelf: "LS", highshelf: "HS", notch: "N",
   allpass: "AP", peaking: "PK",
 };
 
-// ─── Biquad coefficient computation (Audio EQ Cookbook) ─────
+// ─── Graph constants ───────────────────────────────────────
+
+const F_MIN = 20, F_MAX = 20000;
+const DB_MIN = -24, DB_MAX = 24, DB_RANGE = DB_MAX - DB_MIN;
+const LOG_MIN = Math.log10(F_MIN), LOG_MAX = Math.log10(F_MAX);
+
+function freqToNorm(f: number) { return (Math.log10(f) - LOG_MIN) / (LOG_MAX - LOG_MIN); }
+function normToFreq(n: number) { return Math.pow(10, LOG_MIN + n * (LOG_MAX - LOG_MIN)); }
+function gainToNorm(g: number) { return 1 - (g - DB_MIN) / DB_RANGE; }
+function normToGain(n: number) { return DB_MAX - n * DB_RANGE; }
+
+// ─── Biquad coefficients (Audio EQ Cookbook) ────────────────
 
 function computeBiquadCoeffs(
-  type: FilterType, freq: number, Q: number, gainDb: number, sampleRate: number
-): { b0: number; b1: number; b2: number; a0: number; a1: number; a2: number } {
+  type: FilterType, freq: number, Q: number, gainDb: number, sr: number
+) {
   const A = Math.pow(10, gainDb / 40);
-  const w0 = (2 * Math.PI * freq) / sampleRate;
-  const cosW0 = Math.cos(w0);
-  const sinW0 = Math.sin(w0);
+  const w0 = (2 * Math.PI * freq) / sr;
+  const cosW0 = Math.cos(w0), sinW0 = Math.sin(w0);
   const alpha = sinW0 / (2 * Q);
-
   let b0 = 1, b1 = 0, b2 = 0, a0 = 1, a1 = 0, a2 = 0;
 
   switch (type) {
     case "lowpass":
-      b0 = (1 - cosW0) / 2; b1 = 1 - cosW0; b2 = (1 - cosW0) / 2;
-      a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha;
-      break;
+      b0 = (1 - cosW0) / 2; b1 = 1 - cosW0; b2 = b0;
+      a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha; break;
     case "highpass":
-      b0 = (1 + cosW0) / 2; b1 = -(1 + cosW0); b2 = (1 + cosW0) / 2;
-      a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha;
-      break;
+      b0 = (1 + cosW0) / 2; b1 = -(1 + cosW0); b2 = b0;
+      a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha; break;
     case "bandpass":
       b0 = alpha; b1 = 0; b2 = -alpha;
-      a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha;
-      break;
+      a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha; break;
     case "notch":
       b0 = 1; b1 = -2 * cosW0; b2 = 1;
-      a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha;
-      break;
+      a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha; break;
     case "allpass":
       b0 = 1 - alpha; b1 = -2 * cosW0; b2 = 1 + alpha;
-      a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha;
-      break;
+      a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha; break;
     case "peaking":
       b0 = 1 + alpha * A; b1 = -2 * cosW0; b2 = 1 - alpha * A;
-      a0 = 1 + alpha / A; a1 = -2 * cosW0; a2 = 1 - alpha / A;
-      break;
+      a0 = 1 + alpha / A; a1 = -2 * cosW0; a2 = 1 - alpha / A; break;
     case "lowshelf": {
       const sq = 2 * Math.sqrt(A) * alpha;
       b0 = A * ((A + 1) - (A - 1) * cosW0 + sq);
@@ -79,8 +79,7 @@ function computeBiquadCoeffs(
       b2 = A * ((A + 1) - (A - 1) * cosW0 - sq);
       a0 = (A + 1) + (A - 1) * cosW0 + sq;
       a1 = -2 * ((A - 1) + (A + 1) * cosW0);
-      a2 = (A + 1) + (A - 1) * cosW0 - sq;
-      break;
+      a2 = (A + 1) + (A - 1) * cosW0 - sq; break;
     }
     case "highshelf": {
       const sq = 2 * Math.sqrt(A) * alpha;
@@ -89,56 +88,45 @@ function computeBiquadCoeffs(
       b2 = A * ((A + 1) + (A - 1) * cosW0 - sq);
       a0 = (A + 1) - (A - 1) * cosW0 + sq;
       a1 = 2 * ((A - 1) - (A + 1) * cosW0);
-      a2 = (A + 1) - (A - 1) * cosW0 - sq;
-      break;
+      a2 = (A + 1) - (A - 1) * cosW0 - sq; break;
     }
   }
   return { b0, b1, b2, a0, a1, a2 };
 }
 
-function computeFilterResponse(
-  band: FilterBandParams, sampleRate: number, freqs: Float32Array
-): Float32Array {
+function computeFilterResponse(band: FilterBandParams, sr: number, freqs: Float32Array): Float32Array {
   const cascades = Math.max(1, Math.abs(band.rolloff) / 12);
-  const { b0, b1, b2, a0, a1, a2 } = computeBiquadCoeffs(
-    band.type, band.frequency, band.Q, band.gain, sampleRate
-  );
+  const { b0, b1, b2, a0, a1, a2 } = computeBiquadCoeffs(band.type, band.frequency, band.Q, band.gain, sr);
   const mag = new Float32Array(freqs.length);
-
   for (let i = 0; i < freqs.length; i++) {
-    const w = (2 * Math.PI * freqs[i]) / sampleRate;
-    const cosW = Math.cos(w);
-    const cos2W = Math.cos(2 * w);
-    const sinW = Math.sin(w);
-    const sin2W = Math.sin(2 * w);
-
-    const numRe = b0 / a0 + (b1 / a0) * cosW + (b2 / a0) * cos2W;
-    const numIm = -(b1 / a0) * sinW - (b2 / a0) * sin2W;
-    const denRe = 1 + (a1 / a0) * cosW + (a2 / a0) * cos2W;
-    const denIm = -(a1 / a0) * sinW - (a2 / a0) * sin2W;
-
-    const denMagSq = denRe * denRe + denIm * denIm;
-    const re = (numRe * denRe + numIm * denIm) / denMagSq;
-    const im = (numIm * denRe - numRe * denIm) / denMagSq;
-    const m = Math.sqrt(re * re + im * im);
-    mag[i] = Math.pow(m, cascades);
+    const w = (2 * Math.PI * freqs[i]) / sr;
+    const cosW = Math.cos(w), cos2W = Math.cos(2 * w), sinW = Math.sin(w), sin2W = Math.sin(2 * w);
+    const nR = b0 / a0 + (b1 / a0) * cosW + (b2 / a0) * cos2W;
+    const nI = -(b1 / a0) * sinW - (b2 / a0) * sin2W;
+    const dR = 1 + (a1 / a0) * cosW + (a2 / a0) * cos2W;
+    const dI = -(a1 / a0) * sinW - (a2 / a0) * sin2W;
+    const dM = dR * dR + dI * dI;
+    const re = (nR * dR + nI * dI) / dM;
+    const im = (nI * dR - nR * dI) / dM;
+    mag[i] = Math.pow(Math.sqrt(re * re + im * im), cascades);
   }
   return mag;
 }
 
-// ─── Frequency Response Graph ──────────────────────────────
+// ─── Frequency Response Graph with drag-n-drop ─────────────
 
 function FilterResponseGraph({
-  bands,
-  selectedBand,
-  onSelectBand,
+  bands, selectedBand, onSelectBand, onDragBand,
 }: {
   bands: FilterBandParams[];
   selectedBand: number;
   onSelectBand: (i: number) => void;
+  onDragBand: (i: number, freq: number, gain: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const dragging = useRef<{ band: number } | null>(null);
 
+  // Draw
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -154,60 +142,33 @@ function FilterResponseGraph({
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const sampleRate = 48000;
-    const fMin = 20;
-    const fMax = 20000;
-    const dbMin = -24;
-    const dbMax = 24;
-    const dbRange = dbMax - dbMin;
-    const numPoints = Math.max(w, 200);
+    const sr = 48000;
+    const numPts = Math.max(w, 200);
+    const freqs = new Float32Array(numPts);
+    for (let i = 0; i < numPts; i++) freqs[i] = normToFreq(i / (numPts - 1));
 
-    // Generate log-spaced frequency array
-    const freqs = new Float32Array(numPoints);
-    const logMin = Math.log10(fMin);
-    const logMax = Math.log10(fMax);
-    for (let i = 0; i < numPoints; i++) {
-      freqs[i] = Math.pow(10, logMin + (i / (numPoints - 1)) * (logMax - logMin));
-    }
+    const toX = (i: number) => (i / (numPts - 1)) * w;
+    const dbToY = (db: number) => h * (1 - (db - DB_MIN) / DB_RANGE);
+    const fToX = (f: number) => freqToNorm(f) * w;
 
-    const toX = (i: number) => (i / (numPoints - 1)) * w;
-    const dbToY = (db: number) => h * (1 - (db - dbMin) / dbRange);
-    const freqToX = (f: number) => {
-      const logF = Math.log10(f);
-      return ((logF - logMin) / (logMax - logMin)) * w;
-    };
+    const bandMags = bands.map(b => computeFilterResponse(b, sr, freqs));
+    const combined = new Float32Array(numPts).fill(1);
+    for (const m of bandMags) for (let i = 0; i < numPts; i++) combined[i] *= m[i];
 
-    // Compute per-band responses
-    const bandMags: Float32Array[] = [];
-    for (const band of bands) {
-      bandMags.push(computeFilterResponse(band, sampleRate, freqs));
-    }
-
-    // Combined magnitude (multiply all)
-    const combined = new Float32Array(numPoints).fill(1);
-    for (const mag of bandMags) {
-      for (let i = 0; i < numPoints; i++) combined[i] *= mag[i];
-    }
-
-    // ── Background
+    // Background
     ctx.fillStyle = "hsla(0, 0%, 5%, 0.95)";
     ctx.fillRect(0, 0, w, h);
 
-    // ── Grid: frequency lines
-    ctx.strokeStyle = "hsla(0, 0%, 100%, 0.07)";
-    ctx.lineWidth = 1;
-    ctx.fillStyle = "hsla(0, 0%, 100%, 0.18)";
-    ctx.font = "8px monospace";
-    ctx.textAlign = "center";
-
+    // Grid: freq
+    ctx.strokeStyle = "hsla(0, 0%, 100%, 0.07)"; ctx.lineWidth = 1;
+    ctx.fillStyle = "hsla(0, 0%, 100%, 0.18)"; ctx.font = "8px monospace"; ctx.textAlign = "center";
     for (const f of [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]) {
-      const x = freqToX(f);
+      const x = fToX(f);
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-      const label = f >= 1000 ? `${f / 1000}k` : `${f}`;
-      ctx.fillText(label, x, h - 2);
+      ctx.fillText(f >= 1000 ? `${f / 1000}k` : `${f}`, x, h - 2);
     }
 
-    // ── Grid: dB lines
+    // Grid: dB
     ctx.textAlign = "right";
     for (let db = -24; db <= 24; db += 6) {
       const y = dbToY(db);
@@ -220,123 +181,203 @@ function FilterResponseGraph({
       }
     }
 
-    // ── Per-band curves (dimmed, non-selected bands first)
+    // Per-band curves (dimmed)
     for (let b = 0; b < 5; b++) {
       if (b === selectedBand) continue;
-      const mag = bandMags[b];
-      ctx.strokeStyle = BAND_COLORS_DIM[b];
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let i = 0; i < numPoints; i++) {
-        const x = toX(i);
-        const db = 20 * Math.log10(Math.max(mag[i], 1e-6));
-        const y = dbToY(db);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      const m = bandMags[b];
+      ctx.strokeStyle = BAND_COLORS_DIM[b]; ctx.lineWidth = 1; ctx.beginPath();
+      for (let i = 0; i < numPts; i++) {
+        const x = toX(i), y = dbToY(20 * Math.log10(Math.max(m[i], 1e-6)));
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       }
       ctx.stroke();
     }
 
-    // ── Selected band curve (bright)
+    // Selected band curve
     {
-      const mag = bandMags[selectedBand];
-      ctx.strokeStyle = BAND_COLORS[selectedBand];
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (let i = 0; i < numPoints; i++) {
-        const x = toX(i);
-        const db = 20 * Math.log10(Math.max(mag[i], 1e-6));
-        const y = dbToY(db);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      const m = bandMags[selectedBand];
+      ctx.strokeStyle = BAND_COLORS[selectedBand]; ctx.lineWidth = 2; ctx.beginPath();
+      for (let i = 0; i < numPts; i++) {
+        const x = toX(i), y = dbToY(20 * Math.log10(Math.max(m[i], 1e-6)));
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       }
       ctx.stroke();
     }
 
-    // ── Combined curve (white)
-    ctx.strokeStyle = "hsla(0, 0%, 100%, 0.8)";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    for (let i = 0; i < numPoints; i++) {
-      const x = toX(i);
-      const db = 20 * Math.log10(Math.max(combined[i], 1e-6));
-      const y = dbToY(db);
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    // Combined curve
+    ctx.strokeStyle = "hsla(0, 0%, 100%, 0.8)"; ctx.lineWidth = 1.5; ctx.beginPath();
+    for (let i = 0; i < numPts; i++) {
+      const x = toX(i), y = dbToY(20 * Math.log10(Math.max(combined[i], 1e-6)));
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.stroke();
 
-    // Fill under combined curve (subtle)
-    ctx.lineTo(w, dbToY(0));
-    ctx.lineTo(0, dbToY(0));
-    ctx.closePath();
-    const fillGrad = ctx.createLinearGradient(0, 0, 0, h);
-    fillGrad.addColorStop(0, "hsla(0, 0%, 100%, 0.06)");
-    fillGrad.addColorStop(0.5, "hsla(0, 0%, 100%, 0.0)");
-    fillGrad.addColorStop(1, "hsla(0, 0%, 100%, 0.06)");
-    ctx.fillStyle = fillGrad;
-    ctx.fill();
+    // Fill under combined
+    ctx.lineTo(w, dbToY(0)); ctx.lineTo(0, dbToY(0)); ctx.closePath();
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, "hsla(0, 0%, 100%, 0.06)");
+    grad.addColorStop(0.5, "hsla(0, 0%, 100%, 0.0)");
+    grad.addColorStop(1, "hsla(0, 0%, 100%, 0.06)");
+    ctx.fillStyle = grad; ctx.fill();
 
-    // ── Band frequency markers
+    // Band dots (at their gain position, not at 0dB)
     for (let b = 0; b < 5; b++) {
       const band = bands[b];
-      const x = freqToX(band.frequency);
+      const x = fToX(band.frequency);
+      const y = dbToY(band.gain);
+      const r = b === selectedBand ? 5 : 3.5;
+
+      // Glow for selected
+      if (b === selectedBand) {
+        ctx.fillStyle = BAND_COLORS_DIM[b];
+        ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI * 2); ctx.fill();
+      }
+
       ctx.fillStyle = b === selectedBand ? BAND_COLORS[b] : BAND_COLORS_DIM[b];
-      ctx.beginPath();
-      ctx.arc(x, dbToY(0), b === selectedBand ? 4 : 3, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+
+      // Outline
+      ctx.strokeStyle = BAND_COLORS[b]; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+
       // Label
-      ctx.fillStyle = BAND_COLORS[b];
-      ctx.font = "bold 8px monospace";
-      ctx.textAlign = "center";
+      ctx.fillStyle = BAND_COLORS[b]; ctx.font = "bold 8px monospace"; ctx.textAlign = "center";
       ctx.fillText(`${b + 1}`, x, 10);
     }
   }, [bands, selectedBand]);
 
-  const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  // ─── Pointer handlers for drag ───────────────────────────
+
+  const getFreqGain = useCallback((e: React.PointerEvent | PointerEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { freq: 1000, gain: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const nx = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const ny = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    return {
+      freq: Math.round(Math.max(F_MIN, Math.min(F_MAX, normToFreq(nx)))),
+      gain: Math.round(Math.max(DB_MIN, Math.min(DB_MAX, normToGain(ny))) * 2) / 2,
+    };
+  }, []);
+
+  const findClosestBand = useCallback((e: React.PointerEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return 0;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    let closest = 0, minD = Infinity;
+    for (let i = 0; i < bands.length; i++) {
+      const bx = freqToNorm(bands[i].frequency) * rect.width;
+      const by = gainToNorm(bands[i].gain) * rect.height;
+      const d = Math.hypot(mx - bx, my - by);
+      if (d < minD) { minD = d; closest = i; }
+    }
+    return closest;
+  }, [bands]);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const w = rect.width;
-    const fMin = 20, fMax = 20000;
-    const logMin = Math.log10(fMin), logMax = Math.log10(fMax);
-    const clickFreq = Math.pow(10, logMin + (x / w) * (logMax - logMin));
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
 
-    // Find closest band by frequency
-    let closest = 0;
-    let minDist = Infinity;
+    // Check if close to a band dot (within 15px)
+    let hitBand = -1, hitDist = Infinity;
     for (let i = 0; i < bands.length; i++) {
-      const dist = Math.abs(Math.log10(bands[i].frequency) - Math.log10(clickFreq));
-      if (dist < minDist) { minDist = dist; closest = i; }
+      const bx = freqToNorm(bands[i].frequency) * rect.width;
+      const by = gainToNorm(bands[i].gain) * rect.height;
+      const d = Math.hypot(mx - bx, my - by);
+      if (d < hitDist) { hitDist = d; hitBand = i; }
     }
-    onSelectBand(closest);
-  }, [bands, onSelectBand]);
+
+    if (hitDist < 20) {
+      dragging.current = { band: hitBand };
+      onSelectBand(hitBand);
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      e.preventDefault();
+    } else {
+      // Just select closest band
+      const closest = findClosestBand(e);
+      onSelectBand(closest);
+    }
+  }, [bands, onSelectBand, findClosestBand]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!dragging.current) {
+      // Change cursor if near a dot
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      let near = false;
+      for (let i = 0; i < bands.length; i++) {
+        const bx = freqToNorm(bands[i].frequency) * rect.width;
+        const by = gainToNorm(bands[i].gain) * rect.height;
+        if (Math.hypot(mx - bx, my - by) < 20) { near = true; break; }
+      }
+      canvas.style.cursor = near ? "grab" : "crosshair";
+      return;
+    }
+    const { freq, gain } = getFreqGain(e);
+    onDragBand(dragging.current.band, freq, gain);
+  }, [bands, getFreqGain, onDragBand]);
+
+  const handlePointerUp = useCallback(() => {
+    dragging.current = null;
+  }, []);
 
   return (
-    <div className="relative rounded-sm border border-border/40 overflow-hidden" style={{ height: 140 }}>
+    <div className="relative rounded-sm border border-border/40 overflow-hidden flex-1 min-w-0" style={{ minHeight: 140 }}>
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full cursor-crosshair"
-        onClick={handleClick}
+        className="absolute inset-0 w-full h-full"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
       />
     </div>
   );
 }
 
-// ─── Log-scale frequency slider ────────────────────────────
+// ─── Param slider (matches ParamSlider style from MasterEffectsTabs) ───
+
+function FltSlider({ label, value, min, max, step, unit, onChange, disabled }: {
+  label: string; value: number; min: number; max: number; step: number; unit?: string;
+  onChange: (v: number) => void; disabled?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-muted-foreground font-mono uppercase">{label}</span>
+        <span className="text-[10px] text-foreground/70 font-mono tabular-nums">
+          {step < 0.01 ? value.toFixed(3) : step < 1 ? value.toFixed(1) : value.toFixed(0)}{unit ?? ""}
+        </span>
+      </div>
+      <input
+        type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(Number(e.target.value))} disabled={disabled}
+        className="w-full h-1 accent-primary cursor-pointer volume-slider-sm disabled:opacity-30"
+      />
+    </div>
+  );
+}
 
 function LogFreqSlider({ label, value, min, max, onChange, disabled }: {
   label: string; value: number; min: number; max: number;
   onChange: (v: number) => void; disabled?: boolean;
 }) {
-  const logMin = Math.log10(min);
-  const logMax = Math.log10(max);
+  const logMin = Math.log10(min), logMax = Math.log10(max);
   const sliderVal = ((Math.log10(value) - logMin) / (logMax - logMin)) * 1000;
-  const displayVal = value >= 1000 ? `${(value / 1000).toFixed(1)}k` : `${Math.round(value)}`;
+  const display = value >= 1000 ? `${(value / 1000).toFixed(1)}k` : `${Math.round(value)}`;
 
   return (
-    <div className="flex flex-col gap-0">
+    <div className="flex flex-col gap-0.5">
       <div className="flex items-center justify-between">
-        <span className="text-[9px] text-muted-foreground font-mono uppercase">{label}</span>
-        <span className="text-[9px] text-foreground/70 font-mono tabular-nums">{displayVal} Hz</span>
+        <span className="text-[10px] text-muted-foreground font-mono uppercase">{label}</span>
+        <span className="text-[10px] text-foreground/70 font-mono tabular-nums">{display} Hz</span>
       </div>
       <input
         type="range" min={0} max={1000} step={1} value={Math.round(sliderVal)}
@@ -351,122 +392,113 @@ function LogFreqSlider({ label, value, min, max, onChange, disabled }: {
   );
 }
 
-// ─── Param slider (compact) ────────────────────────────────
-
-function FltSlider({ label, value, min, max, step, unit, onChange, disabled }: {
-  label: string; value: number; min: number; max: number; step: number; unit?: string;
-  onChange: (v: number) => void; disabled?: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-0">
-      <div className="flex items-center justify-between">
-        <span className="text-[9px] text-muted-foreground font-mono uppercase">{label}</span>
-        <span className="text-[9px] text-foreground/70 font-mono tabular-nums">
-          {step < 0.01 ? value.toFixed(3) : step < 1 ? value.toFixed(1) : value.toFixed(0)}{unit ?? ""}
-        </span>
-      </div>
-      <input
-        type="range" min={min} max={max} step={step} value={value}
-        onChange={e => onChange(Number(e.target.value))} disabled={disabled}
-        className="w-full h-1 accent-primary cursor-pointer volume-slider-sm disabled:opacity-30"
-      />
-    </div>
-  );
-}
-
 // ─── Main FilterPanel ──────────────────────────────────────
 
 export function FilterPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
   const engine = getAudioEngine();
   const [bands, setBands] = useState<FilterBandParams[]>(() => engine.getMasterFilterBands());
   const [selected, setSelected] = useState(0);
-
   const band = bands[selected];
 
-  const updateBand = useCallback((params: Partial<FilterBandParams>) => {
+  const updateBand = useCallback((idx: number, params: Partial<FilterBandParams>) => {
     setBands(prev => {
       const next = [...prev];
-      next[selected] = { ...next[selected], ...params };
+      next[idx] = { ...next[idx], ...params };
       return next;
     });
-    engine.setMasterFilterBand(selected, params);
-  }, [selected, engine]);
+    engine.setMasterFilterBand(idx, params);
+  }, [engine]);
+
+  const handleDragBand = useCallback((idx: number, freq: number, gain: number) => {
+    updateBand(idx, { frequency: freq, gain });
+  }, [updateBand]);
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Frequency response graph */}
-      <FilterResponseGraph bands={bands} selectedBand={selected} onSelectBand={setSelected} />
+      {/* Graph + Controls side by side */}
+      <div className="flex gap-3">
+        {/* Graph (takes remaining space) */}
+        <FilterResponseGraph
+          bands={bands}
+          selectedBand={selected}
+          onSelectBand={setSelected}
+          onDragBand={handleDragBand}
+        />
 
-      {/* Band selector */}
-      <div className="flex items-center gap-1">
-        {bands.map((b, i) => (
-          <button
-            key={i}
-            onClick={() => setSelected(i)}
-            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold leading-none transition-colors ${
-              i === selected
-                ? "bg-primary/20 text-primary"
-                : "text-foreground/40 hover:text-foreground/60"
-            }`}
-          >
-            <span
-              className="inline-block w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: BAND_COLORS[i] }}
-            />
-            {i + 1}
-          </button>
-        ))}
-        <span className="ml-auto text-[9px] text-muted-foreground/50 font-mono">
-          {TYPE_LABELS[band.type]} {band.frequency >= 1000 ? `${(band.frequency / 1000).toFixed(1)}k` : band.frequency}Hz
-        </span>
-      </div>
+        {/* Controls column (fixed width, matching compressor style) */}
+        <div className="flex flex-col gap-1.5 w-[160px] shrink-0">
+          {/* Band selector */}
+          <div className="flex items-center gap-0.5">
+            {bands.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setSelected(i)}
+                className={`flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-mono font-semibold leading-none transition-colors ${
+                  i === selected
+                    ? "bg-primary/20 text-primary"
+                    : "text-foreground/40 hover:text-foreground/60"
+                }`}
+              >
+                <span
+                  className="inline-block w-1.5 h-1.5 rounded-full"
+                  style={{ backgroundColor: BAND_COLORS[i] }}
+                />
+                {i + 1}
+              </button>
+            ))}
+          </div>
 
-      {/* Controls for selected band */}
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-        <LogFreqSlider
-          label={isRu ? "Частота" : "Freq"}
-          value={band.frequency} min={20} max={20000}
-          onChange={v => updateBand({ frequency: v })} disabled={disabled}
-        />
-        <div className="flex flex-col gap-0">
-          <span className="text-[9px] text-muted-foreground font-mono uppercase">
-            {isRu ? "Тип" : "Type"}
+          {/* Band info */}
+          <span className="text-[9px] text-muted-foreground/50 font-mono">
+            {TYPE_LABELS[band.type]} {band.frequency >= 1000 ? `${(band.frequency / 1000).toFixed(1)}k` : band.frequency}Hz
           </span>
-          <select
-            value={band.type}
-            onChange={e => updateBand({ type: e.target.value as FilterType })}
-            disabled={disabled}
-            className="h-5 bg-background border border-border/60 rounded text-[9px] font-mono text-foreground/80 px-1 disabled:opacity-30"
-          >
-            {FILTER_TYPES.map(t => (
-              <option key={t} value={t}>{TYPE_LABELS[t]} — {t}</option>
-            ))}
-          </select>
-        </div>
-        <FltSlider
-          label="Q"
-          value={band.Q} min={0.1} max={20} step={0.1}
-          onChange={v => updateBand({ Q: v })} disabled={disabled}
-        />
-        <FltSlider
-          label={isRu ? "Усил." : "Gain"}
-          value={band.gain} min={-24} max={24} step={0.5} unit=" dB"
-          onChange={v => updateBand({ gain: v })} disabled={disabled}
-        />
-        <div className="flex flex-col gap-0">
-          <span className="text-[9px] text-muted-foreground font-mono uppercase">
-            {isRu ? "Крутизна" : "Rolloff"}
-          </span>
-          <select
-            value={band.rolloff}
-            onChange={e => updateBand({ rolloff: Number(e.target.value) as FilterRolloff })}
-            disabled={disabled}
-            className="h-5 bg-background border border-border/60 rounded text-[9px] font-mono text-foreground/80 px-1 disabled:opacity-30"
-          >
-            {ROLLOFFS.map(r => (
-              <option key={r} value={r}>{r} dB/oct</option>
-            ))}
-          </select>
+
+          {/* Sliders */}
+          <LogFreqSlider
+            label={isRu ? "Частота" : "Freq"}
+            value={band.frequency} min={20} max={20000}
+            onChange={v => updateBand(selected, { frequency: v })} disabled={disabled}
+          />
+          <FltSlider
+            label={isRu ? "Усил." : "Gain"}
+            value={band.gain} min={-24} max={24} step={0.5} unit=" dB"
+            onChange={v => updateBand(selected, { gain: v })} disabled={disabled}
+          />
+          <FltSlider
+            label="Q"
+            value={band.Q} min={0.1} max={20} step={0.1}
+            onChange={v => updateBand(selected, { Q: v })} disabled={disabled}
+          />
+
+          {/* Type select */}
+          <div className="flex flex-col gap-0">
+            <span className="text-[10px] text-muted-foreground font-mono uppercase">{isRu ? "Тип" : "Type"}</span>
+            <select
+              value={band.type}
+              onChange={e => updateBand(selected, { type: e.target.value as FilterType })}
+              disabled={disabled}
+              className="h-5 bg-background border border-border/60 rounded text-[9px] font-mono text-foreground/80 px-1 disabled:opacity-30"
+            >
+              {FILTER_TYPES.map(t => (
+                <option key={t} value={t}>{TYPE_LABELS[t]} — {t}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Rolloff select */}
+          <div className="flex flex-col gap-0">
+            <span className="text-[10px] text-muted-foreground font-mono uppercase">{isRu ? "Крутизна" : "Rolloff"}</span>
+            <select
+              value={band.rolloff}
+              onChange={e => updateBand(selected, { rolloff: Number(e.target.value) as FilterRolloff })}
+              disabled={disabled}
+              className="h-5 bg-background border border-border/60 rounded text-[9px] font-mono text-foreground/80 px-1 disabled:opacity-30"
+            >
+              {ROLLOFFS.map(r => (
+                <option key={r} value={r}>{r} dB/oct</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
     </div>
