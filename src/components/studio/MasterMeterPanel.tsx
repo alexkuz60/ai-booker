@@ -412,6 +412,9 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
         {/* Meter section */}
         <PeakMeterSection />
 
+        {/* FFT Spectrum Analyzer */}
+        <SpectrumAnalyzer />
+
         {/* Pre-processing plugins (EQ, Comp, Limiter) */}
         <div className="flex flex-col gap-1 mt-1">
           <span className="text-[9px] text-muted-foreground/50 font-body uppercase tracking-wider">
