@@ -383,7 +383,7 @@ export function MasterEffectsTabs({ isRu }: MasterEffectsTabsProps) {
 
   const [pluginStates, setPluginStates] = useState(() => {
     const s = engine.getMasterPluginState();
-    return { eq: s.eqBypassed, filter: s.filterBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed };
+    return { eq: s.eqBypassed, filter: s.filterBypassed, mbc: s.mbcBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed };
   });
 
   const [masterBypassed, setMasterBypassed] = useState(() => engine.getMasterPluginState().chainBypassed);
@@ -397,18 +397,19 @@ export function MasterEffectsTabs({ isRu }: MasterEffectsTabsProps) {
   useEffect(() => {
     const iv = setInterval(() => {
       const s = engine.getMasterPluginState();
-      setPluginStates({ eq: s.eqBypassed, filter: s.filterBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed });
+      setPluginStates({ eq: s.eqBypassed, filter: s.filterBypassed, mbc: s.mbcBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed });
       setMasterBypassed(s.chainBypassed);
     }, 500);
     return () => clearInterval(iv);
   }, [engine]);
 
-  const togglePlugin = useCallback((id: "eq" | "filter" | "comp" | "limit" | "reverb") => {
+  const togglePlugin = useCallback((id: "eq" | "filter" | "mbc" | "comp" | "limit" | "reverb") => {
     setPluginStates(prev => {
       const newBypassed = !prev[id];
       switch (id) {
         case "eq": engine.setMasterEqBypassed(newBypassed); break;
         case "filter": engine.setMasterFilterBypassed(newBypassed); break;
+        case "mbc": engine.setMasterMBCBypassed(newBypassed); break;
         case "comp": engine.setMasterCompBypassed(newBypassed); break;
         case "limit": engine.setMasterLimiterBypassed(newBypassed); break;
         case "reverb": engine.setMasterReverbBypassed(newBypassed); break;
