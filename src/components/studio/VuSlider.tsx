@@ -188,22 +188,16 @@ export function VuSlider({
       {/* Track background */}
       <div className="absolute inset-0 rounded-sm border border-border bg-muted/30" />
 
-      {/* Center mark for volume slider — light red */}
-      {mode === "volume" && (
-        <div
-          className="absolute top-0 bottom-0 w-px pointer-events-none"
-          style={{ left: "50%", backgroundColor: "hsla(0, 70%, 65%, 0.5)" }}
-        />
-      )}
-
-      {/* Thumb */}
+      {/* Thumb with center red mark */}
       <div
-        className="absolute top-0 bottom-0 rounded-sm bg-foreground/90 shadow-sm transition-[left] duration-75"
+        className="absolute top-0 bottom-0 rounded-sm bg-foreground/90 shadow-sm transition-[left] duration-75 flex items-center justify-center"
         style={{
           left: `calc(${thumbRatio * 100}% - ${THUMB_W / 2}px)`,
           width: `${THUMB_W}px`,
         }}
-      />
+      >
+        <div className="w-px h-[60%] rounded-full" style={{ backgroundColor: "hsla(0, 70%, 65%, 0.8)" }} />
+      </div>
     </div>
   );
 }
