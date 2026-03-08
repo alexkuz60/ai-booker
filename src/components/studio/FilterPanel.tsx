@@ -217,12 +217,12 @@ function FilterResponseGraph({
     }
     ctx.stroke();
 
-    // Fill under combined
-    ctx.lineTo(w, dbToY(0)); ctx.lineTo(0, dbToY(0)); ctx.closePath();
+    // Fill area that passes through the filter (between curve and bottom)
+    ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
     const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, "hsla(0, 0%, 100%, 0.06)");
-    grad.addColorStop(0.5, "hsla(0, 0%, 100%, 0.0)");
-    grad.addColorStop(1, "hsla(0, 0%, 100%, 0.06)");
+    grad.addColorStop(0, "hsla(200, 60%, 50%, 0.15)");
+    grad.addColorStop(0.5, "hsla(200, 60%, 50%, 0.07)");
+    grad.addColorStop(1, "hsla(200, 60%, 50%, 0.02)");
     ctx.fillStyle = grad; ctx.fill();
 
     const TOP_LABEL_H = 16; // reserved space for top labels
