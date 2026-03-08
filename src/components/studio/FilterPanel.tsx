@@ -265,6 +265,36 @@ function FilterResponseGraph({
   );
 }
 
+// ─── Log-scale frequency slider ────────────────────────────
+
+function LogFreqSlider({ label, value, min, max, onChange, disabled }: {
+  label: string; value: number; min: number; max: number;
+  onChange: (v: number) => void; disabled?: boolean;
+}) {
+  const logMin = Math.log10(min);
+  const logMax = Math.log10(max);
+  const sliderVal = ((Math.log10(value) - logMin) / (logMax - logMin)) * 1000;
+  const displayVal = value >= 1000 ? `${(value / 1000).toFixed(1)}k` : `${Math.round(value)}`;
+
+  return (
+    <div className="flex flex-col gap-0">
+      <div className="flex items-center justify-between">
+        <span className="text-[9px] text-muted-foreground font-mono uppercase">{label}</span>
+        <span className="text-[9px] text-foreground/70 font-mono tabular-nums">{displayVal} Hz</span>
+      </div>
+      <input
+        type="range" min={0} max={1000} step={1} value={Math.round(sliderVal)}
+        onChange={e => {
+          const t = Number(e.target.value) / 1000;
+          onChange(Math.round(Math.pow(10, logMin + t * (logMax - logMin))));
+        }}
+        disabled={disabled}
+        className="w-full h-1 accent-primary cursor-pointer volume-slider-sm disabled:opacity-30"
+      />
+    </div>
+  );
+}
+
 // ─── Param slider (compact) ────────────────────────────────
 
 function FltSlider({ label, value, min, max, step, unit, onChange, disabled }: {
@@ -337,9 +367,9 @@ export function FilterPanel({ isRu, disabled }: { isRu: boolean; disabled: boole
 
       {/* Controls for selected band */}
       <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-        <FltSlider
+        <LogFreqSlider
           label={isRu ? "Частота" : "Freq"}
-          value={band.frequency} min={20} max={20000} step={1} unit=" Hz"
+          value={band.frequency} min={20} max={20000}
           onChange={v => updateBand({ frequency: v })} disabled={disabled}
         />
         <div className="flex flex-col gap-0">
