@@ -809,6 +809,10 @@ class AudioEngine {
     this.voiceBus.dispose();
     this.atmoBus.dispose();
     this.sfxBus.dispose();
+    this.masterEQ.dispose();
+    this.masterComp.dispose();
+    this.masterLimiter.dispose();
+    this.masterReverb.dispose();
     this.masterSplitter.dispose();
     this.masterMeterL.dispose();
     this.masterMeterR.dispose();
