@@ -419,7 +419,7 @@ export function StudioTimeline({
               {formatTime(player.positionSec)} / {formatTime(player.totalDuration)}
             </span>
             {/* Master output level meter */}
-            <MasterMeter />
+            <TimelineMasterMeter />
             {/* Volume */}
             <div className="flex items-center gap-1 ml-1">
               <button
