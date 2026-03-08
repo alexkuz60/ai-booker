@@ -771,56 +771,62 @@ export function StudioTimeline({
           <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${sidebarWidth}px` }}>
             <MasterMeterPanel isRu={isRu} width={sidebarWidth} />
           </div>
-          <ScrollArea className="flex-1">
-            <div
-              className="min-w-full relative cursor-crosshair"
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const sec = x / (zoom * 4);
-                player.seek(Math.max(0, Math.min(sec, duration)));
-              }}
-            >
-              <TimelineRuler zoom={zoom} duration={duration} />
-              <div className="flex h-10 border-b border-border/50 relative" style={{ width: `${duration * zoom * 4}px` }}>
-                {chapterSceneClips.map((sc, i) => {
-                  const widthPx = sc.durationSec * zoom * 4;
-                  const colorIdx = i % NARRATOR_COLORS.length;
-                  return (
-                    <div
-                      key={sc.sceneId}
-                      className={`absolute top-1 bottom-1 rounded-sm cursor-pointer transition-all ${
-                        sc.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-50 hover:opacity-70"
-                      } ${sc.sceneId === sceneId ? "ring-2 ring-primary ring-offset-1 ring-offset-background opacity-100 z-10" : ""}`}
-                      style={{
-                        left: `${sc.startSec * zoom * 4}px`,
-                        width: `${widthPx}px`,
-                        backgroundColor: NARRATOR_COLORS[colorIdx],
-                        backgroundImage: sc.hasAudio
-                          ? undefined
-                          : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
-                      }}
-                      title={`${sc.label} (${sc.durationSec.toFixed(1)}s)${sc.hasAudio ? " 🔊" : ""} — ${isRu ? "двойной клик → сцена" : "double-click to open"}`}
-                      onDoubleClick={() => {
-                        if (onSelectSceneIdx) {
-                          onSelectSceneIdx(sc.sceneIdx);
-                          setMode("scene");
-                          setZoomOverride(null);
-                        }
-                      }}
-                    >
-                      {widthPx > 50 && (
-                        <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
-                          {sc.hasAudio ? "🔊 " : ""}{sc.label}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <ScrollArea className="flex-shrink-0">
+              <div
+                className="min-w-full relative cursor-crosshair"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const sec = x / (zoom * 4);
+                  player.seek(Math.max(0, Math.min(sec, duration)));
+                }}
+              >
+                <TimelineRuler zoom={zoom} duration={duration} />
+                <div className="flex h-10 border-b border-border/50 relative" style={{ width: `${duration * zoom * 4}px` }}>
+                  {chapterSceneClips.map((sc, i) => {
+                    const widthPx = sc.durationSec * zoom * 4;
+                    const colorIdx = i % NARRATOR_COLORS.length;
+                    return (
+                      <div
+                        key={sc.sceneId}
+                        className={`absolute top-1 bottom-1 rounded-sm cursor-pointer transition-all ${
+                          sc.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-50 hover:opacity-70"
+                        } ${sc.sceneId === sceneId ? "ring-2 ring-primary ring-offset-1 ring-offset-background opacity-100 z-10" : ""}`}
+                        style={{
+                          left: `${sc.startSec * zoom * 4}px`,
+                          width: `${widthPx}px`,
+                          backgroundColor: NARRATOR_COLORS[colorIdx],
+                          backgroundImage: sc.hasAudio
+                            ? undefined
+                            : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
+                        }}
+                        title={`${sc.label} (${sc.durationSec.toFixed(1)}s)${sc.hasAudio ? " 🔊" : ""} — ${isRu ? "двойной клик → сцена" : "double-click to open"}`}
+                        onDoubleClick={() => {
+                          if (onSelectSceneIdx) {
+                            onSelectSceneIdx(sc.sceneIdx);
+                            setMode("scene");
+                            setZoomOverride(null);
+                          }
+                        }}
+                      >
+                        {widthPx > 50 && (
+                          <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
+                            {sc.hasAudio ? "🔊 " : ""}{sc.label}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <Playhead positionSec={player.positionSec} zoom={zoom} />
               </div>
-              <Playhead positionSec={player.positionSec} zoom={zoom} />
+            </ScrollArea>
+            {/* FFT Spectrum Analyzer — fills remaining space */}
+            <div className="flex-1 min-h-[80px] p-2">
+              <SpectrumAnalyzer />
             </div>
-          </ScrollArea>
+          </div>
         </div>
       )}
     </div>
