@@ -436,7 +436,7 @@ const PLUGIN_GROUPS: PluginGroup[] = [
     title: "Master", titleRu: "Мастер",
     slots: [
       { id: "filter", label: "FLT", labelRu: "ФЛТ" },
-      { id: "reverb", label: "REV", labelRу: "РЕВ" },
+      { id: "reverb", label: "REV", labelRu: "РЕВ" },
     ],
   },
 ];
