@@ -343,6 +343,21 @@ export function StudioTimeline({
     return [...narratorTrack, ...charTracks, ...FIXED_TRACKS];
   }, [charTracks, timelineClips, isRu, mode]);
 
+  // ── Mixer sidebar expanded state ───────────────────────────
+  const [mixerExpanded, setMixerExpanded] = useState(() => {
+    try { return localStorage.getItem("studio-mixer-expanded") === "true"; } catch { return false; }
+  });
+
+  const toggleMixerExpanded = useCallback(() => {
+    setMixerExpanded((prev) => {
+      const next = !prev;
+      localStorage.setItem("studio-mixer-expanded", String(next));
+      return next;
+    });
+  }, []);
+
+  const sidebarWidth = mixerExpanded ? TRACK_LABELS_WIDTH_EXPANDED : TRACK_LABELS_WIDTH_COLLAPSED;
+
   // ── Layout / zoom ─────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -350,14 +365,14 @@ export function StudioTimeline({
   useEffect(() => {
     const measure = () => {
       if (tracksContainerRef.current) {
-        setContainerWidth(tracksContainerRef.current.clientWidth - TRACK_LABELS_WIDTH);
+        setContainerWidth(tracksContainerRef.current.clientWidth - sidebarWidth);
       }
     };
     measure();
     const ro = new ResizeObserver(measure);
     if (tracksContainerRef.current) ro.observe(tracksContainerRef.current);
     return () => ro.disconnect();
-  }, []);
+  }, [sidebarWidth]);
 
   const fitZoom = useMemo(() => {
     if (containerWidth <= 0 || duration <= 0) return 1;
