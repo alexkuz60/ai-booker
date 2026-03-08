@@ -218,9 +218,9 @@ function FilterResponseGraph({
     // Fill area that passes through the filter (between curve and bottom)
     ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
     const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, "hsla(200, 60%, 50%, 0.06)");
-    grad.addColorStop(0.5, "hsla(200, 60%, 50%, 0.03)");
-    grad.addColorStop(1, "hsla(200, 60%, 50%, 0.01)");
+    grad.addColorStop(0, "hsla(200, 60%, 50%, 0.35)");
+    grad.addColorStop(0.5, "hsla(200, 60%, 50%, 0.18)");
+    grad.addColorStop(1, "hsla(200, 60%, 50%, 0.05)");
     ctx.fillStyle = grad; ctx.fill();
 
     const TOP_LABEL_H = 16; // reserved space for top labels
