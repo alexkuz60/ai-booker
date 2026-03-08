@@ -200,8 +200,6 @@ function CompPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
       </div>
       {/* Sliders — half width */}
       <div className="flex flex-col gap-3 min-w-0 w-32">
-        <span className="text-[10px] text-muted-foreground/60 font-body">
-          {isRu ? "Компрессор" : "Compressor"}
         </span>
         <ParamSlider label={isRu ? "Порог" : "Threshold"} value={threshold} min={-60} max={0} step={1} unit=" dB"
           onChange={v => { setThreshold(v); engine.setMasterCompThreshold(v); }} disabled={disabled} />
@@ -473,7 +471,12 @@ export function MasterEffectsTabs({ isRu }: MasterEffectsTabsProps) {
           <div className="p-3"><EqPanel isRu={isRu} disabled={isTabDisabled("eq")} /></div>
         )}
         {activeTab === "comp" && (
-          <div className="p-3"><CompPanel isRu={isRu} disabled={isTabDisabled("comp")} /></div>
+          <div className="p-3">
+            <span className="text-[10px] text-muted-foreground/60 font-body block mb-2">
+              {isRu ? "Компрессор" : "Compressor"}
+            </span>
+            <CompPanel isRu={isRu} disabled={isTabDisabled("comp")} />
+          </div>
         )}
         {activeTab === "limit" && (
           <div className="p-3"><LimitPanel isRu={isRu} disabled={isTabDisabled("limit")} /></div>
