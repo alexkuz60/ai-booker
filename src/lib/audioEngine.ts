@@ -27,6 +27,30 @@ export interface FilterBandParams {
   rolloff: FilterRolloff;
 }
 
+export interface MultibandCompBandParams {
+  threshold: number;
+  ratio: number;
+  attack: number;
+  release: number;
+  knee: number;
+}
+
+export interface MultibandCompParams {
+  low: MultibandCompBandParams;
+  mid: MultibandCompBandParams;
+  high: MultibandCompBandParams;
+  lowFrequency: number;   // crossover low→mid
+  highFrequency: number;  // crossover mid→high
+}
+
+export const DEFAULT_MULTIBAND_COMP: MultibandCompParams = {
+  low:  { threshold: -24, ratio: 4, attack: 0.01, release: 0.2, knee: 10 },
+  mid:  { threshold: -18, ratio: 3, attack: 0.005, release: 0.15, knee: 8 },
+  high: { threshold: -12, ratio: 2, attack: 0.003, release: 0.1, knee: 6 },
+  lowFrequency: 250,
+  highFrequency: 3500,
+};
+
 export const DEFAULT_FILTER_BANDS: FilterBandParams[] = [
   { frequency: 30, type: "highpass", Q: 0.707, gain: 0, rolloff: -12 },
   { frequency: 200, type: "lowshelf", Q: 0.707, gain: 0, rolloff: -12 },
