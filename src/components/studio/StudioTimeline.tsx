@@ -598,26 +598,39 @@ export function StudioTimeline({
       {/* Tracks — Scene mode */}
       {!collapsed && mode === "scene" && (
         <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
-          <div className="w-28 shrink-0 border-r border-border flex flex-col">
-            <div className="h-6 border-b border-border" />
+          <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${sidebarWidth}px` }}>
+            {/* Sidebar header with mixer toggle */}
+            <div className="h-6 border-b border-border flex items-center justify-end px-1">
+              <button
+                onClick={toggleMixerExpanded}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                title={mixerExpanded ? (isRu ? "Свернуть микшер" : "Collapse mixer") : (isRu ? "Развернуть микшер" : "Expand mixer")}
+              >
+                {mixerExpanded
+                  ? <PanelLeftClose className="h-3 w-3" />
+                  : <PanelLeftOpen className="h-3 w-3" />
+                }
+              </button>
+            </div>
             {allTracks.map((track) => {
               const charId = track.id.startsWith("char-") ? track.id.slice(5) : null;
               const isSelected = charId != null && charId === selectedCharacterId;
+              // Find engine track IDs that map to this timeline track
+              const engineTrackId = timelineClips.find(c => c.trackId === track.id)?.id;
               return (
-                <div
+                <TrackMixerStrip
                   key={track.id}
-                  className={`h-10 flex items-center px-3 border-b border-border/50 cursor-pointer transition-colors ${
-                    isSelected ? "bg-accent/20" : "hover:bg-muted/30"
-                  }`}
+                  trackId={engineTrackId ?? track.id}
+                  label={track.label}
+                  color={track.color}
+                  expanded={mixerExpanded}
+                  isSelected={isSelected}
                   onClick={() => {
                     if (charId && onSelectCharacter) {
                       onSelectCharacter(isSelected ? null : charId);
                     }
                   }}
-                >
-                  <div className="w-2 h-2 rounded-full shrink-0 mr-2" style={{ backgroundColor: track.color }} />
-                  <span className={`text-xs font-body truncate ${isSelected ? "text-foreground font-medium" : "text-muted-foreground"}`}>{track.label}</span>
-                </div>
+                />
               );
             })}
           </div>
