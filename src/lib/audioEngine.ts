@@ -440,6 +440,7 @@ class AudioEngine {
     if (this._state === "stopped") {
       this.transport.position = 0;
       for (const t of this.tracks.values()) t.schedule();
+      this.transport.start();
     } else if (this._state === "paused") {
       // Re-schedule tracks from current position since pause stops all players
       const pos = this.transport.seconds;
@@ -449,7 +450,6 @@ class AudioEngine {
         const trackEnd = t.startSec + t.durationSec;
         if (pos < trackEnd) {
           if (pos > t.startSec) {
-            // Clip is already "in progress" — must start immediately after transport resumes
             immediateStarts.push({ track: t, offset: pos - t.startSec });
           } else {
             t.schedule();
@@ -464,13 +464,8 @@ class AudioEngine {
           track.player.start(Tone.now(), offset);
         }
       }
-    } else {
-      this.transport.start();
     }
 
-    if (this._state === "stopped") {
-      this.transport.start();
-    }
     this._state = "playing";
     this.startPositionLoop();
     this.notify();
