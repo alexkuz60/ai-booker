@@ -302,6 +302,19 @@ class AudioEngine {
   private sfxBus: Tone.Channel;
   private masterBus: Tone.Channel;
 
+  // Master insert chain: EQ → Compressor → Limiter → Reverb (post)
+  private masterEQ: Tone.EQ3;
+  private masterComp: Tone.Compressor;
+  private masterLimiter: Tone.Limiter;
+  private masterReverb: Tone.Reverb;
+
+  // Bypass states for master chain
+  private _masterEqBypassed = true;
+  private _masterCompBypassed = true;
+  private _masterLimiterBypassed = true;
+  private _masterReverbBypassed = true;
+  private _masterChainBypassed = false;
+
   // Master metering (stereo split)
   private masterSplitter: Tone.Split;
   private masterMeterL: Tone.Meter;
@@ -317,20 +330,37 @@ class AudioEngine {
 
   private constructor() {
     this.masterBus = new Tone.Channel({ volume: volumeToDB(this._volume) });
+
+    // Master insert chain nodes
+    this.masterEQ = new Tone.EQ3({ low: 0, mid: 0, high: 0 });
+    this.masterComp = new Tone.Compressor({ threshold: -18, ratio: 4, attack: 0.005, release: 0.15 });
+    this.masterLimiter = new Tone.Limiter(-1);
+    this.masterReverb = new Tone.Reverb({ decay: 2.0, wet: 0.12 });
+
     this.masterSplitter = new Tone.Split();
     this.masterMeterL = new Tone.Meter({ smoothing: 0.8 });
     this.masterMeterR = new Tone.Meter({ smoothing: 0.8 });
 
-    // Master chain: MasterBus → Splitter → MeterL/R, MasterBus → Destination
-    this.masterBus.connect(this.masterSplitter);
+    // Chain: MasterBus → EQ → Comp → Limiter → Reverb → Splitter → Meters + Destination
+    this.masterBus.connect(this.masterEQ);
+    this.masterEQ.connect(this.masterComp);
+    this.masterComp.connect(this.masterLimiter);
+    this.masterLimiter.connect(this.masterReverb);
+    this.masterReverb.connect(this.masterSplitter);
     this.masterSplitter.connect(this.masterMeterL, 0);
     this.masterSplitter.connect(this.masterMeterR, 1);
-    this.masterBus.toDestination();
+    this.masterReverb.toDestination();
 
     // Sub-buses → MasterBus
     this.voiceBus = new Tone.Channel({ volume: 0 }).connect(this.masterBus);
     this.atmoBus = new Tone.Channel({ volume: 0 }).connect(this.masterBus);
     this.sfxBus = new Tone.Channel({ volume: 0 }).connect(this.masterBus);
+
+    // Apply initial bypass states (all bypassed by default)
+    this.applyMasterEqBypass();
+    this.applyMasterCompBypass();
+    this.applyMasterLimiterBypass();
+    this.applyMasterReverbBypass();
 
     this.transport.loop = false;
   }
@@ -621,6 +651,84 @@ class AudioEngine {
     return Array.from(this.tracks.keys());
   }
 
+  // ─── Master Plugin Controls ─────────────────────────────
+
+  private applyMasterEqBypass(): void {
+    if (this._masterEqBypassed || this._masterChainBypassed) {
+      this.masterEQ.low.value = 0;
+      this.masterEQ.mid.value = 0;
+      this.masterEQ.high.value = 0;
+    } else {
+      // Restore saved values (stored as defaults for now)
+      this.masterEQ.low.value = this._eqLow;
+      this.masterEQ.mid.value = this._eqMid;
+      this.masterEQ.high.value = this._eqHigh;
+    }
+  }
+
+  private applyMasterCompBypass(): void {
+    if (this._masterCompBypassed || this._masterChainBypassed) {
+      this.masterComp.ratio.value = 1;
+    } else {
+      this.masterComp.ratio.value = 4;
+    }
+  }
+
+  private applyMasterLimiterBypass(): void {
+    if (this._masterLimiterBypassed || this._masterChainBypassed) {
+      this.masterLimiter.threshold.value = 0;
+    } else {
+      this.masterLimiter.threshold.value = -1;
+    }
+  }
+
+  private applyMasterReverbBypass(): void {
+    this.masterReverb.wet.value = (this._masterReverbBypassed || this._masterChainBypassed) ? 0 : 0.12;
+  }
+
+  // EQ band values
+  private _eqLow = 0;
+  private _eqMid = 0;
+  private _eqHigh = 0;
+
+  setMasterEqBypassed(b: boolean): void {
+    this._masterEqBypassed = b;
+    this.applyMasterEqBypass();
+  }
+
+  setMasterCompBypassed(b: boolean): void {
+    this._masterCompBypassed = b;
+    this.applyMasterCompBypass();
+  }
+
+  setMasterLimiterBypassed(b: boolean): void {
+    this._masterLimiterBypassed = b;
+    this.applyMasterLimiterBypass();
+  }
+
+  setMasterReverbBypassed(b: boolean): void {
+    this._masterReverbBypassed = b;
+    this.applyMasterReverbBypass();
+  }
+
+  setMasterChainBypassed(b: boolean): void {
+    this._masterChainBypassed = b;
+    this.applyMasterEqBypass();
+    this.applyMasterCompBypass();
+    this.applyMasterLimiterBypass();
+    this.applyMasterReverbBypass();
+  }
+
+  getMasterPluginState() {
+    return {
+      eqBypassed: this._masterEqBypassed,
+      compBypassed: this._masterCompBypassed,
+      limiterBypassed: this._masterLimiterBypassed,
+      reverbBypassed: this._masterReverbBypassed,
+      chainBypassed: this._masterChainBypassed,
+    };
+  }
+
   // ─── Bus volume ───────────────────────────────────────
 
   setVoiceBusVolume(v: number): void {
@@ -701,6 +809,10 @@ class AudioEngine {
     this.voiceBus.dispose();
     this.atmoBus.dispose();
     this.sfxBus.dispose();
+    this.masterEQ.dispose();
+    this.masterComp.dispose();
+    this.masterLimiter.dispose();
+    this.masterReverb.dispose();
     this.masterSplitter.dispose();
     this.masterMeterL.dispose();
     this.masterMeterR.dispose();
