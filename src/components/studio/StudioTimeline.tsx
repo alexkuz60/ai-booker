@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTimelineClips, type TimelineClip } from "@/hooks/useTimelineClips";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { TrackMixerStrip } from "./TrackMixerStrip";
+import { useMixerPersistence } from "@/hooks/useMixerPersistence";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -22,7 +23,7 @@ const FIXED_TRACKS: TimelineTrackData[] = [
 ];
 
 const TRACK_LABELS_WIDTH_COLLAPSED = 112;
-const TRACK_LABELS_WIDTH_EXPANDED = 280;
+const TRACK_LABELS_WIDTH_EXPANDED = 360;
 
 // ─── Palette for character colors ───────────────────────────
 
@@ -358,6 +359,16 @@ export function StudioTimeline({
 
   const sidebarWidth = mixerExpanded ? TRACK_LABELS_WIDTH_EXPANDED : TRACK_LABELS_WIDTH_COLLAPSED;
 
+  // ── Mixer persistence per scene ────────────────────────────
+  const engineTrackIds = useMemo(() =>
+    allTracks.map(t => {
+      const clip = timelineClips.find(c => c.trackId === t.id);
+      return clip?.id ?? t.id;
+    }),
+    [allTracks, timelineClips]
+  );
+  const { scheduleSave: onMixChange } = useMixerPersistence(sceneId ?? null, engineTrackIds);
+
   // ── Layout / zoom ─────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -599,18 +610,41 @@ export function StudioTimeline({
       {!collapsed && mode === "scene" && (
         <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
           <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${sidebarWidth}px` }}>
-            {/* Sidebar header with mixer toggle */}
-            <div className="h-6 border-b border-border flex items-center justify-end px-1">
-              <button
-                onClick={toggleMixerExpanded}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                title={mixerExpanded ? (isRu ? "Свернуть микшер" : "Collapse mixer") : (isRu ? "Развернуть микшер" : "Expand mixer")}
-              >
-                {mixerExpanded
-                  ? <PanelLeftClose className="h-3 w-3" />
-                  : <PanelLeftOpen className="h-3 w-3" />
-                }
-              </button>
+            {/* Sidebar header with mixer toggle + column labels */}
+            <div className="h-6 border-b border-border flex items-center px-2">
+              {mixerExpanded ? (
+                <>
+                  {/* Match TrackMixerStrip column layout: [100px name] | [FX] [Vol] [Pan] [RV] [collapse] */}
+                  <div className="w-[100px] shrink-0" />
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <div className="w-[24px] shrink-0" /> {/* FX button space */}
+                    <span className="flex-1 min-w-[60px] text-[9px] text-muted-foreground/70 font-body uppercase tracking-wider text-center">
+                      {isRu ? "Уровень" : "Volume"}
+                    </span>
+                    <span className="w-[70px] shrink-0 text-[9px] text-muted-foreground/70 font-body uppercase tracking-wider text-center">
+                      {isRu ? "Панорама" : "Pan"}
+                    </span>
+                    <div className="w-[24px] shrink-0" /> {/* RV button space */}
+                  </div>
+                  <button
+                    onClick={toggleMixerExpanded}
+                    className="text-muted-foreground hover:text-foreground transition-colors ml-1"
+                    title={isRu ? "Свернуть микшер" : "Collapse mixer"}
+                  >
+                    <PanelLeftClose className="h-3 w-3" />
+                  </button>
+                </>
+              ) : (
+                <div className="flex-1 flex justify-end">
+                  <button
+                    onClick={toggleMixerExpanded}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    title={isRu ? "Развернуть микшер" : "Expand mixer"}
+                  >
+                    <PanelLeftOpen className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
             </div>
             {allTracks.map((track) => {
               const charId = track.id.startsWith("char-") ? track.id.slice(5) : null;
@@ -625,6 +659,7 @@ export function StudioTimeline({
                   color={track.color}
                   expanded={mixerExpanded}
                   isSelected={isSelected}
+                  onMixChange={onMixChange}
                   onClick={() => {
                     if (charId && onSelectCharacter) {
                       onSelectCharacter(isSelected ? null : charId);

@@ -14,6 +14,7 @@ interface TrackMixerStripProps {
   expanded: boolean;
   isSelected?: boolean;
   onClick?: () => void;
+  onMixChange?: () => void;
 }
 
 export function TrackMixerStrip({
@@ -23,6 +24,7 @@ export function TrackMixerStrip({
   expanded,
   isSelected,
   onClick,
+  onMixChange,
 }: TrackMixerStripProps) {
   const engine = getAudioEngine();
 
@@ -47,21 +49,25 @@ export function TrackMixerStrip({
 
   const handleVolumeChange = useCallback((v: number) => {
     engine.setTrackVolume(trackId, v);
-  }, [engine, trackId]);
+    onMixChange?.();
+  }, [engine, trackId, onMixChange]);
 
   const handlePanChange = useCallback((p: number) => {
     engine.setTrackPan(trackId, p / 100);
-  }, [engine, trackId]);
+    onMixChange?.();
+  }, [engine, trackId, onMixChange]);
 
   const toggleReverbBypass = useCallback(() => {
     if (!mix) return;
     engine.setTrackReverbBypassed(trackId, !mix.reverbBypassed);
-  }, [engine, trackId, mix]);
+    onMixChange?.();
+  }, [engine, trackId, mix, onMixChange]);
 
   const togglePreFxBypass = useCallback(() => {
     if (!mix) return;
     engine.setTrackPreFxBypassed(trackId, !mix.preFxBypassed);
-  }, [engine, trackId, mix]);
+    onMixChange?.();
+  }, [engine, trackId, mix, onMixChange]);
 
   // Collapsed: minimal view
   if (!expanded) {
@@ -92,7 +98,7 @@ export function TrackMixerStrip({
       onClick={onClick}
     >
       {/* Column 1: Color dot + name — fixed width */}
-      <div className="flex items-center gap-2 w-[90px] shrink-0">
+      <div className="flex items-center gap-2 w-[100px] shrink-0">
         <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
         <span className={`text-xs font-body truncate ${isSelected ? "text-foreground font-semibold" : "text-foreground/80"}`}>
           {label}
@@ -125,7 +131,7 @@ export function TrackMixerStrip({
         </div>
 
         {/* Pan slider with L/R VU */}
-        <div className="w-[60px] shrink-0" onClick={(e) => e.stopPropagation()}>
+        <div className="w-[70px] shrink-0" onClick={(e) => e.stopPropagation()}>
           <VuSlider
             mode="pan"
             value={Math.round((mix?.pan ?? 0) * 100)}
