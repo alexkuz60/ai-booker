@@ -6,6 +6,7 @@
  */
 
 import { useRef, useEffect, useState, useCallback } from "react";
+import type { MasterMeterData } from "@/lib/audioEngine";
 import { getAudioEngine } from "@/lib/audioEngine";
 import { Sliders, Power } from "lucide-react";
 
@@ -269,23 +270,7 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
       {/* Content */}
       <div className="flex-1 flex flex-col gap-1.5 p-2 min-h-0 overflow-auto">
         {/* Meter section */}
-        <div className="flex flex-col gap-0">
-          <div className="flex items-center gap-1">
-            <span className="text-[9px] text-foreground/60 font-mono w-3 shrink-0 font-bold">L</span>
-            <div className="flex-1 h-5 rounded-sm overflow-hidden border border-border/40 bg-background/40">
-              <LargeMeterSingleChannel channel="L" />
-            </div>
-          </div>
-          <div className="pl-4 pr-0">
-            <DbScale />
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-[9px] text-foreground/60 font-mono w-3 shrink-0 font-bold">R</span>
-            <div className="flex-1 h-5 rounded-sm overflow-hidden border border-border/40 bg-background/40">
-              <LargeMeterSingleChannel channel="R" />
-            </div>
-          </div>
-        </div>
+        <PeakMeterSection />
 
         {/* Pre-processing plugins (EQ, Comp, Limiter) */}
         <div className="flex flex-col gap-1 mt-1">
