@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { getAudioEngine } from "@/lib/audioEngine";
 import { SpectrumAnalyzer } from "@/components/studio/MasterMeterPanel";
 import { FilterPanel } from "@/components/studio/FilterPanel";
+import { MultibandCompPanel } from "@/components/studio/MultibandCompPanel";
 import { Power } from "lucide-react";
 
 // ─── Shared parameter slider ───────────────────────────────
@@ -355,14 +356,15 @@ function ReverbPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
 
 // ─── Tabs definition ────────────────────────────────────────
 
-type EffectTab = "spectrum" | "eq" | "filter" | "comp" | "limit" | "reverb";
+type EffectTab = "spectrum" | "eq" | "filter" | "mbc" | "comp" | "limit" | "reverb";
 
 const TABS: { id: EffectTab; label: string; labelRu: string }[] = [
   { id: "spectrum", label: "FFT", labelRu: "FFT" },
   { id: "eq", label: "EQ", labelRu: "EQ" },
+  { id: "filter", label: "FLT", labelRu: "ФЛТ" },
+  { id: "mbc", label: "MBC", labelRu: "МБК" },
   { id: "comp", label: "CMP", labelRu: "КМП" },
   { id: "limit", label: "LIM", labelRu: "ЛИМ" },
-  { id: "filter", label: "FLT", labelRu: "ФЛТ" },
   { id: "reverb", label: "REV", labelRu: "РЕВ" },
 ];
 
@@ -381,7 +383,7 @@ export function MasterEffectsTabs({ isRu }: MasterEffectsTabsProps) {
 
   const [pluginStates, setPluginStates] = useState(() => {
     const s = engine.getMasterPluginState();
-    return { eq: s.eqBypassed, filter: s.filterBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed };
+    return { eq: s.eqBypassed, filter: s.filterBypassed, mbc: s.mbcBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed };
   });
 
   const [masterBypassed, setMasterBypassed] = useState(() => engine.getMasterPluginState().chainBypassed);
@@ -395,18 +397,19 @@ export function MasterEffectsTabs({ isRu }: MasterEffectsTabsProps) {
   useEffect(() => {
     const iv = setInterval(() => {
       const s = engine.getMasterPluginState();
-      setPluginStates({ eq: s.eqBypassed, filter: s.filterBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed });
+      setPluginStates({ eq: s.eqBypassed, filter: s.filterBypassed, mbc: s.mbcBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed });
       setMasterBypassed(s.chainBypassed);
     }, 500);
     return () => clearInterval(iv);
   }, [engine]);
 
-  const togglePlugin = useCallback((id: "eq" | "filter" | "comp" | "limit" | "reverb") => {
+  const togglePlugin = useCallback((id: "eq" | "filter" | "mbc" | "comp" | "limit" | "reverb") => {
     setPluginStates(prev => {
       const newBypassed = !prev[id];
       switch (id) {
         case "eq": engine.setMasterEqBypassed(newBypassed); break;
         case "filter": engine.setMasterFilterBypassed(newBypassed); break;
+        case "mbc": engine.setMasterMBCBypassed(newBypassed); break;
         case "comp": engine.setMasterCompBypassed(newBypassed); break;
         case "limit": engine.setMasterLimiterBypassed(newBypassed); break;
         case "reverb": engine.setMasterReverbBypassed(newBypassed); break;
@@ -451,7 +454,7 @@ export function MasterEffectsTabs({ isRu }: MasterEffectsTabsProps) {
         {/* Per-plugin bypass for active plugin tab */}
         {activeTab !== "spectrum" && (
           <button
-            onClick={() => togglePlugin(activeTab as "eq" | "filter" | "comp" | "limit" | "reverb")}
+            onClick={() => togglePlugin(activeTab as "eq" | "filter" | "mbc" | "comp" | "limit" | "reverb")}
             className={`ml-auto flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono uppercase leading-none transition-colors font-semibold ${
               pluginStates[activeTab as keyof typeof pluginStates]
                 ? "text-muted-foreground/40 bg-transparent border border-border/50"
@@ -478,6 +481,14 @@ export function MasterEffectsTabs({ isRu }: MasterEffectsTabsProps) {
               {isRu ? "5-полосный параметрический фильтр" : "5-Band Parametric Filter"}
             </span>
             <FilterPanel isRu={isRu} disabled={isTabDisabled("filter")} />
+          </div>
+        )}
+        {activeTab === "mbc" && (
+          <div className="p-2">
+            <span className="text-[10px] text-muted-foreground/60 font-body block mb-1">
+              {isRu ? "Многополосный динамический компрессор" : "Multiband Dynamic Compressor"}
+            </span>
+            <MultibandCompPanel isRu={isRu} disabled={isTabDisabled("mbc")} />
           </div>
         )}
         {activeTab === "comp" && (

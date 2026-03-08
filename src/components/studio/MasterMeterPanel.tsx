@@ -406,7 +406,7 @@ export function SpectrumAnalyzer() {
 // ─── Plugin slot definition ─────────────────────────────────
 
 interface PluginSlot {
-  id: "eq" | "filter" | "comp" | "limit" | "reverb";
+  id: "eq" | "filter" | "mbc" | "comp" | "limit" | "reverb";
   label: string;
   labelRu: string;
 }
@@ -422,6 +422,7 @@ const PLUGIN_GROUPS: PluginGroup[] = [
     title: "Pre", titleRu: "Пре",
     slots: [
       { id: "eq", label: "EQ", labelRu: "EQ" },
+      { id: "mbc", label: "MBC", labelRu: "МБК" },
       { id: "comp", label: "CMP", labelRu: "КМП" },
     ],
   },
@@ -475,6 +476,7 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
         setPluginStates(parsed);
         engine.setMasterEqBypassed(parsed.eq ?? true);
         engine.setMasterFilterBypassed(parsed.filter ?? true);
+        engine.setMasterMBCBypassed(parsed.mbc ?? true);
         engine.setMasterCompBypassed(parsed.comp ?? true);
         engine.setMasterLimiterBypassed(parsed.limit ?? true);
         engine.setMasterReverbBypassed(parsed.reverb ?? true);
@@ -487,12 +489,13 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
     } catch {}
   }, [engine]);
 
-  const togglePlugin = useCallback((id: "eq" | "filter" | "comp" | "limit" | "reverb") => {
+  const togglePlugin = useCallback((id: "eq" | "filter" | "mbc" | "comp" | "limit" | "reverb") => {
     setPluginStates(prev => {
       const newBypassed = !prev[id];
       switch (id) {
         case "eq": engine.setMasterEqBypassed(newBypassed); break;
         case "filter": engine.setMasterFilterBypassed(newBypassed); break;
+        case "mbc": engine.setMasterMBCBypassed(newBypassed); break;
         case "comp": engine.setMasterCompBypassed(newBypassed); break;
         case "limit": engine.setMasterLimiterBypassed(newBypassed); break;
         case "reverb": engine.setMasterReverbBypassed(newBypassed); break;
