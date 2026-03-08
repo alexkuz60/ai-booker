@@ -693,6 +693,11 @@ class AudioEngine {
     };
   }
 
+  /** Get FFT spectrum data as Float32Array (dB values, typically -100 to 0) */
+  getFFTData(): Float32Array {
+    return this.masterFFT.getValue();
+  }
+
   getTrackMixState(trackId: string): TrackMixState | null {
     return this.tracks.get(trackId)?.getMixState() ?? null;
   }
