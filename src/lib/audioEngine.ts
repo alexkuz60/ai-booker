@@ -1159,6 +1159,7 @@ class AudioEngine {
     this.sfxBus.dispose();
     this.masterFilters.forEach(f => f.dispose());
     this.masterEQ.dispose();
+    this.masterMBC.dispose();
     this.masterComp.dispose();
     this.masterLimiter.dispose();
     this.masterReverb.dispose();
