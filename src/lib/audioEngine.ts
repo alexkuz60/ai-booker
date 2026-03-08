@@ -826,20 +826,20 @@ class AudioEngine {
 
   // ─── Master Plugin Parameter Setters ─────────────────────
 
-  setMasterEqLow(v: number): void { this._eqLow = v; if (!this._masterEqBypassed && !this._masterChainBypassed) this.masterEQ.low.value = v; }
-  setMasterEqMid(v: number): void { this._eqMid = v; if (!this._masterEqBypassed && !this._masterChainBypassed) this.masterEQ.mid.value = v; }
-  setMasterEqHigh(v: number): void { this._eqHigh = v; if (!this._masterEqBypassed && !this._masterChainBypassed) this.masterEQ.high.value = v; }
+  setMasterEqLow(v: number): void { this._eqLow = v; if (!this._masterEqBypassed && !this._masterChainBypassed) this.masterEQ.low.value = v; this._persistParams(); }
+  setMasterEqMid(v: number): void { this._eqMid = v; if (!this._masterEqBypassed && !this._masterChainBypassed) this.masterEQ.mid.value = v; this._persistParams(); }
+  setMasterEqHigh(v: number): void { this._eqHigh = v; if (!this._masterEqBypassed && !this._masterChainBypassed) this.masterEQ.high.value = v; this._persistParams(); }
 
-  setMasterCompThreshold(v: number): void { this._compThreshold = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.threshold.value = v; }
-  setMasterCompRatio(v: number): void { this._compRatio = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.ratio.value = v; }
-  setMasterCompAttack(v: number): void { this._compAttack = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.attack.value = v; }
-  setMasterCompRelease(v: number): void { this._compRelease = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.release.value = v; }
-  setMasterCompKnee(v: number): void { this._compKnee = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.knee.value = v; }
+  setMasterCompThreshold(v: number): void { this._compThreshold = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.threshold.value = v; this._persistParams(); }
+  setMasterCompRatio(v: number): void { this._compRatio = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.ratio.value = v; this._persistParams(); }
+  setMasterCompAttack(v: number): void { this._compAttack = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.attack.value = v; this._persistParams(); }
+  setMasterCompRelease(v: number): void { this._compRelease = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.release.value = v; this._persistParams(); }
+  setMasterCompKnee(v: number): void { this._compKnee = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.knee.value = v; this._persistParams(); }
 
-  setMasterLimiterThreshold(v: number): void { this._limiterThreshold = v; if (!this._masterLimiterBypassed && !this._masterChainBypassed) this.masterLimiter.threshold.value = v; }
+  setMasterLimiterThreshold(v: number): void { this._limiterThreshold = v; if (!this._masterLimiterBypassed && !this._masterChainBypassed) this.masterLimiter.threshold.value = v; this._persistParams(); }
 
-  setMasterReverbDecay(v: number): void { this._reverbDecay = v; this.masterReverb.decay = v; }
-  setMasterReverbWet(v: number): void { this._reverbWet = v; if (!this._masterReverbBypassed && !this._masterChainBypassed) this.masterReverb.wet.value = v; }
+  setMasterReverbDecay(v: number): void { this._reverbDecay = v; this.masterReverb.decay = v; this._persistParams(); }
+  setMasterReverbWet(v: number): void { this._reverbWet = v; if (!this._masterReverbBypassed && !this._masterChainBypassed) this.masterReverb.wet.value = v; this._persistParams(); }
 
   getMasterPluginState() {
     return {
