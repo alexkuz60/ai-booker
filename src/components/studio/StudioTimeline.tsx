@@ -7,7 +7,8 @@ import { useTimelineClips, type TimelineClip } from "@/hooks/useTimelineClips";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { TrackMixerStrip } from "./TrackMixerStrip";
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
-import { getAudioEngine, type MasterMeterData } from "@/lib/audioEngine";
+import { getAudioEngine } from "@/lib/audioEngine";
+import { MasterMeterPanel } from "./MasterMeterPanel";
 
 // ─── Master output level meter ──────────────────────────────
 
