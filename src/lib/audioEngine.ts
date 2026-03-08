@@ -988,6 +988,46 @@ class AudioEngine {
   setMasterReverbDecay(v: number): void { this._reverbDecay = v; this.masterReverb.decay = v; this._persistParams(); }
   setMasterReverbWet(v: number): void { this._reverbWet = v; if (!this._masterReverbBypassed && !this._masterChainBypassed) this.masterReverb.wet.value = v; this._persistParams(); }
 
+  // ─── Multiband Compressor Setters ─────────────────────────
+
+  setMasterMBCBand(band: "low" | "mid" | "high", params: Partial<MultibandCompBandParams>): void {
+    const b = this._mbcParams[band];
+    if (params.threshold !== undefined) b.threshold = params.threshold;
+    if (params.ratio !== undefined) b.ratio = params.ratio;
+    if (params.attack !== undefined) b.attack = params.attack;
+    if (params.release !== undefined) b.release = params.release;
+    if (params.knee !== undefined) b.knee = params.knee;
+    if (!this._masterMBCBypassed && !this._masterChainBypassed) {
+      const node = this.masterMBC[band];
+      if (params.threshold !== undefined) node.threshold.value = b.threshold;
+      if (params.ratio !== undefined) node.ratio.value = b.ratio;
+      if (params.attack !== undefined) node.attack.value = b.attack;
+      if (params.release !== undefined) node.release.value = b.release;
+      if (params.knee !== undefined) node.knee.value = b.knee;
+    }
+    this._persistParams();
+  }
+
+  setMasterMBCCrossover(lowFreq?: number, highFreq?: number): void {
+    if (lowFreq !== undefined) this._mbcParams.lowFrequency = lowFreq;
+    if (highFreq !== undefined) this._mbcParams.highFrequency = highFreq;
+    if (!this._masterMBCBypassed && !this._masterChainBypassed) {
+      if (lowFreq !== undefined) this.masterMBC.lowFrequency.value = lowFreq;
+      if (highFreq !== undefined) this.masterMBC.highFrequency.value = highFreq;
+    }
+    this._persistParams();
+  }
+
+  getMasterMBCParams(): MultibandCompParams {
+    return {
+      low: { ...this._mbcParams.low },
+      mid: { ...this._mbcParams.mid },
+      high: { ...this._mbcParams.high },
+      lowFrequency: this._mbcParams.lowFrequency,
+      highFrequency: this._mbcParams.highFrequency,
+    };
+  }
+
   // ─── Master Filter Band Setters ─────────────────────────
 
   setMasterFilterBand(index: number, params: Partial<FilterBandParams>): void {
@@ -1017,6 +1057,7 @@ class AudioEngine {
     return {
       eqBypassed: this._masterEqBypassed,
       filterBypassed: this._masterFilterBypassed,
+      mbcBypassed: this._masterMBCBypassed,
       compBypassed: this._masterCompBypassed,
       limiterBypassed: this._masterLimiterBypassed,
       reverbBypassed: this._masterReverbBypassed,
@@ -1028,6 +1069,7 @@ class AudioEngine {
     return {
       eqLow: this._eqLow, eqMid: this._eqMid, eqHigh: this._eqHigh,
       filterBands: this._filterBands.map(b => ({ ...b })),
+      mbcParams: this.getMasterMBCParams(),
       compThreshold: this._compThreshold, compRatio: this._compRatio,
       compAttack: this._compAttack, compRelease: this._compRelease, compKnee: this._compKnee,
       limiterThreshold: this._limiterThreshold,
