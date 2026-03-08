@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { getAudioEngine } from "@/lib/audioEngine";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
 
@@ -44,20 +44,28 @@ function saveLocal(sceneId: string, state: SceneMixerState) {
 export function useMixerPersistence(sceneId: string | null, trackIds: string[]) {
   const engine = getAudioEngine();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [restoredFor, setRestoredFor] = useState<string | null>(null);
+  const restoredForRef = useRef<string | null>(null);
+
+  // Stable trackIds key for dependency tracking
+  const trackIdsKey = useMemo(() => trackIds.join(","), [trackIds]);
+  const trackIdsRef = useRef(trackIds);
+  trackIdsRef.current = trackIds;
 
   // Cloud-synced state for ALL scenes' mixer settings
   const { value: cloudStates, update: saveCloudStates, loaded: cloudLoaded } =
     useCloudSettings<AllMixerStates>("mixer_states", {});
 
+  const cloudStatesRef = useRef(cloudStates);
+  cloudStatesRef.current = cloudStates;
+
   // Restore mixer state when scene changes
   useEffect(() => {
-    if (!sceneId || trackIds.length === 0) return;
-    if (restoredFor === sceneId) return;
-    if (!cloudLoaded) return;
+    if (!sceneId || trackIds.length === 0 || !cloudLoaded) return;
+    if (restoredForRef.current === sceneId) return;
+    restoredForRef.current = sceneId;
 
     // Try localStorage first (faster), fallback to cloud
-    const saved = loadLocal(sceneId) ?? cloudStates[sceneId] ?? null;
+    const saved = loadLocal(sceneId) ?? cloudStatesRef.current[sceneId] ?? null;
     if (saved) {
       for (const trackId of trackIds) {
         const mix = saved[trackId];
@@ -68,44 +76,32 @@ export function useMixerPersistence(sceneId: string | null, trackIds: string[]) 
         engine.setTrackReverbBypassed(trackId, mix.reverbBypassed);
       }
     }
-    setRestoredFor(sceneId);
-  }, [sceneId, trackIds.join(","), engine, cloudLoaded]);
-
-  // Collect current state snapshot
-  const collectState = useCallback((): SceneMixerState => {
-    const state: SceneMixerState = {};
-    for (const trackId of trackIds) {
-      const mix = engine.getTrackMixState(trackId);
-      if (mix) {
-        state[trackId] = {
-          volume: mix.volume,
-          pan: mix.pan,
-          preFxBypassed: mix.preFxBypassed,
-          reverbBypassed: mix.reverbBypassed,
-        };
-      }
-    }
-    return state;
-  }, [trackIds.join(","), engine]);
+  }, [sceneId, trackIdsKey, engine, cloudLoaded]);
 
   // Debounced save to both localStorage and cloud
   const scheduleSave = useCallback(() => {
     if (!sceneId) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      const state = collectState();
+      const ids = trackIdsRef.current;
+      const state: SceneMixerState = {};
+      for (const trackId of ids) {
+        const mix = engine.getTrackMixState(trackId);
+        if (mix) {
+          state[trackId] = {
+            volume: mix.volume,
+            pan: mix.pan,
+            preFxBypassed: mix.preFxBypassed,
+            reverbBypassed: mix.reverbBypassed,
+          };
+        }
+      }
       if (Object.keys(state).length === 0) return;
 
-      // Save to localStorage
       saveLocal(sceneId, state);
-
-      // Save to cloud (merge with existing states)
-      saveCloudStates((prev) => ({
-        ...prev,
-        [sceneId]: state,
-      }));
+      saveCloudStates((prev) => ({ ...prev, [sceneId]: state }));
     }, 300);
-  }, [sceneId, collectState, saveCloudStates]);
+  }, [sceneId, engine, saveCloudStates]);
 
   // Cleanup
   useEffect(() => {
