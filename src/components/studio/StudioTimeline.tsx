@@ -359,6 +359,16 @@ export function StudioTimeline({
 
   const sidebarWidth = mixerExpanded ? TRACK_LABELS_WIDTH_EXPANDED : TRACK_LABELS_WIDTH_COLLAPSED;
 
+  // ── Mixer persistence per scene ────────────────────────────
+  const engineTrackIds = useMemo(() =>
+    allTracks.map(t => {
+      const clip = timelineClips.find(c => c.trackId === t.id);
+      return clip?.id ?? t.id;
+    }),
+    [allTracks, timelineClips]
+  );
+  const { scheduleSave: onMixChange } = useMixerPersistence(sceneId ?? null, engineTrackIds);
+
   // ── Layout / zoom ─────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -649,6 +659,7 @@ export function StudioTimeline({
                   color={track.color}
                   expanded={mixerExpanded}
                   isSelected={isSelected}
+                  onMixChange={onMixChange}
                   onClick={() => {
                     if (charId && onSelectCharacter) {
                       onSelectCharacter(isSelected ? null : charId);
