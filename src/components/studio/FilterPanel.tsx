@@ -354,15 +354,29 @@ function FilterResponseGraph({
   }, []);
 
   return (
-    <div className="relative rounded-sm border border-border/40 overflow-hidden flex-1 min-w-0" style={{ minHeight: 140 }}>
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 w-full h-full"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-      />
+    <div className="flex flex-col flex-1 min-w-0">
+      <div className="relative rounded-sm border border-border/40 overflow-hidden flex-1 min-w-0" style={{ minHeight: 130 }}>
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp}
+        />
+      </div>
+      {/* Frequency scale below graph */}
+      <div className="relative w-full h-4 shrink-0">
+        {[20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].map(f => (
+          <span
+            key={f}
+            className="absolute text-[9px] font-mono text-muted-foreground/50 -translate-x-1/2"
+            style={{ left: `${freqToNorm(f) * 100}%`, top: 1 }}
+          >
+            {f >= 1000 ? `${f / 1000}k` : f}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
