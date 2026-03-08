@@ -347,9 +347,10 @@ class AudioEngine {
   private sfxBus: Tone.Channel;
   private masterBus: Tone.Channel;
 
-  // Master insert chain: EQ → Filters(5) → Compressor → Limiter → Reverb (post)
+  // Master insert chain: EQ → Filters(5) → MultibandComp → Compressor → Limiter → Reverb (post)
   private masterEQ: Tone.EQ3;
   private masterFilters: Tone.Filter[] = [];
+  private masterMBC: Tone.MultibandCompressor;
   private masterComp: Tone.Compressor;
   private masterLimiter: Tone.Limiter;
   private masterReverb: Tone.Reverb;
@@ -357,6 +358,7 @@ class AudioEngine {
   // Bypass states for master chain
   private _masterEqBypassed = true;
   private _masterFilterBypassed = true;
+  private _masterMBCBypassed = true;
   private _masterCompBypassed = true;
   private _masterLimiterBypassed = true;
   private _masterReverbBypassed = true;
