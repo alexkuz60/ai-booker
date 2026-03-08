@@ -440,23 +440,32 @@ class AudioEngine {
     if (this._state === "stopped") {
       this.transport.position = 0;
       for (const t of this.tracks.values()) t.schedule();
+      this.transport.start();
     } else if (this._state === "paused") {
       // Re-schedule tracks from current position since pause stops all players
       const pos = this.transport.seconds;
+      const immediateStarts: { track: EngineTrack; offset: number }[] = [];
       for (const t of this.tracks.values()) {
         t.unschedule();
         const trackEnd = t.startSec + t.durationSec;
         if (pos < trackEnd) {
           if (pos > t.startSec) {
-            t.scheduleWithOffset(pos, pos - t.startSec);
+            immediateStarts.push({ track: t, offset: pos - t.startSec });
           } else {
             t.schedule();
           }
         }
       }
+
+      this.transport.start();
+      // Start overlapping clips immediately with correct offset
+      for (const { track, offset } of immediateStarts) {
+        if (track.player.loaded) {
+          track.player.start(Tone.now(), offset);
+        }
+      }
     }
 
-    this.transport.start();
     this._state = "playing";
     this.startPositionLoop();
     this.notify();
