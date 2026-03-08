@@ -8,7 +8,8 @@ import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { TrackMixerStrip } from "./TrackMixerStrip";
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
 import { getAudioEngine } from "@/lib/audioEngine";
-import { MasterMeterPanel, SpectrumAnalyzer } from "./MasterMeterPanel";
+import { MasterMeterPanel } from "./MasterMeterPanel";
+import { MasterEffectsTabs } from "./MasterEffectsTabs";
 
 // ─── Master output level meter ──────────────────────────────
 
@@ -822,9 +823,9 @@ export function StudioTimeline({
                 <Playhead positionSec={player.positionSec} zoom={zoom} />
               </div>
             </ScrollArea>
-            {/* FFT Spectrum Analyzer — fills remaining space to bottom */}
+            {/* Master Effects Tabs — FFT + EQ/CMP/LIM/REV */}
             <div className="flex-1 min-h-0 p-2">
-              <SpectrumAnalyzer />
+              <MasterEffectsTabs isRu={isRu} />
             </div>
           </div>
         </div>
