@@ -651,6 +651,84 @@ class AudioEngine {
     return Array.from(this.tracks.keys());
   }
 
+  // ─── Master Plugin Controls ─────────────────────────────
+
+  private applyMasterEqBypass(): void {
+    if (this._masterEqBypassed || this._masterChainBypassed) {
+      this.masterEQ.low.value = 0;
+      this.masterEQ.mid.value = 0;
+      this.masterEQ.high.value = 0;
+    } else {
+      // Restore saved values (stored as defaults for now)
+      this.masterEQ.low.value = this._eqLow;
+      this.masterEQ.mid.value = this._eqMid;
+      this.masterEQ.high.value = this._eqHigh;
+    }
+  }
+
+  private applyMasterCompBypass(): void {
+    if (this._masterCompBypassed || this._masterChainBypassed) {
+      this.masterComp.ratio.value = 1;
+    } else {
+      this.masterComp.ratio.value = 4;
+    }
+  }
+
+  private applyMasterLimiterBypass(): void {
+    if (this._masterLimiterBypassed || this._masterChainBypassed) {
+      this.masterLimiter.threshold.value = 0;
+    } else {
+      this.masterLimiter.threshold.value = -1;
+    }
+  }
+
+  private applyMasterReverbBypass(): void {
+    this.masterReverb.wet.value = (this._masterReverbBypassed || this._masterChainBypassed) ? 0 : 0.12;
+  }
+
+  // EQ band values
+  private _eqLow = 0;
+  private _eqMid = 0;
+  private _eqHigh = 0;
+
+  setMasterEqBypassed(b: boolean): void {
+    this._masterEqBypassed = b;
+    this.applyMasterEqBypass();
+  }
+
+  setMasterCompBypassed(b: boolean): void {
+    this._masterCompBypassed = b;
+    this.applyMasterCompBypass();
+  }
+
+  setMasterLimiterBypassed(b: boolean): void {
+    this._masterLimiterBypassed = b;
+    this.applyMasterLimiterBypass();
+  }
+
+  setMasterReverbBypassed(b: boolean): void {
+    this._masterReverbBypassed = b;
+    this.applyMasterReverbBypass();
+  }
+
+  setMasterChainBypassed(b: boolean): void {
+    this._masterChainBypassed = b;
+    this.applyMasterEqBypass();
+    this.applyMasterCompBypass();
+    this.applyMasterLimiterBypass();
+    this.applyMasterReverbBypass();
+  }
+
+  getMasterPluginState() {
+    return {
+      eqBypassed: this._masterEqBypassed,
+      compBypassed: this._masterCompBypassed,
+      limiterBypassed: this._masterLimiterBypassed,
+      reverbBypassed: this._masterReverbBypassed,
+      chainBypassed: this._masterChainBypassed,
+    };
+  }
+
   // ─── Bus volume ───────────────────────────────────────
 
   setVoiceBusVolume(v: number): void {
