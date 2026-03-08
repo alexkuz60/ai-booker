@@ -451,6 +451,10 @@ class AudioEngine {
   pause(): void {
     if (this._state !== "playing") return;
     this.transport.pause();
+    // Immediately stop all players so audio doesn't ring out
+    for (const t of this.tracks.values()) {
+      try { t.player.stop(); } catch { /* not started */ }
+    }
     this._state = "paused";
     this.stopPositionLoop();
     this.notify();
