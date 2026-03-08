@@ -173,6 +173,31 @@
 ### Что оказалось лишним
 - Пока нет лишних элементов — все задачи релевантны
 
+---
+
+## Модуль 2.1: Аудио-движок (AudioEngine на Tone.js)
+
+**Статус:** ✅ Реализовано (Фазы 1-2)
+
+### Фаза 1 — Базовый движок
+- Синглтон `AudioEngine` (`src/lib/audioEngine.ts`)
+- `EngineTrack`: Player → Channel (vol/pan) → Bus → Destination
+- `Tone.Transport` как единый источник истины
+- Реактивная подписка через `subscribe()` + `requestAnimationFrame`
+- Миграция `useTimelinePlayer` на новый движок
+
+### Фаза 2 — Микшер
+- **Сигнальная цепочка:** Player → PreFX (компрессор, байпасс) → Channel → Reverb (байпасс) → Split L/R Meter → Bus
+- **3 суб-шины:** Voice, Atmosphere, SFX → MasterBus
+- **Мастер-метеринг:** Split → MeterL + MeterR
+- **UI:** VuSlider (Canvas с динамической VU-индикацией), TrackMixerStrip (сворачиваемый микшер в сайдбаре таймлайна)
+- **Mute/Solo** на уровне треков
+
+### Запланировано
+- Фаза 3: Fade-in/out на клипах, Atmosphere/SFX bus UI
+- Фаза 4: Post-FX контейнер (мастер-лимитер, EQ)
+- Фаза 5: Envelope Editor (визуальный редактор огибающих)
+
 ### Рекомендации по улучшению промптов
 - **Визионер:** Добавить требование описывать user journey для каждого модуля
 - **Стратег:** Включить обязательные секции: Data Model, UI Flow, Error Handling, Provider Strategy
