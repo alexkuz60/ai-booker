@@ -186,7 +186,7 @@ export function VuSlider({
       />
 
       {/* Track background */}
-      <div className="absolute inset-0 rounded-sm border border-border bg-muted/30" />
+      <div className="absolute inset-0 rounded-sm border border-foreground/30 bg-muted/30" />
 
       {/* Thumb with center red mark */}
       <div
