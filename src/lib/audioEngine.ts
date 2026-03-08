@@ -941,6 +941,11 @@ class AudioEngine {
     this.applyMasterFilterBypass();
   }
 
+  setMasterMBCBypassed(b: boolean): void {
+    this._masterMBCBypassed = b;
+    this.applyMasterMBCBypass();
+  }
+
   setMasterCompBypassed(b: boolean): void {
     this._masterCompBypassed = b;
     this.applyMasterCompBypass();
@@ -960,6 +965,7 @@ class AudioEngine {
     this._masterChainBypassed = b;
     this.applyMasterEqBypass();
     this.applyMasterFilterBypass();
+    this.applyMasterMBCBypass();
     this.applyMasterCompBypass();
     this.applyMasterLimiterBypass();
     this.applyMasterReverbBypass();
