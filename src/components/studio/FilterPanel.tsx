@@ -337,9 +337,9 @@ export function FilterPanel({ isRu, disabled }: { isRu: boolean; disabled: boole
 
       {/* Controls for selected band */}
       <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-        <FltSlider
+        <LogFreqSlider
           label={isRu ? "Частота" : "Freq"}
-          value={band.frequency} min={20} max={20000} step={1} unit=" Hz"
+          value={band.frequency} min={20} max={20000}
           onChange={v => updateBand({ frequency: v })} disabled={disabled}
         />
         <div className="flex flex-col gap-0">
