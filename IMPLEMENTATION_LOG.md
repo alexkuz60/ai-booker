@@ -177,7 +177,7 @@
 
 ## Модуль 2.1: Аудио-движок (AudioEngine на Tone.js)
 
-**Статус:** ✅ Реализовано (Фазы 1-2)
+**Статус:** ✅ Реализовано (Фазы 1-4)
 
 ### Фаза 1 — Базовый движок
 - Синглтон `AudioEngine` (`src/lib/audioEngine.ts`)
@@ -189,14 +189,49 @@
 ### Фаза 2 — Микшер
 - **Сигнальная цепочка:** Player → PreFX (компрессор, байпасс) → Channel → Reverb (байпасс) → Split L/R Meter → Bus
 - **3 суб-шины:** Voice, Atmosphere, SFX → MasterBus
-- **Мастер-метеринг:** Split → MeterL + MeterR
-- **UI:** VuSlider (Canvas с динамической VU-индикацией), TrackMixerStrip (сворачиваемый микшер в сайдбаре таймлайна)
+- **Мастер-метеринг:** Split → MeterL + MeterR (stereo VU с peak hold 1.5s)
+- **UI:** VuSlider (Canvas с динамической VU-индикацией ~30fps), TrackMixerStrip (сворачиваемый микшер в сайдбаре таймлайна)
 - **Mute/Solo** на уровне треков
+- **Расширенный режим** (360px): колоночная вёрстка, названия треков 90px, выровненные слайдеры
+- **Персистентность:** гибридная — localStorage (мгновенно) + cloud sync (user_settings, debounce 300ms) per scene
+
+### Фаза 3 — Мастер-метеринг и байпасс-стрип
+- **Стерео VU-метр:** L/R от -96 дB до +3 dB, белая разметка, peak hold, красная зона клиппинга
+- **Плагин-стрип:** вертикальная полоса bypass-кнопок с группировкой (Pre / Post / Master)
+- **Master BYP:** глобальный байпасс всей мастер-цепи
+- **Персистентность:** состояния плагинов в localStorage
+
+### Фаза 4 — Мастер-цепочка обработки (Mastering Chain)
+
+**Сигнальная цепочка:**
+```
+MasterBus → EQ3 → Compressor → Limiter → Filter1→…→Filter5 → MBC → Reverb → Split L/R → Meters + Destination
+```
+
+| Эффект | Реализация | UI | Статус |
+|--------|-----------|-----|--------|
+| **EQ3** | `Tone.EQ3` (low/mid/high) | Слайдеры ±12 dB | ✅ |
+| **Compressor** | `Tone.Compressor` | Threshold, Ratio, Attack, Release, Knee | ✅ |
+| **Limiter** | `Tone.Limiter` | Threshold, Release | ✅ |
+| **5-Band Filter** | 5× `Tone.BiquadFilter` (HP, LS, PK, HS, LP) | Интерактивный график (Canvas): перетягивание узлов, Q/gain, bypass per band | ✅ |
+| **MBC (3-Band)** | `Tone.MultibandCompressor` | Интерактивный график: transfer curves, draggable кроссоверы, per-band threshold/ratio/attack/release/knee | ✅ |
+| **Reverb** | `Tone.Reverb` | Decay, Wet | ✅ |
+| **Spectrum (FFT)** | `Tone.FFT` (динамический размер) | 3 режима: bars, line, mirror; smoothing | ✅ |
+
+**Группировка плагинов в UI:**
+| Группа | Плагины | Порядок в цепи |
+|--------|---------|----------------|
+| Pre | EQ, CMP | 1, 2 |
+| Post | LIM | 3 |
+| Master | FLT, MBC, REV | 4, 5, 6 |
+
+**Табовый интерфейс** (`MasterEffectsTabs`): FFT → EQ → CMP → LIM → FLT → MBC → REV — каждый таб с inline bypass-переключателем.
 
 ### Запланировано
-- Фаза 3: Fade-in/out на клипах, Atmosphere/SFX bus UI
-- Фаза 4: Post-FX контейнер (мастер-лимитер, EQ)
-- Фаза 5: Envelope Editor (визуальный редактор огибающих)
+- Фаза 5: Fade-in/out на клипах, Atmosphere/SFX bus UI
+- Фаза 6: Envelope Editor (визуальный редактор огибающих)
+- Фаза 7: Gain reduction metering для компрессора/MBC
+- Фаза 8: Пресеты мастеринга
 
 ### Рекомендации по улучшению промптов
 - **Визионер:** Добавить требование описывать user journey для каждого модуля

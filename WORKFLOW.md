@@ -1,7 +1,7 @@
 # AI-Booker: Рабочий процесс создания аудиокниги
 
 > Документ описывает полный пайплайн — от загрузки файла до подготовки к озвучке.  
-> Актуальная дата: 2026-03-07. Статус каждого шага: ✅ реализовано, 🔧 частично, ⬜ запланировано.
+> Актуальная дата: 2026-03-08. Статус каждого шага: ✅ реализовано, 🔧 частично, ⬜ запланировано.
 
 ---
 
@@ -339,8 +339,31 @@
 - **Seek по клику** — клик в любой точке шкалы перемещает плейхед и продолжает воспроизведение с новой позиции.
 - Последовательное воспроизведение клипов с готовым аудио (из `segment_audio`).
 - **Overlay-воспроизведение**: инлайн-вставки рассказчика проигрываются параллельно основному треку в рассчитанной временной позиции.
+- **Sample-accurate синхронизация**: Tone.Transport как единый источник времени, корректный расчёт оффсетов для seek mid-clip.
 - Регулировка громкости (персистентная в localStorage).
 - Счётчик времени: текущая позиция / общая длительность.
+
+### Микшер (Mixer) ✅
+
+**Расположение:** Сайдбар таймлайна (компонент `TrackMixerStrip`)
+
+| Элемент | Описание |
+|---------|----------|
+| **VU-слайдер** | Canvas-компонент с реальным VU-метрингом (~30fps), яркими контурами и красной меткой на ручке |
+| **Громкость** | Per-track volume слайдер (-∞ … +6 dB) |
+| **Панорама** | Per-track pan (-1 … +1) |
+| **Mute** | Заглушение трека (совместимо с Solo) |
+| **Solo** | Солирование — авто-мьют остальных треков |
+| **Pre-FX** | Компрессор per-track с байпассом (ratio=1 = bypass) |
+| **Insert Reverb** | Per-track реверб с wet-контролем и байпассом |
+
+**Режимы отображения:**
+- **Развёрнутый** (360px): колоночная вёрстка с заголовками «Уровень» / «Панорама», названия треков (90px)
+- **Свёрнутый**: только имя + цветная точка персонажа
+
+**Персистентность:** гибридная стратегия per scene:
+1. **localStorage** — мгновенное восстановление при переключении сцен (без задержки UI)
+2. **Cloud sync** — фоновая запись в `user_settings` с debounce 300ms для кросс-сессионного сохранения
 
 ### Автопересчёт после синтеза ✅
 После завершения синтеза или ре-синтеза:
@@ -353,7 +376,7 @@
 - Сворачивание/разворачивание.
 - Персистентность состояния (размер, collapse) в localStorage.
 
-**⬜ Запланировано:** drag-and-drop клипов, микширование, экспорт.
+**⬜ Запланировано:** drag-and-drop клипов, fade-in/fade-out, экспорт.
 
 ---
 
@@ -446,14 +469,16 @@ PDF-файл
 │  8. Предпрослушивание           │  Yandex / ElevenLabs TTS
 │  9. Синтез сцены                │  TTS → segment_audio → таймлайн
 │  10. Таймлайн (Сцена/Глава)     │  Воспроизведение, seek, навигация
+│  10a. Микшер                    │  Vol/Pan/Mute/Solo, Pre-FX, Reverb ✅
+│  10b. Мастеринг                 │  EQ→CMP→LIM→FLT→MBC→REV ✅
+│  10c. Метеринг                  │  Stereo VU L/R, FFT Spectrum ✅
 └─────────────┬───────────────────┘
               │  ⬜ следующие этапы
               ▼
 ┌─────────────────────────────────┐
 │  11. Атмосфера + SFX            │  ⬜
-│  12. Монтаж на таймлайне        │  ⬜
-│  13. Сведение + мастеринг       │  ⬜
-│  14. Экспорт финального аудио   │  ⬜
+│  12. Монтаж на таймлайне        │  ⬜ (drag, snap, fade)
+│  13. Экспорт финального аудио   │  ⬜
 └─────────────────────────────────┘
 ```
 
@@ -505,14 +530,16 @@ PDF-файл
 │  8. Предпрослушивание           │  Yandex / ElevenLabs TTS
 │  9. Синтез сцены                │  TTS → segment_audio → таймлайн
 │  10. Таймлайн (Сцена/Глава)     │  Воспроизведение, seek, навигация
+│  10a. Микшер                    │  Vol/Pan/Mute/Solo, Pre-FX, Reverb ✅
+│  10b. Мастеринг                 │  EQ→CMP→LIM→FLT→MBC→REV ✅
+│  10c. Метеринг                  │  Stereo VU L/R, FFT Spectrum ✅
 └─────────────┬───────────────────┘
               │  ⬜ следующие этапы
               ▼
 ┌─────────────────────────────────┐
 │  11. Атмосфера + SFX            │  ⬜
-│  12. Монтаж на таймлайне        │  ⬜
-│  13. Сведение + мастеринг       │  ⬜
-│  14. Экспорт финального аудио   │  ⬜
+│  12. Монтаж на таймлайне        │  ⬜ (drag, snap, fade)
+│  13. Экспорт финального аудио   │  ⬜
 └─────────────────────────────────┘
 
 🤖 Ассистент — доступен на любом этапе через боковое меню
@@ -527,13 +554,20 @@ PDF-файл
 ### Архитектура сигнальной цепочки
 
 ```
-Player (моно TTS) → PreFX (компрессор, байпасс) → Channel (vol/pan) → Reverb (байпасс) → SplitMeter L/R → Bus
-                                                        └→ MeterMono
+Трековая цепочка (per-track):
+  Player (моно TTS) → PreFX (Compressor, bypass) → Channel (Vol/Pan) → Reverb (bypass) → Split L/R Meter → Bus
+                                                          └→ MeterMono
 
-VoiceBus ──┐
-AtmoBus  ──┼→ MasterBus → SplitMeter L/R → Destination
-SfxBus   ──┘
+Суб-шины:
+  VoiceBus ──┐
+  AtmoBus  ──┼→ MasterBus
+  SfxBus   ──┘
+
+Мастер-цепочка:
+  MasterBus → EQ3 → Compressor → Limiter → Filter[1..5] → MBC (3-Band) → Reverb → Split L/R → Meters + FFT → Destination
 ```
+
+### Трековый уровень
 
 | Компонент | Реализация | Статус |
 |-----------|-----------|--------|
@@ -543,21 +577,53 @@ SfxBus   ──┘
 | Per-track Reverb | `Tone.Reverb` с wet-контролем и байпассом | ✅ |
 | Per-track Metering | `Tone.Meter` (моно) + `Tone.Split` → 2×`Tone.Meter` (L/R) | ✅ |
 | 3 суб-шины | Voice / Atmosphere / SFX → MasterBus | ✅ |
-| Master Metering | `Tone.Split` → 2×`Tone.Meter` (L/R) | ✅ |
 | Mute / Solo | Per-track, с авто-мьют при соло | ✅ |
 | Fade-in / Fade-out | Через автоматизацию Tone.js | ⬜ |
 | Envelope Editor | Визуальный редактор огибающих | ⬜ |
-| Post-FX контейнер | Мастер-эффекты (лимитер, EQ) | ⬜ |
+
+### Мастер-цепочка обработки (Mastering Chain) ✅
+
+**Порядок обработки:** EQ3 → Compressor → Limiter → 5-Band Filter → 3-Band MBC → Reverb
+
+| Эффект | Группа | Реализация | UI |
+|--------|--------|-----------|-----|
+| **EQ3** | Pre | `Tone.EQ3` (low/mid/high ±12 dB) | Слайдеры |
+| **Compressor** | Pre | `Tone.Compressor` | Threshold, Ratio, Attack, Release, Knee |
+| **Limiter** | Post | `Tone.Limiter` | Threshold, Release |
+| **5-Band Filter** | Master | 5× `Tone.BiquadFilter` (HP, LS, PK, HS, LP) | Canvas-график: draggable узлы, freq/gain/Q |
+| **MBC 3-Band** | Master | `Tone.MultibandCompressor` | Canvas-график: transfer curves, draggable кроссоверы |
+| **Reverb** | Master | `Tone.Reverb` | Decay (0.1–10s), Wet (0–1) |
+
+### Мастер-метеринг ✅
+
+| Элемент | Описание |
+|---------|----------|
+| **Стерео VU L/R** | -96 dB … +3 dB, peak hold 1.5s, красная зона клиппинга |
+| **Спектроанализатор** | FFT: 3 режима (bars / line / mirror), smoothing |
+| **Плагин-стрип** | Bypass-кнопки с группировкой Pre / Post / Master |
+| **Master BYP** | Глобальный байпасс всей цепи |
+
+### Табовый интерфейс ✅
+
+**Компонент:** `MasterEffectsTabs` — порядок табов: FFT → EQ → CMP → LIM → FLT → MBC → REV
+
+Каждый таб: UI управления + inline bypass (ON/OFF) + disabled при bypass.
 
 ### UI микшера
 
 | Элемент | Расположение | Статус |
 |---------|-------------|--------|
-| VU-слайдер с метром | Компонент `VuSlider` (Canvas + rAF) | ✅ |
+| VU-слайдер с метром | Компонент `VuSlider` (Canvas + rAF ~30fps) | ✅ |
 | Микшер-стрип | `TrackMixerStrip` — сворачиваемый, в сайдбаре таймлайна | ✅ |
-| Развёрнутый режим | Vol + Pan слайдеры с VU, бейджи FX / RV | ✅ |
+| Развёрнутый режим (360px) | Vol + Pan слайдеры с VU, бейджи FX / RV | ✅ |
 | Свёрнутый режим | Только имя + цветная точка | ✅ |
-| Master L/R индикация | В хедере таймлайна | ⬜ |
+| Master L/R панель | `MasterMeterPanel` — стерео VU + плагин-стрип | ✅ |
+| Мастер-эффекты | `MasterEffectsTabs` — 7 табов обработки | ✅ |
+
+### Персистентность
+- **Микшер:** localStorage (мгновенно) + cloud user_settings (debounce 300ms) per scene
+- **Плагин bypass:** localStorage (`master-plugins-state`)
+- **Активный таб:** localStorage (`master-fx-tab`)
 
 ---
 
@@ -570,7 +636,7 @@ SfxBus   ──┘
 | AI-ассистент | Lovable AI Gateway (Gemini 3 Flash Preview) |
 | TTS | Yandex SpeechKit (v1/v3), ElevenLabs (Multilingual v2) |
 | SFX/Музыка | ElevenLabs (Sound Effects, Music) |
-| Аудио-движок | Tone.js (Transport, Channel, Reverb, Meter, Split) |
+| Аудио-движок | Tone.js (Transport, Channel, EQ3, Compressor, Limiter, BiquadFilter, MultibandCompressor, Reverb, FFT, Meter, Split) |
 | Хранение | Lovable Cloud (PostgreSQL + Storage) |
 | Аутентификация | Email + пароль, RLS-политики на все таблицы |
 | UI | React, Tailwind CSS, shadcn/ui, Framer Motion |
