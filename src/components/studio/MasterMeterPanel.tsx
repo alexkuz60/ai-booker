@@ -406,7 +406,7 @@ export function SpectrumAnalyzer() {
 // ─── Plugin slot definition ─────────────────────────────────
 
 interface PluginSlot {
-  id: "eq" | "comp" | "limit" | "reverb";
+  id: "eq" | "filter" | "comp" | "limit" | "reverb";
   label: string;
   labelRu: string;
 }
