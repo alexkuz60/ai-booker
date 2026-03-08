@@ -873,6 +873,7 @@ class AudioEngine {
     this.masterMeterR.dispose();
     this.masterDCMeterL.dispose();
     this.masterDCMeterR.dispose();
+    this.masterFFT.dispose();
     this.masterBus.dispose();
     this.listeners.clear();
     AudioEngine.instance = null;
