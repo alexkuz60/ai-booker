@@ -20,7 +20,7 @@ function dbToLinear(db: number): number {
 function MasterMeter() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engine = getAudioEngine();
-  const meterRef = useRef<MasterMeterData>({ level: -60, levelL: -60, levelR: -60 });
+  const meterRef = useRef({ level: -60, levelL: -60, levelR: -60 });
 
   useEffect(() => {
     let raf: number;
