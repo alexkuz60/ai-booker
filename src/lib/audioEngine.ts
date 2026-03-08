@@ -302,6 +302,19 @@ class AudioEngine {
   private sfxBus: Tone.Channel;
   private masterBus: Tone.Channel;
 
+  // Master insert chain: EQ → Compressor → Limiter → Reverb (post)
+  private masterEQ: Tone.EQ3;
+  private masterComp: Tone.Compressor;
+  private masterLimiter: Tone.Limiter;
+  private masterReverb: Tone.Reverb;
+
+  // Bypass states for master chain
+  private _masterEqBypassed = true;
+  private _masterCompBypassed = true;
+  private _masterLimiterBypassed = true;
+  private _masterReverbBypassed = true;
+  private _masterChainBypassed = false;
+
   // Master metering (stereo split)
   private masterSplitter: Tone.Split;
   private masterMeterL: Tone.Meter;
@@ -317,20 +330,37 @@ class AudioEngine {
 
   private constructor() {
     this.masterBus = new Tone.Channel({ volume: volumeToDB(this._volume) });
+
+    // Master insert chain nodes
+    this.masterEQ = new Tone.EQ3({ low: 0, mid: 0, high: 0 });
+    this.masterComp = new Tone.Compressor({ threshold: -18, ratio: 4, attack: 0.005, release: 0.15 });
+    this.masterLimiter = new Tone.Limiter(-1);
+    this.masterReverb = new Tone.Reverb({ decay: 2.0, wet: 0.12 });
+
     this.masterSplitter = new Tone.Split();
     this.masterMeterL = new Tone.Meter({ smoothing: 0.8 });
     this.masterMeterR = new Tone.Meter({ smoothing: 0.8 });
 
-    // Master chain: MasterBus → Splitter → MeterL/R, MasterBus → Destination
-    this.masterBus.connect(this.masterSplitter);
+    // Chain: MasterBus → EQ → Comp → Limiter → Reverb → Splitter → Meters + Destination
+    this.masterBus.connect(this.masterEQ);
+    this.masterEQ.connect(this.masterComp);
+    this.masterComp.connect(this.masterLimiter);
+    this.masterLimiter.connect(this.masterReverb);
+    this.masterReverb.connect(this.masterSplitter);
     this.masterSplitter.connect(this.masterMeterL, 0);
     this.masterSplitter.connect(this.masterMeterR, 1);
-    this.masterBus.toDestination();
+    this.masterReverb.toDestination();
 
     // Sub-buses → MasterBus
     this.voiceBus = new Tone.Channel({ volume: 0 }).connect(this.masterBus);
     this.atmoBus = new Tone.Channel({ volume: 0 }).connect(this.masterBus);
     this.sfxBus = new Tone.Channel({ volume: 0 }).connect(this.masterBus);
+
+    // Apply initial bypass states (all bypassed by default)
+    this.applyMasterEqBypass();
+    this.applyMasterCompBypass();
+    this.applyMasterLimiterBypass();
+    this.applyMasterReverbBypass();
 
     this.transport.loop = false;
   }
