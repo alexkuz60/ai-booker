@@ -34,38 +34,94 @@ const TYPE_LABELS: Record<FilterType, string> = {
   allpass: "AP", peaking: "PK",
 };
 
-// ─── Biquad frequency response computation ─────────────────
+// ─── Biquad coefficient computation (Audio EQ Cookbook) ─────
 
-function computeBiquadResponse(
-  type: BiquadFilterType, frequency: number, Q: number, gain: number,
-  sampleRate: number, freqs: Float32Array
-): Float32Array {
-  const ctx = new OfflineAudioContext(1, 1, sampleRate);
-  const biquad = ctx.createBiquadFilter();
-  biquad.type = type;
-  biquad.frequency.value = frequency;
-  biquad.Q.value = Q;
-  biquad.gain.value = gain;
+function computeBiquadCoeffs(
+  type: FilterType, freq: number, Q: number, gainDb: number, sampleRate: number
+): { b0: number; b1: number; b2: number; a0: number; a1: number; a2: number } {
+  const A = Math.pow(10, gainDb / 40);
+  const w0 = (2 * Math.PI * freq) / sampleRate;
+  const cosW0 = Math.cos(w0);
+  const sinW0 = Math.sin(w0);
+  const alpha = sinW0 / (2 * Q);
 
-  const magResponse = new Float32Array(freqs.length);
-  const phaseResponse = new Float32Array(freqs.length);
-  biquad.getFrequencyResponse(freqs as any, magResponse as any, phaseResponse as any);
-  return magResponse;
+  let b0 = 1, b1 = 0, b2 = 0, a0 = 1, a1 = 0, a2 = 0;
+
+  switch (type) {
+    case "lowpass":
+      b0 = (1 - cosW0) / 2; b1 = 1 - cosW0; b2 = (1 - cosW0) / 2;
+      a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha;
+      break;
+    case "highpass":
+      b0 = (1 + cosW0) / 2; b1 = -(1 + cosW0); b2 = (1 + cosW0) / 2;
+      a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha;
+      break;
+    case "bandpass":
+      b0 = alpha; b1 = 0; b2 = -alpha;
+      a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha;
+      break;
+    case "notch":
+      b0 = 1; b1 = -2 * cosW0; b2 = 1;
+      a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha;
+      break;
+    case "allpass":
+      b0 = 1 - alpha; b1 = -2 * cosW0; b2 = 1 + alpha;
+      a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha;
+      break;
+    case "peaking":
+      b0 = 1 + alpha * A; b1 = -2 * cosW0; b2 = 1 - alpha * A;
+      a0 = 1 + alpha / A; a1 = -2 * cosW0; a2 = 1 - alpha / A;
+      break;
+    case "lowshelf": {
+      const sq = 2 * Math.sqrt(A) * alpha;
+      b0 = A * ((A + 1) - (A - 1) * cosW0 + sq);
+      b1 = 2 * A * ((A - 1) - (A + 1) * cosW0);
+      b2 = A * ((A + 1) - (A - 1) * cosW0 - sq);
+      a0 = (A + 1) + (A - 1) * cosW0 + sq;
+      a1 = -2 * ((A - 1) + (A + 1) * cosW0);
+      a2 = (A + 1) + (A - 1) * cosW0 - sq;
+      break;
+    }
+    case "highshelf": {
+      const sq = 2 * Math.sqrt(A) * alpha;
+      b0 = A * ((A + 1) + (A - 1) * cosW0 + sq);
+      b1 = -2 * A * ((A - 1) + (A + 1) * cosW0);
+      b2 = A * ((A + 1) + (A - 1) * cosW0 - sq);
+      a0 = (A + 1) - (A - 1) * cosW0 + sq;
+      a1 = 2 * ((A - 1) - (A + 1) * cosW0);
+      a2 = (A + 1) - (A - 1) * cosW0 - sq;
+      break;
+    }
+  }
+  return { b0, b1, b2, a0, a1, a2 };
 }
 
 function computeFilterResponse(
   band: FilterBandParams, sampleRate: number, freqs: Float32Array
 ): Float32Array {
-  const mag = computeBiquadResponse(
-    band.type as BiquadFilterType, band.frequency, band.Q, band.gain,
-    sampleRate, freqs
+  const cascades = Math.max(1, Math.abs(band.rolloff) / 12);
+  const { b0, b1, b2, a0, a1, a2 } = computeBiquadCoeffs(
+    band.type, band.frequency, band.Q, band.gain, sampleRate
   );
-  // For rolloff steeper than -12, cascade identical biquads
-  const cascades = Math.abs(band.rolloff) / 12;
-  if (cascades > 1) {
-    for (let i = 0; i < mag.length; i++) {
-      mag[i] = Math.pow(mag[i], cascades);
-    }
+  const mag = new Float32Array(freqs.length);
+
+  for (let i = 0; i < freqs.length; i++) {
+    const w = (2 * Math.PI * freqs[i]) / sampleRate;
+    const cosW = Math.cos(w);
+    const cos2W = Math.cos(2 * w);
+    const sinW = Math.sin(w);
+    const sin2W = Math.sin(2 * w);
+
+    const numRe = b0 / a0 + (b1 / a0) * cosW + (b2 / a0) * cos2W;
+    const numIm = -(b1 / a0) * sinW - (b2 / a0) * sin2W;
+    const denRe = 1 + (a1 / a0) * cosW + (a2 / a0) * cos2W;
+    const denIm = -(a1 / a0) * sinW - (a2 / a0) * sin2W;
+
+    const denMagSq = denRe * denRe + denIm * denIm;
+    const re = (numRe * denRe + numIm * denIm) / denMagSq;
+    const im = (numIm * denRe - numRe * denIm) / denMagSq;
+    const m = Math.sqrt(re * re + im * im);
+    mag[i] = Math.pow(m, cascades);
   }
   return mag;
 }
