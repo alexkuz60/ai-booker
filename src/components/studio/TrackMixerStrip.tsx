@@ -14,6 +14,7 @@ interface TrackMixerStripProps {
   expanded: boolean;
   isSelected?: boolean;
   onClick?: () => void;
+  onMixChange?: () => void;
 }
 
 export function TrackMixerStrip({
@@ -23,6 +24,7 @@ export function TrackMixerStrip({
   expanded,
   isSelected,
   onClick,
+  onMixChange,
 }: TrackMixerStripProps) {
   const engine = getAudioEngine();
 
@@ -47,21 +49,25 @@ export function TrackMixerStrip({
 
   const handleVolumeChange = useCallback((v: number) => {
     engine.setTrackVolume(trackId, v);
-  }, [engine, trackId]);
+    onMixChange?.();
+  }, [engine, trackId, onMixChange]);
 
   const handlePanChange = useCallback((p: number) => {
     engine.setTrackPan(trackId, p / 100);
-  }, [engine, trackId]);
+    onMixChange?.();
+  }, [engine, trackId, onMixChange]);
 
   const toggleReverbBypass = useCallback(() => {
     if (!mix) return;
     engine.setTrackReverbBypassed(trackId, !mix.reverbBypassed);
-  }, [engine, trackId, mix]);
+    onMixChange?.();
+  }, [engine, trackId, mix, onMixChange]);
 
   const togglePreFxBypass = useCallback(() => {
     if (!mix) return;
     engine.setTrackPreFxBypassed(trackId, !mix.preFxBypassed);
-  }, [engine, trackId, mix]);
+    onMixChange?.();
+  }, [engine, trackId, mix, onMixChange]);
 
   // Collapsed: minimal view
   if (!expanded) {
