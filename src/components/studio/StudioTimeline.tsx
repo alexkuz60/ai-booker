@@ -21,7 +21,8 @@ const FIXED_TRACKS: TimelineTrackData[] = [
   { id: "sfx", label: "SFX", color: "hsl(220 50% 55%)", type: "sfx" },
 ];
 
-const TRACK_LABELS_WIDTH = 112;
+const TRACK_LABELS_WIDTH_COLLAPSED = 112;
+const TRACK_LABELS_WIDTH_EXPANDED = 280;
 
 // ─── Palette for character colors ───────────────────────────
 
