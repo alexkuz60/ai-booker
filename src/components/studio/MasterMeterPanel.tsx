@@ -406,7 +406,7 @@ export function SpectrumAnalyzer() {
 // ─── Plugin slot definition ─────────────────────────────────
 
 interface PluginSlot {
-  id: "eq" | "comp" | "limit" | "reverb";
+  id: "eq" | "filter" | "comp" | "limit" | "reverb";
   label: string;
   labelRu: string;
 }
@@ -422,6 +422,7 @@ const PLUGIN_GROUPS: PluginGroup[] = [
     title: "Pre", titleRu: "Пре",
     slots: [
       { id: "eq", label: "EQ", labelRu: "EQ" },
+      { id: "filter", label: "FLT", labelRu: "ФЛТ" },
       { id: "comp", label: "CMP", labelRu: "КМП" },
     ],
   },
@@ -451,7 +452,7 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
 
   const [pluginStates, setPluginStates] = useState(() => {
     const s = engine.getMasterPluginState();
-    return { eq: s.eqBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed };
+    return { eq: s.eqBypassed, filter: s.filterBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed };
   });
 
   const [masterBypassed, setMasterBypassed] = useState(() => engine.getMasterPluginState().chainBypassed);
@@ -473,6 +474,7 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
         const parsed = JSON.parse(savedPlugins);
         setPluginStates(parsed);
         engine.setMasterEqBypassed(parsed.eq ?? true);
+        engine.setMasterFilterBypassed(parsed.filter ?? true);
         engine.setMasterCompBypassed(parsed.comp ?? true);
         engine.setMasterLimiterBypassed(parsed.limit ?? true);
         engine.setMasterReverbBypassed(parsed.reverb ?? true);
@@ -485,11 +487,12 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
     } catch {}
   }, [engine]);
 
-  const togglePlugin = useCallback((id: "eq" | "comp" | "limit" | "reverb") => {
+  const togglePlugin = useCallback((id: "eq" | "filter" | "comp" | "limit" | "reverb") => {
     setPluginStates(prev => {
       const newBypassed = !prev[id];
       switch (id) {
         case "eq": engine.setMasterEqBypassed(newBypassed); break;
+        case "filter": engine.setMasterFilterBypassed(newBypassed); break;
         case "comp": engine.setMasterCompBypassed(newBypassed); break;
         case "limit": engine.setMasterLimiterBypassed(newBypassed); break;
         case "reverb": engine.setMasterReverbBypassed(newBypassed); break;

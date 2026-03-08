@@ -16,6 +16,25 @@ import * as Tone from "tone";
 
 // ─── Types ──────────────────────────────────────────────────
 
+export type FilterType = "lowpass" | "highpass" | "bandpass" | "lowshelf" | "highshelf" | "notch" | "allpass" | "peaking";
+export type FilterRolloff = -12 | -24 | -48 | -96;
+
+export interface FilterBandParams {
+  frequency: number;
+  type: FilterType;
+  Q: number;
+  gain: number;
+  rolloff: FilterRolloff;
+}
+
+export const DEFAULT_FILTER_BANDS: FilterBandParams[] = [
+  { frequency: 30, type: "highpass", Q: 0.707, gain: 0, rolloff: -12 },
+  { frequency: 200, type: "lowshelf", Q: 0.707, gain: 0, rolloff: -12 },
+  { frequency: 1000, type: "peaking", Q: 1, gain: 0, rolloff: -12 },
+  { frequency: 8000, type: "highshelf", Q: 0.707, gain: 0, rolloff: -12 },
+  { frequency: 18000, type: "lowpass", Q: 0.707, gain: 0, rolloff: -12 },
+];
+
 export interface TrackConfig {
   id: string;
   url: string;
@@ -304,14 +323,16 @@ class AudioEngine {
   private sfxBus: Tone.Channel;
   private masterBus: Tone.Channel;
 
-  // Master insert chain: EQ → Compressor → Limiter → Reverb (post)
+  // Master insert chain: EQ → Filters(5) → Compressor → Limiter → Reverb (post)
   private masterEQ: Tone.EQ3;
+  private masterFilters: Tone.Filter[] = [];
   private masterComp: Tone.Compressor;
   private masterLimiter: Tone.Limiter;
   private masterReverb: Tone.Reverb;
 
   // Bypass states for master chain
   private _masterEqBypassed = true;
+  private _masterFilterBypassed = true;
   private _masterCompBypassed = true;
   private _masterLimiterBypassed = true;
   private _masterReverbBypassed = true;
@@ -345,6 +366,17 @@ class AudioEngine {
 
     // Master insert chain nodes
     this.masterEQ = new Tone.EQ3({ low: 0, mid: 0, high: 0 });
+    // 5-band parametric filter
+    for (let i = 0; i < 5; i++) {
+      const def = this._filterBands[i];
+      this.masterFilters.push(new Tone.Filter({
+        frequency: def.frequency,
+        type: def.type,
+        Q: def.Q,
+        gain: def.gain,
+        rolloff: def.rolloff,
+      }));
+    }
     this.masterComp = new Tone.Compressor({ threshold: -18, ratio: 4, attack: 0.005, release: 0.15 });
     this.masterLimiter = new Tone.Limiter(-1);
     this.masterReverb = new Tone.Reverb({ decay: 2.0, wet: 0.12 });
@@ -357,9 +389,13 @@ class AudioEngine {
     // FFT analyzer (128 bins for smooth spectrum display)
     this.masterFFT = new Tone.FFT(128);
 
-    // Chain: MasterBus → EQ → Comp → Limiter → Reverb → Splitter → Meters + Destination
+    // Chain: MasterBus → EQ → Filter1→…→Filter5 → Comp → Limiter → Reverb → Splitter → Meters + Destination
     this.masterBus.connect(this.masterEQ);
-    this.masterEQ.connect(this.masterComp);
+    this.masterEQ.connect(this.masterFilters[0]);
+    for (let i = 0; i < 4; i++) {
+      this.masterFilters[i].connect(this.masterFilters[i + 1]);
+    }
+    this.masterFilters[4].connect(this.masterComp);
     this.masterComp.connect(this.masterLimiter);
     this.masterLimiter.connect(this.masterReverb);
     this.masterReverb.connect(this.masterSplitter);
@@ -378,6 +414,7 @@ class AudioEngine {
 
     // Apply initial bypass states (all bypassed by default)
     this.applyMasterEqBypass();
+    this.applyMasterFilterBypass();
     this.applyMasterCompBypass();
     this.applyMasterLimiterBypass();
     this.applyMasterReverbBypass();
@@ -736,6 +773,27 @@ class AudioEngine {
     }
   }
 
+  private applyMasterFilterBypass(): void {
+    const bypassed = this._masterFilterBypassed || this._masterChainBypassed;
+    for (let i = 0; i < 5; i++) {
+      const f = this.masterFilters[i];
+      const band = this._filterBands[i];
+      if (bypassed) {
+        // Bypass: make filter transparent (allpass at Q=0.5 effectively passes through)
+        f.type = "allpass";
+        f.frequency.value = 1000;
+        f.Q.value = 0.5;
+        f.gain.value = 0;
+      } else {
+        f.type = band.type;
+        f.frequency.value = band.frequency;
+        f.Q.value = band.Q;
+        f.gain.value = band.gain;
+        f.rolloff = band.rolloff;
+      }
+    }
+  }
+
   private applyMasterCompBypass(): void {
     if (this._masterCompBypassed || this._masterChainBypassed) {
       this.masterComp.ratio.value = 1;
@@ -759,7 +817,7 @@ class AudioEngine {
   // ─── Persist master plugin params ─────────────────────────
   private static readonly _LS_KEY = "master-plugin-params";
 
-  private _loadSavedParams(): Record<string, number> {
+  private _loadSavedParams(): Record<string, any> {
     try {
       const raw = localStorage.getItem(AudioEngine._LS_KEY);
       return raw ? JSON.parse(raw) : {};
@@ -770,6 +828,7 @@ class AudioEngine {
     try {
       localStorage.setItem(AudioEngine._LS_KEY, JSON.stringify({
         eqLow: this._eqLow, eqMid: this._eqMid, eqHigh: this._eqHigh,
+        filterBands: this._filterBands,
         compThreshold: this._compThreshold, compRatio: this._compRatio,
         compAttack: this._compAttack, compRelease: this._compRelease, compKnee: this._compKnee,
         limiterThreshold: this._limiterThreshold,
@@ -784,6 +843,10 @@ class AudioEngine {
   private _eqLow = this._saved.eqLow ?? 0;
   private _eqMid = this._saved.eqMid ?? 0;
   private _eqHigh = this._saved.eqHigh ?? 0;
+  // Filter bands (5-band parametric)
+  private _filterBands: FilterBandParams[] = (this._saved.filterBands as FilterBandParams[] | undefined)?.length === 5
+    ? (this._saved.filterBands as FilterBandParams[])
+    : [...DEFAULT_FILTER_BANDS];
   // Compressor params
   private _compThreshold = this._saved.compThreshold ?? -18;
   private _compRatio = this._saved.compRatio ?? 4;
@@ -799,6 +862,11 @@ class AudioEngine {
   setMasterEqBypassed(b: boolean): void {
     this._masterEqBypassed = b;
     this.applyMasterEqBypass();
+  }
+
+  setMasterFilterBypassed(b: boolean): void {
+    this._masterFilterBypassed = b;
+    this.applyMasterFilterBypass();
   }
 
   setMasterCompBypassed(b: boolean): void {
@@ -819,6 +887,7 @@ class AudioEngine {
   setMasterChainBypassed(b: boolean): void {
     this._masterChainBypassed = b;
     this.applyMasterEqBypass();
+    this.applyMasterFilterBypass();
     this.applyMasterCompBypass();
     this.applyMasterLimiterBypass();
     this.applyMasterReverbBypass();
@@ -841,9 +910,35 @@ class AudioEngine {
   setMasterReverbDecay(v: number): void { this._reverbDecay = v; this.masterReverb.decay = v; this._persistParams(); }
   setMasterReverbWet(v: number): void { this._reverbWet = v; if (!this._masterReverbBypassed && !this._masterChainBypassed) this.masterReverb.wet.value = v; this._persistParams(); }
 
+  // ─── Master Filter Band Setters ─────────────────────────
+
+  setMasterFilterBand(index: number, params: Partial<FilterBandParams>): void {
+    if (index < 0 || index >= 5) return;
+    const band = this._filterBands[index];
+    if (params.frequency !== undefined) band.frequency = params.frequency;
+    if (params.type !== undefined) band.type = params.type;
+    if (params.Q !== undefined) band.Q = params.Q;
+    if (params.gain !== undefined) band.gain = params.gain;
+    if (params.rolloff !== undefined) band.rolloff = params.rolloff;
+    if (!this._masterFilterBypassed && !this._masterChainBypassed) {
+      const f = this.masterFilters[index];
+      f.type = band.type;
+      f.frequency.value = band.frequency;
+      f.Q.value = band.Q;
+      f.gain.value = band.gain;
+      f.rolloff = band.rolloff;
+    }
+    this._persistParams();
+  }
+
+  getMasterFilterBands(): FilterBandParams[] {
+    return this._filterBands.map(b => ({ ...b }));
+  }
+
   getMasterPluginState() {
     return {
       eqBypassed: this._masterEqBypassed,
+      filterBypassed: this._masterFilterBypassed,
       compBypassed: this._masterCompBypassed,
       limiterBypassed: this._masterLimiterBypassed,
       reverbBypassed: this._masterReverbBypassed,
@@ -854,6 +949,7 @@ class AudioEngine {
   getMasterPluginParams() {
     return {
       eqLow: this._eqLow, eqMid: this._eqMid, eqHigh: this._eqHigh,
+      filterBands: this._filterBands.map(b => ({ ...b })),
       compThreshold: this._compThreshold, compRatio: this._compRatio,
       compAttack: this._compAttack, compRelease: this._compRelease, compKnee: this._compKnee,
       limiterThreshold: this._limiterThreshold,
@@ -941,6 +1037,7 @@ class AudioEngine {
     this.voiceBus.dispose();
     this.atmoBus.dispose();
     this.sfxBus.dispose();
+    this.masterFilters.forEach(f => f.dispose());
     this.masterEQ.dispose();
     this.masterComp.dispose();
     this.masterLimiter.dispose();
