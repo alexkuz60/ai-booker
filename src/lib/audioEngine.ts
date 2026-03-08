@@ -740,7 +740,7 @@ class AudioEngine {
     if (this._masterCompBypassed || this._masterChainBypassed) {
       this.masterComp.ratio.value = 1;
     } else {
-      this.masterComp.ratio.value = 4;
+      this.masterComp.ratio.value = this._compRatio;
     }
   }
 
@@ -748,18 +748,28 @@ class AudioEngine {
     if (this._masterLimiterBypassed || this._masterChainBypassed) {
       this.masterLimiter.threshold.value = 0;
     } else {
-      this.masterLimiter.threshold.value = -1;
+      this.masterLimiter.threshold.value = this._limiterThreshold;
     }
   }
 
   private applyMasterReverbBypass(): void {
-    this.masterReverb.wet.value = (this._masterReverbBypassed || this._masterChainBypassed) ? 0 : 0.12;
+    this.masterReverb.wet.value = (this._masterReverbBypassed || this._masterChainBypassed) ? 0 : this._reverbWet;
   }
 
   // EQ band values
   private _eqLow = 0;
   private _eqMid = 0;
   private _eqHigh = 0;
+  // Compressor params
+  private _compThreshold = -18;
+  private _compRatio = 4;
+  private _compAttack = 0.005;
+  private _compRelease = 0.15;
+  // Limiter params
+  private _limiterThreshold = -1;
+  // Reverb params
+  private _reverbDecay = 2.0;
+  private _reverbWet = 0.12;
 
   setMasterEqBypassed(b: boolean): void {
     this._masterEqBypassed = b;
@@ -789,6 +799,22 @@ class AudioEngine {
     this.applyMasterReverbBypass();
   }
 
+  // ─── Master Plugin Parameter Setters ─────────────────────
+
+  setMasterEqLow(v: number): void { this._eqLow = v; if (!this._masterEqBypassed && !this._masterChainBypassed) this.masterEQ.low.value = v; }
+  setMasterEqMid(v: number): void { this._eqMid = v; if (!this._masterEqBypassed && !this._masterChainBypassed) this.masterEQ.mid.value = v; }
+  setMasterEqHigh(v: number): void { this._eqHigh = v; if (!this._masterEqBypassed && !this._masterChainBypassed) this.masterEQ.high.value = v; }
+
+  setMasterCompThreshold(v: number): void { this._compThreshold = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.threshold.value = v; }
+  setMasterCompRatio(v: number): void { this._compRatio = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.ratio.value = v; }
+  setMasterCompAttack(v: number): void { this._compAttack = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.attack.value = v; }
+  setMasterCompRelease(v: number): void { this._compRelease = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.release.value = v; }
+
+  setMasterLimiterThreshold(v: number): void { this._limiterThreshold = v; if (!this._masterLimiterBypassed && !this._masterChainBypassed) this.masterLimiter.threshold.value = v; }
+
+  setMasterReverbDecay(v: number): void { this._reverbDecay = v; this.masterReverb.decay = v; }
+  setMasterReverbWet(v: number): void { this._reverbWet = v; if (!this._masterReverbBypassed && !this._masterChainBypassed) this.masterReverb.wet.value = v; }
+
   getMasterPluginState() {
     return {
       eqBypassed: this._masterEqBypassed,
@@ -796,6 +822,16 @@ class AudioEngine {
       limiterBypassed: this._masterLimiterBypassed,
       reverbBypassed: this._masterReverbBypassed,
       chainBypassed: this._masterChainBypassed,
+    };
+  }
+
+  getMasterPluginParams() {
+    return {
+      eqLow: this._eqLow, eqMid: this._eqMid, eqHigh: this._eqHigh,
+      compThreshold: this._compThreshold, compRatio: this._compRatio,
+      compAttack: this._compAttack, compRelease: this._compRelease,
+      limiterThreshold: this._limiterThreshold,
+      reverbDecay: this._reverbDecay, reverbWet: this._reverbWet,
     };
   }
 
