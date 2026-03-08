@@ -284,6 +284,21 @@ export function SpectrumAnalyzer() {
           ctx.fillRect(i * barWidth, h - normalized * h, barWidth - 0.5, normalized * h);
         }
       } else if (currentMode === "line") {
+        // Vertical frequency grid lines
+        const gridMarkers = [2, 6, 12, 24, 48, 80];
+        ctx.strokeStyle = "hsla(0, 0%, 100%, 0.07)";
+        ctx.lineWidth = 1;
+        gridMarkers.forEach(bin => {
+          if (bin < usableBins) {
+            const gx = bin * barWidth;
+            ctx.beginPath();
+            ctx.moveTo(gx, 0);
+            ctx.lineTo(gx, h);
+            ctx.stroke();
+          }
+        });
+
+        // Draw the line
         ctx.strokeStyle = "hsl(140, 70%, 55%)";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
@@ -294,14 +309,15 @@ export function SpectrumAnalyzer() {
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.stroke();
-        // Fill under line
+        // Fill under line with top-to-bottom transparency gradient
         ctx.lineTo((usableBins - 1) * barWidth + barWidth / 2, h);
         ctx.lineTo(barWidth / 2, h);
         ctx.closePath();
-        const fillGrad = ctx.createLinearGradient(0, h, 0, 0);
-        fillGrad.addColorStop(0, "hsla(140, 60%, 35%, 0.05)");
-        fillGrad.addColorStop(0.5, "hsla(80, 70%, 45%, 0.15)");
-        fillGrad.addColorStop(1, "hsla(50, 80%, 50%, 0.25)");
+        const fillGrad = ctx.createLinearGradient(0, 0, 0, h);
+        fillGrad.addColorStop(0, "hsla(140, 70%, 50%, 0.35)");
+        fillGrad.addColorStop(0.3, "hsla(80, 70%, 48%, 0.2)");
+        fillGrad.addColorStop(0.7, "hsla(50, 80%, 50%, 0.08)");
+        fillGrad.addColorStop(1, "hsla(140, 60%, 35%, 0.01)");
         ctx.fillStyle = fillGrad;
         ctx.fill();
       } else if (currentMode === "mirror") {
