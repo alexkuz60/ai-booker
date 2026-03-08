@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut, Maximize2, Layers, Film, Play, Pause, Square, Volume2, VolumeX } from "lucide-react";
+import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut, Maximize2, Layers, Film, Play, Pause, Square, Volume2, VolumeX, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useTimelineClips, type TimelineClip } from "@/hooks/useTimelineClips";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
+import { TrackMixerStrip } from "./TrackMixerStrip";
 
 // ─── Types ──────────────────────────────────────────────────
 
