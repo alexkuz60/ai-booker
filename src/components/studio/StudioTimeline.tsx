@@ -8,7 +8,8 @@ import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { TrackMixerStrip } from "./TrackMixerStrip";
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
 import { getAudioEngine } from "@/lib/audioEngine";
-import { MasterMeterPanel, SpectrumAnalyzer } from "./MasterMeterPanel";
+import { MasterMeterPanel } from "./MasterMeterPanel";
+import { MasterEffectsTabs } from "./MasterEffectsTabs";
 
 // ─── Master output level meter ──────────────────────────────
 
