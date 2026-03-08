@@ -409,7 +409,7 @@ export function SpectrumAnalyzer() {
             step={0.05}
             value={smoothing}
             onChange={e => setSmoothing(Number(e.target.value))}
-            className="w-12 h-2 accent-primary cursor-pointer shrink-0 [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:h-2 [&::-moz-range-thumb]:w-2 [&::-moz-range-thumb]:h-2"
+            className="w-[72px] h-0.5 accent-primary cursor-pointer volume-slider-sm shrink-0"
             title={`Smoothing ${(smoothing * 100).toFixed(0)}%`}
           />
         </div>
