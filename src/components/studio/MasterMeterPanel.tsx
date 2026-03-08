@@ -187,7 +187,7 @@ function PeakMeterSection() {
 
 // ─── FFT Spectrum Analyzer ──────────────────────────────────
 
-function SpectrumAnalyzer() {
+export function SpectrumAnalyzer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engine = getAudioEngine();
 
@@ -411,9 +411,6 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
       <div className="flex-1 flex flex-col gap-1.5 p-2 min-h-0 overflow-auto">
         {/* Meter section */}
         <PeakMeterSection />
-
-        {/* FFT Spectrum Analyzer */}
-        <SpectrumAnalyzer />
 
         {/* Pre-processing plugins (EQ, Comp, Limiter) */}
         <div className="flex flex-col gap-1 mt-1">
