@@ -31,6 +31,11 @@ const TYPE_LABELS: Record<FilterType, string> = {
   allpass: "AP", peaking: "PK",
 };
 
+// Types where bandwidth (octaves) makes sense
+const BW_TYPES: FilterType[] = ["bandpass", "peaking", "notch"];
+function qToBw(Q: number): number { return (2 / Math.LN2) * Math.asinh(1 / (2 * Q)); }
+function bwToQ(bw: number): number { return 1 / (2 * Math.sinh(Math.LN2 / 2 * bw)); }
+
 // ─── Graph constants ───────────────────────────────────────
 
 const F_MIN = 20, F_MAX = 20000;
