@@ -324,6 +324,8 @@ class AudioEngine {
   // Peak metering (DCMeter for instantaneous/true-peak)
   private masterDCMeterL: Tone.DCMeter;
   private masterDCMeterR: Tone.DCMeter;
+  // FFT analyzer for spectrum visualization
+  private masterFFT: Tone.FFT;
   // Peak hold values (decayed in getMasterMeter)
   private _peakHoldL = -Infinity;
   private _peakHoldR = -Infinity;
@@ -352,6 +354,8 @@ class AudioEngine {
     this.masterMeterR = new Tone.Meter({ smoothing: 0.8 });
     this.masterDCMeterL = new Tone.DCMeter();
     this.masterDCMeterR = new Tone.DCMeter();
+    // FFT analyzer (128 bins for smooth spectrum display)
+    this.masterFFT = new Tone.FFT(128);
 
     // Chain: MasterBus → EQ → Comp → Limiter → Reverb → Splitter → Meters + Destination
     this.masterBus.connect(this.masterEQ);
@@ -363,6 +367,8 @@ class AudioEngine {
     this.masterSplitter.connect(this.masterMeterR, 1);
     this.masterSplitter.connect(this.masterDCMeterL, 0);
     this.masterSplitter.connect(this.masterDCMeterR, 1);
+    // Connect FFT analyzer to master reverb output (before destination)
+    this.masterReverb.connect(this.masterFFT);
     this.masterReverb.toDestination();
 
     // Sub-buses → MasterBus
@@ -687,6 +693,11 @@ class AudioEngine {
     };
   }
 
+  /** Get FFT spectrum data as Float32Array (dB values, typically -100 to 0) */
+  getFFTData(): Float32Array {
+    return this.masterFFT.getValue();
+  }
+
   getTrackMixState(trackId: string): TrackMixState | null {
     return this.tracks.get(trackId)?.getMixState() ?? null;
   }
@@ -862,6 +873,7 @@ class AudioEngine {
     this.masterMeterR.dispose();
     this.masterDCMeterL.dispose();
     this.masterDCMeterR.dispose();
+    this.masterFFT.dispose();
     this.masterBus.dispose();
     this.listeners.clear();
     AudioEngine.instance = null;

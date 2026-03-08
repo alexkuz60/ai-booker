@@ -185,6 +185,107 @@ function PeakMeterSection() {
   );
 }
 
+// ─── FFT Spectrum Analyzer ──────────────────────────────────
+
+function SpectrumAnalyzer() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const engine = getAudioEngine();
+
+  useEffect(() => {
+    let raf: number;
+    const draw = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) { raf = requestAnimationFrame(draw); return; }
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { raf = requestAnimationFrame(draw); return; }
+
+      const dpr = window.devicePixelRatio || 1;
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      // Dark background
+      ctx.fillStyle = "hsla(0, 0%, 5%, 0.95)";
+      ctx.fillRect(0, 0, w, h);
+
+      // Get FFT data
+      const fftData = engine.getFFTData();
+      const binCount = fftData.length;
+
+      // Use logarithmic frequency scale for more musical display
+      // Only render bins up to ~16kHz (skip last few bins)
+      const usableBins = Math.floor(binCount * 0.9);
+      const barWidth = w / usableBins;
+
+      // dB range: -80 to 0
+      const dbMin = -80;
+      const dbMax = 0;
+      const dbRange = dbMax - dbMin;
+
+      // Create gradient for bars
+      const gradient = ctx.createLinearGradient(0, h, 0, 0);
+      gradient.addColorStop(0, "hsl(140, 60%, 35%)");
+      gradient.addColorStop(0.4, "hsl(80, 70%, 45%)");
+      gradient.addColorStop(0.7, "hsl(50, 80%, 50%)");
+      gradient.addColorStop(0.9, "hsl(25, 90%, 50%)");
+      gradient.addColorStop(1, "hsl(0, 75%, 50%)");
+
+      ctx.fillStyle = gradient;
+
+      for (let i = 0; i < usableBins; i++) {
+        const db = fftData[i];
+        // Normalize dB to 0-1 range
+        const normalized = Math.max(0, Math.min(1, (db - dbMin) / dbRange));
+        const barHeight = normalized * h;
+        
+        const x = i * barWidth;
+        ctx.fillRect(x, h - barHeight, barWidth - 0.5, barHeight);
+      }
+
+      // Draw frequency markers (subtle)
+      ctx.fillStyle = "hsla(0, 0%, 100%, 0.15)";
+      ctx.font = "7px monospace";
+      ctx.textAlign = "center";
+      
+      // Approximate frequency markers (assuming 44.1kHz sample rate, 128 bins)
+      const markers = [
+        { bin: 2, label: "100" },
+        { bin: 6, label: "500" },
+        { bin: 12, label: "1k" },
+        { bin: 24, label: "2k" },
+        { bin: 48, label: "5k" },
+        { bin: 80, label: "10k" },
+      ];
+      
+      markers.forEach(m => {
+        if (m.bin < usableBins) {
+          const x = m.bin * barWidth;
+          ctx.fillText(m.label, x, h - 2);
+        }
+      });
+
+      raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(raf);
+  }, [engine]);
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[9px] text-muted-foreground/50 font-body uppercase tracking-wider">
+        Spectrum
+      </span>
+      <canvas 
+        ref={canvasRef} 
+        className="w-full h-16 rounded-sm border border-border/40"
+      />
+    </div>
+  );
+}
 
 
 interface PluginSlot {
@@ -310,6 +411,9 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
       <div className="flex-1 flex flex-col gap-1.5 p-2 min-h-0 overflow-auto">
         {/* Meter section */}
         <PeakMeterSection />
+
+        {/* FFT Spectrum Analyzer */}
+        <SpectrumAnalyzer />
 
         {/* Pre-processing plugins (EQ, Comp, Limiter) */}
         <div className="flex flex-col gap-1 mt-1">
