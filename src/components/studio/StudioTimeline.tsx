@@ -603,6 +603,9 @@ export function StudioTimeline({
             <span className="text-[11px] text-muted-foreground font-mono min-w-[70px] text-center tabular-nums">
               {formatTime(player.positionSec)} / {formatTime(player.totalDuration)}
             </span>
+            {/* Master output level meter */}
+            <MasterMeter />
+            </span>
             {/* Volume */}
             <div className="flex items-center gap-1 ml-1">
               <button
@@ -773,7 +776,15 @@ export function StudioTimeline({
             </div>
           </div>
           <ScrollArea className="flex-1">
-            <div className="min-w-full relative">
+            <div
+              className="min-w-full relative cursor-crosshair"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const sec = x / (zoom * 4);
+                player.seek(Math.max(0, Math.min(sec, duration)));
+              }}
+            >
               <TimelineRuler zoom={zoom} duration={duration} />
               <div className="flex h-10 border-b border-border/50 relative" style={{ width: `${duration * zoom * 4}px` }}>
                 {chapterSceneClips.map((sc, i) => {
