@@ -454,7 +454,7 @@ export function MasterEffectsTabs({ isRu }: MasterEffectsTabsProps) {
         {/* Per-plugin bypass for active plugin tab */}
         {activeTab !== "spectrum" && (
           <button
-            onClick={() => togglePlugin(activeTab as "eq" | "filter" | "comp" | "limit" | "reverb")}
+            onClick={() => togglePlugin(activeTab as "eq" | "filter" | "mbc" | "comp" | "limit" | "reverb")}
             className={`ml-auto flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono uppercase leading-none transition-colors font-semibold ${
               pluginStates[activeTab as keyof typeof pluginStates]
                 ? "text-muted-foreground/40 bg-transparent border border-border/50"
@@ -481,6 +481,14 @@ export function MasterEffectsTabs({ isRu }: MasterEffectsTabsProps) {
               {isRu ? "5-полосный параметрический фильтр" : "5-Band Parametric Filter"}
             </span>
             <FilterPanel isRu={isRu} disabled={isTabDisabled("filter")} />
+          </div>
+        )}
+        {activeTab === "mbc" && (
+          <div className="p-2">
+            <span className="text-[10px] text-muted-foreground/60 font-body block mb-1">
+              {isRu ? "Многополосный динамический компрессор" : "Multiband Dynamic Compressor"}
+            </span>
+            <MultibandCompPanel isRu={isRu} disabled={isTabDisabled("mbc")} />
           </div>
         )}
         {activeTab === "comp" && (
