@@ -275,13 +275,13 @@ export function SpectrumAnalyzer() {
   }, [engine]);
 
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[9px] text-muted-foreground/50 font-body uppercase tracking-wider">
+    <div className="flex flex-col gap-0.5 h-full">
+      <span className="text-[9px] text-muted-foreground/50 font-body uppercase tracking-wider shrink-0">
         Spectrum
       </span>
       <canvas 
         ref={canvasRef} 
-        className="w-full h-16 rounded-sm border border-border/40"
+        className="w-full flex-1 min-h-0 rounded-sm border border-border/40"
       />
     </div>
   );
