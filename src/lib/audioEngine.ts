@@ -562,11 +562,12 @@ class AudioEngine {
   }
 
   getMasterMeter(): MasterMeterData {
-    const val = this.masterMeter.getValue();
-    if (Array.isArray(val)) {
-      return { levelL: val[0] ?? -Infinity, levelR: val[1] ?? -Infinity };
-    }
-    return { levelL: val, levelR: val };
+    const lVal = this.masterMeterL.getValue();
+    const rVal = this.masterMeterR.getValue();
+    return {
+      levelL: typeof lVal === "number" ? lVal : -Infinity,
+      levelR: typeof rVal === "number" ? rVal : -Infinity,
+    };
   }
 
   getTrackMixState(trackId: string): TrackMixState | null {
@@ -657,7 +658,9 @@ class AudioEngine {
     this.voiceBus.dispose();
     this.atmoBus.dispose();
     this.sfxBus.dispose();
-    this.masterMeter.dispose();
+    this.masterSplitter.dispose();
+    this.masterMeterL.dispose();
+    this.masterMeterR.dispose();
     this.masterBus.dispose();
     this.listeners.clear();
     AudioEngine.instance = null;
