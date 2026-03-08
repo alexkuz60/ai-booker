@@ -411,11 +411,32 @@ interface PluginSlot {
   labelRu: string;
 }
 
-const PLUGIN_SLOTS: PluginSlot[] = [
-  { id: "eq", label: "EQ", labelRu: "EQ" },
-  { id: "comp", label: "CMP", labelRu: "КМП" },
-  { id: "limit", label: "LIM", labelRu: "ЛИМ" },
-  { id: "reverb", label: "REV", labelRu: "РЕВ" },
+interface PluginGroup {
+  title: string;
+  titleRu: string;
+  slots: PluginSlot[];
+}
+
+const PLUGIN_GROUPS: PluginGroup[] = [
+  {
+    title: "Pre", titleRu: "Пре",
+    slots: [
+      { id: "eq", label: "EQ", labelRu: "EQ" },
+      { id: "comp", label: "CMP", labelRu: "КМП" },
+    ],
+  },
+  {
+    title: "Post", titleRu: "Пост",
+    slots: [
+      { id: "limit", label: "LIM", labelRu: "ЛИМ" },
+    ],
+  },
+  {
+    title: "Master", titleRu: "Мастер",
+    slots: [
+      { id: "reverb", label: "REV", labelRu: "РЕВ" },
+    ],
+  },
 ];
 
 // ─── Exported Panel (left sidebar: meter + vertical plugin bypass strip) ───
@@ -514,32 +535,39 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
         {/* Meter section */}
         <PeakMeterSection />
 
-        {/* Vertical plugin bypass strip */}
-        <div className="flex flex-col gap-1 mt-1">
-          {PLUGIN_SLOTS.map(slot => {
-            const isBypassed = pluginStates[slot.id];
-            return (
-              <button
-                key={slot.id}
-                onClick={() => togglePlugin(slot.id)}
-                className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-[10px] font-mono uppercase leading-none transition-colors w-full ${
-                  isBypassed
-                    ? masterBypassed
-                      ? "text-muted-foreground/30 bg-transparent"
-                      : "text-muted-foreground/50 bg-muted/20 hover:bg-muted/30"
-                    : masterBypassed
-                      ? "text-muted-foreground/60 bg-muted/10"
-                      : "text-primary bg-primary/15 font-bold hover:bg-primary/20"
-                }`}
-              >
-                <Power className="h-2.5 w-2.5 shrink-0" />
-                <span className="flex-1 text-left">{isRu ? slot.labelRu : slot.label}</span>
-                <span className={`text-[8px] ${isBypassed ? "text-muted-foreground/40" : "text-accent"}`}>
-                  {isBypassed ? "OFF" : masterBypassed ? "BYP" : "ON"}
-                </span>
-              </button>
-            );
-          })}
+        {/* Vertical plugin bypass strip — grouped */}
+        <div className="flex flex-col gap-2 mt-1">
+          {PLUGIN_GROUPS.map(group => (
+            <div key={group.title} className="flex flex-col gap-0.5">
+              <span className="text-[8px] font-body text-muted-foreground/60 uppercase tracking-widest px-1 pb-0.5 border-b border-border/30">
+                {isRu ? group.titleRu : group.title}
+              </span>
+              {group.slots.map(slot => {
+                const isBypassed = pluginStates[slot.id];
+                return (
+                  <button
+                    key={slot.id}
+                    onClick={() => togglePlugin(slot.id)}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-[10px] font-mono uppercase leading-none transition-colors w-full ${
+                      isBypassed
+                        ? masterBypassed
+                          ? "text-muted-foreground/30 bg-transparent"
+                          : "text-muted-foreground/50 bg-muted/20 hover:bg-muted/30"
+                        : masterBypassed
+                          ? "text-muted-foreground/60 bg-muted/10"
+                          : "text-primary bg-primary/15 font-bold hover:bg-primary/20"
+                    }`}
+                  >
+                    <Power className="h-2.5 w-2.5 shrink-0" />
+                    <span className="flex-1 text-left">{isRu ? slot.labelRu : slot.label}</span>
+                    <span className={`text-[8px] ${isBypassed ? "text-muted-foreground/40" : "text-accent"}`}>
+                      {isBypassed ? "OFF" : masterBypassed ? "BYP" : "ON"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
     </div>
