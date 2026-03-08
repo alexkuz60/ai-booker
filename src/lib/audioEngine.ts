@@ -253,11 +253,12 @@ class EngineTrack {
 
   getMeterData(): TrackMeterData {
     const monoVal = this.meterMono.getValue();
-    const splitVal = this.meterSplit.getValue();
+    const lVal = this.meterL.getValue();
+    const rVal = this.meterR.getValue();
     return {
-      level: typeof monoVal === "number" ? monoVal : (monoVal as number[])[0] ?? -Infinity,
-      levelL: Array.isArray(splitVal) ? (splitVal[0] ?? -Infinity) : splitVal,
-      levelR: Array.isArray(splitVal) ? (splitVal[1] ?? -Infinity) : splitVal,
+      level: typeof monoVal === "number" ? monoVal : -Infinity,
+      levelL: typeof lVal === "number" ? lVal : -Infinity,
+      levelR: typeof rVal === "number" ? rVal : -Infinity,
     };
   }
 
@@ -284,7 +285,9 @@ class EngineTrack {
     this.channel.dispose();
     this.reverbNode.dispose();
     this.meterMono.dispose();
-    this.meterSplit.dispose();
+    this.splitter.dispose();
+    this.meterL.dispose();
+    this.meterR.dispose();
   }
 }
 
@@ -300,7 +303,9 @@ class AudioEngine {
   private masterBus: Tone.Channel;
 
   // Master metering (stereo split)
-  private masterMeter: Tone.Meter;
+  private masterSplitter: Tone.Split;
+  private masterMeterL: Tone.Meter;
+  private masterMeterR: Tone.Meter;
 
   private tracks = new Map<string, EngineTrack>();
   private _totalDuration = 0;
@@ -312,11 +317,15 @@ class AudioEngine {
 
   private constructor() {
     this.masterBus = new Tone.Channel({ volume: volumeToDB(this._volume) });
-    this.masterMeter = new Tone.Meter({ smoothing: 0.8, channels: 2 });
+    this.masterSplitter = new Tone.Split();
+    this.masterMeterL = new Tone.Meter({ smoothing: 0.8 });
+    this.masterMeterR = new Tone.Meter({ smoothing: 0.8 });
 
-    // Master chain: MasterBus → MasterMeter → Destination
-    this.masterBus.connect(this.masterMeter);
-    this.masterMeter.toDestination();
+    // Master chain: MasterBus → Splitter → MeterL/R, MasterBus → Destination
+    this.masterBus.connect(this.masterSplitter);
+    this.masterSplitter.connect(this.masterMeterL, 0);
+    this.masterSplitter.connect(this.masterMeterR, 1);
+    this.masterBus.toDestination();
 
     // Sub-buses → MasterBus
     this.voiceBus = new Tone.Channel({ volume: 0 }).connect(this.masterBus);
