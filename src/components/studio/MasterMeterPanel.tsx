@@ -253,7 +253,11 @@ export function SpectrumAnalyzer() {
       ctx.fillRect(0, 0, w, h);
 
       const rawData = engine.getFFTData();
-      const usableBins = Math.floor(rawData.length * 0.9);
+      if (!rawData || rawData.length === 0) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
+      const usableBins = Math.max(1, Math.floor(rawData.length * 0.9));
       const barWidth = w / usableBins;
       const dbMin = -80;
       const dbMax = 0;
