@@ -756,21 +756,45 @@ class AudioEngine {
     this.masterReverb.wet.value = (this._masterReverbBypassed || this._masterChainBypassed) ? 0 : this._reverbWet;
   }
 
+  // ─── Persist master plugin params ─────────────────────────
+  private static readonly _LS_KEY = "master-plugin-params";
+
+  private _loadSavedParams(): Record<string, number> {
+    try {
+      const raw = localStorage.getItem(AudioEngine._LS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  }
+
+  private _persistParams(): void {
+    try {
+      localStorage.setItem(AudioEngine._LS_KEY, JSON.stringify({
+        eqLow: this._eqLow, eqMid: this._eqMid, eqHigh: this._eqHigh,
+        compThreshold: this._compThreshold, compRatio: this._compRatio,
+        compAttack: this._compAttack, compRelease: this._compRelease, compKnee: this._compKnee,
+        limiterThreshold: this._limiterThreshold,
+        reverbDecay: this._reverbDecay, reverbWet: this._reverbWet,
+      }));
+    } catch {}
+  }
+
+  private _saved = this._loadSavedParams();
+
   // EQ band values
-  private _eqLow = 0;
-  private _eqMid = 0;
-  private _eqHigh = 0;
+  private _eqLow = this._saved.eqLow ?? 0;
+  private _eqMid = this._saved.eqMid ?? 0;
+  private _eqHigh = this._saved.eqHigh ?? 0;
   // Compressor params
-  private _compThreshold = -18;
-  private _compRatio = 4;
-  private _compAttack = 0.005;
-  private _compRelease = 0.15;
-  private _compKnee = 6;
+  private _compThreshold = this._saved.compThreshold ?? -18;
+  private _compRatio = this._saved.compRatio ?? 4;
+  private _compAttack = this._saved.compAttack ?? 0.005;
+  private _compRelease = this._saved.compRelease ?? 0.15;
+  private _compKnee = this._saved.compKnee ?? 6;
   // Limiter params
-  private _limiterThreshold = -1;
+  private _limiterThreshold = this._saved.limiterThreshold ?? -1;
   // Reverb params
-  private _reverbDecay = 2.0;
-  private _reverbWet = 0.12;
+  private _reverbDecay = this._saved.reverbDecay ?? 2.0;
+  private _reverbWet = this._saved.reverbWet ?? 0.12;
 
   setMasterEqBypassed(b: boolean): void {
     this._masterEqBypassed = b;
