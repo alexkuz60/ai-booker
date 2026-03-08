@@ -145,8 +145,47 @@ function PeakReadout({ peakDb }: { peakDb: number }) {
     </span>
   );
 }
+// ─── Meter section with peak hold ───────────────────────────
 
-// ─── Plugin definitions ─────────────────────────────────────
+function PeakMeterSection() {
+  const engine = getAudioEngine();
+  const [peaks, setPeaks] = useState({ peakL: -Infinity, peakR: -Infinity });
+
+  useEffect(() => {
+    let raf: number;
+    const tick = () => {
+      const m = engine.getMasterMeter();
+      setPeaks({ peakL: m.peakL, peakR: m.peakR });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [engine]);
+
+  return (
+    <div className="flex flex-col gap-0">
+      <div className="flex items-center gap-1">
+        <span className="text-[9px] text-foreground/60 font-mono w-3 shrink-0 font-bold">L</span>
+        <div className="flex-1 h-5 rounded-sm overflow-hidden border border-border/40 bg-background/40">
+          <LargeMeterSingleChannel channel="L" peakDb={peaks.peakL} />
+        </div>
+        <PeakReadout peakDb={peaks.peakL} />
+      </div>
+      <div className="pl-4 pr-0 mr-9">
+        <DbScale />
+      </div>
+      <div className="flex items-center gap-1">
+        <span className="text-[9px] text-foreground/60 font-mono w-3 shrink-0 font-bold">R</span>
+        <div className="flex-1 h-5 rounded-sm overflow-hidden border border-border/40 bg-background/40">
+          <LargeMeterSingleChannel channel="R" peakDb={peaks.peakR} />
+        </div>
+        <PeakReadout peakDb={peaks.peakR} />
+      </div>
+    </div>
+  );
+}
+
+
 
 interface PluginSlot {
   id: "eq" | "comp" | "limit" | "reverb";
