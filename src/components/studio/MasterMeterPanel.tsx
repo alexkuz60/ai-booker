@@ -194,18 +194,12 @@ const SPECTRUM_MODES: { id: SpectrumMode; label: string }[] = [
   { id: "mirror", label: "⫼" },
 ];
 
-const FFT_SIZES = [64, 128, 256] as const;
-type FFTSize = typeof FFT_SIZES[number];
-
 export function SpectrumAnalyzer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engine = getAudioEngine();
 
   const [mode, setMode] = useState<SpectrumMode>(() => {
     try { return (localStorage.getItem("spectrum-mode") as SpectrumMode) || "bars"; } catch { return "bars"; }
-  });
-  const [fftSize, setFftSize] = useState<FFTSize>(() => {
-    try { const v = Number(localStorage.getItem("spectrum-fft-size")); return FFT_SIZES.includes(v as FFTSize) ? v as FFTSize : 128; } catch { return 128; }
   });
   const [smoothing, setSmoothing] = useState(() => {
     try { const v = Number(localStorage.getItem("spectrum-smoothing")); return isFinite(v) ? v : 0.65; } catch { return 0.65; }
@@ -215,15 +209,14 @@ export function SpectrumAnalyzer() {
   useEffect(() => {
     try {
       localStorage.setItem("spectrum-mode", mode);
-      localStorage.setItem("spectrum-fft-size", String(fftSize));
       localStorage.setItem("spectrum-smoothing", String(smoothing));
     } catch { /* ignore */ }
-  }, [mode, fftSize, smoothing]);
+  }, [mode, smoothing]);
 
-  // Apply FFT size to engine
+  // Ensure 128-bin FFT on mount
   useEffect(() => {
-    engine.setFFTSize(fftSize);
-  }, [engine, fftSize]);
+    engine.setFFTSize(128);
+  }, [engine]);
 
   // Smoothing buffer ref
   const smoothRef = useRef<Float32Array | null>(null);
@@ -365,24 +358,6 @@ export function SpectrumAnalyzer() {
           Spectrum
         </span>
         <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
-          {/* FFT Size selector */}
-          <div className="flex gap-0.5 shrink-0">
-            {FFT_SIZES.map(s => (
-              <button
-                key={s}
-                onClick={() => { setFftSize(s); smoothRef.current = null; }}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-mono leading-none transition-colors ${
-                  fftSize === s
-                    ? "text-foreground bg-accent/20 font-bold"
-                    : "text-foreground/50 hover:text-foreground/80"
-                }`}
-                title={`FFT ${s}`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-          <span className="text-foreground/30 shrink-0">│</span>
           {/* Mode selector */}
           <div className="flex gap-0.5 shrink-0">
             {SPECTRUM_MODES.map(m => (
