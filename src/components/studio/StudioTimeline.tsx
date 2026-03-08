@@ -769,11 +769,7 @@ export function StudioTimeline({
       {!collapsed && mode === "chapter" && (
         <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
           <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${sidebarWidth}px` }}>
-            <div className="h-6 border-b border-border" />
-            <div className="h-10 flex items-center px-3 border-b border-border/50">
-              <Film className="h-3 w-3 shrink-0 mr-2 text-muted-foreground" />
-              <span className="text-xs font-body text-muted-foreground">{isRu ? "Сцены" : "Scenes"}</span>
-            </div>
+            <MasterMeterPanel isRu={isRu} width={sidebarWidth} />
           </div>
           <ScrollArea className="flex-1">
             <div
