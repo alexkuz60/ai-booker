@@ -496,14 +496,20 @@ class AudioEngine {
 
     this.transport.seconds = clamped;
 
+    // Collect tracks that overlap the seek position (need immediate start)
+    const immediateStarts: { track: EngineTrack; offset: number }[] = [];
+
     for (const t of this.tracks.values()) {
       t.unschedule();
       const trackEnd = t.startSec + t.durationSec;
       if (clamped < trackEnd) {
         if (clamped > t.startSec) {
+          // This clip is already "in progress" at the seek point —
+          // schedule future clips normally but start overlapping ones immediately
           const offset = clamped - t.startSec;
-          t.scheduleWithOffset(clamped, offset);
+          immediateStarts.push({ track: t, offset });
         } else {
+          // Clip starts in the future — normal schedule
           t.schedule();
         }
       }
@@ -511,9 +517,19 @@ class AudioEngine {
 
     if (wasPlaying) {
       this.transport.start();
+      // Start overlapping clips immediately with correct offset
+      for (const { track, offset } of immediateStarts) {
+        if (track.player.loaded) {
+          track.player.start(Tone.now(), offset);
+        }
+      }
       this._state = "playing";
       this.startPositionLoop();
     } else {
+      // Paused — schedule overlapping clips so they start on next play()
+      for (const { track, offset } of immediateStarts) {
+        track.scheduleWithOffset(clamped, offset);
+      }
       this._state = "paused";
       this.stopPositionLoop();
     }
