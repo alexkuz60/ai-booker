@@ -181,7 +181,7 @@ function FilterResponseGraph({
       ctx.lineWidth = db === 0 ? 1 : 0.5;
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
       if (db % 12 === 0) {
-        ctx.fillStyle = "hsla(0, 0%, 100%, 0.2)";
+        ctx.fillStyle = "hsla(0, 0%, 100%, 0.2)"; ctx.font = "10px monospace";
         ctx.fillText(`${db > 0 ? "+" : ""}${db}`, w - 2, y - 2);
       }
     }
