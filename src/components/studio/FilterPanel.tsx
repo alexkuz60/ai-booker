@@ -225,7 +225,9 @@ function FilterResponseGraph({
     grad.addColorStop(1, "hsla(0, 0%, 100%, 0.06)");
     ctx.fillStyle = grad; ctx.fill();
 
-    // Vertical dashed lines at each band frequency
+    const TOP_LABEL_H = 16; // reserved space for top labels
+
+    // Vertical dashed lines at each band frequency (start below top labels)
     for (let b = 0; b < 5; b++) {
       const band = bands[b];
       const x = fToX(band.frequency);
@@ -233,17 +235,13 @@ function FilterResponseGraph({
       ctx.strokeStyle = b === selectedBand ? BAND_COLORS[b] : BAND_COLORS_DIM[b];
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 3]);
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x, TOP_LABEL_H); ctx.lineTo(x, h); ctx.stroke();
       ctx.restore();
-      // Freq label at bottom
-      const freqLabel = band.frequency >= 1000 ? `${(band.frequency / 1000).toFixed(1)}k` : `${band.frequency}`;
-      ctx.fillStyle = b === selectedBand ? BAND_COLORS[b] : BAND_COLORS_DIM[b];
-      ctx.font = "bold 10px monospace"; ctx.textAlign = "center";
-      ctx.fillText(freqLabel, x, h - 12);
-      // BW label for bandpass/peaking/notch
+      // BW label at bottom for bandpass/peaking/notch
       if (["bandpass", "peaking", "notch"].includes(band.type)) {
+        ctx.fillStyle = b === selectedBand ? BAND_COLORS[b] : BAND_COLORS_DIM[b];
         const bw = qToBw(band.Q);
-        ctx.font = "9px monospace";
+        ctx.font = "9px monospace"; ctx.textAlign = "center";
         ctx.fillText(`${bw.toFixed(1)} oct`, x, h - 3);
       }
     }
@@ -268,9 +266,10 @@ function FilterResponseGraph({
       ctx.strokeStyle = BAND_COLORS[b]; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
 
-      // Label
-      ctx.fillStyle = BAND_COLORS[b]; ctx.font = "bold 11px monospace"; ctx.textAlign = "center";
-      ctx.fillText(`${b + 1}`, x, 12);
+      // Top label: "N: freq"
+      const freqLabel = band.frequency >= 1000 ? `${(band.frequency / 1000).toFixed(1)}k` : `${band.frequency}`;
+      ctx.fillStyle = BAND_COLORS[b]; ctx.font = "bold 10px monospace"; ctx.textAlign = "center";
+      ctx.fillText(`${b + 1}: ${freqLabel}`, x, 11);
     }
   }, [bands, selectedBand]);
 
