@@ -39,6 +39,8 @@ export interface TrackMeterData {
 export interface MasterMeterData {
   levelL: number;
   levelR: number;
+  peakL: number;
+  peakR: number;
 }
 
 export interface TrackMixState {
@@ -319,6 +321,14 @@ class AudioEngine {
   private masterSplitter: Tone.Split;
   private masterMeterL: Tone.Meter;
   private masterMeterR: Tone.Meter;
+  // Peak metering (DCMeter for instantaneous/true-peak)
+  private masterDCMeterL: Tone.DCMeter;
+  private masterDCMeterR: Tone.DCMeter;
+  // Peak hold values (decayed in getMasterMeter)
+  private _peakHoldL = -Infinity;
+  private _peakHoldR = -Infinity;
+  private _peakHoldTimeL = 0;
+  private _peakHoldTimeR = 0;
 
   private tracks = new Map<string, EngineTrack>();
   private _totalDuration = 0;
@@ -340,6 +350,8 @@ class AudioEngine {
     this.masterSplitter = new Tone.Split();
     this.masterMeterL = new Tone.Meter({ smoothing: 0.8 });
     this.masterMeterR = new Tone.Meter({ smoothing: 0.8 });
+    this.masterDCMeterL = new Tone.DCMeter();
+    this.masterDCMeterR = new Tone.DCMeter();
 
     // Chain: MasterBus → EQ → Comp → Limiter → Reverb → Splitter → Meters + Destination
     this.masterBus.connect(this.masterEQ);
@@ -349,6 +361,8 @@ class AudioEngine {
     this.masterReverb.connect(this.masterSplitter);
     this.masterSplitter.connect(this.masterMeterL, 0);
     this.masterSplitter.connect(this.masterMeterR, 1);
+    this.masterSplitter.connect(this.masterDCMeterL, 0);
+    this.masterSplitter.connect(this.masterDCMeterR, 1);
     this.masterReverb.toDestination();
 
     // Sub-buses → MasterBus
@@ -637,9 +651,39 @@ class AudioEngine {
   getMasterMeter(): MasterMeterData {
     const lVal = this.masterMeterL.getValue();
     const rVal = this.masterMeterR.getValue();
+    const levelL = typeof lVal === "number" ? lVal : -Infinity;
+    const levelR = typeof rVal === "number" ? rVal : -Infinity;
+
+    // DCMeter gives amplitude 0..1 — convert to dB
+    const dcL = this.masterDCMeterL.getValue();
+    const dcR = this.masterDCMeterR.getValue();
+    const peakDbL = dcL > 0 ? 20 * Math.log10(dcL) : -Infinity;
+    const peakDbR = dcR > 0 ? 20 * Math.log10(dcR) : -Infinity;
+
+    // Peak hold: capture new peaks, decay after 1.5s
+    const now = performance.now();
+    const HOLD_MS = 1500;
+    const FALL_RATE = 30; // dB/sec
+
+    if (peakDbL >= this._peakHoldL) {
+      this._peakHoldL = peakDbL;
+      this._peakHoldTimeL = now;
+    } else if (now - this._peakHoldTimeL > HOLD_MS) {
+      this._peakHoldL -= FALL_RATE * (1 / 60);
+    }
+
+    if (peakDbR >= this._peakHoldR) {
+      this._peakHoldR = peakDbR;
+      this._peakHoldTimeR = now;
+    } else if (now - this._peakHoldTimeR > HOLD_MS) {
+      this._peakHoldR -= FALL_RATE * (1 / 60);
+    }
+
     return {
-      levelL: typeof lVal === "number" ? lVal : -Infinity,
-      levelR: typeof rVal === "number" ? rVal : -Infinity,
+      levelL,
+      levelR,
+      peakL: this._peakHoldL,
+      peakR: this._peakHoldR,
     };
   }
 
@@ -816,6 +860,8 @@ class AudioEngine {
     this.masterSplitter.dispose();
     this.masterMeterL.dispose();
     this.masterMeterR.dispose();
+    this.masterDCMeterL.dispose();
+    this.masterDCMeterR.dispose();
     this.masterBus.dispose();
     this.listeners.clear();
     AudioEngine.instance = null;
