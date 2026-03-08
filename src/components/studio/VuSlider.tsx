@@ -181,12 +181,12 @@ export function VuSlider({
       {/* Canvas background (meter) */}
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 rounded-sm"
+        className="absolute inset-0 rounded-sm pointer-events-none"
         style={{ width: "100%", height: `${SLIDER_H}px` }}
       />
 
       {/* Track background */}
-      <div className="absolute inset-0 rounded-sm border border-foreground/30 bg-muted/30" />
+      <div className="absolute inset-0 rounded-sm border border-foreground/30 bg-muted/30 pointer-events-none" />
 
       {/* Thumb with center red mark */}
       <div
