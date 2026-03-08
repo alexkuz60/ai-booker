@@ -164,13 +164,11 @@ function FilterResponseGraph({
     ctx.fillStyle = "hsla(0, 0%, 5%, 0.95)";
     ctx.fillRect(0, 0, w, h);
 
-    // Grid: freq
+    // Grid: freq (vertical lines only; labels rendered as HTML below canvas)
     ctx.strokeStyle = "hsla(0, 0%, 100%, 0.07)"; ctx.lineWidth = 1;
-    ctx.fillStyle = "hsla(0, 0%, 100%, 0.18)"; ctx.font = "11px monospace"; ctx.textAlign = "center";
     for (const f of [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]) {
       const x = fToX(f);
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-      ctx.fillText(f >= 1000 ? `${f / 1000}k` : `${f}`, x, h - 2);
     }
 
     // Grid: dB
