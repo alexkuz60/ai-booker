@@ -360,13 +360,13 @@ export function SpectrumAnalyzer() {
 
   return (
     <div className="flex flex-col gap-1 h-full">
-      <div className="flex items-center justify-between shrink-0 flex-wrap gap-y-1">
-        <span className="text-xs text-foreground font-body uppercase tracking-wider font-semibold">
+      <div className="flex items-center justify-between shrink-0 gap-1">
+        <span className="text-xs text-foreground font-body uppercase tracking-wider font-semibold shrink-0">
           Spectrum
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
           {/* FFT Size selector */}
-          <div className="flex gap-1">
+          <div className="flex gap-0.5 shrink-0">
             {FFT_SIZES.map(s => (
               <button
                 key={s}
@@ -382,14 +382,14 @@ export function SpectrumAnalyzer() {
               </button>
             ))}
           </div>
-          <span className="text-foreground/30">│</span>
+          <span className="text-foreground/30 shrink-0">│</span>
           {/* Mode selector */}
-          <div className="flex gap-1">
+          <div className="flex gap-0.5 shrink-0">
             {SPECTRUM_MODES.map(m => (
               <button
                 key={m.id}
                 onClick={() => setMode(m.id)}
-                className={`px-2 py-0.5 rounded text-[11px] font-mono leading-none transition-colors ${
+                className={`px-1.5 py-0.5 rounded text-[11px] font-mono leading-none transition-colors ${
                   mode === m.id
                     ? "text-foreground bg-primary/20 font-bold"
                     : "text-foreground/50 hover:text-foreground/80"
@@ -400,21 +400,19 @@ export function SpectrumAnalyzer() {
               </button>
             ))}
           </div>
+          <span className="text-foreground/30 shrink-0">│</span>
+          {/* Smoothing slider — compact, inline */}
+          <input
+            type="range"
+            min={0}
+            max={0.95}
+            step={0.05}
+            value={smoothing}
+            onChange={e => setSmoothing(Number(e.target.value))}
+            className="w-12 h-1 accent-primary cursor-pointer shrink-0"
+            title={`Smoothing ${(smoothing * 100).toFixed(0)}%`}
+          />
         </div>
-      </div>
-      {/* Smoothing slider */}
-      <div className="flex items-center gap-2 shrink-0">
-        <span className="text-[10px] text-foreground/70 font-mono w-8 shrink-0 font-semibold">SMT</span>
-        <input
-          type="range"
-          min={0}
-          max={0.95}
-          step={0.05}
-          value={smoothing}
-          onChange={e => setSmoothing(Number(e.target.value))}
-          className="flex-1 h-2 accent-primary cursor-pointer"
-        />
-        <span className="text-[10px] text-foreground/70 font-mono w-8 text-right font-semibold">{(smoothing * 100).toFixed(0)}%</span>
       </div>
       <div className="flex-1 min-h-0 relative rounded-sm border border-border/40 overflow-hidden">
         <canvas
