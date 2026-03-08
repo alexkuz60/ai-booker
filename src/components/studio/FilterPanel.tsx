@@ -225,6 +225,23 @@ function FilterResponseGraph({
     grad.addColorStop(1, "hsla(0, 0%, 100%, 0.06)");
     ctx.fillStyle = grad; ctx.fill();
 
+    // Vertical dashed lines at each band frequency
+    for (let b = 0; b < 5; b++) {
+      const band = bands[b];
+      const x = fToX(band.frequency);
+      ctx.save();
+      ctx.strokeStyle = b === selectedBand ? BAND_COLORS[b] : BAND_COLORS_DIM[b];
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      ctx.restore();
+      // Freq label at bottom
+      const freqLabel = band.frequency >= 1000 ? `${(band.frequency / 1000).toFixed(1)}k` : `${band.frequency}`;
+      ctx.fillStyle = b === selectedBand ? BAND_COLORS[b] : BAND_COLORS_DIM[b];
+      ctx.font = "bold 7px monospace"; ctx.textAlign = "center";
+      ctx.fillText(freqLabel, x, h - 12);
+    }
+
     // Band dots (at their gain position, not at 0dB)
     for (let b = 0; b < 5; b++) {
       const band = bands[b];
