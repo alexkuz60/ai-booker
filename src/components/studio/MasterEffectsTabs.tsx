@@ -193,13 +193,13 @@ function CompPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
   const [knee, setKnee] = useState(params.compKnee);
 
   return (
-    <div className="flex gap-4 max-w-lg">
-      {/* Knee graph */}
-      <div className="w-36 shrink-0">
-        <KneeGraph threshold={threshold} ratio={ratio} knee={knee} />
+    <div className="flex gap-4 max-w-lg items-stretch">
+      {/* Knee graph — matches slider column height */}
+      <div className="w-36 shrink-0 flex">
+        <div className="w-full"><KneeGraph threshold={threshold} ratio={ratio} knee={knee} /></div>
       </div>
-      {/* Sliders */}
-      <div className="flex flex-col gap-3 flex-1 min-w-0">
+      {/* Sliders — half width */}
+      <div className="flex flex-col gap-3 min-w-0 w-32">
         <span className="text-[10px] text-muted-foreground/60 font-body">
           {isRu ? "Компрессор" : "Compressor"}
         </span>
