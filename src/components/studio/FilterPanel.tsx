@@ -40,7 +40,6 @@ function computeBiquadResponse(
   type: BiquadFilterType, frequency: number, Q: number, gain: number,
   sampleRate: number, freqs: Float32Array
 ): Float32Array {
-  // Use OfflineAudioContext to compute exact response
   const ctx = new OfflineAudioContext(1, 1, sampleRate);
   const biquad = ctx.createBiquadFilter();
   biquad.type = type;
@@ -50,7 +49,7 @@ function computeBiquadResponse(
 
   const magResponse = new Float32Array(freqs.length);
   const phaseResponse = new Float32Array(freqs.length);
-  biquad.getFrequencyResponse(freqs, magResponse, phaseResponse);
+  biquad.getFrequencyResponse(freqs as any, magResponse as any, phaseResponse as any);
   return magResponse;
 }
 

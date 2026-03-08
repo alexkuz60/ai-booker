@@ -472,6 +472,14 @@ export function MasterEffectsTabs({ isRu }: MasterEffectsTabsProps) {
         {activeTab === "eq" && (
           <div className="p-3"><EqPanel isRu={isRu} disabled={isTabDisabled("eq")} /></div>
         )}
+        {activeTab === "filter" && (
+          <div className="p-2">
+            <span className="text-[10px] text-muted-foreground/60 font-body block mb-1">
+              {isRu ? "5-полосный параметрический фильтр" : "5-Band Parametric Filter"}
+            </span>
+            <FilterPanel isRu={isRu} disabled={isTabDisabled("filter")} />
+          </div>
+        )}
         {activeTab === "comp" && (
           <div className="p-3">
             <span className="text-[10px] text-muted-foreground/60 font-body block mb-2">
