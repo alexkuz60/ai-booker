@@ -187,9 +187,26 @@ function PeakMeterSection() {
 
 // ─── FFT Spectrum Analyzer ──────────────────────────────────
 
+type SpectrumMode = "bars" | "line" | "mirror";
+const SPECTRUM_MODES: { id: SpectrumMode; label: string }[] = [
+  { id: "bars", label: "▮▮" },
+  { id: "line", label: "〜" },
+  { id: "mirror", label: "⫼" },
+];
+
 export function SpectrumAnalyzer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engine = getAudioEngine();
+  const [mode, setMode] = useState<SpectrumMode>(() => {
+    try { return (localStorage.getItem("spectrum-mode") as SpectrumMode) || "bars"; } catch { return "bars"; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem("spectrum-mode", mode); } catch { /* ignore */ }
+  }, [mode]);
+
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
   useEffect(() => {
     let raf: number;
@@ -208,25 +225,19 @@ export function SpectrumAnalyzer() {
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      // Dark background
       ctx.fillStyle = "hsla(0, 0%, 5%, 0.95)";
       ctx.fillRect(0, 0, w, h);
 
-      // Get FFT data
       const fftData = engine.getFFTData();
-      const binCount = fftData.length;
-
-      // Use logarithmic frequency scale for more musical display
-      // Only render bins up to ~16kHz (skip last few bins)
-      const usableBins = Math.floor(binCount * 0.9);
+      const usableBins = Math.floor(fftData.length * 0.9);
       const barWidth = w / usableBins;
-
-      // dB range: -80 to 0
       const dbMin = -80;
       const dbMax = 0;
       const dbRange = dbMax - dbMin;
 
-      // Create gradient for bars
+      const currentMode = modeRef.current;
+
+      // Gradient (reused across modes)
       const gradient = ctx.createLinearGradient(0, h, 0, 0);
       gradient.addColorStop(0, "hsl(140, 60%, 35%)");
       gradient.addColorStop(0.4, "hsl(80, 70%, 45%)");
@@ -234,38 +245,72 @@ export function SpectrumAnalyzer() {
       gradient.addColorStop(0.9, "hsl(25, 90%, 50%)");
       gradient.addColorStop(1, "hsl(0, 75%, 50%)");
 
-      ctx.fillStyle = gradient;
+      if (currentMode === "bars") {
+        ctx.fillStyle = gradient;
+        for (let i = 0; i < usableBins; i++) {
+          const normalized = Math.max(0, Math.min(1, (fftData[i] - dbMin) / dbRange));
+          ctx.fillRect(i * barWidth, h - normalized * h, barWidth - 0.5, normalized * h);
+        }
+      } else if (currentMode === "line") {
+        ctx.strokeStyle = "hsl(140, 70%, 55%)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let i = 0; i < usableBins; i++) {
+          const normalized = Math.max(0, Math.min(1, (fftData[i] - dbMin) / dbRange));
+          const x = i * barWidth + barWidth / 2;
+          const y = h - normalized * h;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        // Fill under line
+        ctx.lineTo((usableBins - 1) * barWidth + barWidth / 2, h);
+        ctx.lineTo(barWidth / 2, h);
+        ctx.closePath();
+        const fillGrad = ctx.createLinearGradient(0, h, 0, 0);
+        fillGrad.addColorStop(0, "hsla(140, 60%, 35%, 0.05)");
+        fillGrad.addColorStop(0.5, "hsla(80, 70%, 45%, 0.15)");
+        fillGrad.addColorStop(1, "hsla(50, 80%, 50%, 0.25)");
+        ctx.fillStyle = fillGrad;
+        ctx.fill();
+      } else if (currentMode === "mirror") {
+        const halfH = h / 2;
+        // Center line
+        ctx.fillStyle = "hsla(0, 0%, 100%, 0.06)";
+        ctx.fillRect(0, halfH, w, 1);
 
-      for (let i = 0; i < usableBins; i++) {
-        const db = fftData[i];
-        // Normalize dB to 0-1 range
-        const normalized = Math.max(0, Math.min(1, (db - dbMin) / dbRange));
-        const barHeight = normalized * h;
-        
-        const x = i * barWidth;
-        ctx.fillRect(x, h - barHeight, barWidth - 0.5, barHeight);
+        const mirrorGradUp = ctx.createLinearGradient(0, halfH, 0, 0);
+        mirrorGradUp.addColorStop(0, "hsl(140, 60%, 35%)");
+        mirrorGradUp.addColorStop(0.5, "hsl(80, 70%, 45%)");
+        mirrorGradUp.addColorStop(1, "hsl(50, 80%, 50%)");
+
+        const mirrorGradDown = ctx.createLinearGradient(0, halfH, 0, h);
+        mirrorGradDown.addColorStop(0, "hsl(200, 60%, 35%)");
+        mirrorGradDown.addColorStop(0.5, "hsl(220, 70%, 45%)");
+        mirrorGradDown.addColorStop(1, "hsl(260, 60%, 40%)");
+
+        for (let i = 0; i < usableBins; i++) {
+          const normalized = Math.max(0, Math.min(1, (fftData[i] - dbMin) / dbRange));
+          const barH = normalized * halfH;
+          const x = i * barWidth;
+          ctx.fillStyle = mirrorGradUp;
+          ctx.fillRect(x, halfH - barH, barWidth - 0.5, barH);
+          ctx.fillStyle = mirrorGradDown;
+          ctx.fillRect(x, halfH + 1, barWidth - 0.5, barH);
+        }
       }
 
-      // Draw frequency markers (subtle)
+      // Frequency markers
       ctx.fillStyle = "hsla(0, 0%, 100%, 0.15)";
       ctx.font = "7px monospace";
       ctx.textAlign = "center";
-      
-      // Approximate frequency markers (assuming 44.1kHz sample rate, 128 bins)
       const markers = [
-        { bin: 2, label: "100" },
-        { bin: 6, label: "500" },
-        { bin: 12, label: "1k" },
-        { bin: 24, label: "2k" },
-        { bin: 48, label: "5k" },
-        { bin: 80, label: "10k" },
+        { bin: 2, label: "100" }, { bin: 6, label: "500" },
+        { bin: 12, label: "1k" }, { bin: 24, label: "2k" },
+        { bin: 48, label: "5k" }, { bin: 80, label: "10k" },
       ];
-      
+      const markerY = currentMode === "mirror" ? h - 2 : h - 2;
       markers.forEach(m => {
-        if (m.bin < usableBins) {
-          const x = m.bin * barWidth;
-          ctx.fillText(m.label, x, h - 2);
-        }
+        if (m.bin < usableBins) ctx.fillText(m.label, m.bin * barWidth, markerY);
       });
 
       raf = requestAnimationFrame(draw);
@@ -276,11 +321,29 @@ export function SpectrumAnalyzer() {
 
   return (
     <div className="flex flex-col gap-0.5 h-full">
-      <span className="text-[9px] text-muted-foreground/50 font-body uppercase tracking-wider shrink-0">
-        Spectrum
-      </span>
-      <canvas 
-        ref={canvasRef} 
+      <div className="flex items-center justify-between shrink-0">
+        <span className="text-[9px] text-muted-foreground/50 font-body uppercase tracking-wider">
+          Spectrum
+        </span>
+        <div className="flex gap-0.5">
+          {SPECTRUM_MODES.map(m => (
+            <button
+              key={m.id}
+              onClick={() => setMode(m.id)}
+              className={`px-1.5 py-0.5 rounded text-[9px] font-mono leading-none transition-colors ${
+                mode === m.id
+                  ? "text-primary bg-primary/15"
+                  : "text-muted-foreground/40 hover:text-muted-foreground/70"
+              }`}
+              title={m.id}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <canvas
+        ref={canvasRef}
         className="w-full flex-1 min-h-0 rounded-sm border border-border/40"
       />
     </div>
