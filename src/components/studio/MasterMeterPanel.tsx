@@ -436,15 +436,127 @@ interface PluginSlot {
   id: "eq" | "comp" | "limit" | "reverb";
   label: string;
   labelRu: string;
-  type: "pre" | "post";
 }
 
 const PLUGIN_SLOTS: PluginSlot[] = [
-  { id: "eq", label: "EQ", labelRu: "EQ", type: "pre" },
-  { id: "comp", label: "COMP", labelRu: "КОМП", type: "pre" },
-  { id: "limit", label: "LIMIT", labelRu: "ЛИМИТ", type: "pre" },
-  { id: "reverb", label: "REVERB", labelRu: "РЕВЕРБ", type: "post" },
+  { id: "eq", label: "EQ", labelRu: "EQ" },
+  { id: "comp", label: "COMP", labelRu: "КОМП" },
+  { id: "limit", label: "LIMIT", labelRu: "ЛИМИТ" },
+  { id: "reverb", label: "REVERB", labelRu: "РЕВЕРБ" },
 ];
+
+// ─── Shared parameter knob ─────────────────────────────────
+
+function ParamSlider({ label, value, min, max, step, unit, onChange, disabled }: {
+  label: string; value: number; min: number; max: number; step: number; unit?: string;
+  onChange: (v: number) => void; disabled?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[9px] text-muted-foreground font-mono uppercase">{label}</span>
+        <span className="text-[9px] text-foreground/70 font-mono tabular-nums">
+          {step < 0.01 ? value.toFixed(3) : step < 1 ? value.toFixed(1) : value.toFixed(0)}{unit ?? ""}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={e => onChange(Number(e.target.value))}
+        disabled={disabled}
+        className="w-full h-1 accent-primary cursor-pointer volume-slider-sm disabled:opacity-30"
+      />
+    </div>
+  );
+}
+
+// ─── Tab panels ─────────────────────────────────────────────
+
+function EqPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
+  const engine = getAudioEngine();
+  const params = engine.getMasterPluginParams();
+  const [low, setLow] = useState(params.eqLow);
+  const [mid, setMid] = useState(params.eqMid);
+  const [high, setHigh] = useState(params.eqHigh);
+
+  const handleLow = (v: number) => { setLow(v); engine.setMasterEqLow(v); };
+  const handleMid = (v: number) => { setMid(v); engine.setMasterEqMid(v); };
+  const handleHigh = (v: number) => { setHigh(v); engine.setMasterEqHigh(v); };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-[10px] text-muted-foreground/60 font-body">
+        {isRu ? "3-полосный эквалайзер" : "3-Band Equalizer"}
+      </span>
+      <ParamSlider label="Low" value={low} min={-12} max={12} step={0.5} unit=" dB" onChange={handleLow} disabled={disabled} />
+      <ParamSlider label="Mid" value={mid} min={-12} max={12} step={0.5} unit=" dB" onChange={handleMid} disabled={disabled} />
+      <ParamSlider label="High" value={high} min={-12} max={12} step={0.5} unit=" dB" onChange={handleHigh} disabled={disabled} />
+    </div>
+  );
+}
+
+function CompPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
+  const engine = getAudioEngine();
+  const params = engine.getMasterPluginParams();
+  const [threshold, setThreshold] = useState(params.compThreshold);
+  const [ratio, setRatio] = useState(params.compRatio);
+  const [attack, setAttack] = useState(params.compAttack);
+  const [release, setRelease] = useState(params.compRelease);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-[10px] text-muted-foreground/60 font-body">
+        {isRu ? "Компрессор" : "Compressor"}
+      </span>
+      <ParamSlider label={isRu ? "Порог" : "Threshold"} value={threshold} min={-60} max={0} step={1} unit=" dB"
+        onChange={v => { setThreshold(v); engine.setMasterCompThreshold(v); }} disabled={disabled} />
+      <ParamSlider label={isRu ? "Соотн." : "Ratio"} value={ratio} min={1} max={20} step={0.5} unit=":1"
+        onChange={v => { setRatio(v); engine.setMasterCompRatio(v); }} disabled={disabled} />
+      <ParamSlider label={isRu ? "Атака" : "Attack"} value={attack} min={0.001} max={0.5} step={0.001} unit=" s"
+        onChange={v => { setAttack(v); engine.setMasterCompAttack(v); }} disabled={disabled} />
+      <ParamSlider label={isRu ? "Восст." : "Release"} value={release} min={0.01} max={1.0} step={0.01} unit=" s"
+        onChange={v => { setRelease(v); engine.setMasterCompRelease(v); }} disabled={disabled} />
+    </div>
+  );
+}
+
+function LimitPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
+  const engine = getAudioEngine();
+  const params = engine.getMasterPluginParams();
+  const [threshold, setThreshold] = useState(params.limiterThreshold);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-[10px] text-muted-foreground/60 font-body">
+        {isRu ? "Лимитер" : "Limiter"}
+      </span>
+      <ParamSlider label={isRu ? "Порог" : "Threshold"} value={threshold} min={-30} max={0} step={0.5} unit=" dB"
+        onChange={v => { setThreshold(v); engine.setMasterLimiterThreshold(v); }} disabled={disabled} />
+    </div>
+  );
+}
+
+function ReverbPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
+  const engine = getAudioEngine();
+  const params = engine.getMasterPluginParams();
+  const [decay, setDecay] = useState(params.reverbDecay);
+  const [wet, setWet] = useState(params.reverbWet);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-[10px] text-muted-foreground/60 font-body">
+        {isRu ? "Реверберация" : "Reverb"}
+      </span>
+      <ParamSlider label={isRu ? "Затухание" : "Decay"} value={decay} min={0.1} max={10} step={0.1} unit=" s"
+        onChange={v => { setDecay(v); engine.setMasterReverbDecay(v); }} disabled={disabled} />
+      <ParamSlider label="Wet" value={wet} min={0} max={1} step={0.01}
+        onChange={v => { setWet(v); engine.setMasterReverbWet(v); }} disabled={disabled} />
+    </div>
+  );
+}
 
 // ─── Exported Panel ─────────────────────────────────────────
 
@@ -453,8 +565,22 @@ interface MasterMeterPanelProps {
   width: number;
 }
 
+type MasterTab = "spectrum" | "eq" | "comp" | "limit" | "reverb";
+
+const TABS: { id: MasterTab; label: string; labelRu: string }[] = [
+  { id: "spectrum", label: "FFT", labelRu: "FFT" },
+  { id: "eq", label: "EQ", labelRu: "EQ" },
+  { id: "comp", label: "CMP", labelRu: "КМП" },
+  { id: "limit", label: "LIM", labelRu: "ЛИМ" },
+  { id: "reverb", label: "REV", labelRu: "РЕВ" },
+];
+
 export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
   const engine = getAudioEngine();
+
+  const [activeTab, setActiveTab] = useState<MasterTab>(() => {
+    try { return (localStorage.getItem("master-active-tab") as MasterTab) || "spectrum"; } catch { return "spectrum"; }
+  });
 
   // Read initial state from engine
   const [pluginStates, setPluginStates] = useState(() => {
@@ -476,8 +602,9 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
     try {
       localStorage.setItem("master-plugins-state", JSON.stringify(pluginStates));
       localStorage.setItem("master-bypass", String(masterBypassed));
+      localStorage.setItem("master-active-tab", activeTab);
     } catch { /* ignore */ }
-  }, [pluginStates, masterBypassed]);
+  }, [pluginStates, masterBypassed, activeTab]);
 
   // Restore from localStorage on mount
   useEffect(() => {
@@ -503,7 +630,6 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
   const togglePlugin = useCallback((id: "eq" | "comp" | "limit" | "reverb") => {
     setPluginStates(prev => {
       const newBypassed = !prev[id];
-      // Apply to real engine
       switch (id) {
         case "eq": engine.setMasterEqBypassed(newBypassed); break;
         case "comp": engine.setMasterCompBypassed(newBypassed); break;
@@ -522,10 +648,11 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
     });
   }, [engine]);
 
-  const isCompact = width < 200;
-
-  const prePlugins = PLUGIN_SLOTS.filter(p => p.type === "pre");
-  const postPlugins = PLUGIN_SLOTS.filter(p => p.type === "post");
+  // Which plugin tab is bypassed?
+  const isTabDisabled = (tab: MasterTab): boolean => {
+    if (tab === "spectrum") return false;
+    return masterBypassed || pluginStates[tab as keyof typeof pluginStates];
+  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -547,69 +674,70 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
           title={isRu ? "Байпасс мастер-цепи" : "Bypass master chain"}
         >
           <Power className="h-2.5 w-2.5" />
-          {isCompact ? "" : "BYP"}
+          BYP
         </button>
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col gap-1.5 p-2 min-h-0 overflow-auto">
+      <div className="flex-1 flex flex-col gap-1 p-2 min-h-0 overflow-hidden">
         {/* Meter section */}
         <PeakMeterSection />
 
-        {/* Pre-processing plugins (EQ, Comp, Limiter) */}
-        <div className="flex flex-col gap-1 mt-1">
-          <span className="text-[9px] text-muted-foreground/50 font-body uppercase tracking-wider">
-            {isRu ? "Пре-обработка" : "Pre-FX"}
-          </span>
-          {prePlugins.map(plugin => {
-            const bypassed = pluginStates[plugin.id];
+        {/* Tab bar */}
+        <div className="flex gap-0.5 mt-1 shrink-0 flex-wrap">
+          {TABS.map(tab => {
+            const isActive = activeTab === tab.id;
+            const pluginId = tab.id === "spectrum" ? null : tab.id as "eq" | "comp" | "limit" | "reverb";
+            const isBypassed = pluginId ? (masterBypassed || pluginStates[pluginId]) : false;
+
             return (
               <button
-                key={plugin.id}
-                onClick={() => togglePlugin(plugin.id)}
-                className={`flex items-center justify-between px-2 py-1.5 rounded border transition-colors text-[10px] font-mono uppercase tracking-wide ${
-                  bypassed
-                    ? "border-border/50 text-muted-foreground/40 bg-transparent hover:bg-muted/20"
-                    : masterBypassed
-                      ? "border-border text-muted-foreground/60 bg-muted/10"
-                      : "border-accent/50 text-accent bg-accent/10 hover:bg-accent/15"
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-1.5 py-1 rounded text-[9px] font-mono uppercase leading-none transition-colors ${
+                  isActive
+                    ? isBypassed
+                      ? "bg-muted/40 text-muted-foreground font-bold"
+                      : "bg-primary/20 text-primary font-bold"
+                    : isBypassed
+                      ? "text-muted-foreground/30 hover:text-muted-foreground/50"
+                      : "text-foreground/50 hover:text-foreground/80"
                 }`}
               >
-                <span className="font-semibold">{isRu ? plugin.labelRu : plugin.label}</span>
-                <span className={`text-[8px] ${bypassed ? "text-muted-foreground/30" : masterBypassed ? "text-muted-foreground/40" : "text-accent/70"}`}>
-                  {bypassed ? "OFF" : masterBypassed ? "BYP" : "ON"}
-                </span>
+                {isRu ? tab.labelRu : tab.label}
               </button>
             );
           })}
         </div>
 
-        {/* Post-processing plugins (Reverb) */}
-        <div className="flex flex-col gap-1 mt-1">
-          <span className="text-[9px] text-muted-foreground/50 font-body uppercase tracking-wider">
-            {isRu ? "Пост-обработка" : "Post-FX"}
-          </span>
-          {postPlugins.map(plugin => {
-            const bypassed = pluginStates[plugin.id];
-            return (
-              <button
-                key={plugin.id}
-                onClick={() => togglePlugin(plugin.id)}
-                className={`flex items-center justify-between px-2 py-1.5 rounded border transition-colors text-[10px] font-mono uppercase tracking-wide ${
-                  bypassed
-                    ? "border-border/50 text-muted-foreground/40 bg-transparent hover:bg-muted/20"
-                    : masterBypassed
-                      ? "border-border text-muted-foreground/60 bg-muted/10"
-                      : "border-primary/50 text-primary bg-primary/10 hover:bg-primary/15"
-                }`}
-              >
-                <span className="font-semibold">{isRu ? plugin.labelRu : plugin.label}</span>
-                <span className={`text-[8px] ${bypassed ? "text-muted-foreground/30" : masterBypassed ? "text-muted-foreground/40" : "text-primary/70"}`}>
-                  {bypassed ? "OFF" : masterBypassed ? "BYP" : "ON"}
-                </span>
-              </button>
-            );
-          })}
+        {/* Plugin bypass toggle for active plugin tab */}
+        {activeTab !== "spectrum" && (
+          <div className="flex items-center justify-between shrink-0">
+            <span className="text-[9px] text-muted-foreground/60 font-mono uppercase">
+              {PLUGIN_SLOTS.find(p => p.id === activeTab)?.[isRu ? "labelRu" : "label"]}
+            </span>
+            <button
+              onClick={() => togglePlugin(activeTab as "eq" | "comp" | "limit" | "reverb")}
+              className={`px-1.5 py-0.5 rounded text-[8px] font-mono uppercase leading-none transition-colors font-semibold ${
+                pluginStates[activeTab as keyof typeof pluginStates]
+                  ? "text-muted-foreground/40 bg-transparent border border-border/50"
+                  : masterBypassed
+                    ? "text-muted-foreground/60 bg-muted/10 border border-border"
+                    : "text-accent bg-accent/15 border border-accent/50"
+              }`}
+            >
+              {pluginStates[activeTab as keyof typeof pluginStates] ? "OFF" : masterBypassed ? "BYP" : "ON"}
+            </button>
+          </div>
+        )}
+
+        {/* Tab content */}
+        <div className="flex-1 min-h-0 overflow-auto">
+          {activeTab === "spectrum" && <SpectrumAnalyzer />}
+          {activeTab === "eq" && <EqPanel isRu={isRu} disabled={isTabDisabled("eq")} />}
+          {activeTab === "comp" && <CompPanel isRu={isRu} disabled={isTabDisabled("comp")} />}
+          {activeTab === "limit" && <LimitPanel isRu={isRu} disabled={isTabDisabled("limit")} />}
+          {activeTab === "reverb" && <ReverbPanel isRu={isRu} disabled={isTabDisabled("reverb")} />}
         </div>
       </div>
     </div>
