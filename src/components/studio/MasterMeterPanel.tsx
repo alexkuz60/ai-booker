@@ -245,6 +245,22 @@ export function SpectrumAnalyzer() {
       ctx.fillStyle = "hsla(0, 0%, 5%, 0.95)";
       ctx.fillRect(0, 0, w, h);
 
+      // Horizontal dB grid lines
+      const dbGridLevels = [-6, -12, -24, -48];
+      ctx.strokeStyle = "hsla(0, 0%, 100%, 0.08)";
+      ctx.lineWidth = 1;
+      ctx.font = "9px monospace";
+      ctx.fillStyle = "hsla(0, 0%, 100%, 0.25)";
+      ctx.textAlign = "left";
+      dbGridLevels.forEach(dbLvl => {
+        const normalized = Math.max(0, Math.min(1, (dbLvl - (-80)) / 80));
+        const gy = h - normalized * h;
+        ctx.beginPath();
+        ctx.moveTo(0, gy);
+        ctx.lineTo(w, gy);
+        ctx.stroke();
+        ctx.fillText(`${dbLvl}`, 2, gy - 2);
+      });
       const rawData = engine.getFFTData();
       if (!rawData || rawData.length === 0) {
         raf = requestAnimationFrame(draw);
