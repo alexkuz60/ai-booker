@@ -412,10 +412,12 @@ export function SpectrumAnalyzer() {
         />
         <span className="text-[8px] text-muted-foreground/50 font-mono w-6 text-right">{(smoothing * 100).toFixed(0)}%</span>
       </div>
-      <canvas
-        ref={canvasRef}
-        className="w-full flex-1 min-h-0 rounded-sm border border-border/40"
-      />
+      <div className="flex-1 min-h-0 relative rounded-sm border border-border/40 overflow-hidden">
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full"
+        />
+      </div>
     </div>
   );
 }
