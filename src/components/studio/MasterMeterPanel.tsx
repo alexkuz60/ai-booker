@@ -1,8 +1,7 @@
 /**
- * MasterMeterPanel — large stereo L/R output-level meter with dB scale
- * between the bars, mastering plugin chain with bypass.
+ * MasterMeterPanel — left sidebar: stereo L/R output-level meter with dB scale,
+ * vertical plugin bypass strip (EQ, COMP, LIMIT, REVERB) + master BYP toggle.
  * Range: -96 dB … +3 dB. Red zone above 0 dB.
- * Plugins are wired to real Tone.js nodes in AudioEngine.
  */
 
 import { useRef, useEffect, useState, useCallback } from "react";
@@ -145,6 +144,7 @@ function PeakReadout({ peakDb }: { peakDb: number }) {
     </span>
   );
 }
+
 // ─── Meter section with peak hold ───────────────────────────
 
 function PeakMeterSection() {
@@ -185,7 +185,7 @@ function PeakMeterSection() {
   );
 }
 
-// ─── FFT Spectrum Analyzer ──────────────────────────────────
+// ─── FFT Spectrum Analyzer (exported for use in MasterEffectsTabs) ───
 
 type SpectrumMode = "bars" | "line" | "mirror";
 const SPECTRUM_MODES: { id: SpectrumMode; label: string }[] = [
@@ -205,20 +205,15 @@ export function SpectrumAnalyzer() {
     try { const v = Number(localStorage.getItem("spectrum-smoothing")); return isFinite(v) ? v : 0.65; } catch { return 0.65; }
   });
 
-  // Persist settings
   useEffect(() => {
     try {
       localStorage.setItem("spectrum-mode", mode);
       localStorage.setItem("spectrum-smoothing", String(smoothing));
-    } catch { /* ignore */ }
+    } catch {}
   }, [mode, smoothing]);
 
-  // Ensure 128-bin FFT on mount
-  useEffect(() => {
-    engine.setFFTSize(128);
-  }, [engine]);
+  useEffect(() => { engine.setFFTSize(128); }, [engine]);
 
-  // Smoothing buffer ref
   const smoothRef = useRef<Float32Array | null>(null);
   const modeRef = useRef(mode);
   modeRef.current = mode;
@@ -261,18 +256,15 @@ export function SpectrumAnalyzer() {
         ctx.stroke();
         ctx.fillText(`${dbLvl}`, 2, gy - 2);
       });
+
       const rawData = engine.getFFTData();
-      if (!rawData || rawData.length === 0) {
-        raf = requestAnimationFrame(draw);
-        return;
-      }
+      if (!rawData || rawData.length === 0) { raf = requestAnimationFrame(draw); return; }
       const usableBins = Math.max(1, Math.floor(rawData.length * 0.9));
       const barWidth = w / usableBins;
       const dbMin = -80;
       const dbMax = 0;
       const dbRange = dbMax - dbMin;
 
-      // Apply temporal smoothing
       const alpha = smoothingRef.current;
       if (!smoothRef.current || smoothRef.current.length !== rawData.length) {
         smoothRef.current = new Float32Array(rawData);
@@ -282,10 +274,8 @@ export function SpectrumAnalyzer() {
         }
       }
       const fftData = smoothRef.current;
-
       const currentMode = modeRef.current;
 
-      // Gradient (reused across modes)
       const gradient = ctx.createLinearGradient(0, h, 0, 0);
       gradient.addColorStop(0, "hsl(140, 60%, 35%)");
       gradient.addColorStop(0.4, "hsl(80, 70%, 45%)");
@@ -300,21 +290,15 @@ export function SpectrumAnalyzer() {
           ctx.fillRect(i * barWidth, h - normalized * h, barWidth - 0.5, normalized * h);
         }
       } else if (currentMode === "line") {
-        // Vertical frequency grid lines
         const gridMarkers = [2, 6, 12, 24, 48, 80];
         ctx.strokeStyle = "hsla(0, 0%, 100%, 0.07)";
         ctx.lineWidth = 1;
         gridMarkers.forEach(bin => {
           if (bin < usableBins) {
             const gx = bin * barWidth;
-            ctx.beginPath();
-            ctx.moveTo(gx, 0);
-            ctx.lineTo(gx, h);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, h); ctx.stroke();
           }
         });
-
-        // Draw the line
         ctx.strokeStyle = "hsl(140, 70%, 55%)";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
@@ -325,7 +309,6 @@ export function SpectrumAnalyzer() {
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.stroke();
-        // Fill under line with top-to-bottom transparency gradient
         ctx.lineTo((usableBins - 1) * barWidth + barWidth / 2, h);
         ctx.lineTo(barWidth / 2, h);
         ctx.closePath();
@@ -338,20 +321,16 @@ export function SpectrumAnalyzer() {
         ctx.fill();
       } else if (currentMode === "mirror") {
         const halfH = h / 2;
-        // Center line
         ctx.fillStyle = "hsla(0, 0%, 100%, 0.06)";
         ctx.fillRect(0, halfH, w, 1);
-
         const mirrorGradUp = ctx.createLinearGradient(0, halfH, 0, 0);
         mirrorGradUp.addColorStop(0, "hsl(140, 60%, 35%)");
         mirrorGradUp.addColorStop(0.5, "hsl(80, 70%, 45%)");
         mirrorGradUp.addColorStop(1, "hsl(50, 80%, 50%)");
-
         const mirrorGradDown = ctx.createLinearGradient(0, halfH, 0, h);
         mirrorGradDown.addColorStop(0, "hsl(200, 60%, 35%)");
         mirrorGradDown.addColorStop(0.5, "hsl(220, 70%, 45%)");
         mirrorGradDown.addColorStop(1, "hsl(260, 60%, 40%)");
-
         for (let i = 0; i < usableBins; i++) {
           const normalized = Math.max(0, Math.min(1, (fftData[i] - dbMin) / dbRange));
           const barH = normalized * halfH;
@@ -363,7 +342,6 @@ export function SpectrumAnalyzer() {
         }
       }
 
-      // Frequency markers
       ctx.fillStyle = "hsla(0, 0%, 100%, 0.7)";
       ctx.font = "bold 10px monospace";
       ctx.textAlign = "center";
@@ -372,9 +350,8 @@ export function SpectrumAnalyzer() {
         { bin: 12, label: "1k" }, { bin: 24, label: "2k" },
         { bin: 48, label: "5k" }, { bin: 80, label: "10k" },
       ];
-      const markerY = currentMode === "mirror" ? h - 2 : h - 2;
       markers.forEach(m => {
-        if (m.bin < usableBins) ctx.fillText(m.label, m.bin * barWidth, markerY);
+        if (m.bin < usableBins) ctx.fillText(m.label, m.bin * barWidth, h - 2);
       });
 
       raf = requestAnimationFrame(draw);
@@ -390,7 +367,6 @@ export function SpectrumAnalyzer() {
           Spectrum
         </span>
         <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
-          {/* Mode selector */}
           <div className="flex gap-0.5 shrink-0">
             {SPECTRUM_MODES.map(m => (
               <button
@@ -408,7 +384,6 @@ export function SpectrumAnalyzer() {
             ))}
           </div>
           <span className="text-foreground/30 shrink-0">│</span>
-          {/* Smoothing slider — compact, inline */}
           <input
             type="range"
             min={0}
@@ -422,15 +397,13 @@ export function SpectrumAnalyzer() {
         </div>
       </div>
       <div className="flex-1 min-h-0 relative rounded-sm border border-border/40 overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 w-full h-full"
-        />
+        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
       </div>
     </div>
   );
 }
 
+// ─── Plugin slot definition ─────────────────────────────────
 
 interface PluginSlot {
   id: "eq" | "comp" | "limit" | "reverb";
@@ -440,173 +413,37 @@ interface PluginSlot {
 
 const PLUGIN_SLOTS: PluginSlot[] = [
   { id: "eq", label: "EQ", labelRu: "EQ" },
-  { id: "comp", label: "COMP", labelRu: "КОМП" },
-  { id: "limit", label: "LIMIT", labelRu: "ЛИМИТ" },
-  { id: "reverb", label: "REVERB", labelRu: "РЕВЕРБ" },
+  { id: "comp", label: "CMP", labelRu: "КМП" },
+  { id: "limit", label: "LIM", labelRu: "ЛИМ" },
+  { id: "reverb", label: "REV", labelRu: "РЕВ" },
 ];
 
-// ─── Shared parameter knob ─────────────────────────────────
-
-function ParamSlider({ label, value, min, max, step, unit, onChange, disabled }: {
-  label: string; value: number; min: number; max: number; step: number; unit?: string;
-  onChange: (v: number) => void; disabled?: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <div className="flex items-center justify-between">
-        <span className="text-[9px] text-muted-foreground font-mono uppercase">{label}</span>
-        <span className="text-[9px] text-foreground/70 font-mono tabular-nums">
-          {step < 0.01 ? value.toFixed(3) : step < 1 ? value.toFixed(1) : value.toFixed(0)}{unit ?? ""}
-        </span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={e => onChange(Number(e.target.value))}
-        disabled={disabled}
-        className="w-full h-1 accent-primary cursor-pointer volume-slider-sm disabled:opacity-30"
-      />
-    </div>
-  );
-}
-
-// ─── Tab panels ─────────────────────────────────────────────
-
-function EqPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
-  const engine = getAudioEngine();
-  const params = engine.getMasterPluginParams();
-  const [low, setLow] = useState(params.eqLow);
-  const [mid, setMid] = useState(params.eqMid);
-  const [high, setHigh] = useState(params.eqHigh);
-
-  const handleLow = (v: number) => { setLow(v); engine.setMasterEqLow(v); };
-  const handleMid = (v: number) => { setMid(v); engine.setMasterEqMid(v); };
-  const handleHigh = (v: number) => { setHigh(v); engine.setMasterEqHigh(v); };
-
-  return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[10px] text-muted-foreground/60 font-body">
-        {isRu ? "3-полосный эквалайзер" : "3-Band Equalizer"}
-      </span>
-      <ParamSlider label="Low" value={low} min={-12} max={12} step={0.5} unit=" dB" onChange={handleLow} disabled={disabled} />
-      <ParamSlider label="Mid" value={mid} min={-12} max={12} step={0.5} unit=" dB" onChange={handleMid} disabled={disabled} />
-      <ParamSlider label="High" value={high} min={-12} max={12} step={0.5} unit=" dB" onChange={handleHigh} disabled={disabled} />
-    </div>
-  );
-}
-
-function CompPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
-  const engine = getAudioEngine();
-  const params = engine.getMasterPluginParams();
-  const [threshold, setThreshold] = useState(params.compThreshold);
-  const [ratio, setRatio] = useState(params.compRatio);
-  const [attack, setAttack] = useState(params.compAttack);
-  const [release, setRelease] = useState(params.compRelease);
-
-  return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[10px] text-muted-foreground/60 font-body">
-        {isRu ? "Компрессор" : "Compressor"}
-      </span>
-      <ParamSlider label={isRu ? "Порог" : "Threshold"} value={threshold} min={-60} max={0} step={1} unit=" dB"
-        onChange={v => { setThreshold(v); engine.setMasterCompThreshold(v); }} disabled={disabled} />
-      <ParamSlider label={isRu ? "Соотн." : "Ratio"} value={ratio} min={1} max={20} step={0.5} unit=":1"
-        onChange={v => { setRatio(v); engine.setMasterCompRatio(v); }} disabled={disabled} />
-      <ParamSlider label={isRu ? "Атака" : "Attack"} value={attack} min={0.001} max={0.5} step={0.001} unit=" s"
-        onChange={v => { setAttack(v); engine.setMasterCompAttack(v); }} disabled={disabled} />
-      <ParamSlider label={isRu ? "Восст." : "Release"} value={release} min={0.01} max={1.0} step={0.01} unit=" s"
-        onChange={v => { setRelease(v); engine.setMasterCompRelease(v); }} disabled={disabled} />
-    </div>
-  );
-}
-
-function LimitPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
-  const engine = getAudioEngine();
-  const params = engine.getMasterPluginParams();
-  const [threshold, setThreshold] = useState(params.limiterThreshold);
-
-  return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[10px] text-muted-foreground/60 font-body">
-        {isRu ? "Лимитер" : "Limiter"}
-      </span>
-      <ParamSlider label={isRu ? "Порог" : "Threshold"} value={threshold} min={-30} max={0} step={0.5} unit=" dB"
-        onChange={v => { setThreshold(v); engine.setMasterLimiterThreshold(v); }} disabled={disabled} />
-    </div>
-  );
-}
-
-function ReverbPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
-  const engine = getAudioEngine();
-  const params = engine.getMasterPluginParams();
-  const [decay, setDecay] = useState(params.reverbDecay);
-  const [wet, setWet] = useState(params.reverbWet);
-
-  return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[10px] text-muted-foreground/60 font-body">
-        {isRu ? "Реверберация" : "Reverb"}
-      </span>
-      <ParamSlider label={isRu ? "Затухание" : "Decay"} value={decay} min={0.1} max={10} step={0.1} unit=" s"
-        onChange={v => { setDecay(v); engine.setMasterReverbDecay(v); }} disabled={disabled} />
-      <ParamSlider label="Wet" value={wet} min={0} max={1} step={0.01}
-        onChange={v => { setWet(v); engine.setMasterReverbWet(v); }} disabled={disabled} />
-    </div>
-  );
-}
-
-// ─── Exported Panel ─────────────────────────────────────────
+// ─── Exported Panel (left sidebar: meter + vertical plugin bypass strip) ───
 
 interface MasterMeterPanelProps {
   isRu: boolean;
   width: number;
 }
 
-type MasterTab = "spectrum" | "eq" | "comp" | "limit" | "reverb";
-
-const TABS: { id: MasterTab; label: string; labelRu: string }[] = [
-  { id: "spectrum", label: "FFT", labelRu: "FFT" },
-  { id: "eq", label: "EQ", labelRu: "EQ" },
-  { id: "comp", label: "CMP", labelRu: "КМП" },
-  { id: "limit", label: "LIM", labelRu: "ЛИМ" },
-  { id: "reverb", label: "REV", labelRu: "РЕВ" },
-];
-
 export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
   const engine = getAudioEngine();
 
-  const [activeTab, setActiveTab] = useState<MasterTab>(() => {
-    try { return (localStorage.getItem("master-active-tab") as MasterTab) || "spectrum"; } catch { return "spectrum"; }
-  });
-
-  // Read initial state from engine
   const [pluginStates, setPluginStates] = useState(() => {
     const s = engine.getMasterPluginState();
-    return {
-      eq: s.eqBypassed,
-      comp: s.compBypassed,
-      limit: s.limiterBypassed,
-      reverb: s.reverbBypassed,
-    };
+    return { eq: s.eqBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed };
   });
 
-  const [masterBypassed, setMasterBypassed] = useState(() => {
-    return engine.getMasterPluginState().chainBypassed;
-  });
+  const [masterBypassed, setMasterBypassed] = useState(() => engine.getMasterPluginState().chainBypassed);
 
-  // Persist to localStorage on change
+  // Persist
   useEffect(() => {
     try {
       localStorage.setItem("master-plugins-state", JSON.stringify(pluginStates));
       localStorage.setItem("master-bypass", String(masterBypassed));
-      localStorage.setItem("master-active-tab", activeTab);
-    } catch { /* ignore */ }
-  }, [pluginStates, masterBypassed, activeTab]);
+    } catch {}
+  }, [pluginStates, masterBypassed]);
 
-  // Restore from localStorage on mount
+  // Restore on mount
   useEffect(() => {
     try {
       const savedPlugins = localStorage.getItem("master-plugins-state");
@@ -624,7 +461,7 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
         setMasterBypassed(byp);
         engine.setMasterChainBypassed(byp);
       }
-    } catch { /* ignore */ }
+    } catch {}
   }, [engine]);
 
   const togglePlugin = useCallback((id: "eq" | "comp" | "limit" | "reverb") => {
@@ -647,12 +484,6 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
       return next;
     });
   }, [engine]);
-
-  // Which plugin tab is bypassed?
-  const isTabDisabled = (tab: MasterTab): boolean => {
-    if (tab === "spectrum") return false;
-    return masterBypassed || pluginStates[tab as keyof typeof pluginStates];
-  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -679,65 +510,36 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col gap-1 p-2 min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col gap-2 p-2 min-h-0 overflow-hidden">
         {/* Meter section */}
         <PeakMeterSection />
 
-        {/* Tab bar */}
-        <div className="flex gap-0.5 mt-1 shrink-0 flex-wrap">
-          {TABS.map(tab => {
-            const isActive = activeTab === tab.id;
-            const pluginId = tab.id === "spectrum" ? null : tab.id as "eq" | "comp" | "limit" | "reverb";
-            const isBypassed = pluginId ? (masterBypassed || pluginStates[pluginId]) : false;
-
+        {/* Vertical plugin bypass strip */}
+        <div className="flex flex-col gap-1 mt-1">
+          {PLUGIN_SLOTS.map(slot => {
+            const isBypassed = pluginStates[slot.id];
             return (
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-1.5 py-1 rounded text-[9px] font-mono uppercase leading-none transition-colors ${
-                  isActive
-                    ? isBypassed
-                      ? "bg-muted/40 text-muted-foreground font-bold"
-                      : "bg-primary/20 text-primary font-bold"
-                    : isBypassed
-                      ? "text-muted-foreground/30 hover:text-muted-foreground/50"
-                      : "text-foreground/50 hover:text-foreground/80"
+                key={slot.id}
+                onClick={() => togglePlugin(slot.id)}
+                className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-[10px] font-mono uppercase leading-none transition-colors w-full ${
+                  isBypassed
+                    ? masterBypassed
+                      ? "text-muted-foreground/30 bg-transparent"
+                      : "text-muted-foreground/50 bg-muted/20 hover:bg-muted/30"
+                    : masterBypassed
+                      ? "text-muted-foreground/60 bg-muted/10"
+                      : "text-primary bg-primary/15 font-bold hover:bg-primary/20"
                 }`}
               >
-                {isRu ? tab.labelRu : tab.label}
+                <Power className="h-2.5 w-2.5 shrink-0" />
+                <span className="flex-1 text-left">{isRu ? slot.labelRu : slot.label}</span>
+                <span className={`text-[8px] ${isBypassed ? "text-muted-foreground/40" : "text-accent"}`}>
+                  {isBypassed ? "OFF" : masterBypassed ? "BYP" : "ON"}
+                </span>
               </button>
             );
           })}
-        </div>
-
-        {/* Plugin bypass toggle for active plugin tab */}
-        {activeTab !== "spectrum" && (
-          <div className="flex items-center justify-between shrink-0">
-            <span className="text-[9px] text-muted-foreground/60 font-mono uppercase">
-              {PLUGIN_SLOTS.find(p => p.id === activeTab)?.[isRu ? "labelRu" : "label"]}
-            </span>
-            <button
-              onClick={() => togglePlugin(activeTab as "eq" | "comp" | "limit" | "reverb")}
-              className={`px-1.5 py-0.5 rounded text-[8px] font-mono uppercase leading-none transition-colors font-semibold ${
-                pluginStates[activeTab as keyof typeof pluginStates]
-                  ? "text-muted-foreground/40 bg-transparent border border-border/50"
-                  : masterBypassed
-                    ? "text-muted-foreground/60 bg-muted/10 border border-border"
-                    : "text-accent bg-accent/15 border border-accent/50"
-              }`}
-            >
-              {pluginStates[activeTab as keyof typeof pluginStates] ? "OFF" : masterBypassed ? "BYP" : "ON"}
-            </button>
-          </div>
-        )}
-
-        {/* Tab content */}
-        <div className="flex-1 min-h-0 overflow-auto">
-          {activeTab === "spectrum" && <SpectrumAnalyzer />}
-          {activeTab === "eq" && <EqPanel isRu={isRu} disabled={isTabDisabled("eq")} />}
-          {activeTab === "comp" && <CompPanel isRu={isRu} disabled={isTabDisabled("comp")} />}
-          {activeTab === "limit" && <LimitPanel isRu={isRu} disabled={isTabDisabled("limit")} />}
-          {activeTab === "reverb" && <ReverbPanel isRu={isRu} disabled={isTabDisabled("reverb")} />}
         </div>
       </div>
     </div>
