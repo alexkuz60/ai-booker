@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTimelineClips, type TimelineClip } from "@/hooks/useTimelineClips";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { TrackMixerStrip } from "./TrackMixerStrip";
+import { useMixerPersistence } from "@/hooks/useMixerPersistence";
 
 // ─── Types ──────────────────────────────────────────────────
 
