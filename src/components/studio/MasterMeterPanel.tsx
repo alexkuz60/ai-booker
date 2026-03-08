@@ -194,19 +194,43 @@ const SPECTRUM_MODES: { id: SpectrumMode; label: string }[] = [
   { id: "mirror", label: "⫼" },
 ];
 
+const FFT_SIZES = [64, 128, 256] as const;
+type FFTSize = typeof FFT_SIZES[number];
+
 export function SpectrumAnalyzer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engine = getAudioEngine();
+
   const [mode, setMode] = useState<SpectrumMode>(() => {
     try { return (localStorage.getItem("spectrum-mode") as SpectrumMode) || "bars"; } catch { return "bars"; }
   });
+  const [fftSize, setFftSize] = useState<FFTSize>(() => {
+    try { const v = Number(localStorage.getItem("spectrum-fft-size")); return FFT_SIZES.includes(v as FFTSize) ? v as FFTSize : 128; } catch { return 128; }
+  });
+  const [smoothing, setSmoothing] = useState(() => {
+    try { const v = Number(localStorage.getItem("spectrum-smoothing")); return isFinite(v) ? v : 0.65; } catch { return 0.65; }
+  });
 
+  // Persist settings
   useEffect(() => {
-    try { localStorage.setItem("spectrum-mode", mode); } catch { /* ignore */ }
-  }, [mode]);
+    try {
+      localStorage.setItem("spectrum-mode", mode);
+      localStorage.setItem("spectrum-fft-size", String(fftSize));
+      localStorage.setItem("spectrum-smoothing", String(smoothing));
+    } catch { /* ignore */ }
+  }, [mode, fftSize, smoothing]);
 
+  // Apply FFT size to engine
+  useEffect(() => {
+    engine.setFFTSize(fftSize);
+  }, [engine, fftSize]);
+
+  // Smoothing buffer ref
+  const smoothRef = useRef<Float32Array | null>(null);
   const modeRef = useRef(mode);
   modeRef.current = mode;
+  const smoothingRef = useRef(smoothing);
+  smoothingRef.current = smoothing;
 
   useEffect(() => {
     let raf: number;
