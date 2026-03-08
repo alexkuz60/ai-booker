@@ -765,6 +765,7 @@ class AudioEngine {
   private _compRatio = 4;
   private _compAttack = 0.005;
   private _compRelease = 0.15;
+  private _compKnee = 6;
   // Limiter params
   private _limiterThreshold = -1;
   // Reverb params
@@ -809,6 +810,7 @@ class AudioEngine {
   setMasterCompRatio(v: number): void { this._compRatio = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.ratio.value = v; }
   setMasterCompAttack(v: number): void { this._compAttack = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.attack.value = v; }
   setMasterCompRelease(v: number): void { this._compRelease = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.release.value = v; }
+  setMasterCompKnee(v: number): void { this._compKnee = v; if (!this._masterCompBypassed && !this._masterChainBypassed) this.masterComp.knee.value = v; }
 
   setMasterLimiterThreshold(v: number): void { this._limiterThreshold = v; if (!this._masterLimiterBypassed && !this._masterChainBypassed) this.masterLimiter.threshold.value = v; }
 
@@ -829,7 +831,7 @@ class AudioEngine {
     return {
       eqLow: this._eqLow, eqMid: this._eqMid, eqHigh: this._eqHigh,
       compThreshold: this._compThreshold, compRatio: this._compRatio,
-      compAttack: this._compAttack, compRelease: this._compRelease,
+      compAttack: this._compAttack, compRelease: this._compRelease, compKnee: this._compKnee,
       limiterThreshold: this._limiterThreshold,
       reverbDecay: this._reverbDecay, reverbWet: this._reverbWet,
     };

@@ -3,7 +3,7 @@
  * Tab 1: FFT Spectrum Analyzer. Tabs 2-5: EQ, Compressor, Limiter, Reverb controls.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { getAudioEngine } from "@/lib/audioEngine";
 import { SpectrumAnalyzer } from "@/components/studio/MasterMeterPanel";
 import { Power } from "lucide-react";
@@ -60,6 +60,129 @@ function EqPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
   );
 }
 
+// ─── Compressor Knee Graph ──────────────────────────────────
+
+function KneeGraph({ threshold, ratio, knee }: { threshold: number; ratio: number; knee: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const dbMin = -60;
+    const dbMax = 0;
+    const range = dbMax - dbMin;
+
+    const toX = (db: number) => ((db - dbMin) / range) * w;
+    const toY = (db: number) => h - ((db - dbMin) / range) * h;
+
+    // Compute output dB for a given input dB (soft-knee model)
+    const computeOut = (input: number): number => {
+      const halfKnee = knee / 2;
+      if (input <= threshold - halfKnee) {
+        return input; // below knee — unity
+      } else if (input >= threshold + halfKnee) {
+        return threshold + (input - threshold) / ratio; // above knee — full compression
+      } else {
+        // Soft knee quadratic interpolation
+        const x = input - threshold + halfKnee;
+        return input + ((1 / ratio - 1) * x * x) / (2 * knee);
+      }
+    };
+
+    // Background
+    ctx.fillStyle = "hsla(0, 0%, 5%, 0.95)";
+    ctx.fillRect(0, 0, w, h);
+
+    // Grid lines
+    ctx.strokeStyle = "hsla(0, 0%, 100%, 0.07)";
+    ctx.lineWidth = 1;
+    for (let db = -48; db <= 0; db += 12) {
+      const x = toX(db);
+      const y = toY(db);
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+
+    // Grid labels
+    ctx.fillStyle = "hsla(0, 0%, 100%, 0.2)";
+    ctx.font = "9px monospace";
+    ctx.textAlign = "center";
+    for (let db = -48; db <= 0; db += 12) {
+      ctx.fillText(`${db}`, toX(db), h - 3);
+    }
+    ctx.textAlign = "right";
+    for (let db = -48; db <= 0; db += 12) {
+      ctx.fillText(`${db}`, w - 3, toY(db) + 3);
+    }
+
+    // Unity line (1:1)
+    ctx.strokeStyle = "hsla(0, 0%, 100%, 0.12)";
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(toX(dbMin), toY(dbMin));
+    ctx.lineTo(toX(dbMax), toY(dbMax));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Threshold line
+    ctx.strokeStyle = "hsla(50, 80%, 50%, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 2]);
+    const tx = toX(threshold);
+    ctx.beginPath(); ctx.moveTo(tx, 0); ctx.lineTo(tx, h); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Transfer curve
+    ctx.strokeStyle = "hsl(140, 70%, 55%)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const steps = w;
+    for (let i = 0; i <= steps; i++) {
+      const inputDb = dbMin + (i / steps) * range;
+      const outputDb = computeOut(inputDb);
+      const x = toX(inputDb);
+      const y = toY(outputDb);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Fill under curve
+    ctx.lineTo(toX(dbMax), toY(dbMin));
+    ctx.lineTo(toX(dbMin), toY(dbMin));
+    ctx.closePath();
+    const fillGrad = ctx.createLinearGradient(0, 0, 0, h);
+    fillGrad.addColorStop(0, "hsla(140, 70%, 50%, 0.15)");
+    fillGrad.addColorStop(1, "hsla(140, 70%, 50%, 0.02)");
+    ctx.fillStyle = fillGrad;
+    ctx.fill();
+
+    // Threshold label
+    ctx.fillStyle = "hsla(50, 80%, 60%, 0.8)";
+    ctx.font = "bold 9px monospace";
+    ctx.textAlign = "left";
+    ctx.fillText(`T: ${threshold} dB`, tx + 3, 12);
+
+  }, [threshold, ratio, knee]);
+
+  return (
+    <div className="relative rounded-sm border border-border/40 overflow-hidden" style={{ aspectRatio: "1" }}>
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+    </div>
+  );
+}
+
 function CompPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
   const engine = getAudioEngine();
   const params = engine.getMasterPluginParams();
@@ -67,20 +190,30 @@ function CompPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
   const [ratio, setRatio] = useState(params.compRatio);
   const [attack, setAttack] = useState(params.compAttack);
   const [release, setRelease] = useState(params.compRelease);
+  const [knee, setKnee] = useState(params.compKnee);
 
   return (
-    <div className="flex flex-col gap-3 max-w-sm">
-      <span className="text-[10px] text-muted-foreground/60 font-body">
-        {isRu ? "Компрессор" : "Compressor"}
-      </span>
-      <ParamSlider label={isRu ? "Порог" : "Threshold"} value={threshold} min={-60} max={0} step={1} unit=" dB"
-        onChange={v => { setThreshold(v); engine.setMasterCompThreshold(v); }} disabled={disabled} />
-      <ParamSlider label={isRu ? "Соотн." : "Ratio"} value={ratio} min={1} max={20} step={0.5} unit=":1"
-        onChange={v => { setRatio(v); engine.setMasterCompRatio(v); }} disabled={disabled} />
-      <ParamSlider label={isRu ? "Атака" : "Attack"} value={attack} min={0.001} max={0.5} step={0.001} unit=" s"
-        onChange={v => { setAttack(v); engine.setMasterCompAttack(v); }} disabled={disabled} />
-      <ParamSlider label={isRu ? "Восст." : "Release"} value={release} min={0.01} max={1.0} step={0.01} unit=" s"
-        onChange={v => { setRelease(v); engine.setMasterCompRelease(v); }} disabled={disabled} />
+    <div className="flex gap-4 max-w-lg">
+      {/* Knee graph */}
+      <div className="w-36 shrink-0">
+        <KneeGraph threshold={threshold} ratio={ratio} knee={knee} />
+      </div>
+      {/* Sliders */}
+      <div className="flex flex-col gap-3 flex-1 min-w-0">
+        <span className="text-[10px] text-muted-foreground/60 font-body">
+          {isRu ? "Компрессор" : "Compressor"}
+        </span>
+        <ParamSlider label={isRu ? "Порог" : "Threshold"} value={threshold} min={-60} max={0} step={1} unit=" dB"
+          onChange={v => { setThreshold(v); engine.setMasterCompThreshold(v); }} disabled={disabled} />
+        <ParamSlider label={isRu ? "Соотн." : "Ratio"} value={ratio} min={1} max={20} step={0.5} unit=":1"
+          onChange={v => { setRatio(v); engine.setMasterCompRatio(v); }} disabled={disabled} />
+        <ParamSlider label="Knee" value={knee} min={0} max={30} step={1} unit=" dB"
+          onChange={v => { setKnee(v); engine.setMasterCompKnee(v); }} disabled={disabled} />
+        <ParamSlider label={isRu ? "Атака" : "Attack"} value={attack} min={0.001} max={0.5} step={0.001} unit=" s"
+          onChange={v => { setAttack(v); engine.setMasterCompAttack(v); }} disabled={disabled} />
+        <ParamSlider label={isRu ? "Восст." : "Release"} value={release} min={0.01} max={1.0} step={0.01} unit=" s"
+          onChange={v => { setRelease(v); engine.setMasterCompRelease(v); }} disabled={disabled} />
+      </div>
     </div>
   );
 }
