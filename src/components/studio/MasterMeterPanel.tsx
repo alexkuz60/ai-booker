@@ -1,7 +1,7 @@
 /**
- * MasterMeterPanel — large stereo L/R VU meter with dB scale
- * and mastering plugin chain placeholder with bypass.
- * Used in chapter mode timeline sidebar.
+ * MasterMeterPanel — large stereo L/R output-level meter with dB scale
+ * between the bars, mastering plugin chain with bypass.
+ * Range: -96 dB … +3 dB. Red zone above 0 dB.
  */
 
 import { useRef, useEffect, useState, useCallback } from "react";
@@ -10,20 +10,25 @@ import { Sliders, Power } from "lucide-react";
 
 // ─── Helpers ────────────────────────────────────────────────
 
-function dbToLinear(db: number): number {
-  if (db <= -60) return 0;
-  if (db >= 0) return 1;
-  return Math.pow(10, db / 20);
+const DB_MIN = -96;
+const DB_MAX = 3;
+const DB_RANGE = DB_MAX - DB_MIN; // 99
+
+/** Map dB value to 0..1 fraction within -96..+3 range */
+function dbToFraction(db: number): number {
+  if (db <= DB_MIN) return 0;
+  if (db >= DB_MAX) return 1;
+  return (db - DB_MIN) / DB_RANGE;
 }
 
-const DB_MARKS = [0, -3, -6, -12, -18, -24, -36, -48, -60];
+const DB_MARKS = [3, 0, -3, -6, -12, -18, -24, -36, -48, -60, -72, -96];
 
-// ─── Large VU Meter ─────────────────────────────────────────
+// ─── Large Stereo Output Meter (horizontal L on top, R on bottom) ───
 
-function LargeMeter({ vertical }: { vertical?: boolean }) {
+function LargeMeter() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engine = getAudioEngine();
-  const meterRef = useRef({ levelL: -60, levelR: -60 });
+  const meterRef = useRef({ levelL: -96, levelR: -96 });
 
   useEffect(() => {
     let raf: number;
@@ -44,111 +49,82 @@ function LargeMeter({ vertical }: { vertical?: boolean }) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
 
-      const linL = dbToLinear(meterRef.current.levelL);
-      const linR = dbToLinear(meterRef.current.levelR);
+      const fracL = dbToFraction(meterRef.current.levelL);
+      const fracR = dbToFraction(meterRef.current.levelR);
+      const zeroPct = dbToFraction(0); // where 0 dB sits
 
-      if (vertical) {
-        // Vertical bars: bottom-up
-        const barW = (w - 4) / 2;
-        const gap = 4;
+      // Each bar occupies full width, split vertically into L (top) and R (bottom)
+      const barH = (h - 2) / 2;
+      const gap = 2;
 
-        // Gradient bottom→top: green→yellow→red
-        const grad = ctx.createLinearGradient(0, h, 0, 0);
-        grad.addColorStop(0, "hsl(140 60% 45%)");
-        grad.addColorStop(0.6, "hsl(50 80% 50%)");
-        grad.addColorStop(0.85, "hsl(20 80% 50%)");
-        grad.addColorStop(1, "hsl(0 75% 50%)");
+      // Draw a single horizontal bar
+      const drawBar = (y: number, frac: number) => {
+        // Background
+        ctx.fillStyle = "hsla(0, 0%, 50%, 0.1)";
+        ctx.fillRect(0, y, w, barH);
 
-        // L bar
-        const hL = linL * h;
-        ctx.fillStyle = "hsla(0,0%,50%,0.12)";
-        ctx.fillRect(0, 0, barW, h);
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, h - hL, barW, hL);
+        const fillW = frac * w;
+        const zeroX = zeroPct * w;
 
-        // R bar
-        const hR = linR * h;
-        ctx.fillStyle = "hsla(0,0%,50%,0.12)";
-        ctx.fillRect(barW + gap, 0, barW, h);
-        ctx.fillStyle = grad;
-        ctx.fillRect(barW + gap, h - hR, barW, hR);
+        if (fillW <= zeroX) {
+          // All below 0 dB — green→yellow gradient
+          const grad = ctx.createLinearGradient(0, 0, zeroX, 0);
+          grad.addColorStop(0, "hsl(140, 60%, 42%)");
+          grad.addColorStop(0.5, "hsl(80, 60%, 48%)");
+          grad.addColorStop(1, "hsl(50, 80%, 50%)");
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, y, fillW, barH);
+        } else {
+          // Below 0 dB portion
+          const grad = ctx.createLinearGradient(0, 0, zeroX, 0);
+          grad.addColorStop(0, "hsl(140, 60%, 42%)");
+          grad.addColorStop(0.5, "hsl(80, 60%, 48%)");
+          grad.addColorStop(1, "hsl(50, 80%, 50%)");
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, y, zeroX, barH);
 
-        // Peak clip indicator
-        if (meterRef.current.levelL > -0.5) {
-          ctx.fillStyle = "hsl(0 80% 55%)";
-          ctx.fillRect(0, 0, barW, 2);
+          // Above 0 dB — RED
+          ctx.fillStyle = "hsl(0, 75%, 50%)";
+          ctx.fillRect(zeroX, y, fillW - zeroX, barH);
         }
-        if (meterRef.current.levelR > -0.5) {
-          ctx.fillStyle = "hsl(0 80% 55%)";
-          ctx.fillRect(barW + gap, 0, barW, 2);
-        }
-      } else {
-        // Horizontal bars
-        const barH = (h - 2) / 2;
-        const gap = 2;
-        const grad = ctx.createLinearGradient(0, 0, w, 0);
-        grad.addColorStop(0, "hsl(140 60% 45%)");
-        grad.addColorStop(0.6, "hsl(50 80% 50%)");
-        grad.addColorStop(0.85, "hsl(20 80% 50%)");
-        grad.addColorStop(1, "hsl(0 75% 50%)");
 
-        ctx.fillStyle = "hsla(0,0%,50%,0.12)";
-        ctx.fillRect(0, 0, w, barH);
-        ctx.fillRect(0, barH + gap, w, barH);
+        // 0 dB tick line
+        ctx.fillStyle = "hsla(0, 0%, 100%, 0.25)";
+        ctx.fillRect(zeroX, y, 1, barH);
+      };
 
-        const wL = linL * w;
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, wL, barH);
-        const wR = linR * w;
-        ctx.fillRect(0, barH + gap, wR, barH);
-      }
+      drawBar(0, fracL);
+      drawBar(barH + gap, fracR);
 
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [engine, vertical]);
+  }, [engine]);
 
   return <canvas ref={canvasRef} className="w-full h-full" />;
 }
 
-// ─── dB Scale ───────────────────────────────────────────────
+// ─── dB Scale (horizontal, placed between bars via overlay) ──
 
-function DbScale({ vertical, height }: { vertical?: boolean; height?: number }) {
-  if (vertical) {
-    return (
-      <div className="flex flex-col justify-between h-full py-0.5" style={height ? { height } : undefined}>
-        {DB_MARKS.map(db => {
-          const pct = dbToLinear(db) * 100;
-          return (
-            <div
-              key={db}
-              className="flex items-center gap-0.5"
-              style={{ position: "absolute", bottom: `${pct}%`, transform: "translateY(50%)" }}
-            >
-              <div className="w-1.5 h-px bg-muted-foreground/40" />
-              <span className="text-[8px] text-muted-foreground/60 font-mono leading-none">
-                {db === 0 ? "0" : db}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
-  // Horizontal scale
+function DbScale() {
   return (
-    <div className="relative w-full h-3">
+    <div className="relative w-full h-4">
       {DB_MARKS.map(db => {
-        const pct = dbToLinear(db) * 100;
+        const pct = dbToFraction(db) * 100;
         return (
           <span
             key={db}
-            className="absolute text-[7px] text-muted-foreground/60 font-mono leading-none"
+            className={`absolute font-mono leading-none select-none ${
+              db > 0
+                ? "text-[10px] font-bold text-destructive"
+                : db === 0
+                  ? "text-[10px] font-bold text-foreground"
+                  : "text-[9px] text-foreground/80"
+            }`}
             style={{ left: `${pct}%`, transform: "translateX(-50%)", top: 0 }}
           >
-            {db === 0 ? " 0" : db}
+            {db > 0 ? `+${db}` : db === 0 ? "0" : db}
           </span>
         );
       })}
@@ -234,17 +210,28 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
 
       {/* Content */}
       <div className="flex-1 flex flex-col gap-1.5 p-2 min-h-0 overflow-auto">
-        {/* Meter section */}
-        <div className="flex flex-col gap-0.5">
+        {/* Meter section: L bar, dB scale, R bar */}
+        <div className="flex flex-col gap-0">
+          {/* L label + bar */}
           <div className="flex items-center gap-1">
-            <span className="text-[8px] text-muted-foreground/50 font-mono w-3 shrink-0">L</span>
-            <div className="flex-1" />
-            <span className="text-[8px] text-muted-foreground/50 font-mono w-3 shrink-0 text-right">R</span>
+            <span className="text-[9px] text-foreground/60 font-mono w-3 shrink-0 font-bold">L</span>
+            <div className="flex-1 h-5 rounded-sm overflow-hidden border border-border/40 bg-background/40">
+              <LargeMeterSingleChannel channel="L" />
+            </div>
           </div>
-          <div className={`rounded border border-border/50 bg-background/50 ${isCompact ? "h-10" : "h-12"}`}>
-            <LargeMeter />
+
+          {/* dB scale between bars */}
+          <div className="pl-4 pr-0">
+            <DbScale />
           </div>
-          <DbScale />
+
+          {/* R label + bar */}
+          <div className="flex items-center gap-1">
+            <span className="text-[9px] text-foreground/60 font-mono w-3 shrink-0 font-bold">R</span>
+            <div className="flex-1 h-5 rounded-sm overflow-hidden border border-border/40 bg-background/40">
+              <LargeMeterSingleChannel channel="R" />
+            </div>
+          </div>
         </div>
 
         {/* Plugin chain */}
@@ -274,4 +261,72 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
       </div>
     </div>
   );
+}
+
+// ─── Single-channel meter bar (canvas) ──────────────────────
+
+function LargeMeterSingleChannel({ channel }: { channel: "L" | "R" }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const engine = getAudioEngine();
+
+  useEffect(() => {
+    let raf: number;
+    const draw = () => {
+      const meter = engine.getMasterMeter();
+      const canvas = canvasRef.current;
+      if (!canvas) { raf = requestAnimationFrame(draw); return; }
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { raf = requestAnimationFrame(draw); return; }
+
+      const dpr = window.devicePixelRatio || 1;
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+
+      const db = channel === "L" ? meter.levelL : meter.levelR;
+      const frac = dbToFraction(db);
+      const zeroPct = dbToFraction(0);
+      const fillW = frac * w;
+      const zeroX = zeroPct * w;
+
+      // Background
+      ctx.fillStyle = "hsla(0, 0%, 50%, 0.08)";
+      ctx.fillRect(0, 0, w, h);
+
+      if (fillW <= zeroX) {
+        const grad = ctx.createLinearGradient(0, 0, zeroX, 0);
+        grad.addColorStop(0, "hsl(140, 60%, 42%)");
+        grad.addColorStop(0.55, "hsl(80, 60%, 48%)");
+        grad.addColorStop(1, "hsl(50, 80%, 50%)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, fillW, h);
+      } else {
+        const grad = ctx.createLinearGradient(0, 0, zeroX, 0);
+        grad.addColorStop(0, "hsl(140, 60%, 42%)");
+        grad.addColorStop(0.55, "hsl(80, 60%, 48%)");
+        grad.addColorStop(1, "hsl(50, 80%, 50%)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, zeroX, h);
+
+        // Red zone: 0..+3 dB
+        ctx.fillStyle = "hsl(0, 75%, 50%)";
+        ctx.fillRect(zeroX, 0, fillW - zeroX, h);
+      }
+
+      // 0 dB tick
+      ctx.fillStyle = "hsla(0, 0%, 100%, 0.3)";
+      ctx.fillRect(zeroX, 0, 1, h);
+
+      raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(raf);
+  }, [engine, channel]);
+
+  return <canvas ref={canvasRef} className="w-full h-full" />;
 }
