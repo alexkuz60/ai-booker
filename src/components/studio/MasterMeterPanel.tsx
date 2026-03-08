@@ -187,7 +187,7 @@ function PeakMeterSection() {
 
 // ─── FFT Spectrum Analyzer ──────────────────────────────────
 
-function SpectrumAnalyzer() {
+export function SpectrumAnalyzer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engine = getAudioEngine();
 
