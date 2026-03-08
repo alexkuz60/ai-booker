@@ -440,6 +440,20 @@ class AudioEngine {
     if (this._state === "stopped") {
       this.transport.position = 0;
       for (const t of this.tracks.values()) t.schedule();
+    } else if (this._state === "paused") {
+      // Re-schedule tracks from current position since pause stops all players
+      const pos = this.transport.seconds;
+      for (const t of this.tracks.values()) {
+        t.unschedule();
+        const trackEnd = t.startSec + t.durationSec;
+        if (pos < trackEnd) {
+          if (pos > t.startSec) {
+            t.scheduleWithOffset(pos, pos - t.startSec);
+          } else {
+            t.schedule();
+          }
+        }
+      }
     }
 
     this.transport.start();
