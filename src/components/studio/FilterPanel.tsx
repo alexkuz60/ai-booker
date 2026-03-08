@@ -240,6 +240,12 @@ function FilterResponseGraph({
       ctx.fillStyle = b === selectedBand ? BAND_COLORS[b] : BAND_COLORS_DIM[b];
       ctx.font = "bold 7px monospace"; ctx.textAlign = "center";
       ctx.fillText(freqLabel, x, h - 12);
+      // BW label for bandpass/peaking/notch
+      if (["bandpass", "peaking", "notch"].includes(band.type)) {
+        const bw = qToBw(band.Q);
+        ctx.font = "6px monospace";
+        ctx.fillText(`${bw.toFixed(1)} oct`, x, h - 3);
+      }
     }
 
     // Band dots (at their gain position, not at 0dB)
