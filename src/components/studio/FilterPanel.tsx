@@ -166,7 +166,7 @@ function FilterResponseGraph({
 
     // Grid: freq
     ctx.strokeStyle = "hsla(0, 0%, 100%, 0.07)"; ctx.lineWidth = 1;
-    ctx.fillStyle = "hsla(0, 0%, 100%, 0.18)"; ctx.font = "8px monospace"; ctx.textAlign = "center";
+    ctx.fillStyle = "hsla(0, 0%, 100%, 0.18)"; ctx.font = "11px monospace"; ctx.textAlign = "center";
     for (const f of [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]) {
       const x = fToX(f);
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
@@ -181,7 +181,7 @@ function FilterResponseGraph({
       ctx.lineWidth = db === 0 ? 1 : 0.5;
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
       if (db % 12 === 0) {
-        ctx.fillStyle = "hsla(0, 0%, 100%, 0.2)";
+        ctx.fillStyle = "hsla(0, 0%, 100%, 0.2)"; ctx.font = "10px monospace";
         ctx.fillText(`${db > 0 ? "+" : ""}${db}`, w - 2, y - 2);
       }
     }
@@ -238,12 +238,12 @@ function FilterResponseGraph({
       // Freq label at bottom
       const freqLabel = band.frequency >= 1000 ? `${(band.frequency / 1000).toFixed(1)}k` : `${band.frequency}`;
       ctx.fillStyle = b === selectedBand ? BAND_COLORS[b] : BAND_COLORS_DIM[b];
-      ctx.font = "bold 7px monospace"; ctx.textAlign = "center";
+      ctx.font = "bold 10px monospace"; ctx.textAlign = "center";
       ctx.fillText(freqLabel, x, h - 12);
       // BW label for bandpass/peaking/notch
       if (["bandpass", "peaking", "notch"].includes(band.type)) {
         const bw = qToBw(band.Q);
-        ctx.font = "6px monospace";
+        ctx.font = "9px monospace";
         ctx.fillText(`${bw.toFixed(1)} oct`, x, h - 3);
       }
     }
@@ -269,8 +269,8 @@ function FilterResponseGraph({
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
 
       // Label
-      ctx.fillStyle = BAND_COLORS[b]; ctx.font = "bold 8px monospace"; ctx.textAlign = "center";
-      ctx.fillText(`${b + 1}`, x, 10);
+      ctx.fillStyle = BAND_COLORS[b]; ctx.font = "bold 11px monospace"; ctx.textAlign = "center";
+      ctx.fillText(`${b + 1}`, x, 12);
     }
   }, [bands, selectedBand]);
 
