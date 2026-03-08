@@ -698,6 +698,17 @@ class AudioEngine {
     return this.masterFFT.getValue();
   }
 
+  /** Resize FFT (must be power of 2). Reconnects to the same point in the chain. */
+  setFFTSize(size: number): void {
+    this.masterFFT.dispose();
+    this.masterFFT = new Tone.FFT(size);
+    this.masterReverb.connect(this.masterFFT);
+  }
+
+  getFFTSize(): number {
+    return this.masterFFT.size;
+  }
+
   getTrackMixState(trackId: string): TrackMixState | null {
     return this.tracks.get(trackId)?.getMixState() ?? null;
   }

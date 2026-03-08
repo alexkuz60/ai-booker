@@ -194,19 +194,43 @@ const SPECTRUM_MODES: { id: SpectrumMode; label: string }[] = [
   { id: "mirror", label: "⫼" },
 ];
 
+const FFT_SIZES = [64, 128, 256] as const;
+type FFTSize = typeof FFT_SIZES[number];
+
 export function SpectrumAnalyzer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engine = getAudioEngine();
+
   const [mode, setMode] = useState<SpectrumMode>(() => {
     try { return (localStorage.getItem("spectrum-mode") as SpectrumMode) || "bars"; } catch { return "bars"; }
   });
+  const [fftSize, setFftSize] = useState<FFTSize>(() => {
+    try { const v = Number(localStorage.getItem("spectrum-fft-size")); return FFT_SIZES.includes(v as FFTSize) ? v as FFTSize : 128; } catch { return 128; }
+  });
+  const [smoothing, setSmoothing] = useState(() => {
+    try { const v = Number(localStorage.getItem("spectrum-smoothing")); return isFinite(v) ? v : 0.65; } catch { return 0.65; }
+  });
 
+  // Persist settings
   useEffect(() => {
-    try { localStorage.setItem("spectrum-mode", mode); } catch { /* ignore */ }
-  }, [mode]);
+    try {
+      localStorage.setItem("spectrum-mode", mode);
+      localStorage.setItem("spectrum-fft-size", String(fftSize));
+      localStorage.setItem("spectrum-smoothing", String(smoothing));
+    } catch { /* ignore */ }
+  }, [mode, fftSize, smoothing]);
 
+  // Apply FFT size to engine
+  useEffect(() => {
+    engine.setFFTSize(fftSize);
+  }, [engine, fftSize]);
+
+  // Smoothing buffer ref
+  const smoothRef = useRef<Float32Array | null>(null);
   const modeRef = useRef(mode);
   modeRef.current = mode;
+  const smoothingRef = useRef(smoothing);
+  smoothingRef.current = smoothing;
 
   useEffect(() => {
     let raf: number;
@@ -228,12 +252,23 @@ export function SpectrumAnalyzer() {
       ctx.fillStyle = "hsla(0, 0%, 5%, 0.95)";
       ctx.fillRect(0, 0, w, h);
 
-      const fftData = engine.getFFTData();
-      const usableBins = Math.floor(fftData.length * 0.9);
+      const rawData = engine.getFFTData();
+      const usableBins = Math.floor(rawData.length * 0.9);
       const barWidth = w / usableBins;
       const dbMin = -80;
       const dbMax = 0;
       const dbRange = dbMax - dbMin;
+
+      // Apply temporal smoothing
+      const alpha = smoothingRef.current;
+      if (!smoothRef.current || smoothRef.current.length !== rawData.length) {
+        smoothRef.current = new Float32Array(rawData);
+      } else {
+        for (let i = 0; i < rawData.length; i++) {
+          smoothRef.current[i] = alpha * smoothRef.current[i] + (1 - alpha) * rawData[i];
+        }
+      }
+      const fftData = smoothRef.current;
 
       const currentMode = modeRef.current;
 
@@ -321,26 +356,61 @@ export function SpectrumAnalyzer() {
 
   return (
     <div className="flex flex-col gap-0.5 h-full">
-      <div className="flex items-center justify-between shrink-0">
+      <div className="flex items-center justify-between shrink-0 flex-wrap gap-y-0.5">
         <span className="text-[9px] text-muted-foreground/50 font-body uppercase tracking-wider">
           Spectrum
         </span>
-        <div className="flex gap-0.5">
-          {SPECTRUM_MODES.map(m => (
-            <button
-              key={m.id}
-              onClick={() => setMode(m.id)}
-              className={`px-1.5 py-0.5 rounded text-[9px] font-mono leading-none transition-colors ${
-                mode === m.id
-                  ? "text-primary bg-primary/15"
-                  : "text-muted-foreground/40 hover:text-muted-foreground/70"
-              }`}
-              title={m.id}
-            >
-              {m.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-1.5">
+          {/* FFT Size selector */}
+          <div className="flex gap-0.5">
+            {FFT_SIZES.map(s => (
+              <button
+                key={s}
+                onClick={() => { setFftSize(s); smoothRef.current = null; }}
+                className={`px-1 py-0.5 rounded text-[8px] font-mono leading-none transition-colors ${
+                  fftSize === s
+                    ? "text-accent bg-accent/15"
+                    : "text-muted-foreground/30 hover:text-muted-foreground/60"
+                }`}
+                title={`FFT ${s}`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+          <span className="text-muted-foreground/20">│</span>
+          {/* Mode selector */}
+          <div className="flex gap-0.5">
+            {SPECTRUM_MODES.map(m => (
+              <button
+                key={m.id}
+                onClick={() => setMode(m.id)}
+                className={`px-1.5 py-0.5 rounded text-[9px] font-mono leading-none transition-colors ${
+                  mode === m.id
+                    ? "text-primary bg-primary/15"
+                    : "text-muted-foreground/40 hover:text-muted-foreground/70"
+                }`}
+                title={m.id}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
         </div>
+      </div>
+      {/* Smoothing slider */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <span className="text-[8px] text-muted-foreground/40 font-mono w-7 shrink-0">SMT</span>
+        <input
+          type="range"
+          min={0}
+          max={0.95}
+          step={0.05}
+          value={smoothing}
+          onChange={e => setSmoothing(Number(e.target.value))}
+          className="flex-1 h-2 accent-primary cursor-pointer"
+        />
+        <span className="text-[8px] text-muted-foreground/50 font-mono w-6 text-right">{(smoothing * 100).toFixed(0)}%</span>
       </div>
       <canvas
         ref={canvasRef}
