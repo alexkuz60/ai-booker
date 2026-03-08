@@ -6,7 +6,7 @@
  *   "pan"    — split L/R meter bars from center
  */
 
-import { useRef, useEffect, useCallback, useState } from "react";
+import { useRef, useEffect, useCallback } from "react";
 
 interface VuSliderProps {
   mode: "volume" | "pan";
@@ -20,7 +20,7 @@ interface VuSliderProps {
   label?: string;
 }
 
-const SLIDER_H = 16;
+const SLIDER_H = 18;
 const THUMB_W = 8;
 
 /** Map dB to 0..1 linear for display (-60dB = 0, 0dB = 1) */
@@ -43,11 +43,8 @@ export function VuSlider({
   const containerRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
   const rafRef = useRef(0);
-
-  // Smoothed meter values for rendering
   const smoothedRef = useRef<{ l: number; r: number }>({ l: 0, r: 0 });
 
-  // Draw meter background
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -60,7 +57,6 @@ export function VuSlider({
 
     ctx.clearRect(0, 0, w, h);
 
-    // Get current meter values
     let mL: number, mR: number;
     if (Array.isArray(meterDb)) {
       mL = dbToLinear(meterDb[0]);
@@ -69,7 +65,6 @@ export function VuSlider({
       mL = mR = dbToLinear(meterDb);
     }
 
-    // Smooth
     const alpha = 0.3;
     smoothedRef.current.l += (mL - smoothedRef.current.l) * alpha;
     smoothedRef.current.r += (mR - smoothedRef.current.r) * alpha;
@@ -79,7 +74,6 @@ export function VuSlider({
     const radius = 3 * dpr;
 
     if (mode === "volume") {
-      // Single meter bar from left
       const meterW = sL * w;
       if (meterW > 0) {
         ctx.fillStyle = "hsla(142, 50%, 50%, 0.35)";
@@ -88,7 +82,6 @@ export function VuSlider({
         ctx.fill();
       }
     } else {
-      // Pan mode: L from center-left, R from center-right
       const cx = w / 2;
       const barL = sL * cx;
       const barR = sR * cx;
@@ -106,33 +99,23 @@ export function VuSlider({
         ctx.fill();
       }
 
-      // Center line
-      ctx.fillStyle = "hsla(0, 0%, 50%, 0.4)";
+      // Center line — light red
+      ctx.fillStyle = "hsla(0, 70%, 65%, 0.6)";
       ctx.fillRect(cx - 0.5 * dpr, 0, 1 * dpr, h);
     }
   }, [mode, meterDb]);
 
-  // Animation loop for smooth metering
   useEffect(() => {
     let running = true;
-    const tick = () => {
-      if (!running) return;
-      draw();
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    // Throttle to ~30fps
     const interval = setInterval(() => {
       if (running) draw();
     }, 33);
-
     return () => {
       running = false;
-      cancelAnimationFrame(rafRef.current);
       clearInterval(interval);
     };
   }, [draw]);
 
-  // Resize canvas to match container
   useEffect(() => {
     const container = containerRef.current;
     const canvas = canvasRef.current;
@@ -149,14 +132,13 @@ export function VuSlider({
     return () => ro.disconnect();
   }, []);
 
-  // Mouse interaction for slider
   const getValueFromX = useCallback(
     (clientX: number) => {
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return value;
       const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       if (mode === "volume") return Math.round(ratio * 100);
-      return Math.round((ratio * 200) - 100); // -100..100
+      return Math.round((ratio * 200) - 100);
     },
     [mode, value]
   );
@@ -184,7 +166,6 @@ export function VuSlider({
     dragging.current = false;
   }, []);
 
-  // Thumb position
   const thumbRatio = mode === "volume" ? value / 100 : (value + 100) / 200;
 
   return (
@@ -205,11 +186,19 @@ export function VuSlider({
       />
 
       {/* Track background */}
-      <div className="absolute inset-0 rounded-sm border border-border/50 bg-muted/20" />
+      <div className="absolute inset-0 rounded-sm border border-border bg-muted/30" />
+
+      {/* Center mark for volume slider — light red */}
+      {mode === "volume" && (
+        <div
+          className="absolute top-0 bottom-0 w-px pointer-events-none"
+          style={{ left: "50%", backgroundColor: "hsla(0, 70%, 65%, 0.5)" }}
+        />
+      )}
 
       {/* Thumb */}
       <div
-        className="absolute top-0 bottom-0 rounded-sm bg-foreground/80 shadow-sm transition-[left] duration-75"
+        className="absolute top-0 bottom-0 rounded-sm bg-foreground/90 shadow-sm transition-[left] duration-75"
         style={{
           left: `calc(${thumbRatio * 100}% - ${THUMB_W / 2}px)`,
           width: `${THUMB_W}px`,

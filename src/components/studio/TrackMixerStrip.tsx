@@ -1,9 +1,6 @@
 /**
  * TrackMixerStrip — compact horizontal mixer strip for timeline sidebar.
- * Shows: [Color dot] [Name] [PreFX badge] [Vol slider] [Pan slider] [Reverb badge]
- *
- * In collapsed sidebar: just name + color dot.
- * In expanded sidebar: full mixer strip.
+ * Column layout: [Color dot + Name] | [PreFX] [Vol slider] [Pan slider] [Reverb]
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -11,7 +8,7 @@ import { getAudioEngine, type TrackMeterData, type TrackMixState } from "@/lib/a
 import { VuSlider } from "./VuSlider";
 
 interface TrackMixerStripProps {
-  trackId: string;        // engine track ID (e.g. segment UUID)
+  trackId: string;
   label: string;
   color: string;
   expanded: boolean;
@@ -31,19 +28,11 @@ export function TrackMixerStrip({
 
   const [mix, setMix] = useState<TrackMixState | null>(null);
   const [meter, setMeter] = useState<TrackMeterData | null>(null);
-  const rafRef = useRef(0);
 
   // Poll meter + mix state at ~30fps when expanded
   useEffect(() => {
     if (!expanded) return;
     let running = true;
-    const tick = () => {
-      if (!running) return;
-      setMeter(engine.getTrackMeter(trackId));
-      setMix(engine.getTrackMixState(trackId));
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    // Throttle to 30fps
     const interval = setInterval(() => {
       if (running) {
         setMeter(engine.getTrackMeter(trackId));
@@ -52,7 +41,6 @@ export function TrackMixerStrip({
     }, 33);
     return () => {
       running = false;
-      cancelAnimationFrame(rafRef.current);
       clearInterval(interval);
     };
   }, [expanded, trackId, engine]);
@@ -62,7 +50,7 @@ export function TrackMixerStrip({
   }, [engine, trackId]);
 
   const handlePanChange = useCallback((p: number) => {
-    engine.setTrackPan(trackId, p / 100); // convert -100..100 to -1..1
+    engine.setTrackPan(trackId, p / 100);
   }, [engine, trackId]);
 
   const toggleReverbBypass = useCallback(() => {
@@ -84,78 +72,81 @@ export function TrackMixerStrip({
         }`}
         onClick={onClick}
       >
-        <div className="w-2 h-2 rounded-full shrink-0 mr-2" style={{ backgroundColor: color }} />
-        <span className={`text-xs font-body truncate ${isSelected ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+        <div className="w-2.5 h-2.5 rounded-full shrink-0 mr-2" style={{ backgroundColor: color }} />
+        <span className={`text-xs font-body truncate ${isSelected ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
           {label}
         </span>
       </div>
     );
   }
 
-  // Expanded: full mixer strip
+  // Expanded: full mixer strip with column layout
   const meterLevel = meter?.level ?? -60;
   const meterLR: [number, number] = [meter?.levelL ?? -60, meter?.levelR ?? -60];
 
   return (
     <div
-      className={`flex items-center gap-1.5 px-2 py-1 border-b border-border/50 min-h-[40px] cursor-pointer transition-colors ${
+      className={`flex items-center gap-2 px-2 py-1.5 border-b border-border cursor-pointer transition-colors min-h-[44px] ${
         isSelected ? "bg-accent/20" : "hover:bg-muted/30"
       }`}
       onClick={onClick}
     >
-      {/* Color dot + name */}
-      <div className="flex items-center gap-1.5 min-w-[60px] max-w-[80px] shrink-0">
-        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-        <span className={`text-[10px] font-body truncate ${isSelected ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+      {/* Column 1: Color dot + name — fixed width */}
+      <div className="flex items-center gap-2 w-[90px] shrink-0">
+        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+        <span className={`text-xs font-body truncate ${isSelected ? "text-foreground font-semibold" : "text-foreground/80"}`}>
           {label}
         </span>
       </div>
 
-      {/* Pre-FX badge */}
-      <button
-        className={`text-[8px] px-1 py-0.5 rounded border shrink-0 font-mono uppercase leading-none transition-colors ${
-          mix?.preFxBypassed
-            ? "border-border/50 text-muted-foreground/50 bg-transparent"
-            : "border-accent text-accent bg-accent/10"
-        }`}
-        onClick={(e) => { e.stopPropagation(); togglePreFxBypass(); }}
-        title="Pre-FX"
-      >
-        FX
-      </button>
+      {/* Column 2: Controls — flex fill */}
+      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+        {/* Pre-FX badge */}
+        <button
+          className={`text-[9px] px-1.5 py-0.5 rounded border shrink-0 font-mono uppercase leading-none transition-colors font-semibold ${
+            mix?.preFxBypassed
+              ? "border-border text-muted-foreground/60 bg-transparent"
+              : "border-accent text-accent bg-accent/15"
+          }`}
+          onClick={(e) => { e.stopPropagation(); togglePreFxBypass(); }}
+          title="Pre-FX"
+        >
+          FX
+        </button>
 
-      {/* Volume slider with VU */}
-      <div className="flex-1 min-w-[50px]" onClick={(e) => e.stopPropagation()}>
-        <VuSlider
-          mode="volume"
-          value={mix?.volume ?? 80}
-          meterDb={meterLevel}
-          onChange={handleVolumeChange}
-        />
+        {/* Volume slider with VU */}
+        <div className="flex-1 min-w-[60px]" onClick={(e) => e.stopPropagation()}>
+          <VuSlider
+            mode="volume"
+            value={mix?.volume ?? 80}
+            meterDb={meterLevel}
+            onChange={handleVolumeChange}
+          />
+        </div>
+
+        {/* Pan slider with L/R VU */}
+        <div className="w-[60px] shrink-0" onClick={(e) => e.stopPropagation()}>
+          <VuSlider
+            mode="pan"
+            value={Math.round((mix?.pan ?? 0) * 100)}
+            meterDb={meterLR}
+            onChange={handlePanChange}
+          />
+        </div>
+
+        {/* Reverb badge */}
+        <button
+          className={`text-[9px] px-1.5 py-0.5 rounded border shrink-0 font-mono uppercase leading-none transition-colors font-semibold ${
+            mix?.reverbBypassed
+              ? "border-border text-muted-foreground/60 bg-transparent"
+              : "border-primary text-primary bg-primary/15"
+          }`}
+          onClick={(e) => { e.stopPropagation(); toggleReverbBypass(); }}
+          title="Reverb"
+        >
+          RV
+        </button>
       </div>
-
-      {/* Pan slider with L/R VU */}
-      <div className="w-[50px] shrink-0" onClick={(e) => e.stopPropagation()}>
-        <VuSlider
-          mode="pan"
-          value={Math.round((mix?.pan ?? 0) * 100)}
-          meterDb={meterLR}
-          onChange={handlePanChange}
-        />
-      </div>
-
-      {/* Reverb badge */}
-      <button
-        className={`text-[8px] px-1 py-0.5 rounded border shrink-0 font-mono uppercase leading-none transition-colors ${
-          mix?.reverbBypassed
-            ? "border-border/50 text-muted-foreground/50 bg-transparent"
-            : "border-primary text-primary bg-primary/10"
-        }`}
-        onClick={(e) => { e.stopPropagation(); toggleReverbBypass(); }}
-        title="Reverb"
-      >
-        RV
-      </button>
     </div>
   );
 }
