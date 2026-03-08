@@ -822,8 +822,8 @@ export function StudioTimeline({
                 <Playhead positionSec={player.positionSec} zoom={zoom} />
               </div>
             </ScrollArea>
-            {/* FFT Spectrum Analyzer — fills remaining space */}
-            <div className="flex-1 min-h-[80px] p-2">
+            {/* FFT Spectrum Analyzer — fills remaining space to bottom */}
+            <div className="flex-1 min-h-0 p-2">
               <SpectrumAnalyzer />
             </div>
           </div>
