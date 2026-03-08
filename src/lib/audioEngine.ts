@@ -422,16 +422,16 @@ class AudioEngine {
     // FFT analyzer (128 bins for smooth spectrum display)
     this.masterFFT = new Tone.FFT(128);
 
-    // Chain: MasterBus → EQ → Filter1→…→Filter5 → MBC → Comp → Limiter → Reverb → Splitter → Meters + Destination
+    // Chain: MasterBus → EQ → Comp → Limiter → Filter1→…→Filter5 → MBC → Reverb → Splitter → Meters + Destination
     this.masterBus.connect(this.masterEQ);
-    this.masterEQ.connect(this.masterFilters[0]);
+    this.masterEQ.connect(this.masterComp);
+    this.masterComp.connect(this.masterLimiter);
+    this.masterLimiter.connect(this.masterFilters[0]);
     for (let i = 0; i < 4; i++) {
       this.masterFilters[i].connect(this.masterFilters[i + 1]);
     }
     this.masterFilters[4].connect(this.masterMBC);
-    this.masterMBC.connect(this.masterComp);
-    this.masterComp.connect(this.masterLimiter);
-    this.masterLimiter.connect(this.masterReverb);
+    this.masterMBC.connect(this.masterReverb);
     this.masterReverb.connect(this.masterSplitter);
     this.masterSplitter.connect(this.masterMeterL, 0);
     this.masterSplitter.connect(this.masterMeterR, 1);

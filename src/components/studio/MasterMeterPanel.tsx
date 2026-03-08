@@ -422,7 +422,6 @@ const PLUGIN_GROUPS: PluginGroup[] = [
     title: "Pre", titleRu: "Пре",
     slots: [
       { id: "eq", label: "EQ", labelRu: "EQ" },
-      { id: "mbc", label: "MBC", labelRu: "МБК" },
       { id: "comp", label: "CMP", labelRu: "КМП" },
     ],
   },
@@ -436,6 +435,7 @@ const PLUGIN_GROUPS: PluginGroup[] = [
     title: "Master", titleRu: "Мастер",
     slots: [
       { id: "filter", label: "FLT", labelRu: "ФЛТ" },
+      { id: "mbc", label: "MBC", labelRu: "МБК" },
       { id: "reverb", label: "REV", labelRu: "РЕВ" },
     ],
   },

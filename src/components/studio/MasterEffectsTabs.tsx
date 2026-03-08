@@ -361,10 +361,10 @@ type EffectTab = "spectrum" | "eq" | "filter" | "mbc" | "comp" | "limit" | "reve
 const TABS: { id: EffectTab; label: string; labelRu: string }[] = [
   { id: "spectrum", label: "FFT", labelRu: "FFT" },
   { id: "eq", label: "EQ", labelRu: "EQ" },
-  { id: "filter", label: "FLT", labelRu: "ФЛТ" },
-  { id: "mbc", label: "MBC", labelRu: "МБК" },
   { id: "comp", label: "CMP", labelRu: "КМП" },
   { id: "limit", label: "LIM", labelRu: "ЛИМ" },
+  { id: "filter", label: "FLT", labelRu: "ФЛТ" },
+  { id: "mbc", label: "MBC", labelRu: "МБК" },
   { id: "reverb", label: "REV", labelRu: "РЕВ" },
 ];
 
