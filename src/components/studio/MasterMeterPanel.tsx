@@ -252,12 +252,23 @@ export function SpectrumAnalyzer() {
       ctx.fillStyle = "hsla(0, 0%, 5%, 0.95)";
       ctx.fillRect(0, 0, w, h);
 
-      const fftData = engine.getFFTData();
-      const usableBins = Math.floor(fftData.length * 0.9);
+      const rawData = engine.getFFTData();
+      const usableBins = Math.floor(rawData.length * 0.9);
       const barWidth = w / usableBins;
       const dbMin = -80;
       const dbMax = 0;
       const dbRange = dbMax - dbMin;
+
+      // Apply temporal smoothing
+      const alpha = smoothingRef.current;
+      if (!smoothRef.current || smoothRef.current.length !== rawData.length) {
+        smoothRef.current = new Float32Array(rawData);
+      } else {
+        for (let i = 0; i < rawData.length; i++) {
+          smoothRef.current[i] = alpha * smoothRef.current[i] + (1 - alpha) * rawData[i];
+        }
+      }
+      const fftData = smoothRef.current;
 
       const currentMode = modeRef.current;
 
