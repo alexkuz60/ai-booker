@@ -50,9 +50,9 @@ function DbScale() {
   );
 }
 
-// ─── Single-channel meter bar (canvas) ──────────────────────
+// ─── Single-channel meter bar (canvas) with peak hold line ──
 
-function LargeMeterSingleChannel({ channel }: { channel: "L" | "R" }) {
+function LargeMeterSingleChannel({ channel, peakDb }: { channel: "L" | "R"; peakDb: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engine = getAudioEngine();
 
@@ -102,8 +102,19 @@ function LargeMeterSingleChannel({ channel }: { channel: "L" | "R" }) {
         ctx.fillRect(zeroX, 0, fillW - zeroX, h);
       }
 
+      // 0 dB reference line
       ctx.fillStyle = "hsla(0, 0%, 100%, 0.3)";
       ctx.fillRect(zeroX, 0, 1, h);
+
+      // Peak hold line
+      const pk = channel === "L" ? meter.peakL : meter.peakR;
+      const peakFrac = dbToFraction(pk);
+      if (peakFrac > 0) {
+        const peakX = peakFrac * w;
+        const isClip = pk >= 0;
+        ctx.fillStyle = isClip ? "hsl(0, 90%, 60%)" : "hsla(50, 100%, 80%, 0.9)";
+        ctx.fillRect(peakX - 1, 0, 2, h);
+      }
 
       raf = requestAnimationFrame(draw);
     };
@@ -112,6 +123,26 @@ function LargeMeterSingleChannel({ channel }: { channel: "L" | "R" }) {
   }, [engine, channel]);
 
   return <canvas ref={canvasRef} className="w-full h-full" />;
+}
+
+// ─── Peak readout (numeric dB) ──────────────────────────────
+
+function PeakReadout({ peakDb }: { peakDb: number }) {
+  const isClip = peakDb >= 0;
+  const display = peakDb <= DB_MIN
+    ? "-∞"
+    : `${peakDb >= 0 ? "+" : ""}${peakDb.toFixed(1)}`;
+
+  return (
+    <span
+      className={`font-mono text-[9px] leading-none w-8 text-right shrink-0 font-bold ${
+        isClip ? "text-destructive" : "text-foreground/70"
+      }`}
+      title="Peak hold (dB)"
+    >
+      {display}
+    </span>
+  );
 }
 
 // ─── Plugin definitions ─────────────────────────────────────
