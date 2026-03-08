@@ -190,7 +190,7 @@ function CompPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
   const [ratio, setRatio] = useState(params.compRatio);
   const [attack, setAttack] = useState(params.compAttack);
   const [release, setRelease] = useState(params.compRelease);
-  const [knee, setKnee] = useState(params.compKnee ?? 6);
+  const [knee, setKnee] = useState(params.compKnee);
 
   return (
     <div className="flex gap-4 max-w-lg">
@@ -208,7 +208,7 @@ function CompPanel({ isRu, disabled }: { isRu: boolean; disabled: boolean }) {
         <ParamSlider label={isRu ? "Соотн." : "Ratio"} value={ratio} min={1} max={20} step={0.5} unit=":1"
           onChange={v => { setRatio(v); engine.setMasterCompRatio(v); }} disabled={disabled} />
         <ParamSlider label="Knee" value={knee} min={0} max={30} step={1} unit=" dB"
-          onChange={v => { setKnee(v); engine.setMasterCompKnee?.(v); }} disabled={disabled} />
+          onChange={v => { setKnee(v); engine.setMasterCompKnee(v); }} disabled={disabled} />
         <ParamSlider label={isRu ? "Атака" : "Attack"} value={attack} min={0.001} max={0.5} step={0.001} unit=" s"
           onChange={v => { setAttack(v); engine.setMasterCompAttack(v); }} disabled={disabled} />
         <ParamSlider label={isRu ? "Восст." : "Release"} value={release} min={0.01} max={1.0} step={0.01} unit=" s"
