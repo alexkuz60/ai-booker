@@ -470,10 +470,35 @@ export function FilterPanel({ isRu, disabled }: { isRu: boolean; disabled: boole
             ))}
           </div>
 
-          {/* Band info */}
-          <span className="text-[9px] text-muted-foreground/50 font-mono">
-            {TYPE_LABELS[band.type]} {band.frequency >= 1000 ? `${(band.frequency / 1000).toFixed(1)}k` : band.frequency}Hz
-          </span>
+          {/* Type select — above sliders */}
+          <div className="flex flex-col gap-0">
+            <span className="text-[10px] text-muted-foreground font-mono uppercase">{isRu ? "Тип" : "Type"}</span>
+            <select
+              value={band.type}
+              onChange={e => updateBand(selected, { type: e.target.value as FilterType })}
+              disabled={disabled}
+              className="h-5 bg-background border border-border/60 rounded text-[9px] font-mono text-foreground/80 px-1 disabled:opacity-30"
+            >
+              {FILTER_TYPES.map(t => (
+                <option key={t} value={t}>{TYPE_LABELS[t]} — {t}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Rolloff select — above sliders */}
+          <div className="flex flex-col gap-0">
+            <span className="text-[10px] text-muted-foreground font-mono uppercase">{isRu ? "Крутизна" : "Rolloff"}</span>
+            <select
+              value={band.rolloff}
+              onChange={e => updateBand(selected, { rolloff: Number(e.target.value) as FilterRolloff })}
+              disabled={disabled}
+              className="h-5 bg-background border border-border/60 rounded text-[9px] font-mono text-foreground/80 px-1 disabled:opacity-30"
+            >
+              {ROLLOFFS.map(r => (
+                <option key={r} value={r}>{r} dB/oct</option>
+              ))}
+            </select>
+          </div>
 
           {/* Sliders */}
           <LogFreqSlider
@@ -492,35 +517,16 @@ export function FilterPanel({ isRu, disabled }: { isRu: boolean; disabled: boole
             onChange={v => updateBand(selected, { Q: v })} disabled={disabled}
           />
 
-          {/* Type select */}
-          <div className="flex flex-col gap-0">
-            <span className="text-[10px] text-muted-foreground font-mono uppercase">{isRu ? "Тип" : "Type"}</span>
-            <select
-              value={band.type}
-              onChange={e => updateBand(selected, { type: e.target.value as FilterType })}
+          {/* Bandwidth slider — only for bandpass/peaking/notch */}
+          {BW_TYPES.includes(band.type) && (
+            <FltSlider
+              label={isRu ? "Ширина" : "BW"}
+              value={Math.round(qToBw(band.Q) * 100) / 100}
+              min={0.1} max={4} step={0.01} unit=" oct"
+              onChange={v => updateBand(selected, { Q: Math.round(bwToQ(v) * 100) / 100 })}
               disabled={disabled}
-              className="h-5 bg-background border border-border/60 rounded text-[9px] font-mono text-foreground/80 px-1 disabled:opacity-30"
-            >
-              {FILTER_TYPES.map(t => (
-                <option key={t} value={t}>{TYPE_LABELS[t]} — {t}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Rolloff select */}
-          <div className="flex flex-col gap-0">
-            <span className="text-[10px] text-muted-foreground font-mono uppercase">{isRu ? "Крутизна" : "Rolloff"}</span>
-            <select
-              value={band.rolloff}
-              onChange={e => updateBand(selected, { rolloff: Number(e.target.value) as FilterRolloff })}
-              disabled={disabled}
-              className="h-5 bg-background border border-border/60 rounded text-[9px] font-mono text-foreground/80 px-1 disabled:opacity-30"
-            >
-              {ROLLOFFS.map(r => (
-                <option key={r} value={r}>{r} dB/oct</option>
-              ))}
-            </select>
-          </div>
+            />
+          )}
         </div>
       </div>
     </div>
