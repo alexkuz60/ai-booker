@@ -406,7 +406,7 @@ export function SpectrumAnalyzer() {
 // ─── Plugin slot definition ─────────────────────────────────
 
 interface PluginSlot {
-  id: "eq" | "filter" | "comp" | "limit" | "reverb";
+  id: "eq" | "filter" | "mbc" | "comp" | "limit" | "reverb";
   label: string;
   labelRu: string;
 }
@@ -422,6 +422,7 @@ const PLUGIN_GROUPS: PluginGroup[] = [
     title: "Pre", titleRu: "Пре",
     slots: [
       { id: "eq", label: "EQ", labelRu: "EQ" },
+      { id: "mbc", label: "MBC", labelRu: "МБК" },
       { id: "comp", label: "CMP", labelRu: "КМП" },
     ],
   },
@@ -435,7 +436,7 @@ const PLUGIN_GROUPS: PluginGroup[] = [
     title: "Master", titleRu: "Мастер",
     slots: [
       { id: "filter", label: "FLT", labelRu: "ФЛТ" },
-      { id: "reverb", label: "REV", labelRu: "РЕВ" },
+      { id: "reverb", label: "REV", labelRу: "РЕВ" },
     ],
   },
 ];
