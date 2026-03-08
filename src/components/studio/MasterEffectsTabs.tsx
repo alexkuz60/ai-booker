@@ -429,7 +429,7 @@ export function MasterEffectsTabs({ isRu }: MasterEffectsTabsProps) {
       <div className="flex items-center gap-1 shrink-0 px-1">
         {TABS.map(tab => {
           const isActive = activeTab === tab.id;
-          const pluginId = tab.id === "spectrum" ? null : (tab.id as "eq" | "filter" | "comp" | "limit" | "reverb");
+          const pluginId = tab.id === "spectrum" ? null : (tab.id as "eq" | "filter" | "mbc" | "comp" | "limit" | "reverb");
           const isBypassed = pluginId ? (masterBypassed || pluginStates[pluginId]) : false;
 
           return (
