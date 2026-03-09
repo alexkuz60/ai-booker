@@ -1,10 +1,10 @@
-import { SCENE_SILENCE_SEC } from "@/hooks/useTimelineClips";
+import { SCENE_SILENCE_SEC, type SceneBoundary } from "@/hooks/useTimelineClips";
 
 interface TimelineRulerProps {
   zoom: number;
   duration: number;
-  /** Scene boundary offsets in seconds where a 2s silence gap starts */
-  sceneBoundaries?: number[];
+  /** Scene boundaries with start offset and silence duration */
+  sceneBoundaries?: SceneBoundary[];
 }
 
 export function TimelineRuler({ zoom, duration, sceneBoundaries }: TimelineRulerProps) {
@@ -19,19 +19,21 @@ export function TimelineRuler({ zoom, duration, sceneBoundaries }: TimelineRuler
   return (
     <div className="flex items-end h-6 border-b border-border relative" style={{ width: `${duration * zoom * 4}px` }}>
       {/* Scene silence gap markers */}
-      {sceneBoundaries?.map((startSec) => {
-        const silenceWidthPx = SCENE_SILENCE_SEC * zoom * 4;
+      {sceneBoundaries?.map((boundary) => {
+        const silenceDuration = boundary.silenceSec ?? SCENE_SILENCE_SEC;
+        const silenceWidthPx = silenceDuration * zoom * 4;
         return (
           <div
-            key={`silence-${startSec}`}
+            key={`silence-${boundary.startSec}`}
             className="absolute top-0 bottom-0 pointer-events-none"
             style={{
-              left: `${startSec * zoom * 4}px`,
+              left: `${boundary.startSec * zoom * 4}px`,
               width: `${silenceWidthPx}px`,
-              background: "repeating-linear-gradient(90deg, hsl(var(--muted-foreground)/0.10) 0px, hsl(var(--muted-foreground)/0.10) 2px, transparent 2px, transparent 6px)",
-              borderLeft: "1px solid hsl(var(--muted-foreground)/0.35)",
+              background: "hsl(var(--primary) / 0.25)",
+              borderLeft: "2px solid hsl(var(--primary) / 0.5)",
+              borderRight: "1px dashed hsl(var(--primary) / 0.3)",
             }}
-            title={`Тишина ${SCENE_SILENCE_SEC}s`}
+            title={`Тишина ${silenceDuration}s`}
           />
         );
       })}

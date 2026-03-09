@@ -172,6 +172,7 @@ export type Database = {
           mood: string | null
           scene_number: number
           scene_type: string | null
+          silence_sec: number
           title: string
         }
         Insert: {
@@ -183,6 +184,7 @@ export type Database = {
           mood?: string | null
           scene_number?: number
           scene_type?: string | null
+          silence_sec?: number
           title?: string
         }
         Update: {
@@ -194,6 +196,7 @@ export type Database = {
           mood?: string | null
           scene_number?: number
           scene_type?: string | null
+          silence_sec?: number
           title?: string
         }
         Relationships: [
