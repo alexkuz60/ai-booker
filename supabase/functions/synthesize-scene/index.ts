@@ -208,6 +208,49 @@ async function callTts(
   return { audio, durationMs };
 }
 
+// ── ProxyAPI TTS call helper ─────────────────────────────────────────
+
+async function callProxyApiTts(
+  proxyApiKey: string,
+  params: {
+    text: string;
+    voice: string;
+    model?: string;
+    speed?: number;
+    instructions?: string;
+  }
+): Promise<{ audio: Uint8Array; durationMs: number } | { error: string }> {
+  const payload: Record<string, unknown> = {
+    model: params.model || "gpt-4o-mini-tts",
+    input: params.text,
+    voice: params.voice,
+    response_format: "mp3",
+    speed: params.speed ?? 1.0,
+  };
+  if (params.instructions && (params.model === "gpt-4o-mini-tts" || !params.model)) {
+    payload.instructions = params.instructions;
+  }
+
+  const resp = await fetch("https://api.proxyapi.ru/openai/v1/audio/speech", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${proxyApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!resp.ok) {
+    const errBody = await resp.text();
+    return { error: `ProxyAPI TTS ${resp.status}: ${errBody}` };
+  }
+
+  const audioBuffer = await resp.arrayBuffer();
+  const audio = new Uint8Array(audioBuffer);
+  const durationMs = parseMp3Duration(audio);
+  return { audio, durationMs };
+}
+
 // ── SSML builder for dialogue with inline narration pauses ───────────
 
 function buildDialogueSsml(
