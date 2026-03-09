@@ -618,13 +618,8 @@ export function StudioTimeline({
           </div>
           <ScrollArea className="flex-1">
             <div
+              ref={timelineAreaRef}
               className="min-w-full relative cursor-crosshair"
-              onWheel={(e) => {
-                if (e.ctrlKey || e.metaKey) {
-                  e.preventDefault();
-                  adjustZoom(e.deltaY < 0 ? 0.15 : -0.15);
-                }
-              }}
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = e.clientX - rect.left;
