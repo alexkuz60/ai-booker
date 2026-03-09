@@ -358,6 +358,7 @@ export function StoryboardPanel({
   const [characters, setCharacters] = useState<CharacterOption[]>([]);
   const [audioStatus, setAudioStatus] = useState<Map<string, { status: string; durationMs: number }>>(new Map());
   const [inlineNarrationSegIds, setInlineNarrationSegIds] = useState<Set<string>>(new Set());
+  const [currentlySynthesizingIds, setCurrentlySynthesizingIds] = useState<Set<string>>(new Set());
 
   // Scroll selected segment into view when set externally (from timeline)
   useEffect(() => {
