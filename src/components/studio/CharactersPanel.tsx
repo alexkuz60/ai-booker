@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { YANDEX_VOICES, ROLE_LABELS } from "@/config/yandexVoices";
 import { ELEVENLABS_VOICES } from "@/config/elevenlabsVoices";
-import { PROXYAPI_TTS_VOICES, PROXYAPI_TTS_MODELS } from "@/config/proxyapiVoices";
+import { PROXYAPI_TTS_VOICES, PROXYAPI_TTS_MODELS, getVoicesForModel } from "@/config/proxyapiVoices";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -1587,7 +1587,15 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                     <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       {isRu ? "Модель" : "Model"}
                     </label>
-                    <Select value={paModel} onValueChange={v => { setPaModel(v); markDirty(); }}>
+                    <Select value={paModel} onValueChange={v => {
+                      setPaModel(v);
+                      // Reset voice if current voice not available for new model
+                      const available = getVoicesForModel(v);
+                      if (!available.some(av => av.id === paVoice)) {
+                        setPaVoice(available[0]?.id ?? "alloy");
+                      }
+                      markDirty();
+                    }}>
                       <SelectTrigger className="bg-secondary border-border">
                         <SelectValue />
                       </SelectTrigger>
@@ -1616,7 +1624,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-card border-border max-h-64">
-                        {PROXYAPI_TTS_VOICES.map(v => (
+                        {getVoicesForModel(paModel).map(v => (
                           <SelectItem key={v.id} value={v.id}>
                             <div className="flex items-center gap-2">
                               <span>{v.name}</span>

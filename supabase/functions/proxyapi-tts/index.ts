@@ -8,7 +8,9 @@ const corsHeaders = {
 
 // ProxyAPI TTS models and their capabilities
 const VALID_MODELS = new Set(["gpt-4o-mini-tts", "tts-1", "tts-1-hd"]);
-const VALID_VOICES = new Set(["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"]);
+const BASE_VOICES = new Set(["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"]);
+const EXTENDED_VOICES = new Set(["ballad", "verse", "marin", "cedar"]); // gpt-4o-mini-tts only
+const ALL_VOICES = new Set([...BASE_VOICES, ...EXTENDED_VOICES]);
 const VALID_FORMATS = new Set(["mp3", "opus", "aac", "flac", "wav", "pcm"]);
 
 // Only gpt-4o-mini-tts supports instructions
@@ -89,9 +91,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!VALID_VOICES.has(voice)) {
+    if (!ALL_VOICES.has(voice)) {
       return new Response(
-        JSON.stringify({ error: `Invalid voice. Use: ${[...VALID_VOICES].join(", ")}` }),
+        JSON.stringify({ error: `Invalid voice. Use: ${[...ALL_VOICES].join(", ")}` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Extended voices only work with gpt-4o-mini-tts
+    if (EXTENDED_VOICES.has(voice) && model !== "gpt-4o-mini-tts") {
+      return new Response(
+        JSON.stringify({ error: isRu ? `Голос "${voice}" доступен только для gpt-4o-mini-tts.` : `Voice "${voice}" is only available for gpt-4o-mini-tts.` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
