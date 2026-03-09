@@ -519,6 +519,46 @@ export function StoryboardPanel({
     if (sceneId) loadSegments(sceneId);
   }, [sceneId, loadSegments]);
 
+  // Realtime subscription: listen for segment_audio inserts to update synthesizing state per-clip
+  useEffect(() => {
+    if (segments.length === 0 || currentlySynthesizingIds.size === 0) return;
+
+    const segmentIds = segments.map(s => s.segment_id);
+    const channel = supabase
+      .channel(`segment_audio_${sceneId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "segment_audio",
+          filter: `segment_id=in.(${segmentIds.join(",")})`,
+        },
+        (payload) => {
+          const completedSegId = (payload.new as { segment_id: string }).segment_id;
+          // Remove from synthesizing set
+          setCurrentlySynthesizingIds(prev => {
+            const next = new Set(prev);
+            next.delete(completedSegId);
+            onSynthesizingChange?.(next);
+            return next;
+          });
+          // Update audio status for this segment
+          const newAudio = payload.new as { segment_id: string; status: string; duration_ms: number };
+          setAudioStatus(prev => {
+            const next = new Map(prev);
+            next.set(newAudio.segment_id, { status: newAudio.status, durationMs: newAudio.duration_ms });
+            return next;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [segments.map(s => s.segment_id).join(","), currentlySynthesizingIds.size > 0, sceneId, onSynthesizingChange]);
+
   // Run AI segmentation
   const runAnalysis = useCallback(async () => {
     if (!sceneId || !sceneContent) return;
