@@ -156,10 +156,24 @@ const Studio = () => {
             const speaker = segToSpeaker.get(a.segment_id);
             if (speaker && charVoiceMap.size > 0) {
               const currentVc = charVoiceMap.get(speaker.toLowerCase());
-              if (currentVc) {
+              // Only compare if character has an explicitly configured voice
+              if (currentVc && currentVc.voice) {
                 const savedVc = (a.voice_config || {}) as Record<string, unknown>;
                 const keys = ["voice", "role", "speed", "pitchShift", "volume"];
-                const changed = keys.some(k => String(currentVc[k] ?? "") !== String(savedVc[k] ?? ""));
+                const changed = keys.some(k => {
+                  const cur = currentVc[k];
+                  const sav = savedVc[k];
+                  // Normalize: treat undefined/null/"" as equivalent empty
+                  const curStr = (cur !== undefined && cur !== null && cur !== "") ? String(cur) : "";
+                  const savStr = (sav !== undefined && sav !== null && sav !== "") ? String(sav) : "";
+                  // For numeric fields, compare numerically to avoid "1" vs "1.0" issues
+                  if (k === "speed" || k === "pitchShift" || k === "volume") {
+                    const curNum = curStr ? Number(curStr) : -999;
+                    const savNum = savStr ? Number(savStr) : -999;
+                    return Math.abs(curNum - savNum) > 0.01;
+                  }
+                  return curStr !== savStr;
+                });
                 if (changed) stale.add(sceneId);
               }
             }
