@@ -92,7 +92,7 @@ export function TrackMixerStrip({
 
   return (
     <div
-      className={`flex items-center gap-2 px-2 py-1.5 border-b border-border cursor-pointer transition-colors min-h-[44px] ${
+      className={`flex items-center gap-2 px-2 border-b border-border/50 cursor-pointer transition-colors h-10 ${
         isSelected ? "bg-accent/20" : "hover:bg-muted/30"
       }`}
       onClick={onClick}
