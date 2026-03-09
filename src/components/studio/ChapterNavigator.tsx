@@ -190,6 +190,10 @@ export function ChapterNavigator({
                 {chapter.scenes.map((scene, idx) => {
                   const colorClass = SCENE_TYPE_COLORS[scene.scene_type] || SCENE_TYPE_COLORS.mixed;
                   const est = estimateSceneDuration(scene);
+                  const actualMs = scene.id ? playlistDurations.get(scene.id) : undefined;
+                  const actualSec = actualMs && actualMs > 0 ? Math.round(actualMs / 1000) : null;
+                  const displayDuration = actualSec ? formatDuration(actualSec) : est.formatted;
+                  const isActual = !!actualSec;
                   return (
                     <button
                       key={idx}
@@ -222,8 +226,17 @@ export function ChapterNavigator({
                           <Film className="h-3 w-3 text-primary shrink-0" />
                         </span>
                       ) : null}
-                      <span className="text-[11px] text-muted-foreground font-mono shrink-0" title={`${est.chars} ${isRu ? "сим." : "chars"}`}>
-                        {est.formatted}
+                      <span
+                        className={cn(
+                          "text-[11px] font-mono shrink-0",
+                          isActual ? "text-foreground" : "text-muted-foreground"
+                        )}
+                        title={isActual
+                          ? `${isRu ? "Фактическое время" : "Actual duration"} (${est.chars} ${isRu ? "сим." : "chars"})`
+                          : `≈ ${est.chars} ${isRu ? "сим." : "chars"}`
+                        }
+                      >
+                        {!isActual && "≈"}{displayDuration}
                       </span>
                     </button>
                   );
