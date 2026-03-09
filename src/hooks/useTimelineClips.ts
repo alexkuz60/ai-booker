@@ -245,11 +245,17 @@ export function useTimelineClips(
 
           let inlineTrackId = "narrator-fallback";
           const inlineMappings = typeMappings?.get(sceneId);
-          const fpCharId = inlineMappings?.get("first_person");
-          if (fpCharId) {
-            inlineTrackId = `char-${fpCharId}`;
-          } else if (characterMap.has("рассказчик")) {
-            inlineTrackId = `char-${characterMap.get("рассказчик")}`;
+          // Priority: explicit inline_narration mapping > first_person mapping > system Рассказчик
+          const inlineCharId = inlineMappings?.get("inline_narration");
+          if (inlineCharId) {
+            inlineTrackId = `char-${inlineCharId}`;
+          } else {
+            const fpCharId = inlineMappings?.get("first_person");
+            if (fpCharId) {
+              inlineTrackId = `char-${fpCharId}`;
+            } else if (characterMap.has("рассказчик")) {
+              inlineTrackId = `char-${characterMap.get("рассказчик")}`;
+            }
           }
 
           for (let n = 0; n < inlineNarrAudio.length; n++) {

@@ -361,6 +361,8 @@ export function StoryboardPanel({
   const [audioStatus, setAudioStatus] = useState<Map<string, { status: string; durationMs: number }>>(new Map());
   const [inlineNarrationSegIds, setInlineNarrationSegIds] = useState<Set<string>>(new Set());
   const [currentlySynthesizingIds, setCurrentlySynthesizingIds] = useState<Set<string>>(new Set());
+  /** Current speaker assigned to inline narrations (from scene_type_mappings with segment_type="inline_narration") */
+  const [inlineNarrationSpeaker, setInlineNarrationSpeaker] = useState<string | null>(null);
 
   // Scroll selected segment into view when set externally (from timeline)
   useEffect(() => {
@@ -436,12 +438,17 @@ export function StoryboardPanel({
 
       // Build mapping: segment_type → character name
       const typeSpeakerMap = new Map<string, string>();
+      let loadedInlineSpeaker: string | null = null;
       if (mappings) {
         for (const m of mappings as any[]) {
           const name = charNameMap.get(m.character_id);
-          if (name) typeSpeakerMap.set(m.segment_type, name);
+          if (name) {
+            typeSpeakerMap.set(m.segment_type, name);
+            if (m.segment_type === "inline_narration") loadedInlineSpeaker = name;
+          }
         }
       }
+      setInlineNarrationSpeaker(loadedInlineSpeaker);
 
       const phraseMap = new Map<string, Phrase[]>();
       for (const p of phrases || []) {
@@ -878,6 +885,43 @@ export function StoryboardPanel({
     setDetecting(false);
   }, [sceneId, dialogueCount, isRu, loadSegments]);
 
+  // ── Update inline narration voice assignment ──
+  const updateInlineNarrationSpeaker = useCallback(async (newSpeaker: string | null) => {
+    if (!sceneId) return;
+    setInlineNarrationSpeaker(newSpeaker);
+    const charRecord = newSpeaker ? characters.find(c => c.name === newSpeaker) : null;
+    if (charRecord) {
+      await supabase
+        .from("scene_type_mappings" as any)
+        .upsert(
+          { scene_id: sceneId, segment_type: "inline_narration", character_id: charRecord.id },
+          { onConflict: "scene_id,segment_type" }
+        );
+      // Ensure character_appearances for timeline track
+      const { data: existing } = await supabase
+        .from("character_appearances")
+        .select("id")
+        .eq("character_id", charRecord.id)
+        .eq("scene_id", sceneId)
+        .maybeSingle();
+      if (!existing) {
+        await supabase.from("character_appearances").upsert(
+          { character_id: charRecord.id, scene_id: sceneId, role_in_scene: "narrator", segment_ids: [] },
+          { onConflict: "character_id,scene_id" }
+        );
+      }
+      toast.success(isRu ? `Голос вставок → ${newSpeaker}` : `Narration voice → ${newSpeaker}`);
+    } else {
+      await supabase
+        .from("scene_type_mappings" as any)
+        .delete()
+        .eq("scene_id", sceneId)
+        .eq("segment_type", "inline_narration");
+      toast.success(isRu ? "Голос вставок сброшен" : "Narration voice reset");
+    }
+    onSegmented?.(sceneId); // refresh timeline
+  }, [sceneId, characters, isRu, onSegmented]);
+
   // ── No scene selected ──
   if (!sceneId) {
     return (
@@ -1080,6 +1124,18 @@ export function StoryboardPanel({
                 {/* Inline narrations detail */}
                 {seg.inline_narrations && seg.inline_narrations.length > 0 && (
                   <div className="px-3 py-1 bg-accent/10 border-t border-border/30">
+                    <div className="flex items-center gap-2 mb-1">
+                      <BookOpen className="h-3 w-3 text-yellow-400/70" />
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        {isRu ? "Голос вставок:" : "Narration voice:"}
+                      </span>
+                      <SpeakerBadge
+                        speaker={inlineNarrationSpeaker}
+                        characters={characters}
+                        isRu={isRu}
+                        onChange={updateInlineNarrationSpeaker}
+                      />
+                    </div>
                     {seg.inline_narrations.map((n, idx) => (
                       <div key={idx} className="text-sm font-body flex items-start gap-1 leading-relaxed">
                         <BookOpen className="h-3 w-3 mt-1 shrink-0 text-yellow-400/70" />
