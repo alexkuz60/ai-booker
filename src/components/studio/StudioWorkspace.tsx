@@ -24,6 +24,7 @@ interface StudioWorkspaceProps {
   onErrorSegmentsChange?: (ids: Set<string>) => void;
   silenceSec?: number;
   onSilenceSecChange?: (sec: number) => void;
+  onRecalcDone?: () => void;
 }
 
 export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter, activeTab: externalTab, onTabChange, selectedSegmentId, onSelectSegment, onSynthesizingChange, onErrorSegmentsChange, silenceSec, onSilenceSecChange }: StudioWorkspaceProps) {
