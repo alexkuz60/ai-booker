@@ -1,5 +1,16 @@
+import { useState } from "react";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 import type { TimelineTrackData } from "./StudioTimeline";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuSeparator,
+  ContextMenuLabel,
+} from "@/components/ui/context-menu";
 
 interface TimelineTrackProps {
   track: TimelineTrackData;
@@ -9,33 +20,29 @@ interface TimelineTrackProps {
   selectedSegmentId?: string | null;
   onSelectSegment?: (segmentId: string | null) => void;
   synthesizingSegmentIds?: Set<string>;
+  onSetFade?: (clipId: string, fadeInSec: number, fadeOutSec: number) => void;
+  clipFades?: Map<string, { fadeInSec: number; fadeOutSec: number }>;
 }
 
-const DEFAULT_FADE_IN = 0.15;
-const DEFAULT_FADE_OUT = 0.25;
+const FADE_OPTIONS = [
+  { label: "Нет", value: 0 },
+  { label: "0.1 сек", value: 0.1 },
+  { label: "0.25 сек", value: 0.25 },
+  { label: "0.5 сек", value: 0.5 },
+  { label: "1 сек", value: 1 },
+  { label: "2 сек", value: 2 },
+];
 
 /** SVG triangle overlay for fade-in (left) or fade-out (right) */
 function FadeOverlay({
   side,
-  fadeSec,
-  clipWidthPx,
+  fadePx,
   trackColor,
 }: {
   side: "in" | "out";
-  fadeSec: number;
-  clipWidthPx: number;
+  fadePx: number;
   trackColor: string;
 }) {
-  if (fadeSec <= 0) return null;
-  // Cap the visual width to half the clip
-  const maxPx = clipWidthPx / 2;
-  // We need zoom*4 factor but we receive clipWidthPx already scaled
-  // fadeSec is already in real seconds, clipWidthPx = durationSec * zoom * 4
-  // So fadePx = (fadeSec / durationSec) * clipWidthPx — but we don't have durationSec here
-  // We'll compute from the ratio: caller passes fadeSec and we estimate px
-  // Actually easier: the parent knows zoom, so let's just receive fadePx
-  // Redesign: receive fadePx directly from parent
-  const fadePx = Math.min(fadeSec, maxPx);
   if (fadePx < 2) return null;
 
   return (
@@ -79,21 +86,26 @@ export function TimelineTrack({
   selectedSegmentId,
   onSelectSegment,
   synthesizingSegmentIds,
+  onSetFade,
+  clipFades,
 }: TimelineTrackProps) {
   const showFades = zoom >= 2; // 200%+
 
   const clips = realClips && realClips.length > 0
-    ? realClips.map(c => ({
-        id: c.id,
-        start: c.startSec,
-        end: c.startSec + c.durationSec,
-        durationSec: c.durationSec,
-        label: c.label,
-        type: c.segmentType,
-        hasAudio: c.hasAudio,
-        fadeInSec: c.fadeInSec ?? DEFAULT_FADE_IN,
-        fadeOutSec: c.fadeOutSec ?? DEFAULT_FADE_OUT,
-      }))
+    ? realClips.map(c => {
+        const fades = clipFades?.get(c.id);
+        return {
+          id: c.id,
+          start: c.startSec,
+          end: c.startSec + c.durationSec,
+          durationSec: c.durationSec,
+          label: c.label,
+          type: c.segmentType,
+          hasAudio: c.hasAudio,
+          fadeInSec: fades?.fadeInSec ?? c.fadeInSec ?? 0,
+          fadeOutSec: fades?.fadeOutSec ?? c.fadeOutSec ?? 0,
+        };
+      })
     : track.type === "atmosphere"
       ? [{ id: "atm", start: 0, end: duration, durationSec: duration, label: track.label, type: "atmosphere", hasAudio: false, fadeInSec: 0, fadeOutSec: 0 }]
       : track.type === "sfx"
@@ -108,12 +120,13 @@ export function TimelineTrack({
         const isSynthesizing = synthesizingSegmentIds?.has(clip.id);
 
         // Fade visual widths in pixels
-        const fadeInPx = showFades && clip.hasAudio ? Math.min(clip.fadeInSec * zoom * 4, widthPx / 2) : 0;
-        const fadeOutPx = showFades && clip.hasAudio ? Math.min(clip.fadeOutSec * zoom * 4, widthPx / 2) : 0;
+        const fadeInPx = showFades && clip.fadeInSec > 0 ? Math.min(clip.fadeInSec * zoom * 4, widthPx / 2) : 0;
+        const fadeOutPx = showFades && clip.fadeOutSec > 0 ? Math.min(clip.fadeOutSec * zoom * 4, widthPx / 2) : 0;
 
-        return (
+        const hasFades = clip.fadeInSec > 0 || clip.fadeOutSec > 0;
+
+        const clipElement = (
           <div
-            key={i}
             className={`absolute top-1 bottom-1 rounded-sm transition-all cursor-pointer overflow-hidden ${
               clip.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-50 hover:opacity-70"
             } ${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background opacity-100 z-10" : ""} ${isSynthesizing ? "synth-oscilloscope" : ""}`}
@@ -127,15 +140,15 @@ export function TimelineTrack({
                   ? undefined
                   : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
             }}
-            title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${clip.hasAudio ? " 🔊" : ""}${isSynthesizing ? " ⏳" : ""}${showFades && clip.hasAudio ? ` | fade ${clip.fadeInSec.toFixed(2)}s / ${clip.fadeOutSec.toFixed(2)}s` : ""}`}
+            title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${clip.hasAudio ? " 🔊" : ""}${isSynthesizing ? " ⏳" : ""}${hasFades ? ` | fade ${clip.fadeInSec.toFixed(2)}s / ${clip.fadeOutSec.toFixed(2)}s` : ""}`}
             onDoubleClick={() => onSelectSegment?.(clip.id)}
           >
-            {/* Fade overlays (only at high zoom and only for clips with audio) */}
+            {/* Fade overlays (only at high zoom and only for clips with fades) */}
             {fadeInPx >= 2 && (
-              <FadeOverlay side="in" fadeSec={fadeInPx} clipWidthPx={widthPx} trackColor={track.color} />
+              <FadeOverlay side="in" fadePx={fadeInPx} trackColor={track.color} />
             )}
             {fadeOutPx >= 2 && (
-              <FadeOverlay side="out" fadeSec={fadeOutPx} clipWidthPx={widthPx} trackColor={track.color} />
+              <FadeOverlay side="out" fadePx={fadeOutPx} trackColor={track.color} />
             )}
 
             {widthPx > 40 && (
@@ -145,6 +158,55 @@ export function TimelineTrack({
             )}
           </div>
         );
+
+        // Only wrap audio clips with context menu
+        if (clip.hasAudio && onSetFade) {
+          return (
+            <ContextMenu key={i}>
+              <ContextMenuPrimitiveTrigger asChild>
+                {clipElement}
+              </ContextMenuPrimitiveTrigger>
+              <ContextMenuContent className="w-52">
+                <ContextMenuLabel className="text-xs truncate">{clip.label}</ContextMenuLabel>
+                <ContextMenuSeparator />
+                <ContextMenuSub>
+                  <ContextMenuSubTrigger>
+                    🔺 Fade In {clip.fadeInSec > 0 ? `(${clip.fadeInSec}s)` : ""}
+                  </ContextMenuSubTrigger>
+                  <ContextMenuSubContent>
+                    {FADE_OPTIONS.map(opt => (
+                      <ContextMenuItem
+                        key={opt.value}
+                        onClick={() => onSetFade(clip.id, opt.value, clip.fadeOutSec)}
+                        className={clip.fadeInSec === opt.value ? "bg-accent" : ""}
+                      >
+                        {opt.label}
+                      </ContextMenuItem>
+                    ))}
+                  </ContextMenuSubContent>
+                </ContextMenuSub>
+                <ContextMenuSub>
+                  <ContextMenuSubTrigger>
+                    🔻 Fade Out {clip.fadeOutSec > 0 ? `(${clip.fadeOutSec}s)` : ""}
+                  </ContextMenuSubTrigger>
+                  <ContextMenuSubContent>
+                    {FADE_OPTIONS.map(opt => (
+                      <ContextMenuItem
+                        key={opt.value}
+                        onClick={() => onSetFade(clip.id, clip.fadeInSec, opt.value)}
+                        className={clip.fadeOutSec === opt.value ? "bg-accent" : ""}
+                      >
+                        {opt.label}
+                      </ContextMenuItem>
+                    ))}
+                  </ContextMenuSubContent>
+                </ContextMenuSub>
+              </ContextMenuContent>
+            </ContextMenu>
+          );
+        }
+
+        return <div key={i}>{clipElement}</div>;
       })}
     </div>
   );
