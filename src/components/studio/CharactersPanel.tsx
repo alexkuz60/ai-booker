@@ -11,7 +11,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { YANDEX_VOICES, ROLE_LABELS } from "@/config/yandexVoices";
 import { ELEVENLABS_VOICES } from "@/config/elevenlabsVoices";
+import { PROXYAPI_TTS_VOICES, PROXYAPI_TTS_MODELS } from "@/config/proxyapiVoices";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -196,7 +198,14 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [elSimilarity, setElSimilarity] = useState(0.75);
   const [elStyle, setElStyle] = useState(0.4);
   const [elSpeed, setElSpeed] = useState(0.95);
-  const [voiceProvider, setVoiceProvider] = useState<"yandex" | "elevenlabs">("yandex");
+
+  // Voice settings state — ProxyAPI TTS
+  const [paVoice, setPaVoice] = useState("alloy");
+  const [paModel, setPaModel] = useState("gpt-4o-mini-tts");
+  const [paSpeed, setPaSpeed] = useState(1.0);
+  const [paInstructions, setPaInstructions] = useState("");
+
+  const [voiceProvider, setVoiceProvider] = useState<"yandex" | "elevenlabs" | "proxyapi">("yandex");
 
   // ElevenLabs credits
   const [elCredits, setElCredits] = useState<{ used: number; limit: number; tier: string } | null>(null);
@@ -344,9 +353,15 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     if (!selectedChar) return;
     const vc = selectedChar.voice_config;
     const provider = (vc.provider as string) || "yandex";
-    setVoiceProvider(provider === "elevenlabs" ? "elevenlabs" : "yandex");
+    setVoiceProvider(provider === "elevenlabs" ? "elevenlabs" : provider === "proxyapi" ? "proxyapi" : "yandex");
 
-    if (provider === "elevenlabs") {
+    if (provider === "proxyapi") {
+      setPaVoice(vc.voice_id || "alloy");
+      setPaModel((vc as any).model || "gpt-4o-mini-tts");
+      setPaSpeed(vc.speed ?? 1.0);
+      setPaInstructions((vc as any).instructions || "");
+      setDirty(false);
+    } else if (provider === "elevenlabs") {
       setElVoice(vc.voice_id || "JBFqnCBsd6RMkjVDRZzb");
       setElStability((vc as any).stability ?? 0.5);
       setElSimilarity((vc as any).similarity_boost ?? 0.75);
@@ -439,7 +454,16 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     setSaving(true);
     try {
       const currentChar = characters.find(c => c.id === selectedId);
-      const voiceConfig = voiceProvider === "elevenlabs"
+      const voiceConfig = voiceProvider === "proxyapi"
+        ? {
+            provider: "proxyapi",
+            voice_id: paVoice,
+            model: paModel,
+            speed: paSpeed,
+            instructions: paInstructions || undefined,
+            is_extra: currentChar?.voice_config?.is_extra,
+          }
+        : voiceProvider === "elevenlabs"
         ? {
             provider: "elevenlabs",
             voice_id: elVoice,
@@ -856,7 +880,30 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
       let response: Response;
 
-      if (voiceProvider === "elevenlabs") {
+      if (voiceProvider === "proxyapi") {
+        const paBody: Record<string, unknown> = {
+          text: testText,
+          model: paModel,
+          voice: paVoice,
+          speed: paSpeed,
+          lang: isRu ? "ru" : "en",
+        };
+        if (paInstructions && paModel === "gpt-4o-mini-tts") {
+          paBody.instructions = paInstructions;
+        }
+        response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proxyapi-tts`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(paBody),
+          }
+        );
+      } else if (voiceProvider === "elevenlabs") {
         response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
           {
@@ -1320,10 +1367,11 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                 {isRu ? "Голос" : "Voice"}
               </h3>
 
-              <Tabs value={voiceProvider} onValueChange={(v) => { setVoiceProvider(v as "yandex" | "elevenlabs"); markDirty(); }}>
+              <Tabs value={voiceProvider} onValueChange={(v) => { setVoiceProvider(v as "yandex" | "elevenlabs" | "proxyapi"); markDirty(); }}>
                 <TabsList className="w-full">
-                  <TabsTrigger value="yandex" className="flex-1 text-xs">Yandex SpeechKit</TabsTrigger>
+                  <TabsTrigger value="yandex" className="flex-1 text-xs">Yandex</TabsTrigger>
                   <TabsTrigger value="elevenlabs" className="flex-1 text-xs">ElevenLabs</TabsTrigger>
+                  <TabsTrigger value="proxyapi" className="flex-1 text-xs">OpenAI TTS</TabsTrigger>
                 </TabsList>
 
                 {/* ─── Yandex Tab ─── */}
@@ -1529,6 +1577,100 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                         <RotateCcw className="h-3 w-3" />
                       </Button>
                     </div>
+                  </div>
+                </TabsContent>
+
+                {/* ─── ProxyAPI (OpenAI) TTS Tab ─── */}
+                <TabsContent value="proxyapi" className="space-y-4 mt-3">
+                  {/* Model selector */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      {isRu ? "Модель" : "Model"}
+                    </label>
+                    <Select value={paModel} onValueChange={v => { setPaModel(v); markDirty(); }}>
+                      <SelectTrigger className="bg-secondary border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        {PROXYAPI_TTS_MODELS.map(m => (
+                          <SelectItem key={m.id} value={m.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{m.name}</span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {isRu ? m.description.ru : m.description.en}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Voice selector */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      {isRu ? "Голос" : "Voice"}
+                    </label>
+                    <Select value={paVoice} onValueChange={v => { setPaVoice(v); markDirty(); }}>
+                      <SelectTrigger className="bg-secondary border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border max-h-64">
+                        {PROXYAPI_TTS_VOICES.map(v => (
+                          <SelectItem key={v.id} value={v.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{v.name}</span>
+                              <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                {v.gender === "female" ? "♀" : "♂"}
+                              </Badge>
+                              <span className="text-[10px] text-muted-foreground">
+                                {isRu ? v.description.ru : v.description.en}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Speed */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Скорость" : "Speed"}</label>
+                      <span className="text-xs text-muted-foreground tabular-nums">{paSpeed.toFixed(1)}×</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Slider min={0.25} max={4.0} step={0.05} value={[paSpeed]} onValueChange={([v]) => { setPaSpeed(v); markDirty(); }} className="flex-1" />
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setPaSpeed(1.0); markDirty(); }} disabled={paSpeed === 1.0}>
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Instructions (only for gpt-4o-mini-tts) */}
+                  {paModel === "gpt-4o-mini-tts" && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        {isRu ? "Инструкции" : "Instructions"}
+                      </label>
+                      <Textarea
+                        value={paInstructions}
+                        onChange={e => { setPaInstructions(e.target.value); markDirty(); }}
+                        placeholder={isRu ? "Говори с радостной интонацией, спокойно и размеренно..." : "Speak with a joyful tone, calmly and steadily..."}
+                        className="min-h-[80px] text-xs bg-secondary border-border resize-y"
+                      />
+                      <p className="text-[10px] text-muted-foreground/60">
+                        {isRu ? "Управляйте акцентом, эмоциями, скоростью и тоном речи" : "Control accent, emotion, speed and tone of speech"}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="rounded-md border border-border bg-muted/30 p-2.5">
+                    <p className="text-[10px] text-muted-foreground">
+                      {isRu
+                        ? "⚡ Требуется ключ ProxyAPI в Профиле → API-роутеры. Голоса оптимизированы для английского, но поддерживают многие языки."
+                        : "⚡ Requires ProxyAPI key in Profile → API Routers. Voices optimized for English but support many languages."}
+                    </p>
                   </div>
                 </TabsContent>
               </Tabs>

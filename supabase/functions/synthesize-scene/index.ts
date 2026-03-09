@@ -56,7 +56,7 @@ function randomVoiceConfig() {
   const role = roles[Math.floor(Math.random() * roles.length)];
   const speed = Math.round((0.9 + Math.random() * 0.3) * 100) / 100;
   const pitchShift = Math.floor(Math.random() * 400) - 200;
-  return { voice, role, speed, pitchShift, volume: undefined as number | undefined };
+  return { voice, role, speed, pitchShift, volume: undefined as number | undefined, provider: "yandex" as string };
 }
 
 function resolveVoice(
@@ -67,13 +67,17 @@ function resolveVoice(
     ? voiceConfigMap.get(speaker.toLowerCase()) ?? {}
     : {};
 
-  if ((vc as Record<string, unknown>).voice) {
+  if ((vc as Record<string, unknown>).voice || (vc as Record<string, unknown>).voice_id) {
+    const provider = ((vc as Record<string, unknown>).provider as string) || "yandex";
     return {
-      voice: (vc as Record<string, unknown>).voice as string,
+      provider,
+      voice: ((vc as Record<string, unknown>).voice as string) || ((vc as Record<string, unknown>).voice_id as string),
       role: (vc as Record<string, unknown>).role as string | undefined,
       speed: ((vc as Record<string, unknown>).speed as number) || 1.0,
       pitchShift: (vc as Record<string, unknown>).pitchShift as number | undefined,
       volume: (vc as Record<string, unknown>).volume as number | undefined,
+      model: (vc as Record<string, unknown>).model as string | undefined,
+      instructions: (vc as Record<string, unknown>).instructions as string | undefined,
     };
   }
   return randomVoiceConfig();
@@ -196,6 +200,49 @@ async function callTts(
   if (!resp.ok) {
     const errBody = await resp.text();
     return { error: `TTS ${resp.status}: ${errBody}` };
+  }
+
+  const audioBuffer = await resp.arrayBuffer();
+  const audio = new Uint8Array(audioBuffer);
+  const durationMs = parseMp3Duration(audio);
+  return { audio, durationMs };
+}
+
+// ── ProxyAPI TTS call helper ─────────────────────────────────────────
+
+async function callProxyApiTts(
+  proxyApiKey: string,
+  params: {
+    text: string;
+    voice: string;
+    model?: string;
+    speed?: number;
+    instructions?: string;
+  }
+): Promise<{ audio: Uint8Array; durationMs: number } | { error: string }> {
+  const payload: Record<string, unknown> = {
+    model: params.model || "gpt-4o-mini-tts",
+    input: params.text,
+    voice: params.voice,
+    response_format: "mp3",
+    speed: params.speed ?? 1.0,
+  };
+  if (params.instructions && (params.model === "gpt-4o-mini-tts" || !params.model)) {
+    payload.instructions = params.instructions;
+  }
+
+  const resp = await fetch("https://api.proxyapi.ru/openai/v1/audio/speech", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${proxyApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!resp.ok) {
+    const errBody = await resp.text();
+    return { error: `ProxyAPI TTS ${resp.status}: ${errBody}` };
   }
 
   const audioBuffer = await resp.arrayBuffer();
@@ -403,6 +450,19 @@ Deno.serve(async (req) => {
     const userId = userData.user.id;
     const narratorVoice = getNarratorVoice(voiceConfigMap, segments);
 
+    // Load ProxyAPI key if any character uses proxyapi provider
+    let proxyApiKey: string | undefined;
+    const needsProxyApi = [...voiceConfigMap.values()].some(vc => (vc as Record<string, unknown>).provider === "proxyapi");
+    if (needsProxyApi) {
+      try {
+        const { data: apiKeys } = await supabase.rpc("get_my_api_keys");
+        const keys = apiKeys as Record<string, string> | null;
+        proxyApiKey = keys?.proxyapi?.trim();
+      } catch (e) {
+        console.error("Failed to load ProxyAPI key:", e);
+      }
+    }
+
     // ── Load existing audio records for cache comparison ─────────────
     const { data: existingAudio } = await supabase
       .from("segment_audio")
@@ -435,16 +495,18 @@ Deno.serve(async (req) => {
 
     /** Compare relevant voice params + text hash to decide if re-synthesis is needed */
     function voiceConfigChanged(
-      current: { voice: string; role?: string; speed: number; pitchShift?: number; volume?: number },
+      current: { voice: string; role?: string; speed: number; pitchShift?: number; volume?: number; provider?: string; model?: string; instructions?: string },
       cached: Record<string, unknown>,
       currentTextHash: string
     ): boolean {
+      if ((current.provider ?? "yandex") !== (cached.provider ?? "yandex")) return true;
       if (current.voice !== cached.voice) return true;
       if ((current.role ?? "neutral") !== (cached.role ?? "neutral")) return true;
       if (Math.abs((current.speed ?? 1) - (Number(cached.speed) || 1)) > 0.01) return true;
       if ((current.pitchShift ?? 0) !== (Number(cached.pitchShift) || 0)) return true;
       if ((current.volume ?? -1) !== (Number(cached.volume) ?? -1)) return true;
-      // Text edited? Compare hash (catches any change, not just length)
+      if ((current.model ?? "") !== (cached.model ?? "")) return true;
+      if ((current.instructions ?? "") !== (cached.instructions ?? "")) return true;
       if (currentTextHash !== (cached.textHash ?? "")) return true;
       return false;
     }
@@ -504,13 +566,14 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const isUnassigned = !voiceConfigMap.get(seg.speaker?.toLowerCase() ?? "")?.voice;
+      const isUnassigned = !voiceConfigMap.get(seg.speaker?.toLowerCase() ?? "")?.voice && !voiceConfigMap.get(seg.speaker?.toLowerCase() ?? "")?.voice_id;
       if (isUnassigned) {
         console.log(`Unassigned segment ${seg.id}: random voice=${voiceConfig.voice}, role=${voiceConfig.role}`);
       }
 
-      const isV3Voice = V3_ONLY_VOICES.has(voiceConfig.voice);
-      const apiVersion = isV3Voice ? "v3" : "v1";
+      const isProxyApiVoice = (voiceConfig as any).provider === "proxyapi";
+      const isV3Voice = !isProxyApiVoice && V3_ONLY_VOICES.has(voiceConfig.voice);
+      const apiVersion = isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1";
       const estimatedChunks = isV3Voice ? Math.max(1, Math.ceil(text.length / 240)) : 1;
       console.log(`▶ Segment ${i + 1}/${segments.length} [${seg.id}]: speaker=${seg.speaker || seg.segment_type}, api=${apiVersion}, voice=${voiceConfig.voice}, chars=${text.length}, chunks≈${estimatedChunks}${hasInlineNarrations ? `, narrations=${inlineNarrations.length}` : ""}`);
 
@@ -656,15 +719,27 @@ Deno.serve(async (req) => {
 
         } else {
           // ── STANDARD SINGLE-PASS SYNTHESIS ────────────────
-          const result = await callTts(yandexTtsUrl, authHeader, {
-            text,
-            voice: voiceConfig.voice,
-            role: voiceConfig.role,
-            speed: voiceConfig.speed,
-            pitchShift: voiceConfig.pitchShift,
-            volume: voiceConfig.volume,
-            lang: langCode,
-          });
+          let result: { audio: Uint8Array; durationMs: number } | { error: string };
+
+          if (isProxyApiVoice && proxyApiKey) {
+            result = await callProxyApiTts(proxyApiKey, {
+              text,
+              voice: voiceConfig.voice,
+              model: (voiceConfig as any).model,
+              speed: voiceConfig.speed,
+              instructions: (voiceConfig as any).instructions,
+            });
+          } else {
+            result = await callTts(yandexTtsUrl, authHeader, {
+              text,
+              voice: voiceConfig.voice,
+              role: voiceConfig.role,
+              speed: voiceConfig.speed,
+              pitchShift: voiceConfig.pitchShift,
+              volume: voiceConfig.volume,
+              lang: langCode,
+            });
+          }
 
           if ("error" in result) {
             results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: result.error });
@@ -708,13 +783,16 @@ Deno.serve(async (req) => {
             duration_ms: dialogueDurationMs,
             status: "ready",
             voice_config: {
+              provider: isProxyApiVoice ? "proxyapi" : "yandex",
               voice: voiceConfig.voice,
               role: voiceConfig.role,
               speed: voiceConfig.speed,
               pitchShift: voiceConfig.pitchShift,
               volume: voiceConfig.volume,
+              model: isProxyApiVoice ? (voiceConfig as any).model : undefined,
+              instructions: isProxyApiVoice ? (voiceConfig as any).instructions : undefined,
               textHash: hashText(text),
-              apiVersion: isV3Voice ? "v3" : "v1",
+              apiVersion: isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1",
             },
           },
           { onConflict: "segment_id" }
