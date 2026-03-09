@@ -69,6 +69,10 @@ export interface TrackConfig {
   pan?: number;
   /** Bus routing: voice (default), atmosphere, sfx */
   bus?: "voice" | "atmosphere" | "sfx";
+  /** Fade-in duration in seconds (applied via Tone.Player) */
+  fadeInSec?: number;
+  /** Fade-out duration in seconds (applied via Tone.Player) */
+  fadeOutSec?: number;
 }
 
 export type EngineState = "stopped" | "playing" | "paused";
@@ -144,6 +148,8 @@ class EngineTrack {
   private _solo = false;
   private _volume = 80;
   private _pan = 0;
+  private _fadeInSec: number;
+  private _fadeOutSec: number;
 
   private scheduledId: number | null = null;
 
@@ -155,6 +161,8 @@ class EngineTrack {
     this.busType = config.bus ?? "voice";
     this._volume = config.volume ?? 80;
     this._pan = config.pan ?? 0;
+    this._fadeInSec = config.fadeInSec ?? 0;
+    this._fadeOutSec = config.fadeOutSec ?? 0;
 
     // Pre-FX: light compressor, bypassed
     this.preFxNode = new Tone.Compressor({
@@ -185,7 +193,11 @@ class EngineTrack {
     // Chain: Player → PreFX → Channel → Reverb → Splitter → MeterL/R
     //                              └→ MeterMono
     //        Reverb → Bus (main output)
-    this.player = new Tone.Player({ url: config.url });
+    this.player = new Tone.Player({
+      url: config.url,
+      fadeIn: this._fadeInSec,
+      fadeOut: this._fadeOutSec,
+    });
 
     // Wire signal chain
     this.player.connect(this.preFxNode);
@@ -293,6 +305,21 @@ class EngineTrack {
 
   get reverbWet() { return this._reverbWet; }
   get reverbBypassed() { return this._reverbBypassed; }
+
+  // ── Fade in/out ──
+
+  setFadeIn(sec: number): void {
+    this._fadeInSec = Math.max(0, sec);
+    this.player.fadeIn = this._fadeInSec;
+  }
+
+  setFadeOut(sec: number): void {
+    this._fadeOutSec = Math.max(0, sec);
+    this.player.fadeOut = this._fadeOutSec;
+  }
+
+  get fadeInSec() { return this._fadeInSec; }
+  get fadeOutSec() { return this._fadeOutSec; }
 
   // ── Metering ──
 
@@ -718,6 +745,20 @@ class AudioEngine {
 
   setTrackPreFxBypassed(trackId: string, b: boolean): void {
     this.tracks.get(trackId)?.setPreFxBypassed(b);
+  }
+
+  setTrackFadeIn(trackId: string, sec: number): void {
+    this.tracks.get(trackId)?.setFadeIn(sec);
+  }
+
+  setTrackFadeOut(trackId: string, sec: number): void {
+    this.tracks.get(trackId)?.setFadeOut(sec);
+  }
+
+  getTrackFades(trackId: string): { fadeInSec: number; fadeOutSec: number } | null {
+    const t = this.tracks.get(trackId);
+    if (!t) return null;
+    return { fadeInSec: t.fadeInSec, fadeOutSec: t.fadeOutSec };
   }
 
   // ─── Metering ─────────────────────────────────────────
