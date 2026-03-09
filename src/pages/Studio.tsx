@@ -60,6 +60,23 @@ const Studio = () => {
     return estimateSceneDuration(chapter.scenes[selectedSceneIdx]);
   }, [chapter, selectedSceneIdx]);
 
+  // Load actual rendered durations from scene_playlists
+  const [playlistDurations, setPlaylistDurations] = useState<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (!chapterSceneIds?.length) return;
+    (async () => {
+      const { data } = await supabase
+        .from("scene_playlists")
+        .select("scene_id, total_duration_ms")
+        .in("scene_id", chapterSceneIds);
+      if (data?.length) {
+        const m = new Map<string, number>();
+        for (const r of data) m.set(r.scene_id, r.total_duration_ms);
+        setPlaylistDurations(m);
+      }
+    })();
+  }, [chapterSceneIds?.join(","), clipsRefreshToken]);
+
   // Resolve scene IDs and bookId from DB
   useEffect(() => {
     if (!chapter) return;
