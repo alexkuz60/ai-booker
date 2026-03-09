@@ -52,16 +52,21 @@ interface InlineNarrationAudio {
   offset_ms: number;
 }
 
+/** Map: scene_id → Map<segment_type, character_id> */
+export type TypeMappingsByScene = Map<string, Map<string, string>>;
+
 /**
  * Load real clips for timeline from scene_segments + segment_phrases.
  * Uses actual durations from segment_audio when available, falls back to char-based estimate.
  * Supports inline narration overlays from segment metadata.
  * Now reads per-scene silence_sec from book_scenes.
+ * Applies scene_type_mappings to route narrator/first_person clips to character tracks.
  */
 export function useTimelineClips(
   sceneIds: string[],
   characterMap: Map<string, string>, // speaker name (lowercase) -> character ID
   refreshToken: number = 0,
+  typeMappings?: TypeMappingsByScene,
 ) {
   const [clips, setClips] = useState<TimelineClip[]>([]);
   const [loading, setLoading] = useState(false);
