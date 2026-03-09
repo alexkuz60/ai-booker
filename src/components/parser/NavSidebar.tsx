@@ -234,6 +234,12 @@ export default function NavSidebar({
               {entry.startPage}
             </span>
           )}
+          {chapterDurationFormatted && (
+            <span className="text-[11px] text-muted-foreground font-mono flex-shrink-0 flex items-center gap-0.5" title={isRu ? "Расчётное время" : "Estimated duration"}>
+              <Clock className="h-3 w-3" />
+              {chapterDurationFormatted}
+            </span>
+          )}
           {isParent && isChapterFullyDone(idx) && (
             <button
               title={t("toStudio", isRu)}
