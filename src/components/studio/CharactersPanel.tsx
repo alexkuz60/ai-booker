@@ -11,7 +11,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { YANDEX_VOICES, ROLE_LABELS } from "@/config/yandexVoices";
 import { ELEVENLABS_VOICES } from "@/config/elevenlabsVoices";
+import { PROXYAPI_TTS_VOICES, PROXYAPI_TTS_MODELS } from "@/config/proxyapiVoices";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 
 // ─── Types ──────────────────────────────────────────────
 
