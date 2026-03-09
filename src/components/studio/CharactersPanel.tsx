@@ -880,7 +880,30 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
       let response: Response;
 
-      if (voiceProvider === "elevenlabs") {
+      if (voiceProvider === "proxyapi") {
+        const paBody: Record<string, unknown> = {
+          text: testText,
+          model: paModel,
+          voice: paVoice,
+          speed: paSpeed,
+          lang: isRu ? "ru" : "en",
+        };
+        if (paInstructions && paModel === "gpt-4o-mini-tts") {
+          paBody.instructions = paInstructions;
+        }
+        response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proxyapi-tts`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(paBody),
+          }
+        );
+      } else if (voiceProvider === "elevenlabs") {
         response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
           {
