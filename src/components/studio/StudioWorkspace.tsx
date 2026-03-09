@@ -135,7 +135,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
 
         <TabsContent value="finished" className="flex-1 mt-4 min-h-0">
           <div className="rounded-lg border border-border bg-card/50 h-full overflow-hidden">
-            <FinishedChaptersPanel isRu={isRu} bookId={bookId} chapterSceneIds={chapterSceneIds} onRecalcDone={onRecalcDone} />
+            <FinishedChaptersPanel isRu={isRu} bookId={bookId} />
           </div>
         </TabsContent>
       </Tabs>
