@@ -198,7 +198,14 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [elSimilarity, setElSimilarity] = useState(0.75);
   const [elStyle, setElStyle] = useState(0.4);
   const [elSpeed, setElSpeed] = useState(0.95);
-  const [voiceProvider, setVoiceProvider] = useState<"yandex" | "elevenlabs">("yandex");
+
+  // Voice settings state — ProxyAPI TTS
+  const [paVoice, setPaVoice] = useState("alloy");
+  const [paModel, setPaModel] = useState("gpt-4o-mini-tts");
+  const [paSpeed, setPaSpeed] = useState(1.0);
+  const [paInstructions, setPaInstructions] = useState("");
+
+  const [voiceProvider, setVoiceProvider] = useState<"yandex" | "elevenlabs" | "proxyapi">("yandex");
 
   // ElevenLabs credits
   const [elCredits, setElCredits] = useState<{ used: number; limit: number; tier: string } | null>(null);
