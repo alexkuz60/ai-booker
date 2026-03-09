@@ -114,6 +114,15 @@ export default function NavSidebar({
     const isSelected = selectedIndices.has(idx);
     const status = result?.status || "pending";
 
+    // Compute chapter duration estimate from scenes
+    const chapterDurationFormatted = (() => {
+      if (status !== "done" || !result?.scenes?.length) return null;
+      const totalChars = result.scenes.reduce((sum, s) => sum + (s.content?.length ?? 0), 0);
+      if (totalChars === 0) return null;
+      const sec = estimateDurationSec(totalChars);
+      return formatDuration(sec);
+    })();
+
     const isParent = hasDirectChildren(idx);
 
     const childIndices: number[] = [];
