@@ -1,10 +1,11 @@
 import { useState, useRef, useCallback } from "react";
 import {
   Wand2, Loader2, Play, Pause, Save, Music, Volume2, Sparkles,
-  Clock, Sliders, Zap, Trash2,
+  Clock, Sliders, Zap, Trash2, Pencil, ArrowRight, RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -272,6 +273,81 @@ function GeneratorPanel({
   );
 }
 
+// ─── Editable Layer Card ───────────────────────────────────
+
+function EditableLayerCard({
+  layer,
+  index,
+  isRu,
+  onChange,
+  onRemove,
+}: {
+  layer: AtmosphereLayer;
+  index: number;
+  isRu: boolean;
+  onChange: (idx: number, updated: AtmosphereLayer) => void;
+  onRemove: (idx: number) => void;
+}) {
+  const LAYER_LABELS: Record<string, string> = {
+    ambience: isRu ? "🌧 Эмбиент" : "🌧 Ambience",
+    music: isRu ? "🎵 Музыка" : "🎵 Music",
+    sfx: isRu ? "💥 SFX" : "💥 SFX",
+  };
+
+  return (
+    <div className="flex flex-col gap-2 p-3 rounded-lg border border-border/60 bg-card/40">
+      <div className="flex items-center gap-2">
+        <Badge variant="outline" className="text-[10px] shrink-0">
+          {LAYER_LABELS[layer.layer_type] || layer.layer_type}
+        </Badge>
+        <span className="text-[10px] text-muted-foreground ml-auto">
+          {layer.duration_seconds}s · vol:{Math.round(layer.volume * 100)}%
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 shrink-0 text-destructive/60 hover:text-destructive"
+          onClick={() => onRemove(index)}
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
+      </div>
+      <Textarea
+        value={layer.prompt}
+        onChange={(e) => onChange(index, { ...layer, prompt: e.target.value })}
+        className="text-xs font-body min-h-[56px] resize-none"
+        rows={2}
+      />
+      <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+        <div className="flex items-center gap-1.5 flex-1">
+          <Clock className="h-3 w-3 shrink-0" />
+          <Slider
+            value={[layer.duration_seconds]}
+            onValueChange={([v]) => onChange(index, { ...layer, duration_seconds: v })}
+            min={2}
+            max={layer.layer_type === "music" ? 120 : 22}
+            step={1}
+            className="flex-1 max-w-[120px]"
+          />
+          <span className="w-8 text-right">{layer.duration_seconds}s</span>
+        </div>
+        <div className="flex items-center gap-1.5 flex-1">
+          <Volume2 className="h-3 w-3 shrink-0" />
+          <Slider
+            value={[layer.volume]}
+            onValueChange={([v]) => onChange(index, { ...layer, volume: v })}
+            min={0}
+            max={1}
+            step={0.05}
+            className="flex-1 max-w-[100px]"
+          />
+          <span className="w-8 text-right">{Math.round(layer.volume * 100)}%</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Auto-Atmosphere Panel ─────────────────────────────────
 
 function AutoAtmospherePanel({
@@ -284,8 +360,10 @@ function AutoAtmospherePanel({
   onGenerated: (items: HistoryItem[]) => void;
 }) {
   const i = t(isRu);
-  const [loading, setLoading] = useState(false);
+  const [promptLoading, setPromptLoading] = useState(false);
+  const [synthLoading, setSynthLoading] = useState(false);
   const [step, setStep] = useState("");
+  const [pendingLayers, setPendingLayers] = useState<AtmosphereLayer[] | null>(null);
   const [existingLayers, setExistingLayers] = useState<Array<{
     id: string;
     layer_type: string;
@@ -311,13 +389,13 @@ function AutoAtmospherePanel({
   // Load on mount and sceneId change
   useState(() => { loadExisting(); });
 
-  const handleAutoGenerate = useCallback(async () => {
+  // Step 1: Generate AI prompts only (no audio yet)
+  const handleGeneratePrompts = useCallback(async () => {
     if (!sceneId) return;
-    setLoading(true);
-    setStep(isRu ? "Анализ сцены…" : "Analyzing scene…");
+    setPromptLoading(true);
+    setPendingLayers(null);
 
     try {
-      // 1. Get AI prompts
       const { data: session } = await supabase.auth.getSession();
       const token = session.session?.access_token;
       if (!token) throw new Error("Not authenticated");
@@ -346,70 +424,90 @@ function AutoAtmospherePanel({
         return;
       }
 
-      // 2. Generate sounds in parallel
-      setStep(isRu ? `Генерация ${layers.length} слоёв…` : `Generating ${layers.length} layers…`);
+      setPendingLayers(layers);
+      toast.success(isRu ? `AI предложил ${layers.length} слоёв — отредактируйте и запустите синтез` : `AI suggested ${layers.length} layers — review and generate`);
+    } catch (e: any) {
+      toast.error(e.message || (isRu ? "Ошибка генерации промптов" : "Prompt generation failed"));
+    } finally {
+      setPromptLoading(false);
+    }
+  }, [sceneId, isRu]);
 
+  // Edit a pending layer
+  const handleEditLayer = useCallback((idx: number, updated: AtmosphereLayer) => {
+    setPendingLayers(prev => prev ? prev.map((l, i) => i === idx ? updated : l) : prev);
+  }, []);
+
+  // Remove a pending layer
+  const handleRemovePending = useCallback((idx: number) => {
+    setPendingLayers(prev => prev ? prev.filter((_, i) => i !== idx) : prev);
+  }, []);
+
+  // Step 2: Generate audio from (edited) prompts
+  const handleSynthesizeAll = useCallback(async () => {
+    if (!sceneId || !pendingLayers?.length) return;
+    setSynthLoading(true);
+
+    try {
       const results: HistoryItem[] = [];
 
-      await Promise.all(
-        layers.map(async (layer, idx) => {
-          setStep(isRu ? `Генерация слоя ${idx + 1}/${layers.length}…` : `Generating layer ${idx + 1}/${layers.length}…`);
+      for (let idx = 0; idx < pendingLayers.length; idx++) {
+        const layer = pendingLayers[idx];
+        setStep(isRu ? `Синтез ${idx + 1}/${pendingLayers.length}…` : `Synthesizing ${idx + 1}/${pendingLayers.length}…`);
 
-          const category: SoundCategory = layer.layer_type === "music" ? "music" : layer.layer_type === "sfx" ? "sfx" : "atmosphere";
+        const category: SoundCategory = layer.layer_type === "music" ? "music" : layer.layer_type === "sfx" ? "sfx" : "atmosphere";
 
-          const sound = await generateSound({
-            prompt: layer.prompt,
-            category,
-            durationSec: layer.duration_seconds,
-            promptInfluence: category !== "music" ? 0.3 : undefined,
-            lang: "en",
-          });
+        const sound = await generateSound({
+          prompt: layer.prompt,
+          category,
+          durationSec: layer.duration_seconds,
+          promptInfluence: category !== "music" ? 0.3 : undefined,
+          lang: "en",
+        });
 
-          // 3. Save to storage
-          const slug = layer.prompt
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/gi, "-")
-            .slice(0, 40);
-          const fileName = `${slug}-${Date.now()}.mp3`;
-          const path = await saveToStorage(sound.blob, category, fileName);
+        const slug = layer.prompt
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/gi, "-")
+          .slice(0, 40);
+        const fileName = `${slug}-${Date.now()}.mp3`;
+        const path = await saveToStorage(sound.blob, category, fileName);
 
-          // 4. Save to scene_atmospheres
-          const { data: inserted } = await supabase
-            .from("scene_atmospheres")
-            .insert({
-              scene_id: sceneId,
-              layer_type: layer.layer_type,
-              audio_path: path,
-              prompt_used: layer.prompt,
-              duration_ms: Math.round(layer.duration_seconds * 1000),
-              volume: layer.volume,
-              fade_in_ms: layer.fade_in_ms,
-              fade_out_ms: layer.fade_out_ms,
-            } as any)
-            .select("id")
-            .single();
+        const { data: inserted } = await supabase
+          .from("scene_atmospheres")
+          .insert({
+            scene_id: sceneId,
+            layer_type: layer.layer_type,
+            audio_path: path,
+            prompt_used: layer.prompt,
+            duration_ms: Math.round(layer.duration_seconds * 1000),
+            volume: layer.volume,
+            fade_in_ms: layer.fade_in_ms,
+            fade_out_ms: layer.fade_out_ms,
+          } as any)
+          .select("id")
+          .single();
 
-          results.push({
-            id: crypto.randomUUID(),
-            prompt: layer.prompt,
-            category,
-            sound,
-            savedPath: path,
-            sceneAtmosphereId: (inserted as any)?.id,
-          });
-        })
-      );
+        results.push({
+          id: crypto.randomUUID(),
+          prompt: layer.prompt,
+          category,
+          sound,
+          savedPath: path,
+          sceneAtmosphereId: (inserted as any)?.id,
+        });
+      }
 
       onGenerated(results);
+      setPendingLayers(null);
       await loadExisting();
-      toast.success(isRu ? `Сгенерировано ${results.length} слоёв атмосферы!` : `Generated ${results.length} atmosphere layers!`);
+      toast.success(isRu ? `Сгенерировано ${results.length} слоёв!` : `Generated ${results.length} layers!`);
     } catch (e: any) {
-      toast.error(e.message || (isRu ? "Ошибка авто-генерации" : "Auto-generation failed"));
+      toast.error(e.message || (isRu ? "Ошибка синтеза" : "Synthesis failed"));
     } finally {
-      setLoading(false);
+      setSynthLoading(false);
       setStep("");
     }
-  }, [sceneId, isRu, onGenerated, loadExisting]);
+  }, [sceneId, pendingLayers, isRu, onGenerated, loadExisting]);
 
   const handleDeleteLayer = useCallback(async (layerId: string) => {
     await supabase.from("scene_atmospheres").delete().eq("id", layerId);
@@ -433,35 +531,76 @@ function AutoAtmospherePanel({
   };
 
   return (
-    <div className="flex flex-col gap-4 h-full">
-      <div className="flex items-center gap-3">
+    <div className="flex flex-col gap-3 h-full">
+      {/* Top actions */}
+      <div className="flex items-center gap-2 flex-wrap">
         <Button
-          onClick={handleAutoGenerate}
-          disabled={loading}
+          onClick={handleGeneratePrompts}
+          disabled={promptLoading || synthLoading}
+          variant={pendingLayers ? "outline" : "default"}
           className="gap-1.5"
           size="sm"
         >
-          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
-          {loading ? step || i.autoGenerating : i.autoAtmosphere}
+          {promptLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : pendingLayers ? <RotateCcw className="h-3.5 w-3.5" /> : <Wand2 className="h-3.5 w-3.5" />}
+          {promptLoading
+            ? (isRu ? "AI анализирует…" : "AI analyzing…")
+            : pendingLayers
+              ? (isRu ? "Перегенерировать" : "Regenerate")
+              : (isRu ? "Сгенерировать промпты" : "Generate Prompts")}
         </Button>
+
+        {pendingLayers && pendingLayers.length > 0 && (
+          <Button
+            onClick={handleSynthesizeAll}
+            disabled={synthLoading}
+            className="gap-1.5"
+            size="sm"
+          >
+            {synthLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
+            {synthLoading
+              ? step || (isRu ? "Синтез…" : "Synthesizing…")
+              : (isRu ? `Синтез ${pendingLayers.length} слоёв` : `Synthesize ${pendingLayers.length} layers`)}
+          </Button>
+        )}
       </div>
 
-      <p className="text-[11px] text-muted-foreground/60 font-body flex items-center gap-1">
-        <Sparkles className="h-3 w-3" /> {i.autoHint}
-      </p>
+      {!pendingLayers && (
+        <p className="text-[11px] text-muted-foreground/60 font-body flex items-center gap-1">
+          <Sparkles className="h-3 w-3" /> {i.autoHint}
+        </p>
+      )}
 
-      {/* History */}
       <ScrollArea className="flex-1 min-h-0">
+        {/* Pending layers (editable) */}
+        {pendingLayers && pendingLayers.length > 0 && (
+          <div className="flex flex-col gap-2 pr-2 mb-4">
+            <p className="text-[11px] font-body text-muted-foreground flex items-center gap-1.5">
+              <Pencil className="h-3 w-3" />
+              {isRu ? "Отредактируйте промпты и нажмите «Синтез»" : "Edit prompts and click \"Synthesize\""}
+            </p>
+            {pendingLayers.map((layer, idx) => (
+              <EditableLayerCard
+                key={idx}
+                layer={layer}
+                index={idx}
+                isRu={isRu}
+                onChange={handleEditLayer}
+                onRemove={handleRemovePending}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Existing saved layers */}
         {loadingExisting ? (
           <div className="flex items-center justify-center h-16">
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
-        ) : existingLayers.length === 0 ? (
-          <div className="flex items-center justify-center h-24 text-sm text-muted-foreground font-body">
-            {isRu ? "Нет атмосферных слоёв для этой сцены" : "No atmosphere layers for this scene"}
-          </div>
-        ) : (
+        ) : existingLayers.length > 0 && (
           <div className="flex flex-col gap-2 pr-2">
+            <p className="text-[11px] font-body text-muted-foreground">
+              {isRu ? "Сохранённые слои" : "Saved layers"}
+            </p>
             {existingLayers.map((layer) => (
               <div
                 key={layer.id}
@@ -487,6 +626,12 @@ function AutoAtmospherePanel({
                 </Button>
               </div>
             ))}
+          </div>
+        )}
+
+        {!pendingLayers && !loadingExisting && existingLayers.length === 0 && (
+          <div className="flex items-center justify-center h-24 text-sm text-muted-foreground font-body">
+            {isRu ? "Нет атмосферных слоёв для этой сцены" : "No atmosphere layers for this scene"}
           </div>
         )}
       </ScrollArea>
