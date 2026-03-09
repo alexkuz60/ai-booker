@@ -136,6 +136,7 @@ export function useTimelineClips(
 
         // Each scene starts with SCENE_SILENCE_SEC silence
         const sceneStart = globalOffset;
+        boundaries.push(sceneStart);
         let sceneOffset = sceneStart + SCENE_SILENCE_SEC;
 
         for (const seg of sceneSegments) {
