@@ -358,6 +358,7 @@ export function StoryboardPanel({
   const [characters, setCharacters] = useState<CharacterOption[]>([]);
   const [audioStatus, setAudioStatus] = useState<Map<string, { status: string; durationMs: number }>>(new Map());
   const [inlineNarrationSegIds, setInlineNarrationSegIds] = useState<Set<string>>(new Set());
+  const [currentlySynthesizingIds, setCurrentlySynthesizingIds] = useState<Set<string>>(new Set());
 
   // Scroll selected segment into view when set externally (from timeline)
   useEffect(() => {
@@ -517,6 +518,46 @@ export function StoryboardPanel({
     setLoaded(false);
     if (sceneId) loadSegments(sceneId);
   }, [sceneId, loadSegments]);
+
+  // Realtime subscription: listen for segment_audio inserts to update synthesizing state per-clip
+  useEffect(() => {
+    if (segments.length === 0 || currentlySynthesizingIds.size === 0) return;
+
+    const segmentIds = segments.map(s => s.segment_id);
+    const channel = supabase
+      .channel(`segment_audio_${sceneId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "segment_audio",
+          filter: `segment_id=in.(${segmentIds.join(",")})`,
+        },
+        (payload) => {
+          const completedSegId = (payload.new as { segment_id: string }).segment_id;
+          // Remove from synthesizing set
+          setCurrentlySynthesizingIds(prev => {
+            const next = new Set(prev);
+            next.delete(completedSegId);
+            onSynthesizingChange?.(next);
+            return next;
+          });
+          // Update audio status for this segment
+          const newAudio = payload.new as { segment_id: string; status: string; duration_ms: number };
+          setAudioStatus(prev => {
+            const next = new Map(prev);
+            next.set(newAudio.segment_id, { status: newAudio.status, durationMs: newAudio.duration_ms });
+            return next;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [segments.map(s => s.segment_id).join(","), currentlySynthesizingIds.size > 0, sceneId, onSynthesizingChange]);
 
   // Run AI segmentation
   const runAnalysis = useCallback(async () => {
@@ -727,6 +768,7 @@ export function StoryboardPanel({
     if (!sceneId || segments.length === 0) return;
     const allIds = new Set(segments.map(s => s.segment_id));
     setSynthesizing(true);
+    setCurrentlySynthesizingIds(allIds);
     onSynthesizingChange?.(allIds);
     setSynthProgress(isRu ? "Запуск синтеза…" : "Starting synthesis…");
     try {
@@ -758,6 +800,7 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка синтеза" : "Synthesis failed");
     }
     setSynthesizing(false);
+    setCurrentlySynthesizingIds(new Set());
     onSynthesizingChange?.(new Set());
     setSynthProgress("");
   }, [sceneId, segments, isRu, onSegmented, loadAudioStatus, onSynthesizingChange]);
@@ -766,6 +809,7 @@ export function StoryboardPanel({
   const resynthSegment = useCallback(async (segmentId: string) => {
     if (!sceneId) return;
     setResynthSegId(segmentId);
+    setCurrentlySynthesizingIds(new Set([segmentId]));
     onSynthesizingChange?.(new Set([segmentId]));
     try {
       // Delete existing audio record to force re-synthesis
@@ -786,6 +830,7 @@ export function StoryboardPanel({
       await loadAudioStatus(segments.map(s => s.segment_id));
     }
     setResynthSegId(null);
+    setCurrentlySynthesizingIds(new Set());
     onSynthesizingChange?.(new Set());
   }, [sceneId, isRu, onSegmented, loadAudioStatus, segments, onSynthesizingChange]);
 
