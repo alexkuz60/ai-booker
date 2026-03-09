@@ -1367,10 +1367,11 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                 {isRu ? "Голос" : "Voice"}
               </h3>
 
-              <Tabs value={voiceProvider} onValueChange={(v) => { setVoiceProvider(v as "yandex" | "elevenlabs"); markDirty(); }}>
+              <Tabs value={voiceProvider} onValueChange={(v) => { setVoiceProvider(v as "yandex" | "elevenlabs" | "proxyapi"); markDirty(); }}>
                 <TabsList className="w-full">
-                  <TabsTrigger value="yandex" className="flex-1 text-xs">Yandex SpeechKit</TabsTrigger>
+                  <TabsTrigger value="yandex" className="flex-1 text-xs">Yandex</TabsTrigger>
                   <TabsTrigger value="elevenlabs" className="flex-1 text-xs">ElevenLabs</TabsTrigger>
+                  <TabsTrigger value="proxyapi" className="flex-1 text-xs">OpenAI TTS</TabsTrigger>
                 </TabsList>
 
                 {/* ─── Yandex Tab ─── */}
