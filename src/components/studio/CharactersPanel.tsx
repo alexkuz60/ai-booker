@@ -1587,7 +1587,15 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                     <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       {isRu ? "Модель" : "Model"}
                     </label>
-                    <Select value={paModel} onValueChange={v => { setPaModel(v); markDirty(); }}>
+                    <Select value={paModel} onValueChange={v => {
+                      setPaModel(v);
+                      // Reset voice if current voice not available for new model
+                      const available = getVoicesForModel(v);
+                      if (!available.some(av => av.id === paVoice)) {
+                        setPaVoice(available[0]?.id ?? "alloy");
+                      }
+                      markDirty();
+                    }}>
                       <SelectTrigger className="bg-secondary border-border">
                         <SelectValue />
                       </SelectTrigger>
