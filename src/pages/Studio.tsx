@@ -312,6 +312,7 @@ const Studio = () => {
                 selectedSegmentId={selectedSegmentId}
                 onSelectSegment={setSelectedSegmentId}
                 onSynthesizingChange={setSynthesizingSegmentIds}
+                onErrorSegmentsChange={setErrorSegmentIds}
                 silenceSec={silenceSec}
                 onSilenceSecChange={handleSilenceSecChange}
               />
@@ -333,6 +334,7 @@ const Studio = () => {
           selectedSegmentId={selectedSegmentId}
           onSelectSegment={handleSelectSegmentFromTimeline}
           synthesizingSegmentIds={synthesizingSegmentIds}
+          errorSegmentIds={errorSegmentIds}
           clipsRefreshToken={clipsRefreshToken}
         />
       </div>
