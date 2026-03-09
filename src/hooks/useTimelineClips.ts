@@ -24,6 +24,8 @@ export interface TimelineClip {
   hasAudio: boolean;
   audioPath?: string;
   sceneId: string;
+  fadeInSec?: number;
+  fadeOutSec?: number;
 }
 
 interface RawPhrase {

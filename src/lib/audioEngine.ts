@@ -747,6 +747,20 @@ class AudioEngine {
     this.tracks.get(trackId)?.setPreFxBypassed(b);
   }
 
+  setTrackFadeIn(trackId: string, sec: number): void {
+    this.tracks.get(trackId)?.setFadeIn(sec);
+  }
+
+  setTrackFadeOut(trackId: string, sec: number): void {
+    this.tracks.get(trackId)?.setFadeOut(sec);
+  }
+
+  getTrackFades(trackId: string): { fadeInSec: number; fadeOutSec: number } | null {
+    const t = this.tracks.get(trackId);
+    if (!t) return null;
+    return { fadeInSec: t.fadeInSec, fadeOutSec: t.fadeOutSec };
+  }
+
   // ─── Metering ─────────────────────────────────────────
 
   getTrackMeter(trackId: string): TrackMeterData | null {

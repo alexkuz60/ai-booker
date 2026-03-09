@@ -78,6 +78,9 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
         const { clip, url } = result;
         const isOverlay = clip.id.includes("_narrator_");
 
+        const DEFAULT_FADE_IN = 0.15;
+        const DEFAULT_FADE_OUT = 0.25;
+
         configs.push({
           id: clip.id,
           url,
@@ -85,6 +88,8 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
           durationSec: clip.durationSec,
           overlay: isOverlay,
           volume: volume,
+          fadeInSec: clip.fadeInSec ?? DEFAULT_FADE_IN,
+          fadeOutSec: clip.fadeOutSec ?? DEFAULT_FADE_OUT,
         });
       }
 
