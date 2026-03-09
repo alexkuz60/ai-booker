@@ -8,6 +8,7 @@ import {
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
+  ContextMenuTrigger,
   ContextMenuSeparator,
   ContextMenuLabel,
 } from "@/components/ui/context-menu";
@@ -163,9 +164,9 @@ export function TimelineTrack({
         if (clip.hasAudio && onSetFade) {
           return (
             <ContextMenu key={i}>
-              <ContextMenuPrimitiveTrigger asChild>
+              <ContextMenuTrigger asChild>
                 {clipElement}
-              </ContextMenuPrimitiveTrigger>
+              </ContextMenuTrigger>
               <ContextMenuContent className="w-52">
                 <ContextMenuLabel className="text-xs truncate">{clip.label}</ContextMenuLabel>
                 <ContextMenuSeparator />
