@@ -321,11 +321,16 @@ class EngineTrack {
       return;
     }
 
-    const remaining = Math.max(0, this.durationSec - offset);
+    const hasFadeOut = this._fadeOutSec > 0;
     this.scheduledId = Tone.getTransport().schedule((time) => {
       if (this.player.loaded) {
         this.player.fadeIn = 0;
-        this.player.start(time, offset, remaining);
+        if (hasFadeOut) {
+          const remaining = Math.max(0, this.durationSec - offset);
+          this.player.start(time, offset, remaining);
+        } else {
+          this.player.start(time, offset);
+        }
       }
     }, transportTime);
   }
