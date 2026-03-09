@@ -73,7 +73,7 @@ function usePlaceholderChapters(): FinishedChapter[] {
 
 // ─── component ─────────────────────────────────────────────
 
-export function FinishedChaptersPanel({ isRu, bookId, chapterSceneIds, onRecalcDone }: FinishedChaptersPanelProps) {
+export function FinishedChaptersPanel({ isRu, bookId }: FinishedChaptersPanelProps) {
   const i = t(isRu);
   const chapters = usePlaceholderChapters();
 
