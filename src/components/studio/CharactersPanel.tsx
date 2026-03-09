@@ -492,6 +492,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       setCharacters(prev => prev.map(c =>
         c.id === selectedId ? { ...c, voice_config: voiceConfig } : c
       ));
+      onVoiceSaved?.();
       toast.success(isRu ? "Голос сохранён" : "Voice saved");
     } catch (e) {
       toast.error(isRu ? "Ошибка сохранения" : "Save error");

@@ -124,6 +124,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
               chapterSceneIds={chapterSceneIds}
               selectedCharacterId={selectedCharacterId}
               onSelectCharacter={onSelectCharacter}
+              onVoiceSaved={onVoiceSaved}
             />
           </div>
         </TabsContent>
