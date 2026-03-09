@@ -139,6 +139,7 @@ export function StudioTimeline({
   // ── Character tracks ──────────────────────────────────────
   const [charTracks, setCharTracks] = useState<TimelineTrackData[]>([]);
   const [speakerToCharId, setSpeakerToCharId] = useState<Map<string, string>>(new Map());
+  const [typeMappings, setTypeMappings] = useState<TypeMappingsByScene>(new Map());
 
   const contextSceneIds = useMemo(() =>
     mode === "scene"
@@ -148,18 +149,40 @@ export function StudioTimeline({
   );
 
   useEffect(() => {
-    if (!bookId) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
-    if (contextSceneIds.length === 0) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
+    if (!bookId) { setCharTracks([]); setSpeakerToCharId(new Map()); setTypeMappings(new Map()); return; }
+    if (contextSceneIds.length === 0) { setCharTracks([]); setSpeakerToCharId(new Map()); setTypeMappings(new Map()); return; }
 
     (async () => {
-      const { data: appearances } = await supabase
-        .from("character_appearances")
-        .select("character_id")
-        .in("scene_id", contextSceneIds);
+      const [{ data: appearances }, { data: rawMappings }] = await Promise.all([
+        supabase
+          .from("character_appearances")
+          .select("character_id")
+          .in("scene_id", contextSceneIds),
+        supabase
+          .from("scene_type_mappings")
+          .select("scene_id, segment_type, character_id")
+          .in("scene_id", contextSceneIds),
+      ]);
 
-      if (!appearances?.length) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
+      // Build type mappings: scene_id → Map<segment_type, character_id>
+      const tm: TypeMappingsByScene = new Map();
+      if (rawMappings) {
+        for (const m of rawMappings) {
+          let sceneMap = tm.get(m.scene_id);
+          if (!sceneMap) { sceneMap = new Map(); tm.set(m.scene_id, sceneMap); }
+          sceneMap.set(m.segment_type, m.character_id);
+        }
+      }
+      setTypeMappings(tm);
 
-      const charIds = [...new Set(appearances.map(a => a.character_id))];
+      // Collect all character IDs from both appearances AND type mappings
+      const charIdSet = new Set<string>();
+      if (appearances) for (const a of appearances) charIdSet.add(a.character_id);
+      if (rawMappings) for (const m of rawMappings) charIdSet.add(m.character_id);
+
+      if (charIdSet.size === 0) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
+
+      const charIds = [...charIdSet];
 
       const { data: chars } = await supabase
         .from("book_characters")
