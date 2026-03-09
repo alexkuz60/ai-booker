@@ -1184,9 +1184,13 @@ class AudioEngine {
 
   private startPositionLoop(): void {
     this.stopPositionLoop();
+    // Give the transport a brief head-start before checking end condition
+    let tickCount = 0;
     const tick = () => {
       if (this._state !== "playing") return;
-      if (this.transport.seconds >= this._totalDuration) {
+      tickCount++;
+      // Only check end condition after a few frames (avoid false stop at t=0)
+      if (tickCount > 5 && this._totalDuration > 0 && this.transport.seconds >= this._totalDuration) {
         this.stop();
         return;
       }
