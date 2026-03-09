@@ -5,7 +5,7 @@ import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut, Maximize2, Layers, Film,
 import { Button } from "@/components/ui/button";
 
 import { supabase } from "@/integrations/supabase/client";
-import { useTimelineClips, type TimelineClip } from "@/hooks/useTimelineClips";
+import { useTimelineClips, type TimelineClip, type TypeMappingsByScene } from "@/hooks/useTimelineClips";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { TrackMixerStrip } from "./TrackMixerStrip";
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
