@@ -71,7 +71,7 @@
 - [x] ElevenLabs TTS edge function
 - [x] Парсинг структуры книги (LLM-Agent)
 - [x] **Character Profiler** — автопрофилирование персонажей и подбор голосов
-- [x] Привязка голосов к персонажам (Yandex SpeechKit + ElevenLabs)
+- [x] Привязка голосов к персонажам (Yandex SpeechKit + ElevenLabs + ProxyAPI/OpenAI TTS)
 - [x] Синтез сцены (TTS) с кэшированием и инвалидацией
 - [x] Таймлайн: воспроизведение, seek, overlay, режимы Сцена/Глава
 - [x] Детекция инлайн-вставок (авторские ремарки в диалогах)
