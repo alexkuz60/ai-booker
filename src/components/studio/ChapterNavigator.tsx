@@ -57,6 +57,7 @@ export function ChapterNavigator({
   const [chapterOpen, setChapterOpen] = useState(true);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
+  const [recalcRunning, setRecalcRunning] = useState(false);
 
   // Load actual durations from scene_playlists
   const [playlistDurations, setPlaylistDurations] = useState<Map<string, number>>(new Map());
