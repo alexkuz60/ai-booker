@@ -546,11 +546,11 @@ export function StudioTimeline({
         </div>
 
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom(-0.25)} title={isRu ? "Уменьшить" : "Zoom out"}>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("out")} title={isRu ? "Уменьшить" : "Zoom out"}>
             <ZoomOut className="h-3.5 w-3.5" />
           </Button>
           <span className="text-xs text-muted-foreground font-body w-10 text-center">{displayZoomPercent}%</span>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom(0.25)} title={isRu ? "Увеличить" : "Zoom in"}>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("in")} title={isRu ? "Увеличить" : "Zoom in"}>
             <ZoomIn className="h-3.5 w-3.5" />
           </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetZoom} title={isRu ? "По ширине" : "Fit to width"}>
