@@ -79,6 +79,81 @@ function resolveVoice(
   return randomVoiceConfig();
 }
 
+// ── MP3 duration parser ──────────────────────────────────────────────
+// Parses MP3 frame headers to calculate accurate duration instead of
+// rough byte-size estimation which varies with VBR encoding.
+
+const MP3_BITRATES_V1_L3 = [0,32,40,48,56,64,80,96,112,128,160,192,224,256,320,0];
+const MP3_SAMPLERATES_V1  = [44100, 48000, 32000, 0];
+
+function parseMp3Duration(data: Uint8Array): number {
+  let totalMs = 0;
+  let i = 0;
+  let frameCount = 0;
+
+  // Skip ID3v2 tag if present
+  if (data.length > 10 && data[0] === 0x49 && data[1] === 0x44 && data[2] === 0x33) {
+    const size = ((data[6] & 0x7F) << 21) | ((data[7] & 0x7F) << 14) |
+                 ((data[8] & 0x7F) << 7) | (data[9] & 0x7F);
+    i = 10 + size;
+  }
+
+  while (i < data.length - 4) {
+    // Look for frame sync (0xFF 0xE0+)
+    if (data[i] === 0xFF && (data[i + 1] & 0xE0) === 0xE0) {
+      const b1 = data[i + 1];
+      const b2 = data[i + 2];
+
+      const version = (b1 >> 3) & 0x03;     // 0=2.5, 1=reserved, 2=v2, 3=v1
+      const layer   = (b1 >> 1) & 0x03;     // 1=L3, 2=L2, 3=L1
+      const brIdx   = (b2 >> 4) & 0x0F;
+      const srIdx   = (b2 >> 2) & 0x03;
+      const padding = (b2 >> 1) & 0x01;
+
+      if (version === 1 || layer === 0 || brIdx === 0 || brIdx === 15 || srIdx === 3) {
+        i++;
+        continue;
+      }
+
+      let bitrate: number;
+      let sampleRate: number;
+      let samplesPerFrame: number;
+
+      if (version === 3) { // MPEG1
+        bitrate = MP3_BITRATES_V1_L3[brIdx] * 1000;
+        sampleRate = MP3_SAMPLERATES_V1[srIdx];
+        samplesPerFrame = layer === 1 ? 1152 : layer === 2 ? 1152 : 384;
+      } else { // MPEG2 / 2.5
+        // Simplified bitrate table for MPEG2 L3
+        const br2 = [0,8,16,24,32,40,48,56,64,80,96,112,128,144,160,0];
+        bitrate = br2[brIdx] * 1000;
+        sampleRate = MP3_SAMPLERATES_V1[srIdx];
+        if (version === 2) sampleRate /= 2;
+        else if (version === 0) sampleRate /= 4;
+        samplesPerFrame = layer === 1 ? 576 : 576;
+      }
+
+      if (bitrate === 0 || sampleRate === 0) { i++; continue; }
+
+      const frameLen = Math.floor((samplesPerFrame * (bitrate / 8)) / sampleRate) + padding;
+      if (frameLen < 4) { i++; continue; }
+
+      totalMs += (samplesPerFrame / sampleRate) * 1000;
+      frameCount++;
+      i += frameLen;
+    } else {
+      i++;
+    }
+  }
+
+  // Fallback to byte-size estimate if parsing failed
+  if (frameCount < 3) {
+    return Math.round((data.length / 16000) * 1000);
+  }
+
+  return Math.round(totalMs);
+}
+
 // ── TTS call helper ──────────────────────────────────────────────────
 
 async function callTts(
