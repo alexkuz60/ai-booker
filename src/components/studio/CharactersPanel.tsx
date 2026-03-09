@@ -144,6 +144,7 @@ interface CharactersPanelProps {
   chapterSceneIds?: string[];
   selectedCharacterId?: string | null;
   onSelectCharacter?: (characterId: string | null) => void;
+  onVoiceSaved?: () => void;
 }
 
 export interface CharactersPanelHandle {
@@ -153,7 +154,7 @@ export interface CharactersPanelHandle {
   profiling: boolean;
 }
 
-export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanelProps>(function CharactersPanel({ isRu, bookId, sceneId, chapterSceneIds, selectedCharacterId, onSelectCharacter }, ref) {
+export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanelProps>(function CharactersPanel({ isRu, bookId, sceneId, chapterSceneIds, selectedCharacterId, onSelectCharacter, onVoiceSaved }, ref) {
   const [characters, setCharacters] = useState<BookCharacter[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -491,6 +492,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       setCharacters(prev => prev.map(c =>
         c.id === selectedId ? { ...c, voice_config: voiceConfig } : c
       ));
+      onVoiceSaved?.();
       toast.success(isRu ? "Голос сохранён" : "Voice saved");
     } catch (e) {
       toast.error(isRu ? "Ошибка сохранения" : "Save error");

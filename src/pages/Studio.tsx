@@ -357,6 +357,7 @@ const Studio = () => {
                 silenceSec={silenceSec}
                 onSilenceSecChange={handleSilenceSecChange}
                 onRecalcDone={() => setClipsRefreshToken(t => t + 1)}
+                onVoiceSaved={() => setClipsRefreshToken(t => t + 1)}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
