@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2, Clock } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { StudioChapter } from "@/lib/studioChapter";
-import { estimateSceneDuration } from "@/lib/durationEstimate";
+import { estimateSceneDuration, formatDuration } from "@/lib/durationEstimate";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
