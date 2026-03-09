@@ -182,13 +182,19 @@ export function useTimelineClips(
             durationSec = Math.max(0.5, totalChars / CHARS_PER_SEC);
           }
 
-          // Determine track ID
+          // Determine track ID — check scene_type_mappings first, then speaker name
           let trackId = "narrator-fallback";
-          const speakerKey = seg.speaker?.toLowerCase();
-          if (speakerKey && characterMap.has(speakerKey)) {
-            trackId = `char-${characterMap.get(speakerKey)}`;
-          } else if (seg.segment_type === "narrator" || seg.segment_type === "first_person") {
-            trackId = "narrator-fallback";
+          const sceneTypeMappings = typeMappings?.get(sceneId);
+          const mappedCharId = sceneTypeMappings?.get(seg.segment_type);
+
+          if (mappedCharId) {
+            // Type-level mapping takes priority (e.g. first_person → Таисия)
+            trackId = `char-${mappedCharId}`;
+          } else {
+            const speakerKey = seg.speaker?.toLowerCase();
+            if (speakerKey && characterMap.has(speakerKey)) {
+              trackId = `char-${characterMap.get(speakerKey)}`;
+            }
           }
 
           result.push({
