@@ -73,6 +73,12 @@ export interface TrackConfig {
   fadeInSec?: number;
   /** Fade-out duration in seconds (applied via Tone.Player) */
   fadeOutSec?: number;
+  /** If true, the clip loops to fill durationSec. Original clip length in _clipLenSec. */
+  loop?: boolean;
+  /** Original single-iteration clip length (seconds). Required when loop=true. */
+  clipLenSec?: number;
+  /** Crossfade overlap between loop iterations (seconds). Default 1. */
+  loopCrossfadeSec?: number;
 }
 
 export type EngineState = "stopped" | "playing" | "paused";

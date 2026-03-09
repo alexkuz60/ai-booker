@@ -37,6 +37,12 @@ export interface TimelineClip {
   sceneId: string;
   fadeInSec?: number;
   fadeOutSec?: number;
+  /** If true, this clip loops to fill durationSec */
+  loop?: boolean;
+  /** Original single-iteration clip length in seconds */
+  clipLenSec?: number;
+  /** Crossfade between loop iterations (seconds) */
+  loopCrossfadeSec?: number;
 }
 
 export interface SceneBoundary {
