@@ -380,7 +380,7 @@ export function StudioTimeline({
   }, [fitZoom]);
 
   const resetZoom = useCallback(() => setZoomOverride(null), []);
-  const displayZoomPercent = Math.round(zoom * 100);
+  const displayZoomPercent = fitZoom > 0 ? Math.round((zoom / fitZoom) * 100) : 100;
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
