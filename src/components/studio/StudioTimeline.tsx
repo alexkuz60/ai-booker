@@ -372,15 +372,43 @@ export function StudioTimeline({
 
   const height = collapsed ? TIMELINE_HEADER_HEIGHT : size;
 
-  const adjustZoom = useCallback((delta: number) => {
-    setZoomOverride((prev) => {
-      const current = prev ?? fitZoom;
-      return Math.max(0.1, Math.min(10, current + delta));
-    });
+  const UNDER_100_ZOOM_STEPS = [5, 10, 15, 25, 50, 75, 100] as const;
+
+  const toPercent = useCallback((zoomValue: number) => {
+    if (fitZoom <= 0) return 100;
+    return (zoomValue / fitZoom) * 100;
   }, [fitZoom]);
 
+  const stepZoomPercent = useCallback((currentPercent: number, direction: "in" | "out") => {
+    if (direction === "in") {
+      if (currentPercent < 100) {
+        const nextUnder100 = UNDER_100_ZOOM_STEPS.find((step) => step > currentPercent + 0.001);
+        return nextUnder100 ?? 100;
+      }
+      const currentStep = Math.floor(currentPercent / 100);
+      return Math.min(1000, (currentStep + 1) * 100);
+    }
+
+    if (currentPercent <= 100) {
+      const lowerSteps = UNDER_100_ZOOM_STEPS.filter((step) => step < currentPercent - 0.001);
+      return lowerSteps.length > 0 ? lowerSteps[lowerSteps.length - 1] : 5;
+    }
+
+    const currentStep = Math.ceil(currentPercent / 100);
+    return Math.max(100, (currentStep - 1) * 100);
+  }, []);
+
+  const adjustZoom = useCallback((direction: "in" | "out") => {
+    setZoomOverride((prev) => {
+      const currentZoom = prev ?? fitZoom;
+      const currentPercent = toPercent(currentZoom);
+      const nextPercent = stepZoomPercent(currentPercent, direction);
+      return (fitZoom * nextPercent) / 100;
+    });
+  }, [fitZoom, stepZoomPercent, toPercent]);
+
   const resetZoom = useCallback(() => setZoomOverride(null), []);
-  const displayZoomPercent = fitZoom > 0 ? Math.round((zoom / fitZoom) * 100) : 100;
+  const displayZoomPercent = fitZoom > 0 ? Math.round(toPercent(zoom)) : 100;
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
