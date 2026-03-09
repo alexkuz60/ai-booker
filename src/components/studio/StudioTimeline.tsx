@@ -211,7 +211,7 @@ export function StudioTimeline({
         }))
       );
     })();
-  }, [bookId, sceneId, chapterSceneIds?.join(","), mode]);
+  }, [bookId, sceneId, chapterSceneIds?.join(","), mode, clipsRefreshToken]);
 
   // ── Real clips from segments (moved above duration calc) ──
   const { clips: timelineClips, sceneBoundaries } = useTimelineClips(contextSceneIds, speakerToCharId, clipsRefreshToken, typeMappings);
