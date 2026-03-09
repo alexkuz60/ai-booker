@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import heroImg from "@/assets/booker_home.jpeg";
+import heroImg from "@/assets/booker_home.webp";
 
 const Home = () => {
   return (
