@@ -25,8 +25,6 @@ export interface FinishedChapter {
 interface FinishedChaptersPanelProps {
   isRu: boolean;
   bookId?: string | null;
-  chapterSceneIds?: string[];
-  onRecalcDone?: () => void;
 }
 
 // ─── i18n ──────────────────────────────────────────────────
