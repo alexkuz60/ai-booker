@@ -689,24 +689,48 @@ export function StoryboardPanel({
 
   const PROPAGATE_TYPES = new Set(["narrator", "first_person", "inner_thought", "epigraph", "lyric", "footnote"]);
 
-  // Update segment type in DB
+  // Narrator↔first_person propagation pairs
+  const TYPE_PROPAGATION_PAIRS: Record<string, string> = {
+    narrator: "first_person",
+    first_person: "narrator",
+  };
+
+  // Update segment type in DB — propagates narrator↔first_person across all segments of old type
   const updateSegmentType = useCallback(async (segmentId: string, newType: string) => {
     const targetSeg = segments.find(s => s.segment_id === segmentId);
     if (!targetSeg) return;
     const oldType = targetSeg.segment_type;
 
+    // Determine if we should propagate: narrator→first_person or first_person→narrator
+    const shouldPropagate = TYPE_PROPAGATION_PAIRS[oldType] === newType;
+
+    const affectedIds = shouldPropagate
+      ? segments.filter(s => s.segment_type === oldType).map(s => s.segment_id)
+      : [segmentId];
+
     const updatedSegments = segments.map(seg =>
-      seg.segment_id === segmentId ? { ...seg, segment_type: newType } : seg
+      affectedIds.includes(seg.segment_id) ? { ...seg, segment_type: newType } : seg
     );
     setSegments(updatedSegments);
 
     const { error } = await supabase
       .from("scene_segments")
       .update({ segment_type: newType as any })
-      .eq("id", segmentId);
+      .in("id", affectedIds);
     if (error) {
       toast.error(isRu ? "Ошибка сохранения типа" : "Failed to save type");
       return;
+    }
+
+    if (affectedIds.length > 1) {
+      const newLabel = isRu
+        ? SEGMENT_CONFIG[newType]?.label_ru
+        : SEGMENT_CONFIG[newType]?.label_en;
+      toast.success(
+        isRu
+          ? `Тип изменён: ${newLabel} (${affectedIds.length} фрагм.)`
+          : `Type changed: ${newLabel} (${affectedIds.length} seg.)`
+      );
     }
 
     if (!sceneId) return;
