@@ -190,18 +190,37 @@ export function useTimelineClips(
             durationSec = Math.max(0.5, totalChars / CHARS_PER_SEC);
           }
 
-          // Determine track ID — check scene_type_mappings first, then speaker name
+          // Determine track ID — routing priority:
+          // 1. Dialogue: always use speaker name (never type mappings)
+          // 2. Explicit scene_type_mappings (e.g. first_person → Таисия)
+          // 3. System character auto-routing (footnote → Комментатор, narrator → Рассказчик)
+          // 4. Speaker name lookup
+          // 5. Fallback: narrator-fallback
           let trackId = "narrator-fallback";
-          const sceneTypeMappings = typeMappings?.get(sceneId);
-          const mappedCharId = sceneTypeMappings?.get(seg.segment_type);
 
-          if (mappedCharId) {
-            // Type-level mapping takes priority (e.g. first_person → Таисия)
-            trackId = `char-${mappedCharId}`;
-          } else {
+          if (seg.segment_type === "dialogue") {
+            // Dialogue always routes by speaker name, never by type mapping
             const speakerKey = seg.speaker?.toLowerCase();
             if (speakerKey && characterMap.has(speakerKey)) {
               trackId = `char-${characterMap.get(speakerKey)}`;
+            }
+          } else {
+            const sceneTypeMappings = typeMappings?.get(sceneId);
+            const mappedCharId = sceneTypeMappings?.get(seg.segment_type);
+
+            if (mappedCharId) {
+              trackId = `char-${mappedCharId}`;
+            } else {
+              // Auto-route system types to system characters
+              const sysCharName = SYSTEM_TYPE_TO_CHAR[seg.segment_type];
+              if (sysCharName && characterMap.has(sysCharName)) {
+                trackId = `char-${characterMap.get(sysCharName)}`;
+              } else {
+                const speakerKey = seg.speaker?.toLowerCase();
+                if (speakerKey && characterMap.has(speakerKey)) {
+                  trackId = `char-${characterMap.get(speakerKey)}`;
+                }
+              }
             }
           }
 
@@ -219,8 +238,19 @@ export function useTimelineClips(
           });
 
           // ── Inline narration overlay clips ──────────────────
+          // Route to first_person character if mapped (voice consistency),
+          // then to Рассказчик system character, then narrator-fallback
           const metadata = (seg.metadata ?? {}) as Record<string, unknown>;
           const inlineNarrAudio = (metadata.inline_narrations_audio ?? []) as InlineNarrationAudio[];
+
+          let inlineTrackId = "narrator-fallback";
+          const inlineMappings = typeMappings?.get(sceneId);
+          const fpCharId = inlineMappings?.get("first_person");
+          if (fpCharId) {
+            inlineTrackId = `char-${fpCharId}`;
+          } else if (characterMap.has("рассказчик")) {
+            inlineTrackId = `char-${characterMap.get("рассказчик")}`;
+          }
 
           for (let n = 0; n < inlineNarrAudio.length; n++) {
             const narr = inlineNarrAudio[n];
@@ -231,7 +261,7 @@ export function useTimelineClips(
 
             result.push({
               id: `${seg.id}_narrator_${n}`,
-              trackId: "narrator-fallback",
+              trackId: inlineTrackId,
               speaker: null,
               startSec: narrStartSec,
               durationSec: narrDurationSec,
