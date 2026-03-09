@@ -3,6 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 
 const CHARS_PER_SEC = 14;
 
+/** Silence gap prepended before every scene's first clip (seconds) */
+export const SCENE_SILENCE_SEC = 2;
+
 const SEGMENT_TYPE_LABELS: Record<string, string> = {
   narrator: "Рассказчик",
   first_person: "От первого лица",
