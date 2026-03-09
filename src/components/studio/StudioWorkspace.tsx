@@ -108,6 +108,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
               onErrorSegmentsChange={onErrorSegmentsChange}
               silenceSec={silenceSec}
               onSilenceSecChange={onSilenceSecChange}
+              onRecalcDone={onRecalcDone}
             />
           </div>
         </TabsContent>
