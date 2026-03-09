@@ -673,6 +673,77 @@ export function StoryboardPanel({
     }
   }, [isRu, segments, sceneId, characters]);
 
+  // ── Full sync of character_appearances for scene ──
+  // Scans all segments + type mappings to determine which characters are actually used,
+  // removes stale appearances (empty tracks), and ensures used characters are present.
+  const syncSceneCharacters = useCallback(async (updatedSegments: Segment[]) => {
+    if (!sceneId) return;
+
+    // 1. Collect all character IDs actually used
+    const usedCharIds = new Set<string>();
+
+    // From segment speakers
+    for (const seg of updatedSegments) {
+      if (seg.speaker) {
+        const charRecord = characters.find(c => c.name === seg.speaker);
+        if (charRecord) usedCharIds.add(charRecord.id);
+      }
+    }
+
+    // From scene_type_mappings (includes first_person, inline_narration, footnote, etc.)
+    const { data: mappings } = await supabase
+      .from("scene_type_mappings" as any)
+      .select("character_id")
+      .eq("scene_id", sceneId);
+    if (mappings) {
+      for (const m of mappings as any[]) {
+        usedCharIds.add(m.character_id);
+      }
+    }
+
+    // Also include system characters that have auto-routed segments
+    const SYSTEM_TYPES: Record<string, string> = {
+      narrator: "рассказчик", epigraph: "рассказчик", lyric: "рассказчик",
+      footnote: "комментатор",
+    };
+    for (const seg of updatedSegments) {
+      const sysName = SYSTEM_TYPES[seg.segment_type];
+      if (sysName) {
+        const sysChar = characters.find(c => c.name.toLowerCase() === sysName);
+        if (sysChar) usedCharIds.add(sysChar.id);
+      }
+    }
+
+    // 2. Get current appearances
+    const { data: currentAppearances } = await supabase
+      .from("character_appearances")
+      .select("id, character_id")
+      .eq("scene_id", sceneId);
+
+    if (!currentAppearances) return;
+
+    // 3. Delete stale appearances
+    const staleIds = currentAppearances
+      .filter(a => !usedCharIds.has(a.character_id))
+      .map(a => a.id);
+    if (staleIds.length > 0) {
+      await supabase.from("character_appearances").delete().in("id", staleIds);
+    }
+
+    // 4. Ensure all used characters have an appearance
+    const existingCharIds = new Set(currentAppearances.map(a => a.character_id));
+    for (const charId of usedCharIds) {
+      if (!existingCharIds.has(charId)) {
+        await supabase.from("character_appearances").upsert(
+          { character_id: charId, scene_id: sceneId, role_in_scene: "speaker", segment_ids: [] },
+          { onConflict: "character_id,scene_id" }
+        );
+      }
+    }
+
+    onSegmented?.(sceneId); // refresh timeline
+  }, [sceneId, characters, onSegmented]);
+
   // Update speaker in DB
   // Update speaker — propagate to all segments of same type ONLY for non-dialogue types
   // Dialogue segments have individual speakers (different characters speak)
@@ -689,9 +760,10 @@ export function StoryboardPanel({
       : [segmentId];
 
     // Update locally
-    setSegments(prev => prev.map(seg =>
+    const updatedSegments = segments.map(seg =>
       affectedIds.includes(seg.segment_id) ? { ...seg, speaker: newSpeaker } : seg
-    ));
+    );
+    setSegments(updatedSegments);
 
     // Persist to DB
     const { error } = await supabase
@@ -718,49 +790,8 @@ export function StoryboardPanel({
       }
     }
 
-    // Remove old character from character_appearances if they no longer have any segments in this scene
-    if (sceneId && targetSeg.speaker && targetSeg.speaker !== newSpeaker) {
-      const oldCharRecord = characters.find(c => c.name === targetSeg.speaker);
-      if (oldCharRecord) {
-        // Check if old speaker still has other segments in this scene (after the update)
-        const updatedSegments = segments.map(seg =>
-          affectedIds.includes(seg.segment_id) ? { ...seg, speaker: newSpeaker } : seg
-        );
-        const oldSpeakerStillUsed = updatedSegments.some(
-          s => s.speaker === targetSeg.speaker && !affectedIds.includes(s.segment_id)
-        );
-        if (!oldSpeakerStillUsed) {
-          await supabase
-            .from("character_appearances")
-            .delete()
-            .eq("character_id", oldCharRecord.id)
-            .eq("scene_id", sceneId);
-        }
-      }
-    }
-
-    // Upsert character_appearances so the character appears in "scene characters"
-    if (sceneId && newSpeaker) {
-      const charRecord = characters.find(c => c.name === newSpeaker);
-      if (charRecord) {
-        const { data: existing } = await supabase
-          .from("character_appearances")
-          .select("id, segment_ids")
-          .eq("character_id", charRecord.id)
-          .eq("scene_id", sceneId)
-          .maybeSingle();
-
-        if (existing) {
-          const merged = [...new Set([...existing.segment_ids, ...affectedIds])];
-          await supabase.from("character_appearances").update({ segment_ids: merged }).eq("id", existing.id);
-        } else {
-          await supabase.from("character_appearances").upsert(
-            { character_id: charRecord.id, scene_id: sceneId, role_in_scene: "speaker", segment_ids: affectedIds },
-            { onConflict: "character_id,scene_id" }
-          );
-        }
-      }
-    }
+    // Full sync: clean up stale appearances, add missing ones
+    await syncSceneCharacters(updatedSegments);
 
     if (error) {
       toast.error(isRu ? "Ошибка сохранения персонажа" : "Failed to save speaker");
@@ -774,7 +805,7 @@ export function StoryboardPanel({
           : `"${typeLabel}" → ${newSpeaker || "?"} (${affectedIds.length} seg.)`
       );
     }
-  }, [isRu, segments, sceneId, characters]);
+  }, [isRu, segments, sceneId, characters, syncSceneCharacters]);
 
   // ── Synthesize scene ──
   const runSynthesis = useCallback(async () => {
