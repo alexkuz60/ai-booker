@@ -306,6 +306,21 @@ class EngineTrack {
   get reverbWet() { return this._reverbWet; }
   get reverbBypassed() { return this._reverbBypassed; }
 
+  // ── Fade in/out ──
+
+  setFadeIn(sec: number): void {
+    this._fadeInSec = Math.max(0, sec);
+    this.player.fadeIn = this._fadeInSec;
+  }
+
+  setFadeOut(sec: number): void {
+    this._fadeOutSec = Math.max(0, sec);
+    this.player.fadeOut = this._fadeOutSec;
+  }
+
+  get fadeInSec() { return this._fadeInSec; }
+  get fadeOutSec() { return this._fadeOutSec; }
+
   // ── Metering ──
 
   getMeterData(): TrackMeterData {
