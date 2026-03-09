@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { getAudioEngine } from "@/lib/audioEngine";
+import { useCloudSettings } from "@/hooks/useCloudSettings";
 import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut, Maximize2, Layers, Film, Play, Pause, Square, Volume2, VolumeX, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -93,19 +94,45 @@ export function StudioTimeline({
   clipsRefreshToken = 0,
 }: StudioTimelineProps) {
   const [mode, setMode] = useState<"scene" | "chapter">("scene");
-  const [clipFades, setClipFades] = useState<Map<string, { fadeInSec: number; fadeOutSec: number }>>(new Map());
+  // ── Clip fades persistence (localStorage + cloud) ──────────
+  type FadeMap = Record<string, { fadeInSec: number; fadeOutSec: number }>;
+  const fadeCloudKey = sceneId ? `clip_fades_${sceneId}` : "clip_fades_none";
+  const { value: savedFades, update: saveFades, loaded: fadesLoaded } =
+    useCloudSettings<FadeMap>(fadeCloudKey, {});
+
+  const savedFadesRef = useRef(savedFades);
+  savedFadesRef.current = savedFades;
+
+  // Convert to Map for components
+  const clipFades = useMemo(() => {
+    const m = new Map<string, { fadeInSec: number; fadeOutSec: number }>();
+    for (const [k, v] of Object.entries(savedFades)) {
+      m.set(k, v);
+    }
+    return m;
+  }, [savedFades]);
+
+  // Restore fades to engine when loaded
+  const fadesRestoredRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!fadesLoaded || !sceneId) return;
+    if (fadesRestoredRef.current === fadeCloudKey) return;
+    fadesRestoredRef.current = fadeCloudKey;
+    const engine = getAudioEngine();
+    for (const [clipId, f] of Object.entries(savedFadesRef.current)) {
+      engine.setTrackFadeIn(clipId, f.fadeInSec);
+      engine.setTrackFadeOut(clipId, f.fadeOutSec);
+    }
+  }, [fadesLoaded, fadeCloudKey, sceneId]);
 
   const handleSetFade = useCallback((clipId: string, fadeInSec: number, fadeOutSec: number) => {
-    setClipFades(prev => {
-      const next = new Map(prev);
-      next.set(clipId, { fadeInSec, fadeOutSec });
-      return next;
-    });
     // Apply to engine immediately
     const engine = getAudioEngine();
     engine.setTrackFadeIn(clipId, fadeInSec);
     engine.setTrackFadeOut(clipId, fadeOutSec);
-  }, []);
+    // Persist
+    saveFades((prev) => ({ ...prev, [clipId]: { fadeInSec, fadeOutSec } }));
+  }, [saveFades]);
 
   // ── Character tracks ──────────────────────────────────────
   const [charTracks, setCharTracks] = useState<TimelineTrackData[]>([]);
