@@ -3,7 +3,7 @@ import { getAudioEngine } from "@/lib/audioEngine";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
 import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut, Maximize2, Layers, Film, Play, Pause, Square, Volume2, VolumeX, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useTimelineClips, type TimelineClip } from "@/hooks/useTimelineClips";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
@@ -372,15 +372,43 @@ export function StudioTimeline({
 
   const height = collapsed ? TIMELINE_HEADER_HEIGHT : size;
 
-  const adjustZoom = useCallback((delta: number) => {
-    setZoomOverride((prev) => {
-      const current = prev ?? fitZoom;
-      return Math.max(0.1, Math.min(10, current + delta));
-    });
+  const UNDER_100_ZOOM_STEPS = [5, 10, 15, 25, 50, 75, 100] as const;
+
+  const toPercent = useCallback((zoomValue: number) => {
+    if (fitZoom <= 0) return 100;
+    return (zoomValue / fitZoom) * 100;
   }, [fitZoom]);
 
+  const stepZoomPercent = useCallback((currentPercent: number, direction: "in" | "out") => {
+    if (direction === "in") {
+      if (currentPercent < 100) {
+        const nextUnder100 = UNDER_100_ZOOM_STEPS.find((step) => step > currentPercent + 0.001);
+        return nextUnder100 ?? 100;
+      }
+      const currentStep = Math.floor(currentPercent / 100);
+      return Math.min(1000, (currentStep + 1) * 100);
+    }
+
+    if (currentPercent <= 100) {
+      const lowerSteps = UNDER_100_ZOOM_STEPS.filter((step) => step < currentPercent - 0.001);
+      return lowerSteps.length > 0 ? lowerSteps[lowerSteps.length - 1] : 5;
+    }
+
+    const currentStep = Math.ceil(currentPercent / 100);
+    return Math.max(100, (currentStep - 1) * 100);
+  }, []);
+
+  const adjustZoom = useCallback((direction: "in" | "out") => {
+    setZoomOverride((prev) => {
+      const currentZoom = prev ?? fitZoom;
+      const currentPercent = toPercent(currentZoom);
+      const nextPercent = stepZoomPercent(currentPercent, direction);
+      return (fitZoom * nextPercent) / 100;
+    });
+  }, [fitZoom, stepZoomPercent, toPercent]);
+
   const resetZoom = useCallback(() => setZoomOverride(null), []);
-  const displayZoomPercent = fitZoom > 0 ? Math.round((zoom / fitZoom) * 100) : 100;
+  const displayZoomPercent = fitZoom > 0 ? Math.round(toPercent(zoom)) : 100;
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
@@ -518,11 +546,11 @@ export function StudioTimeline({
         </div>
 
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom(-0.25)} title={isRu ? "Уменьшить" : "Zoom out"}>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("out")} title={isRu ? "Уменьшить" : "Zoom out"}>
             <ZoomOut className="h-3.5 w-3.5" />
           </Button>
           <span className="text-xs text-muted-foreground font-body w-10 text-center">{displayZoomPercent}%</span>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom(0.25)} title={isRu ? "Увеличить" : "Zoom in"}>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("in")} title={isRu ? "Увеличить" : "Zoom in"}>
             <ZoomIn className="h-3.5 w-3.5" />
           </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetZoom} title={isRu ? "По ширине" : "Fit to width"}>
@@ -598,9 +626,10 @@ export function StudioTimeline({
               );
             })}
           </div>
-          <ScrollArea className="flex-1">
+          <div className="flex-1 overflow-x-auto overflow-y-hidden">
             <div
-              className="min-w-full relative cursor-crosshair"
+              className="relative cursor-crosshair"
+              style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = e.clientX - rect.left;
@@ -614,7 +643,7 @@ export function StudioTimeline({
               ))}
               <Playhead positionSec={player.positionSec} zoom={zoom} />
             </div>
-          </ScrollArea>
+          </div>
         </div>
       )}
 
@@ -625,9 +654,10 @@ export function StudioTimeline({
             <MasterMeterPanel isRu={isRu} width={sidebarWidth} />
           </div>
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <ScrollArea className="flex-shrink-0">
+            <div className="overflow-x-auto overflow-y-hidden shrink-0">
               <div
-                className="min-w-full relative cursor-crosshair"
+                className="relative cursor-crosshair"
+                style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
                 onClick={(e) => {
                   const rect = e.currentTarget.getBoundingClientRect();
                   const x = e.clientX - rect.left;
@@ -674,7 +704,7 @@ export function StudioTimeline({
                 </div>
                 <Playhead positionSec={player.positionSec} zoom={zoom} />
               </div>
-            </ScrollArea>
+            </div>
             {/* Master Effects Tabs — FFT + EQ/CMP/LIM/REV */}
             <div className="flex-1 min-h-0 p-2">
               <MasterEffectsTabs isRu={isRu} />
