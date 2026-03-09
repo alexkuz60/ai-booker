@@ -162,7 +162,25 @@ export function ChapterNavigator({
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 )}
                 <span className="truncate">{chapter.chapterTitle}</span>
-                <Badge variant="outline" className="ml-auto text-[11px] shrink-0">
+                {(() => {
+                  // Compute total chapter duration: actual from playlists, or estimate
+                  let totalSec = 0;
+                  for (const scene of chapter.scenes) {
+                    const actualMs = scene.id ? playlistDurations.get(scene.id) : undefined;
+                    if (actualMs && actualMs > 0) {
+                      totalSec += actualMs / 1000;
+                    } else {
+                      totalSec += estimateSceneDuration(scene).sec;
+                    }
+                  }
+                  return totalSec > 0 ? (
+                    <span className="flex items-center gap-1 ml-auto text-[11px] text-muted-foreground font-mono shrink-0">
+                      <Clock className="h-3 w-3" />
+                      {formatDuration(Math.round(totalSec))}
+                    </span>
+                  ) : null;
+                })()}
+                <Badge variant="outline" className="text-[11px] shrink-0">
                   {chapter.scenes.length}
                 </Badge>
               </button>
