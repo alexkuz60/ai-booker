@@ -273,6 +273,7 @@ const Studio = () => {
                   fullyRenderedSceneIds={fullyRenderedSceneIds}
                   staleAudioSceneIds={staleAudioSceneIds}
                   onBatchResynthDone={() => setClipsRefreshToken(t => t + 1)}
+                  clipsRefreshToken={clipsRefreshToken}
                 />
               ) : (
                 <EmptyNavigator isRu={isRu} />
