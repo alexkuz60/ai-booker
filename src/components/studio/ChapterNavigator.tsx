@@ -110,6 +110,17 @@ export function ChapterNavigator({
     }
   };
 
+  // Compute total chapter duration
+  let chapterTotalSec = 0;
+  for (const scene of chapter.scenes) {
+    const actualMs = scene.id ? playlistDurations.get(scene.id) : undefined;
+    if (actualMs && actualMs > 0) {
+      chapterTotalSec += actualMs / 1000;
+    } else {
+      chapterTotalSec += estimateSceneDuration(scene).sec;
+    }
+  }
+
   return (
     <div className="h-full flex flex-col border-r border-border">
       <div className="px-4 py-3 border-b border-border shrink-0">
@@ -161,25 +172,13 @@ export function ChapterNavigator({
                 ) : (
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 )}
-                <span className="truncate">{chapter.chapterTitle}</span>
-                {(() => {
-                  // Compute total chapter duration: actual from playlists, or estimate
-                  let totalSec = 0;
-                  for (const scene of chapter.scenes) {
-                    const actualMs = scene.id ? playlistDurations.get(scene.id) : undefined;
-                    if (actualMs && actualMs > 0) {
-                      totalSec += actualMs / 1000;
-                    } else {
-                      totalSec += estimateSceneDuration(scene).sec;
-                    }
-                  }
-                  return totalSec > 0 ? (
-                    <span className="flex items-center gap-1 ml-auto text-[11px] text-muted-foreground font-mono shrink-0">
-                      <Clock className="h-3 w-3" />
-                      {formatDuration(Math.round(totalSec))}
-                    </span>
-                  ) : null;
-                })()}
+                <span className="truncate flex-1">{chapter.chapterTitle}</span>
+                {chapterTotalSec > 0 && (
+                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono shrink-0">
+                    <Clock className="h-3 w-3" />
+                    {formatDuration(Math.round(chapterTotalSec))}
+                  </span>
+                )}
                 <Badge variant="outline" className="text-[11px] shrink-0">
                   {chapter.scenes.length}
                 </Badge>
@@ -193,7 +192,16 @@ export function ChapterNavigator({
                   const actualMs = scene.id ? playlistDurations.get(scene.id) : undefined;
                   const actualSec = actualMs && actualMs > 0 ? Math.round(actualMs / 1000) : null;
                   const displayDuration = actualSec ? formatDuration(actualSec) : est.formatted;
+                  const isStale = staleAudioSceneIds?.has(scene.id || "");
                   const isActual = !!actualSec;
+
+                  // Duration color: stale=yellow, actual=green, estimate=muted
+                  const durationColor = isStale
+                    ? "text-yellow-500"
+                    : isActual
+                      ? "text-emerald-500"
+                      : "text-muted-foreground";
+
                   return (
                     <button
                       key={idx}
@@ -208,7 +216,7 @@ export function ChapterNavigator({
                         {isRu ? (SCENE_TYPE_RU[scene.scene_type] || scene.scene_type) : scene.scene_type}
                       </span>
                       <span className="truncate flex-1">{scene.title}</span>
-                      {staleAudioSceneIds?.has(scene.id || "") && (
+                      {isStale && (
                         <span title={isRu ? "Голос изменился — аудио устарело" : "Voice changed — audio outdated"}>
                           <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0" />
                         </span>
@@ -227,13 +235,13 @@ export function ChapterNavigator({
                         </span>
                       ) : null}
                       <span
-                        className={cn(
-                          "text-[11px] font-mono shrink-0",
-                          isActual ? "text-foreground" : "text-muted-foreground"
-                        )}
-                        title={isActual
-                          ? `${isRu ? "Фактическое время" : "Actual duration"} (${est.chars} ${isRu ? "сим." : "chars"})`
-                          : `≈ ${est.chars} ${isRu ? "сим." : "chars"}`
+                        className={cn("text-[11px] font-mono shrink-0", durationColor)}
+                        title={
+                          isStale
+                            ? (isRu ? "Аудио устарело — требуется ре-синтез" : "Audio stale — re-synthesis needed")
+                            : isActual
+                              ? `${isRu ? "Фактическое время" : "Actual duration"} (${est.chars} ${isRu ? "сим." : "chars"})`
+                              : `≈ ${est.chars} ${isRu ? "сим." : "chars"}`
                         }
                       >
                         {!isActual && "≈"}{displayDuration}
