@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Download, Play, Pause, Headphones, Timer, Loader2 } from "lucide-react";
+import { Download, Play, Pause, Headphones, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -7,8 +7,6 @@ import { Slider } from "@/components/ui/slider";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 // ─── types ─────────────────────────────────────────────────
 
@@ -25,8 +23,6 @@ export interface FinishedChapter {
 interface FinishedChaptersPanelProps {
   isRu: boolean;
   bookId?: string | null;
-  chapterSceneIds?: string[];
-  onRecalcDone?: () => void;
 }
 
 // ─── i18n ──────────────────────────────────────────────────
@@ -75,7 +71,7 @@ function usePlaceholderChapters(): FinishedChapter[] {
 
 // ─── component ─────────────────────────────────────────────
 
-export function FinishedChaptersPanel({ isRu, bookId, chapterSceneIds, onRecalcDone }: FinishedChaptersPanelProps) {
+export function FinishedChaptersPanel({ isRu, bookId }: FinishedChaptersPanelProps) {
   const i = t(isRu);
   const chapters = usePlaceholderChapters();
 
@@ -84,7 +80,7 @@ export function FinishedChaptersPanel({ isRu, bookId, chapterSceneIds, onRecalcD
   const [duration, setDuration] = useState(0);
   const [currentTitle, setCurrentTitle] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [recalcRunning, setRecalcRunning] = useState(false);
+  
 
   // cleanup on unmount
   useEffect(() => () => { audioRef.current?.pause(); }, []);
@@ -124,61 +120,9 @@ export function FinishedChaptersPanel({ isRu, bookId, chapterSceneIds, onRecalcD
     a.click();
   }, []);
 
-  const handleRecalcDurations = async () => {
-    const firstSceneId = chapterSceneIds?.[0];
-    if (!firstSceneId) {
-      toast.info(isRu ? "Нет сцен для пересчёта" : "No scenes to recalculate");
-      return;
-    }
-
-    setRecalcRunning(true);
-    try {
-      const { data: sceneRow } = await supabase
-        .from("book_scenes")
-        .select("chapter_id")
-        .eq("id", firstSceneId)
-        .single();
-
-      if (!sceneRow) {
-        toast.error(isRu ? "Не удалось найти главу" : "Could not find chapter");
-        setRecalcRunning(false);
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke("recalc-durations", {
-        body: { chapter_id: sceneRow.chapter_id },
-      });
-
-      if (error) {
-        toast.error(isRu ? "Ошибка пересчёта" : "Recalc error");
-        console.error("recalc-durations error:", error);
-      } else {
-        const result = data as { updated: number; errors: number; total: number };
-        if (result.updated > 0) {
-          toast.success(
-            isRu
-              ? `Обновлено ${result.updated} из ${result.total} клипов`
-              : `Updated ${result.updated} of ${result.total} clips`
-          );
-          onRecalcDone?.();
-        } else {
-          toast.info(
-            isRu
-              ? `Все длительности актуальны (${result.total} клипов)`
-              : `All durations up to date (${result.total} clips)`
-          );
-        }
-      }
-    } catch (e) {
-      console.error("recalc-durations exception:", e);
-      toast.error(isRu ? "Ошибка пересчёта длительностей" : "Duration recalc error");
-    }
-    setRecalcRunning(false);
-  };
-
   return (
     <div className="flex flex-col h-full">
-      {/* Header with recalc button */}
+      {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
           <Headphones className="h-4 w-4 text-primary" />
@@ -186,21 +130,6 @@ export function FinishedChaptersPanel({ isRu, bookId, chapterSceneIds, onRecalcD
             {i.title}
           </span>
         </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 gap-1.5 text-xs"
-          disabled={recalcRunning || !chapterSceneIds?.length}
-          onClick={handleRecalcDurations}
-          title={isRu ? "Пересчитать длительности из MP3" : "Recalculate durations from MP3"}
-        >
-          {recalcRunning ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <Timer className="h-3 w-3" />
-          )}
-          {isRu ? "Пересчёт" : "Recalc"}
-        </Button>
       </div>
 
       {/* Table */}
