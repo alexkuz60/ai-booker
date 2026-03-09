@@ -27,7 +27,7 @@ interface StudioWorkspaceProps {
   onRecalcDone?: () => void;
 }
 
-export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter, activeTab: externalTab, onTabChange, selectedSegmentId, onSelectSegment, onSynthesizingChange, onErrorSegmentsChange, silenceSec, onSilenceSecChange }: StudioWorkspaceProps) {
+export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter, activeTab: externalTab, onTabChange, selectedSegmentId, onSelectSegment, onSynthesizingChange, onErrorSegmentsChange, silenceSec, onSilenceSecChange, onRecalcDone }: StudioWorkspaceProps) {
   const [activeTab, setActiveTabLocal] = useState(() => externalTab || sessionStorage.getItem("studio_active_tab") || "storyboard");
   const charactersPanelRef = useRef<CharactersPanelHandle | null>(null);
   const [castingExternal, setCastingExternal] = useState(false);
