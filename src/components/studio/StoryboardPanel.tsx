@@ -928,19 +928,6 @@ export function StoryboardPanel({
           { scene_id: sceneId, segment_type: "inline_narration", character_id: charRecord.id },
           { onConflict: "scene_id,segment_type" }
         );
-      // Ensure character_appearances for timeline track
-      const { data: existing } = await supabase
-        .from("character_appearances")
-        .select("id")
-        .eq("character_id", charRecord.id)
-        .eq("scene_id", sceneId)
-        .maybeSingle();
-      if (!existing) {
-        await supabase.from("character_appearances").upsert(
-          { character_id: charRecord.id, scene_id: sceneId, role_in_scene: "narrator", segment_ids: [] },
-          { onConflict: "character_id,scene_id" }
-        );
-      }
       toast.success(isRu ? `Голос вставок → ${newSpeaker}` : `Narration voice → ${newSpeaker}`);
     } else {
       await supabase
@@ -950,8 +937,9 @@ export function StoryboardPanel({
         .eq("segment_type", "inline_narration");
       toast.success(isRu ? "Голос вставок сброшен" : "Narration voice reset");
     }
-    onSegmented?.(sceneId); // refresh timeline
-  }, [sceneId, characters, isRu, onSegmented]);
+    // Full sync: clean up stale appearances, add missing ones
+    await syncSceneCharacters(segments);
+  }, [sceneId, characters, isRu, segments, syncSceneCharacters]);
 
   // ── No scene selected ──
   if (!sceneId) {
