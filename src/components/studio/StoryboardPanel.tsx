@@ -1028,7 +1028,7 @@ export function StoryboardPanel({
             disabled={synthesizing || analyzing || segments.length === 0}
             className="gap-1.5 h-7 text-xs"
           >
-            {synthesizing ? <Loader2 className="h-3 w-3 animate-spin" /> : <AudioLines className="h-3 w-3" />}
+            {synthesizing ? <AudioLines className="h-3 w-3 animate-pulse-glow text-primary" /> : <AudioLines className="h-3 w-3" />}
             {synthesizing
               ? (synthProgress || (isRu ? "Синтез…" : "Synth…"))
               : (isRu ? "Синтез сцены" : "Synthesize")}
