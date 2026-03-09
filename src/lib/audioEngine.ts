@@ -195,7 +195,7 @@ class EngineTrack {
     //        Reverb → Bus (main output)
     this.player = new Tone.Player({
       url: config.url,
-      fadeIn: this._fadeInSec,
+      fadeIn: 0,
       fadeOut: this._fadeOutSec,
     });
 
@@ -220,14 +220,22 @@ class EngineTrack {
   schedule(): void {
     this.unschedule();
     this.scheduledId = Tone.getTransport().schedule((time) => {
-      if (this.player.loaded) this.player.start(time);
+      if (this.player.loaded) {
+        // Apply fadeIn only when clip starts from the beginning
+        this.player.fadeIn = this._fadeInSec;
+        this.player.start(time);
+      }
     }, this.startSec);
   }
 
   scheduleWithOffset(transportTime: number, offset: number): void {
     this.unschedule();
     this.scheduledId = Tone.getTransport().schedule((time) => {
-      if (this.player.loaded) this.player.start(time, offset);
+      if (this.player.loaded) {
+        // No fadeIn when resuming mid-clip
+        this.player.fadeIn = 0;
+        this.player.start(time, offset);
+      }
     }, transportTime);
   }
 
@@ -610,6 +618,7 @@ class AudioEngine {
       // Start overlapping clips immediately with correct offset
       for (const { track, offset } of immediateStarts) {
         if (track.player.loaded) {
+          track.player.fadeIn = 0; // No fade on resume
           track.player.start(Tone.now(), offset);
         }
       }
@@ -678,6 +687,7 @@ class AudioEngine {
       // Start overlapping clips immediately with correct offset
       for (const { track, offset } of immediateStarts) {
         if (track.player.loaded) {
+          track.player.fadeIn = 0; // No fade on seek resume
           track.player.start(Tone.now(), offset);
         }
       }

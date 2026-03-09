@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { getAudioEngine } from "@/lib/audioEngine";
 import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut, Maximize2, Layers, Film, Play, Pause, Square, Volume2, VolumeX, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -92,8 +93,19 @@ export function StudioTimeline({
   clipsRefreshToken = 0,
 }: StudioTimelineProps) {
   const [mode, setMode] = useState<"scene" | "chapter">("scene");
+  const [clipFades, setClipFades] = useState<Map<string, { fadeInSec: number; fadeOutSec: number }>>(new Map());
 
-  
+  const handleSetFade = useCallback((clipId: string, fadeInSec: number, fadeOutSec: number) => {
+    setClipFades(prev => {
+      const next = new Map(prev);
+      next.set(clipId, { fadeInSec, fadeOutSec });
+      return next;
+    });
+    // Apply to engine immediately
+    const engine = getAudioEngine();
+    engine.setTrackFadeIn(clipId, fadeInSec);
+    engine.setTrackFadeOut(clipId, fadeOutSec);
+  }, []);
 
   // ── Character tracks ──────────────────────────────────────
   const [charTracks, setCharTracks] = useState<TimelineTrackData[]>([]);
@@ -571,7 +583,7 @@ export function StudioTimeline({
             >
               <TimelineRuler zoom={zoom} duration={duration} />
               {allTracks.map((track) => (
-                <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} clips={clipsByTrack.get(track.id)} selectedSegmentId={selectedSegmentId} onSelectSegment={onSelectSegment} synthesizingSegmentIds={synthesizingSegmentIds} />
+                <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} clips={clipsByTrack.get(track.id)} selectedSegmentId={selectedSegmentId} onSelectSegment={onSelectSegment} synthesizingSegmentIds={synthesizingSegmentIds} onSetFade={handleSetFade} clipFades={clipFades} />
               ))}
               <Playhead positionSec={player.positionSec} zoom={zoom} />
             </div>
