@@ -11,7 +11,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { ChapterNavigator, EmptyNavigator } from "@/components/studio/ChapterNavigator";
 import { StudioWorkspace } from "@/components/studio/StudioWorkspace";
 import { StudioTimeline } from "@/components/studio/StudioTimeline";
-import { estimateChapterDuration, estimateSceneDuration } from "@/lib/durationEstimate";
+import { estimateChapterDuration, estimateSceneDuration, formatDuration } from "@/lib/durationEstimate";
 import { supabase } from "@/integrations/supabase/client";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { useStudioSession } from "@/hooks/useStudioSession";
