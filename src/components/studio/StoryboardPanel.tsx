@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, Play, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle, RefreshCw, Timer } from "lucide-react";
+import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, AudioLines, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle, RefreshCw, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -1028,7 +1028,7 @@ export function StoryboardPanel({
             disabled={synthesizing || analyzing || segments.length === 0}
             className="gap-1.5 h-7 text-xs"
           >
-            {synthesizing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+            {synthesizing ? <Loader2 className="h-3 w-3 animate-spin" /> : <AudioLines className="h-3 w-3" />}
             {synthesizing
               ? (synthProgress || (isRu ? "Синтез…" : "Synth…"))
               : (isRu ? "Синтез сцены" : "Synthesize")}
@@ -1125,7 +1125,7 @@ export function StoryboardPanel({
                       ? <Loader2 className="h-3 w-3 animate-spin" />
                       : audioStatus.get(seg.segment_id)
                         ? <RefreshCw className="h-3 w-3" />
-                        : <Play className="h-3 w-3" />}
+                        : <AudioLines className="h-3 w-3" />}
                   </button>
                   <span className="ml-auto text-[10px] text-muted-foreground font-mono">
                     #{seg.segment_number}
