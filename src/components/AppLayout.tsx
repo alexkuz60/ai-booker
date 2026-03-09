@@ -1,17 +1,25 @@
 import type { ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { usePageHeader } from "@/hooks/usePageHeader";
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const { title, subtitle, headerRight } = usePageHeader();
+  const isHome = useLocation().pathname === "/";
 
   return (
     <SidebarProvider defaultOpen={false}>
       <div className="h-screen flex w-full overflow-hidden">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-12 flex items-center border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-10 px-3 gap-3">
+          <header
+            className={`h-12 flex items-center sticky top-0 z-10 px-3 gap-3 ${
+              isHome
+                ? "bg-transparent border-b border-transparent"
+                : "bg-background/80 backdrop-blur-sm border-b border-border"
+            }`}
+          >
             <SidebarTrigger className="text-muted-foreground hover:text-foreground shrink-0" />
             {title && (
               <div className="flex items-center gap-2 min-w-0 flex-1">
