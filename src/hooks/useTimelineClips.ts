@@ -206,6 +206,7 @@ export function useTimelineClips(
 
       if (!cancelled) {
         setClips(result);
+        setSceneBoundaries(boundaries);
         setLoading(false);
       }
     })();
@@ -213,5 +214,5 @@ export function useTimelineClips(
     return () => { cancelled = true; };
   }, [key]);
 
-  return { clips, loading };
+  return { clips, loading, sceneBoundaries };
 }
