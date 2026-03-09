@@ -1061,6 +1061,17 @@ export function StoryboardPanel({
         </div>
         <div className="flex items-center gap-1.5">
           <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 text-xs"
+            disabled={recalcRunning || !sceneId}
+            onClick={handleRecalcDurations}
+            title={isRu ? "Пересчитать длительности из MP3" : "Recalculate durations from MP3"}
+          >
+            {recalcRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Timer className="h-3 w-3" />}
+            {isRu ? "Пересчёт" : "Recalc"}
+          </Button>
+          <Button
             variant="outline"
             size="sm"
             onClick={runSynthesis}
