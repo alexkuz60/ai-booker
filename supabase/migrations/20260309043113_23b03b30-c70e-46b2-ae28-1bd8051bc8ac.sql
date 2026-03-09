@@ -1,0 +1,1 @@
+ALTER TABLE public.book_scenes ADD COLUMN silence_sec smallint NOT NULL DEFAULT 2;

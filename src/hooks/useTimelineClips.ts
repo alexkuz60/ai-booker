@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const CHARS_PER_SEC = 14;
 
-/** Silence gap prepended before every scene's first clip (seconds) */
+/** Default silence gap prepended before every scene's first clip (seconds) */
 export const SCENE_SILENCE_SEC = 2;
 
 const SEGMENT_TYPE_LABELS: Record<string, string> = {
@@ -31,6 +31,12 @@ export interface TimelineClip {
   fadeOutSec?: number;
 }
 
+export interface SceneBoundary {
+  startSec: number;
+  silenceSec: number;
+  sceneId: string;
+}
+
 interface RawPhrase {
   id: string;
   segment_id: string;
@@ -50,6 +56,7 @@ interface InlineNarrationAudio {
  * Load real clips for timeline from scene_segments + segment_phrases.
  * Uses actual durations from segment_audio when available, falls back to char-based estimate.
  * Supports inline narration overlays from segment metadata.
+ * Now reads per-scene silence_sec from book_scenes.
  */
 export function useTimelineClips(
   sceneIds: string[],
@@ -58,14 +65,15 @@ export function useTimelineClips(
 ) {
   const [clips, setClips] = useState<TimelineClip[]>([]);
   const [loading, setLoading] = useState(false);
-  /** Absolute second offset where each scene's silence gap begins */
-  const [sceneBoundaries, setSceneBoundaries] = useState<number[]>([]);
+  /** Scene boundaries with absolute start offset and silence duration */
+  const [sceneBoundaries, setSceneBoundaries] = useState<SceneBoundary[]>([]);
 
   const key = sceneIds.join(",") + "|" + [...characterMap.entries()].map(([k, v]) => `${k}:${v}`).join(",") + "|" + refreshToken;
 
   useEffect(() => {
     if (sceneIds.length === 0) {
       setClips([]);
+      setSceneBoundaries([]);
       return;
     }
 
@@ -74,16 +82,30 @@ export function useTimelineClips(
 
     (async () => {
       // Load segments for these scenes (including metadata for inline narrations)
-      const { data: segments } = await supabase
-        .from("scene_segments")
-        .select("id, segment_number, segment_type, speaker, scene_id, metadata")
-        .in("scene_id", sceneIds)
-        .order("scene_id")
-        .order("segment_number");
+      const [{ data: segments }, { data: sceneData }] = await Promise.all([
+        supabase
+          .from("scene_segments")
+          .select("id, segment_number, segment_type, speaker, scene_id, metadata")
+          .in("scene_id", sceneIds)
+          .order("scene_id")
+          .order("segment_number"),
+        supabase
+          .from("book_scenes")
+          .select("id, silence_sec")
+          .in("id", sceneIds),
+      ]);
 
       if (cancelled || !segments?.length) {
-        if (!cancelled) { setClips([]); setLoading(false); }
+        if (!cancelled) { setClips([]); setSceneBoundaries([]); setLoading(false); }
         return;
+      }
+
+      // Build scene silence map
+      const sceneSilenceMap = new Map<string, number>();
+      if (sceneData) {
+        for (const s of sceneData) {
+          sceneSilenceMap.set(s.id, s.silence_sec ?? SCENE_SILENCE_SEC);
+        }
       }
 
       const segIds = segments.map(s => s.id);
@@ -127,17 +149,20 @@ export function useTimelineClips(
       const sceneOrder = sceneIds;
       let globalOffset = 0;
       const result: TimelineClip[] = [];
-      const boundaries: number[] = [];
+      const boundaries: SceneBoundary[] = [];
 
       for (const sceneId of sceneOrder) {
         const sceneSegments = segments
           .filter(s => s.scene_id === sceneId)
           .sort((a, b) => a.segment_number - b.segment_number);
 
-        // Each scene starts with SCENE_SILENCE_SEC silence
+        // Get per-scene silence duration
+        const silenceSec = sceneSilenceMap.get(sceneId) ?? SCENE_SILENCE_SEC;
+
+        // Each scene starts with silenceSec silence
         const sceneStart = globalOffset;
-        boundaries.push(sceneStart);
-        let sceneOffset = sceneStart + SCENE_SILENCE_SEC;
+        boundaries.push({ startSec: sceneStart, silenceSec, sceneId });
+        let sceneOffset = sceneStart + silenceSec;
 
         for (const seg of sceneSegments) {
           const audioInfo = audioDurationMap.get(seg.id);
