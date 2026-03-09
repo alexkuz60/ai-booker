@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 const CHARS_PER_SEC = 14;
@@ -238,6 +238,56 @@ export function useTimelineClips(
 
     return () => { cancelled = true; };
   }, [key]);
+
+  // ── Auto-sync scene_playlists when clips change ──────────────
+  // Ensures the montage scheme stays in sync with any timing change
+  // (silence, synthesis speed, inline narrations, etc.)
+  const prevSyncKeyRef = useRef<string>("");
+  useEffect(() => {
+    if (clips.length === 0 || loading) return;
+
+    // Build a key from clip timing to avoid redundant writes
+    const syncKey = clips.map(c => `${c.id}:${c.startSec}:${c.durationSec}`).join("|");
+    if (syncKey === prevSyncKeyRef.current) return;
+    prevSyncKeyRef.current = syncKey;
+
+    // Group clips by scene and compute total duration per scene
+    const sceneMap = new Map<string, { totalMs: number; segments: Array<Record<string, unknown>> }>();
+    for (const clip of clips) {
+      if (!clip.sceneId) continue;
+      let entry = sceneMap.get(clip.sceneId);
+      if (!entry) {
+        entry = { totalMs: 0, segments: [] };
+        sceneMap.set(clip.sceneId, entry);
+      }
+      const endMs = Math.round((clip.startSec + clip.durationSec) * 1000);
+      if (endMs > entry.totalMs) entry.totalMs = endMs;
+      if (clip.hasAudio) {
+        entry.segments.push({
+          segment_id: clip.id,
+          speaker: clip.speaker,
+          audio_path: clip.audioPath,
+          duration_ms: Math.round(clip.durationSec * 1000),
+          start_ms: Math.round(clip.startSec * 1000),
+        });
+      }
+    }
+
+    // Upsert each scene's playlist in parallel
+    const updates = Array.from(sceneMap.entries()).map(([sceneId, data]) =>
+      supabase.from("scene_playlists").upsert(
+        {
+          scene_id: sceneId,
+          total_duration_ms: data.totalMs,
+          segments: data.segments as unknown as import("@/integrations/supabase/types").Json,
+          status: data.segments.length > 0 ? "ready" : "partial",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "scene_id" },
+      ),
+    );
+    Promise.all(updates).catch(() => {/* silent — non-critical persistence */});
+  }, [clips, loading]);
 
   return { clips, loading, sceneBoundaries };
 }
