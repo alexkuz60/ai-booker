@@ -441,11 +441,12 @@ class EngineTrack {
     };
   }
 
-  get loaded(): boolean { return this.player.loaded; }
+  get loaded(): boolean { return this.player.loaded && (!this.playerB || this.playerB.loaded); }
 
   dispose(): void {
     this.unschedule();
     this.player.dispose();
+    this.playerB?.dispose();
     this.preFxNode.dispose();
     this.channel.dispose();
     this.reverbNode.dispose();

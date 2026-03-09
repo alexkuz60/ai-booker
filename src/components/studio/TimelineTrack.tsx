@@ -106,10 +106,12 @@ export function TimelineTrack({
           hasAudio: c.hasAudio,
           fadeInSec: fades?.fadeInSec ?? c.fadeInSec ?? 0,
           fadeOutSec: fades?.fadeOutSec ?? c.fadeOutSec ?? 0,
+          loop: c.loop ?? false,
+          clipLenSec: c.clipLenSec,
         };
       })
     : track.type === "atmosphere"
-      ? [{ id: "atm", start: 0, end: duration, durationSec: duration, label: track.label, type: "atmosphere", hasAudio: false, fadeInSec: 0, fadeOutSec: 0 }]
+      ? [{ id: "atm", start: 0, end: duration, durationSec: duration, label: track.label, type: "atmosphere", hasAudio: false, fadeInSec: 0, fadeOutSec: 0, loop: false, clipLenSec: undefined }]
       : track.type === "sfx"
         ? []
         : [];
