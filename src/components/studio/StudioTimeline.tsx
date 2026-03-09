@@ -654,9 +654,10 @@ export function StudioTimeline({
             <MasterMeterPanel isRu={isRu} width={sidebarWidth} />
           </div>
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <ScrollArea className="flex-shrink-0">
+            <div className="overflow-x-auto overflow-y-hidden shrink-0">
               <div
-                className="min-w-full relative cursor-crosshair"
+                className="relative cursor-crosshair"
+                style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
                 onClick={(e) => {
                   const rect = e.currentTarget.getBoundingClientRect();
                   const x = e.clientX - rect.left;
@@ -703,7 +704,7 @@ export function StudioTimeline({
                 </div>
                 <Playhead positionSec={player.positionSec} zoom={zoom} />
               </div>
-            </ScrollArea>
+            </div>
             {/* Master Effects Tabs — FFT + EQ/CMP/LIM/REV */}
             <div className="flex-1 min-h-0 p-2">
               <MasterEffectsTabs isRu={isRu} />
