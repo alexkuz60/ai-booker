@@ -768,6 +768,7 @@ export function StoryboardPanel({
     if (!sceneId || segments.length === 0) return;
     const allIds = new Set(segments.map(s => s.segment_id));
     setSynthesizing(true);
+    setCurrentlySynthesizingIds(allIds);
     onSynthesizingChange?.(allIds);
     setSynthProgress(isRu ? "Запуск синтеза…" : "Starting synthesis…");
     try {
@@ -799,6 +800,7 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка синтеза" : "Synthesis failed");
     }
     setSynthesizing(false);
+    setCurrentlySynthesizingIds(new Set());
     onSynthesizingChange?.(new Set());
     setSynthProgress("");
   }, [sceneId, segments, isRu, onSegmented, loadAudioStatus, onSynthesizingChange]);
@@ -807,6 +809,7 @@ export function StoryboardPanel({
   const resynthSegment = useCallback(async (segmentId: string) => {
     if (!sceneId) return;
     setResynthSegId(segmentId);
+    setCurrentlySynthesizingIds(new Set([segmentId]));
     onSynthesizingChange?.(new Set([segmentId]));
     try {
       // Delete existing audio record to force re-synthesis
@@ -827,6 +830,7 @@ export function StoryboardPanel({
       await loadAudioStatus(segments.map(s => s.segment_id));
     }
     setResynthSegId(null);
+    setCurrentlySynthesizingIds(new Set());
     onSynthesizingChange?.(new Set());
   }, [sceneId, isRu, onSegmented, loadAudioStatus, segments, onSynthesizingChange]);
 
