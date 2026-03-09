@@ -450,6 +450,19 @@ Deno.serve(async (req) => {
     const userId = userData.user.id;
     const narratorVoice = getNarratorVoice(voiceConfigMap, segments);
 
+    // Load ProxyAPI key if any character uses proxyapi provider
+    let proxyApiKey: string | undefined;
+    const needsProxyApi = [...voiceConfigMap.values()].some(vc => (vc as Record<string, unknown>).provider === "proxyapi");
+    if (needsProxyApi) {
+      try {
+        const { data: apiKeys } = await supabase.rpc("get_my_api_keys");
+        const keys = apiKeys as Record<string, string> | null;
+        proxyApiKey = keys?.proxyapi?.trim();
+      } catch (e) {
+        console.error("Failed to load ProxyAPI key:", e);
+      }
+    }
+
     // ── Load existing audio records for cache comparison ─────────────
     const { data: existingAudio } = await supabase
       .from("segment_audio")
