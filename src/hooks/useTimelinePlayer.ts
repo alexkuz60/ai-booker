@@ -77,6 +77,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
         if (!result) continue;
         const { clip, url } = result;
         const isOverlay = clip.id.includes("_narrator_");
+        const isAtmo = clip.segmentType?.startsWith("atmosphere_");
 
         configs.push({
           id: clip.id,
@@ -85,8 +86,12 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
           durationSec: clip.durationSec,
           overlay: isOverlay,
           volume: volume,
+          bus: isAtmo ? (clip.segmentType === "atmosphere_sfx" ? "sfx" : "atmosphere") : "voice",
           fadeInSec: clip.fadeInSec ?? 0,
           fadeOutSec: clip.fadeOutSec ?? 0,
+          loop: clip.loop,
+          clipLenSec: clip.clipLenSec,
+          loopCrossfadeSec: clip.loopCrossfadeSec,
         });
       }
 
