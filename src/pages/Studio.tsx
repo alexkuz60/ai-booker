@@ -11,7 +11,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { ChapterNavigator, EmptyNavigator } from "@/components/studio/ChapterNavigator";
 import { StudioWorkspace } from "@/components/studio/StudioWorkspace";
 import { StudioTimeline } from "@/components/studio/StudioTimeline";
-import { estimateChapterDuration, estimateSceneDuration } from "@/lib/durationEstimate";
+import { estimateChapterDuration, estimateSceneDuration, formatDuration } from "@/lib/durationEstimate";
 import { supabase } from "@/integrations/supabase/client";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { useStudioSession } from "@/hooks/useStudioSession";
@@ -59,6 +59,23 @@ const Studio = () => {
     if (!chapter || selectedSceneIdx === null) return null;
     return estimateSceneDuration(chapter.scenes[selectedSceneIdx]);
   }, [chapter, selectedSceneIdx]);
+
+  // Load actual rendered durations from scene_playlists
+  const [playlistDurations, setPlaylistDurations] = useState<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (!chapterSceneIds?.length) return;
+    (async () => {
+      const { data } = await supabase
+        .from("scene_playlists")
+        .select("scene_id, total_duration_ms")
+        .in("scene_id", chapterSceneIds);
+      if (data?.length) {
+        const m = new Map<string, number>();
+        for (const r of data) m.set(r.scene_id, r.total_duration_ms);
+        setPlaylistDurations(m);
+      }
+    })();
+  }, [chapterSceneIds?.join(","), clipsRefreshToken]);
 
   // Resolve scene IDs and bookId from DB
   useEffect(() => {
@@ -232,18 +249,42 @@ const Studio = () => {
     ? `${chapter.bookTitle} → ${chapter.chapterTitle}`
     : (isRu ? "Звукозапись ИИ-актеров. Монтаж. Сведение. Мастеринг." : "AI Voice Recording. Editing. Mixing. Mastering.");
 
+  // Compute actual chapter duration (prefer playlist, fallback to estimate)
+  const actualChapterDurationSec = useMemo(() => {
+    if (!chapter) return null;
+    let total = 0;
+    for (const scene of chapter.scenes) {
+      const actualMs = scene.id ? playlistDurations.get(scene.id) : undefined;
+      if (actualMs && actualMs > 0) {
+        total += actualMs / 1000;
+      } else {
+        total += estimateSceneDuration(scene).sec;
+      }
+    }
+    return total > 0 ? total : null;
+  }, [chapter, playlistDurations]);
+
+  // Actual scene duration from playlist
+  const actualSceneDurationMs = selectedScene?.id ? playlistDurations.get(selectedScene.id) : undefined;
+  const actualSceneSec = actualSceneDurationMs && actualSceneDurationMs > 0 ? actualSceneDurationMs / 1000 : null;
+
   const headerRight = chapterEstimate && chapterEstimate.chars > 0 ? (
     <div className="flex items-center gap-3 text-sm font-body">
       <div className="flex items-center gap-1.5 text-muted-foreground">
         <Clock className="h-4 w-4" />
-        <span className="font-medium text-foreground">{chapterEstimate.formatted}</span>
+        <span className="font-medium text-foreground">
+          {actualChapterDurationSec ? formatDuration(Math.round(actualChapterDurationSec)) : chapterEstimate.formatted}
+        </span>
         <span className="text-xs">
           ({chapterEstimate.chars.toLocaleString()} {isRu ? "сим." : "chars"})
         </span>
       </div>
       {sceneEstimate && sceneEstimate.chars > 0 && (
         <div className="text-xs text-muted-foreground border-l border-border pl-3">
-          {isRu ? "Сцена" : "Scene"}: <span className="font-medium text-foreground">{sceneEstimate.formatted}</span>
+          {isRu ? "Сцена" : "Scene"}:{" "}
+          <span className="font-medium text-foreground">
+            {actualSceneSec ? formatDuration(Math.round(actualSceneSec)) : sceneEstimate.formatted}
+          </span>
           <span className="ml-1">({sceneEstimate.chars.toLocaleString()} {isRu ? "сим." : "ch."})</span>
         </div>
       )}
@@ -253,7 +294,7 @@ const Studio = () => {
   useEffect(() => {
     setPageHeader({ title: studioTitle, subtitle: studioSubtitle, headerRight });
     return () => setPageHeader({});
-  }, [studioTitle, studioSubtitle, chapterEstimate?.formatted, sceneEstimate?.formatted]);
+  }, [studioTitle, studioSubtitle, chapterEstimate?.formatted, sceneEstimate?.formatted, actualChapterDurationSec, actualSceneSec]);
 
   // Show loading while restoring session
   if (!restored) {
