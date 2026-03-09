@@ -74,6 +74,7 @@ interface StudioTimelineProps {
   selectedSegmentId?: string | null;
   onSelectSegment?: (segmentId: string | null) => void;
   synthesizingSegmentIds?: Set<string>;
+  errorSegmentIds?: Set<string>;
   clipsRefreshToken?: number;
 }
 

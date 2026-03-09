@@ -104,6 +104,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
               selectedSegmentId={selectedSegmentId ?? null}
               onSelectSegment={onSelectSegment}
               onSynthesizingChange={onSynthesizingChange}
+              onErrorSegmentsChange={onErrorSegmentsChange}
               silenceSec={silenceSec}
               onSilenceSecChange={onSilenceSecChange}
             />
