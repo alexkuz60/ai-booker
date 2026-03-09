@@ -353,9 +353,15 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     if (!selectedChar) return;
     const vc = selectedChar.voice_config;
     const provider = (vc.provider as string) || "yandex";
-    setVoiceProvider(provider === "elevenlabs" ? "elevenlabs" : "yandex");
+    setVoiceProvider(provider === "elevenlabs" ? "elevenlabs" : provider === "proxyapi" ? "proxyapi" : "yandex");
 
-    if (provider === "elevenlabs") {
+    if (provider === "proxyapi") {
+      setPaVoice(vc.voice_id || "alloy");
+      setPaModel((vc as any).model || "gpt-4o-mini-tts");
+      setPaSpeed(vc.speed ?? 1.0);
+      setPaInstructions((vc as any).instructions || "");
+      setDirty(false);
+    } else if (provider === "elevenlabs") {
       setElVoice(vc.voice_id || "JBFqnCBsd6RMkjVDRZzb");
       setElStability((vc as any).stability ?? 0.5);
       setElSimilarity((vc as any).similarity_boost ?? 0.75);
