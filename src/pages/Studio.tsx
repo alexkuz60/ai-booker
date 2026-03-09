@@ -48,6 +48,7 @@ const Studio = () => {
   const [staleAudioSceneIds, setStaleAudioSceneIds] = useState<Set<string>>(new Set());
   const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
+  const [silenceSec, setSilenceSec] = useState<number>(2);
   const chapterSceneIds = chapter?.scenes.map(s => s.id).filter(Boolean) as string[] | undefined;
 
   const selectedScene = chapter && selectedSceneIdx !== null ? chapter.scenes[selectedSceneIdx] : null;
@@ -175,24 +176,33 @@ const Studio = () => {
     })();
   }, [chapter?.scenes.map(s => s.id).join(","), bookId, clipsRefreshToken]);
 
-  // Load scene content: prefer in-memory, fallback to DB
+  // Load scene content and silenceSec: prefer in-memory, fallback to DB
   useEffect(() => {
     setSceneContent(null);
     if (!selectedScene) return;
     if (selectedScene.content) {
       setSceneContent(selectedScene.content);
-      return;
     }
     if (!selectedScene.id) return;
     (async () => {
       const { data } = await supabase
         .from("book_scenes")
-        .select("content")
+        .select("content, silence_sec")
         .eq("id", selectedScene.id)
         .maybeSingle();
-      setSceneContent(data?.content || null);
+      if (!selectedScene.content && data?.content) setSceneContent(data.content);
+      if (data?.silence_sec !== undefined) setSilenceSec(data.silence_sec);
     })();
   }, [selectedScene?.id, selectedScene?.content]);
+
+  // Save silenceSec when changed
+  const handleSilenceSecChange = useCallback(async (sec: number) => {
+    setSilenceSec(sec);
+    if (selectedScene?.id) {
+      await supabase.from("book_scenes").update({ silence_sec: sec }).eq("id", selectedScene.id);
+      setClipsRefreshToken(t => t + 1); // Refresh timeline
+    }
+  }, [selectedScene?.id]);
 
   const onSegmented = useCallback((sceneId: string) => {
     setSegmentedSceneIds(prev => new Set(prev).add(sceneId));
@@ -286,6 +296,8 @@ const Studio = () => {
                 selectedSegmentId={selectedSegmentId}
                 onSelectSegment={setSelectedSegmentId}
                 onSynthesizingChange={setSynthesizingSegmentIds}
+                silenceSec={silenceSec}
+                onSilenceSecChange={handleSilenceSecChange}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
