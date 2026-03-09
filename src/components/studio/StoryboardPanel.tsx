@@ -365,8 +365,45 @@ export function StoryboardPanel({
   const [currentlySynthesizingIds, setCurrentlySynthesizingIds] = useState<Set<string>>(new Set());
   /** Current speaker assigned to inline narrations (from scene_type_mappings with segment_type="inline_narration") */
   const [inlineNarrationSpeaker, setInlineNarrationSpeaker] = useState<string | null>(null);
+  const [recalcRunning, setRecalcRunning] = useState(false);
 
-  // Scroll selected segment into view when set externally (from timeline)
+  // Recalculate durations from actual MP3 files for current scene
+  const handleRecalcDurations = useCallback(async () => {
+    if (!sceneId) return;
+    setRecalcRunning(true);
+    try {
+      const { data: sceneRow } = await supabase
+        .from("book_scenes")
+        .select("chapter_id")
+        .eq("id", sceneId)
+        .single();
+      if (!sceneRow) {
+        toast.error(isRu ? "Не удалось найти главу" : "Could not find chapter");
+        setRecalcRunning(false);
+        return;
+      }
+      const { data, error } = await supabase.functions.invoke("recalc-durations", {
+        body: { chapter_id: sceneRow.chapter_id },
+      });
+      if (error) {
+        toast.error(isRu ? "Ошибка пересчёта" : "Recalc error");
+      } else {
+        const result = data as { updated: number; errors: number; total: number };
+        if (result.updated > 0) {
+          toast.success(isRu ? `Обновлено ${result.updated} из ${result.total} клипов` : `Updated ${result.updated} of ${result.total} clips`);
+          onRecalcDone?.();
+        } else {
+          toast.info(isRu ? `Все длительности актуальны (${result.total} клипов)` : `All durations up to date (${result.total} clips)`);
+        }
+      }
+    } catch (e) {
+      console.error("recalc-durations exception:", e);
+      toast.error(isRu ? "Ошибка пересчёта длительностей" : "Duration recalc error");
+    }
+    setRecalcRunning(false);
+  }, [sceneId, isRu, onRecalcDone]);
+
+
   useEffect(() => {
     if (!selectedSegmentId) return;
     const el = document.getElementById(`storyboard-seg-${selectedSegmentId}`);
