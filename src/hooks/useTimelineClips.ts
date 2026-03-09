@@ -121,7 +121,7 @@ export function useTimelineClips(
         phrasesBySegment.set(p.segment_id, list);
       }
 
-      // Build clips: sequential timeline
+      // Build clips: sequential timeline with per-scene silence gap
       const sceneOrder = sceneIds;
       let globalOffset = 0;
       const result: TimelineClip[] = [];
@@ -131,7 +131,9 @@ export function useTimelineClips(
           .filter(s => s.scene_id === sceneId)
           .sort((a, b) => a.segment_number - b.segment_number);
 
-        let sceneOffset = globalOffset;
+        // Each scene starts with SCENE_SILENCE_SEC silence
+        const sceneStart = globalOffset;
+        let sceneOffset = sceneStart + SCENE_SILENCE_SEC;
 
         for (const seg of sceneSegments) {
           const audioInfo = audioDurationMap.get(seg.id);
