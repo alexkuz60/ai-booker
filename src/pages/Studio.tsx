@@ -33,6 +33,7 @@ const Studio = () => {
   }, [setActiveTab]);
   const [segmentedSceneIds, setSegmentedSceneIds] = useState<Set<string>>(new Set());
   const [synthesizingSegmentIds, setSynthesizingSegmentIds] = useState<Set<string>>(new Set());
+  const [errorSegmentIds, setErrorSegmentIds] = useState<Set<string>>(new Set());
   const [clipsRefreshToken, setClipsRefreshToken] = useState(0);
 
   // Bump refresh token when synthesis finishes (set goes from non-empty to empty)
@@ -311,6 +312,7 @@ const Studio = () => {
                 selectedSegmentId={selectedSegmentId}
                 onSelectSegment={setSelectedSegmentId}
                 onSynthesizingChange={setSynthesizingSegmentIds}
+                onErrorSegmentsChange={setErrorSegmentIds}
                 silenceSec={silenceSec}
                 onSilenceSecChange={handleSilenceSecChange}
               />
@@ -332,6 +334,7 @@ const Studio = () => {
           selectedSegmentId={selectedSegmentId}
           onSelectSegment={handleSelectSegmentFromTimeline}
           synthesizingSegmentIds={synthesizingSegmentIds}
+          errorSegmentIds={errorSegmentIds}
           clipsRefreshToken={clipsRefreshToken}
         />
       </div>

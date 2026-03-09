@@ -74,6 +74,7 @@ interface StudioTimelineProps {
   selectedSegmentId?: string | null;
   onSelectSegment?: (segmentId: string | null) => void;
   synthesizingSegmentIds?: Set<string>;
+  errorSegmentIds?: Set<string>;
   clipsRefreshToken?: number;
 }
 
@@ -91,6 +92,7 @@ export function StudioTimeline({
   selectedSegmentId,
   onSelectSegment,
   synthesizingSegmentIds,
+  errorSegmentIds,
   clipsRefreshToken = 0,
 }: StudioTimelineProps) {
   const [mode, setMode] = useState<"scene" | "chapter">("scene");
@@ -652,6 +654,7 @@ export function StudioTimeline({
                   selectedSegmentId={selectedSegmentId}
                   onSelectSegment={onSelectSegment}
                   synthesizingSegmentIds={synthesizingSegmentIds}
+                  errorSegmentIds={errorSegmentIds}
                   onSetFade={handleSetFade}
                   clipFades={clipFades}
                 />

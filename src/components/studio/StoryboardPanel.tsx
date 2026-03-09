@@ -333,6 +333,7 @@ export function StoryboardPanel({
   selectedSegmentId,
   onSelectSegment,
   onSynthesizingChange,
+  onErrorSegmentsChange,
   silenceSec,
   onSilenceSecChange,
 }: {
@@ -344,6 +345,7 @@ export function StoryboardPanel({
   selectedSegmentId?: string | null;
   onSelectSegment?: (segmentId: string | null) => void;
   onSynthesizingChange?: (ids: Set<string>) => void;
+  onErrorSegmentsChange?: (ids: Set<string>) => void;
   silenceSec?: number;
   onSilenceSecChange?: (sec: number) => void;
 }) {
@@ -774,14 +776,25 @@ export function StoryboardPanel({
     setSynthesizing(true);
     setCurrentlySynthesizingIds(allIds);
     onSynthesizingChange?.(allIds);
+    onErrorSegmentsChange?.(new Set()); // Clear previous errors
     setSynthProgress(isRu ? "Запуск синтеза…" : "Starting synthesis…");
     try {
       const { data, error } = await supabase.functions.invoke("synthesize-scene", {
         body: { scene_id: sceneId, language: isRu ? "ru" : "en" },
       });
       if (error) throw error;
-      const synth = data as { synthesized: number; errors: number; total_duration_ms: number };
+      const synth = data as { synthesized: number; errors: number; total_duration_ms: number; results?: Array<{ segment_id: string; status: string; error?: string }> };
       const durSec = (synth.total_duration_ms / 1000).toFixed(1);
+
+      // Collect error segment IDs
+      const errorIds = new Set<string>();
+      if (synth.results) {
+        for (const r of synth.results) {
+          if (r.status === "error") errorIds.add(r.segment_id);
+        }
+      }
+      onErrorSegmentsChange?.(errorIds);
+
       if (synth.errors > 0) {
         toast.warning(
           isRu
@@ -807,7 +820,7 @@ export function StoryboardPanel({
     setCurrentlySynthesizingIds(new Set());
     onSynthesizingChange?.(new Set());
     setSynthProgress("");
-  }, [sceneId, segments, isRu, onSegmented, loadAudioStatus, onSynthesizingChange]);
+  }, [sceneId, segments, isRu, onSegmented, loadAudioStatus, onSynthesizingChange, onErrorSegmentsChange]);
 
   // ── Re-synthesize single segment (force) ──
   const resynthSegment = useCallback(async (segmentId: string) => {
