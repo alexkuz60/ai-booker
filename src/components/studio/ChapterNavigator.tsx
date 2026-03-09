@@ -203,6 +203,20 @@ export function ChapterNavigator({
               )}
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className={cn("h-6 w-6 p-0", staleCount > 0 ? "" : "ml-auto")}
+            disabled={recalcRunning}
+            onClick={handleRecalcDurations}
+            title={isRu ? "Пересчитать длительности из MP3" : "Recalculate durations from MP3"}
+          >
+            {recalcRunning ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Timer className="h-3 w-3" />
+            )}
+          </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-0.5 truncate">
           {chapter.bookTitle}
