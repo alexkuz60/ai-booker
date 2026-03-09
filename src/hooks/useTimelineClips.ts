@@ -52,23 +52,29 @@ interface InlineNarrationAudio {
   offset_ms: number;
 }
 
+/** Map: scene_id → Map<segment_type, character_id> */
+export type TypeMappingsByScene = Map<string, Map<string, string>>;
+
 /**
  * Load real clips for timeline from scene_segments + segment_phrases.
  * Uses actual durations from segment_audio when available, falls back to char-based estimate.
  * Supports inline narration overlays from segment metadata.
  * Now reads per-scene silence_sec from book_scenes.
+ * Applies scene_type_mappings to route narrator/first_person clips to character tracks.
  */
 export function useTimelineClips(
   sceneIds: string[],
   characterMap: Map<string, string>, // speaker name (lowercase) -> character ID
   refreshToken: number = 0,
+  typeMappings?: TypeMappingsByScene,
 ) {
   const [clips, setClips] = useState<TimelineClip[]>([]);
   const [loading, setLoading] = useState(false);
   /** Scene boundaries with absolute start offset and silence duration */
   const [sceneBoundaries, setSceneBoundaries] = useState<SceneBoundary[]>([]);
 
-  const key = sceneIds.join(",") + "|" + [...characterMap.entries()].map(([k, v]) => `${k}:${v}`).join(",") + "|" + refreshToken;
+  const typeMappingsKey = typeMappings ? [...typeMappings.entries()].map(([s, m]) => `${s}:${[...m.entries()].join("_")}`).join(";") : "";
+  const key = sceneIds.join(",") + "|" + [...characterMap.entries()].map(([k, v]) => `${k}:${v}`).join(",") + "|" + refreshToken + "|" + typeMappingsKey;
 
   useEffect(() => {
     if (sceneIds.length === 0) {
@@ -176,13 +182,19 @@ export function useTimelineClips(
             durationSec = Math.max(0.5, totalChars / CHARS_PER_SEC);
           }
 
-          // Determine track ID
+          // Determine track ID — check scene_type_mappings first, then speaker name
           let trackId = "narrator-fallback";
-          const speakerKey = seg.speaker?.toLowerCase();
-          if (speakerKey && characterMap.has(speakerKey)) {
-            trackId = `char-${characterMap.get(speakerKey)}`;
-          } else if (seg.segment_type === "narrator" || seg.segment_type === "first_person") {
-            trackId = "narrator-fallback";
+          const sceneTypeMappings = typeMappings?.get(sceneId);
+          const mappedCharId = sceneTypeMappings?.get(seg.segment_type);
+
+          if (mappedCharId) {
+            // Type-level mapping takes priority (e.g. first_person → Таисия)
+            trackId = `char-${mappedCharId}`;
+          } else {
+            const speakerKey = seg.speaker?.toLowerCase();
+            if (speakerKey && characterMap.has(speakerKey)) {
+              trackId = `char-${characterMap.get(speakerKey)}`;
+            }
           }
 
           result.push({
