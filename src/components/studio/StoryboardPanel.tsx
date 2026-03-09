@@ -1124,6 +1124,18 @@ export function StoryboardPanel({
                 {/* Inline narrations detail */}
                 {seg.inline_narrations && seg.inline_narrations.length > 0 && (
                   <div className="px-3 py-1 bg-accent/10 border-t border-border/30">
+                    <div className="flex items-center gap-2 mb-1">
+                      <BookOpen className="h-3 w-3 text-yellow-400/70" />
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        {isRu ? "Голос вставок:" : "Narration voice:"}
+                      </span>
+                      <SpeakerBadge
+                        speaker={inlineNarrationSpeaker}
+                        characters={characters}
+                        isRu={isRu}
+                        onChange={updateInlineNarrationSpeaker}
+                      />
+                    </div>
                     {seg.inline_narrations.map((n, idx) => (
                       <div key={idx} className="text-sm font-body flex items-start gap-1 leading-relaxed">
                         <BookOpen className="h-3 w-3 mt-1 shrink-0 text-yellow-400/70" />
