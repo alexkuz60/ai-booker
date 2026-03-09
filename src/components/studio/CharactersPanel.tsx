@@ -454,7 +454,16 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     setSaving(true);
     try {
       const currentChar = characters.find(c => c.id === selectedId);
-      const voiceConfig = voiceProvider === "elevenlabs"
+      const voiceConfig = voiceProvider === "proxyapi"
+        ? {
+            provider: "proxyapi",
+            voice_id: paVoice,
+            model: paModel,
+            speed: paSpeed,
+            instructions: paInstructions || undefined,
+            is_extra: currentChar?.voice_config?.is_extra,
+          }
+        : voiceProvider === "elevenlabs"
         ? {
             provider: "elevenlabs",
             voice_id: elVoice,
