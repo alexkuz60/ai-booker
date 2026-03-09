@@ -20,6 +20,7 @@ interface TimelineTrackProps {
   selectedSegmentId?: string | null;
   onSelectSegment?: (segmentId: string | null) => void;
   synthesizingSegmentIds?: Set<string>;
+  errorSegmentIds?: Set<string>;
   onSetFade?: (clipId: string, fadeInSec: number, fadeOutSec: number) => void;
   clipFades?: Map<string, { fadeInSec: number; fadeOutSec: number }>;
 }
@@ -86,6 +87,7 @@ export function TimelineTrack({
   selectedSegmentId,
   onSelectSegment,
   synthesizingSegmentIds,
+  errorSegmentIds,
   onSetFade,
   clipFades,
 }: TimelineTrackProps) {
@@ -118,6 +120,7 @@ export function TimelineTrack({
         const widthPx = (clip.end - clip.start) * zoom * 4;
         const isSelected = selectedSegmentId && clip.id === selectedSegmentId;
         const isSynthesizing = synthesizingSegmentIds?.has(clip.id);
+        const isError = errorSegmentIds?.has(clip.id);
 
         // Fade visual widths in pixels
         const fadeInPx = showFades && clip.fadeInSec > 0 ? Math.min(clip.fadeInSec * zoom * 4, widthPx / 2) : 0;
@@ -128,19 +131,23 @@ export function TimelineTrack({
         const clipElement = (
           <div
             className={`absolute top-1 bottom-1 rounded-sm transition-all cursor-pointer overflow-hidden ${
-              clip.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-50 hover:opacity-70"
+              isError
+                ? "opacity-90 hover:opacity-100 ring-2 ring-destructive ring-offset-1 ring-offset-background"
+                : clip.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-50 hover:opacity-70"
             } ${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background opacity-100 z-10" : ""} ${isSynthesizing ? "synth-oscilloscope" : ""}`}
             style={{
               left: `${clip.start * zoom * 4}px`,
               width: `${widthPx}px`,
-              backgroundColor: track.color,
+              backgroundColor: isError ? "hsl(var(--destructive))" : track.color,
               backgroundImage: isSynthesizing
                 ? undefined
-                : clip.hasAudio
-                  ? undefined
-                  : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
+                : isError
+                  ? "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.15) 3px, rgba(255,255,255,0.15) 6px)"
+                  : clip.hasAudio
+                    ? undefined
+                    : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
             }}
-            title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${clip.hasAudio ? " 🔊" : ""}${isSynthesizing ? " ⏳" : ""}${hasFades ? ` | fade ${clip.fadeInSec.toFixed(2)}s / ${clip.fadeOutSec.toFixed(2)}s` : ""}`}
+            title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${isError ? " ❌ Ошибка синтеза" : clip.hasAudio ? " 🔊" : ""}${isSynthesizing ? " ⏳" : ""}${hasFades ? ` | fade ${clip.fadeInSec.toFixed(2)}s / ${clip.fadeOutSec.toFixed(2)}s` : ""}`}
             onDoubleClick={() => onSelectSegment?.(clip.id)}
           >
             {/* Fade overlays (only at high zoom and only for clips with fades) */}
@@ -153,7 +160,7 @@ export function TimelineTrack({
 
             {widthPx > 40 && (
               <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body relative z-[1]">
-                {isSynthesizing ? "⏳ " : clip.hasAudio ? "🔊 " : ""}{clip.label}
+                {isError ? "❌ " : isSynthesizing ? "⏳ " : clip.hasAudio ? "🔊 " : ""}{clip.label}
               </span>
             )}
           </div>
