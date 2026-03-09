@@ -37,7 +37,11 @@ export function TimelineRuler({ zoom, duration, sceneBoundaries }: TimelineRuler
       })}
       {/* Time marks */}
       {marks.map((t) => (
-        <div key={t} className="absolute bottom-0 flex flex-col items-center" style={{ left: `${t * zoom * 4}px` }}>
+        <div
+          key={t}
+          className={`absolute bottom-0 flex flex-col items-center ${t === 0 ? "" : "-translate-x-1/2"}`}
+          style={{ left: `${t * zoom * 4}px` }}
+        >
           <span className="text-[10px] text-muted-foreground font-body mb-0.5">{formatTime(t)}</span>
           <div className="w-px h-2 bg-border" />
         </div>
