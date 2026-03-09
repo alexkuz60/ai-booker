@@ -382,6 +382,24 @@ export function StudioTimeline({
   const resetZoom = useCallback(() => setZoomOverride(null), []);
   const displayZoomPercent = Math.round(zoom * 100);
 
+  // Wheel-zoom on timeline area (native listener to allow preventDefault on non-passive)
+  const timelineAreaRef = useRef<HTMLDivElement>(null);
+  const adjustZoomRef = useRef(adjustZoom);
+  adjustZoomRef.current = adjustZoom;
+  useEffect(() => {
+    const el = timelineAreaRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        adjustZoomRef.current(e.deltaY < 0 ? 0.15 : -0.15);
+      }
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, []);
+
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
@@ -600,13 +618,8 @@ export function StudioTimeline({
           </div>
           <ScrollArea className="flex-1">
             <div
+              ref={timelineAreaRef}
               className="min-w-full relative cursor-crosshair"
-              onWheel={(e) => {
-                if (e.ctrlKey || e.metaKey) {
-                  e.preventDefault();
-                  adjustZoom(e.deltaY < 0 ? 0.15 : -0.15);
-                }
-              }}
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = e.clientX - rect.left;
