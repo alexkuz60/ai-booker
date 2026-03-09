@@ -3,7 +3,7 @@ import { getAudioEngine } from "@/lib/audioEngine";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
 import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut, Maximize2, Layers, Film, Play, Pause, Square, Volume2, VolumeX, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useTimelineClips, type TimelineClip } from "@/hooks/useTimelineClips";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
