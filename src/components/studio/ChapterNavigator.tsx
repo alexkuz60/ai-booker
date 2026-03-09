@@ -41,6 +41,7 @@ export function ChapterNavigator({
   fullyRenderedSceneIds,
   staleAudioSceneIds,
   onBatchResynthDone,
+  clipsRefreshToken,
 }: {
   chapter: StudioChapter;
   selectedSceneIdx: number | null;
@@ -51,10 +52,29 @@ export function ChapterNavigator({
   fullyRenderedSceneIds?: Set<string>;
   staleAudioSceneIds?: Set<string>;
   onBatchResynthDone?: () => void;
+  clipsRefreshToken?: number;
 }) {
   const [chapterOpen, setChapterOpen] = useState(true);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
+
+  // Load actual durations from scene_playlists
+  const [playlistDurations, setPlaylistDurations] = useState<Map<string, number>>(new Map());
+  useEffect(() => {
+    const sceneIds = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
+    if (sceneIds.length === 0) return;
+    (async () => {
+      const { data } = await supabase
+        .from("scene_playlists")
+        .select("scene_id, total_duration_ms")
+        .in("scene_id", sceneIds);
+      if (data) {
+        const map = new Map<string, number>();
+        for (const d of data) map.set(d.scene_id, d.total_duration_ms);
+        setPlaylistDurations(map);
+      }
+    })();
+  }, [chapter.scenes.map(s => s.id).join(","), clipsRefreshToken]);
 
   const staleCount = staleAudioSceneIds?.size ?? 0;
 
