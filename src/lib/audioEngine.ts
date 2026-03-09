@@ -253,7 +253,15 @@ class EngineTrack {
       this.scheduledId = Tone.getTransport().schedule((time) => {
         if (this.player.loaded) {
           this.player.fadeIn = this._fadeInSec;
-          this.player.start(time, 0, this.durationSec);
+          // Don't limit voice clip duration — let audio play to its natural end.
+          // The actual audio may be longer than the estimated durationSec.
+          // Only apply duration limit for atmosphere/sfx clips that have explicit fades.
+          const hasFadeOut = this._fadeOutSec > 0;
+          if (hasFadeOut) {
+            this.player.start(time, 0, this.durationSec);
+          } else {
+            this.player.start(time, 0);
+          }
         }
       }, this.startSec);
     }

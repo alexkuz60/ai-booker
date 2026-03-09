@@ -125,8 +125,7 @@ async function callTts(
 
   const audioBuffer = await resp.arrayBuffer();
   const audio = new Uint8Array(audioBuffer);
-  // Estimate duration from MP3 size (≈16kB/s at 128kbps)
-  const durationMs = Math.round((audio.length / 16000) * 1000);
+  const durationMs = parseMp3Duration(audio);
   return { audio, durationMs };
 }
 
