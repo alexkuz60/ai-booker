@@ -654,6 +654,7 @@ export function StudioTimeline({
                   selectedSegmentId={selectedSegmentId}
                   onSelectSegment={onSelectSegment}
                   synthesizingSegmentIds={synthesizingSegmentIds}
+                  errorSegmentIds={errorSegmentIds}
                   onSetFade={handleSetFade}
                   clipFades={clipFades}
                 />
