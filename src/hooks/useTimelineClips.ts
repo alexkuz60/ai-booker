@@ -3,6 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 
 const CHARS_PER_SEC = 14;
 
+/** Silence gap prepended before every scene's first clip (seconds) */
+export const SCENE_SILENCE_SEC = 2;
+
 const SEGMENT_TYPE_LABELS: Record<string, string> = {
   narrator: "Рассказчик",
   first_person: "От первого лица",
@@ -55,6 +58,8 @@ export function useTimelineClips(
 ) {
   const [clips, setClips] = useState<TimelineClip[]>([]);
   const [loading, setLoading] = useState(false);
+  /** Absolute second offset where each scene's silence gap begins */
+  const [sceneBoundaries, setSceneBoundaries] = useState<number[]>([]);
 
   const key = sceneIds.join(",") + "|" + [...characterMap.entries()].map(([k, v]) => `${k}:${v}`).join(",") + "|" + refreshToken;
 
@@ -118,17 +123,21 @@ export function useTimelineClips(
         phrasesBySegment.set(p.segment_id, list);
       }
 
-      // Build clips: sequential timeline
+      // Build clips: sequential timeline with per-scene silence gap
       const sceneOrder = sceneIds;
       let globalOffset = 0;
       const result: TimelineClip[] = [];
+      const boundaries: number[] = [];
 
       for (const sceneId of sceneOrder) {
         const sceneSegments = segments
           .filter(s => s.scene_id === sceneId)
           .sort((a, b) => a.segment_number - b.segment_number);
 
-        let sceneOffset = globalOffset;
+        // Each scene starts with SCENE_SILENCE_SEC silence
+        const sceneStart = globalOffset;
+        boundaries.push(sceneStart);
+        let sceneOffset = sceneStart + SCENE_SILENCE_SEC;
 
         for (const seg of sceneSegments) {
           const audioInfo = audioDurationMap.get(seg.id);
@@ -197,6 +206,7 @@ export function useTimelineClips(
 
       if (!cancelled) {
         setClips(result);
+        setSceneBoundaries(boundaries);
         setLoading(false);
       }
     })();
@@ -204,5 +214,5 @@ export function useTimelineClips(
     return () => { cancelled = true; };
   }, [key]);
 
-  return { clips, loading };
+  return { clips, loading, sceneBoundaries };
 }
