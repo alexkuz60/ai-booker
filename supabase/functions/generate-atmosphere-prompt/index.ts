@@ -84,6 +84,7 @@ Deno.serve(async (req) => {
       );
     }
 
+    const promptLang = isRu ? "Russian" : "English";
     const systemPrompt = `You are a sound designer for audiobook production. Given scene metadata, generate atmospheric sound layer descriptions for ElevenLabs Sound Effects and Music APIs.
 
 Rules:
@@ -92,7 +93,7 @@ Rules:
 - "ambience" = continuous environmental sound (rain, forest, city, room tone). Duration 10-22 sec (will be looped). Volume 0.2-0.4.
 - "music" = background score matching mood. Duration 30-60 sec. Volume 0.15-0.3.
 - "sfx" = optional single accent sound effect. Duration 2-8 sec. Volume 0.3-0.5. Only include if the scene clearly suggests a specific sound event.
-- Prompts must be in English, detailed, cinematic. Describe the sound, not the visual.
+- Prompts must be in ${promptLang}, detailed, cinematic. Describe the sound, not the visual.
 - Keep ambience present in every response. Music is optional. SFX is optional.
 - Fade-in: 500-2000ms. Fade-out: 1000-3000ms.
 - Match the mood and BPM closely.
