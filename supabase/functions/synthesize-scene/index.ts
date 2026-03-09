@@ -564,13 +564,14 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const isUnassigned = !voiceConfigMap.get(seg.speaker?.toLowerCase() ?? "")?.voice;
+      const isUnassigned = !voiceConfigMap.get(seg.speaker?.toLowerCase() ?? "")?.voice && !voiceConfigMap.get(seg.speaker?.toLowerCase() ?? "")?.voice_id;
       if (isUnassigned) {
         console.log(`Unassigned segment ${seg.id}: random voice=${voiceConfig.voice}, role=${voiceConfig.role}`);
       }
 
-      const isV3Voice = V3_ONLY_VOICES.has(voiceConfig.voice);
-      const apiVersion = isV3Voice ? "v3" : "v1";
+      const isProxyApiVoice = (voiceConfig as any).provider === "proxyapi";
+      const isV3Voice = !isProxyApiVoice && V3_ONLY_VOICES.has(voiceConfig.voice);
+      const apiVersion = isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1";
       const estimatedChunks = isV3Voice ? Math.max(1, Math.ceil(text.length / 240)) : 1;
       console.log(`▶ Segment ${i + 1}/${segments.length} [${seg.id}]: speaker=${seg.speaker || seg.segment_type}, api=${apiVersion}, voice=${voiceConfig.voice}, chars=${text.length}, chunks≈${estimatedChunks}${hasInlineNarrations ? `, narrations=${inlineNarrations.length}` : ""}`);
 
