@@ -42,7 +42,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
 
   // Build a stable key from clip ids + paths to detect changes
   const clipsKey = audioClips
-    .map((c) => `${c.id}:${c.audioPath}:${c.startSec}:${c.durationSec}`)
+    .map((c) => `${c.id}:${c.audioPath}:${c.startSec}:${c.durationSec}:${c.loop ? "L" : ""}`)
     .join("|");
 
   // Load tracks into the engine when clips change
