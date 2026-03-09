@@ -223,18 +223,20 @@ class EngineTrack {
       if (this.player.loaded) {
         // Apply fadeIn only when clip starts from the beginning
         this.player.fadeIn = this._fadeInSec;
-        this.player.start(time);
+        // Limit playback to clip duration to prevent overlap with next clip
+        this.player.start(time, 0, this.durationSec);
       }
     }, this.startSec);
   }
 
   scheduleWithOffset(transportTime: number, offset: number): void {
     this.unschedule();
+    const remaining = Math.max(0, this.durationSec - offset);
     this.scheduledId = Tone.getTransport().schedule((time) => {
       if (this.player.loaded) {
         // No fadeIn when resuming mid-clip
         this.player.fadeIn = 0;
-        this.player.start(time, offset);
+        this.player.start(time, offset, remaining);
       }
     }, transportTime);
   }
@@ -615,11 +617,12 @@ class AudioEngine {
       }
 
       this.transport.start();
-      // Start overlapping clips immediately with correct offset
+      // Start overlapping clips immediately with correct offset and duration limit
       for (const { track, offset } of immediateStarts) {
         if (track.player.loaded) {
           track.player.fadeIn = 0; // No fade on resume
-          track.player.start(Tone.now(), offset);
+          const remaining = Math.max(0, track.durationSec - offset);
+          track.player.start(Tone.now(), offset, remaining);
         }
       }
     }
@@ -684,11 +687,12 @@ class AudioEngine {
 
     if (wasPlaying) {
       this.transport.start();
-      // Start overlapping clips immediately with correct offset
+      // Start overlapping clips immediately with correct offset and duration limit
       for (const { track, offset } of immediateStarts) {
         if (track.player.loaded) {
           track.player.fadeIn = 0; // No fade on seek resume
-          track.player.start(Tone.now(), offset);
+          const remaining = Math.max(0, track.durationSec - offset);
+          track.player.start(Tone.now(), offset, remaining);
         }
       }
       this._state = "playing";
