@@ -193,7 +193,11 @@ class EngineTrack {
     // Chain: Player → PreFX → Channel → Reverb → Splitter → MeterL/R
     //                              └→ MeterMono
     //        Reverb → Bus (main output)
-    this.player = new Tone.Player({ url: config.url });
+    this.player = new Tone.Player({
+      url: config.url,
+      fadeIn: this._fadeInSec,
+      fadeOut: this._fadeOutSec,
+    });
 
     // Wire signal chain
     this.player.connect(this.preFxNode);
