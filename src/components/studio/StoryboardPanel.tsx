@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, Play, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle, RefreshCw } from "lucide-react";
+import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, Play, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle, RefreshCw, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -342,6 +342,8 @@ export function StoryboardPanel({
   selectedSegmentId?: string | null;
   onSelectSegment?: (segmentId: string | null) => void;
   onSynthesizingChange?: (ids: Set<string>) => void;
+  silenceSec?: number;
+  onSilenceSecChange?: (sec: number) => void;
 }) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -857,14 +859,38 @@ export function StoryboardPanel({
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
-        <span className="text-xs text-muted-foreground font-body">
-          {segments.length} {isRu ? "фрагм." : "seg."} · {totalPhrases} {isRu ? "фраз" : "phrases"}
-          {inlineNarrationSegIds.size > 0 && (
-            <span className="ml-1.5 text-accent-foreground">
-              · <MessageCircle className="inline h-3 w-3 -mt-0.5" /> {inlineNarrationSegIds.size}
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted-foreground font-body">
+            {segments.length} {isRu ? "фрагм." : "seg."} · {totalPhrases} {isRu ? "фраз" : "phrases"}
+            {inlineNarrationSegIds.size > 0 && (
+              <span className="ml-1.5 text-accent-foreground">
+                · <MessageCircle className="inline h-3 w-3 -mt-0.5" /> {inlineNarrationSegIds.size}
+              </span>
+            )}
+          </span>
+          {/* Silence duration selector */}
+          <div className="flex items-center gap-1 ml-2 border-l border-border pl-2">
+            <Timer className="h-3 w-3 text-muted-foreground" />
+            {[1, 2, 3].map((sec) => (
+              <button
+                key={sec}
+                onClick={() => onSilenceSecChange?.(sec)}
+                className={cn(
+                  "h-5 w-5 text-[10px] font-mono rounded transition-colors",
+                  (silenceSec ?? 2) === sec
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                )}
+                title={isRu ? `Тишина в начале: ${sec}с` : `Start silence: ${sec}s`}
+              >
+                {sec}
+              </button>
+            ))}
+            <span className="text-[10px] text-muted-foreground ml-0.5">
+              {isRu ? "сек" : "s"}
             </span>
-          )}
-        </span>
+          </div>
+        </div>
         <div className="flex items-center gap-1.5">
           <Button
             variant="outline"
