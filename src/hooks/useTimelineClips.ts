@@ -127,6 +127,7 @@ export function useTimelineClips(
       const sceneOrder = sceneIds;
       let globalOffset = 0;
       const result: TimelineClip[] = [];
+      const boundaries: number[] = [];
 
       for (const sceneId of sceneOrder) {
         const sceneSegments = segments
