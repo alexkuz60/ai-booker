@@ -39,7 +39,7 @@
 | **Хранение персонажей** | `Character { id, book_id, name, aliases[], ... }` | Таблица `book_characters` с RLS через JOIN на `books.user_id` | ✅ Совпадает, расширено полями `color`, `sort_order` |
 | **Связь "персонаж ↔ сцена"** | Не описана в СПРЗ | Таблица `character_appearances` (character_id, scene_id, role_in_scene, segment_ids[]) | 🆕 Не предусмотрено СПРЗ — необходимо для графа появлений и будущего видеопроизводства |
 | **Извлечение персонажей** | Отдельный LLM-проход по всей книге | **Инкрементально:** при сегментации сцены (`segment-scene`) speakers автоматически upsert в реестр | ⚠️ Гибридный подход: быстрое извлечение при сегментации + глубокий профайлинг позже |
-| **Голосовые настройки** | `voice_id, voice_settings: json` | `voice_config: jsonb` — `{ provider, voice_id, role, speed, pitch, volume }` + ElevenLabs: `{ stability, similarity_boost, style, speed }` | ✅ Расширено: мульти-провайдер (Yandex + ElevenLabs) с табовым UI |
+| **Голосовые настройки** | `voice_id, voice_settings: json` | `voice_config: jsonb` — `{ provider, voice_id, role, speed, pitch, volume }` + ElevenLabs: `{ stability, similarity_boost, style, speed }` + ProxyAPI: `{ model, voice, instructions, speed }` | ✅ Расширено: мульти-провайдер (Yandex + ElevenLabs + ProxyAPI) с табовым UI |
 | **UI персонажей** | Карточки с аватаром, Voice Audition, Bulk Assign | Список в Студии с настройкой голоса (табы Yandex/ElevenLabs), предпрослушивание, кредиты ElevenLabs, сохранение в БД | ⚠️ MVP-реализация; карточки, аватары и Bulk Assign — следующий этап |
 | **Кластеризация алиасов** | LLM группирует псевдонимы | Реализовано: AI-профайлинг определяет алиасы, автоочистка дубликатов по совпадению имён/алиасов | ✅ Реализовано |
 | **Voice Matching** | Автоподбор голоса по профилю | Авто-кастинг: пол/возраст → голос, темперамент → роль. Избегание дублирования голосов одного пола | ✅ Реализовано |
@@ -77,7 +77,7 @@
 
 | Параметр | План СПРЗ | Реализация | Расхождение |
 |----------|-----------|------------|-------------|
-| **TTS-провайдер** | Yandex SpeechKit + ElevenLabs | Yandex SpeechKit (v1/v3), ElevenLabs (Multilingual v2), ProxyAPI/OpenAI TTS (gpt-4o-mini-tts, tts-1, tts-1-hd) — тройной API | ⚠️ Расширено: добавлен ProxyAPI с 3 моделями, 12 голосами и инструкциями |
+| **TTS-провайдер** | Yandex SpeechKit + ElevenLabs | Yandex SpeechKit (v1/v3), ElevenLabs (Multilingual v2), ProxyAPI/OpenAI TTS (gpt-4o-mini-tts, tts-1, tts-1-hd) — тройной API | ⚠️ Расширено: добавлен ProxyAPI с 3 моделями, 12 голосами и инструкциямиts-1-hd) — тройной API | ⚠️ Расширено: добавлен ProxyAPI с 3 моделями, 12 голосами и инструкциями |
 | **Кэширование** | Не описано | `segment_audio` как кэш: FNV-1a хеш текста + voice_config → skip при совпадении | 🆕 Значительная оптимизация |
 | **Ре-синтез** | Не описан | Индивидуальный (кнопка 🔄 на сегменте), ручная доозвучка (▶), пакетный по главе | 🆕 Трёхуровневая система |
 | **Инлайн-вставки** | Не описаны | Двухпроходный синтез: SSML-паузы (v1) или overlay-треки (v3) | 🆕 Решает задачу авторских ремарок |
