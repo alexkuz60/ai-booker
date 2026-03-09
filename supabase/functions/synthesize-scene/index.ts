@@ -781,13 +781,16 @@ Deno.serve(async (req) => {
             duration_ms: dialogueDurationMs,
             status: "ready",
             voice_config: {
+              provider: isProxyApiVoice ? "proxyapi" : "yandex",
               voice: voiceConfig.voice,
               role: voiceConfig.role,
               speed: voiceConfig.speed,
               pitchShift: voiceConfig.pitchShift,
               volume: voiceConfig.volume,
+              model: isProxyApiVoice ? (voiceConfig as any).model : undefined,
+              instructions: isProxyApiVoice ? (voiceConfig as any).instructions : undefined,
               textHash: hashText(text),
-              apiVersion: isV3Voice ? "v3" : "v1",
+              apiVersion: isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1",
             },
           },
           { onConflict: "segment_id" }
