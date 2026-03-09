@@ -5,19 +5,38 @@ export interface ProxyApiTtsVoice {
   name: string;
   description: { ru: string; en: string };
   gender: "male" | "female";
+  /** Models that support this voice */
+  models: string[];
 }
 
-export const PROXYAPI_TTS_VOICES: ProxyApiTtsVoice[] = [
-  { id: "alloy", name: "Alloy", description: { ru: "Нейтральный, сбалансированный", en: "Neutral, balanced" }, gender: "female" },
-  { id: "ash", name: "Ash", description: { ru: "Тёплый, уверенный", en: "Warm, confident" }, gender: "male" },
-  { id: "coral", name: "Coral", description: { ru: "Яркий, выразительный", en: "Bright, expressive" }, gender: "female" },
-  { id: "echo", name: "Echo", description: { ru: "Спокойный, ровный", en: "Calm, even" }, gender: "male" },
-  { id: "fable", name: "Fable", description: { ru: "Повествовательный, тёплый", en: "Narrative, warm" }, gender: "male" },
-  { id: "nova", name: "Nova", description: { ru: "Энергичный, молодой", en: "Energetic, young" }, gender: "female" },
-  { id: "onyx", name: "Onyx", description: { ru: "Глубокий, авторитетный", en: "Deep, authoritative" }, gender: "male" },
-  { id: "sage", name: "Sage", description: { ru: "Мудрый, спокойный", en: "Wise, calm" }, gender: "female" },
-  { id: "shimmer", name: "Shimmer", description: { ru: "Лёгкий, воздушный", en: "Light, airy" }, gender: "female" },
+/** Base voices available in all models */
+const BASE_VOICES: ProxyApiTtsVoice[] = [
+  { id: "alloy", name: "Alloy", description: { ru: "Нейтральный, сбалансированный", en: "Neutral, balanced" }, gender: "female", models: ["tts-1", "tts-1-hd", "gpt-4o-mini-tts"] },
+  { id: "echo", name: "Echo", description: { ru: "Спокойный, глубокий мужской", en: "Calm, deep male" }, gender: "male", models: ["tts-1", "tts-1-hd", "gpt-4o-mini-tts"] },
+  { id: "fable", name: "Fable", description: { ru: "Выразительный, «рассказчик»", en: "Expressive, narrator" }, gender: "male", models: ["tts-1", "tts-1-hd", "gpt-4o-mini-tts"] },
+  { id: "onyx", name: "Onyx", description: { ru: "Басовитый, авторитетный", en: "Deep, authoritative" }, gender: "male", models: ["tts-1", "tts-1-hd", "gpt-4o-mini-tts"] },
+  { id: "nova", name: "Nova", description: { ru: "Энергичный, тёплый женский", en: "Energetic, warm female" }, gender: "female", models: ["tts-1", "tts-1-hd", "gpt-4o-mini-tts"] },
+  { id: "shimmer", name: "Shimmer", description: { ru: "Мягкий, чёткий женский", en: "Soft, clear female" }, gender: "female", models: ["tts-1", "tts-1-hd", "gpt-4o-mini-tts"] },
+  { id: "ash", name: "Ash", description: { ru: "Чистый, профессиональный", en: "Clean, professional" }, gender: "male", models: ["tts-1", "tts-1-hd", "gpt-4o-mini-tts"] },
+  { id: "sage", name: "Sage", description: { ru: "Мягкий, рассудительный", en: "Soft, thoughtful" }, gender: "female", models: ["tts-1", "tts-1-hd", "gpt-4o-mini-tts"] },
+  { id: "coral", name: "Coral", description: { ru: "Дружелюбный, доступный", en: "Friendly, approachable" }, gender: "female", models: ["tts-1", "tts-1-hd", "gpt-4o-mini-tts"] },
 ];
+
+/** Extended voices only for gpt-4o-mini-tts */
+const EXTENDED_VOICES: ProxyApiTtsVoice[] = [
+  { id: "ballad", name: "Ballad", description: { ru: "Нарративный, тёплый", en: "Narrative, warm" }, gender: "male", models: ["gpt-4o-mini-tts"] },
+  { id: "verse", name: "Verse", description: { ru: "Лиричный, ритмичный", en: "Lyrical, rhythmic" }, gender: "male", models: ["gpt-4o-mini-tts"] },
+  { id: "marin", name: "Marin", description: { ru: "Улучшенный мужской (премиум)", en: "Enhanced male (premium)" }, gender: "male", models: ["gpt-4o-mini-tts"] },
+  { id: "cedar", name: "Cedar", description: { ru: "Улучшенный женский (премиум)", en: "Enhanced female (premium)" }, gender: "female", models: ["gpt-4o-mini-tts"] },
+];
+
+/** All voices */
+export const PROXYAPI_TTS_VOICES: ProxyApiTtsVoice[] = [...BASE_VOICES, ...EXTENDED_VOICES];
+
+/** Get voices available for a specific model */
+export function getVoicesForModel(modelId: string): ProxyApiTtsVoice[] {
+  return PROXYAPI_TTS_VOICES.filter(v => v.models.includes(modelId));
+}
 
 export interface ProxyApiTtsModel {
   id: string;
@@ -35,7 +54,7 @@ export const PROXYAPI_TTS_MODELS: ProxyApiTtsModel[] = [
 /** Pick a ProxyAPI voice for a character based on gender */
 export function matchProxyApiVoice(gender: string): string {
   const genderVoices = gender !== "unknown"
-    ? PROXYAPI_TTS_VOICES.filter(v => v.gender === gender)
-    : PROXYAPI_TTS_VOICES;
+    ? BASE_VOICES.filter(v => v.gender === gender)
+    : BASE_VOICES;
   return genderVoices[0]?.id ?? "alloy";
 }

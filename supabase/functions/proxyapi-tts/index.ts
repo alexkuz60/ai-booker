@@ -8,7 +8,9 @@ const corsHeaders = {
 
 // ProxyAPI TTS models and their capabilities
 const VALID_MODELS = new Set(["gpt-4o-mini-tts", "tts-1", "tts-1-hd"]);
-const VALID_VOICES = new Set(["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"]);
+const BASE_VOICES = new Set(["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"]);
+const EXTENDED_VOICES = new Set(["ballad", "verse", "marin", "cedar"]); // gpt-4o-mini-tts only
+const ALL_VOICES = new Set([...BASE_VOICES, ...EXTENDED_VOICES]);
 const VALID_FORMATS = new Set(["mp3", "opus", "aac", "flac", "wav", "pcm"]);
 
 // Only gpt-4o-mini-tts supports instructions
