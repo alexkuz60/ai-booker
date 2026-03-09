@@ -621,11 +621,12 @@ export function StoryboardPanel({
     const targetSeg = segments.find(s => s.segment_id === segmentId);
     if (!targetSeg) return;
     const oldType = targetSeg.segment_type;
-    const oldSpeaker = targetSeg.speaker;
 
-    setSegments(prev => prev.map(seg =>
+    const updatedSegments = segments.map(seg =>
       seg.segment_id === segmentId ? { ...seg, segment_type: newType } : seg
-    ));
+    );
+    setSegments(updatedSegments);
+
     const { error } = await supabase
       .from("scene_segments")
       .update({ segment_type: newType as any })
@@ -637,41 +638,21 @@ export function StoryboardPanel({
 
     if (!sceneId) return;
 
-    // If old type was propagatable, check if any segments of that old type remain
+    // If old type was propagatable and no segments of that type remain, clean up mapping
     if (PROPAGATE_TYPES.has(oldType) && oldType !== newType) {
-      const remainingOfOldType = segments.filter(
-        s => s.segment_type === oldType && s.segment_id !== segmentId
-      );
+      const remainingOfOldType = updatedSegments.filter(s => s.segment_type === oldType);
       if (remainingOfOldType.length === 0) {
-        // No more segments of old type — clean up scene_type_mapping
         await supabase
           .from("scene_type_mappings" as any)
           .delete()
           .eq("scene_id", sceneId)
           .eq("segment_type", oldType);
       }
-
-      // Check if old speaker still has any segments in this scene
-      if (oldSpeaker) {
-        const updatedSegments = segments.map(seg =>
-          seg.segment_id === segmentId ? { ...seg, segment_type: newType } : seg
-        );
-        const oldSpeakerStillUsed = updatedSegments.some(
-          s => s.speaker === oldSpeaker && s.segment_id !== segmentId
-        );
-        if (!oldSpeakerStillUsed) {
-          const oldCharRecord = characters.find(c => c.name === oldSpeaker);
-          if (oldCharRecord) {
-            await supabase
-              .from("character_appearances")
-              .delete()
-              .eq("character_id", oldCharRecord.id)
-              .eq("scene_id", sceneId);
-          }
-        }
-      }
     }
-  }, [isRu, segments, sceneId, characters]);
+
+    // Full sync: clean up stale appearances, add missing ones
+    await syncSceneCharacters(updatedSegments);
+  }, [isRu, segments, sceneId, characters, syncSceneCharacters]);
 
   // ── Full sync of character_appearances for scene ──
   // Scans all segments + type mappings to determine which characters are actually used,
