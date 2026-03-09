@@ -144,6 +144,7 @@ interface CharactersPanelProps {
   chapterSceneIds?: string[];
   selectedCharacterId?: string | null;
   onSelectCharacter?: (characterId: string | null) => void;
+  onVoiceSaved?: () => void;
 }
 
 export interface CharactersPanelHandle {
