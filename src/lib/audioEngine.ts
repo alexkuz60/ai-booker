@@ -195,7 +195,7 @@ class EngineTrack {
     //        Reverb → Bus (main output)
     this.player = new Tone.Player({
       url: config.url,
-      fadeIn: this._fadeInSec,
+      fadeIn: 0,
       fadeOut: this._fadeOutSec,
     });
 
