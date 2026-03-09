@@ -189,7 +189,7 @@ export function StudioTimeline({
   }, [bookId, sceneId, chapterSceneIds?.join(","), mode]);
 
   // ── Real clips from segments (moved above duration calc) ──
-  const { clips: timelineClips } = useTimelineClips(contextSceneIds, speakerToCharId, clipsRefreshToken);
+  const { clips: timelineClips, sceneBoundaries } = useTimelineClips(contextSceneIds, speakerToCharId, clipsRefreshToken);
 
   // ── Audio player ──────────────────────────────────────────
   const player = useTimelinePlayer(timelineClips);
