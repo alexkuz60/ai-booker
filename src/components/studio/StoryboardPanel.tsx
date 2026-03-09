@@ -616,44 +616,6 @@ export function StoryboardPanel({
     })));
   }, [isRu]);
 
-  // Update segment type in DB
-  const updateSegmentType = useCallback(async (segmentId: string, newType: string) => {
-    const targetSeg = segments.find(s => s.segment_id === segmentId);
-    if (!targetSeg) return;
-    const oldType = targetSeg.segment_type;
-
-    const updatedSegments = segments.map(seg =>
-      seg.segment_id === segmentId ? { ...seg, segment_type: newType } : seg
-    );
-    setSegments(updatedSegments);
-
-    const { error } = await supabase
-      .from("scene_segments")
-      .update({ segment_type: newType as any })
-      .eq("id", segmentId);
-    if (error) {
-      toast.error(isRu ? "Ошибка сохранения типа" : "Failed to save type");
-      return;
-    }
-
-    if (!sceneId) return;
-
-    // If old type was propagatable and no segments of that type remain, clean up mapping
-    if (PROPAGATE_TYPES.has(oldType) && oldType !== newType) {
-      const remainingOfOldType = updatedSegments.filter(s => s.segment_type === oldType);
-      if (remainingOfOldType.length === 0) {
-        await supabase
-          .from("scene_type_mappings" as any)
-          .delete()
-          .eq("scene_id", sceneId)
-          .eq("segment_type", oldType);
-      }
-    }
-
-    // Full sync: clean up stale appearances, add missing ones
-    await syncSceneCharacters(updatedSegments);
-  }, [isRu, segments, sceneId, characters, syncSceneCharacters]);
-
   // ── Full sync of character_appearances for scene ──
   // Scans all segments + type mappings to determine which characters are actually used,
   // removes stale appearances (empty tracks), and ensures used characters are present.
@@ -725,10 +687,45 @@ export function StoryboardPanel({
     onSegmented?.(sceneId); // refresh timeline
   }, [sceneId, characters, onSegmented]);
 
-  // Update speaker in DB
-  // Update speaker — propagate to all segments of same type ONLY for non-dialogue types
-  // Dialogue segments have individual speakers (different characters speak)
   const PROPAGATE_TYPES = new Set(["narrator", "first_person", "inner_thought", "epigraph", "lyric", "footnote"]);
+
+  // Update segment type in DB
+  const updateSegmentType = useCallback(async (segmentId: string, newType: string) => {
+    const targetSeg = segments.find(s => s.segment_id === segmentId);
+    if (!targetSeg) return;
+    const oldType = targetSeg.segment_type;
+
+    const updatedSegments = segments.map(seg =>
+      seg.segment_id === segmentId ? { ...seg, segment_type: newType } : seg
+    );
+    setSegments(updatedSegments);
+
+    const { error } = await supabase
+      .from("scene_segments")
+      .update({ segment_type: newType as any })
+      .eq("id", segmentId);
+    if (error) {
+      toast.error(isRu ? "Ошибка сохранения типа" : "Failed to save type");
+      return;
+    }
+
+    if (!sceneId) return;
+
+    // If old type was propagatable and no segments of that type remain, clean up mapping
+    if (PROPAGATE_TYPES.has(oldType) && oldType !== newType) {
+      const remainingOfOldType = updatedSegments.filter(s => s.segment_type === oldType);
+      if (remainingOfOldType.length === 0) {
+        await supabase
+          .from("scene_type_mappings" as any)
+          .delete()
+          .eq("scene_id", sceneId)
+          .eq("segment_type", oldType);
+      }
+    }
+
+    // Full sync: clean up stale appearances, add missing ones
+    await syncSceneCharacters(updatedSegments);
+  }, [isRu, segments, sceneId, characters, syncSceneCharacters]);
 
   const updateSpeaker = useCallback(async (segmentId: string, newSpeaker: string | null) => {
     const targetSeg = segments.find(s => s.segment_id === segmentId);
