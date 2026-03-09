@@ -10,7 +10,6 @@ export interface ProxyApiTtsVoice {
 export const PROXYAPI_TTS_VOICES: ProxyApiTtsVoice[] = [
   { id: "alloy", name: "Alloy", description: { ru: "Нейтральный, сбалансированный", en: "Neutral, balanced" }, gender: "female" },
   { id: "ash", name: "Ash", description: { ru: "Тёплый, уверенный", en: "Warm, confident" }, gender: "male" },
-  { id: "ballad", name: "Ballad", description: { ru: "Мягкий, мелодичный", en: "Soft, melodic" }, gender: "male" },
   { id: "coral", name: "Coral", description: { ru: "Яркий, выразительный", en: "Bright, expressive" }, gender: "female" },
   { id: "echo", name: "Echo", description: { ru: "Спокойный, ровный", en: "Calm, even" }, gender: "male" },
   { id: "fable", name: "Fable", description: { ru: "Повествовательный, тёплый", en: "Narrative, warm" }, gender: "male" },
