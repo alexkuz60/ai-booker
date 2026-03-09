@@ -220,14 +220,22 @@ class EngineTrack {
   schedule(): void {
     this.unschedule();
     this.scheduledId = Tone.getTransport().schedule((time) => {
-      if (this.player.loaded) this.player.start(time);
+      if (this.player.loaded) {
+        // Apply fadeIn only when clip starts from the beginning
+        this.player.fadeIn = this._fadeInSec;
+        this.player.start(time);
+      }
     }, this.startSec);
   }
 
   scheduleWithOffset(transportTime: number, offset: number): void {
     this.unschedule();
     this.scheduledId = Tone.getTransport().schedule((time) => {
-      if (this.player.loaded) this.player.start(time, offset);
+      if (this.player.loaded) {
+        // No fadeIn when resuming mid-clip
+        this.player.fadeIn = 0;
+        this.player.start(time, offset);
+      }
     }, transportTime);
   }
 
