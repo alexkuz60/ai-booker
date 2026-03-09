@@ -297,29 +297,50 @@ export function useTimelineClips(
       }
 
       // ── Atmosphere layer clips ──────────────────────────────
-      // Add atmosphere/sfx/music clips from scene_atmospheres on dedicated tracks
+      // Add atmosphere/sfx/music clips from scene_atmospheres on dedicated tracks.
+      // Ambience/music clips shorter than scene content are looped with crossfade.
       if (atmosphereLayers?.length) {
+        // Compute scene content durations (from voice clips)
+        const sceneContentDuration = new Map<string, number>();
+        for (const clip of result) {
+          const end = clip.startSec + clip.durationSec;
+          const prev = sceneContentDuration.get(clip.sceneId) ?? 0;
+          if (end > prev) sceneContentDuration.set(clip.sceneId, end);
+        }
+
         for (const layer of atmosphereLayers as any[]) {
           const boundary = boundaries.find(b => b.sceneId === layer.scene_id);
           if (!boundary) continue;
 
           const trackId = layer.layer_type === "sfx" ? "atmosphere-sfx" : "atmosphere-bg";
           const startSec = boundary.startSec + boundary.silenceSec; // start after silence
-          const durationSec = (layer.duration_ms || 0) / 1000;
+          const clipLenSec = (layer.duration_ms || 0) / 1000 || 10;
+
+          // Scene content end (absolute) → duration from clip start
+          const sceneEndAbs = sceneContentDuration.get(layer.scene_id) ?? (startSec + clipLenSec);
+          const sceneFillSec = Math.max(clipLenSec, sceneEndAbs - startSec);
+
+          // Loop if clip is shorter than scene content (ambience/music only, not SFX)
+          const shouldLoop = layer.layer_type !== "sfx" && clipLenSec < sceneFillSec;
+          const crossfadeSec = shouldLoop ? Math.min(1, clipLenSec * 0.15) : 0;
 
           result.push({
             id: `atmo-${layer.id}`,
             trackId,
             speaker: null,
             startSec,
-            durationSec: durationSec || 10,
-            label: layer.layer_type === "music" ? "🎵 Music" : layer.layer_type === "sfx" ? "💥 SFX" : "🌧 Ambience",
+            durationSec: shouldLoop ? sceneFillSec : clipLenSec,
+            label: (layer.layer_type === "music" ? "🎵 Music" : layer.layer_type === "sfx" ? "💥 SFX" : "🌧 Ambience")
+              + (shouldLoop ? " ↻" : ""),
             segmentType: `atmosphere_${layer.layer_type}`,
             hasAudio: true,
             audioPath: layer.audio_path,
             sceneId: layer.scene_id,
             fadeInSec: (layer.fade_in_ms || 500) / 1000,
             fadeOutSec: (layer.fade_out_ms || 1000) / 1000,
+            loop: shouldLoop,
+            clipLenSec: shouldLoop ? clipLenSec : undefined,
+            loopCrossfadeSec: crossfadeSec,
           });
         }
       }
