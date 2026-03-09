@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2, Clock } from "lucide-react";
+import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2, Clock, Timer } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +57,7 @@ export function ChapterNavigator({
   const [chapterOpen, setChapterOpen] = useState(true);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
+  const [recalcRunning, setRecalcRunning] = useState(false);
 
   // Load actual durations from scene_playlists
   const [playlistDurations, setPlaylistDurations] = useState<Map<string, number>>(new Map());
@@ -110,6 +111,57 @@ export function ChapterNavigator({
     }
   };
 
+  const handleRecalcDurations = async () => {
+    // Find a scene with a DB id to get chapter_id
+    const sceneWithId = chapter.scenes.find(s => s.id);
+    if (!sceneWithId?.id) return;
+
+    setRecalcRunning(true);
+    try {
+      // Get chapter_id from the scene
+      const { data: sceneRow } = await supabase
+        .from("book_scenes")
+        .select("chapter_id")
+        .eq("id", sceneWithId.id)
+        .single();
+
+      if (!sceneRow) {
+        toast.error(isRu ? "Не удалось найти главу" : "Could not find chapter");
+        setRecalcRunning(false);
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke("recalc-durations", {
+        body: { chapter_id: sceneRow.chapter_id },
+      });
+
+      if (error) {
+        toast.error(isRu ? "Ошибка пересчёта" : "Recalc error");
+        console.error("recalc-durations error:", error);
+      } else {
+        const result = data as { updated: number; errors: number; total: number };
+        if (result.updated > 0) {
+          toast.success(
+            isRu
+              ? `Обновлено ${result.updated} из ${result.total} клипов`
+              : `Updated ${result.updated} of ${result.total} clips`
+          );
+          onBatchResynthDone?.(); // triggers clipsRefreshToken increment
+        } else {
+          toast.info(
+            isRu
+              ? `Все длительности актуальны (${result.total} клипов)`
+              : `All durations up to date (${result.total} clips)`
+          );
+        }
+      }
+    } catch (e) {
+      console.error("recalc-durations exception:", e);
+      toast.error(isRu ? "Ошибка пересчёта длительностей" : "Duration recalc error");
+    }
+    setRecalcRunning(false);
+  };
+
   // Compute total chapter duration
   let chapterTotalSec = 0;
   for (const scene of chapter.scenes) {
@@ -151,6 +203,20 @@ export function ChapterNavigator({
               )}
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className={cn("h-6 w-6 p-0", staleCount > 0 ? "" : "ml-auto")}
+            disabled={recalcRunning}
+            onClick={handleRecalcDurations}
+            title={isRu ? "Пересчитать длительности из MP3" : "Recalculate durations from MP3"}
+          >
+            {recalcRunning ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Timer className="h-3 w-3" />
+            )}
+          </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-0.5 truncate">
           {chapter.bookTitle}
