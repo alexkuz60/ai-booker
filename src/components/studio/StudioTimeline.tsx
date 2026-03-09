@@ -92,6 +92,7 @@ export function StudioTimeline({
   selectedSegmentId,
   onSelectSegment,
   synthesizingSegmentIds,
+  errorSegmentIds,
   clipsRefreshToken = 0,
 }: StudioTimelineProps) {
   const [mode, setMode] = useState<"scene" | "chapter">("scene");
