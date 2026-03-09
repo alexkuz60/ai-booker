@@ -618,6 +618,7 @@ class AudioEngine {
       // Start overlapping clips immediately with correct offset
       for (const { track, offset } of immediateStarts) {
         if (track.player.loaded) {
+          track.player.fadeIn = 0; // No fade on resume
           track.player.start(Tone.now(), offset);
         }
       }
