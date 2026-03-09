@@ -1028,7 +1028,7 @@ export function StoryboardPanel({
             disabled={synthesizing || analyzing || segments.length === 0}
             className="gap-1.5 h-7 text-xs"
           >
-            {synthesizing ? <Loader2 className="h-3 w-3 animate-spin" /> : <AudioLines className="h-3 w-3" />}
+            {synthesizing ? <AudioLines className="h-3 w-3 animate-pulse-glow text-primary" /> : <AudioLines className="h-3 w-3" />}
             {synthesizing
               ? (synthProgress || (isRu ? "Синтез…" : "Synth…"))
               : (isRu ? "Синтез сцены" : "Synthesize")}
@@ -1122,7 +1122,7 @@ export function StoryboardPanel({
                       : (isRu ? "Синтез блока" : "Synthesize segment")}
                   >
                     {resynthSegId === seg.segment_id
-                      ? <Loader2 className="h-3 w-3 animate-spin" />
+                      ? <AudioLines className="h-3 w-3 animate-pulse-glow text-primary" />
                       : audioStatus.get(seg.segment_id)
                         ? <RefreshCw className="h-3 w-3" />
                         : <AudioLines className="h-3 w-3" />}
