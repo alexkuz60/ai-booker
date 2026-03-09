@@ -626,9 +626,10 @@ export function StudioTimeline({
               );
             })}
           </div>
-          <ScrollArea className="flex-1">
+          <div className="flex-1 overflow-x-auto overflow-y-hidden">
             <div
-              className="min-w-full relative cursor-crosshair"
+              className="relative cursor-crosshair"
+              style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = e.clientX - rect.left;
@@ -642,7 +643,7 @@ export function StudioTimeline({
               ))}
               <Playhead positionSec={player.positionSec} zoom={zoom} />
             </div>
-          </ScrollArea>
+          </div>
         </div>
       )}
 
