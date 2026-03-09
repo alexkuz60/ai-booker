@@ -495,16 +495,18 @@ Deno.serve(async (req) => {
 
     /** Compare relevant voice params + text hash to decide if re-synthesis is needed */
     function voiceConfigChanged(
-      current: { voice: string; role?: string; speed: number; pitchShift?: number; volume?: number },
+      current: { voice: string; role?: string; speed: number; pitchShift?: number; volume?: number; provider?: string; model?: string; instructions?: string },
       cached: Record<string, unknown>,
       currentTextHash: string
     ): boolean {
+      if ((current.provider ?? "yandex") !== (cached.provider ?? "yandex")) return true;
       if (current.voice !== cached.voice) return true;
       if ((current.role ?? "neutral") !== (cached.role ?? "neutral")) return true;
       if (Math.abs((current.speed ?? 1) - (Number(cached.speed) || 1)) > 0.01) return true;
       if ((current.pitchShift ?? 0) !== (Number(cached.pitchShift) || 0)) return true;
       if ((current.volume ?? -1) !== (Number(cached.volume) ?? -1)) return true;
-      // Text edited? Compare hash (catches any change, not just length)
+      if ((current.model ?? "") !== (cached.model ?? "")) return true;
+      if ((current.instructions ?? "") !== (cached.instructions ?? "")) return true;
       if (currentTextHash !== (cached.textHash ?? "")) return true;
       return false;
     }
