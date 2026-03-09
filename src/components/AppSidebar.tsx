@@ -34,7 +34,7 @@ export function AppSidebar() {
   const [assistantOpen, setAssistantOpen] = useState(false);
   const { signOut } = useAuth();
   const { isAdmin } = useUserRole();
-  const { state } = useSidebar();
+  const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { theme, setTheme } = useTheme();
