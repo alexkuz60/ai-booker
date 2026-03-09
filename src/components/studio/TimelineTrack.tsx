@@ -106,10 +106,12 @@ export function TimelineTrack({
           hasAudio: c.hasAudio,
           fadeInSec: fades?.fadeInSec ?? c.fadeInSec ?? 0,
           fadeOutSec: fades?.fadeOutSec ?? c.fadeOutSec ?? 0,
+          loop: c.loop ?? false,
+          clipLenSec: c.clipLenSec,
         };
       })
     : track.type === "atmosphere"
-      ? [{ id: "atm", start: 0, end: duration, durationSec: duration, label: track.label, type: "atmosphere", hasAudio: false, fadeInSec: 0, fadeOutSec: 0 }]
+      ? [{ id: "atm", start: 0, end: duration, durationSec: duration, label: track.label, type: "atmosphere", hasAudio: false, fadeInSec: 0, fadeOutSec: 0, loop: false, clipLenSec: undefined }]
       : track.type === "sfx"
         ? []
         : [];
@@ -147,9 +149,25 @@ export function TimelineTrack({
                     ? undefined
                     : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
             }}
-            title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${isError ? " ❌ Ошибка синтеза" : clip.hasAudio ? " 🔊" : ""}${isSynthesizing ? " ⏳" : ""}${hasFades ? ` | fade ${clip.fadeInSec.toFixed(2)}s / ${clip.fadeOutSec.toFixed(2)}s` : ""}`}
+            title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${clip.loop && clip.clipLenSec ? ` loop×${Math.ceil(clip.durationSec / clip.clipLenSec)}` : ""}${isError ? " ❌ Ошибка синтеза" : clip.hasAudio ? " 🔊" : ""}${isSynthesizing ? " ⏳" : ""}${hasFades ? ` | fade ${clip.fadeInSec.toFixed(2)}s / ${clip.fadeOutSec.toFixed(2)}s` : ""}`}
             onDoubleClick={() => onSelectSegment?.(clip.id)}
           >
+            {/* Loop iteration markers */}
+            {clip.loop && clip.clipLenSec && clip.clipLenSec > 0 && (() => {
+              const iterPx = clip.clipLenSec * zoom * 4;
+              const markers: JSX.Element[] = [];
+              for (let m = iterPx; m < widthPx - 2; m += iterPx) {
+                markers.push(
+                  <div
+                    key={m}
+                    className="absolute top-0 bottom-0 w-px"
+                    style={{ left: `${m}px`, borderLeft: "1px dashed rgba(255,255,255,0.35)" }}
+                  />
+                );
+              }
+              return markers;
+            })()}
+
             {/* Fade overlays (only at high zoom and only for clips with fades) */}
             {fadeInPx >= 2 && (
               <FadeOverlay side="in" fadePx={fadeInPx} trackColor={track.color} />
