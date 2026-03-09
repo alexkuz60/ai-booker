@@ -16,6 +16,14 @@ const SEGMENT_TYPE_LABELS: Record<string, string> = {
   footnote: "Комментатор",
 };
 
+/** System character routing: segment_type → system character name (lowercase) */
+const SYSTEM_TYPE_TO_CHAR: Record<string, string> = {
+  narrator: "рассказчик",
+  epigraph: "рассказчик",
+  lyric: "рассказчик",
+  footnote: "комментатор",
+};
+
 export interface TimelineClip {
   id: string;
   trackId: string; // "char-{characterId}" or "narrator-fallback"
