@@ -50,7 +50,10 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-border bg-sidebar">
       {/* Logo */}
       <SidebarHeader className="px-3 py-4">
-        <div className="flex items-center gap-2.5 overflow-hidden">
+        <button
+          onClick={toggleSidebar}
+          className="flex items-center gap-2.5 overflow-hidden hover:opacity-80 transition-opacity focus:outline-none"
+        >
           <div className="h-8 w-8 min-w-[2rem] rounded-md gradient-cyan flex items-center justify-center shadow-cool">
             <AudioWaveform className="h-4 w-4 text-primary-foreground" />
           </div>
@@ -59,7 +62,7 @@ export function AppSidebar() {
               AI Booker
             </span>
           )}
-        </div>
+        </button>
       </SidebarHeader>
 
       <SidebarContent>
