@@ -6,8 +6,7 @@ const Home = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="relative h-full overflow-hidden -mt-12"
-      style={{ height: "calc(100% + 3rem)" }}
+      className="relative h-full overflow-hidden"
     >
       <div
         className="absolute inset-0 bg-cover bg-center"
