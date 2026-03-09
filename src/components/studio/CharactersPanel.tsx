@@ -1624,7 +1624,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-card border-border max-h-64">
-                        {PROXYAPI_TTS_VOICES.map(v => (
+                        {getVoicesForModel(paModel).map(v => (
                           <SelectItem key={v.id} value={v.id}>
                             <div className="flex items-center gap-2">
                               <span>{v.name}</span>
