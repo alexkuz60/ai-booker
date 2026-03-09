@@ -717,15 +717,27 @@ Deno.serve(async (req) => {
 
         } else {
           // ── STANDARD SINGLE-PASS SYNTHESIS ────────────────
-          const result = await callTts(yandexTtsUrl, authHeader, {
-            text,
-            voice: voiceConfig.voice,
-            role: voiceConfig.role,
-            speed: voiceConfig.speed,
-            pitchShift: voiceConfig.pitchShift,
-            volume: voiceConfig.volume,
-            lang: langCode,
-          });
+          let result: { audio: Uint8Array; durationMs: number } | { error: string };
+
+          if (isProxyApiVoice && proxyApiKey) {
+            result = await callProxyApiTts(proxyApiKey, {
+              text,
+              voice: voiceConfig.voice,
+              model: (voiceConfig as any).model,
+              speed: voiceConfig.speed,
+              instructions: (voiceConfig as any).instructions,
+            });
+          } else {
+            result = await callTts(yandexTtsUrl, authHeader, {
+              text,
+              voice: voiceConfig.voice,
+              role: voiceConfig.role,
+              speed: voiceConfig.speed,
+              pitchShift: voiceConfig.pitchShift,
+              volume: voiceConfig.volume,
+              lang: langCode,
+            });
+          }
 
           if ("error" in result) {
             results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: result.error });
