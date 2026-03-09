@@ -437,7 +437,68 @@ Yandex SpeechKit v3 имеет лимит ~240 символов на один в
 
 ---
 
-## 11. Библиотека книг ✅
+## 11. The Atmosphere Engine 🔧
+
+**Модуль:** Студия → вкладка «Атмосфера» + Edge Functions `elevenlabs-sfx`, `elevenlabs-music`, `generate-atmosphere-prompt` (⬜)
+
+### Текущее состояние (ручной режим) ✅
+
+Вкладка «Атмосфера» в Студии позволяет вручную генерировать звуковое оформление по текстовому описанию:
+
+| Под-вкладка | Провайдер | Настройки |
+|-------------|-----------|-----------|
+| **Sound Effects** | ElevenLabs Sound Generation | Длительность (1–22 сек), Prompt Influence (0–100%) |
+| **Ambience** | ElevenLabs Sound Generation | Длительность (1–22 сек), Prompt Influence (0–100%) |
+| **Music** | ElevenLabs Music | Длительность (1–120 сек) |
+
+- Встроенный плеер для предпрослушивания.
+- Сохранение в `user-media` storage (путь: `{user_id}/{category}/{slug}-{timestamp}.mp3`).
+- Абстракция `SoundProvider` (`src/lib/soundProvider.ts`) позволяет подключать других провайдеров.
+
+### Запланировано: автогенерация по метаданным сцены ⬜
+
+**Этап 1 — AI Prompt Builder:**
+1. Edge-функция `generate-atmosphere-prompt` принимает метаданные сцены: `mood`, `scene_type`, `bpm`, краткое содержание.
+2. AI (Gemini 3 Flash) генерирует 2–3 звуковых промпта:
+   - **Ambience layer** — фоновый звук окружения (лес, город, дождь…)
+   - **Music layer** (опционально) — фоновая музыка, соответствующая настроению
+   - **SFX accents** (опционально) — точечные звуковые эффекты
+3. Каждый промпт содержит: текст описания, рекомендуемую длительность, громкость, fade-параметры.
+
+**Этап 2 — Auto-Atmosphere:**
+1. Кнопка «🎭 Auto-Atmosphere» в `AtmospherePanel` (или `StoryboardPanel`).
+2. Загрузка метаданных текущей сцены из `book_scenes`.
+3. Вызов Prompt Builder → параллельная генерация слоёв через `generateSound()`.
+4. Автосохранение в `user-media` + запись в `scene_atmospheres`.
+
+**Этап 3 — Таблица `scene_atmospheres`:**
+
+| Поле | Тип | Описание |
+|------|------|----------|
+| `id` | uuid PK | — |
+| `scene_id` | uuid FK → book_scenes | Привязка к сцене |
+| `layer_type` | text | ambience / music / sfx |
+| `audio_path` | text | Путь в storage |
+| `prompt_used` | text | Промпт, по которому сгенерировано |
+| `duration_ms` | int | Длительность аудио |
+| `volume` | float | Рекомендуемая громкость (0–1) |
+| `fade_in_ms` | int | Длительность fade-in |
+| `fade_out_ms` | int | Длительность fade-out |
+| `created_at` | timestamptz | — |
+
+**Этап 4 — Timeline-интеграция:**
+- `useTimelineClips` подтягивает записи из `scene_atmospheres` как клипы на треки `atmosphere` / `sfx`.
+- Если атмосферный клип короче длительности сцены — автоматическое зацикливание (loop) с crossfade.
+- Поддержка drag & drop для ручного позиционирования (после реализации интерактивного таймлайна).
+
+**Этап 5 — Batch-режим:**
+- Кнопка «Сгенерировать атмосферу для всей главы» в навигаторе.
+- Итерация по сценам с отображением прогресс-бара.
+- Пропуск сцен, у которых уже есть `scene_atmospheres`.
+
+---
+
+## 12. Библиотека книг ✅
 
 **Модуль:** Парсер → Библиотека
 
