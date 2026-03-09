@@ -885,6 +885,43 @@ export function StoryboardPanel({
     setDetecting(false);
   }, [sceneId, dialogueCount, isRu, loadSegments]);
 
+  // ── Update inline narration voice assignment ──
+  const updateInlineNarrationSpeaker = useCallback(async (newSpeaker: string | null) => {
+    if (!sceneId) return;
+    setInlineNarrationSpeaker(newSpeaker);
+    const charRecord = newSpeaker ? characters.find(c => c.name === newSpeaker) : null;
+    if (charRecord) {
+      await supabase
+        .from("scene_type_mappings" as any)
+        .upsert(
+          { scene_id: sceneId, segment_type: "inline_narration", character_id: charRecord.id },
+          { onConflict: "scene_id,segment_type" }
+        );
+      // Ensure character_appearances for timeline track
+      const { data: existing } = await supabase
+        .from("character_appearances")
+        .select("id")
+        .eq("character_id", charRecord.id)
+        .eq("scene_id", sceneId)
+        .maybeSingle();
+      if (!existing) {
+        await supabase.from("character_appearances").upsert(
+          { character_id: charRecord.id, scene_id: sceneId, role_in_scene: "narrator", segment_ids: [] },
+          { onConflict: "character_id,scene_id" }
+        );
+      }
+      toast.success(isRu ? `Голос вставок → ${newSpeaker}` : `Narration voice → ${newSpeaker}`);
+    } else {
+      await supabase
+        .from("scene_type_mappings" as any)
+        .delete()
+        .eq("scene_id", sceneId)
+        .eq("segment_type", "inline_narration");
+      toast.success(isRu ? "Голос вставок сброшен" : "Narration voice reset");
+    }
+    onSegmented?.(sceneId); // refresh timeline
+  }, [sceneId, characters, isRu, onSegmented]);
+
   // ── No scene selected ──
   if (!sceneId) {
     return (
