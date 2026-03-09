@@ -58,6 +58,8 @@ export function useTimelineClips(
 ) {
   const [clips, setClips] = useState<TimelineClip[]>([]);
   const [loading, setLoading] = useState(false);
+  /** Absolute second offset where each scene's silence gap begins */
+  const [sceneBoundaries, setSceneBoundaries] = useState<number[]>([]);
 
   const key = sceneIds.join(",") + "|" + [...characterMap.entries()].map(([k, v]) => `${k}:${v}`).join(",") + "|" + refreshToken;
 
