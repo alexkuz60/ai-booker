@@ -73,7 +73,8 @@ export function useTimelineClips(
   /** Scene boundaries with absolute start offset and silence duration */
   const [sceneBoundaries, setSceneBoundaries] = useState<SceneBoundary[]>([]);
 
-  const key = sceneIds.join(",") + "|" + [...characterMap.entries()].map(([k, v]) => `${k}:${v}`).join(",") + "|" + refreshToken;
+  const typeMappingsKey = typeMappings ? [...typeMappings.entries()].map(([s, m]) => `${s}:${[...m.entries()].join("_")}`).join(";") : "";
+  const key = sceneIds.join(",") + "|" + [...characterMap.entries()].map(([k, v]) => `${k}:${v}`).join(",") + "|" + refreshToken + "|" + typeMappingsKey;
 
   useEffect(() => {
     if (sceneIds.length === 0) {
