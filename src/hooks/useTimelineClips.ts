@@ -95,8 +95,8 @@ export function useTimelineClips(
     setLoading(true);
 
     (async () => {
-      // Load segments for these scenes (including metadata for inline narrations)
-      const [{ data: segments }, { data: sceneData }] = await Promise.all([
+      // Load segments, scenes, and atmosphere layers in parallel
+      const [{ data: segments }, { data: sceneData }, { data: atmosphereLayers }] = await Promise.all([
         supabase
           .from("scene_segments")
           .select("id, segment_number, segment_type, speaker, scene_id, metadata")
@@ -107,6 +107,11 @@ export function useTimelineClips(
           .from("book_scenes")
           .select("id, silence_sec")
           .in("id", sceneIds),
+        supabase
+          .from("scene_atmospheres")
+          .select("id, scene_id, layer_type, audio_path, duration_ms, volume, fade_in_ms, fade_out_ms")
+          .in("scene_id", sceneIds)
+          .order("created_at"),
       ]);
 
       if (cancelled || !segments?.length) {
