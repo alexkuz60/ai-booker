@@ -56,7 +56,7 @@ function randomVoiceConfig() {
   const role = roles[Math.floor(Math.random() * roles.length)];
   const speed = Math.round((0.9 + Math.random() * 0.3) * 100) / 100;
   const pitchShift = Math.floor(Math.random() * 400) - 200;
-  return { voice, role, speed, pitchShift, volume: undefined as number | undefined };
+  return { voice, role, speed, pitchShift, volume: undefined as number | undefined, provider: "yandex" as string };
 }
 
 function resolveVoice(
@@ -67,13 +67,17 @@ function resolveVoice(
     ? voiceConfigMap.get(speaker.toLowerCase()) ?? {}
     : {};
 
-  if ((vc as Record<string, unknown>).voice) {
+  if ((vc as Record<string, unknown>).voice || (vc as Record<string, unknown>).voice_id) {
+    const provider = ((vc as Record<string, unknown>).provider as string) || "yandex";
     return {
-      voice: (vc as Record<string, unknown>).voice as string,
+      provider,
+      voice: ((vc as Record<string, unknown>).voice as string) || ((vc as Record<string, unknown>).voice_id as string),
       role: (vc as Record<string, unknown>).role as string | undefined,
       speed: ((vc as Record<string, unknown>).speed as number) || 1.0,
       pitchShift: (vc as Record<string, unknown>).pitchShift as number | undefined,
       volume: (vc as Record<string, unknown>).volume as number | undefined,
+      model: (vc as Record<string, unknown>).model as string | undefined,
+      instructions: (vc as Record<string, unknown>).instructions as string | undefined,
     };
   }
   return randomVoiceConfig();
