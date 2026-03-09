@@ -82,7 +82,7 @@ export function FinishedChaptersPanel({ isRu, bookId, chapterSceneIds, onRecalcD
   const [duration, setDuration] = useState(0);
   const [currentTitle, setCurrentTitle] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [recalcRunning, setRecalcRunning] = useState(false);
+  
 
   // cleanup on unmount
   useEffect(() => () => { audioRef.current?.pause(); }, []);
