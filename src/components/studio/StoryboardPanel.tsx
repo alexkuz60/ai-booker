@@ -438,12 +438,17 @@ export function StoryboardPanel({
 
       // Build mapping: segment_type → character name
       const typeSpeakerMap = new Map<string, string>();
+      let loadedInlineSpeaker: string | null = null;
       if (mappings) {
         for (const m of mappings as any[]) {
           const name = charNameMap.get(m.character_id);
-          if (name) typeSpeakerMap.set(m.segment_type, name);
+          if (name) {
+            typeSpeakerMap.set(m.segment_type, name);
+            if (m.segment_type === "inline_narration") loadedInlineSpeaker = name;
+          }
         }
       }
+      setInlineNarrationSpeaker(loadedInlineSpeaker);
 
       const phraseMap = new Map<string, Phrase[]>();
       for (const p of phrases || []) {
