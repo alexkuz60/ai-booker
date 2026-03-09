@@ -1,10 +1,11 @@
 import { useState, useRef, useCallback } from "react";
 import {
   Wand2, Loader2, Play, Pause, Save, Music, Volume2, Sparkles,
-  Clock, Sliders, Zap, Trash2,
+  Clock, Sliders, Zap, Trash2, Pencil, ArrowRight, RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
