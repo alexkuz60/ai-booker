@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2, Clock } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { StudioChapter } from "@/lib/studioChapter";
-import { estimateSceneDuration } from "@/lib/durationEstimate";
+import { estimateSceneDuration, formatDuration } from "@/lib/durationEstimate";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -41,6 +41,7 @@ export function ChapterNavigator({
   fullyRenderedSceneIds,
   staleAudioSceneIds,
   onBatchResynthDone,
+  clipsRefreshToken,
 }: {
   chapter: StudioChapter;
   selectedSceneIdx: number | null;
@@ -51,10 +52,29 @@ export function ChapterNavigator({
   fullyRenderedSceneIds?: Set<string>;
   staleAudioSceneIds?: Set<string>;
   onBatchResynthDone?: () => void;
+  clipsRefreshToken?: number;
 }) {
   const [chapterOpen, setChapterOpen] = useState(true);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
+
+  // Load actual durations from scene_playlists
+  const [playlistDurations, setPlaylistDurations] = useState<Map<string, number>>(new Map());
+  useEffect(() => {
+    const sceneIds = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
+    if (sceneIds.length === 0) return;
+    (async () => {
+      const { data } = await supabase
+        .from("scene_playlists")
+        .select("scene_id, total_duration_ms")
+        .in("scene_id", sceneIds);
+      if (data) {
+        const map = new Map<string, number>();
+        for (const d of data) map.set(d.scene_id, d.total_duration_ms);
+        setPlaylistDurations(map);
+      }
+    })();
+  }, [chapter.scenes.map(s => s.id).join(","), clipsRefreshToken]);
 
   const staleCount = staleAudioSceneIds?.size ?? 0;
 
@@ -142,7 +162,25 @@ export function ChapterNavigator({
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 )}
                 <span className="truncate">{chapter.chapterTitle}</span>
-                <Badge variant="outline" className="ml-auto text-[11px] shrink-0">
+                {(() => {
+                  // Compute total chapter duration: actual from playlists, or estimate
+                  let totalSec = 0;
+                  for (const scene of chapter.scenes) {
+                    const actualMs = scene.id ? playlistDurations.get(scene.id) : undefined;
+                    if (actualMs && actualMs > 0) {
+                      totalSec += actualMs / 1000;
+                    } else {
+                      totalSec += estimateSceneDuration(scene).sec;
+                    }
+                  }
+                  return totalSec > 0 ? (
+                    <span className="flex items-center gap-1 ml-auto text-[11px] text-muted-foreground font-mono shrink-0">
+                      <Clock className="h-3 w-3" />
+                      {formatDuration(Math.round(totalSec))}
+                    </span>
+                  ) : null;
+                })()}
+                <Badge variant="outline" className="text-[11px] shrink-0">
                   {chapter.scenes.length}
                 </Badge>
               </button>
@@ -152,6 +190,10 @@ export function ChapterNavigator({
                 {chapter.scenes.map((scene, idx) => {
                   const colorClass = SCENE_TYPE_COLORS[scene.scene_type] || SCENE_TYPE_COLORS.mixed;
                   const est = estimateSceneDuration(scene);
+                  const actualMs = scene.id ? playlistDurations.get(scene.id) : undefined;
+                  const actualSec = actualMs && actualMs > 0 ? Math.round(actualMs / 1000) : null;
+                  const displayDuration = actualSec ? formatDuration(actualSec) : est.formatted;
+                  const isActual = !!actualSec;
                   return (
                     <button
                       key={idx}
@@ -184,8 +226,17 @@ export function ChapterNavigator({
                           <Film className="h-3 w-3 text-primary shrink-0" />
                         </span>
                       ) : null}
-                      <span className="text-[11px] text-muted-foreground font-mono shrink-0" title={`${est.chars} ${isRu ? "сим." : "chars"}`}>
-                        {est.formatted}
+                      <span
+                        className={cn(
+                          "text-[11px] font-mono shrink-0",
+                          isActual ? "text-foreground" : "text-muted-foreground"
+                        )}
+                        title={isActual
+                          ? `${isRu ? "Фактическое время" : "Actual duration"} (${est.chars} ${isRu ? "сим." : "chars"})`
+                          : `≈ ${est.chars} ${isRu ? "сим." : "chars"}`
+                        }
+                      >
+                        {!isActual && "≈"}{displayDuration}
                       </span>
                     </button>
                   );

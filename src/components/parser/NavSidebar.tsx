@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2, AlertCircle,
-  BookOpen, FolderOpen, Clapperboard, ChevronLeft, ChevronRightIcon, Trash2, ExternalLink
+  BookOpen, FolderOpen, Clapperboard, ChevronLeft, ChevronRightIcon, Trash2, ExternalLink, Clock
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { t, tSection } from "@/pages/parser/i18n";
 import type { TocChapter, SectionType, ChapterStatus, Scene } from "@/pages/parser/types";
 import { SECTION_ICONS } from "@/pages/parser/types";
+import { estimateDurationSec, formatDuration } from "@/lib/durationEstimate";
 
 interface NavSidebarProps {
   isRu: boolean;
@@ -112,6 +113,15 @@ export default function NavSidebar({
     const result = chapterResults.get(idx);
     const isSelected = selectedIndices.has(idx);
     const status = result?.status || "pending";
+
+    // Compute chapter duration estimate from scenes
+    const chapterDurationFormatted = (() => {
+      if (status !== "done" || !result?.scenes?.length) return null;
+      const totalChars = result.scenes.reduce((sum, s) => sum + (s.content?.length ?? 0), 0);
+      if (totalChars === 0) return null;
+      const sec = estimateDurationSec(totalChars);
+      return formatDuration(sec);
+    })();
 
     const isParent = hasDirectChildren(idx);
 
@@ -222,6 +232,12 @@ export default function NavSidebar({
               }}
             >
               {entry.startPage}
+            </span>
+          )}
+          {chapterDurationFormatted && (
+            <span className="text-[11px] text-muted-foreground font-mono flex-shrink-0 flex items-center gap-0.5" title={isRu ? "Расчётное время" : "Estimated duration"}>
+              <Clock className="h-3 w-3" />
+              {chapterDurationFormatted}
             </span>
           )}
           {isParent && isChapterFullyDone(idx) && (
