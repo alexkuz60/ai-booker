@@ -519,35 +519,39 @@ export function StoryboardPanel({
     if (sceneId) loadSegments(sceneId);
   }, [sceneId, loadSegments]);
 
-  // Realtime subscription: listen for segment_audio inserts to update synthesizing state per-clip
-  useEffect(() => {
-    if (segments.length === 0 || currentlySynthesizingIds.size === 0) return;
+  // Realtime subscription: listen for segment_audio changes to update synthesizing state per-clip
+  const synthIdsRef = useRef<Set<string>>(new Set());
+  synthIdsRef.current = currentlySynthesizingIds;
 
-    const segmentIds = segments.map(s => s.segment_id);
+  useEffect(() => {
+    if (segments.length === 0) return;
+
+    const segmentIdSet = new Set(segments.map(s => s.segment_id));
     const channel = supabase
       .channel(`segment_audio_${sceneId}`)
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "segment_audio",
-          filter: `segment_id=in.(${segmentIds.join(",")})`,
         },
         (payload) => {
-          const completedSegId = (payload.new as { segment_id: string }).segment_id;
+          const row = payload.new as { segment_id: string; status: string; duration_ms: number } | undefined;
+          if (!row || !segmentIdSet.has(row.segment_id)) return;
+          if (!synthIdsRef.current.has(row.segment_id)) return;
+
           // Remove from synthesizing set
           setCurrentlySynthesizingIds(prev => {
             const next = new Set(prev);
-            next.delete(completedSegId);
+            next.delete(row.segment_id);
             onSynthesizingChange?.(next);
             return next;
           });
           // Update audio status for this segment
-          const newAudio = payload.new as { segment_id: string; status: string; duration_ms: number };
           setAudioStatus(prev => {
             const next = new Map(prev);
-            next.set(newAudio.segment_id, { status: newAudio.status, durationMs: newAudio.duration_ms });
+            next.set(row.segment_id, { status: row.status, durationMs: row.duration_ms });
             return next;
           });
         }
@@ -557,7 +561,7 @@ export function StoryboardPanel({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [segments.map(s => s.segment_id).join(","), currentlySynthesizingIds.size > 0, sceneId, onSynthesizingChange]);
+  }, [segments.map(s => s.segment_id).join(","), sceneId, onSynthesizingChange]);
 
   // Run AI segmentation
   const runAnalysis = useCallback(async () => {
