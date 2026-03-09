@@ -305,14 +305,22 @@ export function StudioTimeline({
     : (chapterDurationSec && chapterDurationSec > 0 ? chapterDurationSec : 180);
   const duration = clipsDuration > 0 ? clipsDuration : estimateDuration;
 
-  // Auto-add narrator-fallback track if clips reference it (scene mode only)
+  // Auto-add narrator-fallback + atmosphere tracks if clips reference them (scene mode only)
   const allTracks = useMemo(() => {
     if (mode === "chapter") return FIXED_TRACKS;
     const hasNarratorFallback = timelineClips.some(c => c.trackId === "narrator-fallback");
     const narratorTrack: TimelineTrackData[] = hasNarratorFallback
       ? [{ id: "narrator-fallback", label: isRu ? "Рассказчик" : "Narrator", color: "hsl(var(--primary))", type: "narrator" }]
       : [];
-    return [...narratorTrack, ...charTracks, ...FIXED_TRACKS];
+
+    // Auto-add atmosphere tracks when scene_atmospheres clips exist
+    const hasAtmoBg = timelineClips.some(c => c.trackId === "atmosphere-bg");
+    const hasAtmoSfx = timelineClips.some(c => c.trackId === "atmosphere-sfx");
+    const atmoTracks: TimelineTrackData[] = [];
+    if (hasAtmoBg) atmoTracks.push({ id: "atmosphere-bg", label: isRu ? "Атмосфера" : "Ambience", color: "hsl(175 45% 45%)", type: "atmosphere" });
+    if (hasAtmoSfx) atmoTracks.push({ id: "atmosphere-sfx", label: "SFX", color: "hsl(220 50% 55%)", type: "sfx" });
+
+    return [...narratorTrack, ...charTracks, ...(atmoTracks.length ? atmoTracks : FIXED_TRACKS)];
   }, [charTracks, timelineClips, isRu, mode]);
 
   // ── Mixer sidebar expanded state ───────────────────────────

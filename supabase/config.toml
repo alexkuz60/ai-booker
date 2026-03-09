@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.detect-inline-narrations]
 verify_jwt = false
+
+[functions.generate-atmosphere-prompt]
+verify_jwt = false

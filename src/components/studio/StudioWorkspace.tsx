@@ -127,7 +127,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
 
         <TabsContent value="atmosphere" className="flex-1 mt-4 min-h-0">
           <div className="rounded-lg border border-border bg-card/50 h-full overflow-hidden">
-            <AtmospherePanel isRu={isRu} />
+            <AtmospherePanel isRu={isRu} sceneId={selectedSceneId} />
           </div>
         </TabsContent>
 

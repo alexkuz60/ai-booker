@@ -362,6 +362,53 @@ export type Database = {
         }
         Relationships: []
       }
+      scene_atmospheres: {
+        Row: {
+          audio_path: string
+          created_at: string
+          duration_ms: number
+          fade_in_ms: number
+          fade_out_ms: number
+          id: string
+          layer_type: string
+          prompt_used: string
+          scene_id: string
+          volume: number
+        }
+        Insert: {
+          audio_path: string
+          created_at?: string
+          duration_ms?: number
+          fade_in_ms?: number
+          fade_out_ms?: number
+          id?: string
+          layer_type?: string
+          prompt_used?: string
+          scene_id: string
+          volume?: number
+        }
+        Update: {
+          audio_path?: string
+          created_at?: string
+          duration_ms?: number
+          fade_in_ms?: number
+          fade_out_ms?: number
+          id?: string
+          layer_type?: string
+          prompt_used?: string
+          scene_id?: string
+          volume?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scene_atmospheres_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "book_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scene_playlists: {
         Row: {
           created_at: string

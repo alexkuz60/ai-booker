@@ -95,8 +95,8 @@ export function useTimelineClips(
     setLoading(true);
 
     (async () => {
-      // Load segments for these scenes (including metadata for inline narrations)
-      const [{ data: segments }, { data: sceneData }] = await Promise.all([
+      // Load segments, scenes, and atmosphere layers in parallel
+      const [{ data: segments }, { data: sceneData }, { data: atmosphereLayers }] = await Promise.all([
         supabase
           .from("scene_segments")
           .select("id, segment_number, segment_type, speaker, scene_id, metadata")
@@ -107,6 +107,11 @@ export function useTimelineClips(
           .from("book_scenes")
           .select("id, silence_sec")
           .in("id", sceneIds),
+        supabase
+          .from("scene_atmospheres")
+          .select("id, scene_id, layer_type, audio_path, duration_ms, volume, fade_in_ms, fade_out_ms")
+          .in("scene_id", sceneIds)
+          .order("created_at"),
       ]);
 
       if (cancelled || !segments?.length) {
@@ -283,6 +288,34 @@ export function useTimelineClips(
         }
 
         globalOffset = sceneOffset;
+      }
+
+      // ── Atmosphere layer clips ──────────────────────────────
+      // Add atmosphere/sfx/music clips from scene_atmospheres on dedicated tracks
+      if (atmosphereLayers?.length) {
+        for (const layer of atmosphereLayers as any[]) {
+          const boundary = boundaries.find(b => b.sceneId === layer.scene_id);
+          if (!boundary) continue;
+
+          const trackId = layer.layer_type === "sfx" ? "atmosphere-sfx" : "atmosphere-bg";
+          const startSec = boundary.startSec + boundary.silenceSec; // start after silence
+          const durationSec = (layer.duration_ms || 0) / 1000;
+
+          result.push({
+            id: `atmo-${layer.id}`,
+            trackId,
+            speaker: null,
+            startSec,
+            durationSec: durationSec || 10,
+            label: layer.layer_type === "music" ? "🎵 Music" : layer.layer_type === "sfx" ? "💥 SFX" : "🌧 Ambience",
+            segmentType: `atmosphere_${layer.layer_type}`,
+            hasAudio: true,
+            audioPath: layer.audio_path,
+            sceneId: layer.scene_id,
+            fadeInSec: (layer.fade_in_ms || 500) / 1000,
+            fadeOutSec: (layer.fade_out_ms || 1000) / 1000,
+          });
+        }
       }
 
       if (!cancelled) {
