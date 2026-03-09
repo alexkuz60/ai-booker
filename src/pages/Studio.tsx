@@ -315,6 +315,7 @@ const Studio = () => {
                 onErrorSegmentsChange={setErrorSegmentIds}
                 silenceSec={silenceSec}
                 onSilenceSecChange={handleSilenceSecChange}
+                onRecalcDone={() => setClipsRefreshToken(t => t + 1)}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
