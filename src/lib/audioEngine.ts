@@ -718,8 +718,12 @@ class AudioEngine {
       for (const { track, offset } of immediateStarts) {
         if (track.player.loaded) {
           track.player.fadeIn = 0; // No fade on resume
-          const remaining = Math.max(0, track.durationSec - offset);
-          track.player.start(Tone.now(), offset, remaining);
+          if (track.fadeOutSec > 0) {
+            const remaining = Math.max(0, track.durationSec - offset);
+            track.player.start(Tone.now(), offset, remaining);
+          } else {
+            track.player.start(Tone.now(), offset);
+          }
         }
       }
     }
