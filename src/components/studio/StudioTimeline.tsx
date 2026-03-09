@@ -219,6 +219,25 @@ export function StudioTimeline({
   // ── Audio player ──────────────────────────────────────────
   const player = useTimelinePlayer(timelineClips);
 
+  // ── Spacebar play/pause ──────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+      // Don't hijack typing in inputs/textareas
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if ((e.target as HTMLElement)?.isContentEditable) return;
+      e.preventDefault();
+      if (player.state === "playing") {
+        player.pause();
+      } else {
+        player.play();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [player]);
+
   // Group clips by track ID (scene mode)
   const clipsByTrack = useMemo(() => {
     const map = new Map<string, TimelineClip[]>();
