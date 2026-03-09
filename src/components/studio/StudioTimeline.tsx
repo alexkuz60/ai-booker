@@ -637,9 +637,24 @@ export function StudioTimeline({
                 player.seek(Math.max(0, Math.min(sec, duration)));
               }}
             >
-              <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} />
+              {/* Keep ruler horizontally synced with tracks by rendering it inside the same scroll viewport */}
+              <div className="sticky top-0 z-20 bg-background">
+                <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} />
+              </div>
+
               {allTracks.map((track) => (
-                <TimelineTrack key={track.id} track={track} zoom={zoom} duration={duration} clips={clipsByTrack.get(track.id)} selectedSegmentId={selectedSegmentId} onSelectSegment={onSelectSegment} synthesizingSegmentIds={synthesizingSegmentIds} onSetFade={handleSetFade} clipFades={clipFades} />
+                <TimelineTrack
+                  key={track.id}
+                  track={track}
+                  zoom={zoom}
+                  duration={duration}
+                  clips={clipsByTrack.get(track.id)}
+                  selectedSegmentId={selectedSegmentId}
+                  onSelectSegment={onSelectSegment}
+                  synthesizingSegmentIds={synthesizingSegmentIds}
+                  onSetFade={handleSetFade}
+                  clipFades={clipFades}
+                />
               ))}
               <Playhead positionSec={player.positionSec} zoom={zoom} />
             </div>
@@ -665,7 +680,11 @@ export function StudioTimeline({
                   player.seek(Math.max(0, Math.min(sec, duration)));
                 }}
               >
-                <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} />
+                {/* Keep ruler horizontally synced with tracks by rendering it inside the same scroll viewport */}
+                <div className="sticky top-0 z-20 bg-background">
+                  <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} />
+                </div>
+
                 <div className="flex h-10 border-b border-border/50 relative" style={{ width: `${duration * zoom * 4}px` }}>
                   {chapterSceneClips.map((sc, i) => {
                     const widthPx = sc.durationSec * zoom * 4;
