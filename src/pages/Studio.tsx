@@ -249,18 +249,42 @@ const Studio = () => {
     ? `${chapter.bookTitle} → ${chapter.chapterTitle}`
     : (isRu ? "Звукозапись ИИ-актеров. Монтаж. Сведение. Мастеринг." : "AI Voice Recording. Editing. Mixing. Mastering.");
 
+  // Compute actual chapter duration (prefer playlist, fallback to estimate)
+  const actualChapterDurationSec = useMemo(() => {
+    if (!chapter) return null;
+    let total = 0;
+    for (const scene of chapter.scenes) {
+      const actualMs = scene.id ? playlistDurations.get(scene.id) : undefined;
+      if (actualMs && actualMs > 0) {
+        total += actualMs / 1000;
+      } else {
+        total += estimateSceneDuration(scene).sec;
+      }
+    }
+    return total > 0 ? total : null;
+  }, [chapter, playlistDurations]);
+
+  // Actual scene duration from playlist
+  const actualSceneDurationMs = selectedScene?.id ? playlistDurations.get(selectedScene.id) : undefined;
+  const actualSceneSec = actualSceneDurationMs && actualSceneDurationMs > 0 ? actualSceneDurationMs / 1000 : null;
+
   const headerRight = chapterEstimate && chapterEstimate.chars > 0 ? (
     <div className="flex items-center gap-3 text-sm font-body">
       <div className="flex items-center gap-1.5 text-muted-foreground">
         <Clock className="h-4 w-4" />
-        <span className="font-medium text-foreground">{chapterEstimate.formatted}</span>
+        <span className="font-medium text-foreground">
+          {actualChapterDurationSec ? formatDuration(Math.round(actualChapterDurationSec)) : chapterEstimate.formatted}
+        </span>
         <span className="text-xs">
           ({chapterEstimate.chars.toLocaleString()} {isRu ? "сим." : "chars"})
         </span>
       </div>
       {sceneEstimate && sceneEstimate.chars > 0 && (
         <div className="text-xs text-muted-foreground border-l border-border pl-3">
-          {isRu ? "Сцена" : "Scene"}: <span className="font-medium text-foreground">{sceneEstimate.formatted}</span>
+          {isRu ? "Сцена" : "Scene"}:{" "}
+          <span className="font-medium text-foreground">
+            {actualSceneSec ? formatDuration(Math.round(actualSceneSec)) : sceneEstimate.formatted}
+          </span>
           <span className="ml-1">({sceneEstimate.chars.toLocaleString()} {isRu ? "сим." : "ch."})</span>
         </div>
       )}
