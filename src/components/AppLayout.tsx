@@ -31,11 +31,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </header>
           )}
           <main className="flex-1 min-h-0 overflow-auto relative">
-            {isHome && (
-              <div className="absolute top-3 left-3 z-10">
-                <SidebarTrigger className="text-foreground/70 hover:text-foreground shrink-0 drop-shadow-md" />
-              </div>
-            )}
+            {/* Home page has its own logo trigger */}
             {children}
           </main>
         </div>
