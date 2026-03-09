@@ -159,6 +159,14 @@ class EngineTrack {
 
   private scheduledId: number | null = null;
 
+  // ── Loop support ──
+  private _loop: boolean;
+  private _clipLenSec: number;
+  private _loopCrossfadeSec: number;
+  /** Secondary player for crossfade between loop iterations */
+  private playerB: Tone.Player | null = null;
+  private loopScheduledIds: number[] = [];
+
   constructor(config: TrackConfig, bus: Tone.Channel) {
     this.id = config.id;
     this.startSec = config.startSec;
@@ -169,6 +177,9 @@ class EngineTrack {
     this._pan = config.pan ?? 0;
     this._fadeInSec = config.fadeInSec ?? 0;
     this._fadeOutSec = config.fadeOutSec ?? 0;
+    this._loop = config.loop ?? false;
+    this._clipLenSec = config.clipLenSec ?? config.durationSec;
+    this._loopCrossfadeSec = config.loopCrossfadeSec ?? 0;
 
     // Pre-FX: light compressor, bypassed
     this.preFxNode = new Tone.Compressor({
@@ -216,6 +227,16 @@ class EngineTrack {
     this.splitter.connect(this.meterL, 0);
     this.splitter.connect(this.meterR, 1);
 
+    // Create secondary player for crossfade looping
+    if (this._loop && this._loopCrossfadeSec > 0) {
+      this.playerB = new Tone.Player({
+        url: config.url,
+        fadeIn: this._loopCrossfadeSec,
+        fadeOut: this._loopCrossfadeSec,
+      });
+      this.playerB.connect(this.preFxNode);
+    }
+
     // Apply bypass states
     this.applyPreFxBypass();
     this.applyReverbBypass();
@@ -225,22 +246,76 @@ class EngineTrack {
 
   schedule(): void {
     this.unschedule();
-    this.scheduledId = Tone.getTransport().schedule((time) => {
-      if (this.player.loaded) {
-        // Apply fadeIn only when clip starts from the beginning
-        this.player.fadeIn = this._fadeInSec;
-        // Limit playback to clip duration to prevent overlap with next clip
-        this.player.start(time, 0, this.durationSec);
-      }
-    }, this.startSec);
+
+    if (this._loop) {
+      this.scheduleLoop(this.startSec, 0);
+    } else {
+      this.scheduledId = Tone.getTransport().schedule((time) => {
+        if (this.player.loaded) {
+          this.player.fadeIn = this._fadeInSec;
+          this.player.start(time, 0, this.durationSec);
+        }
+      }, this.startSec);
+    }
+  }
+
+  /** Schedule looping iterations with crossfade overlap */
+  private scheduleLoop(transportStart: number, audioOffset: number): void {
+    this.clearLoopIds();
+    const xfade = this._loopCrossfadeSec;
+    const step = Math.max(1, this._clipLenSec - xfade);
+    const totalFill = this.durationSec - audioOffset;
+    const iterations = Math.ceil(totalFill / step) + 1;
+    const players = [this.player, this.playerB ?? this.player];
+
+    for (let i = 0; i < iterations; i++) {
+      const iterOffset = i * step;
+      if (iterOffset >= totalFill) break;
+
+      const p = players[i % 2];
+      const schedTime = transportStart + iterOffset;
+      const remaining = Math.min(this._clipLenSec, totalFill - iterOffset);
+      const isFirst = i === 0;
+      const isLast = iterOffset + step >= totalFill;
+
+      const id = Tone.getTransport().schedule((time) => {
+        if (p.loaded) {
+          p.fadeIn = isFirst ? this._fadeInSec : xfade;
+          p.fadeOut = isLast ? this._fadeOutSec : xfade;
+          // On first iteration with audioOffset, start from offset
+          const startOffset = isFirst ? audioOffset : 0;
+          const dur = isFirst ? Math.min(remaining, this._clipLenSec - audioOffset) : remaining;
+          p.start(time, startOffset, dur);
+        }
+      }, schedTime);
+
+      this.loopScheduledIds.push(id);
+    }
+  }
+
+  private clearLoopIds(): void {
+    for (const id of this.loopScheduledIds) {
+      Tone.getTransport().clear(id);
+    }
+    this.loopScheduledIds = [];
   }
 
   scheduleWithOffset(transportTime: number, offset: number): void {
     this.unschedule();
+
+    if (this._loop) {
+      // Calculate which iteration we're in and the offset within that iteration
+      const xfade = this._loopCrossfadeSec;
+      const step = Math.max(1, this._clipLenSec - xfade);
+      const iterIdx = Math.floor(offset / step);
+      const iterAudioOffset = offset - iterIdx * step;
+      this.scheduleLoop(transportTime, offset);
+      return;
+    }
+
     const remaining = Math.max(0, this.durationSec - offset);
     this.scheduledId = Tone.getTransport().schedule((time) => {
       if (this.player.loaded) {
-        // No fadeIn when resuming mid-clip
         this.player.fadeIn = 0;
         this.player.start(time, offset, remaining);
       }
@@ -252,7 +327,9 @@ class EngineTrack {
       Tone.getTransport().clear(this.scheduledId);
       this.scheduledId = null;
     }
+    this.clearLoopIds();
     try { this.player.stop(); } catch { /* not started */ }
+    try { this.playerB?.stop(); } catch { /* not started */ }
   }
 
   // ── Volume / Pan ──
