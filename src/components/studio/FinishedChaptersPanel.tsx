@@ -122,61 +122,9 @@ export function FinishedChaptersPanel({ isRu, bookId }: FinishedChaptersPanelPro
     a.click();
   }, []);
 
-  const handleRecalcDurations = async () => {
-    const firstSceneId = chapterSceneIds?.[0];
-    if (!firstSceneId) {
-      toast.info(isRu ? "Нет сцен для пересчёта" : "No scenes to recalculate");
-      return;
-    }
-
-    setRecalcRunning(true);
-    try {
-      const { data: sceneRow } = await supabase
-        .from("book_scenes")
-        .select("chapter_id")
-        .eq("id", firstSceneId)
-        .single();
-
-      if (!sceneRow) {
-        toast.error(isRu ? "Не удалось найти главу" : "Could not find chapter");
-        setRecalcRunning(false);
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke("recalc-durations", {
-        body: { chapter_id: sceneRow.chapter_id },
-      });
-
-      if (error) {
-        toast.error(isRu ? "Ошибка пересчёта" : "Recalc error");
-        console.error("recalc-durations error:", error);
-      } else {
-        const result = data as { updated: number; errors: number; total: number };
-        if (result.updated > 0) {
-          toast.success(
-            isRu
-              ? `Обновлено ${result.updated} из ${result.total} клипов`
-              : `Updated ${result.updated} of ${result.total} clips`
-          );
-          onRecalcDone?.();
-        } else {
-          toast.info(
-            isRu
-              ? `Все длительности актуальны (${result.total} клипов)`
-              : `All durations up to date (${result.total} clips)`
-          );
-        }
-      }
-    } catch (e) {
-      console.error("recalc-durations exception:", e);
-      toast.error(isRu ? "Ошибка пересчёта длительностей" : "Duration recalc error");
-    }
-    setRecalcRunning(false);
-  };
-
   return (
     <div className="flex flex-col h-full">
-      {/* Header with recalc button */}
+      {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
           <Headphones className="h-4 w-4 text-primary" />
@@ -184,21 +132,6 @@ export function FinishedChaptersPanel({ isRu, bookId }: FinishedChaptersPanelPro
             {i.title}
           </span>
         </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 gap-1.5 text-xs"
-          disabled={recalcRunning || !chapterSceneIds?.length}
-          onClick={handleRecalcDurations}
-          title={isRu ? "Пересчитать длительности из MP3" : "Recalculate durations from MP3"}
-        >
-          {recalcRunning ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <Timer className="h-3 w-3" />
-          )}
-          {isRu ? "Пересчёт" : "Recalc"}
-        </Button>
       </div>
 
       {/* Table */}
