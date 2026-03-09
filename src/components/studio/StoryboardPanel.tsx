@@ -336,6 +336,7 @@ export function StoryboardPanel({
   onErrorSegmentsChange,
   silenceSec,
   onSilenceSecChange,
+  onRecalcDone,
 }: {
   sceneId: string | null;
   sceneContent: string | null;
@@ -348,6 +349,7 @@ export function StoryboardPanel({
   onErrorSegmentsChange?: (ids: Set<string>) => void;
   silenceSec?: number;
   onSilenceSecChange?: (sec: number) => void;
+  onRecalcDone?: () => void;
 }) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(false);
