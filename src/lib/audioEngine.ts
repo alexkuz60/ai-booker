@@ -253,7 +253,15 @@ class EngineTrack {
       this.scheduledId = Tone.getTransport().schedule((time) => {
         if (this.player.loaded) {
           this.player.fadeIn = this._fadeInSec;
-          this.player.start(time, 0, this.durationSec);
+          // Don't limit voice clip duration — let audio play to its natural end.
+          // The actual audio may be longer than the estimated durationSec.
+          // Only apply duration limit for atmosphere/sfx clips that have explicit fades.
+          const hasFadeOut = this._fadeOutSec > 0;
+          if (hasFadeOut) {
+            this.player.start(time, 0, this.durationSec);
+          } else {
+            this.player.start(time, 0);
+          }
         }
       }, this.startSec);
     }
@@ -313,11 +321,16 @@ class EngineTrack {
       return;
     }
 
-    const remaining = Math.max(0, this.durationSec - offset);
+    const hasFadeOut = this._fadeOutSec > 0;
     this.scheduledId = Tone.getTransport().schedule((time) => {
       if (this.player.loaded) {
         this.player.fadeIn = 0;
-        this.player.start(time, offset, remaining);
+        if (hasFadeOut) {
+          const remaining = Math.max(0, this.durationSec - offset);
+          this.player.start(time, offset, remaining);
+        } else {
+          this.player.start(time, offset);
+        }
       }
     }, transportTime);
   }
@@ -705,8 +718,12 @@ class AudioEngine {
       for (const { track, offset } of immediateStarts) {
         if (track.player.loaded) {
           track.player.fadeIn = 0; // No fade on resume
-          const remaining = Math.max(0, track.durationSec - offset);
-          track.player.start(Tone.now(), offset, remaining);
+          if (track.fadeOutSec > 0) {
+            const remaining = Math.max(0, track.durationSec - offset);
+            track.player.start(Tone.now(), offset, remaining);
+          } else {
+            track.player.start(Tone.now(), offset);
+          }
         }
       }
     }
@@ -775,8 +792,12 @@ class AudioEngine {
       for (const { track, offset } of immediateStarts) {
         if (track.player.loaded) {
           track.player.fadeIn = 0; // No fade on seek resume
-          const remaining = Math.max(0, track.durationSec - offset);
-          track.player.start(Tone.now(), offset, remaining);
+          if (track.fadeOutSec > 0) {
+            const remaining = Math.max(0, track.durationSec - offset);
+            track.player.start(Tone.now(), offset, remaining);
+          } else {
+            track.player.start(Tone.now(), offset);
+          }
         }
       }
       this._state = "playing";
