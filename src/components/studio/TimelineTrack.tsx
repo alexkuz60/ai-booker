@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 import type { TimelineTrackData } from "./StudioTimeline";
 import {
