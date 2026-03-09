@@ -89,11 +89,43 @@
 - [x] Спектроанализатор (FFT): 3 режима визуализации (bars, line, mirror)
 - [x] Пропагация типов блоков: narrator↔first_person автосмена всех блоков в сцене
 - [x] Автоочистка пустых треков после переназначения типов
-- [ ] Atmosphere Engine
+- [x] Atmosphere Engine: ручная генерация SFX/Music/Ambience (ElevenLabs)
+- [ ] Atmosphere Engine: AI Prompt Builder (auto-atmosphere по метаданным сцены)
+- [ ] Atmosphere Engine: таблица `scene_atmospheres` + интеграция с таймлайном
+- [ ] Atmosphere Engine: batch-генерация атмосферы по главе
 - [ ] Интерактивный таймлайн (drag, snap)
 - [ ] RVC-интеграция
 - [ ] Экспорт финального аудио
 - [ ] Ролевое AI-управление (Режиссёр, Звукорежиссёр, Корректор)
+
+---
+
+### The Atmosphere Engine — план реализации
+
+> **Модуль 2.2** — иммерсивный звуковой ландшафт. Автоматическая генерация фоновых звуков и музыки на основе метаданных сцены (mood, scene_type, bpm, содержание).
+
+#### Текущий статус
+
+- ✅ `SoundProvider` — абстракция над ElevenLabs SFX + Music API
+- ✅ `AtmospherePanel` — ручная генерация по текстовому промпту (3 под-вкладки: SFX, Ambience, Music)
+- ✅ `elevenlabs-sfx` / `elevenlabs-music` — Edge Functions
+- ✅ Сохранение в `user-media` storage
+
+#### Этапы развития
+
+| Этап | Описание | Статус |
+|------|----------|--------|
+| **1. Prompt Builder** | Edge-функция `generate-atmosphere-prompt`: метаданные сцены → 2–3 промпта (ambience + music + SFX) через Lovable AI | ⬜ |
+| **2. Auto-Atmosphere** | Кнопка в UI: метаданные → Prompt Builder → параллельная генерация слоёв → сохранение | ⬜ |
+| **3. DB `scene_atmospheres`** | Таблица привязки атмосферных слоёв к сценам (path, duration, volume, fade) | ⬜ |
+| **4. Timeline-интеграция** | Клипы из `scene_atmospheres` на треках atmosphere/sfx; loop/crossfade | ⬜ |
+| **5. Batch-режим** | Генерация атмосферы для всей главы одним кликом | ⬜ |
+
+#### Зависимости
+
+- Метаданные сцен (`mood`, `scene_type`, `bpm`) из семантического анализа
+- Инфраструктура треков `atmosphere`/`sfx` на таймлайне
+- Batch-режим аналогичен пакетному ре-синтезу
 
 ---
 
