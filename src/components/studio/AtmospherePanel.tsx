@@ -871,6 +871,7 @@ interface AtmospherePanelProps {
 export function AtmospherePanel({ isRu, sceneId }: AtmospherePanelProps) {
   const i = t(isRu);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleGenerated = useCallback((item: HistoryItem) => {
     setHistory((prev) => [item, ...prev]);
@@ -880,9 +881,37 @@ export function AtmospherePanel({ isRu, sceneId }: AtmospherePanelProps) {
     setHistory((prev) => [...items, ...prev]);
   }, []);
 
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("audio/")) {
+      toast.error(isRu ? "Выберите аудиофайл" : "Please select an audio file");
+      return;
+    }
+    try {
+      const category: SoundCategory = "sfx";
+      const slug = file.name.replace(/\.[^.]+$/, "").replace(/[^a-zа-я0-9]+/gi, "-").slice(0, 40);
+      const fileName = `${slug}-${Date.now()}.mp3`;
+      const path = await saveToStorage(file, category, fileName);
+      const url = URL.createObjectURL(file);
+      const item: HistoryItem = {
+        id: crypto.randomUUID(),
+        prompt: file.name,
+        category,
+        sound: { blob: file, url, provider: "upload" },
+        savedPath: path,
+      };
+      setHistory((prev) => [item, ...prev]);
+      toast.success(isRu ? "Файл загружен и сохранён" : "File uploaded and saved");
+    } catch (err: any) {
+      toast.error(err.message || (isRu ? "Ошибка загрузки" : "Upload failed"));
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [isRu]);
+
   return (
     <Tabs defaultValue="auto" className="h-full flex flex-col">
-      <div className="shrink-0 mx-4 mt-3 flex items-center gap-3">
+      <div className="shrink-0 mx-4 mt-3 flex items-center gap-2 flex-wrap">
         <TabsList className="w-fit">
           <TabsTrigger value="auto" className="gap-1.5 text-xs">
             <Zap className="h-3 w-3" />
@@ -901,8 +930,25 @@ export function AtmospherePanel({ isRu, sceneId }: AtmospherePanelProps) {
             {i.musicTab}
           </TabsTrigger>
         </TabsList>
-        <div className="flex-1 min-w-0">
-          <ElevenLabsCreditsWidget isRu={isRu} />
+
+        <div className="flex items-center gap-2 ml-auto">
+          <ElevenLabsCreditsWidget isRu={isRu} compact />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="audio/*"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 text-[10px]"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="h-3 w-3" />
+            {isRu ? "Загрузить" : "Upload"}
+          </Button>
         </div>
       </div>
 
