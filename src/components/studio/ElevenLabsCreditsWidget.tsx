@@ -6,9 +6,10 @@ import { supabase } from "@/integrations/supabase/client";
 interface ElevenLabsCreditsWidgetProps {
   isRu: boolean;
   autoLoad?: boolean;
+  compact?: boolean;
 }
 
-export function ElevenLabsCreditsWidget({ isRu, autoLoad = true }: ElevenLabsCreditsWidgetProps) {
+export function ElevenLabsCreditsWidget({ isRu, autoLoad = true, compact = false }: ElevenLabsCreditsWidgetProps) {
   const [credits, setCredits] = useState<{ used: number; limit: number; tier: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,6 +45,34 @@ export function ElevenLabsCreditsWidget({ isRu, autoLoad = true }: ElevenLabsCre
   }, [autoLoad]);
 
   if (!credits && !error) return null;
+
+  if (compact) {
+    const pct = credits ? Math.round((credits.used / credits.limit) * 100) : 0;
+    return (
+      <div className="flex items-center gap-2">
+        {credits && (
+          <>
+            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+              EL <span className="capitalize font-medium text-foreground">{credits.tier}</span>
+            </span>
+            <div className="h-1.5 w-16 rounded-full bg-muted overflow-hidden shrink-0">
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{ width: `${Math.min(100, pct)}%` }}
+              />
+            </div>
+            <span className="text-[10px] text-muted-foreground whitespace-nowrap">{pct}%</span>
+            <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={load} disabled={loading}>
+              <RotateCcw className={`h-2.5 w-2.5 ${loading ? "animate-spin" : ""}`} />
+            </Button>
+          </>
+        )}
+        {!credits && error && (
+          <span className="text-[10px] text-muted-foreground">⚠️ {error}</span>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-md border border-border bg-muted/30 p-2.5">
