@@ -118,7 +118,7 @@ Content excerpt: ${contentSummary || "(no content available)"}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: clientModel || "google/gemini-3-flash-preview",
+        model: usedModel,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -127,8 +127,11 @@ Content excerpt: ${contentSummary || "(no content available)"}`;
       }),
     });
 
+    const aiLatency = Date.now() - aiStart;
+
     if (!aiResponse.ok) {
       const status = aiResponse.status;
+      logAiUsage({ userId, modelId: usedModel, requestType: "generate-atmosphere", status: "error", latencyMs: aiLatency, errorMessage: `AI error: ${status}` });
       if (status === 429) {
         return new Response(
           JSON.stringify({ error: isRu ? "Превышен лимит запросов, попробуйте позже" : "Rate limit exceeded, try again later" }),
@@ -150,7 +153,11 @@ Content excerpt: ${contentSummary || "(no content available)"}`;
     }
 
     const aiData = await aiResponse.json();
+    const usage = aiData.usage;
     const rawContent = aiData.choices?.[0]?.message?.content || "[]";
+
+    // Log successful AI call
+    logAiUsage({ userId, modelId: usedModel, requestType: "generate-atmosphere", status: "success", latencyMs: aiLatency, tokensInput: usage?.prompt_tokens, tokensOutput: usage?.completion_tokens });
 
     // Parse JSON from AI response (strip markdown fences if present)
     let layers: AtmosphereLayer[];
