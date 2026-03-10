@@ -47,6 +47,7 @@ Deno.serve(async (req) => {
     }
 
     const apiKey = Deno.env.get("FREESOUND_API_KEY");
+    console.log("[freesound-search] API key present:", !!apiKey, "length:", apiKey?.length, "starts:", apiKey?.slice(0, 4));
     if (!apiKey) {
       return new Response(
         JSON.stringify({ error: "Freesound API key not configured" }),
