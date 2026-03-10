@@ -1145,6 +1145,17 @@ export function StoryboardPanel({
         </div>
         <div className="flex items-center gap-1.5">
           <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 text-xs"
+            disabled={!canMerge || merging || synthesizing}
+            onClick={handleMergeSegments}
+            title={isRu ? "Объединить выбранные соседние блоки" : "Merge selected adjacent segments"}
+          >
+            {merging ? <Loader2 className="h-3 w-3 animate-spin" /> : <Merge className="h-3 w-3" />}
+            {merging ? (isRu ? "Слияние…" : "Merging…") : (isRu ? "Объединить блоки" : "Merge")}
+          </Button>
+          <Button
             variant="ghost"
             size="sm"
             className="h-7 gap-1.5 text-xs"
