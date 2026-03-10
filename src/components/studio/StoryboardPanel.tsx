@@ -77,10 +77,11 @@ function renderPhraseText(text: string) {
 
 // ─── Editable phrase ────────────────────────────────────────
 
-function EditablePhrase({ phrase, isRu, onSave }: {
+function EditablePhrase({ phrase, isRu, onSave, onSplit }: {
   phrase: Phrase;
   isRu: boolean;
   onSave: (id: string, text: string) => void;
+  onSplit: (phraseId: string, textBefore: string, textAfter: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(phrase.text);
@@ -117,7 +118,19 @@ function EditablePhrase({ phrase, isRu, onSave }: {
             e.target.style.height = e.target.scrollHeight + "px";
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); }
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              const pos = textareaRef.current?.selectionStart ?? draft.length;
+              const before = draft.slice(0, pos).trim();
+              const after = draft.slice(pos).trim();
+              if (before && after) {
+                // Split at cursor position
+                onSplit(phrase.phrase_id, before, after);
+                setEditing(false);
+              } else {
+                save();
+              }
+            }
             if (e.key === "Escape") { setDraft(phrase.text); setEditing(false); }
           }}
           className="flex-1 text-sm font-body text-foreground leading-relaxed bg-background border border-primary/30 rounded px-2 py-1 resize-none focus:outline-none focus:ring-1 focus:ring-primary"
