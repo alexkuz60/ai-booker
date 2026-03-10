@@ -643,7 +643,7 @@ export function StoryboardPanel({
     }
     setMerging(false);
   }, [sceneId, mergeGroups, isRu, loadSegments, onSegmented]);
-  handleMergeRef.current = handleMergeSegments;
+  
 
   useEffect(() => {
     setSegments([]);
