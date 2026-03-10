@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAiRoles } from "@/hooks/useAiRoles";
 import { YANDEX_VOICES, ROLE_LABELS } from "@/config/yandexVoices";
 import { ELEVENLABS_VOICES } from "@/config/elevenlabsVoices";
 import { PROXYAPI_TTS_VOICES, PROXYAPI_TTS_MODELS, getVoicesForModel } from "@/config/proxyapiVoices";
