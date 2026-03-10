@@ -378,7 +378,7 @@ function GeneratorPanel({
               min={0}
               max={1}
               step={0.05}
-              className="flex-1 max-w-[120px]"
+              className="w-[100px] shrink-0"
             />
             <span className="w-10 text-right font-body text-[10px]">{Math.round(influence * 100)}%</span>
           </div>
