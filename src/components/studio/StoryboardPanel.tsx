@@ -811,6 +811,29 @@ export function StoryboardPanel({
     }
   }, [sceneId, segments, isRu, loadSegments, onSegmented]);
 
+  // Update split silence duration in segment metadata
+  const handleSplitSilenceChange = useCallback(async (segmentId: string, ms: number) => {
+    // Update local state immediately
+    setSegments(prev => prev.map(s =>
+      s.segment_id === segmentId ? { ...s, split_silence_ms: ms } : s
+    ));
+    // Persist to DB: merge into existing metadata
+    const { data: row } = await supabase
+      .from("scene_segments")
+      .select("metadata")
+      .eq("id", segmentId)
+      .single();
+    const existing = (row?.metadata ?? {}) as Record<string, unknown>;
+    await supabase.from("scene_segments")
+      .update({ metadata: { ...existing, split_silence_ms: ms } })
+      .eq("id", segmentId);
+    // Invalidate playlist to recalculate timeline
+    if (sceneId) {
+      await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
+      onSegmented?.(sceneId);
+    }
+  }, [sceneId, onSegmented]);
+
 
   useEffect(() => {
     setSegments([]);
