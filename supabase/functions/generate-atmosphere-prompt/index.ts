@@ -85,6 +85,10 @@ Deno.serve(async (req) => {
       );
     }
 
+    const userId = userData.user.id;
+    const usedModel = clientModel || "google/gemini-3-flash-preview";
+    const aiStart = Date.now();
+
     const promptLang = isRu ? "Russian" : "English";
     const systemPrompt = `You are a sound designer for audiobook production. Given scene metadata, generate atmospheric sound layer descriptions for ElevenLabs Sound Effects and Music APIs.
 
