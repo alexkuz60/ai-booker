@@ -362,7 +362,7 @@ function GeneratorPanel({
             min={1}
             max={maxDuration}
             step={1}
-            className="flex-1 max-w-[120px]"
+            className="w-[100px] shrink-0"
           />
           <span className="w-12 text-right font-body text-[10px]">{durationSec} {i.sec}</span>
         </div>
@@ -378,7 +378,7 @@ function GeneratorPanel({
               min={0}
               max={1}
               step={0.05}
-              className="flex-1 max-w-[120px]"
+              className="w-[100px] shrink-0"
             />
             <span className="w-10 text-right font-body text-[10px]">{Math.round(influence * 100)}%</span>
           </div>
@@ -506,7 +506,7 @@ function EditableLayerCard({
             min={2}
             max={layer.layer_type === "music" ? 120 : 22}
             step={1}
-            className="flex-1 max-w-[120px]"
+            className="w-[100px] shrink-0"
           />
           <span className="w-8 text-right">{layer.duration_seconds}s</span>
         </div>
@@ -519,7 +519,7 @@ function EditableLayerCard({
             min={0}
             max={1}
             step={0.05}
-            className="flex-1 max-w-[100px]"
+            className="w-[100px] shrink-0"
           />
           <span className="w-8 text-right">{Math.round(layer.volume * 100)}%</span>
         </div>
