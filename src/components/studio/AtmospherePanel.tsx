@@ -512,6 +512,7 @@ function EditableLayerCard({
         <div className="flex items-center gap-1.5 flex-1">
           <Volume2 className="h-3 w-3 shrink-0" />
           <Slider
+            compact
             value={[layer.volume]}
             onValueChange={([v]) => onChange(index, { ...layer, volume: v })}
             min={0}
