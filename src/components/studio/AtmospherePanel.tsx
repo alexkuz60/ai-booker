@@ -4,7 +4,7 @@ import {
   Clock, Sliders, Zap, Trash2, Pencil, ArrowRight, RotateCcw,
   Waves, TreePine, CloudRain, Wind, Building2, Flame, Footprints,
   DoorOpen, Bomb, Bird, Guitar, Drum, Piano,
-  Timer, Repeat, ChevronDown, Upload,
+  Timer, Repeat, ChevronDown, Upload, Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import {
   type GeneratedSound,
 } from "@/lib/soundProvider";
 import { ElevenLabsCreditsWidget } from "./ElevenLabsCreditsWidget";
+import { FreesoundPanel } from "./FreesoundPanel";
 
 // ─── i18n ──────────────────────────────────────────────────
 
@@ -929,6 +930,10 @@ export function AtmospherePanel({ isRu, sceneId }: AtmospherePanelProps) {
             <Music className="h-3 w-3" />
             {i.musicTab}
           </TabsTrigger>
+          <TabsTrigger value="freesound" className="gap-1.5 text-xs">
+            <Search className="h-3 w-3" />
+            Freesound
+          </TabsTrigger>
         </TabsList>
 
         <div className="flex items-center gap-2 ml-auto">
@@ -970,6 +975,10 @@ export function AtmospherePanel({ isRu, sceneId }: AtmospherePanelProps) {
           />
         </TabsContent>
       ))}
+
+      <TabsContent value="freesound" className="flex-1 px-4 pb-4 min-h-0">
+        <FreesoundPanel isRu={isRu} />
+      </TabsContent>
     </Tabs>
   );
 }
