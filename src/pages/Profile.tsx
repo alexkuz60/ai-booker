@@ -142,6 +142,10 @@ export default function Profile() {
               <Network className="h-4 w-4 shrink-0" />
               <span>{isRu ? 'API Роутеры' : 'API Routers'}</span>
             </TabsTrigger>
+            <TabsTrigger value="ai-roles" className="flex items-center gap-2 flex-1">
+              <Bot className="h-4 w-4 shrink-0" />
+              <span>{isRu ? 'AI Роли' : 'AI Roles'}</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="profile">
