@@ -355,6 +355,7 @@ function GeneratorPanel({
           <Timer className="h-3.5 w-3.5 shrink-0" />
           <span className="shrink-0 text-[10px]">{i.duration}:</span>
           <Slider
+            compact
             value={[durationSec]}
             onValueChange={([v]) => setDurationSec(v)}
             min={1}
