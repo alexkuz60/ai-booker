@@ -711,14 +711,13 @@ export function StoryboardPanel({
       setMergeChecked(new Set());
       toast.success(isRu ? `Удалено ${toDelete.length} блок(ов)` : `Deleted ${toDelete.length} segment(s)`);
       await loadSegments(sceneId);
-      await syncSceneCharacters(segments.filter(s => !mergeChecked.has(s.segment_id)));
       onSegmented?.(sceneId);
     } catch (err: any) {
       console.error("Delete segments failed:", err);
       toast.error(isRu ? "Ошибка удаления" : "Delete failed");
     }
     setDeleting(false);
-  }, [sceneId, mergeChecked, segments, isRu, loadSegments, syncSceneCharacters, onSegmented]);
+  }, [sceneId, mergeChecked, segments, isRu, loadSegments, onSegmented]);
 
 
   useEffect(() => {
