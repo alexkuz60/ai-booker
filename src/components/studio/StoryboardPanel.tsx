@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, AudioLines, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle, RefreshCw, Timer, Merge } from "lucide-react";
+import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, AudioLines, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -367,8 +367,9 @@ export function StoryboardPanel({
   /** Current speaker assigned to inline narrations (from scene_type_mappings with segment_type="inline_narration") */
   const [inlineNarrationSpeaker, setInlineNarrationSpeaker] = useState<string | null>(null);
   const [recalcRunning, setRecalcRunning] = useState(false);
-  const [mergeChecked, setMergeChecked] = useState<Set<string>>(new Set());
+   const [mergeChecked, setMergeChecked] = useState<Set<string>>(new Set());
   const [merging, setMerging] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Reset merge selection when scene changes
   useEffect(() => { setMergeChecked(new Set()); }, [sceneId]);
@@ -675,7 +676,49 @@ export function StoryboardPanel({
     }
     setMerging(false);
   }, [sceneId, mergeGroups, isRu, loadSegments, onSegmented]);
-  
+
+  // Delete selected segments
+  const handleDeleteSegments = useCallback(async () => {
+    if (!sceneId || mergeChecked.size === 0) return;
+    const toDelete = segments.filter(s => mergeChecked.has(s.segment_id));
+    if (toDelete.length === 0) return;
+    if (toDelete.length === segments.length) {
+      toast.error(isRu ? "Нельзя удалить все блоки сцены" : "Cannot delete all segments");
+      return;
+    }
+    setDeleting(true);
+    try {
+      const deleteIds = toDelete.map(s => s.segment_id);
+      // Delete phrases, audio, then segments
+      await supabase.from("segment_phrases").delete().in("segment_id", deleteIds);
+      await supabase.from("segment_audio").delete().in("segment_id", deleteIds);
+      await supabase.from("scene_segments").delete().in("id", deleteIds);
+      // Renumber remaining segments sequentially
+      const { data: remaining } = await supabase
+        .from("scene_segments")
+        .select("id, segment_number")
+        .eq("scene_id", sceneId)
+        .order("segment_number");
+      if (remaining) {
+        for (let i = 0; i < remaining.length; i++) {
+          if (remaining[i].segment_number !== i + 1) {
+            await supabase.from("scene_segments").update({ segment_number: i + 1 }).eq("id", remaining[i].id);
+          }
+        }
+      }
+      // Invalidate playlist to force timeline recalculation
+      await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
+      setMergeChecked(new Set());
+      toast.success(isRu ? `Удалено ${toDelete.length} блок(ов)` : `Deleted ${toDelete.length} segment(s)`);
+      await loadSegments(sceneId);
+      onSegmented?.(sceneId);
+    } catch (err: any) {
+      console.error("Delete segments failed:", err);
+      toast.error(isRu ? "Ошибка удаления" : "Delete failed");
+    }
+    setDeleting(false);
+  }, [sceneId, mergeChecked, segments, isRu, loadSegments, onSegmented]);
+
 
   useEffect(() => {
     setSegments([]);
@@ -1185,7 +1228,18 @@ export function StoryboardPanel({
             title={isRu ? "Объединить выбранные соседние блоки" : "Merge selected adjacent segments"}
           >
             {merging ? <Loader2 className="h-3 w-3 animate-spin" /> : <Merge className="h-3 w-3" />}
-            {merging ? (isRu ? "Слияние…" : "Merging…") : (isRu ? "Объединить блоки" : "Merge")}
+            {merging ? (isRu ? "Слияние…" : "Merging…") : (isRu ? "Объединить" : "Merge")}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive"
+            disabled={mergeChecked.size === 0 || deleting || synthesizing}
+            onClick={handleDeleteSegments}
+            title={isRu ? "Удалить выбранные блоки" : "Delete selected segments"}
+          >
+            {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+            {deleting ? (isRu ? "Удаление…" : "Deleting…") : (isRu ? "Удалить" : "Delete")}
           </Button>
           <Button
             variant="ghost"
