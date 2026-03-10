@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     }
 
     // ── Params ──
-    const { scene_id, lang } = await req.json();
+    const { scene_id, lang, model: clientModel } = await req.json();
     const isRu = lang === "ru";
 
     if (!scene_id) {
