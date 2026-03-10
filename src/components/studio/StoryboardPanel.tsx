@@ -402,7 +402,7 @@ export function StoryboardPanel({
 
   const canMerge = mergeGroups.length > 0;
 
-  const handleMergeRef = useRef<(() => Promise<void>) | null>(null);
+  
 
   // Recalculate durations from actual MP3 files for current scene
   const handleRecalcDurations = useCallback(async () => {
