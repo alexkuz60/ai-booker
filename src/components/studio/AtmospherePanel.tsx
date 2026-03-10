@@ -975,6 +975,10 @@ export function AtmospherePanel({ isRu, sceneId }: AtmospherePanelProps) {
           />
         </TabsContent>
       ))}
+
+      <TabsContent value="freesound" className="flex-1 px-4 pb-4 min-h-0">
+        <FreesoundPanel isRu={isRu} />
+      </TabsContent>
     </Tabs>
   );
 }
