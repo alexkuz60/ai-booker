@@ -833,6 +833,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   // ── Load ElevenLabs credits ──────────────────────────────
   const loadElCredits = useCallback(async () => {
     setElCreditsLoading(true);
+    setElCreditsError(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -849,13 +850,19 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       if (response.ok) {
         const data = await response.json();
         setElCredits({ used: data.character_count, limit: data.character_limit, tier: data.tier });
+      } else {
+        const err = await response.json().catch(() => ({ error: "unknown" }));
+        if (err.error === "missing_permissions") {
+          setElCreditsError(isRu ? "Ключ не имеет разрешения user_read" : "Key lacks user_read permission");
+        }
+        // Don't show toast for non-critical credits error
       }
     } catch (e) {
       console.error("Credits load error:", e);
     } finally {
       setElCreditsLoading(false);
     }
-  }, []);
+  }, [isRu]);
 
   // Load credits when switching to ElevenLabs tab
   useEffect(() => {
