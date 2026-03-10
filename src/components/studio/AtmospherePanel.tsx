@@ -506,7 +506,7 @@ function EditableLayerCard({
             min={2}
             max={layer.layer_type === "music" ? 120 : 22}
             step={1}
-            className="flex-1 max-w-[120px]"
+            className="w-[100px] shrink-0"
           />
           <span className="w-8 text-right">{layer.duration_seconds}s</span>
         </div>
