@@ -402,59 +402,7 @@ export function StoryboardPanel({
 
   const canMerge = mergeGroups.length > 0;
 
-  const handleMergeSegments = useCallback(async () => {
-    if (!sceneId || mergeGroups.length === 0) return;
-    setMerging(true);
-    try {
-      for (const group of mergeGroups) {
-        const [keeper, ...toMerge] = group;
-        const mergeIds = toMerge.map(s => s.segment_id);
-        // Move phrases from merged segments to keeper, renumbering
-        const keeperPhraseCount = keeper.phrases.length;
-        let offset = keeperPhraseCount;
-        for (const seg of toMerge) {
-          for (const ph of seg.phrases) {
-            offset++;
-            await supabase.from("segment_phrases")
-              .update({ segment_id: keeper.segment_id, phrase_number: offset })
-              .eq("id", ph.phrase_id);
-          }
-        }
-        // Delete audio for merged segments
-        await supabase.from("segment_audio").delete().in("segment_id", mergeIds);
-        // Delete merged segments (phrases already moved)
-        await supabase.from("scene_segments").delete().in("id", mergeIds);
-        // Delete character_appearances referencing merged segments
-        // (segment_ids array field — we'll clean up in full reload)
-      }
-
-      // Renumber remaining segments sequentially
-      const { data: remaining } = await supabase
-        .from("scene_segments")
-        .select("id, segment_number")
-        .eq("scene_id", sceneId)
-        .order("segment_number");
-      if (remaining) {
-        for (let i = 0; i < remaining.length; i++) {
-          if (remaining[i].segment_number !== i + 1) {
-            await supabase.from("scene_segments").update({ segment_number: i + 1 }).eq("id", remaining[i].id);
-          }
-        }
-      }
-
-      // Delete scene_playlists to force recalculation
-      await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
-
-      setMergeChecked(new Set());
-      toast.success(isRu ? "Блоки объединены" : "Segments merged");
-      await loadSegments(sceneId);
-      onSegmented?.(sceneId);
-    } catch (err: any) {
-      console.error("Merge failed:", err);
-      toast.error(isRu ? "Ошибка объединения" : "Merge failed");
-    }
-    setMerging(false);
-  }, [sceneId, mergeGroups, isRu, loadSegments, onSegmented]);
+  const handleMergeRef = useRef<(() => Promise<void>) | null>(null);
 
   // Recalculate durations from actual MP3 files for current scene
   const handleRecalcDurations = useCallback(async () => {
