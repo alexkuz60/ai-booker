@@ -559,6 +559,7 @@ export function StoryboardPanel({
         }
         const meta = (s.metadata ?? {}) as Record<string, unknown>;
         const inlineNarr = Array.isArray(meta.inline_narrations) ? meta.inline_narrations as InlineNarration[] : undefined;
+        const splitSilence = typeof meta.split_silence_ms === "number" ? meta.split_silence_ms : undefined;
         return {
           segment_id: s.id,
           segment_number: s.segment_number,
@@ -566,6 +567,7 @@ export function StoryboardPanel({
           speaker,
           phrases: phraseMap.get(s.id) || [],
           inline_narrations: inlineNarr,
+          split_silence_ms: splitSilence,
         };
       });
 
