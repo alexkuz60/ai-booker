@@ -1,73 +1,127 @@
-# Welcome to your Lovable project
+# AI-Booker — AI-Powered Audiobook Production Studio
 
-## Project info
+> Transform books into immersive audio plays with AI-driven voice acting, atmospheric soundscapes, and professional mastering — all in one click.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+🌐 **Live:** [booker-studio.lovable.app](https://booker-studio.lovable.app)
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## What is AI-Booker?
 
-**Use Lovable**
+AI-Booker is a web application for automated audiobook production in a **radio play format**. It combines deep semantic text analysis, multi-voice TTS synthesis, atmospheric sound design, and a professional DAW-style timeline — powered by AI at every stage.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### Key Features
 
-Changes made via Lovable will be committed automatically to this repo.
+| Feature | Description |
+|---------|-------------|
+| 📖 **Smart Parser** | Upload PDF → automatic TOC extraction → AI scene segmentation with mood/tempo metadata |
+| 🎭 **Character Profiler** | AI identifies characters, builds psychological profiles, and auto-casts voices |
+| 🎙️ **Multi-Provider TTS** | Yandex SpeechKit, ElevenLabs, ProxyAPI/OpenAI — 40+ voices with emotional control |
+| 🎬 **Storyboard Editor** | Segment merge/split, silence pauses, inline narration detection, speaker attribution |
+| 🎵 **Atmosphere Engine** | AI-generated ambient sounds, music & SFX (ElevenLabs) + Freesound.org integration |
+| 🎛️ **DAW Timeline** | Multi-track playback, per-track mixer, master effects chain (EQ→CMP→LIM→FLT→MBC→REV) |
+| 🔊 **Pro Mastering** | 5-band parametric filter, 3-band multiband compressor, stereo VU metering, FFT spectrum |
+| 🤖 **AI Roles** | 6 specialized AI roles (Screenwriter, Profiler, Director, etc.) with dedicated models |
+| 💬 **AI Assistant** | Context-aware chat assistant that guides through the production workflow |
 
-**Use your preferred IDE**
+---
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Production Pipeline
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+```
+PDF File
+  │
+  ▼
+┌─────────────────────────────────┐
+│  1. Upload + Storage            │  Parser / Library
+│  2. TOC Extraction              │
+│  3. Manual Structure Editing    │  Navigator
+│  4. Semantic Analysis           │  AI → scene boundaries → metadata
+└─────────────┬───────────────────┘
+              │  🎬 Send to Studio
+              ▼
+┌─────────────────────────────────┐
+│  5. Storyboard (segmentation)   │  AI → typed segments + phrases
+│     5a. Block editing           │  Merge / Split / Delete + silence
+│  6. Character profiling         │  AI → psychological portraits
+│  7. Voice casting               │  Auto-cast + manual override
+│  8. Preview                     │  Yandex / ElevenLabs / ProxyAPI
+│  9. Scene synthesis             │  TTS → segment_audio → timeline
+│  10. Timeline (Scene/Chapter)   │  Playback, seek, navigation
+│  10a. Mixer                     │  Vol/Pan/Mute/Solo, Pre-FX, Reverb
+│  10b. Mastering                 │  EQ→CMP→LIM→FLT→MBC→REV
+│  10c. Metering                  │  Stereo VU L/R, FFT Spectrum
+└─────────────┬───────────────────┘
+              │
+              ▼
+┌─────────────────────────────────┐
+│  11. Atmosphere + SFX           │  Auto + Freesound + manual
+│  12. Timeline editing           │  ⬜ (drag, snap, fade)
+│  13. Final audio export         │  ⬜
+└─────────────────────────────────┘
 
-Follow these steps:
+🤖 Assistant — available at any stage
+🎭 AI Roles — specialized models for each task type
+```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | React, TypeScript, Vite, Tailwind CSS, shadcn/ui, Framer Motion |
+| Audio Engine | Tone.js (Transport, Channel, EQ, Compressor, Limiter, Filter, MBC, Reverb, FFT) |
+| PDF Processing | pdfjs-dist (browser-side) |
+| AI Analysis | Lovable AI Gateway (Gemini, GPT-5), ProxyAPI, OpenRouter |
+| TTS | Yandex SpeechKit (v1/v3), ElevenLabs, ProxyAPI/OpenAI TTS |
+| Sound Design | ElevenLabs (SFX, Music), Freesound.org |
+| Backend | Lovable Cloud (PostgreSQL + Storage + Edge Functions) |
+| Auth | Email + password, Row-Level Security on all tables |
+
+---
+
+## AI Roles System
+
+Each AI task in the pipeline is handled by a specialized "role" with its own system prompt and optimal model:
+
+| Role | Responsibility | Model Tier |
+|------|---------------|------------|
+| 🌐 Translator | i18n, localization | lite |
+| ✍️ Proofreader | Stress marks, SSML, TTS punctuation | standard |
+| 🎬 Screenwriter | Text segmentation, speaker attribution | standard |
+| 🎭 Director | Tempo, pauses, emotional arc | heavy |
+| 🔍 Profiler | Character analysis, psychotypes | heavy |
+| 🎵 Sound Engineer | SFX/atmosphere prompts | standard |
+
+---
+
+## Getting Started
+
+```bash
+# Clone the repository
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Install dependencies
+npm install
 
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+---
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Documentation
 
-**Use GitHub Codespaces**
+| File | Contents |
+|------|----------|
+| [STRATEGY.md](STRATEGY.md) | Strategic plan, architecture, module roadmap |
+| [WORKFLOW.md](WORKFLOW.md) | Complete production pipeline documentation |
+| [IMPLEMENTATION_LOG.md](IMPLEMENTATION_LOG.md) | Implementation log with plan vs reality analysis |
+| [README_RU.md](README_RU.md) | Документация на русском языке |
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+---
 
-## What technologies are used for this project?
+## License
 
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Private project. All rights reserved.

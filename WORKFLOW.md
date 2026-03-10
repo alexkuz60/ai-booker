@@ -737,10 +737,11 @@ PDF-файл
 | AI-анализ | Lovable AI Gateway (Gemini, GPT-5), ProxyAPI, OpenRouter |
 | AI-ассистент | Lovable AI Gateway (Gemini 3 Flash Preview) |
 | TTS | Yandex SpeechKit (v1/v3), ElevenLabs (Multilingual v2), ProxyAPI/OpenAI TTS (gpt-4o-mini-tts, tts-1, tts-1-hd) |
-| SFX/Музыка | ElevenLabs (Sound Effects, Music) |
+| SFX/Музыка | ElevenLabs (Sound Effects, Music), Freesound.org |
 | Аудио-движок | Tone.js (Transport, Channel, EQ3, Compressor, Limiter, BiquadFilter, MultibandCompressor, Reverb, FFT, Meter, Split) |
 | Хранение | Lovable Cloud (PostgreSQL + Storage) |
 | Аутентификация | Email + пароль, RLS-политики на все таблицы |
+| AI Roles | 6 специализированных ролей с централизованным реестром моделей |
 | UI | React, Tailwind CSS, shadcn/ui, Framer Motion |
 
 ---
