@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -1230,17 +1231,36 @@ export function StoryboardPanel({
             {merging ? <Loader2 className="h-3 w-3 animate-spin" /> : <Merge className="h-3 w-3" />}
             {merging ? (isRu ? "Слияние…" : "Merging…") : (isRu ? "Объединить" : "Merge")}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive"
-            disabled={mergeChecked.size === 0 || deleting || synthesizing}
-            onClick={handleDeleteSegments}
-            title={isRu ? "Удалить выбранные блоки" : "Delete selected segments"}
-          >
-            {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-            {deleting ? (isRu ? "Удаление…" : "Deleting…") : (isRu ? "Удалить" : "Delete")}
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive"
+                disabled={mergeChecked.size === 0 || deleting || synthesizing}
+                title={isRu ? "Удалить выбранные блоки" : "Delete selected segments"}
+              >
+                {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                {deleting ? (isRu ? "Удаление…" : "Deleting…") : (isRu ? "Удалить" : "Delete")}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{isRu ? "Удалить блоки?" : "Delete segments?"}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {isRu
+                    ? `Будет удалено ${mergeChecked.size} блок(ов) вместе с фразами и аудио. Это действие нельзя отменить.`
+                    : `${mergeChecked.size} segment(s) will be deleted along with phrases and audio. This cannot be undone.`}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteSegments} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  {isRu ? "Удалить" : "Delete"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button
             variant="ghost"
             size="sm"
