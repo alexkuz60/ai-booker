@@ -231,6 +231,8 @@ function GeneratorPanel({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [moodSuffix, setMoodSuffix] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playerTime, setPlayerTime] = useState(0);
+  const [playerDuration, setPlayerDuration] = useState(0);
 
   const maxDuration = category === "music" ? 120 : 22;
 
@@ -271,6 +273,8 @@ function GeneratorPanel({
         sound,
       };
       onGenerated(item);
+      // Auto-play the generated result
+      togglePlay(item);
       toast.success(isRu ? "Звук сгенерирован!" : "Sound generated!");
     } catch (e: any) {
       toast.error(e.message || (isRu ? "Ошибка генерации" : "Generation failed"));
@@ -286,15 +290,29 @@ function GeneratorPanel({
         setPlayingId(null);
         return;
       }
-      if (audioRef.current) audioRef.current.pause();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.onended = null;
+        audioRef.current.ontimeupdate = null;
+      }
       const audio = new Audio(item.sound.url);
-      audio.onended = () => setPlayingId(null);
+      audio.onended = () => { setPlayingId(null); setPlayerTime(0); };
+      audio.ontimeupdate = () => setPlayerTime(audio.currentTime);
+      audio.onloadedmetadata = () => setPlayerDuration(audio.duration);
       audio.play();
       audioRef.current = audio;
       setPlayingId(item.id);
+      setPlayerTime(0);
     },
     [playingId]
   );
+
+  const seekPlayer = useCallback((val: number[]) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = val[0];
+      setPlayerTime(val[0]);
+    }
+  }, []);
 
   const handleSave = useCallback(
     async (item: HistoryItem) => {
@@ -395,6 +413,34 @@ function GeneratorPanel({
       <p className="text-[10px] text-muted-foreground/50 font-body flex items-center gap-1">
         <Sparkles className="h-2.5 w-2.5" /> {i.hint}
       </p>
+
+      {/* Mini-player for active track */}
+      {playingId && (() => {
+        const active = filtered.find(h => h.id === playingId);
+        if (!active) return null;
+        const fmtTime = (s: number) => {
+          const m = Math.floor(s / 60);
+          const sec = Math.floor(s % 60);
+          return `${m}:${sec.toString().padStart(2, "0")}`;
+        };
+        return (
+          <div className="flex items-center gap-2 p-2 rounded-md border border-primary/30 bg-primary/5">
+            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => togglePlay(active)}>
+              <Pause className="h-3.5 w-3.5" />
+            </Button>
+            <Slider
+              value={[playerTime]}
+              max={playerDuration || 1}
+              step={0.1}
+              onValueChange={seekPlayer}
+              className="flex-1"
+            />
+            <span className="text-[10px] font-body text-muted-foreground w-16 text-right shrink-0">
+              {fmtTime(playerTime)} / {fmtTime(playerDuration)}
+            </span>
+          </div>
+        );
+      })()}
 
       {/* History */}
       <ScrollArea className="flex-1 min-h-0">
