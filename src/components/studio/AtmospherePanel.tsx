@@ -639,7 +639,7 @@ function AutoAtmospherePanel({
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ scene_id: sceneId, lang: isRu ? "ru" : "en" }),
+          body: JSON.stringify({ scene_id: sceneId, lang: isRu ? "ru" : "en", model: getModelForRole("sound_engineer") }),
         }
       );
 

@@ -892,7 +892,7 @@ export function StoryboardPanel({
     setAnalyzing(true);
     try {
       const { data, error } = await supabase.functions.invoke("segment-scene", {
-        body: { scene_id: sceneId, content: sceneContent, language: isRu ? "ru" : "en" },
+        body: { scene_id: sceneId, content: sceneContent, language: isRu ? "ru" : "en", model: getModelForRole("screenwriter") },
       });
       if (error) throw error;
       setSegments(data.segments || []);

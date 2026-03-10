@@ -409,7 +409,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         return;
       }
 
-      const body: Record<string, unknown> = { book_id: bookId, language: isRu ? "ru" : "en" };
+      const body: Record<string, unknown> = { book_id: bookId, language: isRu ? "ru" : "en", model: getModelForRole("profiler") };
       if (sceneIdsForIncremental?.length) body.scene_ids = sceneIdsForIncremental;
 
       const response = await fetch(
