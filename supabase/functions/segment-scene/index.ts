@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { scene_id, content, language } = await req.json();
+    const { scene_id, content, language, model: clientModel } = await req.json();
     if (!scene_id || !content) {
       return new Response(
         JSON.stringify({ error: "scene_id and content are required" }),
