@@ -1485,6 +1485,7 @@ export function StoryboardPanel({
                       phrase={ph}
                       isRu={isRu}
                       onSave={savePhrase}
+                      onSplit={handleSplitAtPhrase}
                     />
                   ))}
                 </div>
