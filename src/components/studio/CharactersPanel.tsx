@@ -210,6 +210,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
   // ElevenLabs credits
   const [elCredits, setElCredits] = useState<{ used: number; limit: number; tier: string } | null>(null);
+  const [elCreditsError, setElCreditsError] = useState<string | null>(null);
   const [elCreditsLoading, setElCreditsLoading] = useState(false);
 
   const [testing, setTesting] = useState(false);
@@ -832,6 +833,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   // ── Load ElevenLabs credits ──────────────────────────────
   const loadElCredits = useCallback(async () => {
     setElCreditsLoading(true);
+    setElCreditsError(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -848,13 +850,19 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       if (response.ok) {
         const data = await response.json();
         setElCredits({ used: data.character_count, limit: data.character_limit, tier: data.tier });
+      } else {
+        const err = await response.json().catch(() => ({ error: "unknown" }));
+        if (err.error === "missing_permissions") {
+          setElCreditsError(isRu ? "Ключ не имеет разрешения user_read" : "Key lacks user_read permission");
+        }
+        // Don't show toast for non-critical credits error
       }
     } catch (e) {
       console.error("Credits load error:", e);
     } finally {
       setElCreditsLoading(false);
     }
-  }, []);
+  }, [isRu]);
 
   // Load credits when switching to ElevenLabs tab
   useEffect(() => {
@@ -1494,6 +1502,13 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                           />
                         </div>
                       </div>
+                    </div>
+                  )}
+                  {!elCredits && elCreditsError && (
+                    <div className="rounded-md border border-border bg-muted/30 p-2.5">
+                      <p className="text-[10px] text-muted-foreground">
+                        ⚠️ {elCreditsError}
+                      </p>
                     </div>
                   )}
 
