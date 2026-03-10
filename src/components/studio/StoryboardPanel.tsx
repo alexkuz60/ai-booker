@@ -1228,7 +1228,18 @@ export function StoryboardPanel({
             title={isRu ? "Объединить выбранные соседние блоки" : "Merge selected adjacent segments"}
           >
             {merging ? <Loader2 className="h-3 w-3 animate-spin" /> : <Merge className="h-3 w-3" />}
-            {merging ? (isRu ? "Слияние…" : "Merging…") : (isRu ? "Объединить блоки" : "Merge")}
+            {merging ? (isRu ? "Слияние…" : "Merging…") : (isRu ? "Объединить" : "Merge")}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive"
+            disabled={mergeChecked.size === 0 || deleting || synthesizing}
+            onClick={handleDeleteSegments}
+            title={isRu ? "Удалить выбранные блоки" : "Delete selected segments"}
+          >
+            {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+            {deleting ? (isRu ? "Удаление…" : "Deleting…") : (isRu ? "Удалить" : "Delete")}
           </Button>
           <Button
             variant="ghost"
