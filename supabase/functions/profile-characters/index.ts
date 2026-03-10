@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { logAiUsage } from "../_shared/logAiUsage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -54,12 +55,14 @@ function buildPrompt(
   return { systemPrompt, userPrompt: `## Characters to profile:\n\n${characterList}${narratorContext}` };
 }
 
-async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en", modelOverride?: string): Promise<CharacterProfile[]> {
+async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en", modelOverride?: string, userId?: string): Promise<CharacterProfile[]> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) throw new Error("AI key not configured");
 
+  const usedModel = modelOverride || "google/gemini-3-flash-preview";
+  const aiStart = Date.now();
   const aiBody = JSON.stringify({
-    model: modelOverride || "google/gemini-3-flash-preview",
+    model: usedModel,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
@@ -130,6 +133,7 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       }
 
       const aiData = await aiRes.json();
+      const usage = aiData.usage;
       const msg = aiData.choices?.[0]?.message;
       const toolCall = msg?.tool_calls?.[0];
 
@@ -171,7 +175,13 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
         }
       }
 
-      if (profiles && profiles.length > 0) break;
+      if (profiles && profiles.length > 0) {
+        // Log successful AI call
+        if (userId) {
+          logAiUsage({ userId, modelId: usedModel, requestType: "profile-characters", status: "success", latencyMs: Date.now() - aiStart, tokensInput: usage?.prompt_tokens, tokensOutput: usage?.completion_tokens });
+        }
+        break;
+      }
 
       // Log raw response for debugging
       const reasoningLen = String((msg as Record<string, unknown>)?.reasoning || "").length;
@@ -185,7 +195,12 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
     }
   }
 
-  if (!profiles || profiles.length === 0) throw new Error(lastError || "AI returned empty response");
+  if (!profiles || profiles.length === 0) {
+    if (userId) {
+      logAiUsage({ userId, modelId: usedModel, requestType: "profile-characters", status: "error", latencyMs: Date.now() - aiStart, errorMessage: lastError || "Empty response" });
+    }
+    throw new Error(lastError || "AI returned empty response");
+  }
   return profiles;
 }
 
@@ -210,6 +225,11 @@ Deno.serve(async (req) => {
     }
 
     const lang: "ru" | "en" = language === "ru" ? "ru" : "en";
+    // Extract user ID for logging
+    const token = authHeader.replace("Bearer ", "");
+    const tempClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
+    const { data: authData } = await tempClient.auth.getUser(token);
+    const userId = authData?.user?.id;
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
@@ -344,7 +364,7 @@ Deno.serve(async (req) => {
     const { systemPrompt, userPrompt } = buildPrompt(
       charsToProfile, speakerDialogues, narratorExcerpts, lang, existingProfiles,
     );
-    const profiles = await callAI(systemPrompt, userPrompt, lang, clientModel);
+    const profiles = await callAI(systemPrompt, userPrompt, lang, clientModel, userId);
 
     // ── Update DB ────────────────────────────────────────
     let updated = 0;

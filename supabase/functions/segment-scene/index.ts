@@ -1,6 +1,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { splitPhrases } from "../_shared/splitPhrases.ts";
 import { extractCharacters } from "../_shared/extractCharacters.ts";
+import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
+import { extractCharacters } from "../_shared/extractCharacters.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -65,6 +67,10 @@ Deno.serve(async (req) => {
       });
     }
 
+    const userId = await getUserIdFromAuth(authHeader);
+    const usedModel = clientModel || "google/gemini-2.5-flash";
+    const aiStart = Date.now();
+
     const systemPrompt = `You are a literary text analyst. Given a scene text, split it into structural segments.
 Each segment must have:
 - "type": one of ${SEGMENT_TYPES.join(", ")}
@@ -111,7 +117,7 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
       },
       body: JSON.stringify({
-        model: clientModel || "google/gemini-2.5-flash",
+        model: usedModel,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -120,9 +126,14 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
       }),
     });
 
+    const aiLatency = Date.now() - aiStart;
+
     if (!aiRes.ok) {
       const errText = await aiRes.text();
       console.error("AI gateway error:", aiRes.status, errText);
+      if (userId) {
+        logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "error", latencyMs: aiLatency, errorMessage: `AI error: ${aiRes.status}` });
+      }
       return new Response(
         JSON.stringify({ error: `AI error: ${aiRes.status}` }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -130,6 +141,7 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
     }
 
     const aiData = await aiRes.json();
+    const usage = aiData.usage;
     let raw = aiData.choices?.[0]?.message?.content || "";
     raw = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
 
@@ -138,10 +150,18 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
       segments = JSON.parse(raw);
     } catch {
       console.error("Failed to parse AI response:", raw);
+      if (userId) {
+        logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "error", latencyMs: aiLatency, tokensInput: usage?.prompt_tokens, tokensOutput: usage?.completion_tokens, errorMessage: "Unparseable AI response" });
+      }
       return new Response(
         JSON.stringify({ error: "AI returned an unstructured response. Please retry." }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Log successful AI call
+    if (userId) {
+      logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "success", latencyMs: aiLatency, tokensInput: usage?.prompt_tokens, tokensOutput: usage?.completion_tokens });
     }
 
     // ── Save to DB ───────────────────────────────────────
