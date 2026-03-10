@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { User, Key, Settings, HardDrive, Network } from 'lucide-react';
+import { User, Key, Settings, HardDrive, Network, Bot } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,6 +16,7 @@ import { PreferencesTab } from '@/components/profile/tabs/PreferencesTab';
 import { ApiKeysTab } from '@/components/profile/tabs/ApiKeysTab';
 import { ApiRoutersTab } from '@/components/profile/tabs/ApiRoutersTab';
 import { StorageTab } from '@/components/profile/tabs/StorageTab';
+import { AiRolesTab } from '@/components/profile/tabs/AiRolesTab';
 
 export default function Profile() {
   const { theme, setTheme } = useTheme();
@@ -141,6 +142,10 @@ export default function Profile() {
               <Network className="h-4 w-4 shrink-0" />
               <span>{isRu ? 'API Роутеры' : 'API Routers'}</span>
             </TabsTrigger>
+            <TabsTrigger value="ai-roles" className="flex items-center gap-2 flex-1">
+              <Bot className="h-4 w-4 shrink-0" />
+              <span>{isRu ? 'AI Роли' : 'AI Roles'}</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="profile">
@@ -183,6 +188,10 @@ export default function Profile() {
               onLanguageChange={handleLangChange}
               onSave={handleSaveProfile}
             />
+          </TabsContent>
+
+          <TabsContent value="ai-roles">
+            <AiRolesTab apiKeys={apiKeys} isRu={isRu} />
           </TabsContent>
         </Tabs>
       </section>
