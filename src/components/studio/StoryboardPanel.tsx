@@ -31,6 +31,7 @@ interface Segment {
   speaker: string | null;
   phrases: Phrase[];
   inline_narrations?: InlineNarration[];
+  split_silence_ms?: number;
 }
 
 interface CharacterOption {
