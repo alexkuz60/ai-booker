@@ -1301,7 +1301,7 @@ export function StoryboardPanel({
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5">
           <span className="text-xs text-muted-foreground font-body">
             {segments.length} {isRu ? "фрагм." : "seg."} · {totalPhrases} {isRu ? "фраз" : "phrases"}
             {inlineNarrationSegIds.size > 0 && (
@@ -1314,30 +1314,6 @@ export function StoryboardPanel({
             {analyzing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
             {isRu ? "Переанализ" : "Re-analyze"}
           </Button>
-          {/* Silence duration selector */}
-          <div className="flex items-center gap-1 ml-2 border-l border-border pl-2">
-            <Timer className="h-3 w-3 text-muted-foreground" />
-            {[1, 2, 3].map((sec) => (
-              <button
-                key={sec}
-                onClick={() => onSilenceSecChange?.(sec)}
-                className={cn(
-                  "h-5 w-5 text-[10px] font-mono rounded transition-colors",
-                  (silenceSec ?? 2) === sec
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                )}
-                title={isRu ? `Тишина в начале: ${sec}с` : `Start silence: ${sec}s`}
-              >
-                {sec}
-              </button>
-            ))}
-            <span className="text-[10px] text-muted-foreground ml-0.5">
-              {isRu ? "сек" : "s"}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5">
           <Button
             variant="outline"
             size="sm"
@@ -1379,29 +1355,6 @@ export function StoryboardPanel({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1.5 text-xs"
-            disabled={recalcRunning || !sceneId || audioStatus.size === 0}
-            onClick={handleRecalcDurations}
-            title={isRu ? "Пересчитать длительности из MP3" : "Recalculate durations from MP3"}
-          >
-            {recalcRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Timer className="h-3 w-3" />}
-            {isRu ? "Пересчёт" : "Recalc"}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={runSynthesis}
-            disabled={synthesizing || analyzing || segments.length === 0}
-            className="gap-1.5 h-7 text-xs"
-          >
-            {synthesizing ? <AudioLines className="h-3 w-3 animate-pulse-glow text-primary" /> : <AudioLines className="h-3 w-3" />}
-            {synthesizing
-              ? (synthProgress || (isRu ? "Синтез…" : "Synth…"))
-              : (isRu ? "Синтез сцены" : "Synthesize")}
-          </Button>
           {dialogueCount > 0 && (
             <Button
               variant="ghost"
@@ -1415,6 +1368,53 @@ export function StoryboardPanel({
               {detecting ? (isRu ? "Поиск…" : "Detecting…") : (isRu ? "Вставки" : "Narrations")}
             </Button>
           )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          {/* Silence duration selector */}
+          <div className="flex items-center gap-1 border-r border-border pr-2 mr-0.5">
+            <Timer className="h-3 w-3 text-muted-foreground" />
+            {[1, 2, 3].map((sec) => (
+              <button
+                key={sec}
+                onClick={() => onSilenceSecChange?.(sec)}
+                className={cn(
+                  "h-5 w-5 text-[10px] font-mono rounded transition-colors",
+                  (silenceSec ?? 2) === sec
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                )}
+                title={isRu ? `Тишина в начале: ${sec}с` : `Start silence: ${sec}s`}
+              >
+                {sec}
+              </button>
+            ))}
+            <span className="text-[10px] text-muted-foreground ml-0.5">
+              {isRu ? "сек" : "s"}
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={runSynthesis}
+            disabled={synthesizing || analyzing || segments.length === 0}
+            className="gap-1.5 h-7 text-xs"
+          >
+            {synthesizing ? <AudioLines className="h-3 w-3 animate-pulse-glow text-primary" /> : <AudioLines className="h-3 w-3" />}
+            {synthesizing
+              ? (synthProgress || (isRu ? "Синтез…" : "Synth…"))
+              : (isRu ? "Синтез сцены" : "Synthesize")}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 text-xs"
+            disabled={recalcRunning || !sceneId || audioStatus.size === 0}
+            onClick={handleRecalcDurations}
+            title={isRu ? "Пересчитать длительности из MP3" : "Recalculate durations from MP3"}
+          >
+            {recalcRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Timer className="h-3 w-3" />}
+            {isRu ? "Пересчёт" : "Recalc"}
+          </Button>
         </div>
       </div>
       <ScrollArea className="flex-1 min-h-0">
