@@ -1504,6 +1504,13 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                       </div>
                     </div>
                   )}
+                  {!elCredits && elCreditsError && (
+                    <div className="rounded-md border border-border bg-muted/30 p-2.5">
+                      <p className="text-[10px] text-muted-foreground">
+                        ⚠️ {elCreditsError}
+                      </p>
+                    </div>
+                  )}
 
                   {/* Voice selector */}
                   <div className="space-y-2">

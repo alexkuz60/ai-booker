@@ -62,6 +62,13 @@ Deno.serve(async (req) => {
     if (!response.ok) {
       const errText = await response.text();
       console.error("ElevenLabs subscription error:", response.status, errText);
+      // Check for missing_permissions specifically
+      if (response.status === 401 && errText.includes("missing_permissions")) {
+        return new Response(
+          JSON.stringify({ error: "missing_permissions", message: "API key lacks user_read permission" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       return new Response(
         JSON.stringify({ error: `ElevenLabs API error: ${response.status}` }),
         { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
