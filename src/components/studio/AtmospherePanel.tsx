@@ -836,24 +836,29 @@ export function AtmospherePanel({ isRu, sceneId }: AtmospherePanelProps) {
 
   return (
     <Tabs defaultValue="auto" className="h-full flex flex-col">
-      <TabsList className="w-fit shrink-0 mx-4 mt-3">
-        <TabsTrigger value="auto" className="gap-1.5 text-xs">
-          <Zap className="h-3 w-3" />
-          {isRu ? "Авто" : "Auto"}
-        </TabsTrigger>
-        <TabsTrigger value="sfx" className="gap-1.5 text-xs">
-          <Volume2 className="h-3 w-3" />
-          {i.sfxTab}
-        </TabsTrigger>
-        <TabsTrigger value="atmosphere" className="gap-1.5 text-xs">
-          <Sparkles className="h-3 w-3" />
-          {i.ambienceTab}
-        </TabsTrigger>
-        <TabsTrigger value="music" className="gap-1.5 text-xs">
-          <Music className="h-3 w-3" />
-          {i.musicTab}
-        </TabsTrigger>
-      </TabsList>
+      <div className="shrink-0 mx-4 mt-3 flex items-center gap-3">
+        <TabsList className="w-fit">
+          <TabsTrigger value="auto" className="gap-1.5 text-xs">
+            <Zap className="h-3 w-3" />
+            {isRu ? "Авто" : "Auto"}
+          </TabsTrigger>
+          <TabsTrigger value="sfx" className="gap-1.5 text-xs">
+            <Volume2 className="h-3 w-3" />
+            {i.sfxTab}
+          </TabsTrigger>
+          <TabsTrigger value="atmosphere" className="gap-1.5 text-xs">
+            <Sparkles className="h-3 w-3" />
+            {i.ambienceTab}
+          </TabsTrigger>
+          <TabsTrigger value="music" className="gap-1.5 text-xs">
+            <Music className="h-3 w-3" />
+            {i.musicTab}
+          </TabsTrigger>
+        </TabsList>
+        <div className="flex-1 min-w-0">
+          <ElevenLabsCreditsWidget isRu={isRu} />
+        </div>
+      </div>
 
       <TabsContent value="auto" className="flex-1 px-4 pb-4 min-h-0">
         <AutoAtmospherePanel
