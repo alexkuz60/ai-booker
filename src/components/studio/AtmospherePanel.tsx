@@ -412,6 +412,34 @@ function GeneratorPanel({
         <Sparkles className="h-2.5 w-2.5" /> {i.hint}
       </p>
 
+      {/* Mini-player for active track */}
+      {playingId && (() => {
+        const active = filtered.find(h => h.id === playingId);
+        if (!active) return null;
+        const fmtTime = (s: number) => {
+          const m = Math.floor(s / 60);
+          const sec = Math.floor(s % 60);
+          return `${m}:${sec.toString().padStart(2, "0")}`;
+        };
+        return (
+          <div className="flex items-center gap-2 p-2 rounded-md border border-primary/30 bg-primary/5">
+            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => togglePlay(active)}>
+              <Pause className="h-3.5 w-3.5" />
+            </Button>
+            <Slider
+              value={[playerTime]}
+              max={playerDuration || 1}
+              step={0.1}
+              onValueChange={seekPlayer}
+              className="flex-1"
+            />
+            <span className="text-[10px] font-body text-muted-foreground w-16 text-right shrink-0">
+              {fmtTime(playerTime)} / {fmtTime(playerDuration)}
+            </span>
+          </div>
+        );
+      })()}
+
       {/* History */}
       <ScrollArea className="flex-1 min-h-0">
         {filtered.length === 0 ? (
