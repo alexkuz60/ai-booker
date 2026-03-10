@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     }
 
     // ── Params ──
-    const { scene_id, lang } = await req.json();
+    const { scene_id, lang, model: clientModel } = await req.json();
     const isRu = lang === "ru";
 
     if (!scene_id) {
@@ -113,7 +113,7 @@ Content excerpt: ${contentSummary || "(no content available)"}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: clientModel || "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },

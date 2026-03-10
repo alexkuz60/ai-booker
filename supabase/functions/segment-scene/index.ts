@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { scene_id, content, language } = await req.json();
+    const { scene_id, content, language, model: clientModel } = await req.json();
     if (!scene_id || !content) {
       return new Response(
         JSON.stringify({ error: "scene_id and content are required" }),
@@ -111,7 +111,7 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: clientModel || "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAiRoles } from "@/hooks/useAiRoles";
 import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, AudioLines, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -367,6 +368,7 @@ export function StoryboardPanel({
   onSilenceSecChange?: (sec: number) => void;
   onRecalcDone?: () => void;
 }) {
+  const { getModelForRole } = useAiRoles();
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -891,7 +893,7 @@ export function StoryboardPanel({
     setAnalyzing(true);
     try {
       const { data, error } = await supabase.functions.invoke("segment-scene", {
-        body: { scene_id: sceneId, content: sceneContent, language: isRu ? "ru" : "en" },
+        body: { scene_id: sceneId, content: sceneContent, language: isRu ? "ru" : "en", model: getModelForRole("screenwriter") },
       });
       if (error) throw error;
       setSegments(data.segments || []);

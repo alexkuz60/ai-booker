@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAiRoles } from "@/hooks/useAiRoles";
 import {
   generateSound,
   saveToStorage,
@@ -591,6 +592,7 @@ function AutoAtmospherePanel({
   sceneId: string | null;
   onGenerated: (items: HistoryItem[]) => void;
 }) {
+  const { getModelForRole } = useAiRoles();
   const i = t(isRu);
   const [promptLoading, setPromptLoading] = useState(false);
   const [synthLoading, setSynthLoading] = useState(false);
@@ -638,7 +640,7 @@ function AutoAtmospherePanel({
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ scene_id: sceneId, lang: isRu ? "ru" : "en" }),
+          body: JSON.stringify({ scene_id: sceneId, lang: isRu ? "ru" : "en", model: getModelForRole("sound_engineer") }),
         }
       );
 
