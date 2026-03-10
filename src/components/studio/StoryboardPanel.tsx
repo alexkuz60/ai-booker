@@ -1310,6 +1310,10 @@ export function StoryboardPanel({
               </span>
             )}
           </span>
+          <Button variant="ghost" size="sm" onClick={runAnalysis} disabled={analyzing || !sceneContent} className="gap-1.5 h-7 text-xs">
+            {analyzing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            {isRu ? "Переанализ" : "Re-analyze"}
+          </Button>
           {/* Silence duration selector */}
           <div className="flex items-center gap-1 ml-2 border-l border-border pl-2">
             <Timer className="h-3 w-3 text-muted-foreground" />
@@ -1411,10 +1415,6 @@ export function StoryboardPanel({
               {detecting ? (isRu ? "Поиск…" : "Detecting…") : (isRu ? "Вставки" : "Narrations")}
             </Button>
           )}
-          <Button variant="ghost" size="sm" onClick={runAnalysis} disabled={analyzing || !sceneContent} className="gap-1.5 h-7 text-xs">
-            {analyzing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-            {isRu ? "Переанализ" : "Re-analyze"}
-          </Button>
         </div>
       </div>
       <ScrollArea className="flex-1 min-h-0">
