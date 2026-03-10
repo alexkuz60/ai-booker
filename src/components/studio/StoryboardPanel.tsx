@@ -1470,6 +1470,28 @@ export function StoryboardPanel({
                         : <AudioLines className="h-3 w-3" />}
                   </button>
                   <div className="ml-auto flex items-center gap-1.5">
+                    {/* Split silence selector — only for segments with split_silence_ms */}
+                    {seg.split_silence_ms !== undefined && (
+                      <div className="flex items-center gap-0.5 border-r border-border pr-1.5 mr-0.5" onClick={(e) => e.stopPropagation()}>
+                        <Timer className="h-3 w-3 text-muted-foreground" />
+                        {[0, 500, 1000, 1500, 2000].map((ms) => (
+                          <button
+                            key={ms}
+                            onClick={() => handleSplitSilenceChange(seg.segment_id, ms)}
+                            className={cn(
+                              "h-4 min-w-[20px] text-[9px] font-mono rounded transition-colors",
+                              (seg.split_silence_ms ?? 0) === ms
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                            )}
+                            title={`${ms}ms`}
+                          >
+                            {ms === 0 ? "0" : (ms / 1000).toFixed(1)}
+                          </button>
+                        ))}
+                        <span className="text-[9px] text-muted-foreground">{isRu ? "с" : "s"}</span>
+                      </div>
+                    )}
                     <span className="text-[10px] text-muted-foreground font-mono">
                       #{seg.segment_number}
                     </span>
