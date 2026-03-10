@@ -46,6 +46,42 @@ Deno.serve(async (req) => {
       );
     }
 
+    // ── Translate non-Latin queries ──
+    const hasCyrillic = /[а-яёА-ЯЁ]/.test(query);
+    let searchQuery = query.trim();
+    if (hasCyrillic) {
+      try {
+        const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+        if (lovableKey) {
+          const tlRes = await fetch("https://api.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${lovableKey}` },
+            body: JSON.stringify({
+              model: "google/gemini-2.5-flash-lite",
+              messages: [
+                { role: "system", content: "Translate the user's search query to English for Freesound.org sound search. Return ONLY the translated query, nothing else. Keep it short and natural." },
+                { role: "user", content: query }
+              ],
+              max_tokens: 60,
+              temperature: 0,
+            }),
+          });
+          if (tlRes.ok) {
+            const tlData = await tlRes.json();
+            const translated = tlData.choices?.[0]?.message?.content?.trim();
+            if (translated) {
+              console.log("[freesound-search] Translated:", query, "→", translated);
+              searchQuery = translated;
+            }
+          } else {
+            await tlRes.text(); // consume body
+          }
+        }
+      } catch (e) {
+        console.warn("[freesound-search] Translation failed, using original:", e);
+      }
+    }
+
     const apiKey = Deno.env.get("FREESOUND_API_KEY");
     console.log("[freesound-search] API key present:", !!apiKey, "length:", apiKey?.length, "starts:", apiKey?.slice(0, 4));
     if (!apiKey) {
