@@ -175,7 +175,13 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
         }
       }
 
-      if (profiles && profiles.length > 0) break;
+      if (profiles && profiles.length > 0) {
+        // Log successful AI call
+        if (userId) {
+          logAiUsage({ userId, modelId: usedModel, requestType: "profile-characters", status: "success", latencyMs: Date.now() - aiStart, tokensInput: usage?.prompt_tokens, tokensOutput: usage?.completion_tokens });
+        }
+        break;
+      }
 
       // Log raw response for debugging
       const reasoningLen = String((msg as Record<string, unknown>)?.reasoning || "").length;
