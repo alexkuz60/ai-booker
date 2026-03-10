@@ -2,6 +2,9 @@ import { useState, useRef, useCallback } from "react";
 import {
   Wand2, Loader2, Play, Pause, Save, Music, Volume2, Sparkles,
   Clock, Sliders, Zap, Trash2, Pencil, ArrowRight, RotateCcw,
+  Waves, TreePine, CloudRain, Wind, Building2, Flame, Footprints,
+  DoorOpen, Bomb, Bird, Guitar, Drum, Piano,
+  Timer, Repeat, ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +13,8 @@ import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -46,7 +51,56 @@ const t = (isRu: boolean) => ({
   autoHint: isRu
     ? "AI проанализирует настроение сцены и сгенерирует фоновые звуки"
     : "AI will analyze scene mood and generate background sounds",
+  presets: isRu ? "Быстрые промпты" : "Quick prompts",
+  loop: isRu ? "Зацикливание" : "Loop",
+  genre: isRu ? "Жанр/Стиль" : "Genre/Style",
+  mood: isRu ? "Настроение" : "Mood",
 });
+
+// ─── Presets per category ──────────────────────────────────
+
+interface Preset {
+  label: string;
+  prompt: string;
+  icon?: React.ReactNode;
+  duration?: number;
+}
+
+const SFX_PRESETS: (isRu: boolean) => Preset[] = (isRu) => [
+  { label: isRu ? "Дверь" : "Door", prompt: "wooden door creaking open slowly", icon: <DoorOpen className="h-3 w-3" />, duration: 3 },
+  { label: isRu ? "Шаги" : "Footsteps", prompt: "footsteps walking on gravel path", icon: <Footprints className="h-3 w-3" />, duration: 5 },
+  { label: isRu ? "Взрыв" : "Explosion", prompt: "distant explosion with debris falling", icon: <Bomb className="h-3 w-3" />, duration: 4 },
+  { label: isRu ? "Огонь" : "Fire", prompt: "crackling fireplace with popping embers", icon: <Flame className="h-3 w-3" />, duration: 8 },
+  { label: isRu ? "Птицы" : "Birds", prompt: "birds chirping in a quiet forest morning", icon: <Bird className="h-3 w-3" />, duration: 6 },
+  { label: isRu ? "Волны" : "Waves", prompt: "ocean waves crashing on a rocky shore", icon: <Waves className="h-3 w-3" />, duration: 10 },
+];
+
+const AMBIENCE_PRESETS: (isRu: boolean) => Preset[] = (isRu) => [
+  { label: isRu ? "Дождь" : "Rain", prompt: "steady rain falling on rooftop with distant thunder", icon: <CloudRain className="h-3 w-3" />, duration: 15 },
+  { label: isRu ? "Лес" : "Forest", prompt: "peaceful forest ambience with birds and rustling leaves", icon: <TreePine className="h-3 w-3" />, duration: 15 },
+  { label: isRu ? "Город" : "City", prompt: "busy city street ambience with traffic and distant voices", icon: <Building2 className="h-3 w-3" />, duration: 15 },
+  { label: isRu ? "Ветер" : "Wind", prompt: "howling wind through abandoned building", icon: <Wind className="h-3 w-3" />, duration: 12 },
+  { label: isRu ? "Ночь" : "Night", prompt: "quiet night ambience with crickets and occasional owl", icon: <Sparkles className="h-3 w-3" />, duration: 15 },
+  { label: isRu ? "Таверна" : "Tavern", prompt: "medieval tavern ambience with chatter, mugs clinking, fireplace", icon: <Flame className="h-3 w-3" />, duration: 18 },
+];
+
+const MUSIC_GENRES: (isRu: boolean) => Preset[] = (isRu) => [
+  { label: isRu ? "Пианино" : "Piano", prompt: "soft ambient piano melody, contemplative mood", icon: <Piano className="h-3 w-3" />, duration: 30 },
+  { label: isRu ? "Оркестр" : "Orchestral", prompt: "cinematic orchestral score, epic and dramatic", icon: <Music className="h-3 w-3" />, duration: 45 },
+  { label: isRu ? "Гитара" : "Guitar", prompt: "gentle acoustic guitar fingerpicking, warm tone", icon: <Guitar className="h-3 w-3" />, duration: 30 },
+  { label: isRu ? "Электроника" : "Electronic", prompt: "ambient electronic pads, atmospheric and spacious", icon: <Waves className="h-3 w-3" />, duration: 40 },
+  { label: isRu ? "Ударные" : "Percussion", prompt: "tribal percussion rhythm, deep and primal", icon: <Drum className="h-3 w-3" />, duration: 20 },
+  { label: isRu ? "Хоррор" : "Horror", prompt: "dark dissonant strings, unsettling horror atmosphere", icon: <Sparkles className="h-3 w-3" />, duration: 30 },
+];
+
+const MUSIC_MOODS: (isRu: boolean) => { label: string; suffix: string }[] = (isRu) => [
+  { label: isRu ? "Спокойный" : "Calm", suffix: ", calm and peaceful" },
+  { label: isRu ? "Тревожный" : "Tense", suffix: ", tense and suspenseful" },
+  { label: isRu ? "Грустный" : "Sad", suffix: ", melancholic and sorrowful" },
+  { label: isRu ? "Героический" : "Heroic", suffix: ", heroic and triumphant" },
+  { label: isRu ? "Таинственный" : "Mysterious", suffix: ", mysterious and eerie" },
+  { label: isRu ? "Романтичный" : "Romantic", suffix: ", romantic and tender" },
+];
 
 // ─── History item ──────────────────────────────────────────
 
@@ -56,7 +110,7 @@ interface HistoryItem {
   category: SoundCategory;
   sound: GeneratedSound;
   savedPath?: string;
-  sceneAtmosphereId?: string; // if saved to scene_atmospheres
+  sceneAtmosphereId?: string;
 }
 
 // ─── Auto-atmosphere layer from AI ─────────────────────────
@@ -68,6 +122,90 @@ interface AtmosphereLayer {
   volume: number;
   fade_in_ms: number;
   fade_out_ms: number;
+}
+
+// ─── Preset Chips ──────────────────────────────────────────
+
+function PresetChips({
+  presets,
+  onSelect,
+  isRu,
+}: {
+  presets: Preset[];
+  onSelect: (preset: Preset) => void;
+  isRu: boolean;
+}) {
+  const i = t(isRu);
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? presets : presets.slice(0, 4);
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+        <Zap className="h-2.5 w-2.5" />
+        <span>{i.presets}</span>
+        {presets.length > 4 && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="ml-auto text-primary/70 hover:text-primary flex items-center gap-0.5"
+          >
+            <ChevronDown className={`h-2.5 w-2.5 transition-transform ${expanded ? "rotate-180" : ""}`} />
+          </button>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {visible.map((p, idx) => (
+          <button
+            key={idx}
+            onClick={() => onSelect(p)}
+            className="inline-flex items-center gap-1 px-2 py-1 text-[10px] rounded-md border border-border/50 bg-card/40 hover:bg-accent/30 hover:border-primary/30 transition-colors text-foreground/80"
+          >
+            {p.icon}
+            {p.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Mood Chips (Music tab) ────────────────────────────────
+
+function MoodChips({
+  moods,
+  activeMood,
+  onSelect,
+  isRu,
+}: {
+  moods: { label: string; suffix: string }[];
+  activeMood: string;
+  onSelect: (mood: { label: string; suffix: string }) => void;
+  isRu: boolean;
+}) {
+  const i = t(isRu);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+        <Sparkles className="h-2.5 w-2.5" />
+        <span>{i.mood}</span>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {moods.map((m, idx) => (
+          <button
+            key={idx}
+            onClick={() => onSelect(m)}
+            className={`px-2 py-0.5 text-[10px] rounded-full border transition-colors ${
+              activeMood === m.suffix
+                ? "border-primary bg-primary/15 text-primary"
+                : "border-border/50 bg-card/30 text-foreground/70 hover:bg-accent/30"
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // ─── Sub-tab panel ─────────────────────────────────────────
@@ -85,21 +223,41 @@ function GeneratorPanel({
 }) {
   const i = t(isRu);
   const [prompt, setPrompt] = useState("");
-  const [durationSec, setDurationSec] = useState(category === "music" ? 30 : 5);
+  const [durationSec, setDurationSec] = useState(category === "music" ? 30 : category === "atmosphere" ? 15 : 5);
   const [influence, setInfluence] = useState(0.3);
   const [loading, setLoading] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [moodSuffix, setMoodSuffix] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const maxDuration = category === "music" ? 120 : 22;
+
+  const presets =
+    category === "sfx"
+      ? SFX_PRESETS(isRu)
+      : category === "atmosphere"
+        ? AMBIENCE_PRESETS(isRu)
+        : MUSIC_GENRES(isRu);
+
+  const moods = category === "music" ? MUSIC_MOODS(isRu) : [];
+
+  const handlePresetSelect = useCallback((preset: Preset) => {
+    setPrompt(preset.prompt);
+    if (preset.duration) setDurationSec(preset.duration);
+  }, []);
+
+  const handleMoodSelect = useCallback((mood: { label: string; suffix: string }) => {
+    setMoodSuffix(prev => prev === mood.suffix ? "" : mood.suffix);
+  }, []);
 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) return;
     setLoading(true);
     try {
+      const finalPrompt = prompt.trim() + moodSuffix;
       const sound = await generateSound({
-        prompt: prompt.trim(),
+        prompt: finalPrompt,
         category,
         durationSec,
         promptInfluence: category !== "music" ? influence : undefined,
@@ -107,7 +265,7 @@ function GeneratorPanel({
       });
       const item: HistoryItem = {
         id: crypto.randomUUID(),
-        prompt: prompt.trim(),
+        prompt: finalPrompt,
         category,
         sound,
       };
@@ -118,7 +276,7 @@ function GeneratorPanel({
     } finally {
       setLoading(false);
     }
-  }, [prompt, category, durationSec, influence, isRu, onGenerated]);
+  }, [prompt, moodSuffix, category, durationSec, influence, isRu, onGenerated]);
 
   const togglePlay = useCallback(
     (item: HistoryItem) => {
@@ -161,7 +319,15 @@ function GeneratorPanel({
   const filtered = history.filter((h) => h.category === category);
 
   return (
-    <div className="flex flex-col gap-4 h-full">
+    <div className="flex flex-col gap-3 h-full">
+      {/* Presets */}
+      <PresetChips presets={presets} onSelect={handlePresetSelect} isRu={isRu} />
+
+      {/* Music mood chips */}
+      {category === "music" && moods.length > 0 && (
+        <MoodChips moods={moods} activeMood={moodSuffix} onSelect={handleMoodSelect} isRu={isRu} />
+      )}
+
       {/* Prompt input */}
       <div className="flex gap-2">
         <Input
@@ -182,50 +348,59 @@ function GeneratorPanel({
         </Button>
       </div>
 
-      {/* Controls */}
-      <div className="flex items-center gap-6 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2 flex-1">
-          <Clock className="h-3.5 w-3.5 shrink-0" />
-          <span className="shrink-0">{i.duration}:</span>
+      {/* Controls row */}
+      <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+        {/* Duration */}
+        <div className="flex items-center gap-2 min-w-[180px]">
+          <Timer className="h-3.5 w-3.5 shrink-0" />
+          <span className="shrink-0 text-[10px]">{i.duration}:</span>
           <Slider
             value={[durationSec]}
             onValueChange={([v]) => setDurationSec(v)}
             min={1}
             max={maxDuration}
             step={1}
-            className="flex-1 max-w-[160px]"
+            className="flex-1 max-w-[120px]"
           />
-          <span className="w-12 text-right font-body">{durationSec} {i.sec}</span>
+          <span className="w-12 text-right font-body text-[10px]">{durationSec} {i.sec}</span>
         </div>
+        {/* Prompt influence (SFX + Atmosphere only) */}
         {category !== "music" && (
-          <div className="flex items-center gap-2 flex-1">
+          <div className="flex items-center gap-2 min-w-[180px]">
             <Sliders className="h-3.5 w-3.5 shrink-0" />
-            <span className="shrink-0">{i.influence}:</span>
+            <span className="shrink-0 text-[10px]">{i.influence}:</span>
             <Slider
               value={[influence]}
               onValueChange={([v]) => setInfluence(v)}
               min={0}
               max={1}
               step={0.05}
-              className="flex-1 max-w-[160px]"
+              className="flex-1 max-w-[120px]"
             />
-            <span className="w-10 text-right font-body">{Math.round(influence * 100)}%</span>
+            <span className="w-10 text-right font-body text-[10px]">{Math.round(influence * 100)}%</span>
           </div>
+        )}
+        {/* Mood badge for music */}
+        {category === "music" && moodSuffix && (
+          <Badge variant="secondary" className="text-[9px] gap-1">
+            <Sparkles className="h-2.5 w-2.5" />
+            {MUSIC_MOODS(isRu).find(m => m.suffix === moodSuffix)?.label}
+          </Badge>
         )}
       </div>
 
-      <p className="text-[11px] text-muted-foreground/60 font-body flex items-center gap-1">
-        <Sparkles className="h-3 w-3" /> {i.hint}
+      <p className="text-[10px] text-muted-foreground/50 font-body flex items-center gap-1">
+        <Sparkles className="h-2.5 w-2.5" /> {i.hint}
       </p>
 
       {/* History */}
       <ScrollArea className="flex-1 min-h-0">
         {filtered.length === 0 ? (
-          <div className="flex items-center justify-center h-24 text-sm text-muted-foreground font-body">
+          <div className="flex items-center justify-center h-20 text-xs text-muted-foreground font-body">
             {i.noResults}
           </div>
         ) : (
-          <div className="flex flex-col gap-2 pr-2">
+          <div className="flex flex-col gap-1.5 pr-2">
             {filtered.map((item) => (
               <div
                 key={item.id}
@@ -234,26 +409,26 @@ function GeneratorPanel({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 shrink-0"
+                  className="h-7 w-7 shrink-0"
                   onClick={() => togglePlay(item)}
                 >
                   {playingId === item.id ? (
-                    <Pause className="h-3.5 w-3.5" />
+                    <Pause className="h-3 w-3" />
                   ) : (
-                    <Play className="h-3.5 w-3.5" />
+                    <Play className="h-3 w-3" />
                   )}
                 </Button>
-                <span className="text-xs font-body truncate flex-1">{item.prompt}</span>
-                <Badge variant="outline" className="text-[10px] shrink-0">
+                <span className="text-[10px] font-body truncate flex-1">{item.prompt}</span>
+                <Badge variant="outline" className="text-[9px] shrink-0">
                   {item.sound.provider}
                 </Badge>
                 {item.savedPath ? (
-                  <Badge variant="secondary" className="text-[10px] shrink-0">{i.saved}</Badge>
+                  <Badge variant="secondary" className="text-[9px] shrink-0">{i.saved}</Badge>
                 ) : (
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 shrink-0"
+                    className="h-6 w-6 shrink-0"
                     onClick={() => handleSave(item)}
                     disabled={savingId === item.id}
                   >
@@ -343,6 +518,11 @@ function EditableLayerCard({
           />
           <span className="w-8 text-right">{Math.round(layer.volume * 100)}%</span>
         </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[9px]">Fade:</span>
+          <span className="text-[9px]">{layer.fade_in_ms}ms↗</span>
+          <span className="text-[9px]">{layer.fade_out_ms}ms↘</span>
+        </div>
       </div>
     </div>
   );
@@ -373,7 +553,6 @@ function AutoAtmospherePanel({
   }>>([]);
   const [loadingExisting, setLoadingExisting] = useState(false);
 
-  // Load existing atmosphere layers for this scene
   const loadExisting = useCallback(async () => {
     if (!sceneId) { setExistingLayers([]); return; }
     setLoadingExisting(true);
@@ -386,10 +565,8 @@ function AutoAtmospherePanel({
     setLoadingExisting(false);
   }, [sceneId]);
 
-  // Load on mount and sceneId change
   useState(() => { loadExisting(); });
 
-  // Step 1: Generate AI prompts only (no audio yet)
   const handleGeneratePrompts = useCallback(async () => {
     if (!sceneId) return;
     setPromptLoading(true);
@@ -433,17 +610,14 @@ function AutoAtmospherePanel({
     }
   }, [sceneId, isRu]);
 
-  // Edit a pending layer
   const handleEditLayer = useCallback((idx: number, updated: AtmosphereLayer) => {
     setPendingLayers(prev => prev ? prev.map((l, i) => i === idx ? updated : l) : prev);
   }, []);
 
-  // Remove a pending layer
   const handleRemovePending = useCallback((idx: number) => {
     setPendingLayers(prev => prev ? prev.filter((_, i) => i !== idx) : prev);
   }, []);
 
-  // Step 2: Generate audio from (edited) prompts
   const handleSynthesizeAll = useCallback(async () => {
     if (!sceneId || !pendingLayers?.length) return;
     setSynthLoading(true);
@@ -532,7 +706,6 @@ function AutoAtmospherePanel({
 
   return (
     <div className="flex flex-col gap-3 h-full">
-      {/* Top actions */}
       <div className="flex items-center gap-2 flex-wrap">
         <Button
           onClick={handleGeneratePrompts}
@@ -565,16 +738,15 @@ function AutoAtmospherePanel({
       </div>
 
       {!pendingLayers && (
-        <p className="text-[11px] text-muted-foreground/60 font-body flex items-center gap-1">
-          <Sparkles className="h-3 w-3" /> {i.autoHint}
+        <p className="text-[10px] text-muted-foreground/50 font-body flex items-center gap-1">
+          <Sparkles className="h-2.5 w-2.5" /> {i.autoHint}
         </p>
       )}
 
       <ScrollArea className="flex-1 min-h-0">
-        {/* Pending layers (editable) */}
         {pendingLayers && pendingLayers.length > 0 && (
           <div className="flex flex-col gap-2 pr-2 mb-4">
-            <p className="text-[11px] font-body text-muted-foreground flex items-center gap-1.5">
+            <p className="text-[10px] font-body text-muted-foreground flex items-center gap-1.5">
               <Pencil className="h-3 w-3" />
               {isRu ? "Отредактируйте промпты и нажмите «Синтез»" : "Edit prompts and click \"Synthesize\""}
             </p>
@@ -591,14 +763,13 @@ function AutoAtmospherePanel({
           </div>
         )}
 
-        {/* Existing saved layers */}
         {loadingExisting ? (
           <div className="flex items-center justify-center h-16">
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
         ) : existingLayers.length > 0 && (
           <div className="flex flex-col gap-2 pr-2">
-            <p className="text-[11px] font-body text-muted-foreground">
+            <p className="text-[10px] font-body text-muted-foreground">
               {isRu ? "Сохранённые слои" : "Saved layers"}
             </p>
             {existingLayers.map((layer) => (
@@ -606,14 +777,14 @@ function AutoAtmospherePanel({
                 key={layer.id}
                 className="flex items-center gap-2 p-2 rounded-md border border-border/50 bg-card/30"
               >
-                <Badge variant="outline" className="text-[10px] shrink-0">
+                <Badge variant="outline" className="text-[9px] shrink-0">
                   {LAYER_LABELS[layer.layer_type] || layer.layer_type}
                 </Badge>
-                <span className="text-xs font-body truncate flex-1">{layer.prompt_used}</span>
-                <span className="text-[10px] text-muted-foreground shrink-0">
+                <span className="text-[10px] font-body truncate flex-1">{layer.prompt_used}</span>
+                <span className="text-[9px] text-muted-foreground shrink-0">
                   {Math.round(layer.duration_ms / 1000)}s
                 </span>
-                <span className="text-[10px] text-muted-foreground shrink-0">
+                <span className="text-[9px] text-muted-foreground shrink-0">
                   vol:{Math.round(layer.volume * 100)}%
                 </span>
                 <Button
@@ -630,7 +801,7 @@ function AutoAtmospherePanel({
         )}
 
         {!pendingLayers && !loadingExisting && existingLayers.length === 0 && (
-          <div className="flex items-center justify-center h-24 text-sm text-muted-foreground font-body">
+          <div className="flex items-center justify-center h-20 text-xs text-muted-foreground font-body">
             {isRu ? "Нет атмосферных слоёв для этой сцены" : "No atmosphere layers for this scene"}
           </div>
         )}
