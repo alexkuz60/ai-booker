@@ -23,6 +23,7 @@ import {
   type SoundCategory,
   type GeneratedSound,
 } from "@/lib/soundProvider";
+import { ElevenLabsCreditsWidget } from "./ElevenLabsCreditsWidget";
 
 // ─── i18n ──────────────────────────────────────────────────
 
