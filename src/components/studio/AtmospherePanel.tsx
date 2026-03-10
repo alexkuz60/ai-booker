@@ -930,6 +930,10 @@ export function AtmospherePanel({ isRu, sceneId }: AtmospherePanelProps) {
             <Music className="h-3 w-3" />
             {i.musicTab}
           </TabsTrigger>
+          <TabsTrigger value="freesound" className="gap-1.5 text-xs">
+            <Search className="h-3 w-3" />
+            Freesound
+          </TabsTrigger>
         </TabsList>
 
         <div className="flex items-center gap-2 ml-auto">
