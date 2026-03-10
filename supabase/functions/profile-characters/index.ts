@@ -195,7 +195,12 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
     }
   }
 
-  if (!profiles || profiles.length === 0) throw new Error(lastError || "AI returned empty response");
+  if (!profiles || profiles.length === 0) {
+    if (userId) {
+      logAiUsage({ userId, modelId: usedModel, requestType: "profile-characters", status: "error", latencyMs: Date.now() - aiStart, errorMessage: lastError || "Empty response" });
+    }
+    throw new Error(lastError || "AI returned empty response");
+  }
   return profiles;
 }
 
