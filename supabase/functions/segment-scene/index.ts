@@ -117,12 +117,16 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
       },
       body: JSON.stringify({
-        model: clientModel || "google/gemini-2.5-flash",
+        model: usedModel,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
         temperature: 0.1,
+      }),
+    });
+
+    const aiLatency = Date.now() - aiStart;
       }),
     });
 
