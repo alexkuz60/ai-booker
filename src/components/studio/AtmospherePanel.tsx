@@ -288,15 +288,29 @@ function GeneratorPanel({
         setPlayingId(null);
         return;
       }
-      if (audioRef.current) audioRef.current.pause();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.onended = null;
+        audioRef.current.ontimeupdate = null;
+      }
       const audio = new Audio(item.sound.url);
-      audio.onended = () => setPlayingId(null);
+      audio.onended = () => { setPlayingId(null); setPlayerTime(0); };
+      audio.ontimeupdate = () => setPlayerTime(audio.currentTime);
+      audio.onloadedmetadata = () => setPlayerDuration(audio.duration);
       audio.play();
       audioRef.current = audio;
       setPlayingId(item.id);
+      setPlayerTime(0);
     },
     [playingId]
   );
+
+  const seekPlayer = useCallback((val: number[]) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = val[0];
+      setPlayerTime(val[0]);
+    }
+  }, []);
 
   const handleSave = useCallback(
     async (item: HistoryItem) => {
