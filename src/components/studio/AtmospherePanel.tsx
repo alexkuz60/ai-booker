@@ -4,7 +4,7 @@ import {
   Clock, Sliders, Zap, Trash2, Pencil, ArrowRight, RotateCcw,
   Waves, TreePine, CloudRain, Wind, Building2, Flame, Footprints,
   DoorOpen, Bomb, Bird, Guitar, Drum, Piano,
-  Timer, Repeat, ChevronDown,
+  Timer, Repeat, ChevronDown, Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
