@@ -24,6 +24,7 @@ import {
   type GeneratedSound,
 } from "@/lib/soundProvider";
 import { ElevenLabsCreditsWidget } from "./ElevenLabsCreditsWidget";
+import { FreesoundPanel } from "./FreesoundPanel";
 
 // ─── i18n ──────────────────────────────────────────────────
 
