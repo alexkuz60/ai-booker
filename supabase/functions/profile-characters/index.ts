@@ -133,6 +133,7 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       }
 
       const aiData = await aiRes.json();
+      const usage = aiData.usage;
       const msg = aiData.choices?.[0]?.message;
       const toolCall = msg?.tool_calls?.[0];
 
