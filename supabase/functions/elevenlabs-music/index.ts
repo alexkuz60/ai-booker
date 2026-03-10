@@ -51,8 +51,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
-    if (!ELEVENLABS_API_KEY) {
+    // ── Resolve API key: user's personal key first, then server key ──
+    let apiKey: string | undefined;
+    try {
+      const { data: apiKeys, error: rpcErr } = await supabase.rpc("get_my_api_keys");
+      if (!rpcErr) {
+        const key = (apiKeys as Record<string, string> | null)?.elevenlabs?.trim();
+        if (key) apiKey = key;
+      }
+    } catch {}
+    if (!apiKey) {
+      apiKey = Deno.env.get("ELEVENLABS_API_KEY");
+    }
+
+    if (!apiKey) {
       return new Response(
         JSON.stringify({ error: isRu ? "API-ключ ElevenLabs не настроен." : "ElevenLabs API key not configured." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -66,7 +78,7 @@ Deno.serve(async (req) => {
     const response = await fetch("https://api.elevenlabs.io/v1/music", {
       method: "POST",
       headers: {
-        "xi-api-key": ELEVENLABS_API_KEY,
+        "xi-api-key": apiKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
