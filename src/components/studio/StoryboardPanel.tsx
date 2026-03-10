@@ -605,16 +605,48 @@ export function StoryboardPanel({
       for (const group of mergeGroups) {
         const [keeper, ...toMerge] = group;
         const mergeIds = toMerge.map(s => s.segment_id);
-        const keeperPhraseCount = keeper.phrases.length;
-        let offset = keeperPhraseCount;
+
+        // Collect all phrases in order: keeper's phrases + each merged segment's phrases
+        // If a merged segment's first phrase doesn't start a new sentence,
+        // concatenate it with the previous phrase's text
+        let allPhrases = [...keeper.phrases];
         for (const seg of toMerge) {
-          for (const ph of seg.phrases) {
-            offset++;
+          for (let pi = 0; pi < seg.phrases.length; pi++) {
+            const ph = seg.phrases[pi];
+            const startsNewSentence = /^[A-ZА-ЯЁ«"—–\-\[]/.test(ph.text.trimStart());
+            if (pi === 0 && !startsNewSentence && allPhrases.length > 0) {
+              // Merge text into previous phrase
+              const prev = allPhrases[allPhrases.length - 1];
+              const separator = prev.text.endsWith(" ") ? "" : " ";
+              allPhrases[allPhrases.length - 1] = {
+                ...prev,
+                text: prev.text + separator + ph.text,
+              };
+              // Delete this phrase from DB since it's been merged into previous
+              await supabase.from("segment_phrases").delete().eq("id", ph.phrase_id);
+            } else {
+              allPhrases.push(ph);
+            }
+          }
+        }
+
+        // Now reassign all phrases to keeper with correct numbering
+        for (let i = 0; i < allPhrases.length; i++) {
+          const ph = allPhrases[i];
+          const isFromKeeper = keeper.phrases.some(kp => kp.phrase_id === ph.phrase_id);
+          if (isFromKeeper) {
+            // Update text (may have been concatenated) and phrase_number
             await supabase.from("segment_phrases")
-              .update({ segment_id: keeper.segment_id, phrase_number: offset })
+              .update({ phrase_number: i + 1, text: ph.text })
+              .eq("id", ph.phrase_id);
+          } else {
+            // Move from merged segment to keeper
+            await supabase.from("segment_phrases")
+              .update({ segment_id: keeper.segment_id, phrase_number: i + 1 })
               .eq("id", ph.phrase_id);
           }
         }
+
         await supabase.from("segment_audio").delete().in("segment_id", mergeIds);
         await supabase.from("scene_segments").delete().in("id", mergeIds);
       }
