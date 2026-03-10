@@ -236,8 +236,8 @@ export function useTimelineClips(
           }
 
           // Check for split silence (e.g. 1s gap before second part of a split block)
-          const metadata = (seg.metadata ?? {}) as Record<string, unknown>;
-          const splitSilenceMs = typeof metadata.split_silence_ms === "number" ? metadata.split_silence_ms : 0;
+          const segMeta = (seg.metadata ?? {}) as Record<string, unknown>;
+          const splitSilenceMs = typeof segMeta.split_silence_ms === "number" ? segMeta.split_silence_ms : 0;
           if (splitSilenceMs > 0) {
             sceneOffset += splitSilenceMs / 1000;
           }
