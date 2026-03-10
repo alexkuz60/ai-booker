@@ -273,6 +273,8 @@ function GeneratorPanel({
         sound,
       };
       onGenerated(item);
+      // Auto-play the generated result
+      togglePlay(item);
       toast.success(isRu ? "Звук сгенерирован!" : "Sound generated!");
     } catch (e: any) {
       toast.error(e.message || (isRu ? "Ошибка генерации" : "Generation failed"));
