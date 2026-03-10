@@ -1272,9 +1272,17 @@ export function StoryboardPanel({
                         ? <RefreshCw className="h-3 w-3" />
                         : <AudioLines className="h-3 w-3" />}
                   </button>
-                  <span className="ml-auto text-[10px] text-muted-foreground font-mono">
-                    #{seg.segment_number}
-                  </span>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <span className="text-[10px] text-muted-foreground font-mono">
+                      #{seg.segment_number}
+                    </span>
+                    <Checkbox
+                      checked={mergeChecked.has(seg.segment_id)}
+                      onCheckedChange={() => toggleMergeCheck(seg.segment_id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-3.5 w-3.5"
+                    />
+                  </div>
                 </div>
                 {/* Phrases */}
                 <div className="divide-y divide-border/30">
