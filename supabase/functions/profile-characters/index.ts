@@ -225,6 +225,11 @@ Deno.serve(async (req) => {
     }
 
     const lang: "ru" | "en" = language === "ru" ? "ru" : "en";
+    // Extract user ID for logging
+    const token = authHeader.replace("Bearer ", "");
+    const tempClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
+    const { data: authData } = await tempClient.auth.getUser(token);
+    const userId = authData?.user?.id;
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
