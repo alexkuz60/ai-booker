@@ -61,6 +61,7 @@ Deno.serve(async (req) => {
       page_size: String(Math.min(page_size, 30)),
       fields: "id,name,tags,description,duration,previews,images,avg_rating,num_ratings,username,license",
       token: apiKey,
+      format: "json",
     });
 
     if (filter) params.set("filter", filter);
