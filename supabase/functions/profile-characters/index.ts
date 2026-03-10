@@ -202,7 +202,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { book_id, language, scene_ids } = await req.json();
+    const { book_id, language, scene_ids, model: clientModel } = await req.json();
     if (!book_id) {
       return new Response(JSON.stringify({ error: "book_id is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
