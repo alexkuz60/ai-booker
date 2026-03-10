@@ -367,8 +367,9 @@ export function StoryboardPanel({
   /** Current speaker assigned to inline narrations (from scene_type_mappings with segment_type="inline_narration") */
   const [inlineNarrationSpeaker, setInlineNarrationSpeaker] = useState<string | null>(null);
   const [recalcRunning, setRecalcRunning] = useState(false);
-  const [mergeChecked, setMergeChecked] = useState<Set<string>>(new Set());
+   const [mergeChecked, setMergeChecked] = useState<Set<string>>(new Set());
   const [merging, setMerging] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Reset merge selection when scene changes
   useEffect(() => { setMergeChecked(new Set()); }, [sceneId]);
