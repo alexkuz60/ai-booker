@@ -77,10 +77,11 @@ function renderPhraseText(text: string) {
 
 // ─── Editable phrase ────────────────────────────────────────
 
-function EditablePhrase({ phrase, isRu, onSave }: {
+function EditablePhrase({ phrase, isRu, onSave, onSplit }: {
   phrase: Phrase;
   isRu: boolean;
   onSave: (id: string, text: string) => void;
+  onSplit: (phraseId: string, textBefore: string, textAfter: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(phrase.text);
@@ -117,7 +118,19 @@ function EditablePhrase({ phrase, isRu, onSave }: {
             e.target.style.height = e.target.scrollHeight + "px";
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); }
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              const pos = textareaRef.current?.selectionStart ?? draft.length;
+              const before = draft.slice(0, pos).trim();
+              const after = draft.slice(pos).trim();
+              if (before && after) {
+                // Split at cursor position
+                onSplit(phrase.phrase_id, before, after);
+                setEditing(false);
+              } else {
+                save();
+              }
+            }
             if (e.key === "Escape") { setDraft(phrase.text); setEditing(false); }
           }}
           className="flex-1 text-sm font-body text-foreground leading-relaxed bg-background border border-primary/30 rounded px-2 py-1 resize-none focus:outline-none focus:ring-1 focus:ring-primary"
@@ -719,6 +732,80 @@ export function StoryboardPanel({
     }
     setDeleting(false);
   }, [sceneId, mergeChecked, segments, isRu, loadSegments, onSegmented]);
+
+  // Split a segment into two at a given phrase, splitting the phrase text
+  const handleSplitAtPhrase = useCallback(async (phraseId: string, textBefore: string, textAfter: string) => {
+    if (!sceneId) return;
+    // Find segment containing this phrase
+    const seg = segments.find(s => s.phrases.some(p => p.phrase_id === phraseId));
+    if (!seg) return;
+    const phraseIdx = seg.phrases.findIndex(p => p.phrase_id === phraseId);
+    if (phraseIdx < 0) return;
+
+    try {
+      // Phrases staying in original segment: [0..phraseIdx] (split phrase gets textBefore)
+      // Phrases moving to new segment: split phrase gets textAfter + [phraseIdx+1..]
+      const keepPhrases = seg.phrases.slice(0, phraseIdx + 1);
+      const movePhrases = seg.phrases.slice(phraseIdx + 1);
+
+      // Update the split phrase to textBefore
+      await supabase.from("segment_phrases").update({ text: textBefore }).eq("id", phraseId);
+
+      // Shift all subsequent segments' numbers up by 1
+      const { data: allSegs } = await supabase
+        .from("scene_segments")
+        .select("id, segment_number")
+        .eq("scene_id", sceneId)
+        .gt("segment_number", seg.segment_number)
+        .order("segment_number", { ascending: false });
+      if (allSegs) {
+        for (const s of allSegs) {
+          await supabase.from("scene_segments").update({ segment_number: s.segment_number + 1 }).eq("id", s.id);
+        }
+      }
+
+      // Create the new segment
+      const { data: newSeg } = await supabase
+        .from("scene_segments")
+        .insert({
+          scene_id: sceneId,
+          segment_number: seg.segment_number + 1,
+          segment_type: seg.segment_type as any,
+          speaker: seg.speaker,
+        })
+        .select("id")
+        .single();
+
+      if (!newSeg) throw new Error("Failed to create new segment");
+
+      // Create new phrase for the textAfter part
+      await supabase.from("segment_phrases").insert({
+        segment_id: newSeg.id,
+        phrase_number: 1,
+        text: textAfter,
+      });
+
+      // Move remaining phrases to the new segment
+      for (let i = 0; i < movePhrases.length; i++) {
+        await supabase.from("segment_phrases")
+          .update({ segment_id: newSeg.id, phrase_number: i + 2 })
+          .eq("id", movePhrases[i].phrase_id);
+      }
+
+      // Delete audio for the original segment (text changed)
+      await supabase.from("segment_audio").delete().eq("segment_id", seg.segment_id);
+
+      // Invalidate playlist
+      await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
+
+      toast.success(isRu ? "Блок разделён" : "Segment split");
+      await loadSegments(sceneId);
+      onSegmented?.(sceneId);
+    } catch (err: any) {
+      console.error("Split failed:", err);
+      toast.error(isRu ? "Ошибка разделения" : "Split failed");
+    }
+  }, [sceneId, segments, isRu, loadSegments, onSegmented]);
 
 
   useEffect(() => {
@@ -1398,6 +1485,7 @@ export function StoryboardPanel({
                       phrase={ph}
                       isRu={isRu}
                       onSave={savePhrase}
+                      onSplit={handleSplitAtPhrase}
                     />
                   ))}
                 </div>
