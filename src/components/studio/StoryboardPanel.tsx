@@ -676,7 +676,50 @@ export function StoryboardPanel({
     }
     setMerging(false);
   }, [sceneId, mergeGroups, isRu, loadSegments, onSegmented]);
-  
+
+  // Delete selected segments
+  const handleDeleteSegments = useCallback(async () => {
+    if (!sceneId || mergeChecked.size === 0) return;
+    const toDelete = segments.filter(s => mergeChecked.has(s.segment_id));
+    if (toDelete.length === 0) return;
+    if (toDelete.length === segments.length) {
+      toast.error(isRu ? "Нельзя удалить все блоки сцены" : "Cannot delete all segments");
+      return;
+    }
+    setDeleting(true);
+    try {
+      const deleteIds = toDelete.map(s => s.segment_id);
+      // Delete phrases, audio, then segments
+      await supabase.from("segment_phrases").delete().in("segment_id", deleteIds);
+      await supabase.from("segment_audio").delete().in("segment_id", deleteIds);
+      await supabase.from("scene_segments").delete().in("id", deleteIds);
+      // Renumber remaining segments sequentially
+      const { data: remaining } = await supabase
+        .from("scene_segments")
+        .select("id, segment_number")
+        .eq("scene_id", sceneId)
+        .order("segment_number");
+      if (remaining) {
+        for (let i = 0; i < remaining.length; i++) {
+          if (remaining[i].segment_number !== i + 1) {
+            await supabase.from("scene_segments").update({ segment_number: i + 1 }).eq("id", remaining[i].id);
+          }
+        }
+      }
+      // Invalidate playlist to force timeline recalculation
+      await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
+      setMergeChecked(new Set());
+      toast.success(isRu ? `Удалено ${toDelete.length} блок(ов)` : `Deleted ${toDelete.length} segment(s)`);
+      await loadSegments(sceneId);
+      await syncSceneCharacters(segments.filter(s => !mergeChecked.has(s.segment_id)));
+      onSegmented?.(sceneId);
+    } catch (err: any) {
+      console.error("Delete segments failed:", err);
+      toast.error(isRu ? "Ошибка удаления" : "Delete failed");
+    }
+    setDeleting(false);
+  }, [sceneId, mergeChecked, segments, isRu, loadSegments, syncSceneCharacters, onSegmented]);
+
 
   useEffect(() => {
     setSegments([]);
