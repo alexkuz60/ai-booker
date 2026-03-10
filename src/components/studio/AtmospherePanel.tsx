@@ -592,6 +592,7 @@ function AutoAtmospherePanel({
   sceneId: string | null;
   onGenerated: (items: HistoryItem[]) => void;
 }) {
+  const { getModelForRole } = useAiRoles();
   const i = t(isRu);
   const [promptLoading, setPromptLoading] = useState(false);
   const [synthLoading, setSynthLoading] = useState(false);
