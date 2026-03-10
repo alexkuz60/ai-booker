@@ -54,12 +54,12 @@ function buildPrompt(
   return { systemPrompt, userPrompt: `## Characters to profile:\n\n${characterList}${narratorContext}` };
 }
 
-async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en"): Promise<CharacterProfile[]> {
+async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en", modelOverride?: string): Promise<CharacterProfile[]> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) throw new Error("AI key not configured");
 
   const aiBody = JSON.stringify({
-    model: "google/gemini-3-flash-preview",
+    model: modelOverride || "google/gemini-3-flash-preview",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
