@@ -91,13 +91,16 @@
 - [x] Пропагация типов блоков: narrator↔first_person автосмена всех блоков в сцене
 - [x] Автоочистка пустых треков после переназначения типов
 - [x] Atmosphere Engine: ручная генерация SFX/Music/Ambience (ElevenLabs)
-- [ ] Atmosphere Engine: AI Prompt Builder (auto-atmosphere по метаданным сцены)
-- [ ] Atmosphere Engine: таблица `scene_atmospheres` + интеграция с таймлайном
+- [x] Atmosphere Engine: AI Prompt Builder (auto-atmosphere по метаданным сцены)
+- [x] Atmosphere Engine: таблица `scene_atmospheres` + сохранение/удаление слоёв
+- [x] Freesound: поиск, прослушивание и сохранение SFX из Freesound.org
+- [x] Раскадровка: слияние и разбиение сегментов, настраиваемые паузы тишины
+- [x] AI Roles: централизованный реестр ролей (6 ролей), назначение моделей, UI в Профиле
 - [ ] Atmosphere Engine: batch-генерация атмосферы по главе
+- [ ] Atmosphere Engine: интеграция с таймлайном (клипы из scene_atmospheres на треках)
 - [ ] Интерактивный таймлайн (drag, snap)
 - [ ] RVC-интеграция
 - [ ] Экспорт финального аудио
-- [ ] Ролевое AI-управление (Режиссёр, Звукорежиссёр, Корректор)
 
 ---
 
