@@ -132,6 +132,7 @@ export const AI_ROLE_LIST: AiRoleDefinition[] = [
   AI_ROLES.translator,
   AI_ROLES.proofreader,
   AI_ROLES.screenwriter,
+  AI_ROLES.director,
   AI_ROLES.profiler,
   AI_ROLES.sound_engineer,
 ];
