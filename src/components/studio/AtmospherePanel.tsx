@@ -231,6 +231,8 @@ function GeneratorPanel({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [moodSuffix, setMoodSuffix] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playerTime, setPlayerTime] = useState(0);
+  const [playerDuration, setPlayerDuration] = useState(0);
 
   const maxDuration = category === "music" ? 120 : 22;
 
