@@ -210,6 +210,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
   // ElevenLabs credits
   const [elCredits, setElCredits] = useState<{ used: number; limit: number; tier: string } | null>(null);
+  const [elCreditsError, setElCreditsError] = useState<string | null>(null);
   const [elCreditsLoading, setElCreditsLoading] = useState(false);
 
   const [testing, setTesting] = useState(false);
