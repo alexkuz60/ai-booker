@@ -10,6 +10,7 @@ export type AiRoleId =
   | "translator"
   | "proofreader"
   | "screenwriter"
+  | "director"
   | "profiler"
   | "sound_engineer";
 
