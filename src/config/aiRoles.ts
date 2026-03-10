@@ -10,6 +10,7 @@ export type AiRoleId =
   | "translator"
   | "proofreader"
   | "screenwriter"
+  | "director"
   | "profiler"
   | "sound_engineer";
 
@@ -75,6 +76,23 @@ export const AI_ROLES: Record<AiRoleId, AiRoleDefinition> = {
       "and emotional beats. Be precise with segment boundaries.",
   },
 
+  director: {
+    id: "director",
+    labelRu: "Режиссёр",
+    labelEn: "Director",
+    descriptionRu: "Темп, паузы, эмоциональный рисунок, распределение голосов",
+    descriptionEn: "Pacing, pauses, emotional arc, voice casting direction",
+    defaultModelAdmin: "google/gemini-2.5-pro",
+    defaultModelUser: "google/gemini-2.5-pro",
+    tier: "heavy",
+    systemPrompt:
+      "You are an experienced audiobook director and dramaturg. " +
+      "Analyze chapters for pacing, emotional arc, and dramatic tension. " +
+      "Define BPM (reading tempo), silence durations between scenes, mood transitions, " +
+      "and voice casting recommendations based on character psychology and scene dynamics. " +
+      "Consider the listener's experience: build tension, provide relief, manage fatigue.",
+  },
+
   profiler: {
     id: "profiler",
     labelRu: "Профайлер",
@@ -114,6 +132,7 @@ export const AI_ROLE_LIST: AiRoleDefinition[] = [
   AI_ROLES.translator,
   AI_ROLES.proofreader,
   AI_ROLES.screenwriter,
+  AI_ROLES.director,
   AI_ROLES.profiler,
   AI_ROLES.sound_engineer,
 ];
