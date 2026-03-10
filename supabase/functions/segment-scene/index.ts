@@ -67,6 +67,10 @@ Deno.serve(async (req) => {
       });
     }
 
+    const userId = await getUserIdFromAuth(authHeader);
+    const usedModel = clientModel || "google/gemini-2.5-flash";
+    const aiStart = Date.now();
+
     const systemPrompt = `You are a literary text analyst. Given a scene text, split it into structural segments.
 Each segment must have:
 - "type": one of ${SEGMENT_TYPES.join(", ")}
