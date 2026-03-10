@@ -355,6 +355,7 @@ function GeneratorPanel({
           <Timer className="h-3.5 w-3.5 shrink-0" />
           <span className="shrink-0 text-[10px]">{i.duration}:</span>
           <Slider
+            compact
             value={[durationSec]}
             onValueChange={([v]) => setDurationSec(v)}
             min={1}
@@ -370,6 +371,7 @@ function GeneratorPanel({
             <Sliders className="h-3.5 w-3.5 shrink-0" />
             <span className="shrink-0 text-[10px]">{i.influence}:</span>
             <Slider
+              compact
               value={[influence]}
               onValueChange={([v]) => setInfluence(v)}
               min={0}
@@ -497,6 +499,7 @@ function EditableLayerCard({
         <div className="flex items-center gap-1.5 flex-1">
           <Clock className="h-3 w-3 shrink-0" />
           <Slider
+            compact
             value={[layer.duration_seconds]}
             onValueChange={([v]) => onChange(index, { ...layer, duration_seconds: v })}
             min={2}
@@ -509,6 +512,7 @@ function EditableLayerCard({
         <div className="flex items-center gap-1.5 flex-1">
           <Volume2 className="h-3 w-3 shrink-0" />
           <Slider
+            compact
             value={[layer.volume]}
             onValueChange={([v]) => onChange(index, { ...layer, volume: v })}
             min={0}
