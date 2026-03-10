@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { User, Key, Settings, HardDrive, Network } from 'lucide-react';
+import { User, Key, Settings, HardDrive, Network, Bot } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
