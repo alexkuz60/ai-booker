@@ -362,7 +362,7 @@ function GeneratorPanel({
             min={1}
             max={maxDuration}
             step={1}
-            className="flex-1 max-w-[120px]"
+            className="w-[100px] shrink-0"
           />
           <span className="w-12 text-right font-body text-[10px]">{durationSec} {i.sec}</span>
         </div>
