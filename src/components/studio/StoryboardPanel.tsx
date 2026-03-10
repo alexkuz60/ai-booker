@@ -1379,7 +1379,7 @@ export function StoryboardPanel({
             variant="ghost"
             size="sm"
             className="h-7 gap-1.5 text-xs"
-            disabled={recalcRunning || !sceneId}
+            disabled={recalcRunning || !sceneId || audioStatus.size === 0}
             onClick={handleRecalcDurations}
             title={isRu ? "Пересчитать длительности из MP3" : "Recalculate durations from MP3"}
           >
