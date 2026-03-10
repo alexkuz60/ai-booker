@@ -772,6 +772,7 @@ export function StoryboardPanel({
           segment_number: seg.segment_number + 1,
           segment_type: seg.segment_type as any,
           speaker: seg.speaker,
+          metadata: { split_silence_ms: 1000 },
         })
         .select("id")
         .single();
