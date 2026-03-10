@@ -519,7 +519,7 @@ function EditableLayerCard({
             min={0}
             max={1}
             step={0.05}
-            className="flex-1 max-w-[100px]"
+            className="w-[100px] shrink-0"
           />
           <span className="w-8 text-right">{Math.round(layer.volume * 100)}%</span>
         </div>
