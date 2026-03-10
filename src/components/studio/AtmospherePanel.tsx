@@ -499,6 +499,7 @@ function EditableLayerCard({
         <div className="flex items-center gap-1.5 flex-1">
           <Clock className="h-3 w-3 shrink-0" />
           <Slider
+            compact
             value={[layer.duration_seconds]}
             onValueChange={([v]) => onChange(index, { ...layer, duration_seconds: v })}
             min={2}
