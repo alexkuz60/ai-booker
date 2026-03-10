@@ -119,9 +119,9 @@
 
 | Этап | Описание | Статус |
 |------|----------|--------|
-| **1. Prompt Builder** | Edge-функция `generate-atmosphere-prompt`: метаданные сцены → 2–3 промпта (ambience + music + SFX) через Lovable AI | ⬜ |
-| **2. Auto-Atmosphere** | Кнопка в UI: метаданные → Prompt Builder → параллельная генерация слоёв → сохранение | ⬜ |
-| **3. DB `scene_atmospheres`** | Таблица привязки атмосферных слоёв к сценам (path, duration, volume, fade) | ⬜ |
+| **1. Prompt Builder** | Edge-функция `generate-atmosphere-prompt`: метаданные сцены → 2–3 промпта (ambience + music + SFX) через Lovable AI | ✅ |
+| **2. Auto-Atmosphere** | Кнопка в UI: метаданные → Prompt Builder → редактируемые слои → параллельная генерация → сохранение | ✅ |
+| **3. DB `scene_atmospheres`** | Таблица привязки атмосферных слоёв к сценам (path, duration, volume, fade) + удаление | ✅ |
 | **4. Timeline-интеграция** | Клипы из `scene_atmospheres` на треках atmosphere/sfx; loop/crossfade | ⬜ |
 | **5. Batch-режим** | Генерация атмосферы для всей главы одним кликом | ⬜ |
 
