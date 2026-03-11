@@ -29,7 +29,7 @@ export interface PhraseAnnotation {
   rate?: number;
 }
 
-export type TtsProvider = "yandex" | "elevenlabs" | "proxyapi" | "unknown";
+export type TtsProvider = "yandex" | "elevenlabs" | "proxyapi" | "salutespeech" | "unknown";
 
 /** Whether an annotation is an insertion (at a point) vs a range selection */
 export function isInsertionAnnotation(type: AnnotationType): boolean {
@@ -53,7 +53,7 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     label_ru: "⏸ Пауза",
     label_en: "⏸ Pause",
     emoji: "⏸",
-    providers: ["yandex", "elevenlabs", "proxyapi"],
+    providers: ["yandex", "salutespeech", "elevenlabs", "proxyapi"],
     needsRange: false,
   },
   {
@@ -61,7 +61,7 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     label_ru: "💪 Ударение",
     label_en: "💪 Emphasis",
     emoji: "💪",
-    providers: ["yandex"],
+    providers: ["yandex", "salutespeech"],
     needsRange: true,
   },
   {
@@ -69,7 +69,7 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     label_ru: "🤫 Шёпот",
     label_en: "🤫 Whisper",
     emoji: "🤫",
-    providers: ["yandex"],
+    providers: ["yandex", "salutespeech"],
     needsRange: true,
   },
   {
@@ -77,7 +77,7 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     label_ru: "🐢 Медленно",
     label_en: "🐢 Slow",
     emoji: "🐢",
-    providers: ["yandex"],
+    providers: ["yandex", "salutespeech"],
     needsRange: true,
   },
   {
@@ -85,7 +85,7 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     label_ru: "🐇 Быстро",
     label_en: "🐇 Fast",
     emoji: "🐇",
-    providers: ["yandex"],
+    providers: ["yandex", "salutespeech"],
     needsRange: true,
   },
   {
@@ -93,7 +93,7 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     label_ru: "😊 Радость",
     label_en: "😊 Joy",
     emoji: "😊",
-    providers: ["yandex", "elevenlabs", "proxyapi"],
+    providers: ["yandex", "salutespeech", "elevenlabs", "proxyapi"],
     needsRange: true,
   },
   {
@@ -101,7 +101,7 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     label_ru: "😢 Грусть",
     label_en: "😢 Sadness",
     emoji: "😢",
-    providers: ["yandex", "elevenlabs", "proxyapi"],
+    providers: ["yandex", "salutespeech", "elevenlabs", "proxyapi"],
     needsRange: true,
   },
   {
@@ -109,7 +109,7 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     label_ru: "😡 Злость",
     label_en: "😡 Anger",
     emoji: "😡",
-    providers: ["yandex", "elevenlabs", "proxyapi"],
+    providers: ["yandex", "salutespeech", "elevenlabs", "proxyapi"],
     needsRange: true,
   },
   {
@@ -117,7 +117,7 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     label_ru: "😮‍💨 Вздох",
     label_en: "😮‍💨 Sigh",
     emoji: "😮‍💨",
-    providers: ["yandex", "elevenlabs", "proxyapi"],
+    providers: ["yandex", "salutespeech", "elevenlabs", "proxyapi"],
     needsRange: false,
   },
   {
@@ -125,7 +125,7 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     label_ru: "🤧 Кашель",
     label_en: "🤧 Cough",
     emoji: "🤧",
-    providers: ["yandex", "elevenlabs", "proxyapi"],
+    providers: ["yandex", "salutespeech", "elevenlabs", "proxyapi"],
     needsRange: false,
   },
   {
@@ -133,7 +133,7 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     label_ru: "😂 Смех",
     label_en: "😂 Laugh",
     emoji: "😂",
-    providers: ["yandex", "elevenlabs", "proxyapi"],
+    providers: ["yandex", "salutespeech", "elevenlabs", "proxyapi"],
     needsRange: false,
   },
   {
@@ -141,7 +141,7 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     label_ru: "🤔 Хмыканье",
     label_en: "🤔 Hmm",
     emoji: "🤔",
-    providers: ["yandex", "elevenlabs", "proxyapi"],
+    providers: ["yandex", "salutespeech", "elevenlabs", "proxyapi"],
     needsRange: false,
   },
 ];
@@ -221,6 +221,7 @@ export function resolveProvider(voiceConfig: Record<string, unknown> | null | un
   const p = voiceConfig.provider as string | undefined;
   if (p === "elevenlabs") return "elevenlabs";
   if (p === "proxyapi" || p === "openai") return "proxyapi";
+  if (p === "salutespeech") return "salutespeech";
   if (p === "yandex" || !p) return "yandex"; // default to yandex
   return "unknown";
 }
