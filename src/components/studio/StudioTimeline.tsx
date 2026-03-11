@@ -3,6 +3,9 @@ import { getAudioEngine } from "@/lib/audioEngine";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
 import { ChevronUp, ChevronDown, Plus, ZoomIn, ZoomOut, Maximize2, Layers, Film, Play, Pause, Square, Volume2, VolumeX, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useTimelineClips, type TimelineClip, type TypeMappingsByScene } from "@/hooks/useTimelineClips";
@@ -240,12 +243,24 @@ export function StudioTimeline({
 
   // ── Seek to selected segment's clip start ─────────────────
   const prevSelectedRef = useRef<string | null>(null);
+  const sceneScrollRef = useRef<HTMLDivElement>(null);
+  const seekCenterRef = useRef<{ zoom: number; percent: number }>({ zoom: 1, percent: 100 });
+
   useEffect(() => {
     if (!selectedSegmentId || selectedSegmentId === prevSelectedRef.current) return;
     prevSelectedRef.current = selectedSegmentId;
     const clip = timelineClips.find(c => c.id === selectedSegmentId);
     if (clip != null) {
       player.seek(clip.startSec);
+      const { zoom: z, percent } = seekCenterRef.current;
+      if (sceneScrollRef.current && percent > 100) {
+        requestAnimationFrame(() => {
+          const el = sceneScrollRef.current;
+          if (!el) return;
+          const px = clip.startSec * z * 4;
+          el.scrollTo({ left: Math.max(0, px - el.clientWidth / 2), behavior: "smooth" });
+        });
+      }
     }
   }, [selectedSegmentId, timelineClips, player]);
 
@@ -381,10 +396,72 @@ export function StudioTimeline({
     return containerWidth / (duration * 4);
   }, [containerWidth, duration]);
 
+  // Scene zoom presets (percentage of fitZoom)
+  const SCENE_ZOOM_PRESETS = [90, 100, 125, 150, 200, 300] as const;
+  const [sceneZoomPercent, setSceneZoomPercent] = useState<number>(100);
   const [zoomOverride, setZoomOverride] = useState<number | null>(null);
   const zoom = zoomOverride ?? fitZoom;
 
-  useEffect(() => { setZoomOverride(null); }, [fitZoom]);
+  useEffect(() => { setZoomOverride(null); setSceneZoomPercent(100); }, [fitZoom]);
+
+  // Keep seekCenterRef in sync for the segment selection effect above
+  useEffect(() => { seekCenterRef.current = { zoom, percent: sceneZoomPercent }; }, [zoom, sceneZoomPercent]);
+
+  // Apply scene zoom preset
+  const applySceneZoom = useCallback((percent: number) => {
+    setSceneZoomPercent(percent);
+    if (percent === 100) {
+      setZoomOverride(null);
+    } else {
+      setZoomOverride((fitZoom * percent) / 100);
+    }
+  }, [fitZoom]);
+
+  // ── Horizontal scroll sync with playback (scene mode) ─────
+  const userScrollingRef = useRef(false);
+  const userScrollTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Track user scrolling to avoid fighting with auto-scroll
+  useEffect(() => {
+    const el = sceneScrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (player.state !== "playing") return;
+      userScrollingRef.current = true;
+      clearTimeout(userScrollTimerRef.current);
+      userScrollTimerRef.current = setTimeout(() => {
+        userScrollingRef.current = false;
+      }, 2000);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [player.state]);
+
+  // Auto-scroll during playback when zoom > 100%
+  useEffect(() => {
+    if (mode !== "scene" || player.state !== "playing") return;
+    if (sceneZoomPercent <= 100) return;
+    if (userScrollingRef.current) return;
+    const el = sceneScrollRef.current;
+    if (!el) return;
+
+    const playheadPx = player.positionSec * zoom * 4;
+    const viewW = el.clientWidth;
+    const targetScroll = playheadPx - viewW / 2;
+    el.scrollLeft = Math.max(0, targetScroll);
+  }, [player.positionSec, player.state, zoom, sceneZoomPercent, mode]);
+
+  // Center playhead when seeking / selecting segment at zoom > 100%
+  const centerPlayhead = useCallback((sec: number) => {
+    if (sceneZoomPercent <= 100) return;
+    const el = sceneScrollRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      const px = sec * zoom * 4;
+      const viewW = el.clientWidth;
+      el.scrollTo({ left: Math.max(0, px - viewW / 2), behavior: "smooth" });
+    });
+  }, [zoom, sceneZoomPercent]);
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("studio-timeline-collapsed") === "true"; } catch { return false; }
@@ -467,11 +544,12 @@ export function StudioTimeline({
       const currentZoom = prev ?? fitZoom;
       const currentPercent = toPercent(currentZoom);
       const nextPercent = stepZoomPercent(currentPercent, direction);
+      setSceneZoomPercent(nextPercent);
       return (fitZoom * nextPercent) / 100;
     });
   }, [fitZoom, stepZoomPercent, toPercent]);
 
-  const resetZoom = useCallback(() => setZoomOverride(null), []);
+  const resetZoom = useCallback(() => { setZoomOverride(null); setSceneZoomPercent(100); }, []);
   const displayZoomPercent = fitZoom > 0 ? Math.round(toPercent(zoom)) : 100;
 
   const formatTime = (s: number) => {
@@ -610,16 +688,36 @@ export function StudioTimeline({
         </div>
 
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("out")} title={isRu ? "Уменьшить" : "Zoom out"}>
-            <ZoomOut className="h-3.5 w-3.5" />
-          </Button>
-          <span className="text-xs text-muted-foreground font-body w-10 text-center">{displayZoomPercent}%</span>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("in")} title={isRu ? "Увеличить" : "Zoom in"}>
-            <ZoomIn className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetZoom} title={isRu ? "По ширине" : "Fit to width"}>
-            <Maximize2 className="h-3.5 w-3.5" />
-          </Button>
+          {mode === "scene" ? (
+            <Select
+              value={String(sceneZoomPercent)}
+              onValueChange={(v) => applySceneZoom(Number(v))}
+            >
+              <SelectTrigger className="h-7 w-[80px] text-xs font-body border-none bg-transparent px-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SCENE_ZOOM_PRESETS.map((p) => (
+                  <SelectItem key={p} value={String(p)} className="text-xs">
+                    {p}%
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("out")} title={isRu ? "Уменьшить" : "Zoom out"}>
+                <ZoomOut className="h-3.5 w-3.5" />
+              </Button>
+              <span className="text-xs text-muted-foreground font-body w-10 text-center">{displayZoomPercent}%</span>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("in")} title={isRu ? "Увеличить" : "Zoom in"}>
+                <ZoomIn className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetZoom} title={isRu ? "По ширине" : "Fit to width"}>
+                <Maximize2 className="h-3.5 w-3.5" />
+              </Button>
+            </>
+          )}
           <div className="w-px h-4 bg-border mx-1" />
           <Button variant="ghost" size="icon" className="h-7 w-7">
             <Plus className="h-3.5 w-3.5" />
@@ -690,7 +788,7 @@ export function StudioTimeline({
               );
             })}
           </div>
-          <div className="flex-1 overflow-x-auto overflow-y-hidden">
+          <div ref={sceneScrollRef} className="flex-1 overflow-x-auto overflow-y-hidden">
             <div
               className="relative cursor-crosshair"
               style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
@@ -698,7 +796,9 @@ export function StudioTimeline({
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const sec = x / (zoom * 4);
-                player.seek(Math.max(0, Math.min(sec, duration)));
+                const clampedSec = Math.max(0, Math.min(sec, duration));
+                player.seek(clampedSec);
+                centerPlayhead(clampedSec);
               }}
             >
               {/* Keep ruler horizontally synced with tracks by rendering it inside the same scroll viewport */}
