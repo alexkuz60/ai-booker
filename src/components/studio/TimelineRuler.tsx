@@ -7,6 +7,8 @@ interface TimelineRulerProps {
   sceneBoundaries?: SceneBoundary[];
   /** Render progress 0–100, null = no render exists */
   renderPercent?: number | null;
+  /** Whether rendering is actively in progress */
+  isRendering?: boolean;
 }
 
 export function TimelineRuler({ zoom, duration, sceneBoundaries, renderPercent }: TimelineRulerProps) {
