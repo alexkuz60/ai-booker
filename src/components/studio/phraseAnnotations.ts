@@ -32,7 +32,7 @@ export type TtsProvider = "yandex" | "elevenlabs" | "proxyapi" | "unknown";
 
 /** Whether an annotation is an insertion (at a point) vs a range selection */
 export function isInsertionAnnotation(type: AnnotationType): boolean {
-  return type === "pause";
+  return type === "pause" || type === "sigh" || type === "cough" || type === "laugh" || type === "hmm";
 }
 
 export interface AnnotationConfig {
