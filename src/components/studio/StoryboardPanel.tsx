@@ -685,18 +685,36 @@ export function StoryboardPanel({
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [selectedSegmentId]);
 
-  // Load characters for the book
+  // Load characters for the book (including voice_config for provider detection)
   useEffect(() => {
     if (!bookId) { setCharacters([]); return; }
     (async () => {
       const { data } = await supabase
         .from("book_characters")
-        .select("id, name, color")
+        .select("id, name, color, voice_config")
         .eq("book_id", bookId)
         .order("sort_order");
-      if (data) setCharacters(data.map(c => ({ id: c.id, name: c.name, color: c.color })));
+      if (data) setCharacters(data.map(c => ({
+        id: c.id,
+        name: c.name,
+        color: c.color,
+        voiceConfig: (c.voice_config || {}) as Record<string, unknown>,
+      })));
     })();
   }, [bookId]);
+
+  // Build speaker → TTS provider map
+  const speakerProviderMap = useMemo(() => {
+    const map = new Map<string, TtsProvider>();
+    for (const c of characters) {
+      if (c.voiceConfig) {
+        const provider = resolveProvider(c.voiceConfig);
+        map.set(c.name.toLowerCase(), provider);
+        // Also map aliases if available
+      }
+    }
+    return map;
+  }, [characters]);
 
   // Load audio status for segments
   const loadAudioStatus = useCallback(async (segIds: string[]) => {
