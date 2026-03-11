@@ -125,7 +125,7 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     label_ru: "🤧 Кашель",
     label_en: "🤧 Cough",
     emoji: "🤧",
-    providers: ["yandex", "elevenlabs", "proxyapi"],
+    providers: ["yandex", "salutespeech", "elevenlabs", "proxyapi"],
     needsRange: false,
   },
   {
