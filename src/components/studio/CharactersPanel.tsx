@@ -398,47 +398,21 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const handleProfile = () => runProfile();
   const handleIncrementalProfile = () => runProfile(chapterSceneIds);
 
-  // ── Save voice config ───────────────────────────────────
+  // ── Save voice config (only used by auto-cast now) ───────────────────────────
   const handleSave = async () => {
     if (!selectedId) return;
     setSaving(true);
     try {
       const currentChar = characters.find(c => c.id === selectedId);
-      const voiceConfig = voiceProvider === "salutespeech"
-        ? {
-            provider: "salutespeech",
-            voice_id: ssVoice,
-            speed: ssSpeed,
-            is_extra: currentChar?.voice_config?.is_extra,
-          }
-        : voiceProvider === "proxyapi"
-        ? {
-            provider: "proxyapi",
-            voice_id: paVoice,
-            model: paModel,
-            speed: paSpeed,
-            instructions: paInstructions || undefined,
-            is_extra: currentChar?.voice_config?.is_extra,
-          }
-        : voiceProvider === "elevenlabs"
-        ? {
-            provider: "elevenlabs",
-            voice_id: elVoice,
-            stability: elStability,
-            similarity_boost: elSimilarity,
-            style: elStyle,
-            speed: elSpeed,
-            is_extra: currentChar?.voice_config?.is_extra,
-          }
-        : {
-            provider: "yandex",
-            voice_id: voice,
-            role: role !== "neutral" ? role : undefined,
-            speed,
-            pitch: pitch !== 0 ? pitch : undefined,
-            volume: volume !== 0 ? volume : undefined,
-            is_extra: currentChar?.voice_config?.is_extra,
-          };
+      const voiceConfig = {
+        provider: "yandex",
+        voice_id: voice,
+        role: role !== "neutral" ? role : undefined,
+        speed,
+        pitch: pitch !== 0 ? pitch : undefined,
+        volume: volume !== 0 ? volume : undefined,
+        is_extra: currentChar?.voice_config?.is_extra,
+      };
       const { error } = await supabase
         .from("book_characters")
         .update({ voice_config: voiceConfig, updated_at: new Date().toISOString() })
@@ -450,7 +424,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       ));
       onVoiceSaved?.();
       toast.success(isRu ? "Голос сохранён" : "Voice saved");
-    } catch (e) {
+    } catch {
       toast.error(isRu ? "Ошибка сохранения" : "Save error");
     } finally {
       setSaving(false);
