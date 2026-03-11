@@ -209,7 +209,11 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [paSpeed, setPaSpeed] = useState(1.0);
   const [paInstructions, setPaInstructions] = useState("");
 
-  const [voiceProvider, setVoiceProvider] = useState<"yandex" | "elevenlabs" | "proxyapi">("yandex");
+  // Voice settings state — SaluteSpeech
+  const [ssVoice, setSsVoice] = useState("Nec_24000");
+  const [ssSpeed, setSsSpeed] = useState(1.0);
+
+  const [voiceProvider, setVoiceProvider] = useState<"yandex" | "elevenlabs" | "proxyapi" | "salutespeech">("yandex");
 
   // ElevenLabs credits
   const [elCredits, setElCredits] = useState<{ used: number; limit: number; tier: string } | null>(null);
