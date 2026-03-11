@@ -84,7 +84,7 @@ export default function Profile() {
     const { error } = await supabase
       .from('profiles')
       .update({
-        api_keys: apiKeys as any,
+        api_keys: apiKeys as Json,
         updated_at: new Date().toISOString(),
       })
       .eq('id', user.id);

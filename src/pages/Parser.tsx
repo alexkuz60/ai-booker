@@ -194,7 +194,7 @@ export default function Parser() {
     setTocEntries(prev => prev.map(e => e.partTitle === oldTitle ? { ...e, partTitle: newTitle } : e));
     const partId = partIdMap.get(oldTitle);
     if (partId) {
-      supabase.from('book_parts').update({ title: newTitle } as any).eq('id', partId).then();
+      supabase.from('book_parts').update({ title: newTitle }).eq('id', partId).then();
     }
   };
 

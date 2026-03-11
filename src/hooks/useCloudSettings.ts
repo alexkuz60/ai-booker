@@ -62,7 +62,7 @@ export function useCloudSettings<T>(
           .upsert({
             user_id: user.id,
             setting_key: settingKey,
-            setting_value: newValue as any,
+            setting_value: newValue as Json,
           }, { onConflict: 'user_id,setting_key' });
       } catch (err) {
         console.error(`[useCloudSettings] Failed to save "${settingKey}":`, err);

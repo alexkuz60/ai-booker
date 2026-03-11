@@ -1522,7 +1522,7 @@ export function StoryboardPanel({
       const remainingOfOldType = updatedSegments.filter(s => s.segment_type === oldType);
       if (remainingOfOldType.length === 0) {
         await supabase
-          .from("scene_type_mappings" as any)
+          .from("scene_type_mappings")
           .delete()
           .eq("scene_id", sceneId)
           .eq("segment_type", oldType);
