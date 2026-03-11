@@ -1078,7 +1078,7 @@ Deno.serve(async (req) => {
             duration_ms: dialogueDurationMs,
             status: "ready",
             voice_config: {
-              provider: isProxyApiVoice ? "proxyapi" : "yandex",
+              provider: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : "yandex",
               voice: voiceConfig.voice,
               role: voiceConfig.role,
               speed: voiceConfig.speed,
@@ -1087,7 +1087,7 @@ Deno.serve(async (req) => {
               model: isProxyApiVoice ? (voiceConfig as any).model : undefined,
               instructions: isProxyApiVoice ? (voiceConfig as any).instructions : undefined,
               textHash: textHashForCache,
-              apiVersion: isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1",
+              apiVersion: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1",
             },
           },
           { onConflict: "segment_id" }
