@@ -1924,6 +1924,46 @@ export function StoryboardPanel({
               {detecting ? (isRu ? "Поиск…" : "Detecting…") : (isRu ? "Вставки" : "Narrations")}
             </Button>
           )}
+          {segments.length > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={correctingStress || analyzing || synthesizing}
+                  className="gap-1.5 h-7 text-xs"
+                  title={isRu ? "Коррекция ударений" : "Stress correction"}
+                >
+                  {correctingStress ? <Loader2 className="h-3 w-3 animate-spin" /> : <SpellCheck className="h-3 w-3" />}
+                  {isRu ? "Ударения" : "Stress"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-2" align="start">
+                <div className="flex flex-col gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start gap-2 h-8 text-xs"
+                    onClick={() => runStressCorrection("suggest")}
+                    disabled={correctingStress}
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    {isRu ? "Найти неоднозначные" : "Find ambiguous"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start gap-2 h-8 text-xs"
+                    onClick={() => runStressCorrection("correct")}
+                    disabled={correctingStress}
+                  >
+                    <CheckCircle2 className="h-3 w-3" />
+                    {isRu ? "Применить словарь" : "Apply dictionary"}
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
           {staleAudioSegIds.size > 0 && (
             <Button
               variant="ghost"
