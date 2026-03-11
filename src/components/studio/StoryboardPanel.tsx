@@ -859,7 +859,7 @@ export function StoryboardPanel({
           .in("segment_id", segIds)
           .order("phrase_number"),
         supabase
-          .from("scene_type_mappings" as any)
+          .from("scene_type_mappings")
           .select("segment_type, character_id")
           .eq("scene_id", sid),
       ]);
