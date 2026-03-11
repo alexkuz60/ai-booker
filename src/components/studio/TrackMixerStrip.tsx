@@ -20,6 +20,7 @@ interface TrackMixerStripProps {
 
 export function TrackMixerStrip({
   trackId,
+  allClipIds = [],
   label,
   color,
   expanded,
