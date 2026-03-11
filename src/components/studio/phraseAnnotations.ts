@@ -3,6 +3,7 @@
 export type AnnotationType =
   | "pause"
   | "emphasis"
+  | "stress"
   | "whisper"
   | "slow"
   | "fast"
