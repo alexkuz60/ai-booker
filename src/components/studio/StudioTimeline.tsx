@@ -67,6 +67,7 @@ interface StudioTimelineProps {
   synthesizingSegmentIds?: Set<string>;
   errorSegmentIds?: Set<string>;
   clipsRefreshToken?: number;
+  onSceneRendered?: (sceneId: string) => void;
 }
 
 export function StudioTimeline({
