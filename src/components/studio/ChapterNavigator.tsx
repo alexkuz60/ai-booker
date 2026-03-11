@@ -182,6 +182,7 @@ export function ChapterNavigator({
   clipsRefreshToken?: number;
   bookId?: string | null;
 }) {
+  const navigate = useNavigate();
   const [chapterOpen, setChapterOpen] = useState(true);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
