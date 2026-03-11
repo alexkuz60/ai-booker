@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.generate-atmosphere-prompt]
 verify_jwt = false
+
+[functions.salutespeech-test]
+verify_jwt = false
