@@ -1009,7 +1009,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                                   setCharacters(prev => prev.map(c =>
                                     c.id === charId ? { ...c, gender: g } : c
                                   ));
-                                  markDirty();
+                                  setDirty(true);
                                   try {
                                     const { error } = await supabase
                                       .from("book_characters")
