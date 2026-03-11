@@ -262,8 +262,13 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
 
       // Log raw response for debugging
       const reasoningLen = String((msg as Record<string, unknown>)?.reasoning || "").length;
-      console.log(`Attempt ${attempt} unparseable. Keys: ${JSON.stringify(Object.keys(msg || {}))}. Tool calls: ${toolCall?.function?.name}. Content len: ${(msg?.content || "").length}. Reasoning len: ${reasoningLen}`);
+      console.log(`Attempt ${attempt} unparseable (tools=${useToolsMode}). Keys: ${JSON.stringify(Object.keys(msg || {}))}. Tool calls: ${toolCall?.function?.name}. Content len: ${(msg?.content || "").length}. Reasoning len: ${reasoningLen}`);
       lastError = "AI returned unparseable response";
+      // If tools mode failed (reasoning model?), switch to plain JSON mode for next attempt
+      if (useToolsMode) {
+        useToolsMode = false;
+        console.log("Switching to plain JSON mode for next attempt");
+      }
       if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, 1500 * attempt));
     } catch (fetchErr) {
       lastError = String(fetchErr);
