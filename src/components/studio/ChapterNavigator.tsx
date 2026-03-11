@@ -197,18 +197,35 @@ export function ChapterNavigator({
 
   // Load actual durations from scene_playlists
   const [playlistDurations, setPlaylistDurations] = useState<Map<string, number>>(new Map());
+  // Render status: 'full' | 'partial' | undefined (none)
+  const [renderStatus, setRenderStatus] = useState<Map<string, "full" | "partial">>(new Map());
   useEffect(() => {
     const sceneIds = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
     if (sceneIds.length === 0) return;
     (async () => {
-      const { data } = await supabase
-        .from("scene_playlists")
-        .select("scene_id, total_duration_ms")
-        .in("scene_id", sceneIds);
-      if (data) {
+      const [{ data: plData }, { data: rnData }] = await Promise.all([
+        supabase
+          .from("scene_playlists")
+          .select("scene_id, total_duration_ms")
+          .in("scene_id", sceneIds),
+        supabase
+          .from("scene_renders")
+          .select("scene_id, voice_path, atmo_path, sfx_path, status")
+          .in("scene_id", sceneIds),
+      ]);
+      if (plData) {
         const map = new Map<string, number>();
-        for (const d of data) map.set(d.scene_id, d.total_duration_ms);
+        for (const d of plData) map.set(d.scene_id, d.total_duration_ms);
         setPlaylistDurations(map);
+      }
+      if (rnData) {
+        const map = new Map<string, "full" | "partial">();
+        for (const r of rnData) {
+          const paths = [r.voice_path, r.atmo_path, r.sfx_path].filter(Boolean);
+          if (paths.length === 3) map.set(r.scene_id, "full");
+          else if (paths.length > 0) map.set(r.scene_id, "partial");
+        }
+        setRenderStatus(map);
       }
     })();
   }, [chapter.scenes.map(s => s.id).join(","), clipsRefreshToken]);
