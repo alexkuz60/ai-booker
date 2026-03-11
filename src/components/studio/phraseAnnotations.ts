@@ -29,7 +29,7 @@ export interface PhraseAnnotation {
   rate?: number;
 }
 
-export type TtsProvider = "yandex" | "elevenlabs" | "proxyapi" | "unknown";
+export type TtsProvider = "yandex" | "elevenlabs" | "proxyapi" | "salutespeech" | "unknown";
 
 /** Whether an annotation is an insertion (at a point) vs a range selection */
 export function isInsertionAnnotation(type: AnnotationType): boolean {
