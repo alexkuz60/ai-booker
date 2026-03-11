@@ -1191,6 +1191,8 @@ export function StoryboardPanel({
       });
       if (error) throw error;
       toast.success(isRu ? "Блок пересинтезирован" : "Segment re-synthesized");
+      // Clear this segment from error set on success
+      onErrorSegmentsChange?.(new Set());
       onSegmented?.(sceneId);
       // Small delay to ensure DB write is committed before reloading status
       await new Promise(r => setTimeout(r, 500));
@@ -1198,13 +1200,14 @@ export function StoryboardPanel({
     } catch (err: any) {
       console.error("Re-synth failed:", err);
       toast.error(isRu ? "Ошибка ре-синтеза" : "Re-synthesis failed");
+      onErrorSegmentsChange?.(new Set([segmentId]));
       // Reload status even on error to reflect current state
       await loadAudioStatus(segments.map(s => s.segment_id));
     }
     setResynthSegId(null);
     setCurrentlySynthesizingIds(new Set());
     onSynthesizingChange?.(new Set());
-  }, [sceneId, isRu, onSegmented, loadAudioStatus, segments, onSynthesizingChange]);
+  }, [sceneId, isRu, onSegmented, loadAudioStatus, segments, onSynthesizingChange, onErrorSegmentsChange]);
 
   const dialogueCount = segments.filter(s => s.segment_type === "dialogue").length;
   const runDetectNarrations = useCallback(async () => {
