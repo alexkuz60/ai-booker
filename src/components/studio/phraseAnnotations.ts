@@ -61,7 +61,7 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     label_ru: "💪 Ударение",
     label_en: "💪 Emphasis",
     emoji: "💪",
-    providers: ["yandex"],
+    providers: ["yandex", "salutespeech"],
     needsRange: true,
   },
   {
