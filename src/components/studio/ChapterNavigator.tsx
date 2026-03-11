@@ -181,6 +181,7 @@ export function ChapterNavigator({
   onBatchResynthDone?: () => void;
   clipsRefreshToken?: number;
   bookId?: string | null;
+  onPlaylistDurationsLoaded?: (m: Map<string, number>) => void;
 }) {
   const navigate = useNavigate();
   const [chapterOpen, setChapterOpen] = useState(true);
