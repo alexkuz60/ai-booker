@@ -333,26 +333,66 @@ function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onAnnotate
           </ContextMenuItem>
         ) : (
           <>
-            {availableAnnotations.map((a) => (
-              <ContextMenuItem
-                key={a.type}
-                onClick={() => handleAnnotate(a.type)}
-                className="text-xs gap-2"
-              >
-                <span>{a.emoji}</span>
-                {isRu ? a.label_ru.replace(/^. /, "") : a.label_en.replace(/^. /, "")}
-              </ContextMenuItem>
-            ))}
-            {availableInsertions.filter(a => !availableAnnotations.find(x => x.type === a.type)).map((a) => (
-              <ContextMenuItem
-                key={`ins-${a.type}`}
-                onClick={() => handleAnnotate(a.type)}
-                className="text-xs gap-2"
-              >
-                <span>{a.emoji}</span>
-                {isRu ? a.label_ru.replace(/^. /, "") : a.label_en.replace(/^. /, "")}
-              </ContextMenuItem>
-            ))}
+            {availableAnnotations.map((a) =>
+              a.type === "pause" ? (
+                <ContextMenuSub key={a.type}>
+                  <ContextMenuSubTrigger className="text-xs gap-2">
+                    <span>{a.emoji}</span>
+                    {isRu ? "Пауза" : "Pause"}
+                  </ContextMenuSubTrigger>
+                  <ContextMenuSubContent className="min-w-[7rem]">
+                    {[250, 500, 1000, 2000].map((ms) => (
+                      <ContextMenuItem
+                        key={ms}
+                        onClick={() => handleAnnotate("pause", ms)}
+                        className="text-xs gap-2"
+                      >
+                        ⏸ {ms >= 1000 ? `${ms / 1000}с` : `${ms}мс`}
+                      </ContextMenuItem>
+                    ))}
+                  </ContextMenuSubContent>
+                </ContextMenuSub>
+              ) : (
+                <ContextMenuItem
+                  key={a.type}
+                  onClick={() => handleAnnotate(a.type)}
+                  className="text-xs gap-2"
+                >
+                  <span>{a.emoji}</span>
+                  {isRu ? a.label_ru.replace(/^. /, "") : a.label_en.replace(/^. /, "")}
+                </ContextMenuItem>
+              )
+            )}
+            {availableInsertions.filter(a => !availableAnnotations.find(x => x.type === a.type)).map((a) =>
+              a.type === "pause" ? (
+                <ContextMenuSub key={`ins-${a.type}`}>
+                  <ContextMenuSubTrigger className="text-xs gap-2">
+                    <span>{a.emoji}</span>
+                    {isRu ? "Пауза" : "Pause"}
+                  </ContextMenuSubTrigger>
+                  <ContextMenuSubContent className="min-w-[7rem]">
+                    {[250, 500, 1000, 2000].map((ms) => (
+                      <ContextMenuItem
+                        key={ms}
+                        onClick={() => handleAnnotate("pause", ms)}
+                        className="text-xs gap-2"
+                      >
+                        ⏸ {ms >= 1000 ? `${ms / 1000}с` : `${ms}мс`}
+                      </ContextMenuItem>
+                    ))}
+                  </ContextMenuSubContent>
+                </ContextMenuSub>
+              ) : (
+                <ContextMenuItem
+                  key={`ins-${a.type}`}
+                  onClick={() => handleAnnotate(a.type)}
+                  className="text-xs gap-2"
+                >
+                  <span>{a.emoji}</span>
+                  {isRu ? a.label_ru.replace(/^. /, "") : a.label_en.replace(/^. /, "")}
+                </ContextMenuItem>
+              )
+            )}
           </>
         )}
         {hasAnnotations && (
