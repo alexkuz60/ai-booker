@@ -785,7 +785,9 @@ export function StoryboardPanel({
       const phraseMap = new Map<string, Phrase[]>();
       for (const p of phrases || []) {
         const list = phraseMap.get(p.segment_id) || [];
-        list.push({ phrase_id: p.id, phrase_number: p.phrase_number, text: p.text });
+        const phMeta = (p.metadata ?? {}) as Record<string, unknown>;
+        const annotations = Array.isArray(phMeta.annotations) ? phMeta.annotations as PhraseAnnotation[] : undefined;
+        list.push({ phrase_id: p.id, phrase_number: p.phrase_number, text: p.text, annotations });
         phraseMap.set(p.segment_id, list);
       }
 
