@@ -1262,7 +1262,7 @@ export function StoryboardPanel({
         for (const seg of segs) {
           const meta = { ...((seg.metadata ?? {}) as Record<string, unknown>) };
           delete meta.inline_narrations_audio;
-          await supabase.from("scene_segments").update({ metadata: meta }).eq("id", seg.id);
+          await supabase.from("scene_segments").update({ metadata: meta as any }).eq("id", seg.id);
         }
       }
       // Also clear scene_playlists to force timeline refresh
