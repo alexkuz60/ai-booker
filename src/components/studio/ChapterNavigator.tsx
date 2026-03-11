@@ -169,6 +169,7 @@ export function ChapterNavigator({
   onBatchResynthDone,
   clipsRefreshToken,
   bookId,
+  onPlaylistDurationsLoaded,
 }: {
   chapter: StudioChapter;
   selectedSceneIdx: number | null;
