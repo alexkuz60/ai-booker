@@ -542,10 +542,11 @@ export function ChapterNavigator({
                   const colorClass = SCENE_TYPE_COLORS[scene.scene_type] || SCENE_TYPE_COLORS.mixed;
                   const est = estimateSceneDuration(scene);
                   const actualMs = scene.id ? playlistDurations.get(scene.id) : undefined;
-                  const actualSec = actualMs && actualMs > 0 ? Math.round(actualMs / 1000) : null;
-                  const displayDuration = actualSec ? formatDuration(actualSec) : est.formatted;
-                  const isStale = staleAudioSceneIds?.has(scene.id || "");
-                  const isActual = !!actualSec;
+                   const actualSec = actualMs && actualMs > 0 ? Math.round(actualMs / 1000) : null;
+                   const displayDuration = actualSec ? formatDuration(actualSec) : est.formatted;
+                   const isStale = staleAudioSceneIds?.has(scene.id || "");
+                   const isActual = !!actualSec;
+                   const sceneRender = scene.id ? renderStatus.get(scene.id) : undefined;
 
                   const durationColor = isStale
                     ? "text-yellow-500"
