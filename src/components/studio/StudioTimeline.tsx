@@ -243,23 +243,26 @@ export function StudioTimeline({
 
   // ── Seek to selected segment's clip start ─────────────────
   const prevSelectedRef = useRef<string | null>(null);
+  const sceneScrollRef = useRef<HTMLDivElement>(null);
+  const seekCenterRef = useRef<{ zoom: number; percent: number }>({ zoom: 1, percent: 100 });
+
   useEffect(() => {
     if (!selectedSegmentId || selectedSegmentId === prevSelectedRef.current) return;
     prevSelectedRef.current = selectedSegmentId;
     const clip = timelineClips.find(c => c.id === selectedSegmentId);
     if (clip != null) {
       player.seek(clip.startSec);
-      // centerPlayhead is called below after it's defined — use a ref-based approach
-      if (sceneScrollRef.current && sceneZoomPercent > 100) {
+      const { zoom: z, percent } = seekCenterRef.current;
+      if (sceneScrollRef.current && percent > 100) {
         requestAnimationFrame(() => {
           const el = sceneScrollRef.current;
           if (!el) return;
-          const px = clip.startSec * zoom * 4;
+          const px = clip.startSec * z * 4;
           el.scrollTo({ left: Math.max(0, px - el.clientWidth / 2), behavior: "smooth" });
         });
       }
     }
-  }, [selectedSegmentId, timelineClips, player, zoom, sceneZoomPercent]);
+  }, [selectedSegmentId, timelineClips, player]);
 
 
   // Group clips by track ID (scene mode)
