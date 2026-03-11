@@ -788,7 +788,7 @@ export function StudioTimeline({
               );
             })}
           </div>
-          <div className="flex-1 overflow-x-auto overflow-y-hidden">
+          <div ref={sceneScrollRef} className="flex-1 overflow-x-auto overflow-y-hidden">
             <div
               className="relative cursor-crosshair"
               style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
@@ -796,7 +796,9 @@ export function StudioTimeline({
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const sec = x / (zoom * 4);
-                player.seek(Math.max(0, Math.min(sec, duration)));
+                const clampedSec = Math.max(0, Math.min(sec, duration));
+                player.seek(clampedSec);
+                centerPlayhead(clampedSec);
               }}
             >
               {/* Keep ruler horizontally synced with tracks by rendering it inside the same scroll viewport */}
