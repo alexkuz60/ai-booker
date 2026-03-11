@@ -24,7 +24,7 @@ export async function extractCharacters(
 
   const speakerSegments = new Map<string, string[]>();
   for (const seg of segments) {
-    if (seg.speaker && ["dialogue", "first_person"].includes(seg.segment_type)) {
+    if (seg.speaker && ["dialogue", "monologue", "first_person"].includes(seg.segment_type)) {
       const name = seg.speaker.trim();
       if (!name) continue;
       const ids = speakerSegments.get(name) || [];

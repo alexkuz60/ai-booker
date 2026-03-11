@@ -210,8 +210,8 @@ export function useTimelineClips(
           // 5. Fallback: narrator-fallback
           let trackId = "narrator-fallback";
 
-          if (seg.segment_type === "dialogue") {
-            // Dialogue always routes by speaker name, never by type mapping
+          if (seg.segment_type === "dialogue" || seg.segment_type === "monologue") {
+            // Dialogue/monologue always routes by speaker name, never by type mapping
             const speakerKey = seg.speaker?.toLowerCase();
             if (speakerKey && characterMap.has(speakerKey)) {
               trackId = `char-${characterMap.get(speakerKey)}`;

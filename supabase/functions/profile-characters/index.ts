@@ -398,7 +398,7 @@ Deno.serve(async (req) => {
       .from("scene_segments")
       .select("id, segment_type, speaker, scene_id")
       .in("scene_id", contextSceneIds)
-      .in("segment_type", ["dialogue", "first_person", "inner_thought", "narrator"])
+      .in("segment_type", ["dialogue", "monologue", "first_person", "inner_thought", "narrator"])
       .order("segment_number");
 
     if (!segments?.length) {

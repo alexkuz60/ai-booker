@@ -82,7 +82,8 @@ Rules:
 - "narrator" = third-person narration, descriptions, action
 - "first_person" = narration from a character's perspective (I/me)
 - "inner_thought" = character's internal thoughts, reflections
-- "dialogue" = spoken lines; set "speaker" to the character name if identifiable
+- "dialogue" = spoken lines in a conversation (when multiple characters speak in sequence); set "speaker" to the character name
+- "monologue" = a single standalone spoken line (direct speech) NOT part of a back-and-forth exchange; set "speaker" to the character name. Use this when a character speaks once and the scene continues with narration, not another character's reply
 - "lyric" = songs, poems, verses
 - "epigraph" = epigraphs, quotes at the start
 - "footnote" = footnotes, author comments
