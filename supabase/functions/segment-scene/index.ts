@@ -15,6 +15,7 @@ const SEGMENT_TYPES = [
   "first_person",
   "inner_thought",
   "dialogue",
+  "monologue",
   "lyric",
   "footnote",
 ] as const;
