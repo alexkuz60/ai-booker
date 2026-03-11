@@ -331,7 +331,7 @@ function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onAnnotate
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className="flex gap-2 px-3 py-1.5 hover:bg-accent/20 transition-colors group">
+        <div onContextMenu={handleContextMenu} className="flex gap-2 px-3 py-1.5 hover:bg-accent/20 transition-colors group">
           <span className="text-[10px] text-muted-foreground font-mono pt-0.5 shrink-0 w-5 text-right">
             {phrase.phrase_number}
           </span>
