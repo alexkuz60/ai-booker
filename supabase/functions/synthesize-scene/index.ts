@@ -251,6 +251,50 @@ async function callProxyApiTts(
   return { audio, durationMs };
 }
 
+// ── SaluteSpeech TTS call helper ──────────────────────────────────
+
+async function callSaluteSpeechTts(
+  saluteSpeechUrl: string,
+  authHeader: string,
+  params: {
+    text?: string;
+    ssml?: string;
+    voice: string;
+    lang: string;
+  }
+): Promise<{ audio: Uint8Array; durationMs: number } | { error: string }> {
+  const body: Record<string, unknown> = {
+    voice: params.voice,
+    lang: params.lang,
+    format: "opus",
+  };
+  if (params.ssml) {
+    body.ssml = params.ssml;
+  } else {
+    body.text = params.text;
+  }
+
+  const resp = await fetch(saluteSpeechUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: authHeader,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    const errBody = await resp.text();
+    return { error: `SaluteSpeech TTS ${resp.status}: ${errBody}` };
+  }
+
+  const audioBuffer = await resp.arrayBuffer();
+  const audio = new Uint8Array(audioBuffer);
+  // Opus duration estimation: ~32kbps average for speech
+  const durationMs = Math.round((audio.length / 4000) * 1000);
+  return { audio, durationMs };
+}
+
 // ── Phrase annotation types (mirroring phraseAnnotations.ts) ─────────
 
 interface PhraseAnnotation {
@@ -618,6 +662,7 @@ Deno.serve(async (req) => {
     }
 
     const yandexTtsUrl = `${supabaseUrl}/functions/v1/yandex-tts`;
+    const saluteSpeechTtsUrl = `${supabaseUrl}/functions/v1/salutespeech-tts`;
     const userId = userData.user.id;
     const narratorVoice = getNarratorVoice(voiceConfigMap, segments);
 
@@ -774,8 +819,9 @@ Deno.serve(async (req) => {
       }
 
       const isProxyApiVoice = (voiceConfig as any).provider === "proxyapi";
-      const isV3Voice = !isProxyApiVoice && V3_ONLY_VOICES.has(voiceConfig.voice);
-      const apiVersion = isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1";
+      const isSaluteSpeechVoice = (voiceConfig as any).provider === "salutespeech";
+      const isV3Voice = !isProxyApiVoice && !isSaluteSpeechVoice && V3_ONLY_VOICES.has(voiceConfig.voice);
+      const apiVersion = isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1";
       const estimatedChunks = isV3Voice ? Math.max(1, Math.ceil(text.length / 240)) : 1;
       console.log(`▶ Segment ${i + 1}/${segments.length} [${seg.id}]: speaker=${seg.speaker || seg.segment_type}, api=${apiVersion}, voice=${voiceConfig.voice}, chars=${text.length}, chunks≈${estimatedChunks}${hasInlineNarrations ? `, narrations=${inlineNarrations.length}` : ""}`);
 
@@ -924,7 +970,24 @@ Deno.serve(async (req) => {
           let result: { audio: Uint8Array; durationMs: number } | { error: string };
           const hasAnnot = segmentHasAnnotations[i];
 
-          if (isProxyApiVoice && proxyApiKey) {
+          if (isSaluteSpeechVoice) {
+            // SaluteSpeech: use SSML for annotations, plain text otherwise
+            if (hasAnnot) {
+              const ssml = buildSegmentSsml(seg.id);
+              console.log(`SaluteSpeech SSML for segment ${seg.id}: ${ssml.length} chars`);
+              result = await callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, {
+                ssml,
+                voice: voiceConfig.voice,
+                lang: langCode,
+              });
+            } else {
+              result = await callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, {
+                text,
+                voice: voiceConfig.voice,
+                lang: langCode,
+              });
+            }
+          } else if (isProxyApiVoice && proxyApiKey) {
             // ProxyAPI: apply text markers + extra instructions from annotations
             const annotated = hasAnnot ? buildSegmentAnnotatedText(seg.id) : { text, extraInstructions: [] };
             const baseInstructions = (voiceConfig as any).instructions || "";
@@ -986,10 +1049,12 @@ Deno.serve(async (req) => {
         }
 
         // Upload main audio
-        const storagePath = `${userId}/tts/${scene_id}/${seg.id}.mp3`;
+        const audioExt = isSaluteSpeechVoice ? "ogg" : "mp3";
+        const audioMime = isSaluteSpeechVoice ? "audio/ogg" : "audio/mpeg";
+        const storagePath = `${userId}/tts/${scene_id}/${seg.id}.${audioExt}`;
         const { error: uploadErr } = await supabaseAdmin.storage
           .from("user-media")
-          .upload(storagePath, dialogueAudio, { contentType: "audio/mpeg", upsert: true });
+          .upload(storagePath, dialogueAudio, { contentType: audioMime, upsert: true });
 
         if (uploadErr) {
           console.error(`Upload failed for segment ${seg.id}:`, uploadErr);
@@ -1015,7 +1080,7 @@ Deno.serve(async (req) => {
             duration_ms: dialogueDurationMs,
             status: "ready",
             voice_config: {
-              provider: isProxyApiVoice ? "proxyapi" : "yandex",
+              provider: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : "yandex",
               voice: voiceConfig.voice,
               role: voiceConfig.role,
               speed: voiceConfig.speed,
@@ -1024,7 +1089,7 @@ Deno.serve(async (req) => {
               model: isProxyApiVoice ? (voiceConfig as any).model : undefined,
               instructions: isProxyApiVoice ? (voiceConfig as any).instructions : undefined,
               textHash: textHashForCache,
-              apiVersion: isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1",
+              apiVersion: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1",
             },
           },
           { onConflict: "segment_id" }

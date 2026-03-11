@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { YANDEX_VOICES, ROLE_LABELS } from "@/config/yandexVoices";
 import { ELEVENLABS_VOICES } from "@/config/elevenlabsVoices";
+import { SALUTESPEECH_VOICES } from "@/config/salutespeechVoices";
 import { PROXYAPI_TTS_VOICES, PROXYAPI_TTS_MODELS, getVoicesForModel } from "@/config/proxyapiVoices";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -208,7 +209,11 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [paSpeed, setPaSpeed] = useState(1.0);
   const [paInstructions, setPaInstructions] = useState("");
 
-  const [voiceProvider, setVoiceProvider] = useState<"yandex" | "elevenlabs" | "proxyapi">("yandex");
+  // Voice settings state — SaluteSpeech
+  const [ssVoice, setSsVoice] = useState("Nec_24000");
+  const [ssSpeed, setSsSpeed] = useState(1.0);
+
+  const [voiceProvider, setVoiceProvider] = useState<"yandex" | "elevenlabs" | "proxyapi" | "salutespeech">("yandex");
 
   // ElevenLabs credits
   const [elCredits, setElCredits] = useState<{ used: number; limit: number; tier: string } | null>(null);
@@ -357,9 +362,13 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     if (!selectedChar) return;
     const vc = selectedChar.voice_config;
     const provider = (vc.provider as string) || "yandex";
-    setVoiceProvider(provider === "elevenlabs" ? "elevenlabs" : provider === "proxyapi" ? "proxyapi" : "yandex");
+    setVoiceProvider(provider === "elevenlabs" ? "elevenlabs" : provider === "proxyapi" ? "proxyapi" : provider === "salutespeech" ? "salutespeech" : "yandex");
 
-    if (provider === "proxyapi") {
+    if (provider === "salutespeech") {
+      setSsVoice(vc.voice_id || "Nec_24000");
+      setSsSpeed(vc.speed ?? 1.0);
+      setDirty(false);
+    } else if (provider === "proxyapi") {
       setPaVoice(vc.voice_id || "alloy");
       setPaModel((vc as any).model || "gpt-4o-mini-tts");
       setPaSpeed(vc.speed ?? 1.0);
@@ -458,7 +467,14 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     setSaving(true);
     try {
       const currentChar = characters.find(c => c.id === selectedId);
-      const voiceConfig = voiceProvider === "proxyapi"
+      const voiceConfig = voiceProvider === "salutespeech"
+        ? {
+            provider: "salutespeech",
+            voice_id: ssVoice,
+            speed: ssSpeed,
+            is_extra: currentChar?.voice_config?.is_extra,
+          }
+        : voiceProvider === "proxyapi"
         ? {
             provider: "proxyapi",
             voice_id: paVoice,
@@ -892,7 +908,24 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
       let response: Response;
 
-      if (voiceProvider === "proxyapi") {
+      if (voiceProvider === "salutespeech") {
+        response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/salutespeech-tts`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              text: testText,
+              voice: ssVoice,
+              lang: isRu ? "ru" : "en",
+            }),
+          }
+        );
+      } else if (voiceProvider === "proxyapi") {
         const paBody: Record<string, unknown> = {
           text: testText,
           model: paModel,
@@ -1379,11 +1412,12 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                 {isRu ? "Голос" : "Voice"}
               </h3>
 
-              <Tabs value={voiceProvider} onValueChange={(v) => { setVoiceProvider(v as "yandex" | "elevenlabs" | "proxyapi"); markDirty(); }}>
+              <Tabs value={voiceProvider} onValueChange={(v) => { setVoiceProvider(v as "yandex" | "elevenlabs" | "proxyapi" | "salutespeech"); markDirty(); }}>
                 <TabsList className="w-full">
                   <TabsTrigger value="yandex" className="flex-1 text-xs">Yandex</TabsTrigger>
+                  <TabsTrigger value="salutespeech" className="flex-1 text-xs">Salute</TabsTrigger>
                   <TabsTrigger value="elevenlabs" className="flex-1 text-xs">ElevenLabs</TabsTrigger>
-                  <TabsTrigger value="proxyapi" className="flex-1 text-xs">OpenAI TTS</TabsTrigger>
+                  <TabsTrigger value="proxyapi" className="flex-1 text-xs">OpenAI</TabsTrigger>
                 </TabsList>
 
                 {/* ─── Yandex Tab ─── */}
@@ -1476,6 +1510,58 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                         <RotateCcw className="h-3 w-3" />
                       </Button>
                     </div>
+                  </div>
+                </TabsContent>
+
+                {/* ─── SaluteSpeech Tab ─── */}
+                <TabsContent value="salutespeech" className="space-y-4 mt-3">
+                  {/* Voice selector */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      {isRu ? "Голос" : "Voice"}
+                    </label>
+                    <Select value={ssVoice} onValueChange={v => { setSsVoice(v); markDirty(); }}>
+                      <SelectTrigger className="bg-secondary border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border max-h-64">
+                        {SALUTESPEECH_VOICES.map(v => (
+                          <SelectItem key={v.id} value={v.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{isRu ? v.name.ru : v.name.en}</span>
+                              <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                {v.gender === "female" ? "♀" : "♂"}
+                              </Badge>
+                              <span className="text-[10px] text-muted-foreground">
+                                {isRu ? v.description.ru : v.description.en}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Speed */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Скорость" : "Speed"}</label>
+                      <span className="text-xs text-muted-foreground tabular-nums">{ssSpeed.toFixed(1)}×</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Slider min={0.5} max={2.0} step={0.1} value={[ssSpeed]} onValueChange={([v]) => { setSsSpeed(v); markDirty(); }} className="flex-1" />
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setSsSpeed(1.0); markDirty(); }} disabled={ssSpeed === 1.0}>
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-md border border-border bg-muted/30 p-2.5">
+                    <p className="text-[10px] text-muted-foreground">
+                      {isRu
+                        ? "🇷🇺 SaluteSpeech (Сбер) — бесплатный для физлиц. Поддержка SSML, 6 голосов, формат Opus/WAV."
+                        : "🇷🇺 SaluteSpeech (Sber) — free for individuals. SSML support, 6 voices, Opus/WAV format."}
+                    </p>
                   </div>
                 </TabsContent>
 

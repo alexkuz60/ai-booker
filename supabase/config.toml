@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.salutespeech-test]
 verify_jwt = false
+
+[functions.salutespeech-tts]
+verify_jwt = false
