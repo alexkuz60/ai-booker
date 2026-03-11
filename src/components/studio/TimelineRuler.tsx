@@ -1,13 +1,15 @@
-import { SCENE_SILENCE_SEC, type SceneBoundary } from "@/hooks/useTimelineClips";
+import { SCENE_SILENCE_SEC, type SceneBoundary, type TimelineClip } from "@/hooks/useTimelineClips";
 
 interface TimelineRulerProps {
   zoom: number;
   duration: number;
   /** Scene boundaries with start offset and silence duration */
   sceneBoundaries?: SceneBoundary[];
+  /** All timeline clips – used to compute render progress */
+  clips?: TimelineClip[];
 }
 
-export function TimelineRuler({ zoom, duration, sceneBoundaries }: TimelineRulerProps) {
+export function TimelineRuler({ zoom, duration, sceneBoundaries, clips }: TimelineRulerProps) {
   const marks: number[] = [];
   const step = Math.max(1, Math.round(10 / zoom));
   for (let t = 0; t <= duration; t += step) marks.push(t);
