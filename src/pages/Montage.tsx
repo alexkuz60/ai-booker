@@ -1,13 +1,12 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
-import { Loader2, ZoomIn, ZoomOut, Maximize2, Play, Pause, Square, Volume2, VolumeX, ChevronUp, ChevronDown } from "lucide-react";
+import { Loader2, ZoomIn, ZoomOut, Maximize2, Play, Pause, Square, Volume2, VolumeX, ChevronUp, ChevronDown, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
-import { useTimelineClips, type TimelineClip, type TypeMappingsByScene } from "@/hooks/useTimelineClips";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
 import { MasterMeterPanel } from "@/components/studio/MasterMeterPanel";
@@ -15,31 +14,36 @@ import { MasterEffectsTabs } from "@/components/studio/MasterEffectsTabs";
 import { TimelineMasterMeter } from "@/components/studio/TimelineMasterMeter";
 import { TimelineRuler } from "@/components/studio/TimelineRuler";
 import { Playhead } from "@/components/studio/TimelinePlayhead";
+import { TrackMixerStrip } from "@/components/studio/TrackMixerStrip";
+import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 
 // ─── Types ──────────────────────────────────────────────────
-interface ChapterSceneClip {
-  sceneId: string;
-  sceneIdx: number;
-  label: string;
-  startSec: number;
-  durationSec: number;
-  hasAudio: boolean;
+interface SceneRender {
+  id: string;
+  scene_id: string;
+  voice_path: string | null;
+  atmo_path: string | null;
+  sfx_path: string | null;
+  voice_duration_ms: number;
+  atmo_duration_ms: number;
+  sfx_duration_ms: number;
+  status: string;
 }
 
-const NARRATOR_COLORS = [
-  "hsl(var(--primary))",
-  "hsl(var(--accent))",
-  "hsl(30 70% 55%)",
-  "hsl(280 55% 55%)",
-  "hsl(350 65% 55%)",
-  "hsl(160 50% 45%)",
-  "hsl(200 60% 50%)",
-  "hsl(45 75% 50%)",
-  "hsl(320 55% 50%)",
-  "hsl(100 45% 45%)",
+interface StemTrack {
+  id: string;
+  label: string;
+  color: string;
+}
+
+const STEM_TRACKS: StemTrack[] = [
+  { id: "voice", label: "Voice", color: "hsl(var(--primary))" },
+  { id: "atmosphere", label: "Atmosphere", color: "hsl(175 45% 45%)" },
+  { id: "sfx", label: "SFX", color: "hsl(220 50% 55%)" },
 ];
 
 const SIDEBAR_WIDTH = 280;
+const MIXER_SIDEBAR = 160;
 
 const Montage = () => {
   const { user } = useAuth();
@@ -54,148 +58,154 @@ const Montage = () => {
   const [scenes, setScenes] = useState<{ id: string; title: string; scene_number: number }[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Restore from sessionStorage (when coming from Studio)
+  // Scene renders
+  const [sceneRenders, setSceneRenders] = useState<SceneRender[]>([]);
+  const [rendersLoading, setRendersLoading] = useState(false);
+
+  // Restore from sessionStorage
   useEffect(() => {
     const studioBookId = sessionStorage.getItem("montage_book_id");
     const studioChapterId = sessionStorage.getItem("montage_chapter_id");
-    if (studioBookId) {
-      setSelectedBookId(studioBookId);
-      sessionStorage.removeItem("montage_book_id");
-    }
-    if (studioChapterId) {
-      setSelectedChapterId(studioChapterId);
-      sessionStorage.removeItem("montage_chapter_id");
-    }
+    if (studioBookId) { setSelectedBookId(studioBookId); sessionStorage.removeItem("montage_book_id"); }
+    if (studioChapterId) { setSelectedChapterId(studioChapterId); sessionStorage.removeItem("montage_chapter_id"); }
   }, []);
 
   // Load books
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const { data } = await supabase
-        .from("books")
-        .select("id, title")
-        .eq("user_id", user.id)
-        .order("updated_at", { ascending: false });
+      const { data } = await supabase.from("books").select("id, title").eq("user_id", user.id).order("updated_at", { ascending: false });
       setBooks(data ?? []);
       setLoading(false);
     })();
   }, [user?.id]);
 
-  // Load chapters when book selected
+  // Load chapters
   useEffect(() => {
     if (!selectedBookId) { setChapters([]); setSelectedChapterId(null); return; }
     (async () => {
-      const { data } = await supabase
-        .from("book_chapters")
-        .select("id, title, chapter_number")
-        .eq("book_id", selectedBookId)
-        .order("chapter_number");
+      const { data } = await supabase.from("book_chapters").select("id, title, chapter_number").eq("book_id", selectedBookId).order("chapter_number");
       setChapters(data ?? []);
     })();
   }, [selectedBookId]);
 
-  // Load scenes when chapter selected
+  // Load scenes
   useEffect(() => {
     if (!selectedChapterId) { setScenes([]); return; }
     (async () => {
-      const { data } = await supabase
-        .from("book_scenes")
-        .select("id, title, scene_number")
-        .eq("chapter_id", selectedChapterId)
-        .order("scene_number");
+      const { data } = await supabase.from("book_scenes").select("id, title, scene_number, silence_sec").eq("chapter_id", selectedChapterId).order("scene_number");
       setScenes(data ?? []);
     })();
   }, [selectedChapterId]);
 
   const sceneIds = useMemo(() => scenes.map(s => s.id), [scenes]);
 
-  // ── Character tracks + type mappings ───────────────────────
-  const [speakerToCharId, setSpeakerToCharId] = useState<Map<string, string>>(new Map());
-  const [typeMappings, setTypeMappings] = useState<TypeMappingsByScene>(new Map());
-
+  // Load scene renders
   useEffect(() => {
-    if (!selectedBookId || sceneIds.length === 0) {
-      setSpeakerToCharId(new Map());
-      setTypeMappings(new Map());
-      return;
-    }
+    if (sceneIds.length === 0) { setSceneRenders([]); return; }
+    setRendersLoading(true);
     (async () => {
-      const [{ data: rawMappings }, { data: chars }] = await Promise.all([
-        supabase.from("scene_type_mappings").select("scene_id, segment_type, character_id").in("scene_id", sceneIds),
-        supabase.from("book_characters").select("id, name, aliases").eq("book_id", selectedBookId),
-      ]);
-
-      const tm: TypeMappingsByScene = new Map();
-      if (rawMappings) {
-        for (const m of rawMappings) {
-          let sceneMap = tm.get(m.scene_id);
-          if (!sceneMap) { sceneMap = new Map(); tm.set(m.scene_id, sceneMap); }
-          sceneMap.set(m.segment_type, m.character_id);
-        }
-      }
-      setTypeMappings(tm);
-
-      const nameMap = new Map<string, string>();
-      if (chars) {
-        for (const c of chars) {
-          nameMap.set(c.name.toLowerCase(), c.id);
-          for (const alias of (c.aliases ?? [])) {
-            if (alias) nameMap.set((alias as string).toLowerCase(), c.id);
-          }
-        }
-      }
-      setSpeakerToCharId(nameMap);
+      const { data } = await supabase
+        .from("scene_renders" as any)
+        .select("id, scene_id, voice_path, atmo_path, sfx_path, voice_duration_ms, atmo_duration_ms, sfx_duration_ms, status")
+        .in("scene_id", sceneIds)
+        .eq("status", "ready");
+      setSceneRenders((data as any as SceneRender[]) ?? []);
+      setRendersLoading(false);
     })();
-  }, [selectedBookId, sceneIds.join(",")]);
+  }, [sceneIds.join(",")]);
 
-  // ── Timeline clips ─────────────────────────────────────────
-  const { clips: timelineClips, sceneBoundaries } = useTimelineClips(sceneIds, speakerToCharId, 0, typeMappings);
-  const player = useTimelinePlayer(timelineClips);
+  // Build rendersMap
+  const rendersMap = useMemo(() => {
+    const m = new Map<string, SceneRender>();
+    for (const r of sceneRenders) m.set(r.scene_id, r);
+    return m;
+  }, [sceneRenders]);
 
-  // ── Build chapter scene clips ──────────────────────────────
-  const chapterSceneClips = useMemo<ChapterSceneClip[]>(() => {
-    if (sceneIds.length === 0) return [];
+  const renderedSceneIds = useMemo(() => sceneIds.filter(id => rendersMap.has(id)), [sceneIds, rendersMap]);
+  const unrenderedSceneIds = useMemo(() => sceneIds.filter(id => !rendersMap.has(id)), [sceneIds, rendersMap]);
 
-    const clipsByScene = new Map<string, TimelineClip[]>();
-    for (const c of timelineClips) {
-      const list = clipsByScene.get(c.sceneId) ?? [];
-      list.push(c);
-      clipsByScene.set(c.sceneId, list);
-    }
-
-    const DEFAULT_SCENE_SEC = 30;
-    const result: ChapterSceneClip[] = [];
+  // ── Build timeline clips from rendered stems ───────────────
+  const { clips: timelineClips, sceneBoundaries, totalDurationSec } = useMemo(() => {
+    const clips: TimelineClip[] = [];
+    const boundaries: SceneBoundary[] = [];
     let offset = 0;
 
-    for (let i = 0; i < sceneIds.length; i++) {
-      const sid = sceneIds[i];
-      const sceneInfo = scenes[i];
-      const sceneClips = clipsByScene.get(sid);
-      let sceneDuration: number;
-      let hasAudio = false;
-      if (sceneClips?.length) {
-        sceneDuration = sceneClips.reduce((sum, c) => sum + c.durationSec, 0);
-        hasAudio = sceneClips.some(c => c.hasAudio);
-      } else {
-        sceneDuration = DEFAULT_SCENE_SEC;
-      }
-      result.push({
-        sceneId: sid, sceneIdx: i,
-        label: sceneInfo?.title || `${isRu ? "Сцена" : "Scene"} ${sceneInfo?.scene_number ?? i + 1}`,
-        startSec: offset, durationSec: sceneDuration, hasAudio,
-      });
-      offset += sceneDuration;
-    }
-    return result;
-  }, [sceneIds, scenes, timelineClips, isRu]);
+    for (const sceneId of sceneIds) {
+      const render = rendersMap.get(sceneId);
+      if (!render) continue;
 
-  const duration = chapterSceneClips.length > 0
-    ? chapterSceneClips[chapterSceneClips.length - 1].startSec + chapterSceneClips[chapterSceneClips.length - 1].durationSec
-    : 0;
+      const silenceSec = 2; // default silence between scenes
+      boundaries.push({ startSec: offset, silenceSec, sceneId });
+      const sceneStart = offset + silenceSec;
+
+      // Voice stem
+      if (render.voice_path && render.voice_duration_ms > 0) {
+        clips.push({
+          id: `voice-${sceneId}`,
+          trackId: "voice",
+          speaker: null,
+          startSec: sceneStart,
+          durationSec: render.voice_duration_ms / 1000,
+          label: scenes.find(s => s.id === sceneId)?.title ?? "Voice",
+          segmentType: "voice_stem",
+          hasAudio: true,
+          audioPath: render.voice_path,
+          sceneId,
+        });
+      }
+
+      // Atmosphere stem
+      if (render.atmo_path && render.atmo_duration_ms > 0) {
+        clips.push({
+          id: `atmo-${sceneId}`,
+          trackId: "atmosphere",
+          speaker: null,
+          startSec: sceneStart,
+          durationSec: render.atmo_duration_ms / 1000,
+          label: scenes.find(s => s.id === sceneId)?.title ?? "Atmo",
+          segmentType: "atmo_stem",
+          hasAudio: true,
+          audioPath: render.atmo_path,
+          sceneId,
+        });
+      }
+
+      // SFX stem
+      if (render.sfx_path && render.sfx_duration_ms > 0) {
+        clips.push({
+          id: `sfx-${sceneId}`,
+          trackId: "sfx",
+          speaker: null,
+          startSec: sceneStart,
+          durationSec: render.sfx_duration_ms / 1000,
+          label: scenes.find(s => s.id === sceneId)?.title ?? "SFX",
+          segmentType: "sfx_stem",
+          hasAudio: true,
+          audioPath: render.sfx_path,
+          sceneId,
+        });
+      }
+
+      // Scene duration = max of all stems
+      const maxDur = Math.max(
+        render.voice_duration_ms,
+        render.atmo_duration_ms,
+        render.sfx_duration_ms,
+      ) / 1000;
+      offset = sceneStart + maxDur;
+    }
+
+    return { clips, sceneBoundaries: boundaries, totalDurationSec: offset };
+  }, [sceneIds, rendersMap, scenes]);
+
+  // ── Player ─────────────────────────────────────────────────
+  const player = useTimelinePlayer(timelineClips);
+  const duration = player.totalDuration > 0 ? player.totalDuration : totalDurationSec;
 
   // ── Mixer persistence ──────────────────────────────────────
-  const { scheduleSave: onMixChange } = useMixerPersistence(selectedChapterId, []);
+  const trackIds = useMemo(() => STEM_TRACKS.map(t => t.id), []);
+  const { scheduleSave: onMixChange } = useMixerPersistence(selectedChapterId, trackIds);
 
   // ── Zoom ───────────────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
@@ -203,7 +213,7 @@ const Montage = () => {
 
   useEffect(() => {
     const measure = () => {
-      if (tracksContainerRef.current) setContainerWidth(tracksContainerRef.current.clientWidth - SIDEBAR_WIDTH);
+      if (tracksContainerRef.current) setContainerWidth(tracksContainerRef.current.clientWidth - MIXER_SIDEBAR);
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -281,6 +291,17 @@ const Montage = () => {
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
+  // ── Clips grouped by track ─────────────────────────────────
+  const clipsByTrack = useMemo(() => {
+    const map = new Map<string, TimelineClip[]>();
+    for (const clip of timelineClips) {
+      const list = map.get(clip.trackId) ?? [];
+      list.push(clip);
+      map.set(clip.trackId, list);
+    }
+    return map;
+  }, [timelineClips]);
+
   // ── Page header ────────────────────────────────────────────
   const selectedBook = books.find(b => b.id === selectedBookId);
   const selectedChapter = chapters.find(c => c.id === selectedChapterId);
@@ -334,31 +355,37 @@ const Montage = () => {
           </SelectContent>
         </Select>
 
-        {duration > 0 && (
-          <span className="text-xs text-muted-foreground font-body ml-auto">
-            {scenes.length} {isRu ? "сцен" : "scenes"} · {formatTime(duration)}
-          </span>
+        {sceneIds.length > 0 && (
+          <div className="flex items-center gap-2 ml-auto">
+            {unrenderedSceneIds.length > 0 && (
+              <span className="text-xs text-amber-500 flex items-center gap-1 font-body">
+                <AlertCircle className="h-3 w-3" />
+                {unrenderedSceneIds.length} {isRu ? "не отрендерено" : "not rendered"}
+              </span>
+            )}
+            <span className="text-xs text-muted-foreground font-body">
+              {renderedSceneIds.length}/{scenes.length} {isRu ? "сцен" : "scenes"} · {formatTime(duration)}
+            </span>
+          </div>
         )}
       </div>
 
-      {/* Main content — mastering + effects fill the space above the timeline */}
+      {/* Main content */}
       {selectedChapterId && sceneIds.length > 0 ? (
         <>
           {/* Effects workspace */}
           <div className="flex-1 min-h-0 overflow-hidden p-4">
             <div className="h-full rounded-lg border border-border bg-card/50 overflow-hidden flex">
-              {/* Left: Master Meter */}
               <div className="shrink-0 border-r border-border" style={{ width: `${SIDEBAR_WIDTH}px` }}>
                 <MasterMeterPanel isRu={isRu} width={SIDEBAR_WIDTH} />
               </div>
-              {/* Right: Effects tabs */}
               <div className="flex-1 min-h-0 p-2">
                 <MasterEffectsTabs isRu={isRu} />
               </div>
             </div>
           </div>
 
-          {/* Timeline (collapsible bottom panel) */}
+          {/* Timeline (collapsible bottom panel) — 3 stem tracks */}
           <div
             className="flex flex-col bg-background border-t border-border shrink-0"
             style={{ height: timelineCollapsed ? 41 : timelineHeight }}
@@ -378,7 +405,7 @@ const Montage = () => {
                 <button onClick={() => setTimelineCollapsed(!timelineCollapsed)} className="flex items-center gap-1.5 hover:text-foreground transition-colors">
                   {timelineCollapsed ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-body">
-                    {isRu ? "Монтаж" : "Montage"}
+                    {isRu ? "Стемы" : "Stems"}
                   </span>
                 </button>
 
@@ -411,46 +438,72 @@ const Montage = () => {
               </div>
             </div>
 
-            {/* Scene blocks */}
+            {/* Stem tracks */}
             {!timelineCollapsed && (
-              <div ref={tracksContainerRef} className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
-                <div
-                  className="relative cursor-crosshair"
-                  style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
-                  onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    player.seek(Math.max(0, Math.min(x / (zoom * 4), duration)));
-                  }}
-                >
-                  <div className="sticky top-0 z-20 bg-background">
-                    <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} />
-                  </div>
-                  <div className="flex h-10 border-b border-border/50 relative" style={{ width: `${duration * zoom * 4}px` }}>
-                    {chapterSceneClips.map((sc, i) => {
-                      const widthPx = sc.durationSec * zoom * 4;
+              <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
+                {/* Mixer sidebar */}
+                <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${MIXER_SIDEBAR}px` }}>
+                  <div className="h-6 border-b border-border" />
+                  {STEM_TRACKS.map((track) => (
+                    <TrackMixerStrip
+                      key={track.id}
+                      trackId={track.id}
+                      label={track.label}
+                      color={track.color}
+                      expanded={false}
+                      onMixChange={onMixChange}
+                    />
+                  ))}
+                </div>
+
+                {/* Timeline area */}
+                <div className="flex-1 overflow-x-auto overflow-y-hidden">
+                  <div
+                    className="relative cursor-crosshair"
+                    style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const x = e.clientX - rect.left;
+                      player.seek(Math.max(0, Math.min(x / (zoom * 4), duration)));
+                    }}
+                  >
+                    <div className="sticky top-0 z-20 bg-background">
+                      <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} />
+                    </div>
+
+                    {/* Render stem clips as blocks */}
+                    {STEM_TRACKS.map((track) => {
+                      const trackClips = clipsByTrack.get(track.id) ?? [];
                       return (
-                        <div
-                          key={sc.sceneId}
-                          className={`absolute top-1 bottom-1 rounded-sm cursor-pointer transition-all ${sc.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-50 hover:opacity-70"}`}
-                          style={{
-                            left: `${sc.startSec * zoom * 4}px`,
-                            width: `${widthPx}px`,
-                            backgroundColor: NARRATOR_COLORS[i % NARRATOR_COLORS.length],
-                            backgroundImage: sc.hasAudio ? undefined : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
-                          }}
-                          title={`${sc.label} (${sc.durationSec.toFixed(1)}s)${sc.hasAudio ? " 🔊" : ""}`}
-                        >
-                          {widthPx > 50 && (
-                            <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
-                              {sc.hasAudio ? "🔊 " : ""}{sc.label}
-                            </span>
-                          )}
+                        <div key={track.id} className="h-10 border-b border-border/50 relative">
+                          {trackClips.map((clip) => {
+                            const left = clip.startSec * zoom * 4;
+                            const width = clip.durationSec * zoom * 4;
+                            return (
+                              <div
+                                key={clip.id}
+                                className="absolute top-1 bottom-1 rounded-sm opacity-80 hover:opacity-100 transition-opacity"
+                                style={{
+                                  left: `${left}px`,
+                                  width: `${width}px`,
+                                  backgroundColor: track.color,
+                                }}
+                                title={`${clip.label} (${clip.durationSec.toFixed(1)}s)`}
+                              >
+                                {width > 50 && (
+                                  <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
+                                    {clip.label}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       );
                     })}
+
+                    <Playhead positionSec={player.positionSec} zoom={zoom} />
                   </div>
-                  <Playhead positionSec={player.positionSec} zoom={zoom} />
                 </div>
               </div>
             )}
@@ -463,7 +516,7 @@ const Montage = () => {
               {isRu ? "Выберите книгу и главу для монтажа" : "Select a book and chapter to montage"}
             </p>
             <p className="text-sm font-body">
-              {isRu ? "Все клипы сцен считаются готовыми" : "All scene clips are treated as ready"}
+              {isRu ? "Отрендерите сцены в Студии, затем соберите главу здесь" : "Render scenes in Studio, then assemble the chapter here"}
             </p>
           </div>
         </div>
