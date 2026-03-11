@@ -219,6 +219,7 @@ export function ChapterNavigator({
         const map = new Map<string, number>();
         for (const d of plData) map.set(d.scene_id, d.total_duration_ms);
         setPlaylistDurations(map);
+        onPlaylistDurationsLoaded?.(map);
       }
       if (rnData) {
         const map = new Map<string, "full" | "partial">();
