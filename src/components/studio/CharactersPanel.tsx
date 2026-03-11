@@ -1,21 +1,15 @@
 import { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
-import { Users, UsersRound, Volume2, Loader2, Square, Play, RotateCcw, Save, Sparkles, User, Wand2, Filter, Merge, CheckSquare, X, Check, SearchCheck } from "lucide-react";
+import { Users, UsersRound, Volume2, Loader2, Sparkles, User, Filter, Merge, CheckSquare, X, Check, SearchCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAiRoles } from "@/hooks/useAiRoles";
-import { YANDEX_VOICES, ROLE_LABELS } from "@/config/yandexVoices";
-import { ELEVENLABS_VOICES } from "@/config/elevenlabsVoices";
-import { SALUTESPEECH_VOICES } from "@/config/salutespeechVoices";
-import { PROXYAPI_TTS_VOICES, PROXYAPI_TTS_MODELS, getVoicesForModel } from "@/config/proxyapiVoices";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+import { YANDEX_VOICES } from "@/config/yandexVoices";
+import { VoiceCastingTable } from "@/components/studio/VoiceCastingTable";
 
 // ─── Types ──────────────────────────────────────────────
 
