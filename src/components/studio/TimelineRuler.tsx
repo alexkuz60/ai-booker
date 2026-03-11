@@ -1,13 +1,15 @@
-import { SCENE_SILENCE_SEC, type SceneBoundary } from "@/hooks/useTimelineClips";
+import { SCENE_SILENCE_SEC, type SceneBoundary, type TimelineClip } from "@/hooks/useTimelineClips";
 
 interface TimelineRulerProps {
   zoom: number;
   duration: number;
   /** Scene boundaries with start offset and silence duration */
   sceneBoundaries?: SceneBoundary[];
+  /** All timeline clips – used to compute render progress */
+  clips?: TimelineClip[];
 }
 
-export function TimelineRuler({ zoom, duration, sceneBoundaries }: TimelineRulerProps) {
+export function TimelineRuler({ zoom, duration, sceneBoundaries, clips }: TimelineRulerProps) {
   const marks: number[] = [];
   const step = Math.max(1, Math.round(10 / zoom));
   for (let t = 0; t <= duration; t += step) marks.push(t);
@@ -16,6 +18,13 @@ export function TimelineRuler({ zoom, duration, sceneBoundaries }: TimelineRuler
     const sec = s % 60;
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
+
+  // Compute render progress: furthest end-point of clips that have audio
+  const renderedEndSec = clips?.reduce((max, c) => {
+    if (c.hasAudio && c.audioPath) return Math.max(max, c.startSec + c.durationSec);
+    return max;
+  }, 0) ?? 0;
+  const renderedWidthPx = renderedEndSec * zoom * 4;
   return (
     <div className="flex items-end h-6 border-b border-border relative" style={{ width: `${duration * zoom * 4}px` }}>
       {/* Scene silence gap markers */}
@@ -48,6 +57,16 @@ export function TimelineRuler({ zoom, duration, sceneBoundaries }: TimelineRuler
           <div className={`w-px h-2 bg-border ${t === 0 ? "self-start" : ""}`} />
         </div>
       ))}
+      {/* Render progress line */}
+      {renderedWidthPx > 0 && (
+        <div
+          className="absolute bottom-0 left-0 h-[2px] pointer-events-none z-10 transition-[width] duration-300"
+          style={{
+            width: `${renderedWidthPx}px`,
+            background: "linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)))",
+          }}
+        />
+      )}
     </div>
   );
 }
