@@ -35,6 +35,7 @@ const FIXED_TRACKS: TimelineTrackData[] = [
 
 const TRACK_LABELS_WIDTH_COLLAPSED = 112;
 const TRACK_LABELS_WIDTH_EXPANDED = 360;
+const CHAPTER_SIDEBAR_WIDTH = 224;
 
 const NARRATOR_COLORS = [
   "hsl(var(--primary))",
