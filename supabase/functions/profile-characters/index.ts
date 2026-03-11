@@ -55,6 +55,26 @@ function buildPrompt(
   return { systemPrompt, userPrompt: `## Characters to profile:\n\n${characterList}${narratorContext}` };
 }
 
+/** Extract balanced JSON starting from a given index (handles nested braces/brackets) */
+function extractBalancedJson(text: string, start: number): string | null {
+  const open = text[start];
+  const close = open === "{" ? "}" : open === "[" ? "]" : null;
+  if (!close) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length && i < start + 50000; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\") { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === open) depth++;
+    else if (ch === close) { depth--; if (depth === 0) return text.slice(start, i + 1); }
+  }
+  return null;
+}
+
 async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en", modelOverride?: string, userId?: string): Promise<CharacterProfile[]> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) throw new Error("AI key not configured");
@@ -151,25 +171,64 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       if (!profiles) {
         const content = String(msg?.content || "");
         const reasoning = String((msg as Record<string, unknown>)?.reasoning || "");
-        // Try content first, then reasoning
-        for (const source of [content, reasoning]) {
-          if (profiles) break;
-          const raw = source.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-          if (!raw) continue;
-          try {
-            const p = JSON.parse(raw);
-            profiles = p.characters || (Array.isArray(p) ? p : undefined);
-          } catch {
-            // Try to extract JSON array/object from the text
-            const jsonMatch = raw.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-              try { profiles = JSON.parse(jsonMatch[0]); } catch {}
+        // Also check reasoning_details array (some models nest text there)
+        const reasoningDetails = (msg as Record<string, unknown>)?.reasoning_details;
+        let reasoningText = reasoning;
+        if (Array.isArray(reasoningDetails)) {
+          for (const rd of reasoningDetails) {
+            if (rd && typeof rd === "object" && "content" in (rd as Record<string, unknown>)) {
+              reasoningText += "\n" + String((rd as Record<string, unknown>).content || "");
             }
-            if (!profiles) {
-              const objMatch = raw.match(/\{[\s\S]*"characters"\s*:\s*\[[\s\S]*\]\s*\}/);
-              if (objMatch) {
-                try { profiles = JSON.parse(objMatch[0]).characters; } catch {}
-              }
+          }
+        }
+
+        for (const source of [content, reasoningText]) {
+          if (profiles) break;
+          if (!source?.trim()) continue;
+
+          // Extract all ```json blocks first
+          const codeBlocks = [...source.matchAll(/```(?:json)?\s*\n?([\s\S]*?)```/g)].map(m => m[1].trim());
+          // Also try the raw source stripped of fences
+          const raw = source.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+          const candidates = [...codeBlocks, raw];
+
+          for (const candidate of candidates) {
+            if (profiles) break;
+            if (!candidate) continue;
+
+            // Direct parse
+            try {
+              const p = JSON.parse(candidate);
+              profiles = p.characters || (Array.isArray(p) ? p : undefined);
+              if (profiles) break;
+            } catch {}
+
+            // Find JSON objects with "name" key (character profiles)
+            // Use non-greedy matching to find individual JSON blocks
+            const allJsonBlocks: string[] = [];
+
+            // Match { "characters": [...] }
+            const charObjMatches = candidate.matchAll(/\{\s*"characters"\s*:\s*\[/g);
+            for (const m of charObjMatches) {
+              const start = m.index!;
+              const extracted = extractBalancedJson(candidate, start);
+              if (extracted) allJsonBlocks.push(extracted);
+            }
+
+            // Match standalone arrays starting with [{ "name"
+            const arrMatches = candidate.matchAll(/\[\s*\{\s*"name"/g);
+            for (const m of arrMatches) {
+              const start = m.index!;
+              const extracted = extractBalancedJson(candidate, start);
+              if (extracted) allJsonBlocks.push(extracted);
+            }
+
+            for (const block of allJsonBlocks) {
+              try {
+                const p = JSON.parse(block);
+                const arr = p.characters || (Array.isArray(p) ? p : undefined);
+                if (arr?.length && arr[0]?.name) { profiles = arr; break; }
+              } catch {}
             }
           }
         }
