@@ -287,8 +287,17 @@ function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onAnnotate
   }, [phrase.phrase_id, phrase.text.length, onAnnotate]);
 
   const hasAnnotations = phrase.annotations && phrase.annotations.length > 0;
+
+  const EMOTION_TYPES = new Set(["joy", "sadness", "anger"]);
+  const SOUND_TYPES = new Set(["sigh", "cough", "laugh", "hmm"]);
+
   const availableAnnotations = getAvailableAnnotations(ttsProvider, true);
   const availableInsertions = getAvailableAnnotations(ttsProvider, false).filter(a => !a.needsRange);
+
+  const prosodyItems = availableAnnotations.filter(a => !EMOTION_TYPES.has(a.type) && !SOUND_TYPES.has(a.type));
+  const emotionItems = availableAnnotations.filter(a => EMOTION_TYPES.has(a.type));
+  const soundInsertions = availableInsertions.filter(a => SOUND_TYPES.has(a.type));
+  const otherInsertions = availableInsertions.filter(a => !SOUND_TYPES.has(a.type) && !availableAnnotations.find(x => x.type === a.type));
 
   if (editing) {
     return (
