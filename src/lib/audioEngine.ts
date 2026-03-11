@@ -626,6 +626,16 @@ class AudioEngine {
       return;
     }
 
+    // Ensure AudioContext is running before loading audio buffers
+    if (Tone.getContext().state !== "running") {
+      try {
+        await Tone.start();
+        console.log("[AudioEngine] AudioContext started, state:", Tone.getContext().state);
+      } catch (e) {
+        console.warn("[AudioEngine] Could not start AudioContext:", e);
+      }
+    }
+
     for (const cfg of configs) {
       const bus = this.getBus(cfg.bus ?? "voice");
       const track = new EngineTrack(cfg, bus);
