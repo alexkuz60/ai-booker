@@ -873,7 +873,7 @@ export function StoryboardPanel({
       const typeSpeakerMap = new Map<string, string>();
       let loadedInlineSpeaker: string | null = null;
       if (mappings) {
-        for (const m of mappings as any[]) {
+        for (const m of mappings) {
           const name = charNameMap.get(m.character_id);
           if (name) {
             typeSpeakerMap.set(m.segment_type, name);
