@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ZoomIn, ZoomOut, Maximize2, Play, Pause, Square, Volume2, VolumeX, ChevronUp, ChevronDown, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
+import { resetAudioEngine } from "@/lib/audioEngine";
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
 import { TimelineMasterMeter } from "@/components/studio/TimelineMasterMeter";
 import { TimelineRuler } from "@/components/studio/TimelineRuler";
