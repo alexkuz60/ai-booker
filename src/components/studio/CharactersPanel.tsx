@@ -325,56 +325,25 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     });
   }, [characters, filterMode, sceneCharIds, sceneId, SYSTEM_NAMES]);
 
-  // ── Sync voice settings when character selected ─────────
+  // ── Sync voice settings when character selected (for auto-cast only) ─────────
   useEffect(() => {
     if (!selectedChar) return;
     const vc = selectedChar.voice_config;
     const provider = (vc.provider as string) || "yandex";
     setVoiceProvider(provider === "elevenlabs" ? "elevenlabs" : provider === "proxyapi" ? "proxyapi" : provider === "salutespeech" ? "salutespeech" : "yandex");
-
-    if (provider === "salutespeech") {
-      setSsVoice(vc.voice_id || "Nec_24000");
-      setSsSpeed(vc.speed ?? 1.0);
-      setDirty(false);
-    } else if (provider === "proxyapi") {
-      setPaVoice(vc.voice_id || "alloy");
-      setPaModel((vc as any).model || "gpt-4o-mini-tts");
-      setPaSpeed(vc.speed ?? 1.0);
-      setPaInstructions((vc as any).instructions || "");
-      setDirty(false);
-    } else if (provider === "elevenlabs") {
-      setElVoice(vc.voice_id || "JBFqnCBsd6RMkjVDRZzb");
-      setElStability((vc as any).stability ?? 0.5);
-      setElSimilarity((vc as any).similarity_boost ?? 0.75);
-      setElStyle((vc as any).style ?? 0.4);
-      setElSpeed(vc.speed ?? 0.95);
-      setDirty(false);
-    } else {
-      let voiceId = vc.voice_id || "marina";
-      const savedVoice = YANDEX_VOICES.find(v => v.id === voiceId);
-      if (savedVoice && selectedChar.gender !== "unknown" && savedVoice.gender !== selectedChar.gender) {
-        voiceId = matchVoice(selectedChar.gender, selectedChar.age_group);
-      }
-      setVoice(voiceId);
-      const currentVoice = YANDEX_VOICES.find(v => v.id === voiceId);
-      setRole(currentVoice?.roles?.includes(vc.role || "") ? (vc.role || "neutral") : (currentVoice?.roles?.[0] || vc.role || "neutral"));
-      setSpeed(vc.speed ?? 1.0);
-      setPitch(vc.pitch ?? 0);
-      setVolume(vc.volume ?? 0);
-      setDirty(voiceId !== (vc.voice_id || "marina"));
+    let voiceId = vc.voice_id || "marina";
+    const savedVoice = YANDEX_VOICES.find(v => v.id === voiceId);
+    if (savedVoice && selectedChar.gender !== "unknown" && savedVoice.gender !== selectedChar.gender) {
+      voiceId = matchVoice(selectedChar.gender, selectedChar.age_group);
     }
+    setVoice(voiceId);
+    const currentVoice = YANDEX_VOICES.find(v => v.id === voiceId);
+    setRole(currentVoice?.roles?.includes(vc.role || "") ? (vc.role || "neutral") : (currentVoice?.roles?.[0] || vc.role || "neutral"));
+    setSpeed(vc.speed ?? 1.0);
+    setPitch(vc.pitch ?? 0);
+    setVolume(vc.volume ?? 0);
+    setDirty(false);
   }, [selectedId]);
-
-  const markDirty = () => setDirty(true);
-
-  const handleVoiceChange = (v: string) => {
-    setVoice(v);
-    markDirty();
-    const newVoice = YANDEX_VOICES.find(x => x.id === v);
-    if (newVoice?.roles && !newVoice.roles.includes(role)) {
-      setRole(newVoice.roles[0] || "neutral");
-    }
-  };
 
   // ── AI Profiling (full or incremental) ───────────────
   const runProfile = async (sceneIdsForIncremental?: string[]) => {
