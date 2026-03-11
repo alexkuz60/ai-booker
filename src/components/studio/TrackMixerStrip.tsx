@@ -3,7 +3,7 @@
  * Column layout: [Color dot + Name] | [PreFX] [Vol slider] [Pan slider] [Reverb]
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { getAudioEngine, type TrackMeterData, type TrackMixState } from "@/lib/audioEngine";
 import { VuSlider } from "./VuSlider";
 
@@ -17,6 +17,9 @@ interface TrackMixerStripProps {
   onClick?: () => void;
   onMixChange?: () => void;
 }
+
+/** Threshold in dB above which we consider signal "active" */
+const SIGNAL_THRESHOLD_DB = -50;
 
 export function TrackMixerStrip({
   trackId,
@@ -80,15 +83,31 @@ export function TrackMixerStrip({
   // Collapsed: minimal view — with FX/RV toggles for atmo/sfx tracks
   const isAtmoOrSfx = trackId === "ambience" || trackId.startsWith("atmosphere") || trackId === "sfx" || trackId.startsWith("sfx-");
 
-  // Poll mix state even when collapsed for atmo/sfx (lightweight, only for button state)
+  // Poll mix state even when collapsed for atmo/sfx (lightweight, only for button state + meter)
   useEffect(() => {
     if (expanded || !isAtmoOrSfx) return;
     let running = true;
     const interval = setInterval(() => {
-      if (running) setMix(engine.getTrackMixState(trackId));
-    }, 200);
+      if (running) {
+        setMix(engine.getTrackMixState(trackId));
+        setMeter(engine.getTrackMeter(trackId));
+      }
+    }, 100);
     return () => { running = false; clearInterval(interval); };
   }, [expanded, isAtmoOrSfx, trackId, engine]);
+
+  // Signal activity flag
+  const hasSignal = (meter?.level ?? -60) > SIGNAL_THRESHOLD_DB;
+  const fxActive = !mix?.preFxBypassed && hasSignal;
+  const rvActive = !mix?.reverbBypassed && hasSignal;
+
+  // Glow intensity based on signal level (0..1)
+  const glowIntensity = useMemo(() => {
+    const level = meter?.level ?? -60;
+    if (level <= SIGNAL_THRESHOLD_DB) return 0;
+    // Map -50..-6 dB → 0..1
+    return Math.min(1, Math.max(0, (level - SIGNAL_THRESHOLD_DB) / (SIGNAL_THRESHOLD_DB * -0.88)));
+  }, [meter?.level]);
 
   if (!expanded) {
     return (
@@ -110,6 +129,9 @@ export function TrackMixerStrip({
                   ? "border-border text-muted-foreground/40 bg-transparent"
                   : "border-accent text-accent bg-accent/15"
               }`}
+              style={fxActive ? {
+                boxShadow: `0 0 ${4 + glowIntensity * 6}px hsl(var(--accent) / ${0.3 + glowIntensity * 0.4})`,
+              } : undefined}
               onClick={(e) => { e.stopPropagation(); togglePreFxBypass(); }}
               title="Pre-FX"
             >
@@ -121,6 +143,9 @@ export function TrackMixerStrip({
                   ? "border-border text-muted-foreground/40 bg-transparent"
                   : "border-primary text-primary bg-primary/15"
               }`}
+              style={rvActive ? {
+                boxShadow: `0 0 ${4 + glowIntensity * 6}px hsl(var(--primary) / ${0.3 + glowIntensity * 0.4})`,
+              } : undefined}
               onClick={(e) => { e.stopPropagation(); toggleReverbBypass(); }}
               title="Reverb"
             >
@@ -160,6 +185,9 @@ export function TrackMixerStrip({
               ? "border-border text-muted-foreground/60 bg-transparent"
               : "border-accent text-accent bg-accent/15"
           }`}
+          style={fxActive ? {
+            boxShadow: `0 0 ${4 + glowIntensity * 8}px hsl(var(--accent) / ${0.35 + glowIntensity * 0.45})`,
+          } : undefined}
           onClick={(e) => { e.stopPropagation(); togglePreFxBypass(); }}
           title="Pre-FX"
         >
@@ -193,6 +221,9 @@ export function TrackMixerStrip({
               ? "border-border text-muted-foreground/60 bg-transparent"
               : "border-primary text-primary bg-primary/15"
           }`}
+          style={rvActive ? {
+            boxShadow: `0 0 ${4 + glowIntensity * 8}px hsl(var(--primary) / ${0.35 + glowIntensity * 0.45})`,
+          } : undefined}
           onClick={(e) => { e.stopPropagation(); toggleReverbBypass(); }}
           title="Reverb"
         >
