@@ -11,6 +11,7 @@ import { PageHeaderProvider } from "@/hooks/usePageHeader";
 import Home from "./pages/Home";
 import Parser from "./pages/Parser";
 import Studio from "./pages/Studio";
+import Montage from "./pages/Montage";
 import Narrators from "./pages/Narrators";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
@@ -39,6 +40,7 @@ function ProtectedRoutes() {
           <Route path="/" element={<Home />} />
           <Route path="/parser" element={<Parser />} />
           <Route path="/studio" element={<Studio />} />
+          <Route path="/montage" element={<Montage />} />
           <Route path="/narrators" element={<Narrators />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/admin" element={<Admin />} />
