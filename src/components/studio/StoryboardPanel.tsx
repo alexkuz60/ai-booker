@@ -277,11 +277,10 @@ function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onAnnotate
       const offset = sel ? sel.end : phrase.text.length;
       onAnnotate(phrase.phrase_id, { type, offset, durationMs: durationMs ?? 500 });
     } else {
-      if (!sel) {
-        // No selection was captured
-        return;
-      }
-      onAnnotate(phrase.phrase_id, { type, start: sel.start, end: sel.end });
+      if (!sel) return;
+      // Smart emphasis: single letter → stress (word accent), multi-char → emphasis
+      const actualType = type === "emphasis" && (sel.end - sel.start) === 1 ? "stress" as AnnotationType : type;
+      onAnnotate(phrase.phrase_id, { type: actualType, start: sel.start, end: sel.end });
     }
     savedSelection.current = null;
   }, [phrase.phrase_id, phrase.text.length, onAnnotate]);
