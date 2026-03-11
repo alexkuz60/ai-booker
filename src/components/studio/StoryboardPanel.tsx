@@ -204,6 +204,8 @@ function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onAnnotate
   const [draft, setDraft] = useState(phrase.text);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const textRef = useRef<HTMLParagraphElement>(null);
+  // Store selection when context menu opens (before browser clears it)
+  const savedSelection = useRef<{ start: number; end: number } | null>(null);
 
   useEffect(() => {
     if (editing && textareaRef.current) {
@@ -230,7 +232,18 @@ function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onAnnotate
     // Check selection is inside our text element
     if (!textRef.current.contains(range.startContainer) || !textRef.current.contains(range.endContainer)) return null;
 
-    // Calculate offsets by walking text nodes
+    // Calculate offsets relative to the original phrase text
+    // We need to ignore annotation markup (emojis, prefixes) and only count actual text chars
+    const textContent = phrase.text;
+    const selText = sel.toString();
+    
+    // Try to find the selected text in the phrase
+    const selStart = textContent.indexOf(selText);
+    if (selStart >= 0) {
+      return { start: selStart, end: selStart + selText.length };
+    }
+
+    // Fallback: walk text nodes but skip nodes with select-none class
     const walker = document.createTreeWalker(textRef.current, NodeFilter.SHOW_TEXT);
     let offset = 0;
     let start = -1;
@@ -238,6 +251,10 @@ function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onAnnotate
     let node: Node | null;
 
     while ((node = walker.nextNode())) {
+      // Skip text inside annotation markers (select-none spans)
+      const parent = node.parentElement;
+      if (parent?.classList.contains("select-none")) continue;
+      
       const len = (node.textContent || "").length;
       if (node === range.startContainer) start = offset + range.startOffset;
       if (node === range.endContainer) end = offset + range.endOffset;
@@ -246,19 +263,28 @@ function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onAnnotate
 
     if (start >= 0 && end > start) return { start, end };
     return null;
-  }, []);
+  }, [phrase.text]);
+
+  // Capture selection on right-click before context menu steals focus
+  const handleContextMenu = useCallback(() => {
+    savedSelection.current = getSelectionOffsets();
+  }, [getSelectionOffsets]);
 
   const handleAnnotate = useCallback((type: AnnotationType, durationMs?: number) => {
+    // Use saved selection (captured before context menu opened)
+    const sel = savedSelection.current;
     if (isInsertionAnnotation(type)) {
-      const sel = getSelectionOffsets();
       const offset = sel ? sel.end : phrase.text.length;
       onAnnotate(phrase.phrase_id, { type, offset, durationMs: durationMs ?? 500 });
     } else {
-      const sel = getSelectionOffsets();
-      if (!sel) return;
+      if (!sel) {
+        // No selection was captured
+        return;
+      }
       onAnnotate(phrase.phrase_id, { type, start: sel.start, end: sel.end });
     }
-  }, [phrase.phrase_id, phrase.text.length, getSelectionOffsets, onAnnotate]);
+    savedSelection.current = null;
+  }, [phrase.phrase_id, phrase.text.length, onAnnotate]);
 
   const hasAnnotations = phrase.annotations && phrase.annotations.length > 0;
   const availableAnnotations = getAvailableAnnotations(ttsProvider, true);
@@ -305,7 +331,7 @@ function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onAnnotate
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className="flex gap-2 px-3 py-1.5 hover:bg-accent/20 transition-colors group">
+        <div onContextMenu={handleContextMenu} className="flex gap-2 px-3 py-1.5 hover:bg-accent/20 transition-colors group">
           <span className="text-[10px] text-muted-foreground font-mono pt-0.5 shrink-0 w-5 text-right">
             {phrase.phrase_number}
           </span>
