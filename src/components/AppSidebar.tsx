@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen, LogOut, Shield, MessageCircle } from "lucide-react";
+import { Home, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen, LogOut, Shield, MessageCircle, Scissors } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useTheme } from "next-themes";
