@@ -211,15 +211,17 @@ const Montage = () => {
   const tracksContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
+  const timelineVisible = !!selectedChapterId && sceneIds.length > 0 && !timelineCollapsed;
+
   useEffect(() => {
-    const measure = () => {
-      if (tracksContainerRef.current) setContainerWidth(tracksContainerRef.current.clientWidth - MIXER_SIDEBAR);
-    };
+    const el = tracksContainerRef.current;
+    if (!el) { setContainerWidth(0); return; }
+    const measure = () => setContainerWidth(el.clientWidth - MIXER_SIDEBAR);
     measure();
     const ro = new ResizeObserver(measure);
-    if (tracksContainerRef.current) ro.observe(tracksContainerRef.current);
+    ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [timelineVisible]);
 
   const fitZoom = useMemo(() => {
     if (containerWidth <= 0 || duration <= 0) return 1;
