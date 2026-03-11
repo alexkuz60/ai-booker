@@ -1837,6 +1837,9 @@ export function StoryboardPanel({
                       isRu={isRu}
                       onSave={savePhrase}
                       onSplit={handleSplitAtPhrase}
+                      ttsProvider={seg.speaker ? (speakerProviderMap.get(seg.speaker.toLowerCase()) ?? "yandex") : "yandex"}
+                      onAnnotate={saveAnnotation}
+                      onRemoveAnnotation={removeAnnotation}
                     />
                   ))}
                 </div>
