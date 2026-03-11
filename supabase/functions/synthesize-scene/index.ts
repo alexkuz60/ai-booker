@@ -251,6 +251,124 @@ async function callProxyApiTts(
   return { audio, durationMs };
 }
 
+// ── Phrase annotation types (mirroring phraseAnnotations.ts) ─────────
+
+interface PhraseAnnotation {
+  type: "pause" | "emphasis" | "whisper" | "slow" | "fast";
+  offset?: number;
+  start?: number;
+  end?: number;
+  durationMs?: number;
+  rate?: number;
+}
+
+// ── Apply annotations to text → SSML (Yandex v1) ────────────────────
+
+function applyAnnotationsSsml(text: string, annotations: PhraseAnnotation[]): string {
+  if (!annotations.length) return escapeXml(text);
+
+  // Separate insertions (pause) and ranges
+  type Insert = { offset: number; ssml: string };
+  type Range = { start: number; end: number; openTag: string; closeTag: string };
+
+  const inserts: Insert[] = [];
+  const ranges: Range[] = [];
+
+  for (const a of annotations) {
+    if (a.type === "pause") {
+      inserts.push({ offset: a.offset ?? text.length, ssml: `<break time="${a.durationMs ?? 500}ms"/>` });
+    } else if (a.start !== undefined && a.end !== undefined) {
+      switch (a.type) {
+        case "emphasis":
+          ranges.push({ start: a.start, end: a.end, openTag: '<emphasis>', closeTag: '</emphasis>' });
+          break;
+        case "whisper":
+          ranges.push({ start: a.start, end: a.end, openTag: '<prosody volume="silent">', closeTag: '</prosody>' });
+          break;
+        case "slow":
+          ranges.push({ start: a.start, end: a.end, openTag: `<prosody rate="${a.rate ?? 0.7}">`, closeTag: '</prosody>' });
+          break;
+        case "fast":
+          ranges.push({ start: a.start, end: a.end, openTag: `<prosody rate="${a.rate ?? 1.4}">`, closeTag: '</prosody>' });
+          break;
+      }
+    }
+  }
+
+  inserts.sort((a, b) => a.offset - b.offset);
+  ranges.sort((a, b) => a.start - b.start);
+
+  // Build char-by-char output
+  let result = "";
+  let insertIdx = 0;
+
+  for (let i = 0; i <= text.length; i++) {
+    // Insert pauses at this offset
+    while (insertIdx < inserts.length && inserts[insertIdx].offset === i) {
+      result += ` ${inserts[insertIdx].ssml} `;
+      insertIdx++;
+    }
+    if (i >= text.length) break;
+
+    // Check range openings
+    for (const r of ranges) {
+      if (r.start === i) result += r.openTag;
+    }
+
+    result += escapeXml(text[i]);
+
+    // Check range closings
+    for (const r of ranges) {
+      if (r.end === i + 1) result += r.closeTag;
+    }
+  }
+
+  return result;
+}
+
+// ── Apply annotations to plain text (ProxyAPI / ElevenLabs / v3) ─────
+
+function applyAnnotationsText(text: string, annotations: PhraseAnnotation[]): { text: string; extraInstructions: string[] } {
+  if (!annotations.length) return { text, extraInstructions: [] };
+
+  const extraInstructions: string[] = [];
+  let modified = text;
+
+  // Collect range annotations for instructions
+  for (const a of annotations) {
+    if (a.start !== undefined && a.end !== undefined) {
+      const fragment = text.slice(a.start, a.end);
+      switch (a.type) {
+        case "whisper":
+          extraInstructions.push(`Whisper the phrase: "${fragment}"`);
+          break;
+        case "slow":
+          extraInstructions.push(`Say slowly: "${fragment}"`);
+          break;
+        case "fast":
+          extraInstructions.push(`Say quickly: "${fragment}"`);
+          break;
+        case "emphasis":
+          extraInstructions.push(`Emphasize: "${fragment}"`);
+          break;
+      }
+    }
+  }
+
+  // Apply pause insertions as "..." in text (sorted descending to preserve offsets)
+  const pauses = annotations
+    .filter(a => a.type === "pause")
+    .map(a => ({ offset: a.offset ?? text.length, durationMs: a.durationMs ?? 500 }))
+    .sort((a, b) => b.offset - a.offset);
+
+  for (const p of pauses) {
+    const dots = p.durationMs >= 1500 ? "...... " : p.durationMs >= 750 ? "... " : ".. ";
+    modified = modified.slice(0, p.offset) + dots + modified.slice(p.offset);
+  }
+
+  return { text: modified, extraInstructions };
+}
+
 // ── SSML builder for dialogue with inline narration pauses ───────────
 
 function buildDialogueSsml(
