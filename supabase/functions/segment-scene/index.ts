@@ -76,7 +76,7 @@ Each segment must have:
 - "type": one of ${SEGMENT_TYPES.join(", ")}
 - "speaker": string or null (only for dialogue / first_person)
 - "text": the exact text of the segment (preserve original wording)
-- "inline_narrations": array (optional, for dialogue only) — narrator insertions embedded within a character's speech
+- "inline_narrations": array (optional, for dialogue/monologue only) — narrator insertions embedded within a character's speech
 
 Rules:
 - "narrator" = third-person narration, descriptions, action
