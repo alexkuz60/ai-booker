@@ -28,6 +28,7 @@ interface Phrase {
   phrase_id: string;
   phrase_number: number;
   text: string;
+  annotations?: PhraseAnnotation[];
 }
 
 interface InlineNarration {
