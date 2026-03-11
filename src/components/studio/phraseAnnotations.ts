@@ -193,6 +193,22 @@ export const ANNOTATION_STYLES: Record<
     className: "font-bold text-red-400",
     prefix: "😡",
   },
+  sigh: {
+    className: "",
+    prefix: " 😮‍💨 ",
+  },
+  cough: {
+    className: "",
+    prefix: " 🤧 ",
+  },
+  laugh: {
+    className: "",
+    prefix: " 😂 ",
+  },
+  hmm: {
+    className: "",
+    prefix: " 🤔 ",
+  },
 };
 
 /** Resolve TTS provider from a voice_config object */
