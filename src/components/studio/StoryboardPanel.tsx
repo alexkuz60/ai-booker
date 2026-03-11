@@ -1205,7 +1205,7 @@ export function StoryboardPanel({
 
     const { error } = await supabase
       .from("segment_phrases")
-      .update({ metadata: updatedMeta })
+      .update({ metadata: updatedMeta as any })
       .eq("id", phraseId);
 
     if (error) {
