@@ -362,9 +362,13 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     if (!selectedChar) return;
     const vc = selectedChar.voice_config;
     const provider = (vc.provider as string) || "yandex";
-    setVoiceProvider(provider === "elevenlabs" ? "elevenlabs" : provider === "proxyapi" ? "proxyapi" : "yandex");
+    setVoiceProvider(provider === "elevenlabs" ? "elevenlabs" : provider === "proxyapi" ? "proxyapi" : provider === "salutespeech" ? "salutespeech" : "yandex");
 
-    if (provider === "proxyapi") {
+    if (provider === "salutespeech") {
+      setSsVoice(vc.voice_id || "Nec_24000");
+      setSsSpeed(vc.speed ?? 1.0);
+      setDirty(false);
+    } else if (provider === "proxyapi") {
       setPaVoice(vc.voice_id || "alloy");
       setPaModel((vc as any).model || "gpt-4o-mini-tts");
       setPaSpeed(vc.speed ?? 1.0);
