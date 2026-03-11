@@ -632,25 +632,47 @@ class AudioEngine {
       this.tracks.set(cfg.id, track);
     }
 
-    this._totalDuration = Math.max(
-      ...configs.map((c) => c.startSec + c.durationSec)
-    );
+    // Wait for all players to load; drop tracks that failed to load
+    const loadResults = await Promise.all(
+      Array.from(this.tracks.entries()).map(async ([id, t]) => {
+        const loaded = await new Promise<boolean>((resolve) => {
+          if (t.player.loaded) {
+            resolve(true);
+            return;
+          }
 
-    // Wait for all players to load
-    const loadPromises = Array.from(this.tracks.values()).map(
-      (t) =>
-        new Promise<void>((resolve) => {
-          if (t.player.loaded) { resolve(); return; }
+          const timeout = setTimeout(() => resolve(false), 30_000);
           const check = () => {
-            if (t.player.loaded) resolve();
-            else setTimeout(check, 50);
+            if (t.player.loaded) {
+              clearTimeout(timeout);
+              resolve(true);
+            } else {
+              setTimeout(check, 50);
+            }
           };
           check();
-          setTimeout(resolve, 30_000);
-        })
+        });
+
+        return { id, track: t, loaded };
+      })
     );
 
-    await Promise.all(loadPromises);
+    for (const result of loadResults) {
+      if (!result.loaded) {
+        result.track.dispose();
+        this.tracks.delete(result.id);
+      }
+    }
+
+    if (this.tracks.size === 0) {
+      this._totalDuration = 0;
+      this.notify();
+      throw new Error("AudioEngine: no tracks loaded");
+    }
+
+    this._totalDuration = Math.max(
+      ...Array.from(this.tracks.values()).map((t) => t.startSec + t.durationSec)
+    );
 
     this.transport.cancel();
     for (const t of this.tracks.values()) t.schedule();

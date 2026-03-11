@@ -105,6 +105,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
         await engine.loadTracks(configs);
       } catch (err) {
         console.error("[useTimelinePlayer] Failed to load tracks:", err);
+        toast.error("Не удалось загрузить аудиодорожки. Обновите страницу и попробуйте снова.");
       }
     };
 
