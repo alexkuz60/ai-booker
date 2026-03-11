@@ -80,8 +80,11 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
   if (!LOVABLE_API_KEY) throw new Error("AI key not configured");
 
   const usedModel = modelOverride || "google/gemini-3-flash-preview";
+  const isReasoningModel = usedModel.includes("gpt-5") || usedModel.includes("o3") || usedModel.includes("o4");
   const aiStart = Date.now();
-  const aiBody = JSON.stringify({
+
+  // Build two variants: with tools (preferred) and without (fallback for reasoning models)
+  const toolsPayload = {
     model: usedModel,
     messages: [
       { role: "system", content: systemPrompt },
@@ -119,7 +122,21 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       },
     }],
     tool_choice: { type: "function", function: { name: "save_character_profiles" } },
-  });
+  };
+
+  const jsonPromptSuffix = `\n\nIMPORTANT: Return ONLY a valid JSON object with a "characters" array. No markdown, no explanations. Example format:\n{"characters": [{"name": "...", "aliases": [...], "gender": "male", "age_group": "adult", "temperament": "...", "speech_style": "...", "description": "..."}]}`;
+  const plainPayload = {
+    model: usedModel,
+    messages: [
+      { role: "system", content: systemPrompt + jsonPromptSuffix },
+      { role: "user", content: userPrompt },
+    ],
+    temperature: 0.3,
+    max_tokens: 4096,
+  };
+
+  // For reasoning models, skip tools entirely (they don't support tool_choice)
+  let useToolsMode = !isReasoningModel;
 
   const MAX_RETRIES = 3;
   let profiles: CharacterProfile[] | undefined;
