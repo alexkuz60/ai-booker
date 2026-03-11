@@ -243,6 +243,17 @@ Deno.serve(async (req) => {
       const audioBytes = await synthRes.arrayBuffer();
       const synthMs = Date.now() - t1;
 
+      // If raw=true, return audio bytes directly (for TTS test button)
+      if (body.raw) {
+        return new Response(audioBytes, {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "audio/ogg",
+            "X-Synth-Latency-Ms": String(synthMs),
+          },
+        });
+      }
+
       return new Response(
         JSON.stringify({
           ok: true,
