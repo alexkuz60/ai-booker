@@ -147,10 +147,11 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 120_000);
 
+      const currentPayload = useToolsMode ? toolsPayload : plainPayload;
       const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${LOVABLE_API_KEY}` },
-        body: aiBody,
+        body: JSON.stringify(currentPayload),
         signal: controller.signal,
       });
       clearTimeout(timeout);
