@@ -69,7 +69,7 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     label_ru: "🤫 Шёпот",
     label_en: "🤫 Whisper",
     emoji: "🤫",
-    providers: ["yandex"],
+    providers: ["yandex", "salutespeech"],
     needsRange: true,
   },
   {
