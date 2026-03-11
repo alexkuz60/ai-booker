@@ -80,8 +80,11 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
   if (!LOVABLE_API_KEY) throw new Error("AI key not configured");
 
   const usedModel = modelOverride || "google/gemini-3-flash-preview";
+  const isReasoningModel = usedModel.includes("gpt-5") || usedModel.includes("o3") || usedModel.includes("o4");
   const aiStart = Date.now();
-  const aiBody = JSON.stringify({
+
+  // Build two variants: with tools (preferred) and without (fallback for reasoning models)
+  const toolsPayload = {
     model: usedModel,
     messages: [
       { role: "system", content: systemPrompt },
@@ -119,7 +122,21 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       },
     }],
     tool_choice: { type: "function", function: { name: "save_character_profiles" } },
-  });
+  };
+
+  const jsonPromptSuffix = `\n\nIMPORTANT: Return ONLY a valid JSON object with a "characters" array. No markdown, no explanations. Example format:\n{"characters": [{"name": "...", "aliases": [...], "gender": "male", "age_group": "adult", "temperament": "...", "speech_style": "...", "description": "..."}]}`;
+  const plainPayload = {
+    model: usedModel,
+    messages: [
+      { role: "system", content: systemPrompt + jsonPromptSuffix },
+      { role: "user", content: userPrompt },
+    ],
+    temperature: 0.3,
+    max_tokens: 4096,
+  };
+
+  // For reasoning models, skip tools entirely (they don't support tool_choice)
+  let useToolsMode = !isReasoningModel;
 
   const MAX_RETRIES = 3;
   let profiles: CharacterProfile[] | undefined;
@@ -130,10 +147,11 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 120_000);
 
+      const currentPayload = useToolsMode ? toolsPayload : plainPayload;
       const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${LOVABLE_API_KEY}` },
-        body: aiBody,
+        body: JSON.stringify(currentPayload),
         signal: controller.signal,
       });
       clearTimeout(timeout);
@@ -244,8 +262,13 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
 
       // Log raw response for debugging
       const reasoningLen = String((msg as Record<string, unknown>)?.reasoning || "").length;
-      console.log(`Attempt ${attempt} unparseable. Keys: ${JSON.stringify(Object.keys(msg || {}))}. Tool calls: ${toolCall?.function?.name}. Content len: ${(msg?.content || "").length}. Reasoning len: ${reasoningLen}`);
+      console.log(`Attempt ${attempt} unparseable (tools=${useToolsMode}). Keys: ${JSON.stringify(Object.keys(msg || {}))}. Tool calls: ${toolCall?.function?.name}. Content len: ${(msg?.content || "").length}. Reasoning len: ${reasoningLen}`);
       lastError = "AI returned unparseable response";
+      // If tools mode failed (reasoning model?), switch to plain JSON mode for next attempt
+      if (useToolsMode) {
+        useToolsMode = false;
+        console.log("Switching to plain JSON mode for next attempt");
+      }
       if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, 1500 * attempt));
     } catch (fetchErr) {
       lastError = String(fetchErr);
