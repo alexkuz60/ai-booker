@@ -287,8 +287,17 @@ function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onAnnotate
   }, [phrase.phrase_id, phrase.text.length, onAnnotate]);
 
   const hasAnnotations = phrase.annotations && phrase.annotations.length > 0;
+
+  const EMOTION_TYPES = new Set(["joy", "sadness", "anger"]);
+  const SOUND_TYPES = new Set(["sigh", "cough", "laugh", "hmm"]);
+
   const availableAnnotations = getAvailableAnnotations(ttsProvider, true);
   const availableInsertions = getAvailableAnnotations(ttsProvider, false).filter(a => !a.needsRange);
+
+  const prosodyItems = availableAnnotations.filter(a => !EMOTION_TYPES.has(a.type) && !SOUND_TYPES.has(a.type));
+  const emotionItems = availableAnnotations.filter(a => EMOTION_TYPES.has(a.type));
+  const soundInsertions = availableInsertions.filter(a => SOUND_TYPES.has(a.type));
+  const otherInsertions = availableInsertions.filter(a => !SOUND_TYPES.has(a.type) && !availableAnnotations.find(x => x.type === a.type));
 
   if (editing) {
     return (
@@ -359,7 +368,8 @@ function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onAnnotate
           </ContextMenuItem>
         ) : (
           <>
-            {availableAnnotations.map((a) =>
+            {/* Prosody annotations (pause, emphasis, whisper, slow, fast) */}
+            {prosodyItems.map((a) =>
               a.type === "pause" ? (
                 <ContextMenuSub key={a.type}>
                   <ContextMenuSubTrigger className="text-xs gap-2">
@@ -389,36 +399,62 @@ function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onAnnotate
                 </ContextMenuItem>
               )
             )}
-            {availableInsertions.filter(a => !availableAnnotations.find(x => x.type === a.type)).map((a) =>
-              a.type === "pause" ? (
-                <ContextMenuSub key={`ins-${a.type}`}>
-                  <ContextMenuSubTrigger className="text-xs gap-2">
-                    <span>{a.emoji}</span>
-                    {isRu ? "Пауза" : "Pause"}
-                  </ContextMenuSubTrigger>
-                  <ContextMenuSubContent className="min-w-[7rem]">
-                    {[250, 500, 1000, 2000].map((ms) => (
-                      <ContextMenuItem
-                        key={ms}
-                        onClick={() => handleAnnotate("pause", ms)}
-                        className="text-xs gap-2"
-                      >
-                        ⏸ {ms >= 1000 ? `${ms / 1000}с` : `${ms}мс`}
-                      </ContextMenuItem>
-                    ))}
-                  </ContextMenuSubContent>
-                </ContextMenuSub>
-              ) : (
-                <ContextMenuItem
-                  key={`ins-${a.type}`}
-                  onClick={() => handleAnnotate(a.type)}
-                  className="text-xs gap-2"
-                >
-                  <span>{a.emoji}</span>
-                  {isRu ? a.label_ru.replace(/^. /, "") : a.label_en.replace(/^. /, "")}
-                </ContextMenuItem>
-              )
+
+            {/* Emotions submenu */}
+            {emotionItems.length > 0 && (
+              <ContextMenuSub>
+                <ContextMenuSubTrigger className="text-xs gap-2">
+                  <span>🎭</span>
+                  {isRu ? "Эмоции" : "Emotions"}
+                </ContextMenuSubTrigger>
+                <ContextMenuSubContent className="min-w-[8rem]">
+                  {emotionItems.map((a) => (
+                    <ContextMenuItem
+                      key={a.type}
+                      onClick={() => handleAnnotate(a.type)}
+                      className="text-xs gap-2"
+                    >
+                      <span>{a.emoji}</span>
+                      {isRu ? a.label_ru.replace(/^. /, "") : a.label_en.replace(/^. /, "")}
+                    </ContextMenuItem>
+                  ))}
+                </ContextMenuSubContent>
+              </ContextMenuSub>
             )}
+
+            {/* Sound insertions submenu */}
+            {soundInsertions.length > 0 && (
+              <ContextMenuSub>
+                <ContextMenuSubTrigger className="text-xs gap-2">
+                  <span>🔊</span>
+                  {isRu ? "Звуки" : "Sounds"}
+                </ContextMenuSubTrigger>
+                <ContextMenuSubContent className="min-w-[8rem]">
+                  {soundInsertions.map((a) => (
+                    <ContextMenuItem
+                      key={a.type}
+                      onClick={() => handleAnnotate(a.type)}
+                      className="text-xs gap-2"
+                    >
+                      <span>{a.emoji}</span>
+                      {isRu ? a.label_ru.replace(/^. /, "") : a.label_en.replace(/^. /, "")}
+                    </ContextMenuItem>
+                  ))}
+                </ContextMenuSubContent>
+              </ContextMenuSub>
+            )}
+
+            {/* Other insertions (non-pause, non-sound) */}
+            {otherInsertions.map((a) => (
+              <ContextMenuItem
+                key={`ins-${a.type}`}
+                onClick={() => handleAnnotate(a.type)}
+                className="text-xs gap-2"
+              >
+                <span>{a.emoji}</span>
+                {isRu ? a.label_ru.replace(/^. /, "") : a.label_en.replace(/^. /, "")}
+              </ContextMenuItem>
+            ))}
           </>
         )}
         {hasAnnotations && (
