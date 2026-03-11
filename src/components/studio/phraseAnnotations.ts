@@ -145,6 +145,18 @@ export const ANNOTATION_STYLES: Record<
     className: "underline decoration-dotted decoration-rose-400/60 text-rose-300",
     prefix: "🐇",
   },
+  joy: {
+    className: "text-yellow-400 font-medium",
+    prefix: "😊",
+  },
+  sadness: {
+    className: "text-blue-400 italic",
+    prefix: "😢",
+  },
+  anger: {
+    className: "font-bold text-red-400",
+    prefix: "😡",
+  },
 };
 
 /** Resolve TTS provider from a voice_config object */
