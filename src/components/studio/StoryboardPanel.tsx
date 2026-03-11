@@ -1301,7 +1301,7 @@ export function StoryboardPanel({
         const word = m[0].toLowerCase();
         const stressedIndex = stressPos - m.index;
         // Upsert to dictionary (ignore if already exists)
-        await supabase.from("stress_dictionary" as any).upsert(
+        await supabase.from("stress_dictionary").upsert(
           { user_id: (await supabase.auth.getUser()).data.user?.id, word, stressed_index: stressedIndex },
           { onConflict: "user_id,word,stressed_index" }
         );
