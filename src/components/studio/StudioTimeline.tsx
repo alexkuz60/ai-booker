@@ -609,12 +609,15 @@ export function StudioTimeline({
             {allTracks.map((track) => {
               const charId = track.id.startsWith("char-") ? track.id.slice(5) : null;
               const isSelected = charId != null && charId === selectedCharacterId;
-              const engineClipIds = timelineClips.filter(c => c.trackId === track.id).map(c => c.id);
+              const engineClipIds = timelineClips
+                .filter(c => c.trackId === track.id && c.hasAudio && !!c.audioPath)
+                .map(c => c.id);
               return (
                 <TrackMixerStrip
                   key={track.id}
-                  trackId={engineClipIds[0] ?? track.id}
+                  trackId={track.id}
                   allClipIds={engineClipIds}
+                  fallbackEngineId={engineClipIds[0] ?? track.id}
                   label={track.label}
                   color={track.color}
                   expanded={mixerExpanded}

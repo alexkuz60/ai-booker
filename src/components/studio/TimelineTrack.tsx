@@ -110,11 +110,7 @@ export function TimelineTrack({
           clipLenSec: c.clipLenSec,
         };
       })
-    : track.type === "atmosphere"
-      ? [{ id: "atm", start: 0, end: duration, durationSec: duration, label: track.label, type: "atmosphere", hasAudio: false, fadeInSec: 0, fadeOutSec: 0, loop: false, clipLenSec: undefined }]
-      : track.type === "sfx"
-        ? []
-        : [];
+    : [];
 
   return (
     <div className="flex h-10 border-b border-border/50 relative" style={{ width: `${duration * zoom * 4}px` }}>
