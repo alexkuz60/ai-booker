@@ -90,6 +90,32 @@ export function StudioTimeline({
   const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
   const isRendering = renderProgress !== null && renderProgress.phase !== "done" && renderProgress.phase !== "error";
 
+  // Check if current scene already has a completed render
+  const [hasExistingRender, setHasExistingRender] = useState(false);
+  useEffect(() => {
+    setHasExistingRender(false);
+    setRenderProgress(null);
+    if (!sceneId) return;
+    (async () => {
+      const { data } = await supabase
+        .from("scene_renders")
+        .select("voice_path, atmo_path, sfx_path")
+        .eq("scene_id", sceneId)
+        .maybeSingle();
+      if (data) {
+        const paths = [data.voice_path, data.atmo_path, data.sfx_path].filter(Boolean);
+        setHasExistingRender(paths.length > 0);
+      }
+    })();
+  }, [sceneId]);
+
+  // Compute render percent for ruler
+  const rulerRenderPercent = isRendering
+    ? (renderProgress?.percent ?? 0)
+    : renderProgress?.phase === "done" || hasExistingRender
+      ? 100
+      : null;
+
   const handleRenderScene = useCallback(async () => {
     if (!sceneId || !user || isRendering) return;
     try {
@@ -644,7 +670,7 @@ export function StudioTimeline({
               }}
             >
               <div className="sticky top-0 z-20 bg-background">
-                <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} clips={timelineClips} />
+                <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} renderPercent={rulerRenderPercent} />
               </div>
               {allTracks.map((track) => (
                 <TimelineTrack
