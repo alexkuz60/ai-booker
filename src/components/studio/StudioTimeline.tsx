@@ -249,8 +249,17 @@ export function StudioTimeline({
     const clip = timelineClips.find(c => c.id === selectedSegmentId);
     if (clip != null) {
       player.seek(clip.startSec);
+      // centerPlayhead is called below after it's defined — use a ref-based approach
+      if (sceneScrollRef.current && sceneZoomPercent > 100) {
+        requestAnimationFrame(() => {
+          const el = sceneScrollRef.current;
+          if (!el) return;
+          const px = clip.startSec * zoom * 4;
+          el.scrollTo({ left: Math.max(0, px - el.clientWidth / 2), behavior: "smooth" });
+        });
+      }
     }
-  }, [selectedSegmentId, timelineClips, player]);
+  }, [selectedSegmentId, timelineClips, player, zoom, sceneZoomPercent]);
 
 
   // Group clips by track ID (scene mode)
