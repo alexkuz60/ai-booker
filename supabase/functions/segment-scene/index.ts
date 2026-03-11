@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
     const systemPrompt = `You are a literary text analyst. Given a scene text, split it into structural segments.
 Each segment must have:
 - "type": one of ${SEGMENT_TYPES.join(", ")}
-- "speaker": string or null (only for dialogue / first_person)
+- "speaker": string or null (required for dialogue/monologue/first_person, null for others)
 - "text": the exact text of the segment (preserve original wording)
 - "inline_narrations": array (optional, for dialogue/monologue only) — narrator insertions embedded within a character's speech
 
