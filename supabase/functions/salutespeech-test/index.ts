@@ -177,7 +177,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { action } = await req.json().catch(() => ({ action: "token" }));
+    const body = await req.json().catch(() => ({ action: "token" }));
+    const { action, voice: reqVoice, text: reqText } = body;
 
     // Step 1: Get access token
     const t0 = Date.now();
@@ -200,8 +201,8 @@ Deno.serve(async (req) => {
 
     // Step 2: Test synthesis
     if (action === "synthesize") {
-      const text = "Привет! Это тестовый синтез речи через SaluteSpeech.";
-      const voice = "Nec_24000"; // Наталья
+      const text = reqText || "Привет! Это тестовый синтез речи через SaluteSpeech.";
+      const voice = reqVoice || "Nec_24000";
 
       const client = createRuClient();
       let synthRes: Response;
