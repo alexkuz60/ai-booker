@@ -696,8 +696,13 @@ Deno.serve(async (req) => {
       const voiceConfig = resolveVoice(seg.speaker, voiceConfigMap);
 
       // ── Cache check: skip if audio exists with same voice config ──
+      // Include annotations in hash so annotation changes trigger re-synthesis
+      const annotSuffix = segmentHasAnnotations[i]
+        ? JSON.stringify((phrasesBySegment.get(seg.id) ?? []).map(p => p.annotations))
+        : "";
+      const textHashForCache = hashText(text + annotSuffix);
       const cached = existingAudioMap.get(seg.id);
-      if (cached && !forceResynthesize && !voiceConfigChanged(voiceConfig, cached.voice_config, hashText(text))) {
+      if (cached && !forceResynthesize && !voiceConfigChanged(voiceConfig, cached.voice_config, textHashForCache)) {
         // Also check that the text hasn't changed by verifying the file still exists
         // (we trust the DB record — if segment_audio says "ready", it's good)
         console.log(`Cache hit for segment ${seg.id}: voice=${voiceConfig.voice}, skipping TTS`);
