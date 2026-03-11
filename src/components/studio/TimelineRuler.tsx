@@ -11,7 +11,7 @@ interface TimelineRulerProps {
   isRendering?: boolean;
 }
 
-export function TimelineRuler({ zoom, duration, sceneBoundaries, renderPercent }: TimelineRulerProps) {
+export function TimelineRuler({ zoom, duration, sceneBoundaries, renderPercent, isRendering }: TimelineRulerProps) {
   const marks: number[] = [];
   const step = Math.max(1, Math.round(10 / zoom));
   for (let t = 0; t <= duration; t += step) marks.push(t);
