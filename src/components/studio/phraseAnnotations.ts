@@ -8,7 +8,11 @@ export type AnnotationType =
   | "fast"
   | "joy"
   | "sadness"
-  | "anger";
+  | "anger"
+  | "sigh"
+  | "cough"
+  | "laugh"
+  | "hmm";
 
 export interface PhraseAnnotation {
   type: AnnotationType;
