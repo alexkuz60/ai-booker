@@ -251,6 +251,50 @@ async function callProxyApiTts(
   return { audio, durationMs };
 }
 
+// ── SaluteSpeech TTS call helper ──────────────────────────────────
+
+async function callSaluteSpeechTts(
+  saluteSpeechUrl: string,
+  authHeader: string,
+  params: {
+    text?: string;
+    ssml?: string;
+    voice: string;
+    lang: string;
+  }
+): Promise<{ audio: Uint8Array; durationMs: number } | { error: string }> {
+  const body: Record<string, unknown> = {
+    voice: params.voice,
+    lang: params.lang,
+    format: "opus",
+  };
+  if (params.ssml) {
+    body.ssml = params.ssml;
+  } else {
+    body.text = params.text;
+  }
+
+  const resp = await fetch(saluteSpeechUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: authHeader,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    const errBody = await resp.text();
+    return { error: `SaluteSpeech TTS ${resp.status}: ${errBody}` };
+  }
+
+  const audioBuffer = await resp.arrayBuffer();
+  const audio = new Uint8Array(audioBuffer);
+  // Opus duration estimation: ~32kbps average for speech
+  const durationMs = Math.round((audio.length / 4000) * 1000);
+  return { audio, durationMs };
+}
+
 // ── Phrase annotation types (mirroring phraseAnnotations.ts) ─────────
 
 interface PhraseAnnotation {
