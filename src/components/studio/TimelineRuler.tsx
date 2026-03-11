@@ -18,6 +18,13 @@ export function TimelineRuler({ zoom, duration, sceneBoundaries, clips }: Timeli
     const sec = s % 60;
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
+
+  // Compute render progress: furthest end-point of clips that have audio
+  const renderedEndSec = clips?.reduce((max, c) => {
+    if (c.hasAudio && c.audioPath) return Math.max(max, c.startSec + c.durationSec);
+    return max;
+  }, 0) ?? 0;
+  const renderedWidthPx = renderedEndSec * zoom * 4;
   return (
     <div className="flex items-end h-6 border-b border-border relative" style={{ width: `${duration * zoom * 4}px` }}>
       {/* Scene silence gap markers */}
