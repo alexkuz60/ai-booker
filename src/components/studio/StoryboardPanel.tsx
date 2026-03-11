@@ -1280,6 +1280,35 @@ export function StoryboardPanel({
     })));
   }, [isRu]);
 
+  // Auto-add word to stress dictionary when user creates a stress annotation
+  const addToStressDictionary = useCallback(async (phraseId: string, annotation: PhraseAnnotation) => {
+    if (annotation.type !== "stress" || annotation.start === undefined) return;
+    // Find the phrase text
+    let phraseText = "";
+    for (const seg of segments) {
+      const ph = seg.phrases.find(p => p.phrase_id === phraseId);
+      if (ph) { phraseText = ph.text; break; }
+    }
+    if (!phraseText) return;
+
+    // Extract the word containing the stressed letter
+    const stressPos = annotation.start;
+    const wordRegex = /[а-яёА-ЯЁ]+/g;
+    let m: RegExpExecArray | null;
+    while ((m = wordRegex.exec(phraseText)) !== null) {
+      if (stressPos >= m.index && stressPos < m.index + m[0].length) {
+        const word = m[0].toLowerCase();
+        const stressedIndex = stressPos - m.index;
+        // Upsert to dictionary (ignore if already exists)
+        await supabase.from("stress_dictionary" as any).upsert(
+          { user_id: (await supabase.auth.getUser()).data.user?.id, word, stressed_index: stressedIndex },
+          { onConflict: "user_id,word,stressed_index" }
+        );
+        break;
+      }
+    }
+  }, [segments]);
+
   // Save annotation to phrase metadata
   const saveAnnotation = useCallback(async (phraseId: string, annotation: PhraseAnnotation) => {
     // Find current phrase
@@ -1313,6 +1342,11 @@ export function StoryboardPanel({
       return;
     }
 
+    // Auto-add stress annotations to dictionary
+    if (annotation.type === "stress") {
+      addToStressDictionary(phraseId, annotation);
+    }
+
     setSegments(prev => prev.map(seg => ({
       ...seg,
       phrases: seg.phrases.map(ph =>
@@ -1320,7 +1354,7 @@ export function StoryboardPanel({
       ),
     })));
     toast.success(isRu ? "Аннотация добавлена" : "Annotation added");
-  }, [segments, isRu]);
+  }, [segments, isRu, addToStressDictionary]);
 
   // Remove annotation by index
   const removeAnnotation = useCallback(async (phraseId: string, index: number) => {
