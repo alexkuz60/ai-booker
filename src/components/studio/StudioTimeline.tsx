@@ -670,7 +670,7 @@ export function StudioTimeline({
               }}
             >
               <div className="sticky top-0 z-20 bg-background">
-                <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} renderPercent={rulerRenderPercent} />
+                <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} renderPercent={rulerRenderPercent} isRendering={isRendering} />
               </div>
               {allTracks.map((track) => (
                 <TimelineTrack
