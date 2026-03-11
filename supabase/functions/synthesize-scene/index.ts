@@ -254,7 +254,7 @@ async function callProxyApiTts(
 // ── Phrase annotation types (mirroring phraseAnnotations.ts) ─────────
 
 interface PhraseAnnotation {
-  type: "pause" | "emphasis" | "whisper" | "slow" | "fast" | "joy" | "sadness" | "anger" | "sigh" | "cough" | "laugh" | "hmm";
+  type: "pause" | "emphasis" | "stress" | "whisper" | "slow" | "fast" | "joy" | "sadness" | "anger" | "sigh" | "cough" | "laugh" | "hmm";
   offset?: number;
   start?: number;
   end?: number;
@@ -287,6 +287,9 @@ function applyAnnotationsSsml(text: string, annotations: PhraseAnnotation[]): st
       };
       // Insert a break to simulate the sound effect gap
       inserts.push({ offset: a.offset ?? text.length, ssml: `<break time="300ms"/>` });
+    } else if (a.type === "stress" && a.start !== undefined) {
+      // Word stress: insert '+' before the stressed vowel in Yandex SSML
+      inserts.push({ offset: a.start, ssml: '+' });
     } else if (a.start !== undefined && a.end !== undefined) {
       switch (a.type) {
         case "emphasis":
@@ -356,7 +359,13 @@ function applyAnnotationsText(text: string, annotations: PhraseAnnotation[]): { 
 
   // Collect range annotations for instructions
   for (const a of annotations) {
-    if (a.start !== undefined && a.end !== undefined) {
+    if (a.type === "stress" && a.start !== undefined) {
+      // Find the word containing the stressed letter
+      const wordStart = text.lastIndexOf(' ', a.start - 1) + 1;
+      const wordEnd = text.indexOf(' ', a.start);
+      const word = text.slice(wordStart, wordEnd === -1 ? text.length : wordEnd);
+      extraInstructions.push(`Stress the letter "${text[a.start]}" in the word "${word}"`);
+    } else if (a.start !== undefined && a.end !== undefined) {
       const fragment = text.slice(a.start, a.end);
       switch (a.type) {
         case "whisper":

@@ -3,6 +3,7 @@
 export type AnnotationType =
   | "pause"
   | "emphasis"
+  | "stress"
   | "whisper"
   | "slow"
   | "fast"
@@ -168,6 +169,9 @@ export const ANNOTATION_STYLES: Record<
   },
   emphasis: {
     className: "font-bold text-amber-400",
+  },
+  stress: {
+    className: "font-bold text-amber-300 underline decoration-solid decoration-amber-400",
   },
   whisper: {
     className: "italic text-purple-400/80",
