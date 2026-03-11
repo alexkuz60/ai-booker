@@ -57,6 +57,16 @@ export function TimelineRuler({ zoom, duration, sceneBoundaries, clips }: Timeli
           <div className={`w-px h-2 bg-border ${t === 0 ? "self-start" : ""}`} />
         </div>
       ))}
+      {/* Render progress line */}
+      {renderedWidthPx > 0 && (
+        <div
+          className="absolute bottom-0 left-0 h-[2px] pointer-events-none z-10 transition-[width] duration-300"
+          style={{
+            width: `${renderedWidthPx}px`,
+            background: "linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)))",
+          }}
+        />
+      )}
     </div>
   );
 }
