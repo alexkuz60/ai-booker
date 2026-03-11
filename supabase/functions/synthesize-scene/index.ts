@@ -287,6 +287,9 @@ function applyAnnotationsSsml(text: string, annotations: PhraseAnnotation[]): st
       };
       // Insert a break to simulate the sound effect gap
       inserts.push({ offset: a.offset ?? text.length, ssml: `<break time="300ms"/>` });
+    } else if (a.type === "stress" && a.start !== undefined) {
+      // Word stress: insert '+' before the stressed vowel in Yandex SSML
+      inserts.push({ offset: a.start, ssml: '+' });
     } else if (a.start !== undefined && a.end !== undefined) {
       switch (a.type) {
         case "emphasis":
