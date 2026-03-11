@@ -17,6 +17,7 @@ import { ApiKeysTab } from '@/components/profile/tabs/ApiKeysTab';
 import { ApiRoutersTab } from '@/components/profile/tabs/ApiRoutersTab';
 import { StorageTab } from '@/components/profile/tabs/StorageTab';
 import { AiRolesTab } from '@/components/profile/tabs/AiRolesTab';
+import { AiUsageWidget } from '@/components/profile/AiUsageWidget';
 
 export default function Profile() {
   const { theme, setTheme } = useTheme();
