@@ -391,6 +391,7 @@ async function handleAIRequest(
     }
     const usage = data.usage;
     console.log(`[parse-book-structure] latency=${latencyMs}ms tokens_in=${usage?.prompt_tokens ?? '?'} tokens_out=${usage?.completion_tokens ?? '?'} total=${usage?.total_tokens ?? '?'}`);
+    if (userId) logAiUsage({ userId, modelId: model, requestType: `parse-structure${mode ? `-${mode}` : ''}`, status: "success", latencyMs, tokensInput: usage?.prompt_tokens, tokensOutput: usage?.completion_tokens });
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
 
     if (toolCall) {
