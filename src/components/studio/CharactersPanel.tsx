@@ -908,7 +908,24 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
       let response: Response;
 
-      if (voiceProvider === "proxyapi") {
+      if (voiceProvider === "salutespeech") {
+        response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/salutespeech-tts`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              text: testText,
+              voice: ssVoice,
+              lang: isRu ? "ru" : "en",
+            }),
+          }
+        );
+      } else if (voiceProvider === "proxyapi") {
         const paBody: Record<string, unknown> = {
           text: testText,
           model: paModel,
