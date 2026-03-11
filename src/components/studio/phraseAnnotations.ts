@@ -221,6 +221,7 @@ export function resolveProvider(voiceConfig: Record<string, unknown> | null | un
   const p = voiceConfig.provider as string | undefined;
   if (p === "elevenlabs") return "elevenlabs";
   if (p === "proxyapi" || p === "openai") return "proxyapi";
+  if (p === "salutespeech") return "salutespeech";
   if (p === "yandex" || !p) return "yandex"; // default to yandex
   return "unknown";
 }
