@@ -377,7 +377,6 @@ export function StudioTimeline({
 
   // ── Layout / zoom ─────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
-  const sceneScrollRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
   useEffect(() => {
