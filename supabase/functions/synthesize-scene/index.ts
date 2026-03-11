@@ -1049,10 +1049,12 @@ Deno.serve(async (req) => {
         }
 
         // Upload main audio
-        const storagePath = `${userId}/tts/${scene_id}/${seg.id}.mp3`;
+        const audioExt = isSaluteSpeechVoice ? "ogg" : "mp3";
+        const audioMime = isSaluteSpeechVoice ? "audio/ogg" : "audio/mpeg";
+        const storagePath = `${userId}/tts/${scene_id}/${seg.id}.${audioExt}`;
         const { error: uploadErr } = await supabaseAdmin.storage
           .from("user-media")
-          .upload(storagePath, dialogueAudio, { contentType: "audio/mpeg", upsert: true });
+          .upload(storagePath, dialogueAudio, { contentType: audioMime, upsert: true });
 
         if (uploadErr) {
           console.error(`Upload failed for segment ${seg.id}:`, uploadErr);
