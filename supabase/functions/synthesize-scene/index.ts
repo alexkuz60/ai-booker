@@ -801,8 +801,8 @@ Deno.serve(async (req) => {
           { onConflict: "segment_id" }
         );
 
-        // Update segment metadata with inline narration audio info
-        if (narrationResults.length > 0) {
+        // Update segment metadata (add or clear inline narration audio info)
+        if (narrationResults.length > 0 || metadata.inline_narrations_audio) {
           await supabaseAdmin
             .from("scene_segments")
             .update({ metadata: updatedMetadata })
