@@ -524,15 +524,17 @@ Deno.serve(async (req) => {
     const segIds = segments.map((s) => s.id);
     const { data: phrases } = await supabase
       .from("segment_phrases")
-      .select("id, segment_id, phrase_number, text")
+      .select("id, segment_id, phrase_number, text, metadata")
       .in("segment_id", segIds)
       .order("phrase_number");
 
-    // Group phrases by segment
-    const phrasesBySegment = new Map<string, string[]>();
+    // Group phrases by segment (with annotations)
+    const phrasesBySegment = new Map<string, Array<{ text: string; annotations: PhraseAnnotation[] }>>();
     for (const p of phrases ?? []) {
       const list = phrasesBySegment.get(p.segment_id) ?? [];
-      list.push(p.text);
+      const meta = (p.metadata ?? {}) as Record<string, unknown>;
+      const annotations = (meta.annotations ?? []) as PhraseAnnotation[];
+      list.push({ text: p.text, annotations });
       phrasesBySegment.set(p.segment_id, list);
     }
 
