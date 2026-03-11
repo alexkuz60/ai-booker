@@ -602,11 +602,12 @@ export function StudioTimeline({
             {allTracks.map((track) => {
               const charId = track.id.startsWith("char-") ? track.id.slice(5) : null;
               const isSelected = charId != null && charId === selectedCharacterId;
-              const engineTrackId = timelineClips.find(c => c.trackId === track.id)?.id;
+              const engineClipIds = timelineClips.filter(c => c.trackId === track.id).map(c => c.id);
               return (
                 <TrackMixerStrip
                   key={track.id}
-                  trackId={engineTrackId ?? track.id}
+                  trackId={engineClipIds[0] ?? track.id}
+                  allClipIds={engineClipIds}
                   label={track.label}
                   color={track.color}
                   expanded={mixerExpanded}

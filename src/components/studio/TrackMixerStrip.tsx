@@ -9,6 +9,7 @@ import { VuSlider } from "./VuSlider";
 
 interface TrackMixerStripProps {
   trackId: string;
+  allClipIds?: string[];
   label: string;
   color: string;
   expanded: boolean;
