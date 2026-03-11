@@ -359,7 +359,13 @@ function applyAnnotationsText(text: string, annotations: PhraseAnnotation[]): { 
 
   // Collect range annotations for instructions
   for (const a of annotations) {
-    if (a.start !== undefined && a.end !== undefined) {
+    if (a.type === "stress" && a.start !== undefined) {
+      // Find the word containing the stressed letter
+      const wordStart = text.lastIndexOf(' ', a.start - 1) + 1;
+      const wordEnd = text.indexOf(' ', a.start);
+      const word = text.slice(wordStart, wordEnd === -1 ? text.length : wordEnd);
+      extraInstructions.push(`Stress the letter "${text[a.start]}" in the word "${word}"`);
+    } else if (a.start !== undefined && a.end !== undefined) {
       const fragment = text.slice(a.start, a.end);
       switch (a.type) {
         case "whisper":
