@@ -11,6 +11,7 @@ import { PageHeaderProvider } from "@/hooks/usePageHeader";
 import Home from "./pages/Home";
 import Parser from "./pages/Parser";
 import Studio from "./pages/Studio";
+import Montage from "./pages/Montage";
 import Narrators from "./pages/Narrators";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
