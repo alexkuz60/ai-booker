@@ -61,15 +61,19 @@ export function TrackMixerStrip({
 
   const toggleReverbBypass = useCallback(() => {
     if (!mix) return;
-    engine.setTrackReverbBypassed(trackId, !mix.reverbBypassed);
+    const newVal = !mix.reverbBypassed;
+    const ids = allClipIds.length > 0 ? allClipIds : [trackId];
+    for (const id of ids) engine.setTrackReverbBypassed(id, newVal);
     onMixChange?.();
-  }, [engine, trackId, mix, onMixChange]);
+  }, [engine, trackId, allClipIds, mix, onMixChange]);
 
   const togglePreFxBypass = useCallback(() => {
     if (!mix) return;
-    engine.setTrackPreFxBypassed(trackId, !mix.preFxBypassed);
+    const newVal = !mix.preFxBypassed;
+    const ids = allClipIds.length > 0 ? allClipIds : [trackId];
+    for (const id of ids) engine.setTrackPreFxBypassed(id, newVal);
     onMixChange?.();
-  }, [engine, trackId, mix, onMixChange]);
+  }, [engine, trackId, allClipIds, mix, onMixChange]);
 
   // Collapsed: minimal view — with FX/RV toggles for atmo/sfx tracks
   const isAtmoOrSfx = trackId === "ambience" || trackId.startsWith("atmosphere") || trackId === "sfx" || trackId.startsWith("sfx-");
