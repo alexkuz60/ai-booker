@@ -10,6 +10,7 @@ import { VuSlider } from "./VuSlider";
 interface TrackMixerStripProps {
   trackId: string;
   allClipIds?: string[];
+  fallbackEngineId?: string;
   label: string;
   color: string;
   expanded: boolean;
@@ -24,6 +25,7 @@ const SIGNAL_THRESHOLD_DB = -50;
 export function TrackMixerStrip({
   trackId,
   allClipIds = [],
+  fallbackEngineId,
   label,
   color,
   expanded,
@@ -36,8 +38,12 @@ export function TrackMixerStrip({
   const [mix, setMix] = useState<TrackMixState | null>(null);
   const [meter, setMeter] = useState<TrackMeterData | null>(null);
 
-  // Helper: find first valid mix/meter across all clip IDs
-  const effectiveIds = allClipIds.length > 0 ? allClipIds : [trackId];
+  // IDs in engine that should receive mix changes for this logical track
+  const effectiveIds = useMemo(() => {
+    if (allClipIds.length > 0) return allClipIds;
+    if (fallbackEngineId) return [fallbackEngineId];
+    return [trackId];
+  }, [allClipIds, fallbackEngineId, trackId]);
 
   const pollState = useCallback(() => {
     let bestMix: TrackMixState | null = null;
@@ -72,13 +78,15 @@ export function TrackMixerStrip({
 
   const handleVolumeChange = useCallback((v: number) => {
     for (const id of effectiveIds) engine.setTrackVolume(id, v);
+    pollState();
     onMixChange?.();
-  }, [engine, effectiveIds, onMixChange]);
+  }, [engine, effectiveIds, onMixChange, pollState]);
 
   const handlePanChange = useCallback((p: number) => {
     for (const id of effectiveIds) engine.setTrackPan(id, p / 100);
+    pollState();
     onMixChange?.();
-  }, [engine, effectiveIds, onMixChange]);
+  }, [engine, effectiveIds, onMixChange, pollState]);
 
   const toggleReverbBypass = useCallback(() => {
     // Read current state from any available clip
@@ -86,16 +94,18 @@ export function TrackMixerStrip({
     if (!currentMix) return;
     const newVal = !currentMix.reverbBypassed;
     for (const id of effectiveIds) engine.setTrackReverbBypassed(id, newVal);
+    pollState();
     onMixChange?.();
-  }, [engine, effectiveIds, onMixChange]);
+  }, [engine, effectiveIds, onMixChange, pollState]);
 
   const togglePreFxBypass = useCallback(() => {
     const currentMix = effectiveIds.reduce<TrackMixState | null>((acc, id) => acc ?? engine.getTrackMixState(id), null);
     if (!currentMix) return;
     const newVal = !currentMix.preFxBypassed;
     for (const id of effectiveIds) engine.setTrackPreFxBypassed(id, newVal);
+    pollState();
     onMixChange?.();
-  }, [engine, effectiveIds, onMixChange]);
+  }, [engine, effectiveIds, onMixChange, pollState]);
 
   // Signal activity flag
   const hasSignal = (meter?.level ?? -60) > SIGNAL_THRESHOLD_DB;
