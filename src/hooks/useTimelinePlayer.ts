@@ -67,7 +67,11 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
             .from("user-media")
             .createSignedUrl(clip.audioPath!, 3600);
           if (error || !data?.signedUrl) return null;
-          return { clip, url: data.signedUrl };
+          const rawUrl = data.signedUrl;
+          const absoluteUrl = rawUrl.startsWith("http")
+            ? rawUrl
+            : `${import.meta.env.VITE_SUPABASE_URL}/storage/v1${rawUrl}`;
+          return { clip, url: absoluteUrl };
         })
       );
 
@@ -101,6 +105,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
         await engine.loadTracks(configs);
       } catch (err) {
         console.error("[useTimelinePlayer] Failed to load tracks:", err);
+        toast.error("Не удалось загрузить аудиодорожки. Обновите страницу и попробуйте снова.");
       }
     };
 
