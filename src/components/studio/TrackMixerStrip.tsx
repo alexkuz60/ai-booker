@@ -9,6 +9,7 @@ import { VuSlider } from "./VuSlider";
 
 interface TrackMixerStripProps {
   trackId: string;
+  allClipIds?: string[];
   label: string;
   color: string;
   expanded: boolean;
@@ -19,6 +20,7 @@ interface TrackMixerStripProps {
 
 export function TrackMixerStrip({
   trackId,
+  allClipIds = [],
   label,
   color,
   expanded,
@@ -48,26 +50,32 @@ export function TrackMixerStrip({
   }, [expanded, trackId, engine]);
 
   const handleVolumeChange = useCallback((v: number) => {
-    engine.setTrackVolume(trackId, v);
+    const ids = allClipIds.length > 0 ? allClipIds : [trackId];
+    for (const id of ids) engine.setTrackVolume(id, v);
     onMixChange?.();
-  }, [engine, trackId, onMixChange]);
+  }, [engine, trackId, allClipIds, onMixChange]);
 
   const handlePanChange = useCallback((p: number) => {
-    engine.setTrackPan(trackId, p / 100);
+    const ids = allClipIds.length > 0 ? allClipIds : [trackId];
+    for (const id of ids) engine.setTrackPan(id, p / 100);
     onMixChange?.();
-  }, [engine, trackId, onMixChange]);
+  }, [engine, trackId, allClipIds, onMixChange]);
 
   const toggleReverbBypass = useCallback(() => {
     if (!mix) return;
-    engine.setTrackReverbBypassed(trackId, !mix.reverbBypassed);
+    const newVal = !mix.reverbBypassed;
+    const ids = allClipIds.length > 0 ? allClipIds : [trackId];
+    for (const id of ids) engine.setTrackReverbBypassed(id, newVal);
     onMixChange?.();
-  }, [engine, trackId, mix, onMixChange]);
+  }, [engine, trackId, allClipIds, mix, onMixChange]);
 
   const togglePreFxBypass = useCallback(() => {
     if (!mix) return;
-    engine.setTrackPreFxBypassed(trackId, !mix.preFxBypassed);
+    const newVal = !mix.preFxBypassed;
+    const ids = allClipIds.length > 0 ? allClipIds : [trackId];
+    for (const id of ids) engine.setTrackPreFxBypassed(id, newVal);
     onMixChange?.();
-  }, [engine, trackId, mix, onMixChange]);
+  }, [engine, trackId, allClipIds, mix, onMixChange]);
 
   // Collapsed: minimal view — with FX/RV toggles for atmo/sfx tracks
   const isAtmoOrSfx = trackId === "ambience" || trackId.startsWith("atmosphere") || trackId === "sfx" || trackId.startsWith("sfx-");
