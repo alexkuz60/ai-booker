@@ -269,6 +269,10 @@ export function StudioTimeline({
   const estimateDuration = sceneDurationSec && sceneDurationSec > 0 ? sceneDurationSec : 60;
   const duration = player.totalDuration > 0 ? player.totalDuration : estimateDuration;
 
+  // Keep refs current for render callback
+  timelineClipsRef.current = timelineClips;
+  durationRef.current = duration;
+
   // Auto-add narrator-fallback + atmosphere tracks if clips reference them
   const allTracks = useMemo(() => {
     const hasNarratorFallback = timelineClips.some(c => c.trackId === "narrator-fallback");
