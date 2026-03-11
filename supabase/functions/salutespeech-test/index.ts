@@ -96,7 +96,7 @@ async function getAccessToken(authKey: string): Promise<string> {
     return cachedToken.token;
   }
 
-  const rquid = crypto.randomUUID().replace(/-/g, "");
+  const rquid = crypto.randomUUID();
   const client = createRuClient();
 
   let res: Response;
