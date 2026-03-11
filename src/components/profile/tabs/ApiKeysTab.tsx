@@ -40,11 +40,12 @@ function renderHint(p: typeof TTS_PROVIDERS[number], isRu: boolean) {
   );
 }
 
-type TtsProvider = 'elevenlabs' | 'yandex_speechkit';
+type TtsProvider = 'elevenlabs' | 'yandex_speechkit' | 'salute_speech';
 
 const TTS_ENDPOINTS: Record<TtsProvider, string> = {
   elevenlabs: 'elevenlabs-tts',
   yandex_speechkit: 'yandex-tts',
+  salute_speech: 'salutespeech-test',
 };
 
 const TTS_TEST_BODY: Record<TtsProvider, (isRu: boolean) => Record<string, string>> = {
@@ -57,6 +58,11 @@ const TTS_TEST_BODY: Record<TtsProvider, (isRu: boolean) => Record<string, strin
     text: isRu ? 'Привет! Это тестовое сообщение от AI Booker.' : 'Hello! This is a test message from AI Booker.',
     voice: 'alena',
     lang: isRu ? 'ru' : 'en',
+  }),
+  salute_speech: (isRu) => ({
+    action: 'synthesize',
+    text: isRu ? 'Привет! Это тестовое сообщение от AI Booker.' : 'Hello! This is a test message from AI Booker.',
+    voice: 'Nec_24000',
   }),
 };
 
