@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
       .from("scene_segments")
       .select("id, segment_number, segment_type, speaker, metadata")
       .eq("scene_id", scene_id)
-      .in("segment_type", ["dialogue"])
+      .in("segment_type", ["dialogue", "monologue"])
       .order("segment_number");
 
     if (segErr) throw segErr;

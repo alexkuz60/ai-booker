@@ -43,7 +43,7 @@ interface CharacterOption {
 
 // ─── Segment type config ────────────────────────────────────
 
-const SEGMENT_TYPES = ["epigraph", "narrator", "first_person", "inner_thought", "dialogue", "lyric", "footnote"] as const;
+const SEGMENT_TYPES = ["epigraph", "narrator", "first_person", "inner_thought", "dialogue", "monologue", "lyric", "footnote"] as const;
 
 const SEGMENT_CONFIG: Record<string, {
   icon: typeof Quote;
@@ -56,6 +56,7 @@ const SEGMENT_CONFIG: Record<string, {
   first_person: { icon: User, label_ru: "От первого лица", label_en: "First Person", color: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30" },
   inner_thought: { icon: Brain, label_ru: "Мысли", label_en: "Thoughts", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" },
   dialogue: { icon: MessageSquare, label_ru: "Диалог", label_en: "Dialogue", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
+  monologue: { icon: MessageCircle, label_ru: "Монолог", label_en: "Monologue", color: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30" },
   lyric: { icon: Music, label_ru: "Лирика", label_en: "Lyric", color: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
   footnote: { icon: StickyNote, label_ru: "Сноска", label_en: "Footnote", color: "bg-muted text-muted-foreground border-border" },
 };

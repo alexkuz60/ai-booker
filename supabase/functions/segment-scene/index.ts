@@ -15,6 +15,7 @@ const SEGMENT_TYPES = [
   "first_person",
   "inner_thought",
   "dialogue",
+  "monologue",
   "lyric",
   "footnote",
 ] as const;
@@ -73,15 +74,16 @@ Deno.serve(async (req) => {
     const systemPrompt = `You are a literary text analyst. Given a scene text, split it into structural segments.
 Each segment must have:
 - "type": one of ${SEGMENT_TYPES.join(", ")}
-- "speaker": string or null (only for dialogue / first_person)
+- "speaker": string or null (required for dialogue/monologue/first_person, null for others)
 - "text": the exact text of the segment (preserve original wording)
-- "inline_narrations": array (optional, for dialogue only) — narrator insertions embedded within a character's speech
+- "inline_narrations": array (optional, for dialogue/monologue only) — narrator insertions embedded within a character's speech
 
 Rules:
 - "narrator" = third-person narration, descriptions, action
 - "first_person" = narration from a character's perspective (I/me)
 - "inner_thought" = character's internal thoughts, reflections
-- "dialogue" = spoken lines; set "speaker" to the character name if identifiable
+- "dialogue" = spoken lines in a conversation (when multiple characters speak in sequence); set "speaker" to the character name
+- "monologue" = a single standalone spoken line (direct speech) NOT part of a back-and-forth exchange; set "speaker" to the character name. Use this when a character speaks once and the scene continues with narration, not another character's reply
 - "lyric" = songs, poems, verses
 - "epigraph" = epigraphs, quotes at the start
 - "footnote" = footnotes, author comments
@@ -166,6 +168,25 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
     for (const seg of segments) {
       if (seg.type === "narrator" && fpRegex.test(seg.text)) {
         seg.type = "first_person";
+      }
+    }
+
+    // ── Post-process: dialogue vs monologue classification ──
+    // A speech block is "dialogue" only if it has adjacent speech neighbors;
+    // otherwise it's a standalone "monologue".
+    const SPEECH_TYPES = new Set(["dialogue", "monologue"]);
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      if (!SPEECH_TYPES.has(seg.type)) continue;
+
+      const prevSpeech = i > 0 && SPEECH_TYPES.has(segments[i - 1].type);
+      const nextSpeech = i < segments.length - 1 && SPEECH_TYPES.has(segments[i + 1].type);
+      const hasAdjacentSpeech = prevSpeech || nextSpeech;
+
+      if (hasAdjacentSpeech) {
+        seg.type = "dialogue";
+      } else {
+        seg.type = "monologue";
       }
     }
 
