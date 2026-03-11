@@ -182,42 +182,16 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [merging, setMerging] = useState(false);
 
-  // Voice settings state — Yandex
-  const [voice, setVoice] = useState("marina");
-  const [role, setRole] = useState("neutral");
-  const [pitch, setPitch] = useState(0);
-  const [speed, setSpeed] = useState(1.0);
-  const [volume, setVolume] = useState(0);
-  const [dirty, setDirty] = useState(false);
+   const [dirty, setDirty] = useState(false);
+   const [saving, setSaving] = useState(false);
 
-  // Voice settings state — ElevenLabs
-  const [elVoice, setElVoice] = useState("JBFqnCBsd6RMkjVDRZzb");
-  const [elStability, setElStability] = useState(0.5);
-  const [elSimilarity, setElSimilarity] = useState(0.75);
-  const [elStyle, setElStyle] = useState(0.4);
-  const [elSpeed, setElSpeed] = useState(0.95);
-
-  // Voice settings state — ProxyAPI TTS
-  const [paVoice, setPaVoice] = useState("alloy");
-  const [paModel, setPaModel] = useState("gpt-4o-mini-tts");
-  const [paSpeed, setPaSpeed] = useState(1.0);
-  const [paInstructions, setPaInstructions] = useState("");
-
-  // Voice settings state — SaluteSpeech
-  const [ssVoice, setSsVoice] = useState("Nec_24000");
-  const [ssSpeed, setSsSpeed] = useState(1.0);
-
-  const [voiceProvider, setVoiceProvider] = useState<"yandex" | "elevenlabs" | "proxyapi" | "salutespeech">("yandex");
-
-  // ElevenLabs credits
-  const [elCredits, setElCredits] = useState<{ used: number; limit: number; tier: string } | null>(null);
-  const [elCreditsError, setElCreditsError] = useState<string | null>(null);
-  const [elCreditsLoading, setElCreditsLoading] = useState(false);
-
-  const [testing, setTesting] = useState(false);
-  const [playing, setPlaying] = useState(false);
-  const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
-  const [saving, setSaving] = useState(false);
+   // Keep voice/role for auto-cast matching only (not UI-editable here)
+   const [voice, setVoice] = useState("marina");
+   const [role, setRole] = useState("neutral");
+   const [speed, setSpeed] = useState(1.0);
+   const [pitch, setPitch] = useState(0);
+   const [volume, setVolume] = useState(0);
+   const [voiceProvider, setVoiceProvider] = useState<"yandex" | "elevenlabs" | "proxyapi" | "salutespeech">("yandex");
 
   const selectedVoice = YANDEX_VOICES.find(v => v.id === voice);
   const availableRoles = selectedVoice?.roles ?? ["neutral"];
