@@ -592,8 +592,15 @@ class AudioEngine {
   }
 
   static getInstance(): AudioEngine {
+    // Survive Vite HMR: store on window so module re-evaluation reuses the same instance
+    const w = window as unknown as { __audioEngine?: AudioEngine };
+    if (w.__audioEngine) {
+      AudioEngine.instance = w.__audioEngine;
+      return w.__audioEngine;
+    }
     if (!AudioEngine.instance) {
       AudioEngine.instance = new AudioEngine();
+      w.__audioEngine = AudioEngine.instance;
     }
     return AudioEngine.instance;
   }
