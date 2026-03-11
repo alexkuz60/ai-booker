@@ -1180,6 +1180,89 @@ export function StoryboardPanel({
     })));
   }, [isRu]);
 
+  // Save annotation to phrase metadata
+  const saveAnnotation = useCallback(async (phraseId: string, annotation: PhraseAnnotation) => {
+    // Find current phrase
+    let currentAnnotations: PhraseAnnotation[] = [];
+    for (const seg of segments) {
+      const ph = seg.phrases.find(p => p.phrase_id === phraseId);
+      if (ph) {
+        currentAnnotations = [...(ph.annotations || [])];
+        break;
+      }
+    }
+    currentAnnotations.push(annotation);
+
+    // Load current metadata first to preserve other fields
+    const { data: existing } = await supabase
+      .from("segment_phrases")
+      .select("metadata")
+      .eq("id", phraseId)
+      .maybeSingle();
+
+    const meta = (existing?.metadata ?? {}) as Record<string, unknown>;
+    const updatedMeta = { ...meta, annotations: currentAnnotations };
+
+    const { error } = await supabase
+      .from("segment_phrases")
+      .update({ metadata: updatedMeta })
+      .eq("id", phraseId);
+
+    if (error) {
+      toast.error(isRu ? "Ошибка сохранения аннотации" : "Annotation save failed");
+      return;
+    }
+
+    setSegments(prev => prev.map(seg => ({
+      ...seg,
+      phrases: seg.phrases.map(ph =>
+        ph.phrase_id === phraseId ? { ...ph, annotations: currentAnnotations } : ph
+      ),
+    })));
+    toast.success(isRu ? "Аннотация добавлена" : "Annotation added");
+  }, [segments, isRu]);
+
+  // Remove annotation by index
+  const removeAnnotation = useCallback(async (phraseId: string, index: number) => {
+    let currentAnnotations: PhraseAnnotation[] = [];
+    for (const seg of segments) {
+      const ph = seg.phrases.find(p => p.phrase_id === phraseId);
+      if (ph) {
+        currentAnnotations = [...(ph.annotations || [])];
+        break;
+      }
+    }
+    currentAnnotations.splice(index, 1);
+
+    const { data: existing } = await supabase
+      .from("segment_phrases")
+      .select("metadata")
+      .eq("id", phraseId)
+      .maybeSingle();
+
+    const meta = (existing?.metadata ?? {}) as Record<string, unknown>;
+    const updatedMeta = { ...meta, annotations: currentAnnotations.length > 0 ? currentAnnotations : undefined };
+    if (!currentAnnotations.length) delete updatedMeta.annotations;
+
+    const { error } = await supabase
+      .from("segment_phrases")
+      .update({ metadata: updatedMeta })
+      .eq("id", phraseId);
+
+    if (error) {
+      toast.error(isRu ? "Ошибка удаления аннотации" : "Annotation remove failed");
+      return;
+    }
+
+    setSegments(prev => prev.map(seg => ({
+      ...seg,
+      phrases: seg.phrases.map(ph =>
+        ph.phrase_id === phraseId ? { ...ph, annotations: currentAnnotations.length > 0 ? currentAnnotations : undefined } : ph
+      ),
+    })));
+    toast.success(isRu ? "Аннотация удалена" : "Annotation removed");
+  }, [segments, isRu]);
+
   // ── Full sync of character_appearances for scene ──
   // Scans all segments + type mappings to determine which characters are actually used,
   // removes stale appearances (empty tracks), and ensures used characters are present.
