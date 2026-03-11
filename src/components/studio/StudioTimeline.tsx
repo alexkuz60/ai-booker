@@ -404,6 +404,9 @@ export function StudioTimeline({
 
   useEffect(() => { setZoomOverride(null); setSceneZoomPercent(100); }, [fitZoom]);
 
+  // Keep seekCenterRef in sync for the segment selection effect above
+  useEffect(() => { seekCenterRef.current = { zoom, percent: sceneZoomPercent }; }, [zoom, sceneZoomPercent]);
+
   // Apply scene zoom preset
   const applySceneZoom = useCallback((percent: number) => {
     setSceneZoomPercent(percent);
