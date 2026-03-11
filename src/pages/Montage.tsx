@@ -207,6 +207,10 @@ const Montage = () => {
   const trackIds = useMemo(() => STEM_TRACKS.map(t => t.id), []);
   const { scheduleSave: onMixChange } = useMixerPersistence(selectedChapterId, trackIds);
 
+  // ── Timeline panel collapse ────────────────────────────────
+  const [timelineHeight, setTimelineHeight] = useState(300);
+  const [timelineCollapsed, setTimelineCollapsed] = useState(false);
+
   // ── Zoom ───────────────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -256,24 +260,6 @@ const Montage = () => {
   }, [fitZoom, stepZoom, toPercent]);
 
   const resetZoom = useCallback(() => setZoomOverride(null), []);
-
-  // ── Spacebar ───────────────────────────────────────────────
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code !== "Space") return;
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      if ((e.target as HTMLElement)?.isContentEditable) return;
-      e.preventDefault();
-      player.state === "playing" ? player.pause() : player.play();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [player]);
-
-  // ── Timeline panel collapse ────────────────────────────────
-  const [timelineHeight, setTimelineHeight] = useState(300);
-  const [timelineCollapsed, setTimelineCollapsed] = useState(false);
 
   const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
