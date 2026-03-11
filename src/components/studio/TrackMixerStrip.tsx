@@ -36,65 +36,66 @@ export function TrackMixerStrip({
   const [mix, setMix] = useState<TrackMixState | null>(null);
   const [meter, setMeter] = useState<TrackMeterData | null>(null);
 
-  // Poll meter + mix state at ~30fps when expanded
-  useEffect(() => {
-    if (!expanded) return;
-    let running = true;
-    const interval = setInterval(() => {
-      if (running) {
-        setMeter(engine.getTrackMeter(trackId));
-        setMix(engine.getTrackMixState(trackId));
+  // Helper: find first valid mix/meter across all clip IDs
+  const effectiveIds = allClipIds.length > 0 ? allClipIds : [trackId];
+
+  const pollState = useCallback(() => {
+    let bestMix: TrackMixState | null = null;
+    let bestLevel = -Infinity;
+    let bestMeter: TrackMeterData | null = null;
+    for (const id of effectiveIds) {
+      const m = engine.getTrackMixState(id);
+      if (m && !bestMix) bestMix = m;
+      const mt = engine.getTrackMeter(id);
+      if (mt && mt.level > bestLevel) {
+        bestLevel = mt.level;
+        bestMeter = mt;
       }
-    }, 33);
-    return () => {
-      running = false;
-      clearInterval(interval);
-    };
-  }, [expanded, trackId, engine]);
+    }
+    setMix(bestMix);
+    setMeter(bestMeter);
+  }, [engine, effectiveIds]);
+
+  // Collapsed: minimal view — with FX/RV toggles for atmo/sfx tracks (only when they have clips)
+  const isAtmoOrSfx = trackId === "ambience" || trackId.startsWith("atmosphere") || trackId === "sfx" || trackId.startsWith("sfx-");
+  const hasAudioClips = allClipIds.length > 0;
+
+  // Poll meter + mix state at ~30fps when expanded, or 10fps for collapsed atmo/sfx with clips
+  useEffect(() => {
+    const shouldPoll = expanded || (isAtmoOrSfx && hasAudioClips);
+    if (!shouldPoll) return;
+    let running = true;
+    const rate = expanded ? 33 : 100;
+    const interval = setInterval(() => { if (running) pollState(); }, rate);
+    return () => { running = false; clearInterval(interval); };
+  }, [expanded, isAtmoOrSfx, hasAudioClips, pollState]);
 
   const handleVolumeChange = useCallback((v: number) => {
-    const ids = allClipIds.length > 0 ? allClipIds : [trackId];
-    for (const id of ids) engine.setTrackVolume(id, v);
+    for (const id of effectiveIds) engine.setTrackVolume(id, v);
     onMixChange?.();
-  }, [engine, trackId, allClipIds, onMixChange]);
+  }, [engine, effectiveIds, onMixChange]);
 
   const handlePanChange = useCallback((p: number) => {
-    const ids = allClipIds.length > 0 ? allClipIds : [trackId];
-    for (const id of ids) engine.setTrackPan(id, p / 100);
+    for (const id of effectiveIds) engine.setTrackPan(id, p / 100);
     onMixChange?.();
-  }, [engine, trackId, allClipIds, onMixChange]);
+  }, [engine, effectiveIds, onMixChange]);
 
   const toggleReverbBypass = useCallback(() => {
-    if (!mix) return;
-    const newVal = !mix.reverbBypassed;
-    const ids = allClipIds.length > 0 ? allClipIds : [trackId];
-    for (const id of ids) engine.setTrackReverbBypassed(id, newVal);
+    // Read current state from any available clip
+    const currentMix = effectiveIds.reduce<TrackMixState | null>((acc, id) => acc ?? engine.getTrackMixState(id), null);
+    if (!currentMix) return;
+    const newVal = !currentMix.reverbBypassed;
+    for (const id of effectiveIds) engine.setTrackReverbBypassed(id, newVal);
     onMixChange?.();
-  }, [engine, trackId, allClipIds, mix, onMixChange]);
+  }, [engine, effectiveIds, onMixChange]);
 
   const togglePreFxBypass = useCallback(() => {
-    if (!mix) return;
-    const newVal = !mix.preFxBypassed;
-    const ids = allClipIds.length > 0 ? allClipIds : [trackId];
-    for (const id of ids) engine.setTrackPreFxBypassed(id, newVal);
+    const currentMix = effectiveIds.reduce<TrackMixState | null>((acc, id) => acc ?? engine.getTrackMixState(id), null);
+    if (!currentMix) return;
+    const newVal = !currentMix.preFxBypassed;
+    for (const id of effectiveIds) engine.setTrackPreFxBypassed(id, newVal);
     onMixChange?.();
-  }, [engine, trackId, allClipIds, mix, onMixChange]);
-
-  // Collapsed: minimal view — with FX/RV toggles for atmo/sfx tracks
-  const isAtmoOrSfx = trackId === "ambience" || trackId.startsWith("atmosphere") || trackId === "sfx" || trackId.startsWith("sfx-");
-
-  // Poll mix state even when collapsed for atmo/sfx (lightweight, only for button state + meter)
-  useEffect(() => {
-    if (expanded || !isAtmoOrSfx) return;
-    let running = true;
-    const interval = setInterval(() => {
-      if (running) {
-        setMix(engine.getTrackMixState(trackId));
-        setMeter(engine.getTrackMeter(trackId));
-      }
-    }, 100);
-    return () => { running = false; clearInterval(interval); };
-  }, [expanded, isAtmoOrSfx, trackId, engine]);
+  }, [engine, effectiveIds, onMixChange]);
 
   // Signal activity flag
   const hasSignal = (meter?.level ?? -60) > SIGNAL_THRESHOLD_DB;
