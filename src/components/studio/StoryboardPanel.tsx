@@ -1417,11 +1417,11 @@ export function StoryboardPanel({
 
     // From scene_type_mappings (includes first_person, inline_narration, footnote, etc.)
     const { data: mappings } = await supabase
-      .from("scene_type_mappings" as any)
+      .from("scene_type_mappings")
       .select("character_id")
       .eq("scene_id", sceneId);
     if (mappings) {
-      for (const m of mappings as any[]) {
+      for (const m of mappings) {
         usedCharIds.add(m.character_id);
       }
     }
