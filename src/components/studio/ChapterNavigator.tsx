@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2, Clock, Timer, BookOpen } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2, Clock, Timer, BookOpen, Scissors } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
@@ -181,6 +182,7 @@ export function ChapterNavigator({
   clipsRefreshToken?: number;
   bookId?: string | null;
 }) {
+  const navigate = useNavigate();
   const [chapterOpen, setChapterOpen] = useState(true);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
@@ -454,6 +456,28 @@ export function ChapterNavigator({
             ) : (
               <Timer className="h-3 w-3" />
             )}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 w-6 p-0"
+            onClick={() => {
+              if (bookId) sessionStorage.setItem("montage_book_id", bookId);
+              const chapterId = chapter.scenes[0]?.id ? undefined : undefined;
+              // Find chapter ID from scenes
+              const sceneId = chapter.scenes[0]?.id;
+              if (sceneId) {
+                supabase.from("book_scenes").select("chapter_id").eq("id", sceneId).single().then(({ data }) => {
+                  if (data?.chapter_id) sessionStorage.setItem("montage_chapter_id", data.chapter_id);
+                  navigate("/montage");
+                });
+              } else {
+                navigate("/montage");
+              }
+            }}
+            title={isRu ? "Открыть в Монтаже" : "Open in Montage"}
+          >
+            <Scissors className="h-3 w-3" />
           </Button>
         </div>
         <div className="flex items-center gap-2 mt-0.5">
