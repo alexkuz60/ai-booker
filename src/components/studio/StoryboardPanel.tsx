@@ -610,6 +610,15 @@ export function StoryboardPanel({
       // Track which segments have inline narrations
       const inlineIds = new Set(builtSegments.filter(s => s.inline_narrations && s.inline_narrations.length > 0).map(s => s.segment_id));
       setInlineNarrationSegIds(inlineIds);
+      // Track segments with stale inline_narrations_audio metadata
+      const staleIds = new Set<string>();
+      for (const s of segs) {
+        const meta = (s.metadata ?? {}) as Record<string, unknown>;
+        if (Array.isArray(meta.inline_narrations_audio) && (meta.inline_narrations_audio as unknown[]).length > 0) {
+          staleIds.add(s.id);
+        }
+      }
+      setStaleAudioSegIds(staleIds);
       setLoaded(true);
       // Load audio status
       loadAudioStatus(builtSegments.map(s => s.segment_id));
