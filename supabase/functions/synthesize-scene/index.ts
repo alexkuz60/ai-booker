@@ -970,7 +970,24 @@ Deno.serve(async (req) => {
           let result: { audio: Uint8Array; durationMs: number } | { error: string };
           const hasAnnot = segmentHasAnnotations[i];
 
-          if (isProxyApiVoice && proxyApiKey) {
+          if (isSaluteSpeechVoice) {
+            // SaluteSpeech: use SSML for annotations, plain text otherwise
+            if (hasAnnot) {
+              const ssml = buildSegmentSsml(seg.id);
+              console.log(`SaluteSpeech SSML for segment ${seg.id}: ${ssml.length} chars`);
+              result = await callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, {
+                ssml,
+                voice: voiceConfig.voice,
+                lang: langCode,
+              });
+            } else {
+              result = await callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, {
+                text,
+                voice: voiceConfig.voice,
+                lang: langCode,
+              });
+            }
+          } else if (isProxyApiVoice && proxyApiKey) {
             // ProxyAPI: apply text markers + extra instructions from annotations
             const annotated = hasAnnot ? buildSegmentAnnotatedText(seg.id) : { text, extraInstructions: [] };
             const baseInstructions = (voiceConfig as any).instructions || "";
