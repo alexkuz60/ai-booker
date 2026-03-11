@@ -68,7 +68,22 @@ export function TimelineRuler({ zoom, duration, sceneBoundaries, renderPercent, 
               ? "hsl(var(--primary))"
               : "linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)))",
           }}
-        />
+        >
+          {/* Pulse dot at the leading edge during active rendering */}
+          {isRendering && renderPercent !== null && renderPercent < 100 && (
+            <div
+              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2"
+            >
+              <div
+                className="w-2 h-2 rounded-full bg-accent"
+                style={{ boxShadow: "0 0 6px 2px hsl(var(--accent) / 0.6)" }}
+              />
+              <div
+                className="absolute inset-0 w-2 h-2 rounded-full bg-accent/50 animate-ping"
+              />
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
