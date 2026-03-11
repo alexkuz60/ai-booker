@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { YANDEX_VOICES, ROLE_LABELS } from "@/config/yandexVoices";
 import { ELEVENLABS_VOICES } from "@/config/elevenlabsVoices";
+import { SALUTESPEECH_VOICES } from "@/config/salutespeechVoices";
 import { PROXYAPI_TTS_VOICES, PROXYAPI_TTS_MODELS, getVoicesForModel } from "@/config/proxyapiVoices";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
