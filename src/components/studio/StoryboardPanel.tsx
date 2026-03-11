@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAiRoles } from "@/hooks/useAiRoles";
-import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, AudioLines, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2 } from "lucide-react";
+import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, AudioLines, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -387,6 +387,8 @@ export function StoryboardPanel({
    const [mergeChecked, setMergeChecked] = useState<Set<string>>(new Set());
   const [merging, setMerging] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [staleAudioSegIds, setStaleAudioSegIds] = useState<Set<string>>(new Set());
+  const [cleaningMetadata, setCleaningMetadata] = useState(false);
 
   // Reset merge selection when scene changes
   useEffect(() => { setMergeChecked(new Set()); }, [sceneId]);
@@ -608,6 +610,15 @@ export function StoryboardPanel({
       // Track which segments have inline narrations
       const inlineIds = new Set(builtSegments.filter(s => s.inline_narrations && s.inline_narrations.length > 0).map(s => s.segment_id));
       setInlineNarrationSegIds(inlineIds);
+      // Track segments with stale inline_narrations_audio metadata
+      const staleIds = new Set<string>();
+      for (const s of segs) {
+        const meta = (s.metadata ?? {}) as Record<string, unknown>;
+        if (Array.isArray(meta.inline_narrations_audio) && (meta.inline_narrations_audio as unknown[]).length > 0) {
+          staleIds.add(s.id);
+        }
+      }
+      setStaleAudioSegIds(staleIds);
       setLoaded(true);
       // Load audio status
       loadAudioStatus(builtSegments.map(s => s.segment_id));
@@ -1236,7 +1247,40 @@ export function StoryboardPanel({
     setDetecting(false);
   }, [sceneId, dialogueCount, isRu, loadSegments]);
 
-  // ── Update inline narration voice assignment ──
+  // ── Clean stale inline_narrations_audio metadata ──
+  const cleanStaleInlineAudio = useCallback(async () => {
+    if (!sceneId || staleAudioSegIds.size === 0) return;
+    setCleaningMetadata(true);
+    try {
+      const ids = [...staleAudioSegIds];
+      // Load current metadata for each segment, remove inline_narrations_audio
+      const { data: segs } = await supabase
+        .from("scene_segments")
+        .select("id, metadata")
+        .in("id", ids);
+      if (segs) {
+        for (const seg of segs) {
+          const meta = { ...((seg.metadata ?? {}) as Record<string, unknown>) };
+          delete meta.inline_narrations_audio;
+          await supabase.from("scene_segments").update({ metadata: meta as any }).eq("id", seg.id);
+        }
+      }
+      // Also clear scene_playlists to force timeline refresh
+      await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
+      setStaleAudioSegIds(new Set());
+      if (onSegmented) onSegmented(sceneId);
+      toast.success(
+        isRu
+          ? `Очищено ${ids.length} устаревших аудио-вставок`
+          : `Cleared ${ids.length} stale audio metadata entries`
+      );
+    } catch (err) {
+      console.error("Cleanup failed:", err);
+      toast.error(isRu ? "Ошибка очистки" : "Cleanup failed");
+    }
+    setCleaningMetadata(false);
+  }, [sceneId, staleAudioSegIds, isRu, onSegmented]);
+
   const updateInlineNarrationSpeaker = useCallback(async (newSpeaker: string | null) => {
     if (!sceneId) return;
     setInlineNarrationSpeaker(newSpeaker);
@@ -1371,6 +1415,21 @@ export function StoryboardPanel({
             >
               {detecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <ScanSearch className="h-3 w-3" />}
               {detecting ? (isRu ? "Поиск…" : "Detecting…") : (isRu ? "Вставки" : "Narrations")}
+            </Button>
+          )}
+          {staleAudioSegIds.size > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={cleanStaleInlineAudio}
+              disabled={cleaningMetadata || synthesizing}
+              className="gap-1.5 h-7 text-xs text-destructive hover:text-destructive"
+              title={isRu
+                ? `Очистить ${staleAudioSegIds.size} устаревших аудио-вставок (без ре-синтеза)`
+                : `Clear ${staleAudioSegIds.size} stale audio metadata (no re-synthesis)`}
+            >
+              {cleaningMetadata ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eraser className="h-3 w-3" />}
+              {staleAudioSegIds.size}
             </Button>
           )}
         </div>
