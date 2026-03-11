@@ -111,6 +111,38 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     providers: ["yandex", "elevenlabs", "proxyapi"],
     needsRange: true,
   },
+  {
+    type: "sigh",
+    label_ru: "😮‍💨 Вздох",
+    label_en: "😮‍💨 Sigh",
+    emoji: "😮‍💨",
+    providers: ["yandex", "elevenlabs", "proxyapi"],
+    needsRange: false,
+  },
+  {
+    type: "cough",
+    label_ru: "🤧 Кашель",
+    label_en: "🤧 Cough",
+    emoji: "🤧",
+    providers: ["yandex", "elevenlabs", "proxyapi"],
+    needsRange: false,
+  },
+  {
+    type: "laugh",
+    label_ru: "😂 Смех",
+    label_en: "😂 Laugh",
+    emoji: "😂",
+    providers: ["yandex", "elevenlabs", "proxyapi"],
+    needsRange: false,
+  },
+  {
+    type: "hmm",
+    label_ru: "🤔 Хмыканье",
+    label_en: "🤔 Hmm",
+    emoji: "🤔",
+    providers: ["yandex", "elevenlabs", "proxyapi"],
+    needsRange: false,
+  },
 ];
 
 /** Get available annotations for a given TTS provider */
