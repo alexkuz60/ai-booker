@@ -447,6 +447,62 @@ export type Database = {
           },
         ]
       }
+      scene_renders: {
+        Row: {
+          atmo_duration_ms: number
+          atmo_path: string | null
+          created_at: string
+          id: string
+          render_config: Json
+          scene_id: string
+          sfx_duration_ms: number
+          sfx_path: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          voice_duration_ms: number
+          voice_path: string | null
+        }
+        Insert: {
+          atmo_duration_ms?: number
+          atmo_path?: string | null
+          created_at?: string
+          id?: string
+          render_config?: Json
+          scene_id: string
+          sfx_duration_ms?: number
+          sfx_path?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          voice_duration_ms?: number
+          voice_path?: string | null
+        }
+        Update: {
+          atmo_duration_ms?: number
+          atmo_path?: string | null
+          created_at?: string
+          id?: string
+          render_config?: Json
+          scene_id?: string
+          sfx_duration_ms?: number
+          sfx_path?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          voice_duration_ms?: number
+          voice_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scene_renders_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: true
+            referencedRelation: "book_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scene_segments: {
         Row: {
           created_at: string

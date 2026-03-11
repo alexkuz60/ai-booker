@@ -1,11 +1,14 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { getAudioEngine } from "@/lib/audioEngine";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
-import { ChevronUp, ChevronDown, Plus, Film, Play, Pause, Square, Volume2, VolumeX, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ChevronUp, ChevronDown, Plus, Film, Play, Pause, Square, Volume2, VolumeX, PanelLeftClose, PanelLeftOpen, Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { renderScene, type RenderProgress } from "@/lib/sceneRenderer";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useTimelineClips, type TimelineClip, type TypeMappingsByScene } from "@/hooks/useTimelineClips";
@@ -64,6 +67,7 @@ interface StudioTimelineProps {
   synthesizingSegmentIds?: Set<string>;
   errorSegmentIds?: Set<string>;
   clipsRefreshToken?: number;
+  onSceneRendered?: (sceneId: string) => void;
 }
 
 export function StudioTimeline({
@@ -78,7 +82,34 @@ export function StudioTimeline({
   synthesizingSegmentIds,
   errorSegmentIds,
   clipsRefreshToken = 0,
+  onSceneRendered,
 }: StudioTimelineProps) {
+  const { user } = useAuth();
+
+  // ── Scene render state ────────────────────────────────────
+  const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
+  const isRendering = renderProgress !== null && renderProgress.phase !== "done" && renderProgress.phase !== "error";
+
+  const handleRenderScene = useCallback(async () => {
+    if (!sceneId || !user || isRendering) return;
+    try {
+      await renderScene(
+        sceneId,
+        timelineClipsRef.current,
+        durationRef.current,
+        user.id,
+        setRenderProgress,
+      );
+      toast.success(isRu ? "Сцена отрендерена" : "Scene rendered");
+      onSceneRendered?.(sceneId);
+    } catch (err: any) {
+      toast.error(isRu ? "Ошибка рендера" : "Render error", { description: err.message });
+    }
+  }, [sceneId, user, isRendering, isRu, onSceneRendered]);
+
+  // Refs for render callback (avoid stale closures)
+  const timelineClipsRef = useRef<typeof timelineClips>([]);
+  const durationRef = useRef(0);
   // ── Clip fades persistence (localStorage + cloud) ──────────
   type FadeMap = Record<string, { fadeInSec: number; fadeOutSec: number }>;
   const fadeCloudKey = sceneId ? `clip_fades_${sceneId}` : "clip_fades_none";
@@ -237,6 +268,10 @@ export function StudioTimeline({
   // ── Duration ──────────────────────────────────────────────
   const estimateDuration = sceneDurationSec && sceneDurationSec > 0 ? sceneDurationSec : 60;
   const duration = player.totalDuration > 0 ? player.totalDuration : estimateDuration;
+
+  // Keep refs current for render callback
+  timelineClipsRef.current = timelineClips;
+  durationRef.current = duration;
 
   // Auto-add narrator-fallback + atmosphere tracks if clips reference them
   const allTracks = useMemo(() => {
@@ -506,6 +541,27 @@ export function StudioTimeline({
               ))}
             </SelectContent>
           </Select>
+          <div className="w-px h-4 bg-border mx-1" />
+          <Button
+            variant={isRendering ? "secondary" : "outline"}
+            size="sm"
+            className="h-7 text-xs gap-1.5 font-body"
+            onClick={handleRenderScene}
+            disabled={isRendering || !sceneId || !player.hasAudio}
+            title={isRu ? "Рендер сцены (3 стема)" : "Render scene (3 stems)"}
+          >
+            {isRendering ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {renderProgress?.percent ?? 0}%
+              </>
+            ) : (
+              <>
+                <Download className="h-3 w-3" />
+                {isRu ? "Рендер" : "Render"}
+              </>
+            )}
+          </Button>
           <div className="w-px h-4 bg-border mx-1" />
           <Button variant="ghost" size="icon" className="h-7 w-7">
             <Plus className="h-3.5 w-3.5" />
