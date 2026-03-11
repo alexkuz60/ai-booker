@@ -320,6 +320,7 @@ const Studio = () => {
                   onBatchResynthDone={() => setClipsRefreshToken(t => t + 1)}
                   clipsRefreshToken={clipsRefreshToken}
                   bookId={bookId}
+                  onPlaylistDurationsLoaded={handlePlaylistDurationsLoaded}
                 />
               ) : (
                 <EmptyNavigator isRu={isRu} />
