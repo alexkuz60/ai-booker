@@ -1,21 +1,15 @@
 import { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
-import { Users, UsersRound, Volume2, Loader2, Square, Play, RotateCcw, Save, Sparkles, User, Wand2, Filter, Merge, CheckSquare, X, Check, SearchCheck } from "lucide-react";
+import { Users, UsersRound, Volume2, Loader2, Sparkles, User, Filter, Merge, CheckSquare, X, Check, SearchCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAiRoles } from "@/hooks/useAiRoles";
-import { YANDEX_VOICES, ROLE_LABELS } from "@/config/yandexVoices";
-import { ELEVENLABS_VOICES } from "@/config/elevenlabsVoices";
-import { SALUTESPEECH_VOICES } from "@/config/salutespeechVoices";
-import { PROXYAPI_TTS_VOICES, PROXYAPI_TTS_MODELS, getVoicesForModel } from "@/config/proxyapiVoices";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+import { YANDEX_VOICES } from "@/config/yandexVoices";
+import { VoiceCastingTable } from "@/components/studio/VoiceCastingTable";
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -188,42 +182,16 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [merging, setMerging] = useState(false);
 
-  // Voice settings state — Yandex
-  const [voice, setVoice] = useState("marina");
-  const [role, setRole] = useState("neutral");
-  const [pitch, setPitch] = useState(0);
-  const [speed, setSpeed] = useState(1.0);
-  const [volume, setVolume] = useState(0);
-  const [dirty, setDirty] = useState(false);
+   const [dirty, setDirty] = useState(false);
+   const [saving, setSaving] = useState(false);
 
-  // Voice settings state — ElevenLabs
-  const [elVoice, setElVoice] = useState("JBFqnCBsd6RMkjVDRZzb");
-  const [elStability, setElStability] = useState(0.5);
-  const [elSimilarity, setElSimilarity] = useState(0.75);
-  const [elStyle, setElStyle] = useState(0.4);
-  const [elSpeed, setElSpeed] = useState(0.95);
-
-  // Voice settings state — ProxyAPI TTS
-  const [paVoice, setPaVoice] = useState("alloy");
-  const [paModel, setPaModel] = useState("gpt-4o-mini-tts");
-  const [paSpeed, setPaSpeed] = useState(1.0);
-  const [paInstructions, setPaInstructions] = useState("");
-
-  // Voice settings state — SaluteSpeech
-  const [ssVoice, setSsVoice] = useState("Nec_24000");
-  const [ssSpeed, setSsSpeed] = useState(1.0);
-
-  const [voiceProvider, setVoiceProvider] = useState<"yandex" | "elevenlabs" | "proxyapi" | "salutespeech">("yandex");
-
-  // ElevenLabs credits
-  const [elCredits, setElCredits] = useState<{ used: number; limit: number; tier: string } | null>(null);
-  const [elCreditsError, setElCreditsError] = useState<string | null>(null);
-  const [elCreditsLoading, setElCreditsLoading] = useState(false);
-
-  const [testing, setTesting] = useState(false);
-  const [playing, setPlaying] = useState(false);
-  const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
-  const [saving, setSaving] = useState(false);
+   // Keep voice/role for auto-cast matching only (not UI-editable here)
+   const [voice, setVoice] = useState("marina");
+   const [role, setRole] = useState("neutral");
+   const [speed, setSpeed] = useState(1.0);
+   const [pitch, setPitch] = useState(0);
+   const [volume, setVolume] = useState(0);
+   const [voiceProvider, setVoiceProvider] = useState<"yandex" | "elevenlabs" | "proxyapi" | "salutespeech">("yandex");
 
   const selectedVoice = YANDEX_VOICES.find(v => v.id === voice);
   const availableRoles = selectedVoice?.roles ?? ["neutral"];
@@ -357,56 +325,25 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     });
   }, [characters, filterMode, sceneCharIds, sceneId, SYSTEM_NAMES]);
 
-  // ── Sync voice settings when character selected ─────────
+  // ── Sync voice settings when character selected (for auto-cast only) ─────────
   useEffect(() => {
     if (!selectedChar) return;
     const vc = selectedChar.voice_config;
     const provider = (vc.provider as string) || "yandex";
     setVoiceProvider(provider === "elevenlabs" ? "elevenlabs" : provider === "proxyapi" ? "proxyapi" : provider === "salutespeech" ? "salutespeech" : "yandex");
-
-    if (provider === "salutespeech") {
-      setSsVoice(vc.voice_id || "Nec_24000");
-      setSsSpeed(vc.speed ?? 1.0);
-      setDirty(false);
-    } else if (provider === "proxyapi") {
-      setPaVoice(vc.voice_id || "alloy");
-      setPaModel((vc as any).model || "gpt-4o-mini-tts");
-      setPaSpeed(vc.speed ?? 1.0);
-      setPaInstructions((vc as any).instructions || "");
-      setDirty(false);
-    } else if (provider === "elevenlabs") {
-      setElVoice(vc.voice_id || "JBFqnCBsd6RMkjVDRZzb");
-      setElStability((vc as any).stability ?? 0.5);
-      setElSimilarity((vc as any).similarity_boost ?? 0.75);
-      setElStyle((vc as any).style ?? 0.4);
-      setElSpeed(vc.speed ?? 0.95);
-      setDirty(false);
-    } else {
-      let voiceId = vc.voice_id || "marina";
-      const savedVoice = YANDEX_VOICES.find(v => v.id === voiceId);
-      if (savedVoice && selectedChar.gender !== "unknown" && savedVoice.gender !== selectedChar.gender) {
-        voiceId = matchVoice(selectedChar.gender, selectedChar.age_group);
-      }
-      setVoice(voiceId);
-      const currentVoice = YANDEX_VOICES.find(v => v.id === voiceId);
-      setRole(currentVoice?.roles?.includes(vc.role || "") ? (vc.role || "neutral") : (currentVoice?.roles?.[0] || vc.role || "neutral"));
-      setSpeed(vc.speed ?? 1.0);
-      setPitch(vc.pitch ?? 0);
-      setVolume(vc.volume ?? 0);
-      setDirty(voiceId !== (vc.voice_id || "marina"));
+    let voiceId = vc.voice_id || "marina";
+    const savedVoice = YANDEX_VOICES.find(v => v.id === voiceId);
+    if (savedVoice && selectedChar.gender !== "unknown" && savedVoice.gender !== selectedChar.gender) {
+      voiceId = matchVoice(selectedChar.gender, selectedChar.age_group);
     }
+    setVoice(voiceId);
+    const currentVoice = YANDEX_VOICES.find(v => v.id === voiceId);
+    setRole(currentVoice?.roles?.includes(vc.role || "") ? (vc.role || "neutral") : (currentVoice?.roles?.[0] || vc.role || "neutral"));
+    setSpeed(vc.speed ?? 1.0);
+    setPitch(vc.pitch ?? 0);
+    setVolume(vc.volume ?? 0);
+    setDirty(false);
   }, [selectedId]);
-
-  const markDirty = () => setDirty(true);
-
-  const handleVoiceChange = (v: string) => {
-    setVoice(v);
-    markDirty();
-    const newVoice = YANDEX_VOICES.find(x => x.id === v);
-    if (newVoice?.roles && !newVoice.roles.includes(role)) {
-      setRole(newVoice.roles[0] || "neutral");
-    }
-  };
 
   // ── AI Profiling (full or incremental) ───────────────
   const runProfile = async (sceneIdsForIncremental?: string[]) => {
@@ -461,47 +398,21 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const handleProfile = () => runProfile();
   const handleIncrementalProfile = () => runProfile(chapterSceneIds);
 
-  // ── Save voice config ───────────────────────────────────
+  // ── Save voice config (only used by auto-cast now) ───────────────────────────
   const handleSave = async () => {
     if (!selectedId) return;
     setSaving(true);
     try {
       const currentChar = characters.find(c => c.id === selectedId);
-      const voiceConfig = voiceProvider === "salutespeech"
-        ? {
-            provider: "salutespeech",
-            voice_id: ssVoice,
-            speed: ssSpeed,
-            is_extra: currentChar?.voice_config?.is_extra,
-          }
-        : voiceProvider === "proxyapi"
-        ? {
-            provider: "proxyapi",
-            voice_id: paVoice,
-            model: paModel,
-            speed: paSpeed,
-            instructions: paInstructions || undefined,
-            is_extra: currentChar?.voice_config?.is_extra,
-          }
-        : voiceProvider === "elevenlabs"
-        ? {
-            provider: "elevenlabs",
-            voice_id: elVoice,
-            stability: elStability,
-            similarity_boost: elSimilarity,
-            style: elStyle,
-            speed: elSpeed,
-            is_extra: currentChar?.voice_config?.is_extra,
-          }
-        : {
-            provider: "yandex",
-            voice_id: voice,
-            role: role !== "neutral" ? role : undefined,
-            speed,
-            pitch: pitch !== 0 ? pitch : undefined,
-            volume: volume !== 0 ? volume : undefined,
-            is_extra: currentChar?.voice_config?.is_extra,
-          };
+      const voiceConfig = {
+        provider: "yandex",
+        voice_id: voice,
+        role: role !== "neutral" ? role : undefined,
+        speed,
+        pitch: pitch !== 0 ? pitch : undefined,
+        volume: volume !== 0 ? volume : undefined,
+        is_extra: currentChar?.voice_config?.is_extra,
+      };
       const { error } = await supabase
         .from("book_characters")
         .update({ voice_config: voiceConfig, updated_at: new Date().toISOString() })
@@ -513,7 +424,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       ));
       onVoiceSaved?.();
       toast.success(isRu ? "Голос сохранён" : "Voice saved");
-    } catch (e) {
+    } catch {
       toast.error(isRu ? "Ошибка сохранения" : "Save error");
     } finally {
       setSaving(false);
@@ -848,164 +759,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     }
   }, [characters, segmentCounts, SYSTEM_NAMES, isRu, loadCharacters]);
 
-  // ── Load ElevenLabs credits ──────────────────────────────
-  const loadElCredits = useCallback(async () => {
-    setElCreditsLoading(true);
-    setElCreditsError(null);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-credits`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setElCredits({ used: data.character_count, limit: data.character_limit, tier: data.tier });
-      } else {
-        const err = await response.json().catch(() => ({ error: "unknown" }));
-        if (err.error === "missing_permissions") {
-          setElCreditsError(isRu ? "Ключ не имеет разрешения user_read" : "Key lacks user_read permission");
-        }
-        // Don't show toast for non-critical credits error
-      }
-    } catch (e) {
-      console.error("Credits load error:", e);
-    } finally {
-      setElCreditsLoading(false);
-    }
-  }, [isRu]);
-
-  // Load credits when switching to ElevenLabs tab
-  useEffect(() => {
-    if (voiceProvider === "elevenlabs" && !elCredits && !elCreditsLoading) {
-      loadElCredits();
-    }
-  }, [voiceProvider]);
-
-  // ── TTS Preview ─────────────────────────────────────────
-  const handlePreview = async () => {
-    if (playing && audioRef) {
-      audioRef.pause();
-      audioRef.currentTime = 0;
-      setPlaying(false);
-      return;
-    }
-    setTesting(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { toast.error(isRu ? "Необходимо авторизоваться" : "Please sign in"); return; }
-
-      const testText = isRu
-        ? "Здравствуйте. Это предварительное прослушивание голоса для вашего персонажа."
-        : "Hello. This is a voice preview for your character.";
-
-      let response: Response;
-
-      if (voiceProvider === "salutespeech") {
-        response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/salutespeech-tts`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({
-              text: testText,
-              voice: ssVoice,
-              lang: isRu ? "ru" : "en",
-            }),
-          }
-        );
-      } else if (voiceProvider === "proxyapi") {
-        const paBody: Record<string, unknown> = {
-          text: testText,
-          model: paModel,
-          voice: paVoice,
-          speed: paSpeed,
-          lang: isRu ? "ru" : "en",
-        };
-        if (paInstructions && paModel === "gpt-4o-mini-tts") {
-          paBody.instructions = paInstructions;
-        }
-        response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proxyapi-tts`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify(paBody),
-          }
-        );
-      } else if (voiceProvider === "elevenlabs") {
-        response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({
-              text: testText,
-              voiceId: elVoice,
-              lang: isRu ? "ru" : "en",
-            }),
-          }
-        );
-      } else {
-        const body: Record<string, unknown> = {
-          text: testText, voice, lang: selectedVoice?.lang === "en" ? "en" : "ru", speed,
-          role: role !== "neutral" ? role : undefined,
-          pitchShift: pitch !== 0 ? pitch : undefined,
-          volume: volume !== 0 ? volume : undefined,
-        };
-        response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/yandex-tts`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify(body),
-          }
-        );
-      }
-
-      if (!response.ok) {
-        let errMsg = `HTTP ${response.status}`;
-        try { const d = await response.json(); errMsg = d.error || errMsg; } catch {}
-        throw new Error(errMsg);
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      setAudioRef(audio);
-      setPlaying(true);
-      audio.onended = () => { setPlaying(false); URL.revokeObjectURL(url); };
-      await audio.play();
-    } catch (e) {
-      console.error("TTS preview error:", e);
-      toast.error(e instanceof Error ? e.message : (isRu ? "Ошибка TTS" : "TTS error"));
-    } finally {
-      setTesting(false);
-    }
-  };
+  // Voice editing is now on the Narrators page
 
   return (
     <div className="h-full flex">
@@ -1255,7 +1009,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                                   setCharacters(prev => prev.map(c =>
                                     c.id === charId ? { ...c, gender: g } : c
                                   ));
-                                  markDirty();
+                                  setDirty(true);
                                   try {
                                     const { error } = await supabase
                                       .from("book_characters")
@@ -1404,407 +1158,23 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
           </ScrollArea>
         </div>
 
-        {/* Column 2: Voice */}
+        {/* Column 2: Voice Casting Table */}
         <div className="flex-1 min-w-0">
-          <ScrollArea className="h-full">
-            <div className="p-4 space-y-4">
-              <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider">
-                {isRu ? "Голос" : "Voice"}
-              </h3>
-
-              <Tabs value={voiceProvider} onValueChange={(v) => { setVoiceProvider(v as "yandex" | "elevenlabs" | "proxyapi" | "salutespeech"); markDirty(); }}>
-                <TabsList className="w-full">
-                  <TabsTrigger value="yandex" className="flex-1 text-xs">Yandex</TabsTrigger>
-                  <TabsTrigger value="salutespeech" className="flex-1 text-xs">Salute</TabsTrigger>
-                  <TabsTrigger value="elevenlabs" className="flex-1 text-xs">ElevenLabs</TabsTrigger>
-                  <TabsTrigger value="proxyapi" className="flex-1 text-xs">OpenAI</TabsTrigger>
-                </TabsList>
-
-                {/* ─── Yandex Tab ─── */}
-                <TabsContent value="yandex" className="space-y-4 mt-3">
-                  {/* Voice selector */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      {isRu ? "Голос" : "Voice"}
-                    </label>
-                    <Select value={voice} onValueChange={handleVoiceChange}>
-                      <SelectTrigger className="bg-secondary border-border">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border">
-                        {YANDEX_VOICES.map(v => (
-                          <SelectItem key={v.id} value={v.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{isRu ? v.name.ru : v.name.en}</span>
-                              <Badge variant="outline" className="text-[10px] px-1 py-0">
-                                {v.gender === "female" ? "♀" : "♂"}
-                              </Badge>
-                              {v.apiVersion === "v3" && (
-                                <Badge variant="secondary" className="text-[10px] px-1 py-0">v3</Badge>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Role */}
-                  {availableRoles.length > 1 && (
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        {isRu ? "Амплуа" : "Role"}
-                      </label>
-                      <Select value={role} onValueChange={v => { setRole(v); markDirty(); }}>
-                        <SelectTrigger className="bg-secondary border-border">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-card border-border">
-                          {availableRoles.map(r => (
-                            <SelectItem key={r} value={r}>
-                              {ROLE_LABELS[r]?.[isRu ? "ru" : "en"] ?? r}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  {/* Speed */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Скорость" : "Speed"}</label>
-                      <span className="text-xs text-muted-foreground tabular-nums">{speed.toFixed(1)}×</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Slider min={0.3} max={2.0} step={0.1} value={[speed]} onValueChange={([v]) => { setSpeed(v); markDirty(); }} className="flex-1" />
-                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setSpeed(1.0); markDirty(); }} disabled={speed === 1.0}>
-                        <RotateCcw className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Pitch */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Тон (pitch)" : "Pitch"}</label>
-                      <span className="text-xs text-muted-foreground tabular-nums">{pitch > 0 ? "+" : ""}{pitch} Hz</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Slider min={-500} max={500} step={50} value={[pitch]} onValueChange={([v]) => { setPitch(v); markDirty(); }} className="flex-1" />
-                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setPitch(0); markDirty(); }} disabled={pitch === 0}>
-                        <RotateCcw className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Volume */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Громкость" : "Volume"}</label>
-                      <span className="text-xs text-muted-foreground tabular-nums">{volume > 0 ? "+" : ""}{volume} dB</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Slider min={-15} max={15} step={1} value={[volume]} onValueChange={([v]) => { setVolume(v); markDirty(); }} className="flex-1" />
-                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setVolume(0); markDirty(); }} disabled={volume === 0}>
-                        <RotateCcw className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                {/* ─── SaluteSpeech Tab ─── */}
-                <TabsContent value="salutespeech" className="space-y-4 mt-3">
-                  {/* Voice selector */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      {isRu ? "Голос" : "Voice"}
-                    </label>
-                    <Select value={ssVoice} onValueChange={v => { setSsVoice(v); markDirty(); }}>
-                      <SelectTrigger className="bg-secondary border-border">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border max-h-64">
-                        {SALUTESPEECH_VOICES.map(v => (
-                          <SelectItem key={v.id} value={v.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{isRu ? v.name.ru : v.name.en}</span>
-                              <Badge variant="outline" className="text-[10px] px-1 py-0">
-                                {v.gender === "female" ? "♀" : "♂"}
-                              </Badge>
-                              <span className="text-[10px] text-muted-foreground">
-                                {isRu ? v.description.ru : v.description.en}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Speed */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Скорость" : "Speed"}</label>
-                      <span className="text-xs text-muted-foreground tabular-nums">{ssSpeed.toFixed(1)}×</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Slider min={0.5} max={2.0} step={0.1} value={[ssSpeed]} onValueChange={([v]) => { setSsSpeed(v); markDirty(); }} className="flex-1" />
-                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setSsSpeed(1.0); markDirty(); }} disabled={ssSpeed === 1.0}>
-                        <RotateCcw className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="rounded-md border border-border bg-muted/30 p-2.5">
-                    <p className="text-[10px] text-muted-foreground">
-                      {isRu
-                        ? "🇷🇺 SaluteSpeech (Сбер) — бесплатный для физлиц. Поддержка SSML, 6 голосов, формат Opus/WAV."
-                        : "🇷🇺 SaluteSpeech (Sber) — free for individuals. SSML support, 6 voices, Opus/WAV format."}
-                    </p>
-                  </div>
-                </TabsContent>
-
-                {/* ─── ElevenLabs Tab ─── */}
-                <TabsContent value="elevenlabs" className="space-y-4 mt-3">
-                  {/* Credits info */}
-                  {elCredits && (
-                    <div className="rounded-md border border-border bg-muted/30 p-2.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">
-                          {isRu ? "Кредиты" : "Credits"}: <span className="font-semibold text-foreground capitalize">{elCredits.tier}</span>
-                        </span>
-                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={loadElCredits} disabled={elCreditsLoading}>
-                          <RotateCcw className={`h-3 w-3 ${elCreditsLoading ? "animate-spin" : ""}`} />
-                        </Button>
-                      </div>
-                      <div className="mt-1.5">
-                        <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
-                          <span>{elCredits.used.toLocaleString()} / {elCredits.limit.toLocaleString()}</span>
-                          <span>{Math.round((elCredits.used / elCredits.limit) * 100)}%</span>
-                        </div>
-                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-primary transition-all"
-                            style={{ width: `${Math.min(100, (elCredits.used / elCredits.limit) * 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {!elCredits && elCreditsError && (
-                    <div className="rounded-md border border-border bg-muted/30 p-2.5">
-                      <p className="text-[10px] text-muted-foreground">
-                        ⚠️ {elCreditsError}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Voice selector */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      {isRu ? "Голос" : "Voice"}
-                    </label>
-                    <Select value={elVoice} onValueChange={v => { setElVoice(v); markDirty(); }}>
-                      <SelectTrigger className="bg-secondary border-border">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border max-h-64">
-                        {ELEVENLABS_VOICES.map(v => (
-                          <SelectItem key={v.id} value={v.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{v.name}</span>
-                              <Badge variant="outline" className="text-[10px] px-1 py-0">
-                                {v.gender === "female" ? "♀" : "♂"}
-                              </Badge>
-                              <span className="text-[10px] text-muted-foreground">
-                                {isRu ? v.description.ru : v.description.en}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Stability */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Стабильность" : "Stability"}</label>
-                      <span className="text-xs text-muted-foreground tabular-nums">{(elStability * 100).toFixed(0)}%</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Slider min={0} max={1} step={0.05} value={[elStability]} onValueChange={([v]) => { setElStability(v); markDirty(); }} className="flex-1" />
-                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setElStability(0.5); markDirty(); }} disabled={elStability === 0.5}>
-                        <RotateCcw className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground/60">{isRu ? "Ниже = выразительнее, выше = стабильнее" : "Lower = more expressive, higher = more consistent"}</p>
-                  </div>
-
-                  {/* Similarity Boost */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Схожесть" : "Similarity"}</label>
-                      <span className="text-xs text-muted-foreground tabular-nums">{(elSimilarity * 100).toFixed(0)}%</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Slider min={0} max={1} step={0.05} value={[elSimilarity]} onValueChange={([v]) => { setElSimilarity(v); markDirty(); }} className="flex-1" />
-                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setElSimilarity(0.75); markDirty(); }} disabled={elSimilarity === 0.75}>
-                        <RotateCcw className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Style */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Стиль" : "Style"}</label>
-                      <span className="text-xs text-muted-foreground tabular-nums">{(elStyle * 100).toFixed(0)}%</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Slider min={0} max={1} step={0.05} value={[elStyle]} onValueChange={([v]) => { setElStyle(v); markDirty(); }} className="flex-1" />
-                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setElStyle(0.4); markDirty(); }} disabled={elStyle === 0.4}>
-                        <RotateCcw className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Speed */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Скорость" : "Speed"}</label>
-                      <span className="text-xs text-muted-foreground tabular-nums">{elSpeed.toFixed(2)}×</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Slider min={0.7} max={1.2} step={0.05} value={[elSpeed]} onValueChange={([v]) => { setElSpeed(v); markDirty(); }} className="flex-1" />
-                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setElSpeed(0.95); markDirty(); }} disabled={elSpeed === 0.95}>
-                        <RotateCcw className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                {/* ─── ProxyAPI (OpenAI) TTS Tab ─── */}
-                <TabsContent value="proxyapi" className="space-y-4 mt-3">
-                  {/* Model selector */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      {isRu ? "Модель" : "Model"}
-                    </label>
-                    <Select value={paModel} onValueChange={v => {
-                      setPaModel(v);
-                      // Reset voice if current voice not available for new model
-                      const available = getVoicesForModel(v);
-                      if (!available.some(av => av.id === paVoice)) {
-                        setPaVoice(available[0]?.id ?? "alloy");
-                      }
-                      markDirty();
-                    }}>
-                      <SelectTrigger className="bg-secondary border-border">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border">
-                        {PROXYAPI_TTS_MODELS.map(m => (
-                          <SelectItem key={m.id} value={m.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{m.name}</span>
-                              <span className="text-[10px] text-muted-foreground">
-                                {isRu ? m.description.ru : m.description.en}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Voice selector */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      {isRu ? "Голос" : "Voice"}
-                    </label>
-                    <Select value={paVoice} onValueChange={v => { setPaVoice(v); markDirty(); }}>
-                      <SelectTrigger className="bg-secondary border-border">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border max-h-64">
-                        {getVoicesForModel(paModel).map(v => (
-                          <SelectItem key={v.id} value={v.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{v.name}</span>
-                              <Badge variant="outline" className="text-[10px] px-1 py-0">
-                                {v.gender === "female" ? "♀" : "♂"}
-                              </Badge>
-                              <span className="text-[10px] text-muted-foreground">
-                                {isRu ? v.description.ru : v.description.en}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Speed */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Скорость" : "Speed"}</label>
-                      <span className="text-xs text-muted-foreground tabular-nums">{paSpeed.toFixed(1)}×</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Slider min={0.25} max={4.0} step={0.05} value={[paSpeed]} onValueChange={([v]) => { setPaSpeed(v); markDirty(); }} className="flex-1" />
-                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setPaSpeed(1.0); markDirty(); }} disabled={paSpeed === 1.0}>
-                        <RotateCcw className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Instructions (only for gpt-4o-mini-tts) */}
-                  {paModel === "gpt-4o-mini-tts" && (
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        {isRu ? "Инструкции" : "Instructions"}
-                      </label>
-                      <Textarea
-                        value={paInstructions}
-                        onChange={e => { setPaInstructions(e.target.value); markDirty(); }}
-                        placeholder={isRu ? "Говори с радостной интонацией, спокойно и размеренно..." : "Speak with a joyful tone, calmly and steadily..."}
-                        className="min-h-[80px] text-xs bg-secondary border-border resize-y"
-                      />
-                      <p className="text-[10px] text-muted-foreground/60">
-                        {isRu ? "Управляйте акцентом, эмоциями, скоростью и тоном речи" : "Control accent, emotion, speed and tone of speech"}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="rounded-md border border-border bg-muted/30 p-2.5">
-                    <p className="text-[10px] text-muted-foreground">
-                      {isRu
-                        ? "⚡ Требуется ключ ProxyAPI в Профиле → API-роутеры. Голоса оптимизированы для английского, но поддерживают многие языки."
-                        : "⚡ Requires ProxyAPI key in Profile → API Routers. Voices optimized for English but support many languages."}
-                    </p>
-                  </div>
-                </TabsContent>
-              </Tabs>
-
-              <Separator />
-
-              {/* Action buttons */}
-              <div className="flex gap-2">
-                <Button onClick={handlePreview} disabled={testing} variant="outline" className="gap-2">
-                  {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : playing ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                  {playing ? (isRu ? "Стоп" : "Stop") : (isRu ? "Прослушать" : "Preview")}
-                </Button>
-                {selectedId && (
-                  <Button onClick={handleSave} disabled={saving || !dirty} className="gap-2">
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    {isRu ? "Сохранить" : "Save"}
-                  </Button>
-                )}
-              </div>
+          <div className="p-4 h-full flex flex-col">
+            <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider mb-3">
+              {isRu ? "Голоса" : "Voices"}
+            </h3>
+            <div className="flex-1 min-h-0">
+              <VoiceCastingTable
+                characters={filteredCharacters}
+                isRu={isRu}
+                selectedCharacterId={selectedId}
+                onSelectCharacter={handleSelectCharacter}
+                filterMode={filterMode}
+                sceneCharIds={sceneCharIds}
+              />
             </div>
-          </ScrollArea>
+          </div>
         </div>
       </div>
     </div>
