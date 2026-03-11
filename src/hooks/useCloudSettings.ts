@@ -37,7 +37,7 @@ export function useCloudSettings<T>(
 
         if (cancelled) return;
         if (!error && data) {
-          const dbValue = (data as any).setting_value as T;
+          const dbValue = data.setting_value as T;
           setValue(dbValue);
           try { localStorage.setItem(cacheKey, JSON.stringify(dbValue)); } catch {}
         }
