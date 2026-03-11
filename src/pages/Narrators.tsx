@@ -213,7 +213,7 @@ const Narrators = () => {
     setSaving(true);
     try {
       const currentChar = characters.find(c => c.id === selectedId);
-      const isExtra = currentChar?.voice_config?.is_extra;
+      const isExtra = currentChar?.voice_config?.is_extra as boolean | undefined;
       const voiceConfig = voiceProvider === "salutespeech"
         ? { provider: "salutespeech", voice_id: ssVoice, speed: ssSpeed, is_extra: isExtra }
         : voiceProvider === "proxyapi"
