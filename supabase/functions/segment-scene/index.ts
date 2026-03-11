@@ -171,6 +171,25 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
       }
     }
 
+    // ── Post-process: dialogue vs monologue classification ──
+    // A speech block is "dialogue" only if it has adjacent speech neighbors;
+    // otherwise it's a standalone "monologue".
+    const SPEECH_TYPES = new Set(["dialogue", "monologue"]);
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      if (!SPEECH_TYPES.has(seg.type)) continue;
+
+      const prevSpeech = i > 0 && SPEECH_TYPES.has(segments[i - 1].type);
+      const nextSpeech = i < segments.length - 1 && SPEECH_TYPES.has(segments[i + 1].type);
+      const hasAdjacentSpeech = prevSpeech || nextSpeech;
+
+      if (hasAdjacentSpeech) {
+        seg.type = "dialogue";
+      } else {
+        seg.type = "monologue";
+      }
+    }
+
     // Log successful AI call
     if (userId) {
       logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "success", latencyMs: aiLatency, tokensInput: usage?.prompt_tokens, tokensOutput: usage?.completion_tokens });
