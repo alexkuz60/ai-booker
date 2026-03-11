@@ -1417,6 +1417,21 @@ export function StoryboardPanel({
               {detecting ? (isRu ? "Поиск…" : "Detecting…") : (isRu ? "Вставки" : "Narrations")}
             </Button>
           )}
+          {staleAudioSegIds.size > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={cleanStaleInlineAudio}
+              disabled={cleaningMetadata || synthesizing}
+              className="gap-1.5 h-7 text-xs text-destructive hover:text-destructive"
+              title={isRu
+                ? `Очистить ${staleAudioSegIds.size} устаревших аудио-вставок (без ре-синтеза)`
+                : `Clear ${staleAudioSegIds.size} stale audio metadata (no re-synthesis)`}
+            >
+              {cleaningMetadata ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eraser className="h-3 w-3" />}
+              {staleAudioSegIds.size}
+            </Button>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
           {/* Silence duration selector */}
