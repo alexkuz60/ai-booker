@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAiRoles } from "@/hooks/useAiRoles";
-import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, AudioLines, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser } from "lucide-react";
+import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, AudioLines, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -693,6 +693,7 @@ export function StoryboardPanel({
   const [synthesizing, setSynthesizing] = useState(false);
   const [synthProgress, setSynthProgress] = useState("");
   const [detecting, setDetecting] = useState(false);
+  const [correctingStress, setCorrectingStress] = useState(false);
   const [resynthSegId, setResynthSegId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [characters, setCharacters] = useState<CharacterOption[]>([]);
@@ -1280,6 +1281,35 @@ export function StoryboardPanel({
     })));
   }, [isRu]);
 
+  // Auto-add word to stress dictionary when user creates a stress annotation
+  const addToStressDictionary = useCallback(async (phraseId: string, annotation: PhraseAnnotation) => {
+    if (annotation.type !== "stress" || annotation.start === undefined) return;
+    // Find the phrase text
+    let phraseText = "";
+    for (const seg of segments) {
+      const ph = seg.phrases.find(p => p.phrase_id === phraseId);
+      if (ph) { phraseText = ph.text; break; }
+    }
+    if (!phraseText) return;
+
+    // Extract the word containing the stressed letter
+    const stressPos = annotation.start;
+    const wordRegex = /[а-яёА-ЯЁ]+/g;
+    let m: RegExpExecArray | null;
+    while ((m = wordRegex.exec(phraseText)) !== null) {
+      if (stressPos >= m.index && stressPos < m.index + m[0].length) {
+        const word = m[0].toLowerCase();
+        const stressedIndex = stressPos - m.index;
+        // Upsert to dictionary (ignore if already exists)
+        await supabase.from("stress_dictionary" as any).upsert(
+          { user_id: (await supabase.auth.getUser()).data.user?.id, word, stressed_index: stressedIndex },
+          { onConflict: "user_id,word,stressed_index" }
+        );
+        break;
+      }
+    }
+  }, [segments]);
+
   // Save annotation to phrase metadata
   const saveAnnotation = useCallback(async (phraseId: string, annotation: PhraseAnnotation) => {
     // Find current phrase
@@ -1313,6 +1343,11 @@ export function StoryboardPanel({
       return;
     }
 
+    // Auto-add stress annotations to dictionary
+    if (annotation.type === "stress") {
+      addToStressDictionary(phraseId, annotation);
+    }
+
     setSegments(prev => prev.map(seg => ({
       ...seg,
       phrases: seg.phrases.map(ph =>
@@ -1320,7 +1355,7 @@ export function StoryboardPanel({
       ),
     })));
     toast.success(isRu ? "Аннотация добавлена" : "Annotation added");
-  }, [segments, isRu]);
+  }, [segments, isRu, addToStressDictionary]);
 
   // Remove annotation by index
   const removeAnnotation = useCallback(async (phraseId: string, index: number) => {
@@ -1668,6 +1703,57 @@ export function StoryboardPanel({
     setDetecting(false);
   }, [sceneId, dialogueCount, isRu, loadSegments]);
 
+  // ── Stress correction ──────────────────────────────────────────
+  const runStressCorrection = useCallback(async (mode: "correct" | "suggest") => {
+    if (!sceneId) return;
+    setCorrectingStress(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("correct-stress", {
+        body: { scene_id: sceneId, mode, model: getModelForRole("screenwriter") },
+      });
+      if (error) throw error;
+
+      if (mode === "suggest") {
+        const suggestions = data.suggestions as Array<{ word: string; stressed_index: number; reason: string }>;
+        if (!suggestions?.length) {
+          toast.info(isRu ? "Неоднозначных ударений не найдено" : "No ambiguous stress found");
+          return;
+        }
+        // Auto-add suggestions to dictionary
+        const userId = (await supabase.auth.getUser()).data.user?.id;
+        if (userId) {
+          for (const s of suggestions) {
+            await supabase.from("stress_dictionary" as any).upsert(
+              { user_id: userId, word: s.word.toLowerCase(), stressed_index: s.stressed_index, context: s.reason },
+              { onConflict: "user_id,word,stressed_index" }
+            );
+          }
+          toast.success(
+            isRu
+              ? `Найдено ${suggestions.length} слов, добавлены в словарь. Запустите «Применить» для расстановки.`
+              : `Found ${suggestions.length} words, added to dictionary. Run "Apply" to set stress marks.`
+          );
+        }
+      } else {
+        // correct mode
+        if (data.applied > 0) {
+          toast.success(
+            isRu
+              ? `Расставлено ${data.applied} ударений в ${data.phrases_affected} фразах`
+              : `Applied ${data.applied} stress marks in ${data.phrases_affected} phrases`
+          );
+          await loadSegments(sceneId);
+        } else {
+          toast.info(data.message || (isRu ? "Нет совпадений со словарём" : "No dictionary matches"));
+        }
+      }
+    } catch (err: any) {
+      console.error("Stress correction failed:", err);
+      toast.error(isRu ? "Ошибка коррекции ударений" : "Stress correction failed");
+    }
+    setCorrectingStress(false);
+  }, [sceneId, isRu, loadSegments]);
+
   // ── Clean stale inline_narrations_audio metadata ──
   const cleanStaleInlineAudio = useCallback(async () => {
     if (!sceneId || staleAudioSegIds.size === 0) return;
@@ -1837,6 +1923,46 @@ export function StoryboardPanel({
               {detecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <ScanSearch className="h-3 w-3" />}
               {detecting ? (isRu ? "Поиск…" : "Detecting…") : (isRu ? "Вставки" : "Narrations")}
             </Button>
+          )}
+          {segments.length > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={correctingStress || analyzing || synthesizing}
+                  className="gap-1.5 h-7 text-xs"
+                  title={isRu ? "Коррекция ударений" : "Stress correction"}
+                >
+                  {correctingStress ? <Loader2 className="h-3 w-3 animate-spin" /> : <SpellCheck className="h-3 w-3" />}
+                  {isRu ? "Ударения" : "Stress"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-2" align="start">
+                <div className="flex flex-col gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start gap-2 h-8 text-xs"
+                    onClick={() => runStressCorrection("suggest")}
+                    disabled={correctingStress}
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    {isRu ? "Найти неоднозначные" : "Find ambiguous"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start gap-2 h-8 text-xs"
+                    onClick={() => runStressCorrection("correct")}
+                    disabled={correctingStress}
+                  >
+                    <CheckCircle2 className="h-3 w-3" />
+                    {isRu ? "Применить словарь" : "Apply dictionary"}
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
           )}
           {staleAudioSegIds.size > 0 && (
             <Button

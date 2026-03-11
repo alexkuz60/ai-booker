@@ -597,6 +597,33 @@ export type Database = {
           },
         ]
       }
+      stress_dictionary: {
+        Row: {
+          context: string | null
+          created_at: string
+          id: string
+          stressed_index: number
+          user_id: string
+          word: string
+        }
+        Insert: {
+          context?: string | null
+          created_at?: string
+          id?: string
+          stressed_index: number
+          user_id: string
+          word: string
+        }
+        Update: {
+          context?: string | null
+          created_at?: string
+          id?: string
+          stressed_index?: number
+          user_id?: string
+          word?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
