@@ -841,7 +841,7 @@ export function StudioTimeline({
       {/* Tracks — Chapter mode: single scenes track */}
       {!collapsed && mode === "chapter" && (
         <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
-          <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${sidebarWidth}px` }}>
+          <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${CHAPTER_SIDEBAR_WIDTH}px` }}>
             <MasterMeterPanel isRu={isRu} width={sidebarWidth} />
           </div>
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
