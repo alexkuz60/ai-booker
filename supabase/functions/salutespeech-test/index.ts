@@ -17,19 +17,29 @@ async function getAccessToken(authKey: string): Promise<string> {
 
   const rquid = crypto.randomUUID().replace(/-/g, "");
 
-  const res = await fetch(
-    "https://ngw.devices.sberbank.ru:9443/api/v2/oauth",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-        RqUID: rquid,
-        Authorization: `Basic ${authKey}`,
+  // Sber uses Russian CA certs not trusted by default in Deno
+  const httpClient = Deno.createHttpClient({ caCerts: [], proxy: { url: "" } });
+
+  let res: Response;
+  try {
+    res = await fetch(
+      "https://ngw.devices.sberbank.ru:9443/api/v2/oauth",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+          RqUID: rquid,
+          Authorization: `Basic ${authKey}`,
+        },
+        body: "scope=SALUTE_SPEECH_PERS",
+        // @ts-ignore Deno unstable API
+        client: httpClient,
       },
-      body: "scope=SALUTE_SPEECH_PERS",
-    },
-  );
+    );
+  } finally {
+    httpClient.close();
+  }
 
   if (!res.ok) {
     const text = await res.text();
