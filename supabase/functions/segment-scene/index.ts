@@ -158,6 +158,17 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
       );
     }
 
+    // ── Post-process: detect first-person narration by pronouns ──
+    const FIRST_PERSON_RU = /\b(я|мне|меня|мной|мною|моего|моей|моему|моим|моих|моё|мое|мои)\b/i;
+    const FIRST_PERSON_EN = /\b(I|me|my|mine|myself)\b/;
+    const fpRegex = lang === "ru" ? FIRST_PERSON_RU : FIRST_PERSON_EN;
+
+    for (const seg of segments) {
+      if (seg.type === "narrator" && fpRegex.test(seg.text)) {
+        seg.type = "first_person";
+      }
+    }
+
     // Log successful AI call
     if (userId) {
       logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "success", latencyMs: aiLatency, tokensInput: usage?.prompt_tokens, tokensOutput: usage?.completion_tokens });
