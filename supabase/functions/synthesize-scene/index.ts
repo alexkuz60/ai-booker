@@ -662,6 +662,7 @@ Deno.serve(async (req) => {
     }
 
     const yandexTtsUrl = `${supabaseUrl}/functions/v1/yandex-tts`;
+    const saluteSpeechTtsUrl = `${supabaseUrl}/functions/v1/salutespeech-tts`;
     const userId = userData.user.id;
     const narratorVoice = getNarratorVoice(voiceConfigMap, segments);
 
