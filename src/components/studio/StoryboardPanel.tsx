@@ -50,6 +50,7 @@ interface CharacterOption {
   id: string;
   name: string;
   color: string | null;
+  voiceConfig?: Record<string, unknown>;
 }
 
 // ─── Segment type config ────────────────────────────────────
