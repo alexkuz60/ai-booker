@@ -175,7 +175,7 @@ export default function Parser() {
     setTocEntries(prev => prev.map((e, i) => i === idx ? { ...e, title: newTitle } : e));
     const chapterId = chapterIdMap.get(idx);
     if (chapterId) {
-      supabase.from('book_chapters').update({ title: newTitle } as any).eq('id', chapterId).then();
+      supabase.from('book_chapters').update({ title: newTitle }).eq('id', chapterId).then();
     }
   };
 
