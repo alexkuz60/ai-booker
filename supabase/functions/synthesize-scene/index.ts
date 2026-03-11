@@ -251,6 +251,124 @@ async function callProxyApiTts(
   return { audio, durationMs };
 }
 
+// ── Phrase annotation types (mirroring phraseAnnotations.ts) ─────────
+
+interface PhraseAnnotation {
+  type: "pause" | "emphasis" | "whisper" | "slow" | "fast";
+  offset?: number;
+  start?: number;
+  end?: number;
+  durationMs?: number;
+  rate?: number;
+}
+
+// ── Apply annotations to text → SSML (Yandex v1) ────────────────────
+
+function applyAnnotationsSsml(text: string, annotations: PhraseAnnotation[]): string {
+  if (!annotations.length) return escapeXml(text);
+
+  // Separate insertions (pause) and ranges
+  type Insert = { offset: number; ssml: string };
+  type Range = { start: number; end: number; openTag: string; closeTag: string };
+
+  const inserts: Insert[] = [];
+  const ranges: Range[] = [];
+
+  for (const a of annotations) {
+    if (a.type === "pause") {
+      inserts.push({ offset: a.offset ?? text.length, ssml: `<break time="${a.durationMs ?? 500}ms"/>` });
+    } else if (a.start !== undefined && a.end !== undefined) {
+      switch (a.type) {
+        case "emphasis":
+          ranges.push({ start: a.start, end: a.end, openTag: '<emphasis>', closeTag: '</emphasis>' });
+          break;
+        case "whisper":
+          ranges.push({ start: a.start, end: a.end, openTag: '<prosody volume="silent">', closeTag: '</prosody>' });
+          break;
+        case "slow":
+          ranges.push({ start: a.start, end: a.end, openTag: `<prosody rate="${a.rate ?? 0.7}">`, closeTag: '</prosody>' });
+          break;
+        case "fast":
+          ranges.push({ start: a.start, end: a.end, openTag: `<prosody rate="${a.rate ?? 1.4}">`, closeTag: '</prosody>' });
+          break;
+      }
+    }
+  }
+
+  inserts.sort((a, b) => a.offset - b.offset);
+  ranges.sort((a, b) => a.start - b.start);
+
+  // Build char-by-char output
+  let result = "";
+  let insertIdx = 0;
+
+  for (let i = 0; i <= text.length; i++) {
+    // Insert pauses at this offset
+    while (insertIdx < inserts.length && inserts[insertIdx].offset === i) {
+      result += ` ${inserts[insertIdx].ssml} `;
+      insertIdx++;
+    }
+    if (i >= text.length) break;
+
+    // Check range openings
+    for (const r of ranges) {
+      if (r.start === i) result += r.openTag;
+    }
+
+    result += escapeXml(text[i]);
+
+    // Check range closings
+    for (const r of ranges) {
+      if (r.end === i + 1) result += r.closeTag;
+    }
+  }
+
+  return result;
+}
+
+// ── Apply annotations to plain text (ProxyAPI / ElevenLabs / v3) ─────
+
+function applyAnnotationsText(text: string, annotations: PhraseAnnotation[]): { text: string; extraInstructions: string[] } {
+  if (!annotations.length) return { text, extraInstructions: [] };
+
+  const extraInstructions: string[] = [];
+  let modified = text;
+
+  // Collect range annotations for instructions
+  for (const a of annotations) {
+    if (a.start !== undefined && a.end !== undefined) {
+      const fragment = text.slice(a.start, a.end);
+      switch (a.type) {
+        case "whisper":
+          extraInstructions.push(`Whisper the phrase: "${fragment}"`);
+          break;
+        case "slow":
+          extraInstructions.push(`Say slowly: "${fragment}"`);
+          break;
+        case "fast":
+          extraInstructions.push(`Say quickly: "${fragment}"`);
+          break;
+        case "emphasis":
+          extraInstructions.push(`Emphasize: "${fragment}"`);
+          break;
+      }
+    }
+  }
+
+  // Apply pause insertions as "..." in text (sorted descending to preserve offsets)
+  const pauses = annotations
+    .filter(a => a.type === "pause")
+    .map(a => ({ offset: a.offset ?? text.length, durationMs: a.durationMs ?? 500 }))
+    .sort((a, b) => b.offset - a.offset);
+
+  for (const p of pauses) {
+    const dots = p.durationMs >= 1500 ? "...... " : p.durationMs >= 750 ? "... " : ".. ";
+    modified = modified.slice(0, p.offset) + dots + modified.slice(p.offset);
+  }
+
+  return { text: modified, extraInstructions };
+}
+
 // ── SSML builder for dialogue with inline narration pauses ───────────
 
 function buildDialogueSsml(
@@ -406,15 +524,17 @@ Deno.serve(async (req) => {
     const segIds = segments.map((s) => s.id);
     const { data: phrases } = await supabase
       .from("segment_phrases")
-      .select("id, segment_id, phrase_number, text")
+      .select("id, segment_id, phrase_number, text, metadata")
       .in("segment_id", segIds)
       .order("phrase_number");
 
-    // Group phrases by segment
-    const phrasesBySegment = new Map<string, string[]>();
+    // Group phrases by segment (with annotations)
+    const phrasesBySegment = new Map<string, Array<{ text: string; annotations: PhraseAnnotation[] }>>();
     for (const p of phrases ?? []) {
       const list = phrasesBySegment.get(p.segment_id) ?? [];
-      list.push(p.text);
+      const meta = (p.metadata ?? {}) as Record<string, unknown>;
+      const annotations = (meta.annotations ?? []) as PhraseAnnotation[];
+      list.push({ text: p.text, annotations });
       phrasesBySegment.set(p.segment_id, list);
     }
 
@@ -511,10 +631,36 @@ Deno.serve(async (req) => {
       return false;
     }
 
-    // Build segment texts
+    // Build segment texts (plain) and annotated versions
     const segmentTexts = segments.map(seg => {
-      return (phrasesBySegment.get(seg.id) ?? []).join(" ");
+      return (phrasesBySegment.get(seg.id) ?? []).map(p => p.text).join(" ");
     });
+
+    // Check if segment has any annotations
+    const segmentHasAnnotations = segments.map(seg => {
+      const phrs = phrasesBySegment.get(seg.id) ?? [];
+      return phrs.some(p => p.annotations.length > 0);
+    });
+
+    // Build SSML for v1 with annotations (per segment)
+    function buildSegmentSsml(segId: string): string {
+      const phrs = phrasesBySegment.get(segId) ?? [];
+      const parts = phrs.map(p => applyAnnotationsSsml(p.text, p.annotations));
+      return `<speak>${parts.join(" ")}</speak>`;
+    }
+
+    // Build annotated text for ProxyAPI/v3 (per segment)
+    function buildSegmentAnnotatedText(segId: string): { text: string; extraInstructions: string[] } {
+      const phrs = phrasesBySegment.get(segId) ?? [];
+      const allInstructions: string[] = [];
+      const textParts: string[] = [];
+      for (const p of phrs) {
+        const { text: t, extraInstructions } = applyAnnotationsText(p.text, p.annotations);
+        textParts.push(t);
+        allInstructions.push(...extraInstructions);
+      }
+      return { text: textParts.join(" "), extraInstructions: allInstructions };
+    }
 
     // ── Synthesize each segment ──────────────────────────────────────
     const results: SegmentResult[] = [];
@@ -550,8 +696,13 @@ Deno.serve(async (req) => {
       const voiceConfig = resolveVoice(seg.speaker, voiceConfigMap);
 
       // ── Cache check: skip if audio exists with same voice config ──
+      // Include annotations in hash so annotation changes trigger re-synthesis
+      const annotSuffix = segmentHasAnnotations[i]
+        ? JSON.stringify((phrasesBySegment.get(seg.id) ?? []).map(p => p.annotations))
+        : "";
+      const textHashForCache = hashText(text + annotSuffix);
       const cached = existingAudioMap.get(seg.id);
-      if (cached && !forceResynthesize && !voiceConfigChanged(voiceConfig, cached.voice_config, hashText(text))) {
+      if (cached && !forceResynthesize && !voiceConfigChanged(voiceConfig, cached.voice_config, textHashForCache)) {
         // Also check that the text hasn't changed by verifying the file still exists
         // (we trust the DB record — if segment_audio says "ready", it's good)
         console.log(`Cache hit for segment ${seg.id}: voice=${voiceConfig.voice}, skipping TTS`);
@@ -720,14 +871,41 @@ Deno.serve(async (req) => {
         } else {
           // ── STANDARD SINGLE-PASS SYNTHESIS ────────────────
           let result: { audio: Uint8Array; durationMs: number } | { error: string };
+          const hasAnnot = segmentHasAnnotations[i];
 
           if (isProxyApiVoice && proxyApiKey) {
+            // ProxyAPI: apply text markers + extra instructions from annotations
+            const annotated = hasAnnot ? buildSegmentAnnotatedText(seg.id) : { text, extraInstructions: [] };
+            const baseInstructions = (voiceConfig as any).instructions || "";
+            const fullInstructions = [baseInstructions, ...annotated.extraInstructions].filter(Boolean).join(". ");
             result = await callProxyApiTts(proxyApiKey, {
-              text,
+              text: annotated.text,
               voice: voiceConfig.voice,
               model: (voiceConfig as any).model,
               speed: voiceConfig.speed,
-              instructions: (voiceConfig as any).instructions,
+              instructions: fullInstructions || undefined,
+            });
+          } else if (!isV3Voice && hasAnnot) {
+            // Yandex v1: use SSML with annotation tags
+            const ssml = buildSegmentSsml(seg.id);
+            console.log(`Annotated SSML for segment ${seg.id}: ${ssml.length} chars`);
+            result = await callTts(yandexTtsUrl, authHeader, {
+              ssml,
+              voice: voiceConfig.voice,
+              speed: voiceConfig.speed,
+              lang: langCode,
+            });
+          } else if (isV3Voice && hasAnnot) {
+            // Yandex v3: apply text markers (pauses as "...", instructions ignored)
+            const annotated = buildSegmentAnnotatedText(seg.id);
+            result = await callTts(yandexTtsUrl, authHeader, {
+              text: annotated.text,
+              voice: voiceConfig.voice,
+              role: voiceConfig.role,
+              speed: voiceConfig.speed,
+              pitchShift: voiceConfig.pitchShift,
+              volume: voiceConfig.volume,
+              lang: langCode,
             });
           } else {
             result = await callTts(yandexTtsUrl, authHeader, {
@@ -794,7 +972,7 @@ Deno.serve(async (req) => {
               volume: voiceConfig.volume,
               model: isProxyApiVoice ? (voiceConfig as any).model : undefined,
               instructions: isProxyApiVoice ? (voiceConfig as any).instructions : undefined,
-              textHash: hashText(text),
+              textHash: textHashForCache,
               apiVersion: isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1",
             },
           },
