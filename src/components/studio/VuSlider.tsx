@@ -42,9 +42,13 @@ export function VuSlider({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
-  const rafRef = useRef(0);
   const smoothedRef = useRef<{ l: number; r: number }>({ l: 0, r: 0 });
 
+  // Store meterDb in a ref so the draw loop doesn't need to restart on every change
+  const meterDbRef = useRef(meterDb);
+  meterDbRef.current = meterDb;
+
+  // Stable draw function that reads meterDb from ref
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -57,12 +61,13 @@ export function VuSlider({
 
     ctx.clearRect(0, 0, w, h);
 
+    const currentMeterDb = meterDbRef.current;
     let mL: number, mR: number;
-    if (Array.isArray(meterDb)) {
-      mL = dbToLinear(meterDb[0]);
-      mR = dbToLinear(meterDb[1]);
+    if (Array.isArray(currentMeterDb)) {
+      mL = dbToLinear(currentMeterDb[0]);
+      mR = dbToLinear(currentMeterDb[1]);
     } else {
-      mL = mR = dbToLinear(meterDb);
+      mL = mR = dbToLinear(currentMeterDb);
     }
 
     const alpha = 0.3;
@@ -103,8 +108,9 @@ export function VuSlider({
       ctx.fillStyle = "hsla(0, 70%, 65%, 0.6)";
       ctx.fillRect(cx - 0.5 * dpr, 0, 1 * dpr, h);
     }
-  }, [mode, meterDb]);
+  }, [mode]); // only depends on mode, reads meterDb from ref
 
+  // Stable draw loop — doesn't restart when meterDb changes
   useEffect(() => {
     let running = true;
     const interval = setInterval(() => {
