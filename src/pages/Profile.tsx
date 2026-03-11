@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { User, Key, Settings, HardDrive, Network, Bot } from 'lucide-react';
+import { User, Key, Settings, HardDrive, Network, Bot, Activity } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -17,6 +17,7 @@ import { ApiKeysTab } from '@/components/profile/tabs/ApiKeysTab';
 import { ApiRoutersTab } from '@/components/profile/tabs/ApiRoutersTab';
 import { StorageTab } from '@/components/profile/tabs/StorageTab';
 import { AiRolesTab } from '@/components/profile/tabs/AiRolesTab';
+import { AiUsageWidget } from '@/components/profile/AiUsageWidget';
 
 export default function Profile() {
   const { theme, setTheme } = useTheme();
@@ -206,6 +207,18 @@ export default function Profile() {
           </h2>
         </div>
         {user && <StorageTab isRu={isRu} userId={user.id} />}
+      </section>
+
+      <Separator className="my-2" />
+
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="h-5 w-5 text-primary" />
+          <h2 className="text-xl font-semibold font-display">
+            {isRu ? 'AI Аналитика' : 'AI Analytics'}
+          </h2>
+        </div>
+        <AiUsageWidget isRu={isRu} />
       </section>
 
       <Separator className="my-2" />
