@@ -772,6 +772,9 @@ Deno.serve(async (req) => {
         const updatedMetadata = { ...metadata };
         if (narrationResults.length > 0) {
           updatedMetadata.inline_narrations_audio = narrationResults;
+        } else {
+          // Clear stale inline narration audio if narrations were removed
+          delete updatedMetadata.inline_narrations_audio;
         }
 
         // Upsert segment_audio record
