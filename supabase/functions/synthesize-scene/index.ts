@@ -277,6 +277,16 @@ function applyAnnotationsSsml(text: string, annotations: PhraseAnnotation[]): st
   for (const a of annotations) {
     if (a.type === "pause") {
       inserts.push({ offset: a.offset ?? text.length, ssml: `<break time="${a.durationMs ?? 500}ms"/>` });
+    } else if (a.type === "sigh" || a.type === "cough" || a.type === "laugh" || a.type === "hmm") {
+      // Sound insertions: use short pause + text hint in SSML
+      const soundMap: Record<string, string> = {
+        sigh: '*вздох*',
+        cough: '*кашель*',
+        laugh: '*смех*',
+        hmm: '*хм*',
+      };
+      // Insert a break to simulate the sound effect gap
+      inserts.push({ offset: a.offset ?? text.length, ssml: `<break time="300ms"/>` });
     } else if (a.start !== undefined && a.end !== undefined) {
       switch (a.type) {
         case "emphasis":
