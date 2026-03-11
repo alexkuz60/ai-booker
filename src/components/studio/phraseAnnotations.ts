@@ -83,6 +83,30 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     providers: ["yandex"],
     needsRange: true,
   },
+  {
+    type: "joy",
+    label_ru: "😊 Радость",
+    label_en: "😊 Joy",
+    emoji: "😊",
+    providers: ["yandex", "elevenlabs", "proxyapi"],
+    needsRange: true,
+  },
+  {
+    type: "sadness",
+    label_ru: "😢 Грусть",
+    label_en: "😢 Sadness",
+    emoji: "😢",
+    providers: ["yandex", "elevenlabs", "proxyapi"],
+    needsRange: true,
+  },
+  {
+    type: "anger",
+    label_ru: "😡 Злость",
+    label_en: "😡 Anger",
+    emoji: "😡",
+    providers: ["yandex", "elevenlabs", "proxyapi"],
+    needsRange: true,
+  },
 ];
 
 /** Get available annotations for a given TTS provider */
