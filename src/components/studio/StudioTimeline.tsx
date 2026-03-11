@@ -542,6 +542,27 @@ export function StudioTimeline({
             </SelectContent>
           </Select>
           <div className="w-px h-4 bg-border mx-1" />
+          <Button
+            variant={isRendering ? "secondary" : "outline"}
+            size="sm"
+            className="h-7 text-xs gap-1.5 font-body"
+            onClick={handleRenderScene}
+            disabled={isRendering || !sceneId || !player.hasAudio}
+            title={isRu ? "Рендер сцены (3 стема)" : "Render scene (3 stems)"}
+          >
+            {isRendering ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {renderProgress?.percent ?? 0}%
+              </>
+            ) : (
+              <>
+                <Download className="h-3 w-3" />
+                {isRu ? "Рендер" : "Render"}
+              </>
+            )}
+          </Button>
+          <div className="w-px h-4 bg-border mx-1" />
           <Button variant="ghost" size="icon" className="h-7 w-7">
             <Plus className="h-3.5 w-3.5" />
           </Button>
