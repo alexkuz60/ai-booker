@@ -866,14 +866,41 @@ Deno.serve(async (req) => {
         } else {
           // ── STANDARD SINGLE-PASS SYNTHESIS ────────────────
           let result: { audio: Uint8Array; durationMs: number } | { error: string };
+          const hasAnnot = segmentHasAnnotations[i];
 
           if (isProxyApiVoice && proxyApiKey) {
+            // ProxyAPI: apply text markers + extra instructions from annotations
+            const annotated = hasAnnot ? buildSegmentAnnotatedText(seg.id) : { text, extraInstructions: [] };
+            const baseInstructions = (voiceConfig as any).instructions || "";
+            const fullInstructions = [baseInstructions, ...annotated.extraInstructions].filter(Boolean).join(". ");
             result = await callProxyApiTts(proxyApiKey, {
-              text,
+              text: annotated.text,
               voice: voiceConfig.voice,
               model: (voiceConfig as any).model,
               speed: voiceConfig.speed,
-              instructions: (voiceConfig as any).instructions,
+              instructions: fullInstructions || undefined,
+            });
+          } else if (!isV3Voice && hasAnnot) {
+            // Yandex v1: use SSML with annotation tags
+            const ssml = buildSegmentSsml(seg.id);
+            console.log(`Annotated SSML for segment ${seg.id}: ${ssml.length} chars`);
+            result = await callTts(yandexTtsUrl, authHeader, {
+              ssml,
+              voice: voiceConfig.voice,
+              speed: voiceConfig.speed,
+              lang: langCode,
+            });
+          } else if (isV3Voice && hasAnnot) {
+            // Yandex v3: apply text markers (pauses as "...", instructions ignored)
+            const annotated = buildSegmentAnnotatedText(seg.id);
+            result = await callTts(yandexTtsUrl, authHeader, {
+              text: annotated.text,
+              voice: voiceConfig.voice,
+              role: voiceConfig.role,
+              speed: voiceConfig.speed,
+              pitchShift: voiceConfig.pitchShift,
+              volume: voiceConfig.volume,
+              lang: langCode,
             });
           } else {
             result = await callTts(yandexTtsUrl, authHeader, {
