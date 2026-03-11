@@ -453,7 +453,7 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
 
   const [pluginStates, setPluginStates] = useState(() => {
     const s = engine.getMasterPluginState();
-    return { eq: s.eqBypassed, filter: s.filterBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed };
+    return { eq: s.eqBypassed, filter: s.filterBypassed, mbc: s.mbcBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed };
   });
 
   const [masterBypassed, setMasterBypassed] = useState(() => engine.getMasterPluginState().chainBypassed);
