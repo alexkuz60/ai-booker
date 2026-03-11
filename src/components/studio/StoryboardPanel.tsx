@@ -754,7 +754,7 @@ export function StoryboardPanel({
       const [{ data: phrases, error: phErr }, { data: mappings }] = await Promise.all([
         supabase
           .from("segment_phrases")
-          .select("id, segment_id, phrase_number, text")
+          .select("id, segment_id, phrase_number, text, metadata")
           .in("segment_id", segIds)
           .order("phrase_number"),
         supabase
