@@ -238,6 +238,18 @@ export function StudioTimeline({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [player]);
 
+  // ── Seek to selected segment's clip start ─────────────────
+  const prevSelectedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selectedSegmentId || selectedSegmentId === prevSelectedRef.current) return;
+    prevSelectedRef.current = selectedSegmentId;
+    const clip = timelineClips.find(c => c.id === selectedSegmentId);
+    if (clip != null) {
+      player.seek(clip.startSec);
+    }
+  }, [selectedSegmentId, timelineClips, player]);
+
+
   // Group clips by track ID (scene mode)
   const clipsByTrack = useMemo(() => {
     const map = new Map<string, TimelineClip[]>();
