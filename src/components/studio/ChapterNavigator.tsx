@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2, Clock, Timer, BookOpen, Scissors } from "lucide-react";
+import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2, Clock, Timer, BookOpen, Scissors, Disc } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
@@ -197,18 +197,35 @@ export function ChapterNavigator({
 
   // Load actual durations from scene_playlists
   const [playlistDurations, setPlaylistDurations] = useState<Map<string, number>>(new Map());
+  // Render status: 'full' | 'partial' | undefined (none)
+  const [renderStatus, setRenderStatus] = useState<Map<string, "full" | "partial">>(new Map());
   useEffect(() => {
     const sceneIds = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
     if (sceneIds.length === 0) return;
     (async () => {
-      const { data } = await supabase
-        .from("scene_playlists")
-        .select("scene_id, total_duration_ms")
-        .in("scene_id", sceneIds);
-      if (data) {
+      const [{ data: plData }, { data: rnData }] = await Promise.all([
+        supabase
+          .from("scene_playlists")
+          .select("scene_id, total_duration_ms")
+          .in("scene_id", sceneIds),
+        supabase
+          .from("scene_renders")
+          .select("scene_id, voice_path, atmo_path, sfx_path, status")
+          .in("scene_id", sceneIds),
+      ]);
+      if (plData) {
         const map = new Map<string, number>();
-        for (const d of data) map.set(d.scene_id, d.total_duration_ms);
+        for (const d of plData) map.set(d.scene_id, d.total_duration_ms);
         setPlaylistDurations(map);
+      }
+      if (rnData) {
+        const map = new Map<string, "full" | "partial">();
+        for (const r of rnData) {
+          const paths = [r.voice_path, r.atmo_path, r.sfx_path].filter(Boolean);
+          if (paths.length === 3) map.set(r.scene_id, "full");
+          else if (paths.length > 0) map.set(r.scene_id, "partial");
+        }
+        setRenderStatus(map);
       }
     })();
   }, [chapter.scenes.map(s => s.id).join(","), clipsRefreshToken]);
@@ -525,10 +542,11 @@ export function ChapterNavigator({
                   const colorClass = SCENE_TYPE_COLORS[scene.scene_type] || SCENE_TYPE_COLORS.mixed;
                   const est = estimateSceneDuration(scene);
                   const actualMs = scene.id ? playlistDurations.get(scene.id) : undefined;
-                  const actualSec = actualMs && actualMs > 0 ? Math.round(actualMs / 1000) : null;
-                  const displayDuration = actualSec ? formatDuration(actualSec) : est.formatted;
-                  const isStale = staleAudioSceneIds?.has(scene.id || "");
-                  const isActual = !!actualSec;
+                   const actualSec = actualMs && actualMs > 0 ? Math.round(actualMs / 1000) : null;
+                   const displayDuration = actualSec ? formatDuration(actualSec) : est.formatted;
+                   const isStale = staleAudioSceneIds?.has(scene.id || "");
+                   const isActual = !!actualSec;
+                   const sceneRender = scene.id ? renderStatus.get(scene.id) : undefined;
 
                   const durationColor = isStale
                     ? "text-yellow-500"
@@ -550,11 +568,20 @@ export function ChapterNavigator({
                         {isRu ? (SCENE_TYPE_RU[scene.scene_type] || scene.scene_type) : scene.scene_type}
                       </span>
                       <span className="truncate flex-1">{scene.title}</span>
-                      {isStale && (
-                        <span title={isRu ? "Голос изменился — аудио устарело" : "Voice changed — audio outdated"}>
-                          <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0" />
-                        </span>
-                      )}
+                       {isStale && (
+                         <span title={isRu ? "Голос изменился — аудио устарело" : "Voice changed — audio outdated"}>
+                           <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0" />
+                         </span>
+                       )}
+                       {sceneRender === "full" ? (
+                         <span title={isRu ? "Рендер готов (3 стема)" : "Render ready (3 stems)"}>
+                           <Disc className="h-3 w-3 text-emerald-500 shrink-0" />
+                         </span>
+                       ) : sceneRender === "partial" ? (
+                         <span title={isRu ? "Частичный рендер" : "Partial render"}>
+                           <Disc className="h-3 w-3 text-yellow-500 shrink-0" />
+                         </span>
+                       ) : null}
                       {fullyRenderedSceneIds?.has(scene.id || "") ? (
                         <span title={isRu ? "Все клипы готовы" : "All clips ready"}>
                           <Volume2 className="h-3 w-3 text-foreground shrink-0" />
