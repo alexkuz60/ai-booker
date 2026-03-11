@@ -358,6 +358,7 @@ async function handleAIRequest(
 
     if (!response.ok) {
       const status = response.status;
+      if (userId) logAiUsage({ userId, modelId: model, requestType: `parse-structure${mode ? `-${mode}` : ''}`, status: "error", latencyMs: Math.round(performance.now() - t0), errorMessage: `HTTP ${status}` });
       if (status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
