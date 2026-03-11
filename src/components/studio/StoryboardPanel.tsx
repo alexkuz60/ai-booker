@@ -1183,12 +1183,6 @@ export function StoryboardPanel({
     setResynthSegId(segmentId);
     setCurrentlySynthesizingIds(new Set([segmentId]));
     onSynthesizingChange?.(new Set([segmentId]));
-    // Clear this segment from error set immediately
-    onErrorSegmentsChange?.(prev => {
-      const next = new Set(prev);
-      next.delete(segmentId);
-      return next;
-    });
     try {
       // Delete existing audio record to force re-synthesis
       await supabase.from("segment_audio").delete().eq("segment_id", segmentId);
