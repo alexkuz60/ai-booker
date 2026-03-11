@@ -1703,6 +1703,57 @@ export function StoryboardPanel({
     setDetecting(false);
   }, [sceneId, dialogueCount, isRu, loadSegments]);
 
+  // ── Stress correction ──────────────────────────────────────────
+  const runStressCorrection = useCallback(async (mode: "correct" | "suggest") => {
+    if (!sceneId) return;
+    setCorrectingStress(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("correct-stress", {
+        body: { scene_id: sceneId, mode, model: getModelForRole("screenwriter") },
+      });
+      if (error) throw error;
+
+      if (mode === "suggest") {
+        const suggestions = data.suggestions as Array<{ word: string; stressed_index: number; reason: string }>;
+        if (!suggestions?.length) {
+          toast.info(isRu ? "Неоднозначных ударений не найдено" : "No ambiguous stress found");
+          return;
+        }
+        // Auto-add suggestions to dictionary
+        const userId = (await supabase.auth.getUser()).data.user?.id;
+        if (userId) {
+          for (const s of suggestions) {
+            await supabase.from("stress_dictionary" as any).upsert(
+              { user_id: userId, word: s.word.toLowerCase(), stressed_index: s.stressed_index, context: s.reason },
+              { onConflict: "user_id,word,stressed_index" }
+            );
+          }
+          toast.success(
+            isRu
+              ? `Найдено ${suggestions.length} слов, добавлены в словарь. Запустите «Применить» для расстановки.`
+              : `Found ${suggestions.length} words, added to dictionary. Run "Apply" to set stress marks.`
+          );
+        }
+      } else {
+        // correct mode
+        if (data.applied > 0) {
+          toast.success(
+            isRu
+              ? `Расставлено ${data.applied} ударений в ${data.phrases_affected} фразах`
+              : `Applied ${data.applied} stress marks in ${data.phrases_affected} phrases`
+          );
+          await loadSegments(sceneId);
+        } else {
+          toast.info(data.message || (isRu ? "Нет совпадений со словарём" : "No dictionary matches"));
+        }
+      }
+    } catch (err: any) {
+      console.error("Stress correction failed:", err);
+      toast.error(isRu ? "Ошибка коррекции ударений" : "Stress correction failed");
+    }
+    setCorrectingStress(false);
+  }, [sceneId, isRu, loadSegments]);
+
   // ── Clean stale inline_narrations_audio metadata ──
   const cleanStaleInlineAudio = useCallback(async () => {
     if (!sceneId || staleAudioSegIds.size === 0) return;
