@@ -70,7 +70,7 @@ export function TrackMixerStrip({
   }, [engine, trackId, mix, onMixChange]);
 
   // Collapsed: minimal view — with FX/RV toggles for atmo/sfx tracks
-  const isAtmoOrSfx = trackId.startsWith("atmo-") || trackId.startsWith("atmosphere") || trackId === "sfx" || trackId.startsWith("sfx-");
+  const isAtmoOrSfx = trackId === "ambience" || trackId.startsWith("atmosphere") || trackId === "sfx" || trackId.startsWith("sfx-");
 
   // Poll mix state even when collapsed for atmo/sfx (lightweight, only for button state)
   useEffect(() => {
