@@ -213,6 +213,18 @@ export default function Profile() {
 
       <section>
         <div className="flex items-center gap-2 mb-4">
+          <Activity className="h-5 w-5 text-primary" />
+          <h2 className="text-xl font-semibold font-display">
+            {isRu ? 'AI Аналитика' : 'AI Analytics'}
+          </h2>
+        </div>
+        <AiUsageWidget isRu={isRu} />
+      </section>
+
+      <Separator className="my-2" />
+
+      <section>
+        <div className="flex items-center gap-2 mb-4">
           <Key className="h-5 w-5 text-primary" />
           <h2 className="text-xl font-semibold font-display">
             {isRu ? 'Управление API' : 'API Management'}
