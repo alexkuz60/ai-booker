@@ -10,6 +10,7 @@ import { VuSlider } from "./VuSlider";
 interface TrackMixerStripProps {
   trackId: string;
   allClipIds?: string[];
+  fallbackEngineId?: string;
   label: string;
   color: string;
   expanded: boolean;
@@ -24,6 +25,7 @@ const SIGNAL_THRESHOLD_DB = -50;
 export function TrackMixerStrip({
   trackId,
   allClipIds = [],
+  fallbackEngineId,
   label,
   color,
   expanded,
@@ -36,8 +38,12 @@ export function TrackMixerStrip({
   const [mix, setMix] = useState<TrackMixState | null>(null);
   const [meter, setMeter] = useState<TrackMeterData | null>(null);
 
-  // Helper: find first valid mix/meter across all clip IDs
-  const effectiveIds = allClipIds.length > 0 ? allClipIds : [trackId];
+  // IDs in engine that should receive mix changes for this logical track
+  const effectiveIds = useMemo(() => {
+    if (allClipIds.length > 0) return allClipIds;
+    if (fallbackEngineId) return [fallbackEngineId];
+    return [trackId];
+  }, [allClipIds, fallbackEngineId, trackId]);
 
   const pollState = useCallback(() => {
     let bestMix: TrackMixState | null = null;

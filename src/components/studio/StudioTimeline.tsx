@@ -305,13 +305,20 @@ export function StudioTimeline({
   const sidebarWidth = mixerExpanded ? TRACK_LABELS_WIDTH_EXPANDED : TRACK_LABELS_WIDTH_COLLAPSED;
 
   // ── Mixer persistence per scene ────────────────────────────
-  const engineTrackIds = useMemo(() =>
-    allTracks.map(t => {
-      const clip = timelineClips.find(c => c.trackId === t.id);
-      return clip?.id ?? t.id;
-    }),
-    [allTracks, timelineClips]
-  );
+  const engineTrackIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const track of allTracks) {
+      const trackClipIds = timelineClips
+        .filter((c) => c.trackId === track.id && c.hasAudio && !!c.audioPath)
+        .map((c) => c.id);
+      if (trackClipIds.length > 0) {
+        for (const id of trackClipIds) ids.add(id);
+      } else {
+        ids.add(track.id);
+      }
+    }
+    return [...ids];
+  }, [allTracks, timelineClips]);
   const { scheduleSave: onMixChange } = useMixerPersistence(sceneId ?? null, engineTrackIds);
 
   // ── Layout / zoom ─────────────────────────────────────────
