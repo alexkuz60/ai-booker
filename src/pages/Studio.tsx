@@ -330,6 +330,7 @@ const Studio = () => {
                   staleAudioSceneIds={staleAudioSceneIds}
                   onBatchResynthDone={() => setClipsRefreshToken(t => t + 1)}
                   clipsRefreshToken={clipsRefreshToken}
+                  bookId={bookId}
                 />
               ) : (
                 <EmptyNavigator isRu={isRu} />
