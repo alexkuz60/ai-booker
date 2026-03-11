@@ -1497,7 +1497,7 @@ export function StoryboardPanel({
 
     const { error } = await supabase
       .from("scene_segments")
-      .update({ segment_type: newType as any })
+      .update({ segment_type: newType as Database["public"]["Enums"]["segment_type"] })
       .in("id", affectedIds);
     if (error) {
       toast.error(isRu ? "Ошибка сохранения типа" : "Failed to save type");
