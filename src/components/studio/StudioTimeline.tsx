@@ -365,6 +365,7 @@ export function StudioTimeline({
 
   // ── Layout / zoom ─────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
+  const sceneScrollRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
   useEffect(() => {
@@ -384,10 +385,69 @@ export function StudioTimeline({
     return containerWidth / (duration * 4);
   }, [containerWidth, duration]);
 
+  // Scene zoom presets (percentage of fitZoom)
+  const SCENE_ZOOM_PRESETS = [90, 100, 125, 150, 200, 300] as const;
+  const [sceneZoomPercent, setSceneZoomPercent] = useState<number>(100);
   const [zoomOverride, setZoomOverride] = useState<number | null>(null);
   const zoom = zoomOverride ?? fitZoom;
 
-  useEffect(() => { setZoomOverride(null); }, [fitZoom]);
+  useEffect(() => { setZoomOverride(null); setSceneZoomPercent(100); }, [fitZoom]);
+
+  // Apply scene zoom preset
+  const applySceneZoom = useCallback((percent: number) => {
+    setSceneZoomPercent(percent);
+    if (percent === 100) {
+      setZoomOverride(null);
+    } else {
+      setZoomOverride((fitZoom * percent) / 100);
+    }
+  }, [fitZoom]);
+
+  // ── Horizontal scroll sync with playback (scene mode) ─────
+  const userScrollingRef = useRef(false);
+  const userScrollTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Track user scrolling to avoid fighting with auto-scroll
+  useEffect(() => {
+    const el = sceneScrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (player.state !== "playing") return;
+      userScrollingRef.current = true;
+      clearTimeout(userScrollTimerRef.current);
+      userScrollTimerRef.current = setTimeout(() => {
+        userScrollingRef.current = false;
+      }, 2000);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [player.state]);
+
+  // Auto-scroll during playback when zoom > 100%
+  useEffect(() => {
+    if (mode !== "scene" || player.state !== "playing") return;
+    if (sceneZoomPercent <= 100) return;
+    if (userScrollingRef.current) return;
+    const el = sceneScrollRef.current;
+    if (!el) return;
+
+    const playheadPx = player.positionSec * zoom * 4;
+    const viewW = el.clientWidth;
+    const targetScroll = playheadPx - viewW / 2;
+    el.scrollLeft = Math.max(0, targetScroll);
+  }, [player.positionSec, player.state, zoom, sceneZoomPercent, mode]);
+
+  // Center playhead when seeking / selecting segment at zoom > 100%
+  const centerPlayhead = useCallback((sec: number) => {
+    if (sceneZoomPercent <= 100) return;
+    const el = sceneScrollRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      const px = sec * zoom * 4;
+      const viewW = el.clientWidth;
+      el.scrollTo({ left: Math.max(0, px - viewW / 2), behavior: "smooth" });
+    });
+  }, [zoom, sceneZoomPercent]);
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("studio-timeline-collapsed") === "true"; } catch { return false; }
@@ -470,11 +530,12 @@ export function StudioTimeline({
       const currentZoom = prev ?? fitZoom;
       const currentPercent = toPercent(currentZoom);
       const nextPercent = stepZoomPercent(currentPercent, direction);
+      setSceneZoomPercent(nextPercent);
       return (fitZoom * nextPercent) / 100;
     });
   }, [fitZoom, stepZoomPercent, toPercent]);
 
-  const resetZoom = useCallback(() => setZoomOverride(null), []);
+  const resetZoom = useCallback(() => { setZoomOverride(null); setSceneZoomPercent(100); }, []);
   const displayZoomPercent = fitZoom > 0 ? Math.round(toPercent(zoom)) : 100;
 
   const formatTime = (s: number) => {
