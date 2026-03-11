@@ -457,6 +457,28 @@ export function ChapterNavigator({
               <Timer className="h-3 w-3" />
             )}
           </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 w-6 p-0"
+            onClick={() => {
+              if (bookId) sessionStorage.setItem("montage_book_id", bookId);
+              const chapterId = chapter.scenes[0]?.id ? undefined : undefined;
+              // Find chapter ID from scenes
+              const sceneId = chapter.scenes[0]?.id;
+              if (sceneId) {
+                supabase.from("book_scenes").select("chapter_id").eq("id", sceneId).single().then(({ data }) => {
+                  if (data?.chapter_id) sessionStorage.setItem("montage_chapter_id", data.chapter_id);
+                  navigate("/montage");
+                });
+              } else {
+                navigate("/montage");
+              }
+            }}
+            title={isRu ? "Открыть в Монтаже" : "Open in Montage"}
+          >
+            <Scissors className="h-3 w-3" />
+          </Button>
         </div>
         <div className="flex items-center gap-2 mt-0.5">
           <p className="text-xs text-muted-foreground truncate flex-1">
