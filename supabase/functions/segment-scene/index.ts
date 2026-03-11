@@ -2,7 +2,6 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { splitPhrases } from "../_shared/splitPhrases.ts";
 import { extractCharacters } from "../_shared/extractCharacters.ts";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
-import { extractCharacters } from "../_shared/extractCharacters.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -157,6 +156,17 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
         JSON.stringify({ error: "AI returned an unstructured response. Please retry." }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // ── Post-process: detect first-person narration by pronouns ──
+    const FIRST_PERSON_RU = /\b(я|мне|меня|мной|мною|моего|моей|моему|моим|моих|моё|мое|мои)\b/i;
+    const FIRST_PERSON_EN = /\b(I|me|my|mine|myself)\b/;
+    const fpRegex = lang === "ru" ? FIRST_PERSON_RU : FIRST_PERSON_EN;
+
+    for (const seg of segments) {
+      if (seg.type === "narrator" && fpRegex.test(seg.text)) {
+        seg.type = "first_person";
+      }
     }
 
     // Log successful AI call
