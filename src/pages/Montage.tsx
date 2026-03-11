@@ -358,7 +358,7 @@ const Montage = () => {
         {sceneIds.length > 0 && (
           <div className="flex items-center gap-2 ml-auto">
             {unrenderedSceneIds.length > 0 && (
-              <span className="text-xs text-amber-500 flex items-center gap-1 font-body">
+            <span className="text-xs text-destructive flex items-center gap-1 font-body">
                 <AlertCircle className="h-3 w-3" />
                 {unrenderedSceneIds.length} {isRu ? "не отрендерено" : "not rendered"}
               </span>
