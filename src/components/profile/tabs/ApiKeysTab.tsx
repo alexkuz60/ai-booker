@@ -152,7 +152,7 @@ function TtsTestButton({ provider, isRu }: { provider: TtsProvider; isRu: boolea
   );
 }
 
-const TESTABLE_TTS: Set<string> = new Set(['elevenlabs', 'yandex_speechkit']);
+const TESTABLE_TTS: Set<string> = new Set(['elevenlabs', 'yandex_speechkit', 'salute_speech']);
 
 export function ApiKeysTab({ apiKeys, saving, isRu, onKeyChange, onSave }: ApiKeysTabProps) {
   const p = (key: string) => getProfileText(key, isRu);
