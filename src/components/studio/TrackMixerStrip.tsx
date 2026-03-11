@@ -69,7 +69,19 @@ export function TrackMixerStrip({
     onMixChange?.();
   }, [engine, trackId, mix, onMixChange]);
 
-  // Collapsed: minimal view
+  // Collapsed: minimal view — with FX/RV toggles for atmo/sfx tracks
+  const isAtmoOrSfx = trackId.startsWith("atmo-") || trackId.startsWith("atmosphere") || trackId === "sfx" || trackId.startsWith("sfx-");
+
+  // Poll mix state even when collapsed for atmo/sfx (lightweight, only for button state)
+  useEffect(() => {
+    if (expanded || !isAtmoOrSfx) return;
+    let running = true;
+    const interval = setInterval(() => {
+      if (running) setMix(engine.getTrackMixState(trackId));
+    }, 200);
+    return () => { running = false; clearInterval(interval); };
+  }, [expanded, isAtmoOrSfx, trackId, engine]);
+
   if (!expanded) {
     return (
       <div
@@ -79,9 +91,35 @@ export function TrackMixerStrip({
         onClick={onClick}
       >
         <div className="w-2.5 h-2.5 rounded-full shrink-0 mr-2" style={{ backgroundColor: color }} />
-        <span className={`text-xs font-body truncate ${isSelected ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
+        <span className={`text-xs font-body truncate flex-1 ${isSelected ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
           {label}
         </span>
+        {isAtmoOrSfx && (
+          <div className="flex items-center gap-1 ml-1 shrink-0">
+            <button
+              className={`text-[8px] px-1 py-0.5 rounded border font-mono uppercase leading-none transition-colors font-semibold ${
+                mix?.preFxBypassed
+                  ? "border-border text-muted-foreground/40 bg-transparent"
+                  : "border-accent text-accent bg-accent/15"
+              }`}
+              onClick={(e) => { e.stopPropagation(); togglePreFxBypass(); }}
+              title="Pre-FX"
+            >
+              FX
+            </button>
+            <button
+              className={`text-[8px] px-1 py-0.5 rounded border font-mono uppercase leading-none transition-colors font-semibold ${
+                mix?.reverbBypassed
+                  ? "border-border text-muted-foreground/40 bg-transparent"
+                  : "border-primary text-primary bg-primary/15"
+              }`}
+              onClick={(e) => { e.stopPropagation(); toggleReverbBypass(); }}
+              title="Reverb"
+            >
+              RV
+            </button>
+          </div>
+        )}
       </div>
     );
   }
