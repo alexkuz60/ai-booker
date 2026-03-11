@@ -568,11 +568,20 @@ export function ChapterNavigator({
                         {isRu ? (SCENE_TYPE_RU[scene.scene_type] || scene.scene_type) : scene.scene_type}
                       </span>
                       <span className="truncate flex-1">{scene.title}</span>
-                      {isStale && (
-                        <span title={isRu ? "Голос изменился — аудио устарело" : "Voice changed — audio outdated"}>
-                          <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0" />
-                        </span>
-                      )}
+                       {isStale && (
+                         <span title={isRu ? "Голос изменился — аудио устарело" : "Voice changed — audio outdated"}>
+                           <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0" />
+                         </span>
+                       )}
+                       {sceneRender === "full" ? (
+                         <span title={isRu ? "Рендер готов (3 стема)" : "Render ready (3 stems)"}>
+                           <Disc className="h-3 w-3 text-emerald-500 shrink-0" />
+                         </span>
+                       ) : sceneRender === "partial" ? (
+                         <span title={isRu ? "Частичный рендер" : "Partial render"}>
+                           <Disc className="h-3 w-3 text-yellow-500 shrink-0" />
+                         </span>
+                       ) : null}
                       {fullyRenderedSceneIds?.has(scene.id || "") ? (
                         <span title={isRu ? "Все клипы готовы" : "All clips ready"}>
                           <Volume2 className="h-3 w-3 text-foreground shrink-0" />
