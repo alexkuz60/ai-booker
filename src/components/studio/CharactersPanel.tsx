@@ -1513,6 +1513,58 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                   </div>
                 </TabsContent>
 
+                {/* ─── SaluteSpeech Tab ─── */}
+                <TabsContent value="salutespeech" className="space-y-4 mt-3">
+                  {/* Voice selector */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      {isRu ? "Голос" : "Voice"}
+                    </label>
+                    <Select value={ssVoice} onValueChange={v => { setSsVoice(v); markDirty(); }}>
+                      <SelectTrigger className="bg-secondary border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border max-h-64">
+                        {SALUTESPEECH_VOICES.map(v => (
+                          <SelectItem key={v.id} value={v.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{isRu ? v.name.ru : v.name.en}</span>
+                              <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                {v.gender === "female" ? "♀" : "♂"}
+                              </Badge>
+                              <span className="text-[10px] text-muted-foreground">
+                                {isRu ? v.description.ru : v.description.en}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Speed */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Скорость" : "Speed"}</label>
+                      <span className="text-xs text-muted-foreground tabular-nums">{ssSpeed.toFixed(1)}×</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Slider min={0.5} max={2.0} step={0.1} value={[ssSpeed]} onValueChange={([v]) => { setSsSpeed(v); markDirty(); }} className="flex-1" />
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => { setSsSpeed(1.0); markDirty(); }} disabled={ssSpeed === 1.0}>
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-md border border-border bg-muted/30 p-2.5">
+                    <p className="text-[10px] text-muted-foreground">
+                      {isRu
+                        ? "🇷🇺 SaluteSpeech (Сбер) — бесплатный для физлиц. Поддержка SSML, 6 голосов, формат Opus/WAV."
+                        : "🇷🇺 SaluteSpeech (Sber) — free for individuals. SSML support, 6 voices, Opus/WAV format."}
+                    </p>
+                  </div>
+                </TabsContent>
+
                 {/* ─── ElevenLabs Tab ─── */}
                 <TabsContent value="elevenlabs" className="space-y-4 mt-3">
                   {/* Credits info */}
