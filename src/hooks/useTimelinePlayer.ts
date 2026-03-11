@@ -103,9 +103,14 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
 
       try {
         await engine.loadTracks(configs);
-      } catch (err) {
+      } catch (err: any) {
         console.error("[useTimelinePlayer] Failed to load tracks:", err);
-        toast.error("Не удалось загрузить аудиодорожки. Обновите страницу и попробуйте снова.");
+        const msg = err?.message ?? "";
+        if (msg.includes("ctx=suspended") || msg.includes("ctx=closed")) {
+          toast.error("AudioContext не активен. Нажмите кнопку ↺ для сброса движка, затем Play.");
+        } else {
+          toast.error("Не удалось загрузить аудиодорожки. Попробуйте кнопку ↺ сброса движка.");
+        }
       }
     };
 

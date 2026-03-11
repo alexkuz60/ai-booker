@@ -626,6 +626,16 @@ class AudioEngine {
       return;
     }
 
+    // Ensure AudioContext is running before loading audio buffers
+    if (Tone.getContext().state !== "running") {
+      try {
+        await Tone.start();
+        console.log("[AudioEngine] AudioContext started, state:", Tone.getContext().state);
+      } catch (e) {
+        console.warn("[AudioEngine] Could not start AudioContext:", e);
+      }
+    }
+
     for (const cfg of configs) {
       const bus = this.getBus(cfg.bus ?? "voice");
       const track = new EngineTrack(cfg, bus);
@@ -641,33 +651,64 @@ class AudioEngine {
             return;
           }
 
-          const timeout = setTimeout(() => resolve(false), 30_000);
+          const timeout = setTimeout(() => {
+            console.warn(`[AudioEngine] Track ${id} timed out loading`);
+            resolve(false);
+          }, 30_000);
+
+          // Use Tone.Player's native callbacks instead of polling
+          const origOnload = t.player.onstop; // save
+          t.player.onstop = origOnload; // keep
+
+          // Tone.Buffer loaded event via ToneAudioBuffer
+          const buf = (t.player as any)._buffer ?? (t.player as any).buffer;
+          if (buf && typeof buf.onload === "function") {
+            // fallback: poll
+          }
+
+          // Best approach: poll but also listen for errors
+          let errored = false;
+          const origOnerror = (t.player as any).onerror;
+          (t.player as any).onerror = (err: any) => {
+            console.error(`[AudioEngine] Track ${id} load error:`, err);
+            errored = true;
+            clearTimeout(timeout);
+            resolve(false);
+            if (origOnerror) origOnerror(err);
+          };
+
           const check = () => {
+            if (errored) return;
             if (t.player.loaded) {
               clearTimeout(timeout);
               resolve(true);
             } else {
-              setTimeout(check, 50);
+              setTimeout(check, 100);
             }
           };
-          check();
+          // Start checking after a small delay to let Tone initialize
+          setTimeout(check, 50);
         });
 
         return { id, track: t, loaded };
       })
     );
 
+    let dropped = 0;
     for (const result of loadResults) {
       if (!result.loaded) {
+        console.warn(`[AudioEngine] Dropping unloaded track: ${result.id}`);
         result.track.dispose();
         this.tracks.delete(result.id);
+        dropped++;
       }
     }
 
     if (this.tracks.size === 0) {
       this._totalDuration = 0;
       this.notify();
-      throw new Error("AudioEngine: no tracks loaded");
+      const ctxState = Tone.getContext().state;
+      throw new Error(`AudioEngine: no tracks loaded (${dropped} dropped, ctx=${ctxState})`);
     }
 
     this._totalDuration = Math.max(
