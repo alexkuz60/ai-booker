@@ -122,7 +122,7 @@ export function TrackMixerStrip({
         <span className={`text-xs font-body truncate flex-1 ${isSelected ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
           {label}
         </span>
-        {isAtmoOrSfx && (
+        {isAtmoOrSfx && hasAudioClips && (
           <div className="flex items-center gap-1 ml-1 shrink-0">
             <button
               className={`text-[8px] px-1 py-0.5 rounded border font-mono uppercase leading-none transition-colors font-semibold ${
