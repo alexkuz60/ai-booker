@@ -82,7 +82,34 @@ export function StudioTimeline({
   synthesizingSegmentIds,
   errorSegmentIds,
   clipsRefreshToken = 0,
+  onSceneRendered,
 }: StudioTimelineProps) {
+  const { user } = useAuth();
+
+  // ── Scene render state ────────────────────────────────────
+  const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
+  const isRendering = renderProgress !== null && renderProgress.phase !== "done" && renderProgress.phase !== "error";
+
+  const handleRenderScene = useCallback(async () => {
+    if (!sceneId || !user || isRendering) return;
+    try {
+      await renderScene(
+        sceneId,
+        timelineClipsRef.current,
+        durationRef.current,
+        user.id,
+        setRenderProgress,
+      );
+      toast.success(isRu ? "Сцена отрендерена" : "Scene rendered");
+      onSceneRendered?.(sceneId);
+    } catch (err: any) {
+      toast.error(isRu ? "Ошибка рендера" : "Render error", { description: err.message });
+    }
+  }, [sceneId, user, isRendering, isRu, onSceneRendered]);
+
+  // Refs for render callback (avoid stale closures)
+  const timelineClipsRef = useRef<typeof timelineClips>([]);
+  const durationRef = useRef(0);
   // ── Clip fades persistence (localStorage + cloud) ──────────
   type FadeMap = Record<string, { fadeInSec: number; fadeOutSec: number }>;
   const fadeCloudKey = sceneId ? `clip_fades_${sceneId}` : "clip_fades_none";
