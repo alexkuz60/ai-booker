@@ -50,14 +50,16 @@ export function TrackMixerStrip({
   }, [expanded, trackId, engine]);
 
   const handleVolumeChange = useCallback((v: number) => {
-    engine.setTrackVolume(trackId, v);
+    const ids = allClipIds.length > 0 ? allClipIds : [trackId];
+    for (const id of ids) engine.setTrackVolume(id, v);
     onMixChange?.();
-  }, [engine, trackId, onMixChange]);
+  }, [engine, trackId, allClipIds, onMixChange]);
 
   const handlePanChange = useCallback((p: number) => {
-    engine.setTrackPan(trackId, p / 100);
+    const ids = allClipIds.length > 0 ? allClipIds : [trackId];
+    for (const id of ids) engine.setTrackPan(id, p / 100);
     onMixChange?.();
-  }, [engine, trackId, onMixChange]);
+  }, [engine, trackId, allClipIds, onMixChange]);
 
   const toggleReverbBypass = useCallback(() => {
     if (!mix) return;
