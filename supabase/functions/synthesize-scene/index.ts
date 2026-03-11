@@ -361,6 +361,15 @@ function applyAnnotationsText(text: string, annotations: PhraseAnnotation[]): { 
         case "emphasis":
           extraInstructions.push(`Emphasize: "${fragment}"`);
           break;
+        case "joy":
+          extraInstructions.push(`Say with joy and happiness: "${fragment}"`);
+          break;
+        case "sadness":
+          extraInstructions.push(`Say with sadness and sorrow: "${fragment}"`);
+          break;
+        case "anger":
+          extraInstructions.push(`Say with anger and intensity: "${fragment}"`);
+          break;
       }
     }
   }
