@@ -248,12 +248,11 @@ function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onAnnotate
     return null;
   }, []);
 
-  const handleAnnotate = useCallback((type: AnnotationType) => {
+  const handleAnnotate = useCallback((type: AnnotationType, durationMs?: number) => {
     if (isInsertionAnnotation(type)) {
-      // Insert at cursor / end of selection
       const sel = getSelectionOffsets();
       const offset = sel ? sel.end : phrase.text.length;
-      onAnnotate(phrase.phrase_id, { type, offset, durationMs: 500 });
+      onAnnotate(phrase.phrase_id, { type, offset, durationMs: durationMs ?? 500 });
     } else {
       const sel = getSelectionOffsets();
       if (!sel) return;
