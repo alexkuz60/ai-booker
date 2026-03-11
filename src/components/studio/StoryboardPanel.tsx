@@ -1435,7 +1435,7 @@ export function StoryboardPanel({
                     ? "border-primary ring-2 ring-primary/30 bg-card"
                     : "border-border bg-card/50"
                 }`}
-                onDoubleClick={() => onSelectSegment?.(seg.segment_id)}
+                onClick={() => onSelectSegment?.(isSelected ? null : seg.segment_id)}
               >
                 {/* Segment header */}
                 <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 bg-muted/30">
