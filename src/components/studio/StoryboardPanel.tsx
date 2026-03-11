@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json, Database } from "@/integrations/supabase/types";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, AudioLines, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
