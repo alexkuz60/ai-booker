@@ -254,7 +254,7 @@ async function callProxyApiTts(
 // ── Phrase annotation types (mirroring phraseAnnotations.ts) ─────────
 
 interface PhraseAnnotation {
-  type: "pause" | "emphasis" | "whisper" | "slow" | "fast" | "joy" | "sadness" | "anger";
+  type: "pause" | "emphasis" | "whisper" | "slow" | "fast" | "joy" | "sadness" | "anger" | "sigh" | "cough" | "laugh" | "hmm";
   offset?: number;
   start?: number;
   end?: number;
