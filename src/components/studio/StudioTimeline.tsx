@@ -688,16 +688,36 @@ export function StudioTimeline({
         </div>
 
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("out")} title={isRu ? "Уменьшить" : "Zoom out"}>
-            <ZoomOut className="h-3.5 w-3.5" />
-          </Button>
-          <span className="text-xs text-muted-foreground font-body w-10 text-center">{displayZoomPercent}%</span>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("in")} title={isRu ? "Увеличить" : "Zoom in"}>
-            <ZoomIn className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetZoom} title={isRu ? "По ширине" : "Fit to width"}>
-            <Maximize2 className="h-3.5 w-3.5" />
-          </Button>
+          {mode === "scene" ? (
+            <Select
+              value={String(sceneZoomPercent)}
+              onValueChange={(v) => applySceneZoom(Number(v))}
+            >
+              <SelectTrigger className="h-7 w-[80px] text-xs font-body border-none bg-transparent px-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SCENE_ZOOM_PRESETS.map((p) => (
+                  <SelectItem key={p} value={String(p)} className="text-xs">
+                    {p}%
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("out")} title={isRu ? "Уменьшить" : "Zoom out"}>
+                <ZoomOut className="h-3.5 w-3.5" />
+              </Button>
+              <span className="text-xs text-muted-foreground font-body w-10 text-center">{displayZoomPercent}%</span>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("in")} title={isRu ? "Увеличить" : "Zoom in"}>
+                <ZoomIn className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetZoom} title={isRu ? "По ширине" : "Fit to width"}>
+                <Maximize2 className="h-3.5 w-3.5" />
+              </Button>
+            </>
+          )}
           <div className="w-px h-4 bg-border mx-1" />
           <Button variant="ghost" size="icon" className="h-7 w-7">
             <Plus className="h-3.5 w-3.5" />
