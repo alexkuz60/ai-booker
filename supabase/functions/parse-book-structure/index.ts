@@ -480,7 +480,8 @@ Deno.serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    return await handleAIRequest(truncatedText, endpoint, model, apiKey, effectiveProvider, mode, chapter_title, openrouter_api_key, effectiveLang);
+    const userId = await getUserIdFromAuth(req.headers.get("Authorization") || "");
+    return await handleAIRequest(truncatedText, endpoint, model, apiKey, effectiveProvider, mode, chapter_title, openrouter_api_key, effectiveLang, userId);
   } catch (e) {
     console.error("parse-book-structure error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
