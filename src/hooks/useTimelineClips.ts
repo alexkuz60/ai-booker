@@ -10,6 +10,7 @@ const SEGMENT_TYPE_LABELS: Record<string, string> = {
   narrator: "Рассказчик",
   first_person: "От первого лица",
   dialogue: "Диалог",
+  monologue: "Монолог",
   inner_thought: "Мысли",
   epigraph: "Эпиграф",
   lyric: "Стихи",
