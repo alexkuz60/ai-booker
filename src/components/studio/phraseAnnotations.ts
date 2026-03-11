@@ -5,7 +5,10 @@ export type AnnotationType =
   | "emphasis"
   | "whisper"
   | "slow"
-  | "fast";
+  | "fast"
+  | "joy"
+  | "sadness"
+  | "anger";
 
 export interface PhraseAnnotation {
   type: AnnotationType;
