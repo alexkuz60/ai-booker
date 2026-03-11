@@ -90,17 +90,120 @@ function renderPhraseText(text: string) {
   });
 }
 
-// ─── Editable phrase ────────────────────────────────────────
+// ─── Render text with annotations ───────────────────────────
 
-function EditablePhrase({ phrase, isRu, onSave, onSplit }: {
+function renderAnnotatedText(text: string, annotations?: PhraseAnnotation[]) {
+  // First apply sound marker rendering, then overlay annotations
+  if (!annotations || annotations.length === 0) return renderPhraseText(text);
+
+  // Build a list of styled ranges and insertions
+  type Span = { start: number; end: number; type: AnnotationType };
+  type Insert = { offset: number; type: AnnotationType };
+  const ranges: Span[] = [];
+  const inserts: Insert[] = [];
+
+  for (const a of annotations) {
+    if (isInsertionAnnotation(a.type)) {
+      inserts.push({ offset: a.offset ?? 0, type: a.type });
+    } else if (a.start !== undefined && a.end !== undefined) {
+      ranges.push({ start: a.start, end: a.end, type: a.type });
+    }
+  }
+
+  // Sort ranges by start
+  ranges.sort((a, b) => a.start - b.start);
+  inserts.sort((a, b) => a.offset - b.offset);
+
+  // Build character-level style map
+  const charStyles = new Array(text.length).fill(null) as (AnnotationType | null)[];
+  for (const r of ranges) {
+    for (let i = r.start; i < Math.min(r.end, text.length); i++) {
+      charStyles[i] = r.type;
+    }
+  }
+
+  // Build fragments
+  const fragments: React.ReactNode[] = [];
+  let insertIdx = 0;
+  let i = 0;
+
+  while (i < text.length) {
+    // Insert any insertions at this offset
+    while (insertIdx < inserts.length && inserts[insertIdx].offset <= i) {
+      const ins = inserts[insertIdx];
+      const style = ANNOTATION_STYLES[ins.type];
+      fragments.push(
+        <span key={`ins-${insertIdx}`} className="text-muted-foreground text-xs select-none">
+          {style.prefix || ""}
+        </span>
+      );
+      insertIdx++;
+    }
+
+    const currentStyle = charStyles[i];
+    let j = i;
+    while (j < text.length && charStyles[j] === currentStyle) j++;
+
+    const chunk = text.slice(i, j);
+
+    if (currentStyle) {
+      const style = ANNOTATION_STYLES[currentStyle];
+      fragments.push(
+        <span key={`r-${i}`} className={cn(style.className, "relative")}>
+          {style.prefix && <span className="text-[10px] select-none">{style.prefix}</span>}
+          {chunk}
+          {style.suffix && <span className="text-[10px] select-none">{style.suffix}</span>}
+        </span>
+      );
+    } else {
+      // Apply sound marker rendering to plain chunks
+      const parts = chunk.split(/(\[[^\]]+\])/g);
+      for (const [pi, part] of parts.entries()) {
+        if (/^\[.+\]$/.test(part)) {
+          fragments.push(
+            <span key={`s-${i}-${pi}`} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-accent text-accent-foreground text-xs font-medium mx-0.5">
+              <Volume2 className="h-3 w-3" />
+              {part.slice(1, -1)}
+            </span>
+          );
+        } else if (part) {
+          fragments.push(<span key={`t-${i}-${pi}`}>{part}</span>);
+        }
+      }
+    }
+    i = j;
+  }
+
+  // Trailing insertions
+  while (insertIdx < inserts.length) {
+    const ins = inserts[insertIdx];
+    const style = ANNOTATION_STYLES[ins.type];
+    fragments.push(
+      <span key={`ins-${insertIdx}`} className="text-muted-foreground text-xs select-none">
+        {style.prefix || ""}
+      </span>
+    );
+    insertIdx++;
+  }
+
+  return fragments;
+}
+
+// ─── Editable phrase with context menu ──────────────────────
+
+function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onAnnotate, onRemoveAnnotation }: {
   phrase: Phrase;
   isRu: boolean;
   onSave: (id: string, text: string) => void;
   onSplit: (phraseId: string, textBefore: string, textAfter: string) => void;
+  ttsProvider: TtsProvider;
+  onAnnotate: (phraseId: string, annotation: PhraseAnnotation) => void;
+  onRemoveAnnotation: (phraseId: string, index: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(phrase.text);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
     if (editing && textareaRef.current) {
@@ -117,6 +220,50 @@ function EditablePhrase({ phrase, isRu, onSave, onSplit }: {
     }
     setEditing(false);
   };
+
+  // Get text selection offsets relative to the phrase text
+  const getSelectionOffsets = useCallback((): { start: number; end: number } | null => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !textRef.current) return null;
+
+    const range = sel.getRangeAt(0);
+    // Check selection is inside our text element
+    if (!textRef.current.contains(range.startContainer) || !textRef.current.contains(range.endContainer)) return null;
+
+    // Calculate offsets by walking text nodes
+    const walker = document.createTreeWalker(textRef.current, NodeFilter.SHOW_TEXT);
+    let offset = 0;
+    let start = -1;
+    let end = -1;
+    let node: Node | null;
+
+    while ((node = walker.nextNode())) {
+      const len = (node.textContent || "").length;
+      if (node === range.startContainer) start = offset + range.startOffset;
+      if (node === range.endContainer) end = offset + range.endOffset;
+      offset += len;
+    }
+
+    if (start >= 0 && end > start) return { start, end };
+    return null;
+  }, []);
+
+  const handleAnnotate = useCallback((type: AnnotationType) => {
+    if (isInsertionAnnotation(type)) {
+      // Insert at cursor / end of selection
+      const sel = getSelectionOffsets();
+      const offset = sel ? sel.end : phrase.text.length;
+      onAnnotate(phrase.phrase_id, { type, offset, durationMs: 500 });
+    } else {
+      const sel = getSelectionOffsets();
+      if (!sel) return;
+      onAnnotate(phrase.phrase_id, { type, start: sel.start, end: sel.end });
+    }
+  }, [phrase.phrase_id, phrase.text.length, getSelectionOffsets, onAnnotate]);
+
+  const hasAnnotations = phrase.annotations && phrase.annotations.length > 0;
+  const availableAnnotations = getAvailableAnnotations(ttsProvider, true);
+  const availableInsertions = getAvailableAnnotations(ttsProvider, false).filter(a => !a.needsRange);
 
   if (editing) {
     return (
@@ -139,7 +286,6 @@ function EditablePhrase({ phrase, isRu, onSave, onSplit }: {
               const before = draft.slice(0, pos).trim();
               const after = draft.slice(pos).trim();
               if (before && after) {
-                // Split at cursor position
                 onSplit(phrase.phrase_id, before, after);
                 setEditing(false);
               } else {
@@ -158,23 +304,82 @@ function EditablePhrase({ phrase, isRu, onSave, onSplit }: {
   }
 
   return (
-    <div
-      className="flex gap-2 px-3 py-1.5 hover:bg-accent/20 transition-colors group"
-    >
-      <span className="text-[10px] text-muted-foreground font-mono pt-0.5 shrink-0 w-5 text-right">
-        {phrase.phrase_number}
-      </span>
-      <p className="text-sm font-body text-foreground leading-relaxed flex-1">
-        {renderPhraseText(phrase.text)}
-      </p>
-      <button
-        onClick={() => setEditing(true)}
-        className="shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground cursor-pointer"
-        title={isRu ? "Редактировать" : "Edit"}
-      >
-        <Pencil className="h-3 w-3" />
-      </button>
-    </div>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className="flex gap-2 px-3 py-1.5 hover:bg-accent/20 transition-colors group">
+          <span className="text-[10px] text-muted-foreground font-mono pt-0.5 shrink-0 w-5 text-right">
+            {phrase.phrase_number}
+          </span>
+          <p ref={textRef} className="text-sm font-body text-foreground leading-relaxed flex-1 select-text">
+            {renderAnnotatedText(phrase.text, phrase.annotations)}
+          </p>
+          <button
+            onClick={() => setEditing(true)}
+            className="shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground cursor-pointer"
+            title={isRu ? "Редактировать" : "Edit"}
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-52">
+        <ContextMenuLabel className="text-xs">
+          {isRu ? "Аннотации речи" : "Speech Annotations"}
+          <span className="ml-1 text-[10px] text-muted-foreground font-normal">({ttsProvider})</span>
+        </ContextMenuLabel>
+        <ContextMenuSeparator />
+        {availableAnnotations.length === 0 && availableInsertions.length === 0 ? (
+          <ContextMenuItem disabled className="text-xs text-muted-foreground">
+            {isRu ? "Нет доступных аннотаций для этого TTS" : "No annotations available for this TTS"}
+          </ContextMenuItem>
+        ) : (
+          <>
+            {availableAnnotations.map((a) => (
+              <ContextMenuItem
+                key={a.type}
+                onClick={() => handleAnnotate(a.type)}
+                className="text-xs gap-2"
+              >
+                <span>{a.emoji}</span>
+                {isRu ? a.label_ru.replace(/^. /, "") : a.label_en.replace(/^. /, "")}
+              </ContextMenuItem>
+            ))}
+            {availableInsertions.filter(a => !availableAnnotations.find(x => x.type === a.type)).map((a) => (
+              <ContextMenuItem
+                key={`ins-${a.type}`}
+                onClick={() => handleAnnotate(a.type)}
+                className="text-xs gap-2"
+              >
+                <span>{a.emoji}</span>
+                {isRu ? a.label_ru.replace(/^. /, "") : a.label_en.replace(/^. /, "")}
+              </ContextMenuItem>
+            ))}
+          </>
+        )}
+        {hasAnnotations && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuLabel className="text-[10px]">
+              {isRu ? "Удалить аннотацию" : "Remove annotation"}
+            </ContextMenuLabel>
+            {phrase.annotations!.map((a, idx) => (
+              <ContextMenuItem
+                key={`rm-${idx}`}
+                onClick={() => onRemoveAnnotation(phrase.phrase_id, idx)}
+                className="text-xs gap-2 text-destructive"
+              >
+                ✕ {ANNOTATION_STYLES[a.type]?.prefix || ""} {a.type}
+                {a.start !== undefined && a.end !== undefined && (
+                  <span className="text-muted-foreground ml-1">
+                    [{a.start}:{a.end}]
+                  </span>
+                )}
+              </ContextMenuItem>
+            ))}
+          </>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
