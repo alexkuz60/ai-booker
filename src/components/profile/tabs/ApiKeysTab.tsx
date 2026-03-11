@@ -63,6 +63,7 @@ const TTS_TEST_BODY: Record<TtsProvider, (isRu: boolean) => Record<string, strin
     action: 'synthesize',
     text: isRu ? 'Привет! Это тестовое сообщение от AI Booker.' : 'Hello! This is a test message from AI Booker.',
     voice: 'Nec_24000',
+    raw: 'true',
   }),
 };
 
