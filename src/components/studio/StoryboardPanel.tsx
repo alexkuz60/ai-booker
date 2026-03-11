@@ -1247,7 +1247,40 @@ export function StoryboardPanel({
     setDetecting(false);
   }, [sceneId, dialogueCount, isRu, loadSegments]);
 
-  // ── Update inline narration voice assignment ──
+  // ── Clean stale inline_narrations_audio metadata ──
+  const cleanStaleInlineAudio = useCallback(async () => {
+    if (!sceneId || staleAudioSegIds.size === 0) return;
+    setCleaningMetadata(true);
+    try {
+      const ids = [...staleAudioSegIds];
+      // Load current metadata for each segment, remove inline_narrations_audio
+      const { data: segs } = await supabase
+        .from("scene_segments")
+        .select("id, metadata")
+        .in("id", ids);
+      if (segs) {
+        for (const seg of segs) {
+          const meta = { ...((seg.metadata ?? {}) as Record<string, unknown>) };
+          delete meta.inline_narrations_audio;
+          await supabase.from("scene_segments").update({ metadata: meta }).eq("id", seg.id);
+        }
+      }
+      // Also clear scene_playlists to force timeline refresh
+      await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
+      setStaleAudioSegIds(new Set());
+      if (onSegmented) onSegmented(sceneId);
+      toast.success(
+        isRu
+          ? `Очищено ${ids.length} устаревших аудио-вставок`
+          : `Cleared ${ids.length} stale audio metadata entries`
+      );
+    } catch (err) {
+      console.error("Cleanup failed:", err);
+      toast.error(isRu ? "Ошибка очистки" : "Cleanup failed");
+    }
+    setCleaningMetadata(false);
+  }, [sceneId, staleAudioSegIds, isRu, onSegmented]);
+
   const updateInlineNarrationSpeaker = useCallback(async (newSpeaker: string | null) => {
     if (!sceneId) return;
     setInlineNarrationSpeaker(newSpeaker);
