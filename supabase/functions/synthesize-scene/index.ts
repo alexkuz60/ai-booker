@@ -384,15 +384,28 @@ function applyAnnotationsText(text: string, annotations: PhraseAnnotation[]): { 
     }
   }
 
-  // Apply pause insertions as "..." in text (sorted descending to preserve offsets)
-  const pauses = annotations
-    .filter(a => a.type === "pause")
-    .map(a => ({ offset: a.offset ?? text.length, durationMs: a.durationMs ?? 500 }))
+  // Apply insertion annotations (pauses + sounds) sorted descending to preserve offsets
+  const insertions = annotations
+    .filter(a => a.type === "pause" || a.type === "sigh" || a.type === "cough" || a.type === "laugh" || a.type === "hmm")
+    .map(a => ({ offset: a.offset ?? text.length, type: a.type, durationMs: a.durationMs ?? 500 }))
     .sort((a, b) => b.offset - a.offset);
 
-  for (const p of pauses) {
-    const dots = p.durationMs >= 1500 ? "...... " : p.durationMs >= 750 ? "... " : ".. ";
-    modified = modified.slice(0, p.offset) + dots + modified.slice(p.offset);
+  const soundTextMap: Record<string, string> = {
+    sigh: " *sigh* ",
+    cough: " *cough* ",
+    laugh: " *laughs* ",
+    hmm: " *hmm* ",
+  };
+
+  for (const ins of insertions) {
+    let marker: string;
+    if (ins.type === "pause") {
+      marker = ins.durationMs >= 1500 ? "...... " : ins.durationMs >= 750 ? "... " : ".. ";
+    } else {
+      marker = soundTextMap[ins.type] || "... ";
+      extraInstructions.push(`Insert a ${ins.type} sound at the marked position`);
+    }
+    modified = modified.slice(0, ins.offset) + marker + modified.slice(ins.offset);
   }
 
   return { text: modified, extraInstructions };
