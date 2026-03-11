@@ -1,9 +1,13 @@
-import { useState, useEffect } from "react";
-import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2, Clock, Timer } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2, Clock, Timer, BookOpen } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import type { StudioChapter } from "@/lib/studioChapter";
 import { estimateSceneDuration, formatDuration } from "@/lib/durationEstimate";
@@ -29,6 +33,127 @@ export const SCENE_TYPE_RU: Record<string, string> = {
   mixed: "смешанный",
 };
 
+// ─── Book-wide stale segment info ───────────────────────────
+interface StaleSegmentInfo {
+  segmentId: string;
+  sceneId: string;
+  speaker: string | null;
+  currentVoice: string;
+  savedVoice: string;
+}
+
+interface BookStaleReport {
+  staleSegments: StaleSegmentInfo[];
+  totalAudioSegments: number;
+  scenesAffected: Set<string>;
+  providerBreakdown: Map<string, number>; // provider -> count
+}
+
+async function scanBookForStaleAudio(bookId: string): Promise<BookStaleReport> {
+  const report: BookStaleReport = {
+    staleSegments: [],
+    totalAudioSegments: 0,
+    scenesAffected: new Set(),
+    providerBreakdown: new Map(),
+  };
+
+  // Load all characters with voice configs
+  const { data: chars } = await supabase
+    .from("book_characters")
+    .select("name, aliases, voice_config")
+    .eq("book_id", bookId);
+  if (!chars?.length) return report;
+
+  const charVoiceMap = new Map<string, Record<string, unknown>>();
+  for (const c of chars) {
+    const vc = (c.voice_config || {}) as Record<string, unknown>;
+    charVoiceMap.set((c.name || "").toLowerCase(), vc);
+    for (const a of (c.aliases || [])) {
+      charVoiceMap.set((a as string).toLowerCase(), vc);
+    }
+  }
+
+  // Load all chapters -> scenes -> segments -> audio for the book
+  const { data: chapters } = await supabase
+    .from("book_chapters")
+    .select("id")
+    .eq("book_id", bookId);
+  if (!chapters?.length) return report;
+
+  const chapterIds = chapters.map(c => c.id);
+  const { data: scenes } = await supabase
+    .from("book_scenes")
+    .select("id")
+    .in("chapter_id", chapterIds);
+  if (!scenes?.length) return report;
+
+  const sceneIds = scenes.map(s => s.id);
+
+  // Load all segments for these scenes
+  const { data: segments } = await supabase
+    .from("scene_segments")
+    .select("id, scene_id, speaker")
+    .in("scene_id", sceneIds);
+  if (!segments?.length) return report;
+
+  const segIds = segments.map(s => s.id);
+
+  // Load all ready audio
+  const { data: audioData } = await supabase
+    .from("segment_audio")
+    .select("segment_id, voice_config, status")
+    .in("segment_id", segIds)
+    .eq("status", "ready");
+  if (!audioData?.length) return report;
+
+  report.totalAudioSegments = audioData.length;
+
+  const segToSpeaker = new Map(segments.map(s => [s.id, s.speaker]));
+  const segToScene = new Map(segments.map(s => [s.id, s.scene_id]));
+
+  const COMPARE_KEYS = ["voice", "role", "speed", "pitchShift", "volume", "provider", "model"];
+
+  for (const a of audioData) {
+    const speaker = segToSpeaker.get(a.segment_id);
+    if (!speaker) continue;
+
+    const currentVc = charVoiceMap.get(speaker.toLowerCase());
+    if (!currentVc || !currentVc.voice) continue;
+
+    const savedVc = (a.voice_config || {}) as Record<string, unknown>;
+
+    const changed = COMPARE_KEYS.some(k => {
+      const cur = currentVc[k];
+      const sav = savedVc[k];
+      const curStr = (cur !== undefined && cur !== null && cur !== "") ? String(cur) : "";
+      const savStr = (sav !== undefined && sav !== null && sav !== "") ? String(sav) : "";
+      if (k === "speed" || k === "pitchShift" || k === "volume") {
+        const curNum = curStr ? Number(curStr) : -999;
+        const savNum = savStr ? Number(savStr) : -999;
+        return Math.abs(curNum - savNum) > 0.01;
+      }
+      return curStr !== savStr;
+    });
+
+    if (changed) {
+      const sceneId = segToScene.get(a.segment_id) || "";
+      report.staleSegments.push({
+        segmentId: a.segment_id,
+        sceneId,
+        speaker,
+        currentVoice: String(currentVc.voice || ""),
+        savedVoice: String(savedVc.voice || ""),
+      });
+      report.scenesAffected.add(sceneId);
+
+      const provider = String(currentVc.provider || savedVc.provider || "yandex");
+      report.providerBreakdown.set(provider, (report.providerBreakdown.get(provider) || 0) + 1);
+    }
+  }
+
+  return report;
+}
+
 // ─── Chapter Navigator ──────────────────────────────────────
 
 export function ChapterNavigator({
@@ -42,6 +167,7 @@ export function ChapterNavigator({
   staleAudioSceneIds,
   onBatchResynthDone,
   clipsRefreshToken,
+  bookId,
 }: {
   chapter: StudioChapter;
   selectedSceneIdx: number | null;
@@ -53,11 +179,19 @@ export function ChapterNavigator({
   staleAudioSceneIds?: Set<string>;
   onBatchResynthDone?: () => void;
   clipsRefreshToken?: number;
+  bookId?: string | null;
 }) {
   const [chapterOpen, setChapterOpen] = useState(true);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
   const [recalcRunning, setRecalcRunning] = useState(false);
+
+  // Book-wide stale scan
+  const [scanning, setScanning] = useState(false);
+  const [staleReport, setStaleReport] = useState<BookStaleReport | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [bookResynthRunning, setBookResynthRunning] = useState(false);
+  const [bookResynthProgress, setBookResynthProgress] = useState("");
 
   // Load actual durations from scene_playlists
   const [playlistDurations, setPlaylistDurations] = useState<Map<string, number>>(new Map());
@@ -112,13 +246,11 @@ export function ChapterNavigator({
   };
 
   const handleRecalcDurations = async () => {
-    // Find a scene with a DB id to get chapter_id
     const sceneWithId = chapter.scenes.find(s => s.id);
     if (!sceneWithId?.id) return;
 
     setRecalcRunning(true);
     try {
-      // Get chapter_id from the scene
       const { data: sceneRow } = await supabase
         .from("book_scenes")
         .select("chapter_id")
@@ -146,7 +278,7 @@ export function ChapterNavigator({
               ? `Обновлено ${result.updated} из ${result.total} клипов`
               : `Updated ${result.updated} of ${result.total} clips`
           );
-          onBatchResynthDone?.(); // triggers clipsRefreshToken increment
+          onBatchResynthDone?.();
         } else {
           toast.info(
             isRu
@@ -162,6 +294,85 @@ export function ChapterNavigator({
     setRecalcRunning(false);
   };
 
+  // ── Book-wide stale scan ──
+  const handleBookStaleScan = useCallback(async () => {
+    if (!bookId) {
+      toast.error(isRu ? "ID книги не определён" : "Book ID not found");
+      return;
+    }
+    setScanning(true);
+    try {
+      const report = await scanBookForStaleAudio(bookId);
+      setStaleReport(report);
+      if (report.staleSegments.length === 0) {
+        toast.success(isRu ? "Все аудио актуальны — устаревших нет" : "All audio up to date — no stale segments");
+      } else {
+        setShowConfirmDialog(true);
+      }
+    } catch (e) {
+      console.error("Book stale scan error:", e);
+      toast.error(isRu ? "Ошибка сканирования" : "Scan error");
+    }
+    setScanning(false);
+  }, [bookId, isRu]);
+
+  // ── Book-wide resynth ──
+  const handleBookResynth = useCallback(async () => {
+    if (!staleReport) return;
+    setShowConfirmDialog(false);
+    setBookResynthRunning(true);
+
+    const affectedScenes = [...staleReport.scenesAffected];
+    let done = 0;
+    let errors = 0;
+
+    for (const sceneId of affectedScenes) {
+      done++;
+      setBookResynthProgress(`${done}/${affectedScenes.length}`);
+      try {
+        // Only re-synth stale segment_ids within each scene
+        const staleSegIds = staleReport.staleSegments
+          .filter(s => s.sceneId === sceneId)
+          .map(s => s.segmentId);
+
+        const { error } = await supabase.functions.invoke("synthesize-scene", {
+          body: {
+            scene_id: sceneId,
+            language: isRu ? "ru" : "en",
+            force: true,
+            segment_ids: staleSegIds,
+          },
+        });
+        if (error) {
+          console.error("Book resynth error for scene", sceneId, error);
+          errors++;
+        }
+      } catch (e) {
+        console.error("Book resynth exception for scene", sceneId, e);
+        errors++;
+      }
+    }
+
+    setBookResynthRunning(false);
+    setBookResynthProgress("");
+    setStaleReport(null);
+    onBatchResynthDone?.();
+
+    if (errors === 0) {
+      toast.success(
+        isRu
+          ? `Ре-синтез завершён: ${staleReport.staleSegments.length} сегментов в ${affectedScenes.length} сценах`
+          : `Re-synthesis complete: ${staleReport.staleSegments.length} segments in ${affectedScenes.length} scenes`
+      );
+    } else {
+      toast.warning(
+        isRu
+          ? `Ре-синтез: ${affectedScenes.length - errors} ок, ${errors} ошибок`
+          : `Re-synthesis: ${affectedScenes.length - errors} ok, ${errors} errors`
+      );
+    }
+  }, [staleReport, isRu, onBatchResynthDone]);
+
   // Compute total chapter duration
   let chapterTotalSec = 0;
   for (const scene of chapter.scenes) {
@@ -172,6 +383,16 @@ export function ChapterNavigator({
       chapterTotalSec += estimateSceneDuration(scene).sec;
     }
   }
+
+  // Build provider cost estimate text
+  const buildCostWarning = (report: BookStaleReport): string => {
+    const lines: string[] = [];
+    for (const [provider, count] of report.providerBreakdown) {
+      const label = provider === "elevenlabs" ? "ElevenLabs" : provider === "proxyapi" ? "OpenAI (ProxyAPI)" : "Yandex TTS";
+      lines.push(`• ${label}: ${count} ${isRu ? "сегм." : "seg."}`);
+    }
+    return lines.join("\n");
+  };
 
   return (
     <div className="h-full flex flex-col border-r border-border">
@@ -185,10 +406,10 @@ export function ChapterNavigator({
             <Button
               size="sm"
               variant="outline"
-              className="ml-auto h-6 px-2 text-[11px] gap-1 text-yellow-500 border-yellow-500/30 hover:bg-yellow-500/10"
+              className="h-6 px-2 text-[11px] gap-1 text-yellow-500 border-yellow-500/30 hover:bg-yellow-500/10"
               disabled={batchRunning}
               onClick={handleBatchResynth}
-              title={isRu ? `Ре-синтез ${staleCount} устаревших сцен` : `Re-synthesize ${staleCount} stale scenes`}
+              title={isRu ? `Ре-синтез ${staleCount} устаревших сцен главы` : `Re-synthesize ${staleCount} stale scenes in chapter`}
             >
               {batchRunning ? (
                 <>
@@ -203,10 +424,27 @@ export function ChapterNavigator({
               )}
             </Button>
           )}
+          {/* Book-wide stale scan button */}
           <Button
             size="sm"
             variant="ghost"
             className={cn("h-6 w-6 p-0", staleCount > 0 ? "" : "ml-auto")}
+            disabled={scanning || bookResynthRunning}
+            onClick={handleBookStaleScan}
+            title={isRu ? "Сканировать всю книгу на устаревшее аудио" : "Scan entire book for stale audio"}
+          >
+            {scanning ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : bookResynthRunning ? (
+              <Loader2 className="h-3 w-3 animate-spin text-yellow-500" />
+            ) : (
+              <BookOpen className="h-3 w-3" />
+            )}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className={cn("h-6 w-6 p-0", staleCount > 0 || true ? "" : "ml-auto")}
             disabled={recalcRunning}
             onClick={handleRecalcDurations}
             title={isRu ? "Пересчитать длительности из MP3" : "Recalculate durations from MP3"}
@@ -218,9 +456,16 @@ export function ChapterNavigator({
             )}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground mt-0.5 truncate">
-          {chapter.bookTitle}
-        </p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <p className="text-xs text-muted-foreground truncate flex-1">
+            {chapter.bookTitle}
+          </p>
+          {bookResynthRunning && (
+            <span className="text-[10px] text-yellow-500 font-mono shrink-0">
+              {bookResynthProgress}
+            </span>
+          )}
+        </div>
       </div>
       <ScrollArea type="always" className="flex-1 min-h-0">
         <div className="py-2 px-1">
@@ -261,7 +506,6 @@ export function ChapterNavigator({
                   const isStale = staleAudioSceneIds?.has(scene.id || "");
                   const isActual = !!actualSec;
 
-                  // Duration color: stale=yellow, actual=green, estimate=muted
                   const durationColor = isStale
                     ? "text-yellow-500"
                     : isActual
@@ -320,6 +564,66 @@ export function ChapterNavigator({
           </Collapsible>
         </div>
       </ScrollArea>
+
+      {/* Book-wide stale confirmation dialog */}
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              {isRu ? "Устаревшее аудио в книге" : "Stale Audio in Book"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>
+                  {isRu
+                    ? `Обнаружено ${staleReport?.staleSegments.length ?? 0} устаревших сегментов в ${staleReport?.scenesAffected.size ?? 0} сценах (из ${staleReport?.totalAudioSegments ?? 0} аудио-сегментов в книге).`
+                    : `Found ${staleReport?.staleSegments.length ?? 0} stale segments in ${staleReport?.scenesAffected.size ?? 0} scenes (out of ${staleReport?.totalAudioSegments ?? 0} audio segments in the book).`
+                  }
+                </p>
+
+                {staleReport && staleReport.providerBreakdown.size > 0 && (
+                  <div className="bg-muted/50 rounded-md p-3 space-y-1">
+                    <p className="font-medium text-foreground text-xs">
+                      {isRu ? "Расход по провайдерам:" : "Cost by provider:"}
+                    </p>
+                    {[...staleReport.providerBreakdown.entries()].map(([provider, count]) => {
+                      const label = provider === "elevenlabs" ? "ElevenLabs" : provider === "proxyapi" ? "OpenAI (ProxyAPI)" : "Yandex TTS";
+                      const isExpensive = provider === "elevenlabs" || provider === "proxyapi";
+                      return (
+                        <div key={provider} className={cn("flex items-center gap-2 text-xs", isExpensive ? "text-yellow-500" : "text-muted-foreground")}>
+                          {isExpensive && <AlertTriangle className="h-3 w-3" />}
+                          <span>{label}: {count} {isRu ? "сегм." : "seg."}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <p className="text-yellow-600 dark:text-yellow-400 font-medium text-xs">
+                  {isRu
+                    ? "⚠ Ре-синтез использует API речевых движков и может повлечь дополнительные расходы. Каждый сегмент будет заново озвучен с текущими голосовыми настройками персонажей."
+                    : "⚠ Re-synthesis uses speech engine APIs and may incur additional costs. Each segment will be re-voiced with current character voice settings."
+                  }
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBookResynth}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              {isRu
+                ? `Ре-синтез ${staleReport?.staleSegments.length ?? 0} сегментов`
+                : `Re-synth ${staleReport?.staleSegments.length ?? 0} segments`
+              }
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
