@@ -458,9 +458,10 @@ Deno.serve(async (req) => {
         if (openrouter_api_key) {
           const orModel = user_model || 'google/gemini-2.5-flash';
           console.log(`Non-admin, redirecting ${orModel} to OpenRouter`);
+          const userId = await getUserIdFromAuth(authHeader || "");
           return await handleAIRequest(
             truncatedText, 'https://openrouter.ai/api/v1/chat/completions',
-            orModel, openrouter_api_key, 'openrouter', mode, chapter_title, null, effectiveLang
+            orModel, openrouter_api_key, 'openrouter', mode, chapter_title, null, effectiveLang, userId
           );
         }
         return new Response(
