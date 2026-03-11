@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json, Database } from "@/integrations/supabase/types";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, AudioLines, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -859,7 +860,7 @@ export function StoryboardPanel({
           .in("segment_id", segIds)
           .order("phrase_number"),
         supabase
-          .from("scene_type_mappings" as any)
+          .from("scene_type_mappings")
           .select("segment_type, character_id")
           .eq("scene_id", sid),
       ]);
@@ -873,7 +874,7 @@ export function StoryboardPanel({
       const typeSpeakerMap = new Map<string, string>();
       let loadedInlineSpeaker: string | null = null;
       if (mappings) {
-        for (const m of mappings as any[]) {
+        for (const m of mappings) {
           const name = charNameMap.get(m.character_id);
           if (name) {
             typeSpeakerMap.set(m.segment_type, name);
@@ -1125,7 +1126,7 @@ export function StoryboardPanel({
         .insert({
           scene_id: sceneId,
           segment_number: seg.segment_number + 1,
-          segment_type: seg.segment_type as any,
+          segment_type: seg.segment_type as Database["public"]["Enums"]["segment_type"],
           speaker: seg.speaker,
           metadata: { split_silence_ms: 1000 },
         })
@@ -1301,7 +1302,7 @@ export function StoryboardPanel({
         const word = m[0].toLowerCase();
         const stressedIndex = stressPos - m.index;
         // Upsert to dictionary (ignore if already exists)
-        await supabase.from("stress_dictionary" as any).upsert(
+        await supabase.from("stress_dictionary").upsert(
           { user_id: (await supabase.auth.getUser()).data.user?.id, word, stressed_index: stressedIndex },
           { onConflict: "user_id,word,stressed_index" }
         );
@@ -1335,7 +1336,7 @@ export function StoryboardPanel({
 
     const { error } = await supabase
       .from("segment_phrases")
-      .update({ metadata: updatedMeta as any })
+      .update({ metadata: updatedMeta as unknown as Json })
       .eq("id", phraseId);
 
     if (error) {
@@ -1381,7 +1382,7 @@ export function StoryboardPanel({
 
     const { error } = await supabase
       .from("segment_phrases")
-      .update({ metadata: updatedMeta as any })
+      .update({ metadata: updatedMeta as unknown as Json })
       .eq("id", phraseId);
 
     if (error) {
@@ -1417,11 +1418,11 @@ export function StoryboardPanel({
 
     // From scene_type_mappings (includes first_person, inline_narration, footnote, etc.)
     const { data: mappings } = await supabase
-      .from("scene_type_mappings" as any)
+      .from("scene_type_mappings")
       .select("character_id")
       .eq("scene_id", sceneId);
     if (mappings) {
-      for (const m of mappings as any[]) {
+      for (const m of mappings) {
         usedCharIds.add(m.character_id);
       }
     }
@@ -1497,7 +1498,7 @@ export function StoryboardPanel({
 
     const { error } = await supabase
       .from("scene_segments")
-      .update({ segment_type: newType as any })
+      .update({ segment_type: newType as Database["public"]["Enums"]["segment_type"] })
       .in("id", affectedIds);
     if (error) {
       toast.error(isRu ? "Ошибка сохранения типа" : "Failed to save type");
@@ -1522,7 +1523,7 @@ export function StoryboardPanel({
       const remainingOfOldType = updatedSegments.filter(s => s.segment_type === oldType);
       if (remainingOfOldType.length === 0) {
         await supabase
-          .from("scene_type_mappings" as any)
+          .from("scene_type_mappings")
           .delete()
           .eq("scene_id", sceneId)
           .eq("segment_type", oldType);

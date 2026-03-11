@@ -193,7 +193,7 @@ export function useBookManager({ userId, isRu }: UseBookManagerParams) {
       const hasParts = parts.length > 0;
       const savedToc: TocChapter[] = chapters.map((ch, i) => {
         const pdfInfo = tocFromPdf[i];
-        const dbLevel = (ch as any).level;
+        const dbLevel = ch.level;
         return {
           title: ch.title,
           startPage: pdfInfo?.startPage || 0,

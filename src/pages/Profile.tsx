@@ -6,6 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { User, Key, Settings, HardDrive, Network, Bot, Activity } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useCloudSettings } from '@/hooks/useCloudSettings';
@@ -84,7 +85,7 @@ export default function Profile() {
     const { error } = await supabase
       .from('profiles')
       .update({
-        api_keys: apiKeys as any,
+        api_keys: apiKeys as Json,
         updated_at: new Date().toISOString(),
       })
       .eq('id', user.id);

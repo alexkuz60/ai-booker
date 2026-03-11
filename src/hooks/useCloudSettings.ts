@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { useAuth } from '@/hooks/useAuth';
 
 /**
@@ -37,7 +38,7 @@ export function useCloudSettings<T>(
 
         if (cancelled) return;
         if (!error && data) {
-          const dbValue = (data as any).setting_value as T;
+          const dbValue = data.setting_value as T;
           setValue(dbValue);
           try { localStorage.setItem(cacheKey, JSON.stringify(dbValue)); } catch {}
         }
@@ -62,7 +63,7 @@ export function useCloudSettings<T>(
           .upsert({
             user_id: user.id,
             setting_key: settingKey,
-            setting_value: newValue as any,
+            setting_value: newValue as Json,
           }, { onConflict: 'user_id,setting_key' });
       } catch (err) {
         console.error(`[useCloudSettings] Failed to save "${settingKey}":`, err);

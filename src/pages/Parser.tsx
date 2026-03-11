@@ -164,7 +164,7 @@ export default function Parser() {
       for (const ci of allAffected) {
         const chapterId = chapterIdMap.get(ci);
         if (chapterId) {
-          supabase.from('book_chapters').update({ level: next[ci].level } as any).eq('id', chapterId).then();
+          supabase.from('book_chapters').update({ level: next[ci].level }).eq('id', chapterId).then();
         }
       }
       return next;
@@ -175,7 +175,7 @@ export default function Parser() {
     setTocEntries(prev => prev.map((e, i) => i === idx ? { ...e, title: newTitle } : e));
     const chapterId = chapterIdMap.get(idx);
     if (chapterId) {
-      supabase.from('book_chapters').update({ title: newTitle } as any).eq('id', chapterId).then();
+      supabase.from('book_chapters').update({ title: newTitle }).eq('id', chapterId).then();
     }
   };
 
@@ -194,7 +194,7 @@ export default function Parser() {
     setTocEntries(prev => prev.map(e => e.partTitle === oldTitle ? { ...e, partTitle: newTitle } : e));
     const partId = partIdMap.get(oldTitle);
     if (partId) {
-      supabase.from('book_parts').update({ title: newTitle } as any).eq('id', partId).then();
+      supabase.from('book_parts').update({ title: newTitle }).eq('id', partId).then();
     }
   };
 

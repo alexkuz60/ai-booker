@@ -316,7 +316,7 @@ export function useTimelineClips(
           if (end > prev) sceneContentDuration.set(clip.sceneId, end);
         }
 
-        for (const layer of atmosphereLayers as any[]) {
+        for (const layer of atmosphereLayers) {
           const boundary = boundaries.find(b => b.sceneId === layer.scene_id);
           if (!boundary) continue;
 
