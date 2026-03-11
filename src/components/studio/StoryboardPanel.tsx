@@ -1125,7 +1125,7 @@ export function StoryboardPanel({
         .insert({
           scene_id: sceneId,
           segment_number: seg.segment_number + 1,
-          segment_type: seg.segment_type as any,
+          segment_type: seg.segment_type as Database["public"]["Enums"]["segment_type"],
           speaker: seg.speaker,
           metadata: { split_silence_ms: 1000 },
         })
