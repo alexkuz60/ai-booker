@@ -694,17 +694,21 @@ class AudioEngine {
       })
     );
 
+    let dropped = 0;
     for (const result of loadResults) {
       if (!result.loaded) {
+        console.warn(`[AudioEngine] Dropping unloaded track: ${result.id}`);
         result.track.dispose();
         this.tracks.delete(result.id);
+        dropped++;
       }
     }
 
     if (this.tracks.size === 0) {
       this._totalDuration = 0;
       this.notify();
-      throw new Error("AudioEngine: no tracks loaded");
+      const ctxState = Tone.getContext().state;
+      throw new Error(`AudioEngine: no tracks loaded (${dropped} dropped, ctx=${ctxState})`);
     }
 
     this._totalDuration = Math.max(
