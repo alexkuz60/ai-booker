@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ZoomIn, ZoomOut, Maximize2, Play, Pause, Square, Volume2, VolumeX, ChevronUp, ChevronDown } from "lucide-react";
+import { toast } from "sonner";
+import { ZoomIn, ZoomOut, Maximize2, Play, Pause, Square, Volume2, VolumeX, ChevronUp, ChevronDown, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
+import { resetAudioEngine } from "@/lib/audioEngine";
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
 import { TimelineMasterMeter } from "@/components/studio/TimelineMasterMeter";
 import { TimelineRuler } from "@/components/studio/TimelineRuler";
@@ -154,6 +156,18 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
         </div>
 
         <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+            title={isRu ? "Сброс аудио движка" : "Reset audio engine"}
+            onClick={() => {
+              resetAudioEngine();
+              toast.success(isRu ? "Аудио движок перезапущен" : "Audio engine restarted");
+            }}
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("out")}><ZoomOut className="h-3.5 w-3.5" /></Button>
           <span className="text-xs text-muted-foreground font-body w-10 text-center">{displayZoomPercent}%</span>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("in")}><ZoomIn className="h-3.5 w-3.5" /></Button>
