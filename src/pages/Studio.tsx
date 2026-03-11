@@ -376,6 +376,7 @@ const Studio = () => {
           synthesizingSegmentIds={synthesizingSegmentIds}
           errorSegmentIds={errorSegmentIds}
           clipsRefreshToken={clipsRefreshToken}
+          onSceneRendered={() => setClipsRefreshToken(t => t + 1)}
         />
       </div>
     </motion.div>
