@@ -407,15 +407,25 @@ export function StudioTimeline({
   // Keep seekCenterRef in sync for the segment selection effect above
   useEffect(() => { seekCenterRef.current = { zoom, percent: sceneZoomPercent }; }, [zoom, sceneZoomPercent]);
 
-  // Apply scene zoom preset
+  // Apply scene zoom preset — center on current playhead position
   const applySceneZoom = useCallback((percent: number) => {
     setSceneZoomPercent(percent);
+    const newZoom = percent === 100 ? fitZoom : (fitZoom * percent) / 100;
     if (percent === 100) {
       setZoomOverride(null);
     } else {
-      setZoomOverride((fitZoom * percent) / 100);
+      setZoomOverride(newZoom);
     }
-  }, [fitZoom]);
+    // After zoom change, center scroll on current playhead
+    if (percent > 100) {
+      requestAnimationFrame(() => {
+        const el = sceneScrollRef.current;
+        if (!el) return;
+        const px = player.positionSec * newZoom * 4;
+        el.scrollTo({ left: Math.max(0, px - el.clientWidth / 2), behavior: "smooth" });
+      });
+    }
+  }, [fitZoom, player.positionSec]);
 
   // ── Horizontal scroll sync with playback (scene mode) ─────
   const userScrollingRef = useRef(false);
