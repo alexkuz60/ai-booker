@@ -819,8 +819,9 @@ Deno.serve(async (req) => {
       }
 
       const isProxyApiVoice = (voiceConfig as any).provider === "proxyapi";
-      const isV3Voice = !isProxyApiVoice && V3_ONLY_VOICES.has(voiceConfig.voice);
-      const apiVersion = isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1";
+      const isSaluteSpeechVoice = (voiceConfig as any).provider === "salutespeech";
+      const isV3Voice = !isProxyApiVoice && !isSaluteSpeechVoice && V3_ONLY_VOICES.has(voiceConfig.voice);
+      const apiVersion = isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1";
       const estimatedChunks = isV3Voice ? Math.max(1, Math.ceil(text.length / 240)) : 1;
       console.log(`▶ Segment ${i + 1}/${segments.length} [${seg.id}]: speaker=${seg.speaker || seg.segment_type}, api=${apiVersion}, voice=${voiceConfig.voice}, chars=${text.length}, chunks≈${estimatedChunks}${hasInlineNarrations ? `, narrations=${inlineNarrations.length}` : ""}`);
 
