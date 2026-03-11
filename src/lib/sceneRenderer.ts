@@ -1,9 +1,8 @@
 /**
  * SceneRenderer — offline (OfflineAudioContext) renderer that produces
- * 3 stem files per scene: voice.mp3, atmosphere.mp3, sfx.mp3.
+ * 3 stem files per scene: voice.wav, atmosphere.wav, sfx.wav.
  *
- * All channel-level processing (volume, pan, PreFX compressor, reverb)
- * is baked destructively into the rendered stems.
+ * Loading phase reports per-clip progress; rendering is atomic.
  */
 
 import { supabase } from "@/integrations/supabase/client";
@@ -33,10 +32,11 @@ function classifyClip(clip: TimelineClip): BusType {
   return "voice";
 }
 
-/** Fetch a signed URL and decode to AudioBuffer */
+/* ─── Audio loading ─── */
+
 async function fetchAudioBuffer(
   audioPath: string,
-  ctx: OfflineAudioContext,
+  sampleRate: number,
 ): Promise<AudioBuffer | null> {
   try {
     const { data: urlData } = await supabase.storage
@@ -46,18 +46,40 @@ async function fetchAudioBuffer(
 
     const resp = await fetch(urlData.signedUrl);
     const arrayBuf = await resp.arrayBuffer();
-    return await ctx.decodeAudioData(arrayBuf);
+    const decodeCtx = new OfflineAudioContext(2, 1, sampleRate);
+    return await decodeCtx.decodeAudioData(arrayBuf);
   } catch {
     return null;
   }
 }
 
-/** Encode Float32 PCM to WAV blob */
+/** Pre-load all clip buffers with per-clip progress */
+async function preloadClipBuffers(
+  clips: TimelineClip[],
+  sampleRate: number,
+  onClipLoaded?: (loaded: number, total: number) => void,
+): Promise<Map<string, AudioBuffer>> {
+  const buffers = new Map<string, AudioBuffer>();
+  const loadable = clips.filter(c => c.audioPath);
+  let loaded = 0;
+
+  for (const clip of loadable) {
+    const buffer = await fetchAudioBuffer(clip.audioPath!, sampleRate);
+    if (buffer) buffers.set(clip.id, buffer);
+    loaded++;
+    onClipLoaded?.(loaded, loadable.length);
+  }
+
+  return buffers;
+}
+
+/* ─── WAV encoder ─── */
+
 function encodeWav(buffer: AudioBuffer): Blob {
   const numChannels = buffer.numberOfChannels;
   const sampleRate = buffer.sampleRate;
   const length = buffer.length;
-  const bytesPerSample = 2; // 16-bit
+  const bytesPerSample = 2;
   const blockAlign = numChannels * bytesPerSample;
   const dataSize = length * blockAlign;
   const headerSize = 44;
@@ -66,22 +88,17 @@ function encodeWav(buffer: AudioBuffer): Blob {
   const arrayBuffer = new ArrayBuffer(totalSize);
   const view = new DataView(arrayBuffer);
 
-  // RIFF header
   writeString(view, 0, "RIFF");
   view.setUint32(4, totalSize - 8, true);
   writeString(view, 8, "WAVE");
-
-  // fmt chunk
   writeString(view, 12, "fmt ");
   view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true); // PCM
+  view.setUint16(20, 1, true);
   view.setUint16(22, numChannels, true);
   view.setUint32(24, sampleRate, true);
   view.setUint32(28, sampleRate * blockAlign, true);
   view.setUint16(32, blockAlign, true);
   view.setUint16(34, 16, true);
-
-  // data chunk
   writeString(view, 36, "data");
   view.setUint32(40, dataSize, true);
 
@@ -108,62 +125,50 @@ function writeString(view: DataView, offset: number, str: string) {
   }
 }
 
-/**
- * Render a single bus (voice / atmo / sfx) offline.
- * Applies per-track volume, pan, PreFX compressor, and reverb from current mixer state.
- */
-async function renderBus(
+/* ─── Bus scheduling (atomic render) ─── */
+
+function scheduleBus(
   clips: TimelineClip[],
+  buffers: Map<string, AudioBuffer>,
   durationSec: number,
   sampleRate: number,
-): Promise<AudioBuffer | null> {
-  if (clips.length === 0) return null;
+): OfflineAudioContext | null {
+  const withAudio = clips.filter(c => buffers.has(c.id));
+  if (withAudio.length === 0) return null;
 
   const ctx = new OfflineAudioContext(2, Math.ceil(durationSec * sampleRate), sampleRate);
   const engine = getAudioEngine();
 
-  // Load and schedule each clip
-  for (const clip of clips) {
-    if (!clip.audioPath) continue;
+  for (const clip of withAudio) {
+    const buffer = buffers.get(clip.id)!;
 
-    const buffer = await fetchAudioBuffer(clip.audioPath, ctx);
-    if (!buffer) continue;
-
-    // Get current mixer state for this clip's track
     const mixState = engine.getTrackMixState(clip.id);
     const volume = mixState?.volume ?? 80;
     const pan = mixState?.pan ?? 0;
     const preFxBypassed = mixState?.preFxBypassed ?? true;
     const reverbBypassed = mixState?.reverbBypassed ?? true;
 
-    // Build offline processing chain: Source → Compressor → Gain → Panner → Convolver → Destination
     const source = ctx.createBufferSource();
     source.buffer = buffer;
 
-    // PreFX compressor
     const compressor = ctx.createDynamicsCompressor();
     compressor.threshold.value = -24;
     compressor.ratio.value = preFxBypassed ? 1 : 3;
     compressor.attack.value = 0.01;
     compressor.release.value = 0.1;
 
-    // Volume
     const gainNode = ctx.createGain();
     const dbVal = volume <= 0 ? -100 : 20 * Math.log10(volume / 100);
     gainNode.gain.value = Math.pow(10, dbVal / 20);
 
-    // Pan (StereoPanner)
     const panner = ctx.createStereoPanner();
     panner.pan.value = pan;
 
-    // Wire chain
     source.connect(compressor);
     compressor.connect(gainNode);
     gainNode.connect(panner);
 
-    // Simple reverb via ConvolverNode if not bypassed
     if (!reverbBypassed) {
-      // Create a simple impulse response for reverb
       const irLength = Math.ceil(sampleRate * 1.5);
       const irBuffer = ctx.createBuffer(2, irLength, sampleRate);
       for (let ch = 0; ch < 2; ch++) {
@@ -172,18 +177,13 @@ async function renderBus(
           data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (sampleRate * 0.3));
         }
       }
-
       const convolver = ctx.createConvolver();
       convolver.buffer = irBuffer;
-
-      // Dry/wet mix (15% wet)
       const dryGain = ctx.createGain();
       dryGain.gain.value = 0.85;
       const wetGain = ctx.createGain();
       wetGain.gain.value = 0.15;
-
       const merger = ctx.createGain();
-
       panner.connect(dryGain);
       dryGain.connect(merger);
       panner.connect(convolver);
@@ -194,7 +194,6 @@ async function renderBus(
       panner.connect(ctx.destination);
     }
 
-    // Apply fades
     const fadeIn = clip.fadeInSec ?? 0;
     const fadeOut = clip.fadeOutSec ?? 0;
     if (fadeIn > 0) {
@@ -207,7 +206,6 @@ async function renderBus(
       gainNode.gain.linearRampToValueAtTime(0, clip.startSec + clip.durationSec);
     }
 
-    // Handle looping
     if (clip.loop && clip.clipLenSec) {
       const step = Math.max(1, clip.clipLenSec - (clip.loopCrossfadeSec ?? 0));
       const iterations = Math.ceil(clip.durationSec / step) + 1;
@@ -225,13 +223,11 @@ async function renderBus(
     }
   }
 
-  return await ctx.startRendering();
+  return ctx;
 }
 
-/**
- * Main scene render function.
- * Renders 3 stems (voice, atmo, sfx) and uploads to storage.
- */
+/* ─── Main render ─── */
+
 export async function renderScene(
   sceneId: string,
   clips: TimelineClip[],
@@ -251,16 +247,29 @@ export async function renderScene(
     const atmoClips = clips.filter(c => classifyClip(c) === "atmosphere" && c.hasAudio);
     const sfxClips = clips.filter(c => classifyClip(c) === "sfx" && c.hasAudio);
 
-    report("rendering", 10);
+    const allClips = [...voiceClips, ...atmoClips, ...sfxClips];
+    const totalLoadable = allClips.filter(c => c.audioPath).length;
 
-    // Render all 3 buses in parallel
+    // Pre-load all buffers with per-clip progress (0–45%)
+    const buffers = await preloadClipBuffers(allClips, sampleRate, (loaded, total) => {
+      const pct = total > 0 ? Math.round((loaded / total) * 45) : 0;
+      report("loading", pct);
+    });
+
+    report("rendering", 50);
+
+    // Schedule and render all 3 buses in parallel (atomic)
+    const voiceCtx = scheduleBus(voiceClips, buffers, durationSec, sampleRate);
+    const atmoCtx = scheduleBus(atmoClips, buffers, durationSec, sampleRate);
+    const sfxCtx = scheduleBus(sfxClips, buffers, durationSec, sampleRate);
+
     const [voiceBuf, atmoBuf, sfxBuf] = await Promise.all([
-      renderBus(voiceClips, durationSec, sampleRate),
-      renderBus(atmoClips, durationSec, sampleRate),
-      renderBus(sfxClips, durationSec, sampleRate),
+      voiceCtx?.startRendering() ?? Promise.resolve(null),
+      atmoCtx?.startRendering() ?? Promise.resolve(null),
+      sfxCtx?.startRendering() ?? Promise.resolve(null),
     ]);
 
-    report("encoding", 50);
+    report("encoding", 65);
 
     // Encode to WAV
     const stems: { key: BusType; buffer: AudioBuffer | null }[] = [
@@ -275,7 +284,7 @@ export async function renderScene(
       sfx: null,
     };
 
-    report("uploading", 60);
+    report("uploading", 70);
 
     for (const stem of stems) {
       if (!stem.buffer) continue;
