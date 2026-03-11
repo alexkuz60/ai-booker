@@ -5,7 +5,10 @@ export type AnnotationType =
   | "emphasis"
   | "whisper"
   | "slow"
-  | "fast";
+  | "fast"
+  | "joy"
+  | "sadness"
+  | "anger";
 
 export interface PhraseAnnotation {
   type: AnnotationType;
@@ -80,6 +83,30 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     providers: ["yandex"],
     needsRange: true,
   },
+  {
+    type: "joy",
+    label_ru: "😊 Радость",
+    label_en: "😊 Joy",
+    emoji: "😊",
+    providers: ["yandex", "elevenlabs", "proxyapi"],
+    needsRange: true,
+  },
+  {
+    type: "sadness",
+    label_ru: "😢 Грусть",
+    label_en: "😢 Sadness",
+    emoji: "😢",
+    providers: ["yandex", "elevenlabs", "proxyapi"],
+    needsRange: true,
+  },
+  {
+    type: "anger",
+    label_ru: "😡 Злость",
+    label_en: "😡 Anger",
+    emoji: "😡",
+    providers: ["yandex", "elevenlabs", "proxyapi"],
+    needsRange: true,
+  },
 ];
 
 /** Get available annotations for a given TTS provider */
@@ -117,6 +144,18 @@ export const ANNOTATION_STYLES: Record<
   fast: {
     className: "underline decoration-dotted decoration-rose-400/60 text-rose-300",
     prefix: "🐇",
+  },
+  joy: {
+    className: "text-yellow-400 font-medium",
+    prefix: "😊",
+  },
+  sadness: {
+    className: "text-blue-400 italic",
+    prefix: "😢",
+  },
+  anger: {
+    className: "font-bold text-red-400",
+    prefix: "😡",
   },
 };
 

@@ -254,7 +254,7 @@ async function callProxyApiTts(
 // ── Phrase annotation types (mirroring phraseAnnotations.ts) ─────────
 
 interface PhraseAnnotation {
-  type: "pause" | "emphasis" | "whisper" | "slow" | "fast";
+  type: "pause" | "emphasis" | "whisper" | "slow" | "fast" | "joy" | "sadness" | "anger";
   offset?: number;
   start?: number;
   end?: number;
@@ -290,6 +290,16 @@ function applyAnnotationsSsml(text: string, annotations: PhraseAnnotation[]): st
           break;
         case "fast":
           ranges.push({ start: a.start, end: a.end, openTag: `<prosody rate="${a.rate ?? 1.4}">`, closeTag: '</prosody>' });
+          break;
+        // Emotions: Yandex SSML doesn't have native emotion tags, use prosody hints
+        case "joy":
+          ranges.push({ start: a.start, end: a.end, openTag: '<prosody pitch="+10%">', closeTag: '</prosody>' });
+          break;
+        case "sadness":
+          ranges.push({ start: a.start, end: a.end, openTag: '<prosody rate="0.85" pitch="-5%">', closeTag: '</prosody>' });
+          break;
+        case "anger":
+          ranges.push({ start: a.start, end: a.end, openTag: '<prosody rate="1.1" volume="loud">', closeTag: '</prosody>' });
           break;
       }
     }
@@ -350,6 +360,15 @@ function applyAnnotationsText(text: string, annotations: PhraseAnnotation[]): { 
           break;
         case "emphasis":
           extraInstructions.push(`Emphasize: "${fragment}"`);
+          break;
+        case "joy":
+          extraInstructions.push(`Say with joy and happiness: "${fragment}"`);
+          break;
+        case "sadness":
+          extraInstructions.push(`Say with sadness and sorrow: "${fragment}"`);
+          break;
+        case "anger":
+          extraInstructions.push(`Say with anger and intensity: "${fragment}"`);
           break;
       }
     }
