@@ -631,10 +631,36 @@ Deno.serve(async (req) => {
       return false;
     }
 
-    // Build segment texts
+    // Build segment texts (plain) and annotated versions
     const segmentTexts = segments.map(seg => {
-      return (phrasesBySegment.get(seg.id) ?? []).join(" ");
+      return (phrasesBySegment.get(seg.id) ?? []).map(p => p.text).join(" ");
     });
+
+    // Check if segment has any annotations
+    const segmentHasAnnotations = segments.map(seg => {
+      const phrs = phrasesBySegment.get(seg.id) ?? [];
+      return phrs.some(p => p.annotations.length > 0);
+    });
+
+    // Build SSML for v1 with annotations (per segment)
+    function buildSegmentSsml(segId: string): string {
+      const phrs = phrasesBySegment.get(segId) ?? [];
+      const parts = phrs.map(p => applyAnnotationsSsml(p.text, p.annotations));
+      return `<speak>${parts.join(" ")}</speak>`;
+    }
+
+    // Build annotated text for ProxyAPI/v3 (per segment)
+    function buildSegmentAnnotatedText(segId: string): { text: string; extraInstructions: string[] } {
+      const phrs = phrasesBySegment.get(segId) ?? [];
+      const allInstructions: string[] = [];
+      const textParts: string[] = [];
+      for (const p of phrs) {
+        const { text: t, extraInstructions } = applyAnnotationsText(p.text, p.annotations);
+        textParts.push(t);
+        allInstructions.push(...extraInstructions);
+      }
+      return { text: textParts.join(" "), extraInstructions: allInstructions };
+    }
 
     // ── Synthesize each segment ──────────────────────────────────────
     const results: SegmentResult[] = [];
