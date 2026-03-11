@@ -972,7 +972,7 @@ Deno.serve(async (req) => {
               volume: voiceConfig.volume,
               model: isProxyApiVoice ? (voiceConfig as any).model : undefined,
               instructions: isProxyApiVoice ? (voiceConfig as any).instructions : undefined,
-              textHash: hashText(text),
+              textHash: textHashForCache,
               apiVersion: isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1",
             },
           },
