@@ -169,6 +169,7 @@ export function ChapterNavigator({
   onBatchResynthDone,
   clipsRefreshToken,
   bookId,
+  onPlaylistDurationsLoaded,
 }: {
   chapter: StudioChapter;
   selectedSceneIdx: number | null;
@@ -181,6 +182,7 @@ export function ChapterNavigator({
   onBatchResynthDone?: () => void;
   clipsRefreshToken?: number;
   bookId?: string | null;
+  onPlaylistDurationsLoaded?: (m: Map<string, number>) => void;
 }) {
   const navigate = useNavigate();
   const [chapterOpen, setChapterOpen] = useState(true);
@@ -217,6 +219,7 @@ export function ChapterNavigator({
         const map = new Map<string, number>();
         for (const d of plData) map.set(d.scene_id, d.total_duration_ms);
         setPlaylistDurations(map);
+        onPlaylistDurationsLoaded?.(map);
       }
       if (rnData) {
         const map = new Map<string, "full" | "partial">();
