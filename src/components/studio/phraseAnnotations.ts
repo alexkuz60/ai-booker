@@ -8,7 +8,11 @@ export type AnnotationType =
   | "fast"
   | "joy"
   | "sadness"
-  | "anger";
+  | "anger"
+  | "sigh"
+  | "cough"
+  | "laugh"
+  | "hmm";
 
 export interface PhraseAnnotation {
   type: AnnotationType;
@@ -28,7 +32,7 @@ export type TtsProvider = "yandex" | "elevenlabs" | "proxyapi" | "unknown";
 
 /** Whether an annotation is an insertion (at a point) vs a range selection */
 export function isInsertionAnnotation(type: AnnotationType): boolean {
-  return type === "pause";
+  return type === "pause" || type === "sigh" || type === "cough" || type === "laugh" || type === "hmm";
 }
 
 export interface AnnotationConfig {
@@ -107,6 +111,38 @@ export const ANNOTATION_CONFIGS: AnnotationConfig[] = [
     providers: ["yandex", "elevenlabs", "proxyapi"],
     needsRange: true,
   },
+  {
+    type: "sigh",
+    label_ru: "😮‍💨 Вздох",
+    label_en: "😮‍💨 Sigh",
+    emoji: "😮‍💨",
+    providers: ["yandex", "elevenlabs", "proxyapi"],
+    needsRange: false,
+  },
+  {
+    type: "cough",
+    label_ru: "🤧 Кашель",
+    label_en: "🤧 Cough",
+    emoji: "🤧",
+    providers: ["yandex", "elevenlabs", "proxyapi"],
+    needsRange: false,
+  },
+  {
+    type: "laugh",
+    label_ru: "😂 Смех",
+    label_en: "😂 Laugh",
+    emoji: "😂",
+    providers: ["yandex", "elevenlabs", "proxyapi"],
+    needsRange: false,
+  },
+  {
+    type: "hmm",
+    label_ru: "🤔 Хмыканье",
+    label_en: "🤔 Hmm",
+    emoji: "🤔",
+    providers: ["yandex", "elevenlabs", "proxyapi"],
+    needsRange: false,
+  },
 ];
 
 /** Get available annotations for a given TTS provider */
@@ -156,6 +192,22 @@ export const ANNOTATION_STYLES: Record<
   anger: {
     className: "font-bold text-red-400",
     prefix: "😡",
+  },
+  sigh: {
+    className: "",
+    prefix: " 😮‍💨 ",
+  },
+  cough: {
+    className: "",
+    prefix: " 🤧 ",
+  },
+  laugh: {
+    className: "",
+    prefix: " 😂 ",
+  },
+  hmm: {
+    className: "",
+    prefix: " 🤔 ",
   },
 };
 
