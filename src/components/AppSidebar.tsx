@@ -27,6 +27,7 @@ const mainNav = [
   { title: "Главная", titleEn: "Home", url: "/", icon: Home },
   { title: "Парсер", titleEn: "Parser", url: "/parser", icon: BookOpen },
   { title: "Студия", titleEn: "Studio", url: "/studio", icon: AudioWaveform },
+  { title: "Монтаж", titleEn: "Montage", url: "/montage", icon: Scissors },
   { title: "Дикторы", titleEn: "Narrators", url: "/narrators", icon: Mic2 },
 ];
 
