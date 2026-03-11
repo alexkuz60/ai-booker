@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -64,6 +65,9 @@ serve(async (req) => {
     }
 
     const systemContent = SYSTEM_PROMPT + contextBlock;
+    const usedModel = "google/gemini-3-flash-preview";
+    const userId = await getUserIdFromAuth(req.headers.get("authorization") || "");
+    const aiStart = Date.now();
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -72,7 +76,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: usedModel,
         messages: [
           { role: "system", content: systemContent },
           ...messages,
@@ -83,6 +87,7 @@ serve(async (req) => {
 
     if (!response.ok) {
       const status = response.status;
+      if (userId) logAiUsage({ userId, modelId: usedModel, requestType: "assistant-chat", status: "error", latencyMs: Date.now() - aiStart, errorMessage: `HTTP ${status}` });
       if (status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Try again later." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -99,6 +104,9 @@ serve(async (req) => {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Log success (streaming — no token count available)
+    if (userId) logAiUsage({ userId, modelId: usedModel, requestType: "assistant-chat", status: "success", latencyMs: Date.now() - aiStart });
 
     return new Response(response.body, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },

@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -274,7 +275,7 @@ function canFallbackToOpenRouter(userApiKey: string | null, model: string): { en
 async function handleAIRequest(
   truncatedText: string, endpoint: string, model: string, apiKey: string,
   provider: string, mode: string | undefined, chapterTitle: string | undefined,
-  openrouterApiKey: string | null, lang: string = 'en'
+  openrouterApiKey: string | null, lang: string = 'en', userId: string | null = null
 ): Promise<Response> {
   let systemPrompt: string;
   let userContent: string;
@@ -357,6 +358,7 @@ async function handleAIRequest(
 
     if (!response.ok) {
       const status = response.status;
+      if (userId) logAiUsage({ userId, modelId: model, requestType: `parse-structure${mode ? `-${mode}` : ''}`, status: "error", latencyMs: Math.round(performance.now() - t0), errorMessage: `HTTP ${status}` });
       if (status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -390,6 +392,7 @@ async function handleAIRequest(
     }
     const usage = data.usage;
     console.log(`[parse-book-structure] latency=${latencyMs}ms tokens_in=${usage?.prompt_tokens ?? '?'} tokens_out=${usage?.completion_tokens ?? '?'} total=${usage?.total_tokens ?? '?'}`);
+    if (userId) logAiUsage({ userId, modelId: model, requestType: `parse-structure${mode ? `-${mode}` : ''}`, status: "success", latencyMs, tokensInput: usage?.prompt_tokens, tokensOutput: usage?.completion_tokens });
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
 
     if (toolCall) {
@@ -456,9 +459,10 @@ Deno.serve(async (req) => {
         if (openrouter_api_key) {
           const orModel = user_model || 'google/gemini-2.5-flash';
           console.log(`Non-admin, redirecting ${orModel} to OpenRouter`);
+          const userId = await getUserIdFromAuth(authHeader || "");
           return await handleAIRequest(
             truncatedText, 'https://openrouter.ai/api/v1/chat/completions',
-            orModel, openrouter_api_key, 'openrouter', mode, chapter_title, null, effectiveLang
+            orModel, openrouter_api_key, 'openrouter', mode, chapter_title, null, effectiveLang, userId
           );
         }
         return new Response(
@@ -478,7 +482,8 @@ Deno.serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    return await handleAIRequest(truncatedText, endpoint, model, apiKey, effectiveProvider, mode, chapter_title, openrouter_api_key, effectiveLang);
+    const userId = await getUserIdFromAuth(req.headers.get("Authorization") || "");
+    return await handleAIRequest(truncatedText, endpoint, model, apiKey, effectiveProvider, mode, chapter_title, openrouter_api_key, effectiveLang, userId);
   } catch (e) {
     console.error("parse-book-structure error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
