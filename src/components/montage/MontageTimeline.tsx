@@ -450,7 +450,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
 
           {/* Waveform Editor — fills remaining space */}
           <WaveformEditor
-            clips={clips}
+            clips={trimmedClips}
             trackId={selectedTrackId}
             trackLabel={stemTracks.find(t => t.id === selectedTrackId)?.label ?? ""}
             trackColor={stemTracks.find(t => t.id === selectedTrackId)?.color ?? "hsl(var(--primary))"}
@@ -462,6 +462,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             mixerWidth={MIXER_SIDEBAR}
             isRu={isRu}
             onSeek={player.seek}
+            onTrim={handleTrim}
           />
         </div>
       )}
