@@ -158,6 +158,8 @@ export function WaveformEditor({
   onTrim,
   onFadeIn,
   onFadeOut,
+  onUndo,
+  canUndo,
 }: WaveformEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
