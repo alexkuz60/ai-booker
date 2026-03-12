@@ -7,9 +7,19 @@ import { Send, Loader2, Bot, User, Trash2 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useLocation } from "react-router-dom";
 import { loadStudioChapter } from "@/lib/studioChapter";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 type Msg = { role: "user" | "assistant"; content: string };
+
+interface CharacterBrief {
+  name: string;
+  gender: string;
+  age_group: string;
+  temperament: string | null;
+  voice_provider?: string;
+  voice_id?: string;
+}
 
 export interface AssistantContext {
   currentPage: string;
@@ -18,9 +28,10 @@ export interface AssistantContext {
   sceneIndex?: number | null;
   activeTab?: string;
   totalScenes?: number;
+  characters?: CharacterBrief[];
 }
 
-function gatherContext(pathname: string): AssistantContext {
+async function gatherContext(pathname: string): Promise<AssistantContext> {
   const ctx: AssistantContext = { currentPage: pathname };
 
   const chapter = loadStudioChapter();
@@ -35,6 +46,30 @@ function gatherContext(pathname: string): AssistantContext {
 
   const savedTab = sessionStorage.getItem("studio_active_tab");
   if (savedTab) ctx.activeTab = savedTab;
+
+  // Fetch characters with voice configs for current book
+  if (chapter?.bookId) {
+    try {
+      const { data } = await supabase
+        .from("book_characters")
+        .select("name, gender, age_group, temperament, voice_config")
+        .eq("book_id", chapter.bookId)
+        .order("sort_order");
+      if (data) {
+        ctx.characters = data.map((c) => {
+          const vc = (c.voice_config || {}) as Record<string, unknown>;
+          return {
+            name: c.name,
+            gender: c.gender,
+            age_group: c.age_group,
+            temperament: c.temperament,
+            voice_provider: (vc.provider as string) || undefined,
+            voice_id: (vc.voice_id as string) || undefined,
+          };
+        });
+      }
+    } catch { /* non-critical */ }
+  }
 
   return ctx;
 }

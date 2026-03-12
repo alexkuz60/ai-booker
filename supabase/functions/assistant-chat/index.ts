@@ -90,6 +90,18 @@ serve(async (req) => {
       if (context.totalScenes != null) parts.push(`Сцен в главе: ${context.totalScenes}`);
       if (context.sceneIndex != null) parts.push(`Выбрана сцена #${context.sceneIndex + 1}`);
       if (context.activeTab) parts.push(`Активная вкладка Студии: ${context.activeTab}`);
+
+      if (Array.isArray(context.characters) && context.characters.length > 0) {
+        const charLines = context.characters.map((c: { name: string; gender?: string; age_group?: string; temperament?: string | null; voice_provider?: string; voice_id?: string }) => {
+          const attrs = [c.gender, c.age_group, c.temperament].filter(Boolean).join(", ");
+          const voice = c.voice_provider
+            ? `голос: ${c.voice_provider}/${c.voice_id || "—"}`
+            : "голос не назначен";
+          return `- **${c.name}** (${attrs}) — ${voice}`;
+        });
+        parts.push(`Персонажи книги:\n${charLines.join("\n")}`);
+      }
+
       if (parts.length) {
         contextBlock = `\n\n## Текущее состояние пользователя\n${parts.join("\n")}`;
       }
