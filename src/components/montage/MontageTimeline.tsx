@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { ZoomIn, ZoomOut, Maximize2, Play, Pause, Square, Volume2, VolumeX, ChevronUp, ChevronDown, RotateCcw, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2, Play, Pause, Square, Volume2, VolumeX, ChevronUp, ChevronDown, RotateCcw, Loader2, RefreshCw, AlertTriangle, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { resetAudioEngine } from "@/lib/audioEngine";
@@ -40,9 +40,11 @@ interface MontageTimelineProps {
   totalDurationSec: number;
   chapterId: string | null;
   isRu: boolean;
+  onSplitAtScene?: (sceneId: string) => void;
+  hasParts?: boolean;
 }
 
-export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chapterId, isRu }: MontageTimelineProps) {
+export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chapterId, isRu, onSplitAtScene, hasParts }: MontageTimelineProps) {
   const player = useTimelinePlayer(clips);
   const duration = player.totalDuration > 0 ? player.totalDuration : totalDurationSec;
 
@@ -201,6 +203,40 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
         </div>
 
         <div className="flex items-center gap-1">
+          {/* Split button */}
+          {onSplitAtScene && (() => {
+            // Find which scene boundary the transport is within
+            const pos = player.positionSec;
+            let splitSceneId: string | null = null;
+            for (let i = sceneBoundaries.length - 1; i >= 0; i--) {
+              if (pos >= sceneBoundaries[i].startSec) {
+                splitSceneId = sceneBoundaries[i].sceneId;
+                break;
+              }
+            }
+            // Can't split at last scene
+            const isLast = splitSceneId === sceneBoundaries[sceneBoundaries.length - 1]?.sceneId;
+            const canSplit = !!splitSceneId && !isLast && sceneBoundaries.length > 1;
+            return (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[10px] gap-1 text-muted-foreground hover:text-primary"
+                disabled={!canSplit}
+                title={isRu ? "Разделить главу в этой позиции" : "Split chapter at this position"}
+                onClick={() => {
+                  if (splitSceneId) {
+                    onSplitAtScene(splitSceneId);
+                    toast.success(isRu ? "Глава разделена" : "Chapter split");
+                  }
+                }}
+              >
+                <Scissors className="h-3.5 w-3.5" />
+                <span className="font-body">{isRu ? "Разделить" : "Split"}</span>
+              </Button>
+            );
+          })()}
+
           <Button
             variant="ghost"
             size="icon"

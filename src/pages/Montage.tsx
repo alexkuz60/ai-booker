@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Loader2, AlertCircle } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -7,6 +7,7 @@ import { useMontageData } from "@/hooks/useMontageData";
 import { MasterMeterPanel } from "@/components/studio/MasterMeterPanel";
 import { MasterEffectsTabs } from "@/components/studio/MasterEffectsTabs";
 import { MontageTimeline } from "@/components/montage/MontageTimeline";
+import { Button } from "@/components/ui/button";
 
 const SIDEBAR_WIDTH = 280;
 
@@ -25,6 +26,8 @@ const Montage = () => {
     scenes, sceneIds, loading,
     renderedSceneIds, unrenderedSceneIds,
     clips, sceneBoundaries, totalDurationSec,
+    parts, activePartIdx, setActivePartIdx,
+    splitAtScene, removeParts, activeSceneIds,
   } = useMontageData();
 
   // ── Page header ────────────────────────────────────────────
@@ -48,6 +51,11 @@ const Montage = () => {
 
   const hasContent = !!chapterId && sceneIds.length > 0;
 
+  // Count rendered/unrendered for active part only
+  const activeRendered = activeSceneIds.filter(id => renderedSceneIds.includes(id));
+  const activeUnrendered = activeSceneIds.filter(id => unrenderedSceneIds.includes(id));
+  const activeSceneCount = activeSceneIds.length;
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -60,15 +68,42 @@ const Montage = () => {
           <span className="text-xs text-muted-foreground font-body truncate">
             {bookTitle} → {chapterTitle}
           </span>
+
+          {/* Part tabs */}
+          {parts.length > 0 && (
+            <div className="flex items-center gap-1 ml-2">
+              {parts.map((part, idx) => (
+                <Button
+                  key={part.id}
+                  variant={idx === activePartIdx ? "default" : "outline"}
+                  size="sm"
+                  className="h-5 px-2 text-[10px] font-mono"
+                  onClick={() => setActivePartIdx(idx)}
+                >
+                  {isRu ? `Часть ${part.part_number}` : `Part ${part.part_number}`}
+                </Button>
+              ))}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 px-1.5 text-[10px] text-muted-foreground hover:text-destructive"
+                onClick={removeParts}
+                title={isRu ? "Убрать разбивку" : "Remove split"}
+              >
+                ✕
+              </Button>
+            </div>
+          )}
+
           <div className="flex items-center gap-2 ml-auto">
-            {unrenderedSceneIds.length > 0 && (
+            {activeUnrendered.length > 0 && (
               <span className="text-xs text-destructive flex items-center gap-1 font-body">
                 <AlertCircle className="h-3 w-3" />
-                {unrenderedSceneIds.length} {isRu ? "не отрендерено" : "not rendered"}
+                {activeUnrendered.length} {isRu ? "не отрендерено" : "not rendered"}
               </span>
             )}
             <span className="text-xs text-muted-foreground font-body">
-              {renderedSceneIds.length}/{scenes.length} {isRu ? "сцен" : "scenes"} · {formatTime(totalDurationSec)}
+              {activeRendered.length}/{activeSceneCount} {isRu ? "сцен" : "scenes"} · {formatTime(totalDurationSec)}
             </span>
           </div>
         </div>
@@ -96,6 +131,8 @@ const Montage = () => {
             totalDurationSec={totalDurationSec}
             chapterId={chapterId}
             isRu={isRu}
+            onSplitAtScene={splitAtScene}
+            hasParts={parts.length > 0}
           />
         </>
       ) : (
