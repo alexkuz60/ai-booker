@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, type SetStateAction } from "react";
 import { getAudioEngine } from "@/lib/audioEngine";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
 import { ChevronUp, ChevronDown, Plus, Film, Play, Pause, Square, Volume2, VolumeX, PanelLeftClose, PanelLeftOpen, Download, Loader2, SlidersHorizontal } from "lucide-react";
