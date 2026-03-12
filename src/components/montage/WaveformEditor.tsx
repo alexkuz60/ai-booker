@@ -181,30 +181,32 @@ export function WaveformEditor({
 
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth;
-    const h = CHANNEL_HEIGHT * 2 + CHANNEL_GAP;
+    const h = canvas.clientHeight;
+    if (h < 4) return; // not laid out yet
     canvas.width = w * dpr;
     canvas.height = h * dpr;
+
+    const chH = (h - CHANNEL_GAP) / 2;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-  // Background — resolve CSS variable for canvas
+    // Background
     ctx.fillStyle = resolveHsl("--background");
     ctx.fillRect(0, 0, w * dpr, h * dpr);
 
-    // Cyan waveform color from design system
     const waveColor = resolveHsl("--cyan-glow");
 
     // Draw L channel
-    drawChannel(ctx, currentPeaks, 0, 0, w, CHANNEL_HEIGHT, waveColor, scrollLeft, totalWidthPx, selection, duration, "L");
+    drawChannel(ctx, currentPeaks, 0, 0, w, chH, waveColor, scrollLeft, totalWidthPx, selection, duration, "L");
 
     // Gap line
     const borderColor = resolveHsl("--border");
     ctx.fillStyle = borderColor.replace(")", " / 0.5)").replace("hsl(", "hsl(");
-    ctx.fillRect(0, CHANNEL_HEIGHT * dpr, w * dpr, CHANNEL_GAP * dpr);
+    ctx.fillRect(0, chH * dpr, w * dpr, CHANNEL_GAP * dpr);
 
     // Draw R channel
-    drawChannel(ctx, currentPeaks, 0, CHANNEL_HEIGHT + CHANNEL_GAP, w, CHANNEL_HEIGHT, waveColor, scrollLeft, totalWidthPx, selection, duration, "R");
+    drawChannel(ctx, currentPeaks, 0, chH + CHANNEL_GAP, w, chH, waveColor, scrollLeft, totalWidthPx, selection, duration, "R");
 
     // Playhead
     const playheadPx = (positionSec / duration) * totalWidthPx - scrollLeft;
@@ -306,8 +308,7 @@ export function WaveformEditor({
   if (!trackId) {
     return (
       <div
-        className="flex items-center justify-center border-t border-border bg-card/30"
-        style={{ height: EDITOR_HEIGHT }}
+        className="flex-1 flex items-center justify-center border-t border-border bg-card/30 min-h-[120px]"
       >
         <div className="flex items-center gap-2 text-xs text-muted-foreground font-body">
           <AudioWaveform className="h-4 w-4" />
@@ -318,7 +319,7 @@ export function WaveformEditor({
   }
 
   return (
-    <div className="flex flex-col border-t border-border bg-card/30 shrink-0" style={{ height: EDITOR_HEIGHT }}>
+    <div className="flex flex-col border-t border-border bg-card/30 flex-1 min-h-[120px]">
       {/* Toolbar */}
       <div className="flex items-center justify-between px-3 py-1 border-b border-border/50 shrink-0 h-6">
         <div className="flex items-center gap-2">
@@ -377,8 +378,7 @@ export function WaveformEditor({
       <div ref={containerRef} className="flex-1 min-h-0 relative cursor-crosshair">
         <canvas
           ref={canvasRef}
-          className="w-full"
-          style={{ height: CHANNEL_HEIGHT * 2 + CHANNEL_GAP }}
+          className="w-full h-full"
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
