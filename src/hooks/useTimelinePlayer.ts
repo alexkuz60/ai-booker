@@ -10,23 +10,16 @@ export type PlayerState = EngineState;
  * Manages playback of timeline audio clips via the Tone.js-based AudioEngine.
  */
 export function useTimelinePlayer(clips: TimelineClip[]) {
-  // Always get the latest engine instance (survives resets)
-  const engineRef = useRef(getAudioEngine());
-  const [engineInstanceId, setEngineInstanceId] = useState(() => engineRef.current.instanceId);
+  const [reloadTrigger, setReloadTrigger] = useState(0);
 
-  // Detect engine reset by polling instanceId (cheap, no extra event system needed)
+  // Listen for engine reset events
   useEffect(() => {
-    const check = setInterval(() => {
-      const current = getAudioEngine();
-      if (current.instanceId !== engineRef.current.instanceId) {
-        engineRef.current = current;
-        setEngineInstanceId(current.instanceId);
-      }
-    }, 500);
-    return () => clearInterval(check);
+    const handler = () => setReloadTrigger(n => n + 1);
+    window.addEventListener("audio-engine-reset", handler);
+    return () => window.removeEventListener("audio-engine-reset", handler);
   }, []);
 
-  const engine = engineRef.current;
+  const engine = getAudioEngine();
 
   const [state, setState] = useState<PlayerState>("stopped");
   const [positionSec, setPositionSec] = useState(0);
@@ -43,7 +36,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
   });
 
   const loadedKeyRef = useRef<string>("");
-  const loadedEngineIdRef = useRef<number>(engineInstanceId);
+  const loadedReloadRef = useRef<number>(0);
 
   const audioClips = clips.filter((c) => c.hasAudio && c.audioPath);
 
@@ -61,14 +54,12 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     .map((c) => `${c.id}:${c.audioPath}:${c.startSec}:${c.durationSec}:${c.loop ? "L" : ""}`)
     .join("|");
 
-  // When engine instance changes, invalidate loaded key to force reload
-  const needsReload = engineInstanceId !== loadedEngineIdRef.current;
+  const needsReload = reloadTrigger !== loadedReloadRef.current;
 
   useEffect(() => {
-    // Skip if same clips AND same engine instance
     if (clipsKey === loadedKeyRef.current && !needsReload) return;
     loadedKeyRef.current = clipsKey;
-    loadedEngineIdRef.current = engineInstanceId;
+    loadedReloadRef.current = reloadTrigger;
 
     if (audioClips.length === 0) {
       engine.loadTracks([]);
@@ -160,7 +151,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clipsKey, engineInstanceId]);
+  }, [clipsKey, reloadTrigger]);
 
   // Retry only failed stems
   const retryFailed = useCallback(async () => {

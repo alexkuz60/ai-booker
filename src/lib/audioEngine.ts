@@ -1513,7 +1513,9 @@ export function resetAudioEngine(): AudioEngine {
     AudioEngine.getInstance().dispose();
   } catch { /* ignore */ }
   delete w.__audioEngine;
-  return AudioEngine.getInstance();
+  const newEngine = AudioEngine.getInstance();
+  window.dispatchEvent(new Event("audio-engine-reset"));
+  return newEngine;
 }
 
 export default AudioEngine;
