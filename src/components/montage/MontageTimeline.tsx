@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { ZoomIn, ZoomOut, Maximize2, Play, Pause, Square, Volume2, VolumeX, ChevronUp, ChevronDown, RotateCcw, Loader2 } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2, Play, Pause, Square, Volume2, VolumeX, ChevronUp, ChevronDown, RotateCcw, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { resetAudioEngine } from "@/lib/audioEngine";
@@ -135,19 +135,47 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
           </button>
 
           {/* Loading progress */}
-          {player.loadProgress && player.loadProgress.total > 0 && player.loadProgress.done < player.loadProgress.total && (
+          {player.loadProgress && player.loadProgress.total > 0 && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground animate-in fade-in">
-              <Loader2 className="h-3 w-3 animate-spin text-primary" />
-              <div className="flex items-center gap-1.5">
-                <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all duration-300"
-                    style={{ width: `${(player.loadProgress.done / player.loadProgress.total) * 100}%` }}
-                  />
-                </div>
-                <span className="font-mono tabular-nums">{player.loadProgress.done}/{player.loadProgress.total}</span>
-                <span className="max-w-[160px] truncate font-body opacity-70">{player.loadProgress.currentLabel}</span>
-              </div>
+              {player.loadProgress.done < player.loadProgress.total ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all duration-300"
+                        style={{ width: `${(player.loadProgress.done / player.loadProgress.total) * 100}%` }}
+                      />
+                    </div>
+                    <span className="font-mono tabular-nums">{player.loadProgress.done}/{player.loadProgress.total}</span>
+                    {player.loadProgress.failed > 0 && (
+                      <span className="text-destructive font-mono tabular-nums flex items-center gap-0.5">
+                        <AlertTriangle className="h-3 w-3" />{player.loadProgress.failed}
+                      </span>
+                    )}
+                    <span className="max-w-[160px] truncate font-body opacity-70">{player.loadProgress.currentLabel}</span>
+                  </div>
+                </>
+              ) : player.loadProgress.failed > 0 ? (
+                <>
+                  <AlertTriangle className="h-3 w-3 text-destructive" />
+                  <span className="text-destructive font-body">
+                    {player.loadProgress.failed} {isRu ? "не загружено" : "failed"}
+                  </span>
+                  <span className="font-mono tabular-nums">
+                    {player.loadProgress.loaded}/{player.loadProgress.total}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-5 px-2 text-[10px] gap-1"
+                    onClick={player.retryFailed}
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    {isRu ? "Повторить" : "Retry"}
+                  </Button>
+                </>
+              ) : null}
             </div>
           )}
 

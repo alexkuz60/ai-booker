@@ -8,7 +8,6 @@ export type PlayerState = EngineState;
 
 /**
  * Manages playback of timeline audio clips via the Tone.js-based AudioEngine.
- * Main clips and overlay clips are all scheduled on the Transport — no setTimeout hacks.
  */
 export function useTimelinePlayer(clips: TimelineClip[]) {
   const engine = getAudioEngine();
@@ -17,6 +16,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
   const [positionSec, setPositionSec] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
   const [loadProgress, setLoadProgress] = useState<LoadProgress | null>(null);
+  const [failedConfigs, setFailedConfigs] = useState<TrackConfig[]>([]);
   const [volume, setVolumeState] = useState(() => {
     try {
       const v = Number(localStorage.getItem("timeline-volume"));
@@ -26,12 +26,11 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     }
   });
 
-  // Track which clip set we've loaded to avoid redundant reloads
   const loadedKeyRef = useRef<string>("");
+  const lastConfigsRef = useRef<TrackConfig[]>([]);
 
   const audioClips = clips.filter((c) => c.hasAudio && c.audioPath);
 
-  // Subscribe to engine state
   useEffect(() => {
     const unsub = engine.subscribe((snap) => {
       setState(snap.state);
@@ -41,25 +40,23 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     return unsub;
   }, [engine]);
 
-  // Build a stable key from clip ids + paths to detect changes
   const clipsKey = audioClips
     .map((c) => `${c.id}:${c.audioPath}:${c.startSec}:${c.durationSec}:${c.loop ? "L" : ""}`)
     .join("|");
 
-  // Load tracks into the engine when clips change
   useEffect(() => {
     if (clipsKey === loadedKeyRef.current) return;
     loadedKeyRef.current = clipsKey;
 
     if (audioClips.length === 0) {
       engine.loadTracks([]);
+      setFailedConfigs([]);
       return;
     }
 
     let cancelled = false;
 
     const loadAll = async () => {
-      // Get signed URLs for all clips in parallel
       const configs: TrackConfig[] = [];
 
       const urlResults = await Promise.all(
@@ -102,16 +99,27 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       }
 
       if (cancelled) return;
+      lastConfigsRef.current = configs;
 
       try {
         setLoadProgress({ total: configs.length, done: 0, loaded: 0, failed: 0, currentId: "", currentLabel: "" });
+        setFailedConfigs([]);
         const res = await engine.loadTracks(configs, (p) => {
           if (!cancelled) setLoadProgress(p);
         });
-        if (!cancelled && res.dropped > 0) {
-          toast.warning(`Загружено не всё: ${res.loaded}/${res.total}. Часть стемов не декодировалась.`);
+        if (!cancelled) {
+          if (res.dropped > 0) {
+            // Identify which configs failed
+            const loadedIds = new Set(Array.from((engine as any).tracks?.keys?.() ?? []));
+            const failed = configs.filter(c => !loadedIds.has(c.id));
+            setFailedConfigs(failed);
+            // Show final progress with failed count (don't null it out)
+            setLoadProgress({ total: res.total, done: res.total, loaded: res.loaded, failed: res.dropped, currentId: "", currentLabel: "" });
+          } else {
+            setLoadProgress(null);
+            setFailedConfigs([]);
+          }
         }
-        setLoadProgress(null);
       } catch (err: any) {
         console.error("[useTimelinePlayer] Failed to load tracks:", err);
         const msg = err?.message ?? "";
@@ -120,8 +128,8 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
         } else {
           toast.error("Не удалось загрузить аудиодорожки. Попробуйте кнопку ↺ сброса движка.");
         }
-        }
         setLoadProgress(null);
+      }
     };
 
     loadAll();
@@ -132,12 +140,40 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clipsKey]);
 
+  // Retry only failed stems
+  const retryFailed = useCallback(async () => {
+    if (failedConfigs.length === 0) return;
+    const toRetry = [...failedConfigs];
+    setFailedConfigs([]);
+    setLoadProgress({ total: toRetry.length, done: 0, loaded: 0, failed: 0, currentId: "", currentLabel: "" });
+
+    try {
+      const res = await engine.loadAdditionalTracks(toRetry, (p) => {
+        setLoadProgress(p);
+      });
+      if (res.dropped > 0) {
+        const loadedIds = new Set(Array.from((engine as any).tracks?.keys?.() ?? []));
+        const stillFailed = toRetry.filter(c => !loadedIds.has(c.id));
+        setFailedConfigs(stillFailed);
+        setLoadProgress({ total: res.total, done: res.total, loaded: res.loaded, failed: res.dropped, currentId: "", currentLabel: "" });
+        toast.warning(`Повтор: ${res.loaded}/${res.total} загружено, ${res.dropped} снова не удалось.`);
+      } else {
+        setLoadProgress(null);
+        toast.success(`Все ${res.loaded} стемов успешно загружены!`);
+      }
+    } catch (err) {
+      console.error("[useTimelinePlayer] retryFailed error:", err);
+      setFailedConfigs(toRetry);
+      setLoadProgress(null);
+      toast.error("Повторная загрузка не удалась.");
+    }
+  }, [failedConfigs, engine]);
+
   // Sync master volume
   useEffect(() => {
     engine.setMasterVolume(volume);
   }, [volume, engine]);
 
-  // Compute total duration from all clips (including non-audio for timeline width)
   const computedTotalDuration =
     clips.length > 0
       ? Math.max(...clips.map((c) => c.startSec + c.durationSec))
@@ -155,20 +191,9 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     }
   }, [engine, volume]);
 
-  const pause = useCallback(() => {
-    engine.pause();
-  }, [engine]);
-
-  const stop = useCallback(() => {
-    engine.stop();
-  }, [engine]);
-
-  const seek = useCallback(
-    (toSec: number) => {
-      engine.seek(toSec);
-    },
-    [engine]
-  );
+  const pause = useCallback(() => { engine.pause(); }, [engine]);
+  const stop = useCallback(() => { engine.stop(); }, [engine]);
+  const seek = useCallback((toSec: number) => { engine.seek(toSec); }, [engine]);
 
   const changeVolume = useCallback(
     (v: number) => {
@@ -186,10 +211,12 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     hasAudio: audioClips.length > 0,
     volume,
     loadProgress,
+    failedCount: failedConfigs.length,
     changeVolume,
     play,
     pause,
     stop,
     seek,
+    retryFailed,
   };
 }
