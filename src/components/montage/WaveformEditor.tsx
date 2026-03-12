@@ -154,6 +154,8 @@ export function WaveformEditor({
   isRu,
   onSeek,
   onTrim,
+  onFadeIn,
+  onFadeOut,
 }: WaveformEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
