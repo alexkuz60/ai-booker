@@ -132,6 +132,7 @@ export interface ChannelEqState {
 export interface ChannelCompState {
   threshold: number;
   ratio: number;
+  knee: number;
   attack: number;
   release: number;
   bypassed: boolean;
@@ -195,6 +196,7 @@ class EngineTrack {
   private _preFxBypassed = true;
   private _compThreshold = -24;
   private _compRatio = 3;
+  private _compKnee = 10;
   private _compAttack = 0.01;
   private _compRelease = 0.1;
 
@@ -252,6 +254,7 @@ class EngineTrack {
     this.preFxNode = new Tone.Compressor({
       threshold: this._compThreshold,
       ratio: this._compRatio,
+      knee: this._compKnee,
       attack: this._compAttack,
       release: this._compRelease,
     });
@@ -496,12 +499,13 @@ class EngineTrack {
 
   setCompThreshold(v: number): void { this._compThreshold = v; this.preFxNode.threshold.value = v; }
   setCompRatio(v: number): void { this._compRatio = v; if (!this._preFxBypassed) this.preFxNode.ratio.value = v; }
+  setCompKnee(v: number): void { this._compKnee = v; this.preFxNode.knee.value = v; }
   setCompAttack(v: number): void { this._compAttack = v; this.preFxNode.attack.value = v; }
   setCompRelease(v: number): void { this._compRelease = v; this.preFxNode.release.value = v; }
 
   get preFxBypassed() { return this._preFxBypassed; }
   get compState(): ChannelCompState {
-    return { threshold: this._compThreshold, ratio: this._compRatio, attack: this._compAttack, release: this._compRelease, bypassed: this._preFxBypassed };
+    return { threshold: this._compThreshold, ratio: this._compRatio, knee: this._compKnee, attack: this._compAttack, release: this._compRelease, bypassed: this._preFxBypassed };
   }
 
   // ── Channel Limiter (POST) ──
@@ -1123,6 +1127,7 @@ class AudioEngine {
   // ─── Per-track channel compressor params ───────────────
   setTrackCompThreshold(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompThreshold(v); }
   setTrackCompRatio(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompRatio(v); }
+  setTrackCompKnee(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompKnee(v); }
   setTrackCompAttack(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompAttack(v); }
   setTrackCompRelease(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompRelease(v); }
 
