@@ -134,6 +134,23 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             </span>
           </button>
 
+          {/* Loading progress */}
+          {player.loadProgress && player.loadProgress.total > 0 && player.loadProgress.done < player.loadProgress.total && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground animate-in fade-in">
+              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+              <div className="flex items-center gap-1.5">
+                <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-300"
+                    style={{ width: `${(player.loadProgress.done / player.loadProgress.total) * 100}%` }}
+                  />
+                </div>
+                <span className="font-mono tabular-nums">{player.loadProgress.done}/{player.loadProgress.total}</span>
+                <span className="max-w-[160px] truncate font-body opacity-70">{player.loadProgress.currentLabel}</span>
+              </div>
+            </div>
+          )}
+
           {/* Transport */}
           <div className="flex items-center gap-0.5">
             {player.state === "playing" ? (
