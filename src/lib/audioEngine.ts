@@ -352,8 +352,35 @@ class EngineTrack {
       });
     }
 
-    // Wire signal chain
-    this.player.connect(this.eqNode);
+    // Wire signal chain (with optional telephone insert before EQ)
+    if (this._telephone) {
+      this._phoneFilter = new Tone.Filter({ type: "bandpass", frequency: 1900, Q: 0.8 });
+      this._phoneBitCrusher = new Tone.BitCrusher({ bits: 4 });
+      this._phoneDistortion = new Tone.Distortion({ distortion: 0.2, wet: 0.5 });
+      this._phoneComp = new Tone.Compressor({ threshold: -30, ratio: 12, attack: 0.003, release: 0.25 });
+      // Chain: Player → BandpassFilter → BitCrusher → Distortion → PhoneComp → EQ
+      this.player.connect(this._phoneFilter);
+      this._phoneFilter.connect(this._phoneBitCrusher);
+      this._phoneBitCrusher.connect(this._phoneDistortion);
+      this._phoneDistortion.connect(this._phoneComp);
+      this._phoneComp.connect(this.eqNode);
+
+      // Pink noise (line static)
+      this._phoneNoiseFilter = new Tone.Filter({ type: "bandpass", frequency: 1000, Q: 0.5 });
+      this._phoneNoiseGain = new Tone.Gain(0.015);
+      this._phoneNoise = new Tone.Noise("pink");
+      this._phoneNoise.connect(this._phoneNoiseFilter);
+      this._phoneNoiseFilter.connect(this._phoneNoiseGain);
+      this._phoneNoiseGain.connect(this._phoneFilter); // route noise through same bandpass
+
+      // 50Hz hum (power line)
+      this._phoneHumGain = new Tone.Gain(0.005);
+      this._phoneHum = new Tone.Oscillator(50, "sine");
+      this._phoneHum.connect(this._phoneHumGain);
+      this._phoneHumGain.connect(this._phoneFilter);
+    } else {
+      this.player.connect(this.eqNode);
+    }
     this.eqNode.connect(this.preFxNode);
     this.preFxNode.connect(this.channel);
     this.channel.connect(this.meterMono);
