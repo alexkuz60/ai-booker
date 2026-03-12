@@ -284,6 +284,48 @@ export type Database = {
           },
         ]
       }
+      convolution_impulses: {
+        Row: {
+          category: string
+          channels: number
+          created_at: string
+          description: string | null
+          duration_ms: number
+          file_path: string
+          id: string
+          is_public: boolean
+          name: string
+          sample_rate: number
+          uploaded_by: string
+        }
+        Insert: {
+          category?: string
+          channels?: number
+          created_at?: string
+          description?: string | null
+          duration_ms?: number
+          file_path: string
+          id?: string
+          is_public?: boolean
+          name?: string
+          sample_rate?: number
+          uploaded_by: string
+        }
+        Update: {
+          category?: string
+          channels?: number
+          created_at?: string
+          description?: string | null
+          duration_ms?: number
+          file_path?: string
+          id?: string
+          is_public?: boolean
+          name?: string
+          sample_rate?: number
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           api_keys: Json | null
