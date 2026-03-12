@@ -385,9 +385,11 @@ export async function renderScene(
     report("rendering", 50);
 
     // Schedule and render all 3 buses in parallel (atomic), passing per-clip plugin configs
-    const voiceCtx = scheduleBus(voiceClips, buffers, durationSec, sampleRate, clipConfigs);
-    const atmoCtx = scheduleBus(atmoClips, buffers, durationSec, sampleRate, clipConfigs);
-    const sfxCtx = scheduleBus(sfxClips, buffers, durationSec, sampleRate, clipConfigs);
+    const [voiceCtx, atmoCtx, sfxCtx] = await Promise.all([
+      scheduleBus(voiceClips, buffers, durationSec, sampleRate, clipConfigs),
+      scheduleBus(atmoClips, buffers, durationSec, sampleRate, clipConfigs),
+      scheduleBus(sfxClips, buffers, durationSec, sampleRate, clipConfigs),
+    ]);
 
     const [voiceBuf, atmoBuf, sfxBuf] = await Promise.all([
       voiceCtx?.startRendering() ?? Promise.resolve(null),
