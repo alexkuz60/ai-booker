@@ -1127,6 +1127,7 @@ class AudioEngine {
   // ─── Per-track channel compressor params ───────────────
   setTrackCompThreshold(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompThreshold(v); }
   setTrackCompRatio(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompRatio(v); }
+  setTrackCompKnee(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompKnee(v); }
   setTrackCompAttack(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompAttack(v); }
   setTrackCompRelease(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompRelease(v); }
 
