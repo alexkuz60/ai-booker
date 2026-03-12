@@ -21,6 +21,7 @@ interface WaveformEditorProps {
   positionSec: number;
   scrollLeft: number;
   visibleWidth: number;
+  mixerWidth: number;
   isRu: boolean;
   onSeek: (sec: number) => void;
 }

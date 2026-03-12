@@ -396,6 +396,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             positionSec={player.positionSec}
             scrollLeft={editorScrollLeft}
             visibleWidth={editorVisibleWidth}
+            mixerWidth={MIXER_SIDEBAR}
             isRu={isRu}
             onSeek={player.seek}
           />
