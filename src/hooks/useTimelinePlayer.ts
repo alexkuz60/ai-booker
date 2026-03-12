@@ -10,23 +10,16 @@ export type PlayerState = EngineState;
  * Manages playback of timeline audio clips via the Tone.js-based AudioEngine.
  */
 export function useTimelinePlayer(clips: TimelineClip[]) {
-  // Always get the latest engine instance (survives resets)
-  const engineRef = useRef(getAudioEngine());
-  const [engineInstanceId, setEngineInstanceId] = useState(() => engineRef.current.instanceId);
+  const [reloadTrigger, setReloadTrigger] = useState(0);
 
-  // Detect engine reset by polling instanceId (cheap, no extra event system needed)
+  // Listen for engine reset events
   useEffect(() => {
-    const check = setInterval(() => {
-      const current = getAudioEngine();
-      if (current.instanceId !== engineRef.current.instanceId) {
-        engineRef.current = current;
-        setEngineInstanceId(current.instanceId);
-      }
-    }, 500);
-    return () => clearInterval(check);
+    const handler = () => setReloadTrigger(n => n + 1);
+    window.addEventListener("audio-engine-reset", handler);
+    return () => window.removeEventListener("audio-engine-reset", handler);
   }, []);
 
-  const engine = engineRef.current;
+  const engine = getAudioEngine();
 
   const [state, setState] = useState<PlayerState>("stopped");
   const [positionSec, setPositionSec] = useState(0);
