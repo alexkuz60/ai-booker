@@ -196,7 +196,6 @@ const SPECTRUM_MODES: { id: SpectrumMode; label: string }[] = [
 
 export function SpectrumAnalyzer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const engine = getAudioEngine();
 
   const [mode, setMode] = useState<SpectrumMode>(() => {
     try { return (localStorage.getItem("spectrum-mode") as SpectrumMode) || "bars"; } catch { return "bars"; }
@@ -212,7 +211,7 @@ export function SpectrumAnalyzer() {
     } catch {}
   }, [mode, smoothing]);
 
-  useEffect(() => { engine.setFFTSize(128); }, [engine]);
+  useEffect(() => { getAudioEngine().setFFTSize(128); }, []);
 
   const smoothRef = useRef<Float32Array | null>(null);
   const modeRef = useRef(mode);
@@ -257,7 +256,7 @@ export function SpectrumAnalyzer() {
         ctx.fillText(`${dbLvl}`, 2, gy - 2);
       });
 
-      const rawData = engine.getFFTData();
+      const rawData = getAudioEngine().getFFTData();
       if (!rawData || rawData.length === 0) { raf = requestAnimationFrame(draw); return; }
       const usableBins = Math.max(1, Math.floor(rawData.length * 0.9));
       const barWidth = w / usableBins;
@@ -358,7 +357,7 @@ export function SpectrumAnalyzer() {
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [engine]);
+  }, []);
 
   return (
     <div className="flex flex-col gap-1 h-full">
