@@ -1,29 +1,34 @@
 /**
  * WaveformEditor — professional stereo L/R waveform display with selection,
  * trim, fade in/out, normalize. Canvas-based with virtual rendering.
- * Synced with timeline zoom, scroll, and transport.
+ * Operates in SCENE-LOCAL coordinates: 100% zoom = full scene visible.
+ * Transport position is relative to scene start.
  */
 
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import { Loader2, Scissors, ArrowUpRight, ArrowDownRight, Maximize, AudioWaveform, Undo2, Redo2 } from "lucide-react";
+import { Loader2, Scissors, ArrowUpRight, ArrowDownRight, Maximize, AudioWaveform, Undo2, Redo2, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { chooseLod, type MultiLodPeaks, type StereoPeaks } from "@/lib/waveformPeaks";
 import { useWaveformPeaks, type WaveformStatus } from "@/hooks/useWaveformPeaks";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 
 interface WaveformEditorProps {
-  clips: TimelineClip[];
+  /** Clips for the selected track WITHIN the current scene (scene-local startSec) */
+  sceneClips: TimelineClip[];
   trackId: string | null;
   trackLabel: string;
   trackColor: string;
-  zoom: number;
-  duration: number;
-  positionSec: number;
-  scrollLeft: number;
-  visibleWidth: number;
+  /** Duration of the current scene in seconds */
+  sceneDuration: number;
+  /** Transport position relative to scene start */
+  scenePositionSec: number;
+  /** Current scene label for display */
+  sceneLabel: string;
   mixerWidth: number;
   isRu: boolean;
-  onSeek: (sec: number) => void;
+  /** Seek callback — receives scene-relative seconds */
+  onSeek: (sceneRelativeSec: number) => void;
   onTrim?: (trackId: string, startSec: number, endSec: number) => void;
   onFadeIn?: (trackId: string, durationSec: number) => void;
   onFadeOut?: (trackId: string, durationSec: number) => void;
@@ -41,7 +46,8 @@ interface Selection {
 
 const CHANNEL_HEIGHT = 96;
 const CHANNEL_GAP = 2;
-const EDITOR_HEIGHT = CHANNEL_HEIGHT * 2 + CHANNEL_GAP + 24; // 2 channels + gap + toolbar
+
+const EDITOR_ZOOM_PRESETS = [100, 200, 300, 400, 500] as const;
 
 /** Resolve a CSS custom property to a usable hsl() string for Canvas */
 function resolveHsl(varName: string): string {
@@ -145,15 +151,13 @@ function drawChannel(
 }
 
 export function WaveformEditor({
-  clips,
+  sceneClips,
   trackId,
   trackLabel,
   trackColor,
-  zoom,
-  duration,
-  positionSec,
-  scrollLeft,
-  visibleWidth,
+  sceneDuration,
+  scenePositionSec,
+  sceneLabel,
   mixerWidth,
   isRu,
   onSeek,
@@ -167,25 +171,89 @@ export function WaveformEditor({
 }: WaveformEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const editorScrollRef = useRef<HTMLDivElement>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<number>(0);
 
-  // Filter clips for selected track
-  const trackClips = useMemo(
-    () => clips.filter((c) => c.trackId === trackId),
-    [clips, trackId],
-  );
+  // ── Editor-local zoom (100% = scene fits) ─────────────────
+  const [editorZoomPercent, setEditorZoomPercent] = useState(100);
+  const [editorContainerWidth, setEditorContainerWidth] = useState(0);
 
-  const { status, peaks, error } = useWaveformPeaks(trackClips, trackId);
+  // Measure available width
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => setEditorContainerWidth(el.clientWidth - mixerWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [mixerWidth]);
 
-  const totalWidthPx = duration * zoom * 4;
+  // Fit zoom: makes scene fill the available width
+  const fitZoom = useMemo(() => {
+    if (editorContainerWidth <= 0 || sceneDuration <= 0) return 1;
+    return editorContainerWidth / (sceneDuration * 4);
+  }, [editorContainerWidth, sceneDuration]);
+
+  const editorZoom = editorZoomPercent === 100 ? fitZoom : (fitZoom * editorZoomPercent) / 100;
+  const totalWidthPx = sceneDuration * editorZoom * 4;
+
+  // Reset zoom when scene changes
+  const prevSceneLabelRef = useRef(sceneLabel);
+  useEffect(() => {
+    if (sceneLabel !== prevSceneLabelRef.current) {
+      prevSceneLabelRef.current = sceneLabel;
+      setEditorZoomPercent(100);
+      setSelection(null);
+    }
+  }, [sceneLabel]);
+
+  // ── Editor-local scroll ──────────────────────────────────
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  useEffect(() => {
+    const el = editorScrollRef.current;
+    if (!el) return;
+    const onScroll = () => setScrollLeft(el.scrollLeft);
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Auto-scroll to follow playhead during playback when zoomed in
+  const userScrollingRef = useRef(false);
+  useEffect(() => {
+    const el = editorScrollRef.current;
+    if (!el) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const onScroll = () => {
+      userScrollingRef.current = true;
+      clearTimeout(timer);
+      timer = setTimeout(() => { userScrollingRef.current = false; }, 600);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => { el.removeEventListener("scroll", onScroll); clearTimeout(timer); };
+  }, []);
+
+  useEffect(() => {
+    if (editorZoomPercent <= 100 || userScrollingRef.current) return;
+    const el = editorScrollRef.current;
+    if (!el) return;
+    const playheadPx = scenePositionSec * editorZoom * 4;
+    const target = Math.max(0, playheadPx - el.clientWidth / 2);
+    el.scrollLeft = target;
+  }, [scenePositionSec, editorZoom, editorZoomPercent]);
+
+  // Peaks for scene clips on selected track
+  const { status, peaks, error } = useWaveformPeaks(sceneClips, trackId);
 
   // Choose LOD based on visible area
-  const visibleDurationSec = visibleWidth > 0 ? (visibleWidth / totalWidthPx) * duration : duration;
+  const visibleWidth = editorContainerWidth;
+  const visibleDurationSec = visibleWidth > 0 && totalWidthPx > 0 ? (visibleWidth / totalWidthPx) * sceneDuration : sceneDuration;
   const lodLevel = useMemo(
-    () => chooseLod(visibleWidth, duration, visibleDurationSec),
-    [visibleWidth, duration, visibleDurationSec],
+    () => chooseLod(visibleWidth, sceneDuration, visibleDurationSec),
+    [visibleWidth, sceneDuration, visibleDurationSec],
   );
 
   const currentPeaks = peaks?.lods.get(lodLevel) ?? peaks?.lods.get(200) ?? null;
@@ -193,7 +261,6 @@ export function WaveformEditor({
   // ── dB scale helpers ────────────────────────────────────────
   const DB_MARKS = [0, -6, -12, -18, -30, -60];
 
-  /** Convert dB to linear amplitude 0..1 (-60dB=0, 0dB=1) */
   function dbToLinear(db: number): number {
     if (db <= -60) return 0;
     if (db >= 0) return 1;
@@ -208,7 +275,7 @@ export function WaveformEditor({
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
-    if (h < 4) return; // not laid out yet
+    if (h < 4) return;
     canvas.width = w * dpr;
     canvas.height = h * dpr;
 
@@ -239,18 +306,15 @@ export function WaveformEditor({
         const yUp = mid - lin * amp;
         const yDown = mid + lin * amp;
 
-        // Horizontal grid lines across waveform area
         ctx.strokeStyle = borderColor.replace(")", " / 0.2)").replace("hsl(", "hsl(");
         ctx.lineWidth = db === 0 ? 0.8 : 0.4;
         ctx.setLineDash(db === 0 ? [] : [2, 3]);
 
-        // Upper grid line
         ctx.beginPath();
         ctx.moveTo(mixerWidth * dpr, yUp * dpr);
         ctx.lineTo(w * dpr, yUp * dpr);
         ctx.stroke();
 
-        // Lower grid line (mirror)
         if (db !== 0) {
           ctx.beginPath();
           ctx.moveTo(mixerWidth * dpr, yDown * dpr);
@@ -260,7 +324,6 @@ export function WaveformEditor({
 
         ctx.setLineDash([]);
 
-        // dB labels in sidebar
         ctx.fillStyle = mutedColor.replace(")", " / 0.5)").replace("hsl(", "hsl(");
         const label = db === 0 ? " 0" : `${db}`;
         ctx.fillText(label, (mixerWidth - 4) * dpr, (yUp + 3) * dpr);
@@ -271,15 +334,13 @@ export function WaveformEditor({
       ctx.textAlign = "left";
     };
 
-    // Draw dB scales for both channels (in sidebar area, no clipping)
     drawDbScale(0, chH);
     drawDbScale(chH + CHANNEL_GAP, chH);
 
-    // ── Time grid (vertical lines) ──────────────────────────
+    // ── Time grid (vertical lines) — scene-local ────────────
     const drawTimeGrid = () => {
-      // Determine grid interval based on zoom
-      const pxPerSec = totalWidthPx / duration;
-      let interval = 1; // seconds
+      const pxPerSec = totalWidthPx / sceneDuration;
+      let interval = 1;
       if (pxPerSec < 10) interval = 30;
       else if (pxPerSec < 20) interval = 15;
       else if (pxPerSec < 40) interval = 10;
@@ -287,15 +348,15 @@ export function WaveformEditor({
       else if (pxPerSec < 200) interval = 2;
       else interval = 1;
 
-      const startSec = Math.floor((scrollLeft / totalWidthPx) * duration / interval) * interval;
-      const endSec = Math.ceil(((scrollLeft + waveW) / totalWidthPx) * duration / interval) * interval;
+      const startSec = Math.floor((scrollLeft / totalWidthPx) * sceneDuration / interval) * interval;
+      const endSec = Math.ceil(((scrollLeft + waveW) / totalWidthPx) * sceneDuration / interval) * interval;
 
       ctx.font = `${8 * dpr}px monospace`;
       ctx.textAlign = "center";
 
       for (let t = startSec; t <= endSec; t += interval) {
         if (t < 0) continue;
-        const px = (t / duration) * totalWidthPx - scrollLeft + mixerWidth;
+        const px = (t / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
         if (px < mixerWidth || px > w) continue;
 
         const isMajor = t % (interval * 5) === 0 || interval >= 10;
@@ -323,39 +384,37 @@ export function WaveformEditor({
     ctx.lineTo(mixerWidth * dpr, h * dpr);
     ctx.stroke();
 
-    // Offset drawing to after mixer sidebar
+    // Clip to waveform area
     ctx.save();
     ctx.beginPath();
     ctx.rect(mixerWidth * dpr, 0, (w - mixerWidth) * dpr, h * dpr);
     ctx.clip();
 
     // Draw L channel
-    drawChannel(ctx, currentPeaks, mixerWidth, 0, waveW, chH, waveColor, scrollLeft, totalWidthPx, selection, duration, "L");
+    drawChannel(ctx, currentPeaks, mixerWidth, 0, waveW, chH, waveColor, scrollLeft, totalWidthPx, selection, sceneDuration, "L");
 
     // Gap line
     ctx.fillStyle = borderColor.replace(")", " / 0.5)").replace("hsl(", "hsl(");
     ctx.fillRect(mixerWidth * dpr, chH * dpr, waveW * dpr, CHANNEL_GAP * dpr);
 
     // Draw R channel
-    drawChannel(ctx, currentPeaks, mixerWidth, chH + CHANNEL_GAP, waveW, chH, waveColor, scrollLeft, totalWidthPx, selection, duration, "R");
+    drawChannel(ctx, currentPeaks, mixerWidth, chH + CHANNEL_GAP, waveW, chH, waveColor, scrollLeft, totalWidthPx, selection, sceneDuration, "R");
 
     // ── Draw fade envelopes for each clip ───────────────────
     const fadeColor = resolveHsl("--primary");
-    for (const clip of trackClips) {
+    for (const clip of sceneClips) {
       const fadeIn = clip.fadeInSec ?? 0;
       const fadeOut = clip.fadeOutSec ?? 0;
       if (fadeIn <= 0 && fadeOut <= 0) continue;
 
-      const clipStartPx = (clip.startSec / duration) * totalWidthPx - scrollLeft + mixerWidth;
-      const clipEndPx = ((clip.startSec + clip.durationSec) / duration) * totalWidthPx - scrollLeft + mixerWidth;
+      const clipStartPx = (clip.startSec / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
+      const clipEndPx = ((clip.startSec + clip.durationSec) / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
 
-      // Fade In envelope (triangle from bottom-left to top)
       if (fadeIn > 0) {
-        const fadeEndPx = ((clip.startSec + fadeIn) / duration) * totalWidthPx - scrollLeft + mixerWidth;
+        const fadeEndPx = ((clip.startSec + fadeIn) / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
         const x0 = Math.max(mixerWidth, clipStartPx);
         const x1 = Math.min(w, fadeEndPx);
         if (x1 > x0) {
-          // Shaded area
           ctx.fillStyle = fadeColor.replace(")", " / 0.12)").replace("hsl(", "hsl(");
           ctx.beginPath();
           ctx.moveTo(x0 * dpr, 0);
@@ -363,7 +422,6 @@ export function WaveformEditor({
           ctx.lineTo(x1 * dpr, 0);
           ctx.closePath();
           ctx.fill();
-          // Envelope line
           ctx.strokeStyle = fadeColor.replace(")", " / 0.7)").replace("hsl(", "hsl(");
           ctx.lineWidth = 1.5;
           ctx.setLineDash([3, 2]);
@@ -372,16 +430,14 @@ export function WaveformEditor({
           ctx.lineTo(x1 * dpr, 0);
           ctx.stroke();
           ctx.setLineDash([]);
-          // "FI" label
           ctx.fillStyle = fadeColor.replace(")", " / 0.6)").replace("hsl(", "hsl(");
           ctx.font = `${9 * dpr}px monospace`;
           ctx.fillText("FI", ((x0 + x1) / 2 - 4) * dpr, (h - 4) * dpr);
         }
       }
 
-      // Fade Out envelope (triangle from top to bottom-right)
       if (fadeOut > 0) {
-        const fadeStartPx = ((clip.startSec + clip.durationSec - fadeOut) / duration) * totalWidthPx - scrollLeft + mixerWidth;
+        const fadeStartPx = ((clip.startSec + clip.durationSec - fadeOut) / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
         const x0 = Math.max(mixerWidth, fadeStartPx);
         const x1 = Math.min(w, clipEndPx);
         if (x1 > x0) {
@@ -407,8 +463,8 @@ export function WaveformEditor({
       }
     }
 
-    // Playhead
-    const playheadPx = (positionSec / duration) * totalWidthPx - scrollLeft + mixerWidth;
+    // Playhead — scene-relative
+    const playheadPx = (scenePositionSec / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
     if (playheadPx >= mixerWidth && playheadPx <= w) {
       ctx.strokeStyle = resolveHsl("--primary");
       ctx.lineWidth = 1.5;
@@ -418,7 +474,7 @@ export function WaveformEditor({
       ctx.stroke();
     }
     ctx.restore();
-  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, duration, positionSec, mixerWidth, trackClips]);
+  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, sceneDuration, scenePositionSec, mixerWidth, sceneClips]);
 
   // ── Keyboard shortcuts (Ctrl+Z / Ctrl+Shift+Z) ─────────────
   useEffect(() => {
@@ -437,13 +493,8 @@ export function WaveformEditor({
     return () => window.removeEventListener("keydown", handler);
   }, [onUndo, onRedo]);
 
-  // Redraw on RAF when playing
+  // Redraw on RAF for smooth playhead
   const rafRef = useRef<number>(0);
-  useEffect(() => {
-    draw();
-  }, [draw]);
-
-  // Re-request draw each frame for smooth playhead
   useEffect(() => {
     let running = true;
     const loop = () => {
@@ -458,16 +509,16 @@ export function WaveformEditor({
     };
   }, [draw]);
 
-  // ── Mouse handlers for selection + seek ───────────────────
+  // ── Mouse handlers for selection + seek (scene-local) ─────
   const pxToSec = useCallback(
     (clientX: number) => {
       const canvas = canvasRef.current;
       if (!canvas) return 0;
       const rect = canvas.getBoundingClientRect();
       const px = clientX - rect.left - mixerWidth + scrollLeft;
-      return Math.max(0, Math.min(duration, (px / totalWidthPx) * duration));
+      return Math.max(0, Math.min(sceneDuration, (px / totalWidthPx) * sceneDuration));
     },
-    [scrollLeft, totalWidthPx, duration, mixerWidth],
+    [scrollLeft, totalWidthPx, sceneDuration, mixerWidth],
   );
 
   const handleMouseDown = useCallback(
@@ -475,7 +526,6 @@ export function WaveformEditor({
       if (e.button !== 0) return;
       const sec = pxToSec(e.clientX);
       if (e.shiftKey) {
-        // Extend selection
         setSelection((prev) =>
           prev ? { startSec: Math.min(prev.startSec, sec), endSec: Math.max(prev.endSec, sec) } : { startSec: sec, endSec: sec },
         );
@@ -509,13 +559,40 @@ export function WaveformEditor({
       const start = Math.min(dragStartRef.current, sec);
       const end = Math.max(dragStartRef.current, sec);
       if (end - start < 0.05) {
-        // Click — seek
+        // Click — seek (scene-relative)
         setSelection(null);
         onSeek(sec);
       }
     },
     [isDragging, pxToSec, onSeek],
   );
+
+  // ── Zoom controls ─────────────────────────────────────────
+  const applyEditorZoom = useCallback((percent: number) => {
+    setEditorZoomPercent(percent);
+    if (percent > 100) {
+      requestAnimationFrame(() => {
+        const el = editorScrollRef.current;
+        if (!el) return;
+        const newZoom = (fitZoom * percent) / 100;
+        const px = scenePositionSec * newZoom * 4;
+        el.scrollTo({ left: Math.max(0, px - el.clientWidth / 2), behavior: "smooth" });
+      });
+    }
+  }, [fitZoom, scenePositionSec]);
+
+  const adjustEditorZoom = useCallback((dir: "in" | "out") => {
+    const presets = EDITOR_ZOOM_PRESETS;
+    const cur = editorZoomPercent;
+    let next: number;
+    if (dir === "in") {
+      next = presets.find(p => p > cur) ?? presets[presets.length - 1];
+    } else {
+      const lower = [...presets].reverse().find(p => p < cur);
+      next = lower ?? presets[0];
+    }
+    applyEditorZoom(next);
+  }, [editorZoomPercent, applyEditorZoom]);
 
   // ── Selection info ─────────────────────────────────────────
   const selectionInfo = selection
@@ -524,9 +601,7 @@ export function WaveformEditor({
 
   if (!trackId) {
     return (
-      <div
-        className="flex-1 flex items-center justify-center border-t border-border bg-card/30 min-h-[120px]"
-      >
+      <div className="flex-1 flex items-center justify-center border-t border-border bg-card/30 min-h-[120px]">
         <div className="flex items-center gap-2 text-xs text-muted-foreground font-body">
           <AudioWaveform className="h-4 w-4" />
           {isRu ? "Выберите стем для просмотра волны" : "Select a stem to view waveform"}
@@ -542,16 +617,50 @@ export function WaveformEditor({
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full" style={{ backgroundColor: trackColor }} />
           <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider font-body">
-            {trackLabel} — Wave
+            {trackLabel}
           </span>
+          {sceneLabel && (
+            <span className="text-[10px] text-primary/70 font-mono">
+              {sceneLabel}
+            </span>
+          )}
           {status === "loading" && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
           {error && <span className="text-[10px] text-destructive">{error}</span>}
         </div>
 
         <div className="flex items-center gap-1">
+          {/* Scene-local time */}
+          <span className="text-[10px] text-muted-foreground font-mono tabular-nums mr-1">
+            {formatTimePrecise(scenePositionSec)} / {formatTimePrecise(sceneDuration)}
+          </span>
+
           {selectionInfo && (
             <span className="text-[10px] text-muted-foreground font-mono mr-2">{selectionInfo}</span>
           )}
+
+          {/* Editor zoom controls */}
+          <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => adjustEditorZoom("out")} disabled={editorZoomPercent <= 100}>
+            <ZoomOut className="h-3 w-3" />
+          </Button>
+          <Select value={String(editorZoomPercent)} onValueChange={(v) => applyEditorZoom(Number(v))}>
+            <SelectTrigger className="h-5 w-[52px] text-[10px] font-body border-none bg-transparent px-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {EDITOR_ZOOM_PRESETS.map((p) => (
+                <SelectItem key={p} value={String(p)} className="text-xs">{p}%</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => adjustEditorZoom("in")} disabled={editorZoomPercent >= 500}>
+            <ZoomIn className="h-3 w-3" />
+          </Button>
+          <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => applyEditorZoom(100)}>
+            <Maximize2 className="h-3 w-3" />
+          </Button>
+
+          <div className="w-px h-3 bg-border/50 mx-0.5" />
+
           <Button
             variant="ghost"
             size="sm"
@@ -630,18 +739,23 @@ export function WaveformEditor({
         </div>
       </div>
 
-      {/* Canvas */}
-      <div ref={containerRef} className="flex-1 min-h-0 relative cursor-crosshair">
-        <canvas
-          ref={canvasRef}
-          className="w-full h-full"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={() => {
-            if (isDragging) setIsDragging(false);
-          }}
-        />
+      {/* Canvas with independent scroll */}
+      <div ref={containerRef} className="flex-1 min-h-0 relative flex">
+        {/* dB sidebar placeholder — fixed left */}
+        <div ref={editorScrollRef} className="flex-1 overflow-x-auto overflow-y-hidden cursor-crosshair">
+          <div style={{ width: `${totalWidthPx + mixerWidth}px`, height: "100%" }}>
+            <canvas
+              ref={canvasRef}
+              style={{ width: `${totalWidthPx + mixerWidth}px`, height: "100%" }}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={() => {
+                if (isDragging) setIsDragging(false);
+              }}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
