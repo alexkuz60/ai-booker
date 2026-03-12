@@ -188,7 +188,7 @@ function EqGraph({ low, mid, high }: { low: number; mid: number; high: number })
   }, [low, mid, high]);
 
   return (
-    <div className="relative rounded-sm border border-border/40 overflow-hidden w-full" style={{ aspectRatio: "2.2" }}>
+    <div className="relative rounded-sm border border-border/40 overflow-hidden w-full h-[120px]">
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
     </div>
   );
