@@ -414,7 +414,7 @@ class EngineTrack {
           fadeOut: this._loopCrossfadeSec,
         });
       }
-      this.playerB.connect(this.eqNode);
+      this.playerB.connect(this._telephone && this._phoneFilter ? this._phoneFilter : this.eqNode);
     }
 
     // Apply bypass states
