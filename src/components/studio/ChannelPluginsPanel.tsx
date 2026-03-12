@@ -23,6 +23,8 @@ export interface ClipInfo {
   id: string;
   label: string;         // e.g. segment type or short name
   segmentType?: string;  // narrator, dialogue, etc.
+  startSec: number;
+  durationSec: number;
 }
 
 interface ChannelPluginsPanelProps {
@@ -114,6 +116,13 @@ export function ChannelPluginsPanel({
     });
   }, [enabledIds, engine, onMixChange]);
 
+  // Compute total duration span for proportional clip widths
+  const totalSpanSec = useMemo(() => {
+    if (clips.length === 0) return 0;
+    const maxEnd = Math.max(...clips.map(c => c.startSec + c.durationSec));
+    return maxEnd;
+  }, [clips]);
+
   if (clips.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground/50 text-xs font-body">
@@ -126,45 +135,59 @@ export function ChannelPluginsPanel({
 
   return (
     <div className="flex flex-col h-full px-3 py-2">
-      {/* Header: Clip chips */}
-      <div className="flex items-center gap-1.5 shrink-0 pb-2 border-b border-border/30 mb-2 flex-wrap">
-        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: trackColor ?? "hsl(var(--primary))" }} />
-        <span className="text-[10px] font-mono text-foreground/60 uppercase tracking-wider mr-1 shrink-0">
-          {trackLabel ?? "Track"}
-        </span>
-        <div className="flex items-center gap-1 flex-wrap">
-          <TooltipProvider delayDuration={200}>
-            {clips.map((clip, idx) => {
-              const enabled = enabledClipIds.has(clip.id);
-              return (
-                <Tooltip key={clip.id}>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => onToggleClip(clip.id)}
-                      className={`
-                        h-5 px-1.5 rounded text-[9px] font-mono uppercase tracking-wider
-                        border transition-all duration-150 cursor-pointer select-none
-                        ${enabled
-                          ? "border-primary/60 bg-primary/15 text-primary"
-                          : "border-border/40 bg-muted/30 text-muted-foreground/40 line-through"
-                        }
-                      `}
-                      title={clip.label}
-                    >
-                      {idx + 1}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-xs">
-                    <span className="font-mono">{clip.label}</span>
-                    <span className="ml-1.5 text-muted-foreground">
-                      {enabled ? (isRu ? "— обработка вкл" : "— processing on") : (isRu ? "— обработка выкл" : "— processing off")}
-                    </span>
-                  </TooltipContent>
-                </Tooltip>
-              );
-            })}
-          </TooltipProvider>
+      {/* Header: Miniature proportional clip strip */}
+      <div className="flex flex-col gap-1 shrink-0 pb-2 border-b border-border/30 mb-2">
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: trackColor ?? "hsl(var(--primary))" }} />
+          <span className="text-[10px] font-mono text-foreground/60 uppercase tracking-wider shrink-0">
+            {trackLabel ?? "Track"}
+          </span>
         </div>
+        {clips.length > 0 && totalSpanSec > 0 && (
+          <div className="relative w-full" style={{ height: "14px" }}>
+            <TooltipProvider delayDuration={200}>
+              {clips.map((clip) => {
+                const enabled = enabledClipIds.has(clip.id);
+                const leftPct = (clip.startSec / totalSpanSec) * 100;
+                const widthPct = (clip.durationSec / totalSpanSec) * 100;
+                return (
+                  <Tooltip key={clip.id}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => onToggleClip(clip.id)}
+                        className={`absolute top-0 h-full rounded-sm cursor-pointer transition-all duration-150 overflow-hidden select-none ${
+                          enabled
+                            ? "opacity-90 hover:opacity-100"
+                            : "opacity-30 hover:opacity-50"
+                        }`}
+                        style={{
+                          left: `${leftPct}%`,
+                          width: `${Math.max(widthPct, 0.5)}%`,
+                          backgroundColor: trackColor ?? "hsl(var(--primary))",
+                          backgroundImage: !enabled
+                            ? "repeating-linear-gradient(135deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px)"
+                            : undefined,
+                        }}
+                      >
+                        {widthPct > 4 && (
+                          <span className="text-[7px] text-primary-foreground px-0.5 truncate block leading-[14px] font-body">
+                            {clip.label}
+                          </span>
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      <span className="font-mono">{clip.label}</span>
+                      <span className="ml-1.5 text-muted-foreground">
+                        {enabled ? (isRu ? "— обработка вкл" : "— processing on") : (isRu ? "— обработка выкл" : "— processing off")}
+                      </span>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </TooltipProvider>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
