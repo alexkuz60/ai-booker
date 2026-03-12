@@ -257,7 +257,13 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
                     ref={fileInputRef}
                     type="file"
                     accept=".wav,.flac,.ogg,.mp3"
-                    onChange={e => setFile(e.target.files?.[0] || null)}
+                    onChange={e => {
+                      const f = e.target.files?.[0] || null;
+                      setFile(f);
+                      if (f && !name.trim()) {
+                        setName(f.name.replace(/\.[^.]+$/, "").replace(/[_-]/g, " "));
+                      }
+                    }}
                     className="h-8 text-sm flex-1"
                   />
                   <Button size="sm" onClick={handleUpload} disabled={uploading || !file || !name.trim()}>
