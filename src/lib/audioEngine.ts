@@ -122,6 +122,26 @@ export interface MasterMeterData {
   peakR: number;
 }
 
+export interface ChannelEqState {
+  low: number;   // dB, -12..12
+  mid: number;
+  high: number;
+  bypassed: boolean;
+}
+
+export interface ChannelCompState {
+  threshold: number;
+  ratio: number;
+  attack: number;
+  release: number;
+  bypassed: boolean;
+}
+
+export interface ChannelLimiterState {
+  threshold: number;  // dB, -30..0
+  bypassed: boolean;
+}
+
 export interface TrackMixState {
   volume: number;       // 0-100
   pan: number;          // -1..1
@@ -130,6 +150,9 @@ export interface TrackMixState {
   preFxBypassed: boolean;
   muted: boolean;
   solo: boolean;
+  eq: ChannelEqState;
+  comp: ChannelCompState;
+  limiter: ChannelLimiterState;
 }
 
 export interface EngineSnapshot {
