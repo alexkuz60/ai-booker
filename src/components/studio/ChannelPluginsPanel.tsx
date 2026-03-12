@@ -88,6 +88,8 @@ export function ChannelPluginsPanel({
     if (cfg.eq.enabled) count++;
     if (cfg.comp.enabled) count++;
     if (cfg.limiter.enabled) count++;
+    if (cfg.panner3d.enabled) count++;
+    if (cfg.convolver.enabled) count++;
     return count;
   }, [clipConfigs]);
 
