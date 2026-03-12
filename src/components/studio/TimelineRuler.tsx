@@ -9,9 +9,15 @@ interface TimelineRulerProps {
   renderPercent?: number | null;
   /** Whether rendering is actively in progress */
   isRendering?: boolean;
+  /** Load progress 0–100, null = not loading */
+  loadPercent?: number | null;
+  /** Whether loading is actively in progress */
+  isLoading?: boolean;
+  /** Label of currently loading item */
+  loadLabel?: string;
 }
 
-export function TimelineRuler({ zoom, duration, sceneBoundaries, renderPercent, isRendering }: TimelineRulerProps) {
+export function TimelineRuler({ zoom, duration, sceneBoundaries, renderPercent, isRendering, loadPercent, isLoading, loadLabel }: TimelineRulerProps) {
   const marks: number[] = [];
   const step = Math.max(1, Math.round(10 / zoom));
   for (let t = 0; t <= duration; t += step) marks.push(t);
@@ -24,6 +30,9 @@ export function TimelineRuler({ zoom, duration, sceneBoundaries, renderPercent, 
   const totalWidthPx = duration * zoom * 4;
   const progressWidthPx = renderPercent != null && renderPercent > 0
     ? (renderPercent / 100) * totalWidthPx
+    : 0;
+  const loadWidthPx = loadPercent != null && loadPercent > 0
+    ? (loadPercent / 100) * totalWidthPx
     : 0;
 
   return (
@@ -81,6 +90,37 @@ export function TimelineRuler({ zoom, duration, sceneBoundaries, renderPercent, 
               <div
                 className="absolute inset-0 w-2 h-2 rounded-full bg-accent/50 animate-ping"
               />
+            </div>
+          )}
+        </div>
+      )}
+      {/* Load progress line (montage stem loading) */}
+      {loadWidthPx > 0 && (
+        <div
+          className="absolute bottom-0 left-0 h-[2px] pointer-events-none z-10 transition-[width] duration-300"
+          style={{
+            width: `${loadWidthPx}px`,
+            background: loadPercent === 100
+              ? "hsl(var(--primary))"
+              : "linear-gradient(90deg, hsl(50 80% 50%), hsl(140 70% 50%))",
+          }}
+        >
+          {isLoading && loadPercent !== null && loadPercent < 100 && (
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2">
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: "hsl(50 80% 50%)", boxShadow: "0 0 6px 2px hsl(50 80% 50% / 0.6)" }}
+              />
+              <div
+                className="absolute inset-0 w-2 h-2 rounded-full animate-ping"
+                style={{ backgroundColor: "hsl(50 80% 50% / 0.5)" }}
+              />
+              {/* Current label tooltip */}
+              {loadLabel && (
+                <div className="absolute bottom-3 right-0 translate-x-1/2 whitespace-nowrap bg-background/90 border border-border rounded px-1.5 py-0.5 text-[9px] font-mono text-muted-foreground shadow-sm">
+                  {loadLabel}
+                </div>
+              )}
             </div>
           )}
         </div>
