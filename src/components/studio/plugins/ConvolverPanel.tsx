@@ -227,9 +227,24 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpd
           )}
         </div>
 
-        {/* Waveform */}
-        <div className="flex-1 min-h-0" style={{ minHeight: 40 }}>
+        {/* Waveform + preview */}
+        <div className="flex-1 min-h-0 relative" style={{ minHeight: 40 }}>
           <canvas ref={canvasRef} className="w-full h-full rounded" style={{ display: "block" }} />
+          {config.impulseId && (
+            <button
+              onClick={handlePreview}
+              className={`absolute top-1 right-1 p-1 rounded transition-colors ${
+                previewing
+                  ? "bg-primary/30 text-primary"
+                  : "bg-background/60 text-muted-foreground/60 hover:text-foreground/80 hover:bg-background/80"
+              }`}
+              title={isRu ? (previewing ? "Остановить" : "Прослушать клип с IR") : (previewing ? "Stop" : "Preview clip with IR")}
+            >
+              {previewing
+                ? <Square className="h-3 w-3 fill-current" />
+                : <Play className="h-3 w-3 fill-current" />}
+            </button>
+          )}
         </div>
 
         {/* Controls */}
