@@ -377,7 +377,7 @@ export function SpectrumAnalyzer() {
         const lin = Math.pow(10, fftData[i] / 20);
         powerSum += lin * lin;
       }
-      const rmsDb = usableBins > 0 ? 10 * Math.log10(powerSum / usableBins) : -Infinity;
+      const rmsDb = usableBins > 0 ? 10 * Math.log10(powerSum / usableBins) : DB_MIN;
       // Peak-hold behaviour: only update displayed RMS if new value is higher, else decay after 1.5s
       const now = performance.now();
       const RMS_HOLD_MS = 1500;
