@@ -175,6 +175,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
   }, [fadedClips, fadeOverrides, isRu]);
 
   const handleFadeOut = useCallback((trackId: string, fadeDurationSec: number) => {
+    pushUndo();
     const affected = fadedClips.filter(c => c.trackId === trackId);
     if (affected.length === 0) return;
     const newOverrides = new Map(fadeOverrides);
