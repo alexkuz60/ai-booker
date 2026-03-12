@@ -117,8 +117,18 @@ export function EqGraph({ low, mid, high, className }: { low: number; mid: numbe
     ctx.fill();
   }, [low, mid, high]);
 
+  useEffect(() => { draw(); }, [draw]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ro = new ResizeObserver(() => draw());
+    ro.observe(canvas.parentElement!);
+    return () => ro.disconnect();
+  }, [draw]);
+
   return (
-    <div className="relative rounded-sm border border-border/40 overflow-hidden w-full h-[120px]">
+    <div className={cn("relative rounded-sm border border-border/40 overflow-hidden w-full", className)}>
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
     </div>
   );

@@ -81,8 +81,18 @@ export function KneeGraph({ threshold, ratio, knee, className }: { threshold: nu
     ctx.fillText(`T: ${threshold} dB`, tx + 2, 10);
   }, [threshold, ratio, knee]);
 
+  useEffect(() => { draw(); }, [draw]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ro = new ResizeObserver(() => draw());
+    ro.observe(canvas.parentElement!);
+    return () => ro.disconnect();
+  }, [draw]);
+
   return (
-    <div className="relative rounded-sm border border-border/40 overflow-hidden w-full h-[120px]">
+    <div className={cn("relative rounded-sm border border-border/40 overflow-hidden w-full", className)}>
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
     </div>
   );
