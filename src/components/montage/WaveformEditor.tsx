@@ -585,6 +585,17 @@ export function WaveformEditor({
           >
             <Maximize className="h-3 w-3" />
           </Button>
+          <div className="w-px h-3 bg-border/50 mx-0.5" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 px-1.5 text-[10px] gap-0.5"
+            disabled={!canUndo}
+            title={isRu ? "Отменить (Undo)" : "Undo"}
+            onClick={onUndo}
+          >
+            <Undo2 className="h-3 w-3" />
+          </Button>
         </div>
       </div>
 
