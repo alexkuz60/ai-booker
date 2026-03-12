@@ -37,6 +37,7 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpd
   const [loading, setLoading] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [fallbackPeaks, setFallbackPeaks] = useState<number[] | null>(null);
+  const [previewing, setPreviewing] = useState(false);
 
   // Load catalog
   useEffect(() => {
