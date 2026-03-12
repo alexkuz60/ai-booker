@@ -638,7 +638,7 @@ class AudioEngine {
 
   // ─── Track management ──────────────────────────────────
 
-  async loadTracks(configs: TrackConfig[], onProgress?: (p: LoadProgress) => void): Promise<void> {
+  async loadTracks(configs: TrackConfig[], onProgress?: (p: LoadProgress) => void): Promise<LoadTracksResult> {
     this.stop();
     for (const t of this.tracks.values()) t.dispose();
     this.tracks.clear();
@@ -646,7 +646,7 @@ class AudioEngine {
     if (configs.length === 0) {
       this._totalDuration = 0;
       this.notify();
-      return;
+      return { total: 0, loaded: 0, dropped: 0 };
     }
 
     // Ensure AudioContext is running before loading audio buffers
