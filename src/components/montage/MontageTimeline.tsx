@@ -10,7 +10,7 @@ import { TimelineMasterMeter } from "@/components/studio/TimelineMasterMeter";
 import { TimelineRuler } from "@/components/studio/TimelineRuler";
 import { Playhead } from "@/components/studio/TimelinePlayhead";
 import { TrackMixerStrip } from "@/components/studio/TrackMixerStrip";
-import { STEM_TRACKS } from "@/hooks/useMontageData";
+import { getStemTracks } from "@/hooks/useMontageData";
 import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 
 const MIXER_SIDEBAR = 160;
@@ -37,7 +37,8 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
   const player = useTimelinePlayer(clips);
   const duration = player.totalDuration > 0 ? player.totalDuration : totalDurationSec;
 
-  const trackIds = useMemo(() => STEM_TRACKS.map(t => t.id), []);
+  const stemTracks = useMemo(() => getStemTracks(isRu), [isRu]);
+  const trackIds = useMemo(() => stemTracks.map(t => t.id), [stemTracks]);
   const { scheduleSave: onMixChange } = useMixerPersistence(chapterId, trackIds);
 
   const [timelineHeight, setTimelineHeight] = useState(300);
@@ -292,7 +293,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
           {/* Mixer sidebar */}
           <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${MIXER_SIDEBAR}px` }}>
             <div className="h-6 border-b border-border" />
-            {STEM_TRACKS.map((track) => (
+            {stemTracks.map((track) => (
               <TrackMixerStrip
                 key={track.id}
                 trackId={track.id}
@@ -334,7 +335,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
                 />
               </div>
 
-              {STEM_TRACKS.map((track) => {
+              {stemTracks.map((track) => {
                 const trackClips = clipsByTrack.get(track.id) ?? [];
                 return (
                   <div key={track.id} className="h-10 border-b border-border/50 relative">

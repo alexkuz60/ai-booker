@@ -29,6 +29,14 @@ export interface StemTrack {
   color: string;
 }
 
+export function getStemTracks(isRu: boolean): StemTrack[] {
+  return [
+    { id: "voice", label: isRu ? "Голос" : "Voice", color: "hsl(var(--primary))" },
+    { id: "atmosphere", label: isRu ? "Атмосфера" : "Atmosphere", color: "hsl(175 45% 45%)" },
+    { id: "sfx", label: isRu ? "Звуки" : "SFX", color: "hsl(220 50% 55%)" },
+  ];
+}
+
 export interface MontagePart {
   id: string;
   chapter_id: string;
@@ -37,11 +45,8 @@ export interface MontagePart {
   user_id: string;
 }
 
-export const STEM_TRACKS: StemTrack[] = [
-  { id: "voice", label: "Voice", color: "hsl(var(--primary))" },
-  { id: "atmosphere", label: "Atmosphere", color: "hsl(175 45% 45%)" },
-  { id: "sfx", label: "SFX", color: "hsl(220 50% 55%)" },
-];
+/** @deprecated Use getStemTracks(isRu) instead */
+export const STEM_TRACKS = getStemTracks(false);
 
 const LS_KEY = "montage_last_context";
 
