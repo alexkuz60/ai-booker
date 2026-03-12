@@ -428,6 +428,30 @@ export function StudioTimeline({
     });
   }, [zoom, sceneZoomPercent]);
 
+  // ── Timeline view mode: "tracks" or "plugins" ─────────────
+  type TimelineView = "tracks" | "plugins";
+  const [timelineView, setTimelineView] = useState<TimelineView>("tracks");
+
+  // Selected track for channel plugins (use first clip of selected character track, or first available)
+  const pluginsTrackId = useMemo(() => {
+    if (!selectedCharacterId) return null;
+    const charTrackId = `char-${selectedCharacterId}`;
+    const clipIds = timelineClips
+      .filter(c => c.trackId === charTrackId && c.hasAudio && !!c.audioPath)
+      .map(c => c.id);
+    return clipIds[0] ?? null;
+  }, [selectedCharacterId, timelineClips]);
+
+  const pluginsTrackLabel = useMemo(() => {
+    if (!selectedCharacterId) return undefined;
+    return charTracks.find(t => t.id === `char-${selectedCharacterId}`)?.label;
+  }, [selectedCharacterId, charTracks]);
+
+  const pluginsTrackColor = useMemo(() => {
+    if (!selectedCharacterId) return undefined;
+    return charTracks.find(t => t.id === `char-${selectedCharacterId}`)?.color;
+  }, [selectedCharacterId, charTracks]);
+
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("studio-timeline-collapsed") === "true"; } catch { return false; }
   });
