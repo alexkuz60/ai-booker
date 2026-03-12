@@ -193,7 +193,7 @@ class EngineTrack {
   private playerB: Tone.Player | null = null;
   private loopScheduledIds: number[] = [];
 
-  constructor(config: TrackConfig, bus: Tone.Channel, preloadedBuffer?: ToneAudioBuffer) {
+  constructor(config: TrackConfig, bus: Tone.Channel, preloadedBuffer?: Tone.ToneAudioBuffer) {
     this.id = config.id;
     this.startSec = config.startSec;
     this.durationSec = config.durationSec;
