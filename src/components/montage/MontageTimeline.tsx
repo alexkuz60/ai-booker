@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 
+import { getAudioEngine } from "@/lib/audioEngine";
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
 import { TimelineMasterMeter } from "@/components/studio/TimelineMasterMeter";
 import { TimelineRuler } from "@/components/studio/TimelineRuler";
