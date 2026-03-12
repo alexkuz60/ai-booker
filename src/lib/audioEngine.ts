@@ -549,6 +549,7 @@ class AudioEngine {
   private transport = Tone.getTransport();
 
   private constructor() {
+    this.instanceId = ++_engineInstanceId;
     this.masterBus = new Tone.Channel({ volume: volumeToDB(this._volume) });
 
     // Master insert chain nodes
