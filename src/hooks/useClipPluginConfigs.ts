@@ -263,4 +263,25 @@ function applyConfigToEngine(engine: ReturnType<typeof getAudioEngine>, clipId: 
   if (cfg.limiter.enabled) {
     engine.setTrackLimiterThreshold(clipId, cfg.limiter.threshold);
   }
+
+  // Panner3D
+  engine.setTrackPanner3dBypassed(clipId, !cfg.panner3d.enabled);
+  if (cfg.panner3d.enabled) {
+    engine.setTrackPanner3dPosition(clipId, cfg.panner3d.positionX, cfg.panner3d.positionY, cfg.panner3d.positionZ);
+    engine.setTrackPanner3dParams(clipId, {
+      distanceModel: cfg.panner3d.distanceModel,
+      refDistance: cfg.panner3d.refDistance,
+      maxDistance: cfg.panner3d.maxDistance,
+      rolloffFactor: cfg.panner3d.rolloffFactor,
+      coneInnerAngle: cfg.panner3d.coneInnerAngle,
+      coneOuterAngle: cfg.panner3d.coneOuterAngle,
+      coneOuterGain: cfg.panner3d.coneOuterGain,
+    });
+  }
+
+  // Convolver
+  engine.setTrackConvolverBypassed(clipId, !cfg.convolver.enabled);
+  if (cfg.convolver.enabled) {
+    engine.setTrackConvolverDryWet(clipId, cfg.convolver.dryWet);
+  }
 }
