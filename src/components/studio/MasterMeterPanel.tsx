@@ -388,9 +388,7 @@ export function SpectrumAnalyzer() {
       const px = w - pillW - 4;
       const py = 4;
       ctx.fillStyle = "hsla(0, 0%, 0%, 0.65)";
-      ctx.beginPath();
-      ctx.roundRect(px, py, pillW, pillH, 4);
-      ctx.fill();
+      ctx.fillRect(px, py, pillW, pillH);
 
       ctx.font = "bold 9px monospace";
       ctx.textAlign = "left";
