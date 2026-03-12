@@ -283,7 +283,16 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("out")}><ZoomOut className="h-3.5 w-3.5" /></Button>
-          <span className="text-xs text-muted-foreground font-body w-10 text-center">{displayZoomPercent}%</span>
+          <Select value={String(montageZoomPercent)} onValueChange={(v) => applyMontageZoom(Number(v))}>
+            <SelectTrigger className="h-7 w-[72px] text-xs font-body border-none bg-transparent px-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MONTAGE_ZOOM_PRESETS.map((p) => (
+                <SelectItem key={p} value={String(p)} className="text-xs">{p}%</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("in")}><ZoomIn className="h-3.5 w-3.5" /></Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetZoom}><Maximize2 className="h-3.5 w-3.5" /></Button>
         </div>
