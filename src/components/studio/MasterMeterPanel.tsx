@@ -218,6 +218,8 @@ export function SpectrumAnalyzer() {
   modeRef.current = mode;
   const smoothingRef = useRef(smoothing);
   smoothingRef.current = smoothing;
+  const rmsHoldRef = useRef(-Infinity);
+  const rmsHoldTimeRef = useRef(0);
 
   useEffect(() => {
     let raf: number;
