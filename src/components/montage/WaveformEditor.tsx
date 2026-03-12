@@ -235,7 +235,8 @@ export function WaveformEditor({
       ctx.lineTo(playheadPx * dpr, h * dpr);
       ctx.stroke();
     }
-  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, duration, positionSec]);
+    ctx.restore();
+  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, duration, positionSec, mixerWidth]);
 
   // Redraw on RAF when playing
   const rafRef = useRef<number>(0);
