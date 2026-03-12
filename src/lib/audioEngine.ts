@@ -777,25 +777,27 @@ class AudioEngine {
       const cfg = configs[ci];
       onProgress?.({ total: configs.length, done: ci, loaded: loadedCount, failed: dropped, currentId: cfg.id, currentLabel: cfg.label ?? cfg.id });
 
-      const bus = this.getBus(cfg.bus ?? "voice");
-      const track = new EngineTrack(cfg, bus);
-      this.tracks.set(cfg.id, track);
+      const startedAt = performance.now();
+      let buffer: Tone.ToneAudioBuffer | null = null;
 
-      const timeoutMs = Math.min(900_000, Math.max(120_000, Math.round((cfg.durationSec || 0) * 1200)));
-      const loaded = await new Promise<boolean>((resolve) => {
-        if (track.player.loaded) { resolve(true); return; }
-        let settled = false;
-        const finish = (ok: boolean) => { if (settled) return; settled = true; window.clearTimeout(tid); window.clearInterval(pid); resolve(ok); };
-        const tid = window.setTimeout(() => finish(false), timeoutMs);
-        const pid = window.setInterval(() => { if (track.player.loaded) finish(true); }, 120);
-        (track.player as any).onerror = () => finish(false);
-      });
+      try {
+        const arrayBuf = cfg.cacheKey
+          ? await fetchWithStemCache(cfg.cacheKey, cfg.url)
+          : await fetch(cfg.url).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.arrayBuffer(); });
+        const audioCtx = Tone.getContext().rawContext as AudioContext;
+        const decoded = await audioCtx.decodeAudioData(arrayBuf.slice(0));
+        buffer = new Tone.ToneAudioBuffer(decoded);
+        console.log(`[AudioEngine] Additional track ${cfg.id} loaded in ${Math.round(performance.now() - startedAt)}ms`);
+      } catch (err) {
+        console.error(`[AudioEngine] Additional track ${cfg.id} fetch/decode error:`, err);
+      }
 
-      if (!loaded) {
-        track.dispose();
-        this.tracks.delete(cfg.id);
+      if (!buffer) {
         dropped++;
       } else {
+        const bus = this.getBus(cfg.bus ?? "voice");
+        const track = new EngineTrack(cfg, bus, buffer);
+        this.tracks.set(cfg.id, track);
         loadedCount++;
         track.schedule();
       }
