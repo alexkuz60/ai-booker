@@ -28,7 +28,6 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
   });
 
   const loadedKeyRef = useRef<string>("");
-  const loadedReloadRef = useRef<number>(0);
 
   const audioClips = clips.filter((c) => c.hasAudio && c.audioPath);
 
