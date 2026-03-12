@@ -565,6 +565,81 @@ class EngineTrack {
   get limiterBypassed() { return this._limiterBypassed; }
   get limiterState(): ChannelLimiterState { return { threshold: this._limiterThreshold, bypassed: this._limiterBypassed }; }
 
+  // ── Panner3D ──
+
+  setPanner3dBypassed(b: boolean): void {
+    this._panner3dBypassed = b;
+    this.applyPanner3dBypass();
+  }
+
+  private applyPanner3dBypass(): void {
+    if (this._panner3dBypassed) {
+      this.panner3dNode.positionX.value = 0;
+      this.panner3dNode.positionY.value = 0;
+      this.panner3dNode.positionZ.value = 0;
+    } else {
+      this.panner3dNode.positionX.value = this._panner3dX;
+      this.panner3dNode.positionY.value = this._panner3dY;
+      this.panner3dNode.positionZ.value = this._panner3dZ;
+    }
+  }
+
+  setPanner3dPosition(x: number, y: number, z: number): void {
+    this._panner3dX = x; this._panner3dY = y; this._panner3dZ = z;
+    if (!this._panner3dBypassed) {
+      this.panner3dNode.positionX.value = x;
+      this.panner3dNode.positionY.value = y;
+      this.panner3dNode.positionZ.value = z;
+    }
+  }
+
+  setPanner3dParams(p: { distanceModel?: DistanceModelType; refDistance?: number; maxDistance?: number; rolloffFactor?: number; coneInnerAngle?: number; coneOuterAngle?: number; coneOuterGain?: number }): void {
+    if (p.distanceModel !== undefined) { this._panner3dDistanceModel = p.distanceModel; this.panner3dNode.distanceModel = p.distanceModel; }
+    if (p.refDistance !== undefined) { this._panner3dRefDistance = p.refDistance; this.panner3dNode.refDistance = p.refDistance; }
+    if (p.maxDistance !== undefined) { this._panner3dMaxDistance = p.maxDistance; this.panner3dNode.maxDistance = p.maxDistance; }
+    if (p.rolloffFactor !== undefined) { this._panner3dRolloffFactor = p.rolloffFactor; this.panner3dNode.rolloffFactor = p.rolloffFactor; }
+    if (p.coneInnerAngle !== undefined) { this._panner3dConeInnerAngle = p.coneInnerAngle; this.panner3dNode.coneInnerAngle = p.coneInnerAngle; }
+    if (p.coneOuterAngle !== undefined) { this._panner3dConeOuterAngle = p.coneOuterAngle; this.panner3dNode.coneOuterAngle = p.coneOuterAngle; }
+    if (p.coneOuterGain !== undefined) { this._panner3dConeOuterGain = p.coneOuterGain; this.panner3dNode.coneOuterGain = p.coneOuterGain; }
+  }
+
+  get panner3dBypassed() { return this._panner3dBypassed; }
+
+  // ── Convolver ──
+
+  setConvolverBypassed(b: boolean): void {
+    this._convolverBypassed = b;
+    this.applyConvolverBypass();
+  }
+
+  private applyConvolverBypass(): void {
+    if (this._convolverBypassed) {
+      this._convolverDryGain.gain.value = 1;
+      this._convolverWetGain.gain.value = 0;
+    } else {
+      this._convolverDryGain.gain.value = 1 - this._convolverDryWet;
+      this._convolverWetGain.gain.value = this._convolverDryWet;
+    }
+  }
+
+  setConvolverDryWet(w: number): void {
+    this._convolverDryWet = Math.max(0, Math.min(1, w));
+    if (!this._convolverBypassed) {
+      this._convolverDryGain.gain.value = 1 - this._convolverDryWet;
+      this._convolverWetGain.gain.value = this._convolverDryWet;
+    }
+  }
+
+  async loadConvolverIR(url: string): Promise<void> {
+    try {
+      await this.convolverNode.load(url);
+    } catch (e) {
+      console.error("[EngineTrack] Failed to load convolver IR:", e);
+    }
+  }
+
+  get convolverBypassed() { return this._convolverBypassed; }
+
   // ── Reverb ──
 
   setReverbWet(w: number): void {
