@@ -79,6 +79,19 @@ export interface TrackConfig {
   clipLenSec?: number;
   /** Crossfade overlap between loop iterations (seconds). Default 1. */
   loopCrossfadeSec?: number;
+  /** Human-readable label for progress display */
+  label?: string;
+}
+
+export interface LoadProgress {
+  /** Total number of tracks to load */
+  total: number;
+  /** Number of tracks loaded so far (including failed) */
+  done: number;
+  /** ID of the track currently loading */
+  currentId: string;
+  /** Label of the currently loading track */
+  currentLabel: string;
 }
 
 export type EngineState = "stopped" | "playing" | "paused";
