@@ -718,6 +718,11 @@ class EngineTrack {
     this.preFxNode.dispose();
     this.channel.dispose();
     this.limiterNode.dispose();
+    this.panner3dNode.dispose();
+    this.convolverNode.dispose();
+    this._convolverDryGain.dispose();
+    this._convolverWetGain.dispose();
+    this._convolverMerge.dispose();
     this.reverbNode.dispose();
     this.meterMono.dispose();
     this.splitter.dispose();
