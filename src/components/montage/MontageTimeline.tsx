@@ -40,12 +40,13 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
   const [trimOverrides, setTrimOverrides] = useState<Map<string, { offsetSec: number; newDurationSec: number }>>(new Map());
   const [fadeOverrides, setFadeOverrides] = useState<Map<string, { fadeInSec: number; fadeOutSec: number }>>(new Map());
 
-  // ── Undo stack (snapshots of both overrides) ───────────────
+  // ── Undo/Redo stack ──────────────────────────────────────
   type UndoSnapshot = {
     trimOverrides: Map<string, { offsetSec: number; newDurationSec: number }>;
     fadeOverrides: Map<string, { fadeInSec: number; fadeOutSec: number }>;
   };
   const [undoStack, setUndoStack] = useState<UndoSnapshot[]>([]);
+  const [redoStack, setRedoStack] = useState<UndoSnapshot[]>([]);
   const trimRef = useRef(trimOverrides);
   trimRef.current = trimOverrides;
   const fadeRef = useRef(fadeOverrides);
@@ -56,15 +57,38 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
       trimOverrides: new Map(trimRef.current),
       fadeOverrides: new Map(fadeRef.current),
     }]);
+    // Clear redo stack on new action
+    setRedoStack([]);
   }, []);
 
   const handleUndo = useCallback(() => {
     setUndoStack(prev => {
       if (prev.length === 0) return prev;
       const snapshot = prev[prev.length - 1];
+      // Save current state to redo stack before undoing
+      setRedoStack(r => [...r, {
+        trimOverrides: new Map(trimRef.current),
+        fadeOverrides: new Map(fadeRef.current),
+      }]);
       setTrimOverrides(snapshot.trimOverrides);
       setFadeOverrides(snapshot.fadeOverrides);
       toast.success(isRu ? "Отменено" : "Undone");
+      return prev.slice(0, -1);
+    });
+  }, [isRu]);
+
+  const handleRedo = useCallback(() => {
+    setRedoStack(prev => {
+      if (prev.length === 0) return prev;
+      const snapshot = prev[prev.length - 1];
+      // Save current state to undo stack before redoing
+      setUndoStack(u => [...u.slice(-19), {
+        trimOverrides: new Map(trimRef.current),
+        fadeOverrides: new Map(fadeRef.current),
+      }]);
+      setTrimOverrides(snapshot.trimOverrides);
+      setFadeOverrides(snapshot.fadeOverrides);
+      toast.success(isRu ? "Повторено" : "Redone");
       return prev.slice(0, -1);
     });
   }, [isRu]);
@@ -547,7 +571,9 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             onFadeIn={handleFadeIn}
             onFadeOut={handleFadeOut}
             onUndo={handleUndo}
+            onRedo={handleRedo}
             canUndo={undoStack.length > 0}
+            canRedo={redoStack.length > 0}
           />
         </div>
       )}

@@ -5,7 +5,7 @@
  */
 
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import { Loader2, Scissors, ArrowUpRight, ArrowDownRight, Maximize, AudioWaveform, Undo2 } from "lucide-react";
+import { Loader2, Scissors, ArrowUpRight, ArrowDownRight, Maximize, AudioWaveform, Undo2, Redo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { chooseLod, type MultiLodPeaks, type StereoPeaks } from "@/lib/waveformPeaks";
 import { useWaveformPeaks, type WaveformStatus } from "@/hooks/useWaveformPeaks";
@@ -28,7 +28,9 @@ interface WaveformEditorProps {
   onFadeIn?: (trackId: string, durationSec: number) => void;
   onFadeOut?: (trackId: string, durationSec: number) => void;
   onUndo?: () => void;
+  onRedo?: () => void;
   canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 // ── Selection state ──────────────────────────────────────────
@@ -159,7 +161,9 @@ export function WaveformEditor({
   onFadeIn,
   onFadeOut,
   onUndo,
+  onRedo,
   canUndo,
+  canRedo,
 }: WaveformEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -416,6 +420,23 @@ export function WaveformEditor({
     ctx.restore();
   }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, duration, positionSec, mixerWidth, trackClips]);
 
+  // ── Keyboard shortcuts (Ctrl+Z / Ctrl+Shift+Z) ─────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!e.ctrlKey) return;
+      if (e.key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          onRedo?.();
+        } else {
+          onUndo?.();
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onUndo, onRedo]);
+
   // Redraw on RAF when playing
   const rafRef = useRef<number>(0);
   useEffect(() => {
@@ -591,10 +612,20 @@ export function WaveformEditor({
             size="sm"
             className="h-5 px-1.5 text-[10px] gap-0.5"
             disabled={!canUndo}
-            title={isRu ? "Отменить (Undo)" : "Undo"}
+            title={isRu ? "Отменить (Ctrl+Z)" : "Undo (Ctrl+Z)"}
             onClick={onUndo}
           >
             <Undo2 className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 px-1.5 text-[10px] gap-0.5"
+            disabled={!canRedo}
+            title={isRu ? "Повторить (Ctrl+Shift+Z)" : "Redo (Ctrl+Shift+Z)"}
+            onClick={onRedo}
+          >
+            <Redo2 className="h-3 w-3" />
           </Button>
         </div>
       </div>
