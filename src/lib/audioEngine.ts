@@ -495,8 +495,12 @@ class EngineTrack {
 
 // ─── AudioEngine (Singleton) ────────────────────────────────
 
+let _engineInstanceId = 0;
+
 class AudioEngine {
   private static instance: AudioEngine | null = null;
+  /** Monotonically increasing ID to detect engine resets */
+  readonly instanceId: number;
 
   // Buses
   private voiceBus: Tone.Channel;
