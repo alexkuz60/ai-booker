@@ -335,7 +335,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
                 />
               </div>
 
-              {STEM_TRACKS.map((track) => {
+              {stemTracks.map((track) => {
                 const trackClips = clipsByTrack.get(track.id) ?? [];
                 return (
                   <div key={track.id} className="h-10 border-b border-border/50 relative">
