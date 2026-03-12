@@ -196,7 +196,6 @@ const SPECTRUM_MODES: { id: SpectrumMode; label: string }[] = [
 
 export function SpectrumAnalyzer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const engine = getAudioEngine();
 
   const [mode, setMode] = useState<SpectrumMode>(() => {
     try { return (localStorage.getItem("spectrum-mode") as SpectrumMode) || "bars"; } catch { return "bars"; }
