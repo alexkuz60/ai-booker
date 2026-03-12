@@ -200,8 +200,8 @@ export function useClipPluginConfigs(sceneId: string | null) {
   const updatePluginParams = useCallback((
     clipId: string,
     trackId: string,
-    plugin: "eq" | "comp" | "limiter",
-    params: Partial<ClipEqConfig> | Partial<ClipCompConfig> | Partial<ClipLimiterConfig>,
+    plugin: "eq" | "comp" | "limiter" | "panner3d" | "convolver",
+    params: Partial<ClipEqConfig> | Partial<ClipCompConfig> | Partial<ClipLimiterConfig> | Partial<ClipPanner3dConfig> | Partial<ClipConvolverConfig>,
   ) => {
     const engine = getAudioEngine();
     setConfigs(prev => {
