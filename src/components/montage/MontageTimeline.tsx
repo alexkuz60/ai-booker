@@ -284,8 +284,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
       userScrollingRef.current = true;
       clearTimeout(timer);
       timer = setTimeout(() => { userScrollingRef.current = false; }, 600);
-      setEditorScrollLeft(el.scrollLeft);
-      setEditorVisibleWidth(el.clientWidth);
     };
     // Initial measure
     setEditorScrollLeft(el.scrollLeft);
