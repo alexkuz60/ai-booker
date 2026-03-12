@@ -36,6 +36,7 @@ export function Panner3DStage({ isRu, allClips, selectedClipId, config, disabled
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState(120);
   const draggingRef = useRef(false);
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; color?: string } | null>(null);
 
   // Responsive canvas
   useEffect(() => {
@@ -146,16 +147,7 @@ export function Panner3DStage({ isRu, allClips, selectedClipId, config, disabled
         ctx.globalAlpha = 1;
       }
 
-      // Label for non-selected (always show if enabled)
-      if (!isSelected && isEnabled && canvasSize >= 100) {
-        ctx.font = "6px monospace";
-        ctx.fillStyle = "hsla(220, 20%, 70%, 0.6)";
-        ctx.textAlign = "center";
-        const labelText = clip.label.length > 6 ? clip.label.slice(0, 5) + "…" : clip.label;
-        ctx.fillText(labelText, sx, sz - dotR - 2);
-      }
-
-      // Height indicator (Y) for selected clip
+      // Height indicator (Y) for selected clip only
       if (isSelected && Math.abs(p3d.positionY) > 0.1) {
         ctx.font = "7px monospace";
         ctx.fillStyle = "hsl(45, 80%, 60%)";
@@ -164,6 +156,30 @@ export function Panner3DStage({ isRu, allClips, selectedClipId, config, disabled
       }
     }
   }, [canvasSize, allClips, selectedClipId, config]);
+
+  // Tooltip on hover — find nearest clip dot
+  const handleCanvasHover = useCallback((e: React.PointerEvent) => {
+    if (draggingRef.current) { setTooltip(null); return; }
+    const c = canvasRef.current;
+    if (!c) return;
+    const rect = c.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const half = canvasSize / 2;
+    const scale = half / STAGE_RADIUS;
+    const HIT_R = 10; // px hit radius
+
+    for (const clip of allClips) {
+      const sx = half + clip.panner3d.positionX * scale;
+      const sz = half - clip.panner3d.positionZ * scale;
+      const dx = mx - sx, dy = my - sz;
+      if (dx * dx + dy * dy <= HIT_R * HIT_R) {
+        setTooltip({ x: sx, y: sz, label: clip.label, color: clip.color });
+        return;
+      }
+    }
+    setTooltip(null);
+  }, [canvasSize, allClips]);
 
   // Drag handler
   const worldFromCanvas = useCallback((clientX: number, clientY: number) => {
@@ -211,16 +227,32 @@ export function Panner3DStage({ isRu, allClips, selectedClipId, config, disabled
         {/* Canvas */}
         <div
           ref={containerRef}
-          className={`flex-1 min-w-0 min-h-0 flex items-center justify-center ${disabled || !config.enabled ? "opacity-40 pointer-events-none" : ""}`}
+          className={`flex-1 min-w-0 min-h-0 flex items-center justify-center relative ${disabled || !config.enabled ? "opacity-40 pointer-events-none" : ""}`}
         >
-          <canvas
-            ref={canvasRef}
-            style={{ width: canvasSize, height: canvasSize, borderRadius: 6, cursor: config.enabled ? "crosshair" : "default" }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerLeave={handlePointerUp}
-          />
+          <div className="relative" style={{ width: canvasSize, height: canvasSize }}>
+            <canvas
+              ref={canvasRef}
+              style={{ width: canvasSize, height: canvasSize, borderRadius: 6, cursor: config.enabled ? "crosshair" : "default" }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={(e) => { handlePointerMove(e); handleCanvasHover(e); }}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={(e) => { handlePointerUp(); setTooltip(null); }}
+            />
+            {/* Tooltip overlay */}
+            {tooltip && (
+              <div
+                className="absolute pointer-events-none px-1.5 py-0.5 rounded text-[10px] font-mono text-foreground bg-popover border border-border shadow-md whitespace-nowrap z-10"
+                style={{
+                  left: tooltip.x,
+                  top: tooltip.y - 20,
+                  transform: "translateX(-50%)",
+                }}
+              >
+                <span className="inline-block w-1.5 h-1.5 rounded-full mr-1 align-middle" style={{ backgroundColor: tooltip.color ?? "hsl(var(--primary))" }} />
+                {tooltip.label}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Sliders */}
