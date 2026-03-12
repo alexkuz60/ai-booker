@@ -10,6 +10,7 @@ import { TimelineMasterMeter } from "@/components/studio/TimelineMasterMeter";
 import { TimelineRuler } from "@/components/studio/TimelineRuler";
 import { Playhead } from "@/components/studio/TimelinePlayhead";
 import { TrackMixerStrip } from "@/components/studio/TrackMixerStrip";
+import { WaveformEditor } from "@/components/montage/WaveformEditor";
 import { getStemTracks } from "@/hooks/useMontageData";
 import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 
