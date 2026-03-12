@@ -65,9 +65,30 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     setUndoStack(prev => {
       if (prev.length === 0) return prev;
       const snapshot = prev[prev.length - 1];
+      // Save current state to redo stack before undoing
+      setRedoStack(r => [...r, {
+        trimOverrides: new Map(trimRef.current),
+        fadeOverrides: new Map(fadeRef.current),
+      }]);
       setTrimOverrides(snapshot.trimOverrides);
       setFadeOverrides(snapshot.fadeOverrides);
       toast.success(isRu ? "Отменено" : "Undone");
+      return prev.slice(0, -1);
+    });
+  }, [isRu]);
+
+  const handleRedo = useCallback(() => {
+    setRedoStack(prev => {
+      if (prev.length === 0) return prev;
+      const snapshot = prev[prev.length - 1];
+      // Save current state to undo stack before redoing
+      setUndoStack(u => [...u.slice(-19), {
+        trimOverrides: new Map(trimRef.current),
+        fadeOverrides: new Map(fadeRef.current),
+      }]);
+      setTrimOverrides(snapshot.trimOverrides);
+      setFadeOverrides(snapshot.fadeOverrides);
+      toast.success(isRu ? "Повторено" : "Redone");
       return prev.slice(0, -1);
     });
   }, [isRu]);
