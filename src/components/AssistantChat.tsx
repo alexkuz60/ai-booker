@@ -175,7 +175,7 @@ export function AssistantChat({ open, onOpenChange }: { open: boolean; onOpenCha
 
     await streamChat({
       messages: updated,
-      context: gatherContext(location.pathname),
+      context: await gatherContext(location.pathname),
       onDelta: upsert,
       onDone: () => setLoading(false),
       onError: (e) => { toast.error(e); setLoading(false); },
