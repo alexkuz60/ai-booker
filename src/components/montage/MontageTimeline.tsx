@@ -37,7 +37,8 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
   const player = useTimelinePlayer(clips);
   const duration = player.totalDuration > 0 ? player.totalDuration : totalDurationSec;
 
-  const trackIds = useMemo(() => STEM_TRACKS.map(t => t.id), []);
+  const stemTracks = useMemo(() => getStemTracks(isRu), [isRu]);
+  const trackIds = useMemo(() => stemTracks.map(t => t.id), [stemTracks]);
   const { scheduleSave: onMixChange } = useMixerPersistence(chapterId, trackIds);
 
   const [timelineHeight, setTimelineHeight] = useState(300);
