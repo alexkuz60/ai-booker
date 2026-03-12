@@ -52,7 +52,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     }).filter(c => c.durationSec > 0.01);
   }, [clips, trimOverrides]);
 
-  // player is declared after fadedClips below
 
   const stemTracks = useMemo(() => getStemTracks(isRu), [isRu]);
   const trackIds = useMemo(() => stemTracks.map(t => t.id), [stemTracks]);
