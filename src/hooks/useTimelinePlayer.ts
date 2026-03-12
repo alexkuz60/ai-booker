@@ -10,14 +10,6 @@ export type PlayerState = EngineState;
  * Manages playback of timeline audio clips via the Tone.js-based AudioEngine.
  */
 export function useTimelinePlayer(clips: TimelineClip[]) {
-  const [reloadTrigger, setReloadTrigger] = useState(0);
-
-  // Listen for engine reset events
-  useEffect(() => {
-    const handler = () => setReloadTrigger(n => n + 1);
-    window.addEventListener("audio-engine-reset", handler);
-    return () => window.removeEventListener("audio-engine-reset", handler);
-  }, []);
 
   const engine = getAudioEngine();
 
