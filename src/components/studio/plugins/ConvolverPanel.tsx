@@ -1,6 +1,6 @@
 /**
  * ConvolverPanel — IR catalog selector + waveform visualization + dry/wet + filter controls.
- * Loads impulse responses from the convolution_impulses table and storage.
+ * Uses pre-computed peaks from DB for instant waveform + stemCache for audio caching.
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -8,6 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ParamSlider } from "./ParamSlider";
 import { BypassButton } from "./BypassButton";
+import { drawPeaksWaveform } from "@/lib/irPeaks";
+import { fetchWithStemCache } from "@/lib/stemCache";
 import type { ClipConvolverConfig } from "@/hooks/useClipPluginConfigs";
 
 interface ConvolverPanelProps {
@@ -26,13 +28,14 @@ interface ImpulseRow {
   file_path: string;
   duration_ms: number;
   description: string | null;
+  peaks: number[] | null;
 }
 
 export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpdate }: ConvolverPanelProps) {
   const [impulses, setImpulses] = useState<ImpulseRow[]>([]);
   const [loading, setLoading] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [irBuffer, setIrBuffer] = useState<AudioBuffer | null>(null);
+  const [fallbackPeaks, setFallbackPeaks] = useState<number[] | null>(null);
 
   // Load catalog
   useEffect(() => {
@@ -40,11 +43,11 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpd
       setLoading(true);
       const { data } = await supabase
         .from("convolution_impulses")
-        .select("id, name, category, file_path, duration_ms, description")
+        .select("id, name, category, file_path, duration_ms, description, peaks")
         .eq("is_public", true)
         .order("category")
         .order("name");
-      setImpulses(data ?? []);
+      setImpulses((data as unknown as ImpulseRow[]) ?? []);
       setLoading(false);
     })();
   }, []);
@@ -60,12 +63,21 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpd
     return map;
   }, [impulses]);
 
-  // Load IR waveform for visualization when impulse changes
+  const selectedImpulse = impulses.find(i => i.id === config.impulseId);
+
+  // Compute fallback peaks only when selected impulse has no stored peaks
   useEffect(() => {
-    if (!config.impulseId) { setIrBuffer(null); return; }
+    if (!config.impulseId) { setFallbackPeaks(null); return; }
     const impulse = impulses.find(i => i.id === config.impulseId);
     if (!impulse) return;
 
+    // If we have stored peaks, no need to fetch audio for visualization
+    if (impulse.peaks && impulse.peaks.length > 0) {
+      setFallbackPeaks(null);
+      return;
+    }
+
+    // Fallback: fetch + decode for old impulses without peaks
     (async () => {
       try {
         const { data: urlData } = await supabase.storage
@@ -73,36 +85,48 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpd
           .createSignedUrl(impulse.file_path, 600);
         if (!urlData?.signedUrl) return;
 
-        const resp = await fetch(urlData.signedUrl);
-        const arrayBuf = await resp.arrayBuffer();
+        const arrayBuf = await fetchWithStemCache(impulse.file_path, urlData.signedUrl);
+        const { computePeaks } = await import("@/lib/irPeaks");
         const audioCtx = new AudioContext();
         const decoded = await audioCtx.decodeAudioData(arrayBuf);
-        setIrBuffer(decoded);
+        const peaks = computePeaks(decoded);
+        setFallbackPeaks(peaks);
         audioCtx.close();
+
+        // Backfill peaks to DB (fire-and-forget)
+        supabase
+          .from("convolution_impulses")
+          .update({ peaks } as any)
+          .eq("id", impulse.id)
+          .then(() => {
+            // Update local state so next render uses stored peaks
+            setImpulses(prev => prev.map(i => i.id === impulse.id ? { ...i, peaks } : i));
+          });
       } catch {
-        setIrBuffer(null);
+        setFallbackPeaks(null);
       }
     })();
   }, [config.impulseId, impulses]);
 
-  // Draw waveform
+  // Draw waveform from peaks (stored or fallback)
   useEffect(() => {
     const c = canvasRef.current;
     if (!c) return;
-    const dpr = window.devicePixelRatio || 1;
-    const w = c.clientWidth;
-    const h = c.clientHeight;
-    c.width = w * dpr;
-    c.height = h * dpr;
-    const ctx = c.getContext("2d");
-    if (!ctx) return;
-    ctx.scale(dpr, dpr);
 
-    // Background
-    ctx.fillStyle = "hsl(220 15% 8%)";
-    ctx.fillRect(0, 0, w, h);
+    const peaks = selectedImpulse?.peaks ?? fallbackPeaks;
 
-    if (!irBuffer) {
+    if (!peaks || peaks.length === 0) {
+      // Draw empty state
+      const dpr = window.devicePixelRatio || 1;
+      const w = c.clientWidth;
+      const h = c.clientHeight;
+      c.width = w * dpr;
+      c.height = h * dpr;
+      const ctx = c.getContext("2d");
+      if (!ctx) return;
+      ctx.scale(dpr, dpr);
+      ctx.fillStyle = "hsl(220 15% 8%)";
+      ctx.fillRect(0, 0, w, h);
       ctx.font = "9px monospace";
       ctx.fillStyle = "hsl(220 10% 35%)";
       ctx.textAlign = "center";
@@ -110,53 +134,24 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpd
       return;
     }
 
-    const data = irBuffer.getChannelData(0);
-    const step = Math.max(1, Math.floor(data.length / w));
-    ctx.strokeStyle = "hsl(175 50% 45%)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    const mid = h / 2;
-    for (let x = 0; x < w; x++) {
-      const idx = x * step;
-      let max = 0;
-      for (let j = 0; j < step && idx + j < data.length; j++) {
-        const v = Math.abs(data[idx + j]);
-        if (v > max) max = v;
-      }
-      const y = mid - max * mid * 0.9;
-      if (x === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    // Mirror
-    for (let x = w - 1; x >= 0; x--) {
-      const idx = x * step;
-      let max = 0;
-      for (let j = 0; j < step && idx + j < data.length; j++) {
-        const v = Math.abs(data[idx + j]);
-        if (v > max) max = v;
-      }
-      const y = mid + max * mid * 0.9;
-      ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-    ctx.fillStyle = "hsla(175, 50%, 45%, 0.15)";
-    ctx.fill();
-    ctx.stroke();
-  }, [irBuffer, isRu]);
+    drawPeaksWaveform(c, peaks);
+  }, [selectedImpulse, fallbackPeaks, isRu]);
 
-  // Handle IR change → also load into engine
+  // Handle IR change → load into engine via stemCache
   const handleImpulseChange = useCallback(async (impulseId: string) => {
     onUpdate({ impulseId });
 
     const impulse = impulses.find(i => i.id === impulseId);
     if (!impulse) return;
 
-    // Load IR into audio engine for realtime preview
     try {
       const { data: urlData } = await supabase.storage
         .from("impulse-responses")
         .createSignedUrl(impulse.file_path, 600);
       if (urlData?.signedUrl) {
+        // Pre-cache the IR audio
+        await fetchWithStemCache(impulse.file_path, urlData.signedUrl);
+        // Load into engine
         const { getAudioEngine } = await import("@/lib/audioEngine");
         await getAudioEngine().loadTrackConvolverIR(clipId, urlData.signedUrl);
       }
@@ -164,8 +159,6 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpd
       console.error("Failed to load IR into engine:", e);
     }
   }, [impulses, clipId, onUpdate]);
-
-  const selectedImpulse = impulses.find(i => i.id === config.impulseId);
 
   return (
     <div className="flex flex-col gap-2 h-full">

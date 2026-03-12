@@ -129,17 +129,20 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
     for (const file of files) {
       setUploadProgress(`${uploaded + 1}/${files.length}: ${file.name}`);
       try {
-        // Decode metadata
+        // Decode metadata + compute peaks
         let durationMs = 0;
         let sampleRate = 48000;
         let channels = 2;
+        let peaks: number[] | null = null;
         try {
+          const { computePeaks } = await import("@/lib/irPeaks");
           const arrayBuf = await file.arrayBuffer();
           const audioCtx = new AudioContext();
           const decoded = await audioCtx.decodeAudioData(arrayBuf);
           durationMs = Math.round(decoded.duration * 1000);
           sampleRate = decoded.sampleRate;
           channels = decoded.numberOfChannels;
+          peaks = computePeaks(decoded);
           audioCtx.close();
         } catch { /* defaults */ }
 
@@ -160,6 +163,7 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
             channels,
             uploaded_by: userId,
             is_public: true,
+            peaks,
           } as any);
         if (dbErr) throw dbErr;
         uploaded++;

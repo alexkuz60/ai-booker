@@ -336,6 +336,7 @@ export type Database = {
           id: string
           is_public: boolean
           name: string
+          peaks: Json | null
           sample_rate: number
           uploaded_by: string
         }
@@ -349,6 +350,7 @@ export type Database = {
           id?: string
           is_public?: boolean
           name?: string
+          peaks?: Json | null
           sample_rate?: number
           uploaded_by: string
         }
@@ -362,6 +364,7 @@ export type Database = {
           id?: string
           is_public?: boolean
           name?: string
+          peaks?: Json | null
           sample_rate?: number
           uploaded_by?: string
         }

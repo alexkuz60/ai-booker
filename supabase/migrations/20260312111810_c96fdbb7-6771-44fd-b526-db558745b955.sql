@@ -1,0 +1,1 @@
+ALTER TABLE public.convolution_impulses ADD COLUMN peaks jsonb DEFAULT NULL;
