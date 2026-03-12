@@ -367,7 +367,10 @@ export function SpectrumAnalyzer() {
 
       // ─── RMS / Peak overlay (top-right) ───────────────────
       const meter = getAudioEngine().getMasterMeter();
-      const fmtDb = (db: number) => db <= -96 ? "-∞" : `${db >= 0 ? "+" : ""}${db.toFixed(1)}`;
+      const fmtDb = (db: number) => {
+        const safe = Number.isFinite(db) ? Math.max(DB_MIN, db) : DB_MIN;
+        return `${safe >= 0 ? "+" : ""}${safe.toFixed(1)}`;
+      };
       // Compute RMS from FFT bins (approximate power sum)
       let powerSum = 0;
       for (let i = 0; i < usableBins; i++) {
