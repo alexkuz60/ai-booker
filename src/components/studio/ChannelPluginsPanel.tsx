@@ -2,30 +2,63 @@
  * ChannelPluginsPanel — Two-tab layout:
  * Tab 1 "Dynamics": EQ + Compressor + Limiter (PRE → POST)
  * Tab 2 "Spatial": placeholder for Stereo Width, Stage Placement, Convolution Reverb
+ *
+ * Supports per-clip plugin enable/disable via header clip chips.
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { getAudioEngine } from "@/lib/audioEngine";
-import { Power, Radio, Waves } from "lucide-react";
+import { Radio, Waves } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { EqGraph } from "./plugins/EqGraph";
 import { KneeGraph } from "./plugins/KneeGraph";
 import { LimiterGraph } from "./plugins/LimiterGraph";
 import { ParamSlider } from "./plugins/ParamSlider";
 import { BypassButton } from "./plugins/BypassButton";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
-// ─── Main component ─────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────
+
+export interface ClipInfo {
+  id: string;
+  label: string;         // e.g. segment type or short name
+  segmentType?: string;  // narrator, dialogue, etc.
+}
 
 interface ChannelPluginsPanelProps {
   isRu: boolean;
-  trackId: string | null;
+  clips: ClipInfo[];
   trackLabel?: string;
   trackColor?: string;
+  /** Set of clip IDs that have plugins enabled (not bypassed). Managed externally for persistence. */
+  enabledClipIds: Set<string>;
+  onToggleClip: (clipId: string) => void;
   onMixChange?: () => void;
 }
 
-export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onMixChange }: ChannelPluginsPanelProps) {
+// ─── Main component ─────────────────────────────────────────
+
+export function ChannelPluginsPanel({
+  isRu,
+  clips,
+  trackLabel,
+  trackColor,
+  enabledClipIds,
+  onToggleClip,
+  onMixChange,
+}: ChannelPluginsPanelProps) {
   const engine = getAudioEngine();
+
+  // The "primary" clip we read state from (first enabled clip, or first clip overall)
+  const primaryClipId = useMemo(() => {
+    const firstEnabled = clips.find(c => enabledClipIds.has(c.id));
+    return firstEnabled?.id ?? clips[0]?.id ?? null;
+  }, [clips, enabledClipIds]);
+
+  const enabledIds = useMemo(
+    () => clips.filter(c => enabledClipIds.has(c.id)).map(c => c.id),
+    [clips, enabledClipIds],
+  );
 
   // ── State ──
   const [eqLow, setEqLow] = useState(0);
@@ -42,11 +75,11 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
 
   const [bypasses, setBypasses] = useState({ eq: true, comp: true, limiter: true });
 
-  // ── Sync from engine ──
+  // ── Sync state from primary clip ──
   useEffect(() => {
-    if (!trackId) return;
+    if (!primaryClipId) return;
     const sync = () => {
-      const ms = engine.getTrackMixState(trackId);
+      const ms = engine.getTrackMixState(primaryClipId);
       if (!ms) return;
       setEqLow(ms.eq.low); setEqMid(ms.eq.mid); setEqHigh(ms.eq.high);
       setCompThreshold(ms.comp.threshold); setCompRatio(ms.comp.ratio);
@@ -57,23 +90,31 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
     sync();
     const iv = setInterval(sync, 500);
     return () => clearInterval(iv);
-  }, [trackId, engine]);
+  }, [primaryClipId, engine]);
+
+  // ── Apply param to all enabled clips ──
+  const applyToEnabled = useCallback((fn: (id: string) => void) => {
+    for (const id of enabledIds) fn(id);
+    onMixChange?.();
+  }, [enabledIds, onMixChange]);
 
   const toggleBypass = useCallback((section: "eq" | "comp" | "limiter") => {
-    if (!trackId) return;
+    if (enabledIds.length === 0) return;
     setBypasses(prev => {
       const next = !prev[section];
-      switch (section) {
-        case "eq": engine.setTrackEqBypassed(trackId, next); break;
-        case "comp": engine.setTrackPreFxBypassed(trackId, next); break;
-        case "limiter": engine.setTrackLimiterBypassed(trackId, next); break;
+      for (const id of enabledIds) {
+        switch (section) {
+          case "eq": engine.setTrackEqBypassed(id, next); break;
+          case "comp": engine.setTrackPreFxBypassed(id, next); break;
+          case "limiter": engine.setTrackLimiterBypassed(id, next); break;
+        }
       }
       onMixChange?.();
       return { ...prev, [section]: next };
     });
-  }, [trackId, engine, onMixChange]);
+  }, [enabledIds, engine, onMixChange]);
 
-  if (!trackId) {
+  if (clips.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground/50 text-xs font-body">
         {isRu ? "Выберите дорожку для настройки плагинов" : "Select a track to configure plugins"}
@@ -81,14 +122,49 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
     );
   }
 
+  const noEnabled = enabledIds.length === 0;
+
   return (
     <div className="flex flex-col h-full px-3 py-2">
-      {/* Header: Track label */}
-      <div className="flex items-center gap-2 shrink-0 pb-2 border-b border-border/30 mb-2">
+      {/* Header: Clip chips */}
+      <div className="flex items-center gap-1.5 shrink-0 pb-2 border-b border-border/30 mb-2 flex-wrap">
         <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: trackColor ?? "hsl(var(--primary))" }} />
-        <span className="text-[10px] font-mono text-foreground/80 uppercase tracking-wider truncate">
-          {trackLabel ?? trackId}
+        <span className="text-[10px] font-mono text-foreground/60 uppercase tracking-wider mr-1 shrink-0">
+          {trackLabel ?? "Track"}
         </span>
+        <div className="flex items-center gap-1 flex-wrap">
+          <TooltipProvider delayDuration={200}>
+            {clips.map((clip, idx) => {
+              const enabled = enabledClipIds.has(clip.id);
+              return (
+                <Tooltip key={clip.id}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => onToggleClip(clip.id)}
+                      className={`
+                        h-5 px-1.5 rounded text-[9px] font-mono uppercase tracking-wider
+                        border transition-all duration-150 cursor-pointer select-none
+                        ${enabled
+                          ? "border-primary/60 bg-primary/15 text-primary"
+                          : "border-border/40 bg-muted/30 text-muted-foreground/40 line-through"
+                        }
+                      `}
+                      title={clip.label}
+                    >
+                      {idx + 1}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">
+                    <span className="font-mono">{clip.label}</span>
+                    <span className="ml-1.5 text-muted-foreground">
+                      {enabled ? (isRu ? "— обработка вкл" : "— processing on") : (isRu ? "— обработка выкл" : "— processing off")}
+                    </span>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </TooltipProvider>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -106,7 +182,7 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
 
         {/* ═══ Tab 1: Dynamics ═══ */}
         <TabsContent value="dynamics" className="flex-1 min-h-0 mt-2">
-          <div className="flex gap-4 h-full divide-x divide-border/40">
+          <div className={`flex gap-4 h-full divide-x divide-border/40 ${noEnabled ? "opacity-40 pointer-events-none" : ""}`}>
             {/* ── EQ Column ── */}
             <div style={{ flex: "3 1 0%" }} className="min-w-0 flex flex-col gap-2">
               <div className="flex items-center justify-between shrink-0">
@@ -121,11 +197,11 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
                 </div>
                 <div className="flex flex-col gap-1.5 shrink-0 justify-center" style={{ width: 100 }}>
                   <ParamSlider label="Low" value={eqLow} min={-12} max={12} step={0.5} unit=" dB"
-                    onChange={v => { setEqLow(v); engine.setTrackEqLow(trackId, v); onMixChange?.(); }} disabled={bypasses.eq} />
+                    onChange={v => { setEqLow(v); applyToEnabled(id => engine.setTrackEqLow(id, v)); }} disabled={bypasses.eq} />
                   <ParamSlider label="Mid" value={eqMid} min={-12} max={12} step={0.5} unit=" dB"
-                    onChange={v => { setEqMid(v); engine.setTrackEqMid(trackId, v); onMixChange?.(); }} disabled={bypasses.eq} />
+                    onChange={v => { setEqMid(v); applyToEnabled(id => engine.setTrackEqMid(id, v)); }} disabled={bypasses.eq} />
                   <ParamSlider label="High" value={eqHigh} min={-12} max={12} step={0.5} unit=" dB"
-                    onChange={v => { setEqHigh(v); engine.setTrackEqHigh(trackId, v); onMixChange?.(); }} disabled={bypasses.eq} />
+                    onChange={v => { setEqHigh(v); applyToEnabled(id => engine.setTrackEqHigh(id, v)); }} disabled={bypasses.eq} />
                 </div>
               </div>
             </div>
@@ -144,15 +220,15 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
                 </div>
                 <div className="flex flex-col gap-1.5 shrink-0 justify-center" style={{ width: 100 }}>
                   <ParamSlider label={isRu ? "Порог" : "Threshold"} value={compThreshold} min={-60} max={0} step={1} unit=" dB"
-                    onChange={v => { setCompThreshold(v); engine.setTrackCompThreshold(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
+                    onChange={v => { setCompThreshold(v); applyToEnabled(id => engine.setTrackCompThreshold(id, v)); }} disabled={bypasses.comp} />
                   <ParamSlider label={isRu ? "Соотн." : "Ratio"} value={compRatio} min={1} max={20} step={0.5} unit=":1"
-                    onChange={v => { setCompRatio(v); engine.setTrackCompRatio(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
+                    onChange={v => { setCompRatio(v); applyToEnabled(id => engine.setTrackCompRatio(id, v)); }} disabled={bypasses.comp} />
                   <ParamSlider label="Knee" value={compKnee} min={0} max={30} step={1} unit=" dB"
-                    onChange={v => { setCompKnee(v); engine.setTrackCompKnee(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
+                    onChange={v => { setCompKnee(v); applyToEnabled(id => engine.setTrackCompKnee(id, v)); }} disabled={bypasses.comp} />
                   <ParamSlider label={isRu ? "Атака" : "Attack"} value={compAttack} min={0.001} max={0.5} step={0.001} unit=" s"
-                    onChange={v => { setCompAttack(v); engine.setTrackCompAttack(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
+                    onChange={v => { setCompAttack(v); applyToEnabled(id => engine.setTrackCompAttack(id, v)); }} disabled={bypasses.comp} />
                   <ParamSlider label={isRu ? "Восст." : "Release"} value={compRelease} min={0.01} max={1.0} step={0.01} unit=" s"
-                    onChange={v => { setCompRelease(v); engine.setTrackCompRelease(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
+                    onChange={v => { setCompRelease(v); applyToEnabled(id => engine.setTrackCompRelease(id, v)); }} disabled={bypasses.comp} />
                 </div>
               </div>
             </div>
@@ -171,7 +247,7 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
                 </div>
                 <div className="flex flex-col gap-1.5 shrink-0 justify-center" style={{ width: 100 }}>
                   <ParamSlider label={isRu ? "Порог" : "Threshold"} value={limThreshold} min={-30} max={0} step={0.5} unit=" dB"
-                    onChange={v => { setLimThreshold(v); engine.setTrackLimiterThreshold(trackId, v); onMixChange?.(); }} disabled={bypasses.limiter} />
+                    onChange={v => { setLimThreshold(v); applyToEnabled(id => engine.setTrackLimiterThreshold(id, v)); }} disabled={bypasses.limiter} />
                 </div>
               </div>
             </div>
