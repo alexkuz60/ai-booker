@@ -84,6 +84,8 @@ export interface TrackConfig {
   label?: string;
   /** Stable cache key (e.g. storage audioPath). If set, Cache API is used. */
   cacheKey?: string;
+  /** Segment type from storyboard — used for auto-FX (e.g. 'telephone') */
+  segmentType?: string;
 }
 
 export interface LoadProgress {
