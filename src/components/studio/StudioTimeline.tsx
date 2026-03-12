@@ -635,8 +635,21 @@ export function StudioTimeline({
         </div>
       </div>
 
+      {/* Content: Tracks or Plugins */}
+      {!collapsed && timelineView === "plugins" && (
+        <div className="flex-1 min-h-0 overflow-auto">
+          <ChannelPluginsPanel
+            isRu={isRu}
+            trackId={pluginsTrackId}
+            trackLabel={pluginsTrackLabel}
+            trackColor={pluginsTrackColor}
+            onMixChange={onMixChange}
+          />
+        </div>
+      )}
+
       {/* Tracks — Scene mode only */}
-      {!collapsed && (
+      {!collapsed && timelineView === "tracks" && (
         <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
           <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${sidebarWidth}px` }}>
             <div className="h-6 border-b border-border flex items-center px-2">
