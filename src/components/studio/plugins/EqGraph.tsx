@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
+import { cn } from "@/lib/utils";
 
-export function EqGraph({ low, mid, high }: { low: number; mid: number; high: number }) {
+export function EqGraph({ low, mid, high, className }: { low: number; mid: number; high: number; className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
