@@ -293,7 +293,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
           {/* Mixer sidebar */}
           <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${MIXER_SIDEBAR}px` }}>
             <div className="h-6 border-b border-border" />
-            {STEM_TRACKS.map((track) => (
+            {stemTracks.map((track) => (
               <TrackMixerStrip
                 key={track.id}
                 trackId={track.id}
