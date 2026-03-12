@@ -181,30 +181,32 @@ export function WaveformEditor({
 
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth;
-    const h = CHANNEL_HEIGHT * 2 + CHANNEL_GAP;
+    const h = canvas.clientHeight;
+    if (h < 4) return; // not laid out yet
     canvas.width = w * dpr;
     canvas.height = h * dpr;
+
+    const chH = (h - CHANNEL_GAP) / 2;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-  // Background — resolve CSS variable for canvas
+    // Background
     ctx.fillStyle = resolveHsl("--background");
     ctx.fillRect(0, 0, w * dpr, h * dpr);
 
-    // Cyan waveform color from design system
     const waveColor = resolveHsl("--cyan-glow");
 
     // Draw L channel
-    drawChannel(ctx, currentPeaks, 0, 0, w, CHANNEL_HEIGHT, waveColor, scrollLeft, totalWidthPx, selection, duration, "L");
+    drawChannel(ctx, currentPeaks, 0, 0, w, chH, waveColor, scrollLeft, totalWidthPx, selection, duration, "L");
 
     // Gap line
     const borderColor = resolveHsl("--border");
     ctx.fillStyle = borderColor.replace(")", " / 0.5)").replace("hsl(", "hsl(");
-    ctx.fillRect(0, CHANNEL_HEIGHT * dpr, w * dpr, CHANNEL_GAP * dpr);
+    ctx.fillRect(0, chH * dpr, w * dpr, CHANNEL_GAP * dpr);
 
     // Draw R channel
-    drawChannel(ctx, currentPeaks, 0, CHANNEL_HEIGHT + CHANNEL_GAP, w, CHANNEL_HEIGHT, waveColor, scrollLeft, totalWidthPx, selection, duration, "R");
+    drawChannel(ctx, currentPeaks, 0, chH + CHANNEL_GAP, w, chH, waveColor, scrollLeft, totalWidthPx, selection, duration, "R");
 
     // Playhead
     const playheadPx = (positionSec / duration) * totalWidthPx - scrollLeft;
