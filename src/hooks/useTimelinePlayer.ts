@@ -10,7 +10,23 @@ export type PlayerState = EngineState;
  * Manages playback of timeline audio clips via the Tone.js-based AudioEngine.
  */
 export function useTimelinePlayer(clips: TimelineClip[]) {
-  const engine = getAudioEngine();
+  // Always get the latest engine instance (survives resets)
+  const engineRef = useRef(getAudioEngine());
+  const [engineInstanceId, setEngineInstanceId] = useState(() => engineRef.current.instanceId);
+
+  // Detect engine reset by polling instanceId (cheap, no extra event system needed)
+  useEffect(() => {
+    const check = setInterval(() => {
+      const current = getAudioEngine();
+      if (current.instanceId !== engineRef.current.instanceId) {
+        engineRef.current = current;
+        setEngineInstanceId(current.instanceId);
+      }
+    }, 500);
+    return () => clearInterval(check);
+  }, []);
+
+  const engine = engineRef.current;
 
   const [state, setState] = useState<PlayerState>("stopped");
   const [positionSec, setPositionSec] = useState(0);
@@ -27,10 +43,11 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
   });
 
   const loadedKeyRef = useRef<string>("");
-  const lastConfigsRef = useRef<TrackConfig[]>([]);
+  const loadedEngineIdRef = useRef<number>(engineInstanceId);
 
   const audioClips = clips.filter((c) => c.hasAudio && c.audioPath);
 
+  // Subscribe to engine state
   useEffect(() => {
     const unsub = engine.subscribe((snap) => {
       setState(snap.state);
@@ -44,9 +61,14 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     .map((c) => `${c.id}:${c.audioPath}:${c.startSec}:${c.durationSec}:${c.loop ? "L" : ""}`)
     .join("|");
 
+  // When engine instance changes, invalidate loaded key to force reload
+  const needsReload = engineInstanceId !== loadedEngineIdRef.current;
+
   useEffect(() => {
-    if (clipsKey === loadedKeyRef.current) return;
+    // Skip if same clips AND same engine instance
+    if (clipsKey === loadedKeyRef.current && !needsReload) return;
     loadedKeyRef.current = clipsKey;
+    loadedEngineIdRef.current = engineInstanceId;
 
     if (audioClips.length === 0) {
       engine.loadTracks([]);
@@ -99,7 +121,6 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       }
 
       if (cancelled) return;
-      lastConfigsRef.current = configs;
 
       try {
         setLoadProgress({ total: configs.length, done: 0, loaded: 0, failed: 0, currentId: "", currentLabel: "" });
@@ -109,11 +130,9 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
         });
         if (!cancelled) {
           if (res.dropped > 0) {
-            // Identify which configs failed
             const loadedIds = new Set(Array.from((engine as any).tracks?.keys?.() ?? []));
             const failed = configs.filter(c => !loadedIds.has(c.id));
             setFailedConfigs(failed);
-            // Show final progress with failed count (don't null it out)
             setLoadProgress({ total: res.total, done: res.total, loaded: res.loaded, failed: res.dropped, currentId: "", currentLabel: "" });
           } else {
             setLoadProgress(null);
@@ -121,14 +140,17 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
           }
         }
       } catch (err: any) {
+        if (cancelled) return;
         console.error("[useTimelinePlayer] Failed to load tracks:", err);
+        // All tracks failed — populate failedConfigs so user can retry
+        setFailedConfigs(configs);
+        setLoadProgress({ total: configs.length, done: configs.length, loaded: 0, failed: configs.length, currentId: "", currentLabel: "" });
         const msg = err?.message ?? "";
         if (msg.includes("ctx=suspended") || msg.includes("ctx=closed")) {
           toast.error("AudioContext не активен. Нажмите кнопку ↺ для сброса движка, затем Play.");
         } else {
           toast.error("Не удалось загрузить аудиодорожки. Попробуйте кнопку ↺ сброса движка.");
         }
-        setLoadProgress(null);
       }
     };
 
@@ -138,7 +160,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clipsKey]);
+  }, [clipsKey, engineInstanceId]);
 
   // Retry only failed stems
   const retryFailed = useCallback(async () => {
@@ -148,11 +170,12 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     setLoadProgress({ total: toRetry.length, done: 0, loaded: 0, failed: 0, currentId: "", currentLabel: "" });
 
     try {
-      const res = await engine.loadAdditionalTracks(toRetry, (p) => {
+      const currentEngine = getAudioEngine();
+      const res = await currentEngine.loadAdditionalTracks(toRetry, (p) => {
         setLoadProgress(p);
       });
       if (res.dropped > 0) {
-        const loadedIds = new Set(Array.from((engine as any).tracks?.keys?.() ?? []));
+        const loadedIds = new Set(Array.from((currentEngine as any).tracks?.keys?.() ?? []));
         const stillFailed = toRetry.filter(c => !loadedIds.has(c.id));
         setFailedConfigs(stillFailed);
         setLoadProgress({ total: res.total, done: res.total, loaded: res.loaded, failed: res.dropped, currentId: "", currentLabel: "" });
@@ -167,7 +190,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       setLoadProgress(null);
       toast.error("Повторная загрузка не удалась.");
     }
-  }, [failedConfigs, engine]);
+  }, [failedConfigs]);
 
   // Sync master volume
   useEffect(() => {
@@ -181,27 +204,28 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
 
   const play = useCallback(async () => {
     try {
+      const currentEngine = getAudioEngine();
       if (volume === 0) {
         toast.warning("Громкость мастера = 0. Увеличьте ползунок справа от Play.");
       }
-      await engine.play();
+      await currentEngine.play();
     } catch (err) {
       console.error("[useTimelinePlayer] play failed:", err);
       toast.error("Не удалось воспроизвести аудио. Проверьте настройки браузера.");
     }
-  }, [engine, volume]);
+  }, [volume]);
 
-  const pause = useCallback(() => { engine.pause(); }, [engine]);
-  const stop = useCallback(() => { engine.stop(); }, [engine]);
-  const seek = useCallback((toSec: number) => { engine.seek(toSec); }, [engine]);
+  const pause = useCallback(() => { getAudioEngine().pause(); }, []);
+  const stop = useCallback(() => { getAudioEngine().stop(); }, []);
+  const seek = useCallback((toSec: number) => { getAudioEngine().seek(toSec); }, []);
 
   const changeVolume = useCallback(
     (v: number) => {
       const clamped = Math.max(0, Math.min(100, v));
       setVolumeState(clamped);
-      engine.setMasterVolume(clamped);
+      getAudioEngine().setMasterVolume(clamped);
     },
-    [engine]
+    []
   );
 
   return {
