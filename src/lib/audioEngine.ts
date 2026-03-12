@@ -749,7 +749,7 @@ class AudioEngine {
     for (const t of this.tracks.values()) t.schedule();
 
     this.notify();
-  }
+    return { total: configs.length, loaded: this.tracks.size, dropped };
 
   async addTrack(config: TrackConfig): Promise<void> {
     const bus = this.getBus(config.bus ?? "voice");
