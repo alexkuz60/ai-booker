@@ -1,9 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
+import { cn } from "@/lib/utils";
 
-export function LimiterGraph({ threshold }: { threshold: number }) {
+export function LimiterGraph({ threshold, className }: { threshold: number; className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useEffect(() => {
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -73,8 +74,18 @@ export function LimiterGraph({ threshold }: { threshold: number }) {
     ctx.fillText(`T: ${threshold} dB`, 3, ty - 3);
   }, [threshold]);
 
+  useEffect(() => { draw(); }, [draw]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ro = new ResizeObserver(() => draw());
+    ro.observe(canvas.parentElement!);
+    return () => ro.disconnect();
+  }, [draw]);
+
   return (
-    <div className="relative rounded-sm border border-border/40 overflow-hidden w-full h-[120px]">
+    <div className={cn("relative rounded-sm border border-border/40 overflow-hidden w-full", className)}>
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
     </div>
   );

@@ -105,21 +105,21 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
         </TabsList>
 
         {/* ═══ Tab 1: Dynamics ═══ */}
-        <TabsContent value="dynamics" className="flex-1 min-h-0 overflow-auto mt-2">
+        <TabsContent value="dynamics" className="flex-1 min-h-0 mt-2">
           <div className="flex gap-4 h-full divide-x divide-border/40">
             {/* ── EQ Column ── */}
             <div style={{ flex: "3 1 0%" }} className="min-w-0 flex flex-col gap-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between shrink-0">
                 <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">
                   {isRu ? "3-полосный EQ" : "3-Band EQ"}
                 </span>
                 <BypassButton label="EQ" bypassed={bypasses.eq} onToggle={() => toggleBypass("eq")} />
               </div>
-              <div className="flex gap-2 items-start">
-                <div className="flex-1 min-w-0">
-                  <EqGraph low={bypasses.eq ? 0 : eqLow} mid={bypasses.eq ? 0 : eqMid} high={bypasses.eq ? 0 : eqHigh} />
+              <div className="flex gap-2 flex-1 min-h-0">
+                <div className="flex-1 min-w-0 min-h-0">
+                  <EqGraph low={bypasses.eq ? 0 : eqLow} mid={bypasses.eq ? 0 : eqMid} high={bypasses.eq ? 0 : eqHigh} className="h-full" />
                 </div>
-                <div className="flex flex-col gap-1.5 shrink-0" style={{ width: 100 }}>
+                <div className="flex flex-col gap-1.5 shrink-0 justify-center" style={{ width: 100 }}>
                   <ParamSlider label="Low" value={eqLow} min={-12} max={12} step={0.5} unit=" dB"
                     onChange={v => { setEqLow(v); engine.setTrackEqLow(trackId, v); onMixChange?.(); }} disabled={bypasses.eq} />
                   <ParamSlider label="Mid" value={eqMid} min={-12} max={12} step={0.5} unit=" dB"
@@ -132,17 +132,17 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
 
             {/* ── Compressor Column ── */}
             <div style={{ flex: "1 1 0%" }} className="min-w-0 flex flex-col gap-2 pl-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between shrink-0">
                 <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">
                   {isRu ? "Компрессор" : "Compressor"}
                 </span>
                 <BypassButton label="CMP" bypassed={bypasses.comp} onToggle={() => toggleBypass("comp")} />
               </div>
-              <div className="flex gap-2 items-start">
-                <div className="flex-1 min-w-0">
-                  <KneeGraph threshold={compThreshold} ratio={compRatio} knee={compKnee} />
+              <div className="flex gap-2 flex-1 min-h-0">
+                <div className="flex-1 min-w-0 min-h-0">
+                  <KneeGraph threshold={compThreshold} ratio={compRatio} knee={compKnee} className="h-full" />
                 </div>
-                <div className="flex flex-col gap-1.5 shrink-0" style={{ width: 100 }}>
+                <div className="flex flex-col gap-1.5 shrink-0 justify-center" style={{ width: 100 }}>
                   <ParamSlider label={isRu ? "Порог" : "Threshold"} value={compThreshold} min={-60} max={0} step={1} unit=" dB"
                     onChange={v => { setCompThreshold(v); engine.setTrackCompThreshold(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
                   <ParamSlider label={isRu ? "Соотн." : "Ratio"} value={compRatio} min={1} max={20} step={0.5} unit=":1"
@@ -159,17 +159,17 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
 
             {/* ── Limiter Column (POST) ── */}
             <div style={{ flex: "1 1 0%" }} className="min-w-0 flex flex-col gap-2 pl-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between shrink-0">
                 <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">
                   {isRu ? "Лимитер" : "Limiter"}
                 </span>
                 <BypassButton label="LIM" bypassed={bypasses.limiter} onToggle={() => toggleBypass("limiter")} />
               </div>
-              <div className="flex gap-2 items-start">
-                <div className="flex-1 min-w-0">
-                  <LimiterGraph threshold={bypasses.limiter ? 0 : limThreshold} />
+              <div className="flex gap-2 flex-1 min-h-0">
+                <div className="flex-1 min-w-0 min-h-0">
+                  <LimiterGraph threshold={bypasses.limiter ? 0 : limThreshold} className="h-full" />
                 </div>
-                <div className="flex flex-col gap-1.5 shrink-0" style={{ width: 100 }}>
+                <div className="flex flex-col gap-1.5 shrink-0 justify-center" style={{ width: 100 }}>
                   <ParamSlider label={isRu ? "Порог" : "Threshold"} value={limThreshold} min={-30} max={0} step={0.5} unit=" dB"
                     onChange={v => { setLimThreshold(v); engine.setTrackLimiterThreshold(trackId, v); onMixChange?.(); }} disabled={bypasses.limiter} />
                 </div>
