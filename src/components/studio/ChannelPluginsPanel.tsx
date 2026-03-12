@@ -480,7 +480,7 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
         </div>
 
         {/* ── Compressor Column ── */}
-        <div className="flex-1 min-w-0 flex flex-col gap-2 pl-4">
+        <div style={{ flex: "1 1 0%" }} className="min-w-0 flex flex-col gap-2 pl-4">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">
               {isRu ? "Компрессор" : "Compressor"}
