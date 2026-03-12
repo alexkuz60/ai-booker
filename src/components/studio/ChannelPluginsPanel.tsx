@@ -33,11 +33,15 @@ export interface ClipInfo {
   segmentType?: string;
   startSec: number;
   durationSec: number;
+  /** Character color from book_characters.color */
+  charColor?: string;
 }
 
 interface ChannelPluginsPanelProps {
   isRu: boolean;
   clips: ClipInfo[];
+  /** ALL scene clips across all tracks (for Panner3D multi-character view) */
+  allSceneClips?: ClipInfo[];
   trackLabel?: string;
   trackColor?: string;
   trackId?: string;
