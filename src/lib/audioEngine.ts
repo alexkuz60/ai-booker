@@ -636,70 +636,56 @@ class AudioEngine {
       }
     }
 
+    let dropped = 0;
+
+    // Load large stem files sequentially to avoid decoder/network starvation.
     for (const cfg of configs) {
       const bus = this.getBus(cfg.bus ?? "voice");
       const track = new EngineTrack(cfg, bus);
       this.tracks.set(cfg.id, track);
-    }
 
-    // Wait for all players to load; drop tracks that failed to load
-    const loadResults = await Promise.all(
-      Array.from(this.tracks.entries()).map(async ([id, t]) => {
-        const loaded = await new Promise<boolean>((resolve) => {
-          if (t.player.loaded) {
-            resolve(true);
-            return;
-          }
+      const timeoutMs = Math.min(240_000, Math.max(30_000, Math.round((cfg.durationSec || 0) * 350)));
+      const startedAt = performance.now();
 
-          const timeout = setTimeout(() => {
-            console.warn(`[AudioEngine] Track ${id} timed out loading`);
-            resolve(false);
-          }, 30_000);
+      const loaded = await new Promise<boolean>((resolve) => {
+        if (track.player.loaded) {
+          resolve(true);
+          return;
+        }
 
-          // Use Tone.Player's native callbacks instead of polling
-          const origOnload = t.player.onstop; // save
-          t.player.onstop = origOnload; // keep
+        let settled = false;
+        const finish = (ok: boolean) => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timeoutId);
+          window.clearInterval(pollId);
+          resolve(ok);
+        };
 
-          // Tone.Buffer loaded event via ToneAudioBuffer
-          const buf = (t.player as any)._buffer ?? (t.player as any).buffer;
-          if (buf && typeof buf.onload === "function") {
-            // fallback: poll
-          }
+        const timeoutId = window.setTimeout(() => {
+          console.warn(`[AudioEngine] Track ${cfg.id} timed out loading after ${timeoutMs}ms`);
+          finish(false);
+        }, timeoutMs);
 
-          // Best approach: poll but also listen for errors
-          let errored = false;
-          const origOnerror = (t.player as any).onerror;
-          (t.player as any).onerror = (err: any) => {
-            console.error(`[AudioEngine] Track ${id} load error:`, err);
-            errored = true;
-            clearTimeout(timeout);
-            resolve(false);
-            if (origOnerror) origOnerror(err);
-          };
+        const pollId = window.setInterval(() => {
+          if (!track.player.loaded) return;
+          const elapsedMs = Math.round(performance.now() - startedAt);
+          console.log(`[AudioEngine] Track ${cfg.id} loaded in ${elapsedMs}ms`);
+          finish(true);
+        }, 120);
 
-          const check = () => {
-            if (errored) return;
-            if (t.player.loaded) {
-              clearTimeout(timeout);
-              resolve(true);
-            } else {
-              setTimeout(check, 100);
-            }
-          };
-          // Start checking after a small delay to let Tone initialize
-          setTimeout(check, 50);
-        });
+        const origOnerror = (track.player as any).onerror;
+        (track.player as any).onerror = (err: unknown) => {
+          console.error(`[AudioEngine] Track ${cfg.id} load error:`, err);
+          if (origOnerror) origOnerror(err);
+          finish(false);
+        };
+      });
 
-        return { id, track: t, loaded };
-      })
-    );
-
-    let dropped = 0;
-    for (const result of loadResults) {
-      if (!result.loaded) {
-        console.warn(`[AudioEngine] Dropping unloaded track: ${result.id}`);
-        result.track.dispose();
-        this.tracks.delete(result.id);
+      if (!loaded) {
+        console.warn(`[AudioEngine] Dropping unloaded track: ${cfg.id}`);
+        track.dispose();
+        this.tracks.delete(cfg.id);
         dropped++;
       }
     }
