@@ -756,9 +756,11 @@ export function StudioTimeline({
             <div className="flex-1 overflow-auto border-l border-border">
               <ChannelPluginsPanel
                 isRu={isRu}
-                trackId={pluginsTrackId}
+                clips={pluginsClips}
                 trackLabel={pluginsTrackLabel}
                 trackColor={pluginsTrackColor}
+                enabledClipIds={pluginEnabledClipIds}
+                onToggleClip={handleToggleClip}
                 onMixChange={() => { onMixChange(); onPluginsChange(); }}
               />
             </div>
