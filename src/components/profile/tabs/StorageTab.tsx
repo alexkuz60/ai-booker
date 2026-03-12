@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { ImpulsesSection } from './ImpulsesSection';
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 
