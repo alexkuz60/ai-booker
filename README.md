@@ -26,6 +26,7 @@ AI-Booker is a web application for automated audiobook production in a **radio p
 | 🔊 **Pro Mastering** | 5-band parametric filter, 3-band multiband compressor, stereo VU metering, FFT spectrum |
 | 🤖 **AI Roles** | 6 specialized AI roles (Screenwriter, Profiler, Director, etc.) with dedicated models |
 | 💬 **AI Assistant** | Context-aware chat assistant that guides through the production workflow |
+| 🎬 **Montage Workspace** | Final chapter assembly: stem-based timeline with mastering chain |
 
 ---
 
@@ -61,8 +62,9 @@ PDF File
               ▼
 ┌─────────────────────────────────┐
 │  11. Atmosphere + SFX           │  Auto + Freesound + manual
-│  12. Timeline editing           │  ⬜ (drag, snap, fade)
-│  13. Final audio export         │  ⬜
+│  12. Montage Workspace          │  Stem timeline, master chain 🔧
+│  13. Timeline editing             │  ⬜ (drag, snap, fade)
+│  14. Final audio export           │  ⬜
 └─────────────────────────────────┘
 
 🤖 Assistant — available at any stage
