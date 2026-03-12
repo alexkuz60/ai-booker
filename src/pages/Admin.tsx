@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { Shield, Loader2, UserPlus, Trash2, Users, Crown, Star, User, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
+import { ImpulseManager } from '@/components/admin/ImpulseManager';
 
 type AppRole = 'admin' | 'moderator' | 'user';
 
