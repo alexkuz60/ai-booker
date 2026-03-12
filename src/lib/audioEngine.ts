@@ -223,6 +223,9 @@ class EngineTrack {
   private convolverNode: Tone.Convolver;
   private _convolverBypassed = true;
   private _convolverDryWet = 0.3;
+  private _convolverDryGain: Tone.Gain;
+  private _convolverWetGain: Tone.Gain;
+  private _convolverMerge: Tone.Gain;
 
   // Per-channel reverb
   private reverbNode: Tone.Reverb;
