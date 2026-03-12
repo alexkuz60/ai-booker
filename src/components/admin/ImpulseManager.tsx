@@ -49,6 +49,8 @@ export function ImpulseManager({ isRu }: ImpulseManagerProps) {
   const [impulses, setImpulses] = useState<Impulse[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillProgress, setBackfillProgress] = useState("");
 
   // Form state
   const [name, setName] = useState("");
