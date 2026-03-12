@@ -911,8 +911,8 @@ class AudioEngine {
     this.masterSplitter.connect(this.masterMeterR, 1);
     this.masterSplitter.connect(this.masterDCMeterL, 0);
     this.masterSplitter.connect(this.masterDCMeterR, 1);
-    // Connect FFT analyzer to master reverb output (before destination)
-    this.masterReverb.connect(this.masterFFT);
+    // Connect FFT analyzer to splitter (same tap point as meters)
+    this.masterSplitter.connect(this.masterFFT);
     this.masterReverb.toDestination();
 
     // Sub-buses → MasterBus
