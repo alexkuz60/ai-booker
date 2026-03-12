@@ -250,7 +250,22 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
               }}
             >
               <div className="sticky top-0 z-20 bg-background">
-                <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} />
+                <TimelineRuler
+                  zoom={zoom}
+                  duration={duration}
+                  sceneBoundaries={sceneBoundaries}
+                  loadPercent={
+                    player.loadProgress && player.loadProgress.total > 0
+                      ? Math.round((player.loadProgress.done / player.loadProgress.total) * 100)
+                      : null
+                  }
+                  isLoading={
+                    player.loadProgress != null &&
+                    player.loadProgress.total > 0 &&
+                    player.loadProgress.done < player.loadProgress.total
+                  }
+                  loadLabel={player.loadProgress?.currentLabel || undefined}
+                />
               </div>
 
               {STEM_TRACKS.map((track) => {
