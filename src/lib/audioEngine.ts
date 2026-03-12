@@ -79,6 +79,19 @@ export interface TrackConfig {
   clipLenSec?: number;
   /** Crossfade overlap between loop iterations (seconds). Default 1. */
   loopCrossfadeSec?: number;
+  /** Human-readable label for progress display */
+  label?: string;
+}
+
+export interface LoadProgress {
+  /** Total number of tracks to load */
+  total: number;
+  /** Number of tracks loaded so far (including failed) */
+  done: number;
+  /** ID of the track currently loading */
+  currentId: string;
+  /** Label of the currently loading track */
+  currentLabel: string;
 }
 
 export type EngineState = "stopped" | "playing" | "paused";
@@ -615,7 +628,7 @@ class AudioEngine {
 
   // ─── Track management ──────────────────────────────────
 
-  async loadTracks(configs: TrackConfig[]): Promise<void> {
+  async loadTracks(configs: TrackConfig[], onProgress?: (p: LoadProgress) => void): Promise<void> {
     this.stop();
     for (const t of this.tracks.values()) t.dispose();
     this.tracks.clear();
@@ -639,7 +652,9 @@ class AudioEngine {
     let dropped = 0;
 
     // Load large stem files sequentially to avoid decoder/network starvation.
-    for (const cfg of configs) {
+    for (let ci = 0; ci < configs.length; ci++) {
+      const cfg = configs[ci];
+      onProgress?.({ total: configs.length, done: ci, currentId: cfg.id, currentLabel: cfg.label ?? cfg.id });
       const bus = this.getBus(cfg.bus ?? "voice");
       const track = new EngineTrack(cfg, bus);
       this.tracks.set(cfg.id, track);
@@ -689,6 +704,7 @@ class AudioEngine {
         dropped++;
       }
     }
+    onProgress?.({ total: configs.length, done: configs.length, currentId: "", currentLabel: "" });
 
     if (this.tracks.size === 0) {
       this._totalDuration = 0;

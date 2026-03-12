@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { getAudioEngine, type EngineState, type TrackConfig } from "@/lib/audioEngine";
+import { getAudioEngine, type EngineState, type TrackConfig, type LoadProgress } from "@/lib/audioEngine";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 
 export type PlayerState = EngineState;
@@ -16,6 +16,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
   const [state, setState] = useState<PlayerState>("stopped");
   const [positionSec, setPositionSec] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
+  const [loadProgress, setLoadProgress] = useState<LoadProgress | null>(null);
   const [volume, setVolumeState] = useState(() => {
     try {
       const v = Number(localStorage.getItem("timeline-volume"));
@@ -96,13 +97,18 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
           loop: clip.loop,
           clipLenSec: clip.clipLenSec,
           loopCrossfadeSec: clip.loopCrossfadeSec,
+          label: clip.label,
         });
       }
 
       if (cancelled) return;
 
       try {
-        await engine.loadTracks(configs);
+        setLoadProgress({ total: configs.length, done: 0, currentId: "", currentLabel: "" });
+        await engine.loadTracks(configs, (p) => {
+          if (!cancelled) setLoadProgress(p);
+        });
+        setLoadProgress(null);
       } catch (err: any) {
         console.error("[useTimelinePlayer] Failed to load tracks:", err);
         const msg = err?.message ?? "";
@@ -111,7 +117,8 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
         } else {
           toast.error("Не удалось загрузить аудиодорожки. Попробуйте кнопку ↺ сброса движка.");
         }
-      }
+        }
+        setLoadProgress(null);
     };
 
     loadAll();
@@ -172,6 +179,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     totalDuration: Math.max(computedTotalDuration, totalDuration),
     hasAudio: audioClips.length > 0,
     volume,
+    loadProgress,
     changeVolume,
     play,
     pause,
