@@ -15,6 +15,7 @@ const SEGMENT_TYPE_LABELS: Record<string, string> = {
   epigraph: "Эпиграф",
   lyric: "Стихи",
   footnote: "Комментатор",
+  telephone: "📞 Телефон",
 };
 
 /** System character routing: segment_type → system character name (lowercase) */

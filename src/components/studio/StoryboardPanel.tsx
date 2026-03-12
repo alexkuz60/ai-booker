@@ -56,7 +56,7 @@ interface CharacterOption {
 
 // ─── Segment type config ────────────────────────────────────
 
-const SEGMENT_TYPES = ["epigraph", "narrator", "first_person", "inner_thought", "dialogue", "monologue", "lyric", "footnote"] as const;
+const SEGMENT_TYPES = ["epigraph", "narrator", "first_person", "inner_thought", "dialogue", "monologue", "lyric", "footnote", "telephone"] as const;
 
 const SEGMENT_CONFIG: Record<string, {
   icon: typeof Quote;
@@ -72,6 +72,7 @@ const SEGMENT_CONFIG: Record<string, {
   monologue: { icon: MessageCircle, label_ru: "Монолог", label_en: "Monologue", color: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30" },
   lyric: { icon: Music, label_ru: "Лирика", label_en: "Lyric", color: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
   footnote: { icon: StickyNote, label_ru: "Сноска", label_en: "Footnote", color: "bg-muted text-muted-foreground border-border" },
+  telephone: { icon: Phone, label_ru: "Телефон", label_en: "Telephone", color: "bg-orange-500/20 text-orange-400 border-orange-500/30" },
 };
 
 // ─── Inline sound marker rendering ──────────────────────────
