@@ -299,9 +299,11 @@ class EngineTrack {
       coneOuterGain: 0,
     });
 
-    // POST: Convolver (bypassed — wet=0)
+    // POST: Convolver with manual dry/wet routing
     this.convolverNode = new Tone.Convolver();
-    this.convolverNode.wet.value = 0;
+    this._convolverDryGain = new Tone.Gain(1);
+    this._convolverWetGain = new Tone.Gain(0);
+    this._convolverMerge = new Tone.Gain(1);
 
     // Reverb: small room, bypassed
     this.reverbNode = new Tone.Reverb({
@@ -315,7 +317,7 @@ class EngineTrack {
     this.meterL = new Tone.Meter({ smoothing: 0.8 });
     this.meterR = new Tone.Meter({ smoothing: 0.8 });
 
-    // Chain: Player → EQ3 → Comp → Channel → Limiter → Reverb → Bus
+    // Chain: Player → EQ3 → Comp → Channel → Limiter → Panner3D → [ConvolverDry/Wet] → Reverb → Bus
     //                                  └→ MeterMono
     //        Reverb → Splitter → MeterL/R
     if (preloadedBuffer) {
@@ -338,7 +340,14 @@ class EngineTrack {
     this.preFxNode.connect(this.channel);
     this.channel.connect(this.meterMono);
     this.channel.connect(this.limiterNode);
-    this.limiterNode.connect(this.reverbNode);
+    this.limiterNode.connect(this.panner3dNode);
+    // Panner3D → convolver dry/wet split → merge → reverb
+    this.panner3dNode.connect(this._convolverDryGain);
+    this.panner3dNode.connect(this.convolverNode);
+    this.convolverNode.connect(this._convolverWetGain);
+    this._convolverDryGain.connect(this._convolverMerge);
+    this._convolverWetGain.connect(this._convolverMerge);
+    this._convolverMerge.connect(this.reverbNode);
     this.reverbNode.connect(bus);
     // Stereo metering tap
     this.reverbNode.connect(this.splitter);
