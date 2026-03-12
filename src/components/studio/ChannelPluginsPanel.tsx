@@ -442,20 +442,19 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
   }
 
   return (
-    <div className="flex flex-col h-full gap-2 px-3 py-2">
-      {/* Track label */}
-      <div className="flex items-center gap-2 shrink-0">
+    <div className="flex flex-col h-full px-3 py-2">
+      {/* Header: Track label + PRE badge */}
+      <div className="flex items-center gap-2 shrink-0 pb-2 border-b border-border/30 mb-2">
         <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: trackColor ?? "hsl(var(--primary))" }} />
         <span className="text-[10px] font-mono text-foreground/80 uppercase tracking-wider truncate">
           {trackLabel ?? trackId}
         </span>
+        <span className="text-[8px] font-mono text-muted-foreground/40 uppercase ml-auto">
+          {isRu ? "Канальные плагины · PRE → POST" : "Channel Plugins · PRE → POST"}
+        </span>
       </div>
 
-      {/* PRE section — two columns: EQ | Compressor */}
-      <div className="flex items-start gap-1 shrink-0">
-        <span className="text-[8px] font-mono text-muted-foreground/40 uppercase mt-0.5">PRE</span>
-      </div>
-
+      {/* Plugin columns — stretch to bottom */}
       <div className="flex gap-4 flex-1 min-h-0 overflow-auto divide-x divide-border/40">
         {/* ── EQ Column ── */}
         <div className="flex-1 min-w-0 flex flex-col gap-2">
@@ -508,17 +507,22 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
         </div>
 
         {/* ── Limiter Column (POST) ── */}
-        <div className="w-36 shrink-0 flex flex-col gap-2 pl-4">
+        <div className="flex-1 min-w-0 flex flex-col gap-2 pl-4">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">
-              <span className="text-[8px] text-muted-foreground/40 mr-1">POST</span>
               {isRu ? "Лимитер" : "Limiter"}
             </span>
             <BypassButton label="LIM" bypassed={bypasses.limiter} onToggle={() => toggleBypass("limiter")} />
           </div>
-          <LimiterGraph threshold={bypasses.limiter ? 0 : limThreshold} />
-          <ParamSlider label={isRu ? "Порог" : "Threshold"} value={limThreshold} min={-30} max={0} step={0.5} unit=" dB"
-            onChange={v => { setLimThreshold(v); engine.setTrackLimiterThreshold(trackId, v); onMixChange?.(); }} disabled={bypasses.limiter} />
+          <div className="flex gap-2 items-start">
+            <div className="flex-1 min-w-0">
+              <LimiterGraph threshold={bypasses.limiter ? 0 : limThreshold} />
+            </div>
+            <div className="flex flex-col gap-1.5 shrink-0" style={{ width: 100 }}>
+              <ParamSlider label={isRu ? "Порог" : "Threshold"} value={limThreshold} min={-30} max={0} step={0.5} unit=" dB"
+                onChange={v => { setLimThreshold(v); engine.setTrackLimiterThreshold(trackId, v); onMixChange?.(); }} disabled={bypasses.limiter} />
+            </div>
+          </div>
         </div>
       </div>
     </div>
