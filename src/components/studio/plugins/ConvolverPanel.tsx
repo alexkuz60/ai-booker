@@ -162,6 +162,31 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpd
     }
   }, [impulses, clipId, onUpdate]);
 
+  // Preview clip through convolver
+  const handlePreview = useCallback(async () => {
+    try {
+      const { getAudioEngine } = await import("@/lib/audioEngine");
+      const engine = getAudioEngine();
+      if (previewing) {
+        engine.stopPreview();
+        setPreviewing(false);
+      } else {
+        await engine.previewClip(clipId);
+        setPreviewing(true);
+        // Listen for engine state changes to detect when preview ends
+        const checkInterval = setInterval(() => {
+          if (engine.previewingTrackId !== clipId) {
+            setPreviewing(false);
+            clearInterval(checkInterval);
+          }
+        }, 300);
+      }
+    } catch (e) {
+      console.error("Preview error:", e);
+      setPreviewing(false);
+    }
+  }, [clipId, previewing]);
+
   return (
     <div className="flex flex-col gap-2 h-full">
       {/* Header */}
