@@ -282,6 +282,7 @@ class EngineTrack {
     this._loop = config.loop ?? false;
     this._clipLenSec = config.clipLenSec ?? config.durationSec;
     this._loopCrossfadeSec = config.loopCrossfadeSec ?? 0;
+    this._telephone = config.segmentType === "telephone";
 
     // PRE: EQ3 (bypassed)
     this.eqNode = new Tone.EQ3({ low: 0, mid: 0, high: 0 });
