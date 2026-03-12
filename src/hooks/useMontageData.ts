@@ -16,17 +16,6 @@ export interface SceneRender {
   status: string;
 }
 
-export interface BookOption {
-  id: string;
-  title: string;
-}
-
-export interface ChapterOption {
-  id: string;
-  title: string;
-  chapter_number: number;
-}
-
 export interface SceneOption {
   id: string;
   title: string;
@@ -45,61 +34,88 @@ export const STEM_TRACKS: StemTrack[] = [
   { id: "sfx", label: "SFX", color: "hsl(220 50% 55%)" },
 ];
 
+const LS_KEY = "montage_last_context";
+
+interface MontageContext {
+  bookId: string;
+  bookTitle: string;
+  chapterId: string;
+  chapterTitle: string;
+}
+
+function saveContext(ctx: MontageContext) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(ctx)); } catch { /* ignore */ }
+}
+
+function loadContext(): MontageContext | null {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
 // ─── Hook ───────────────────────────────────────────────────
 export function useMontageData() {
   const { user } = useAuth();
 
-  const [books, setBooks] = useState<BookOption[]>([]);
-  const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
-  const [chapters, setChapters] = useState<ChapterOption[]>([]);
-  const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
+  const [bookId, setBookId] = useState<string | null>(null);
+  const [bookTitle, setBookTitle] = useState<string>("");
+  const [chapterId, setChapterId] = useState<string | null>(null);
+  const [chapterTitle, setChapterTitle] = useState<string>("");
   const [scenes, setScenes] = useState<SceneOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [sceneRenders, setSceneRenders] = useState<SceneRender[]>([]);
-  const [rendersLoading, setRendersLoading] = useState(false);
 
-  // Restore from sessionStorage
+  // ── Resolve context: sessionStorage (from Studio) → localStorage (last used) ──
   useEffect(() => {
     const studioBookId = sessionStorage.getItem("montage_book_id");
     const studioChapterId = sessionStorage.getItem("montage_chapter_id");
-    if (studioBookId) { setSelectedBookId(studioBookId); sessionStorage.removeItem("montage_book_id"); }
-    if (studioChapterId) { setSelectedChapterId(studioChapterId); sessionStorage.removeItem("montage_chapter_id"); }
+
+    if (studioBookId && studioChapterId) {
+      sessionStorage.removeItem("montage_book_id");
+      sessionStorage.removeItem("montage_chapter_id");
+      setBookId(studioBookId);
+      setChapterId(studioChapterId);
+      // Fetch titles for header
+      fetchTitles(studioBookId, studioChapterId);
+    } else {
+      const saved = loadContext();
+      if (saved) {
+        setBookId(saved.bookId);
+        setBookTitle(saved.bookTitle);
+        setChapterId(saved.chapterId);
+        setChapterTitle(saved.chapterTitle);
+      }
+    }
+    setLoading(false);
   }, []);
 
-  // Load books
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      const { data } = await supabase.from("books").select("id, title").eq("user_id", user.id).order("updated_at", { ascending: false });
-      setBooks(data ?? []);
-      setLoading(false);
-    })();
-  }, [user?.id]);
-
-  // Load chapters
-  useEffect(() => {
-    if (!selectedBookId) { setChapters([]); setSelectedChapterId(null); return; }
-    (async () => {
-      const { data } = await supabase.from("book_chapters").select("id, title, chapter_number").eq("book_id", selectedBookId).order("chapter_number");
-      setChapters(data ?? []);
-    })();
-  }, [selectedBookId]);
+  async function fetchTitles(bId: string, cId: string) {
+    const [bookRes, chapterRes] = await Promise.all([
+      supabase.from("books").select("title").eq("id", bId).single(),
+      supabase.from("book_chapters").select("title").eq("id", cId).single(),
+    ]);
+    const bTitle = bookRes.data?.title ?? "";
+    const cTitle = chapterRes.data?.title ?? "";
+    setBookTitle(bTitle);
+    setChapterTitle(cTitle);
+    saveContext({ bookId: bId, bookTitle: bTitle, chapterId: cId, chapterTitle: cTitle });
+  }
 
   // Load scenes
   useEffect(() => {
-    if (!selectedChapterId) { setScenes([]); return; }
+    if (!chapterId) { setScenes([]); return; }
     (async () => {
-      const { data } = await supabase.from("book_scenes").select("id, title, scene_number, silence_sec").eq("chapter_id", selectedChapterId).order("scene_number");
+      const { data } = await supabase.from("book_scenes").select("id, title, scene_number, silence_sec").eq("chapter_id", chapterId).order("scene_number");
       setScenes(data ?? []);
     })();
-  }, [selectedChapterId]);
+  }, [chapterId]);
 
   const sceneIds = useMemo(() => scenes.map(s => s.id), [scenes]);
 
   // Load scene renders
   useEffect(() => {
     if (sceneIds.length === 0) { setSceneRenders([]); return; }
-    setRendersLoading(true);
     (async () => {
       const { data } = await supabase
         .from("scene_renders")
@@ -107,7 +123,6 @@ export function useMontageData() {
         .in("scene_id", sceneIds)
         .eq("status", "ready");
       setSceneRenders((data ?? []) as SceneRender[]);
-      setRendersLoading(false);
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sceneIds.join(",")]);
@@ -173,15 +188,11 @@ export function useMontageData() {
     return { clips, sceneBoundaries: boundaries, totalDurationSec: offset };
   }, [sceneIds, rendersMap, scenes]);
 
-  const selectedBook = books.find(b => b.id === selectedBookId);
-  const selectedChapter = chapters.find(c => c.id === selectedChapterId);
-
   return {
-    books, selectedBookId, setSelectedBookId,
-    chapters, selectedChapterId, setSelectedChapterId,
-    scenes, sceneIds, loading, rendersLoading,
+    bookId, bookTitle,
+    chapterId, chapterTitle,
+    scenes, sceneIds, loading,
     renderedSceneIds, unrenderedSceneIds,
     clips, sceneBoundaries, totalDurationSec,
-    selectedBook, selectedChapter,
   };
 }

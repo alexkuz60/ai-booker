@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Loader2, AlertCircle } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { useMontageData } from "@/hooks/useMontageData";
@@ -22,18 +21,16 @@ const Montage = () => {
   const { setPageHeader } = usePageHeader();
 
   const {
-    books, selectedBookId, setSelectedBookId,
-    chapters, selectedChapterId, setSelectedChapterId,
+    bookTitle, chapterId, chapterTitle,
     scenes, sceneIds, loading,
     renderedSceneIds, unrenderedSceneIds,
     clips, sceneBoundaries, totalDurationSec,
-    selectedBook, selectedChapter,
   } = useMontageData();
 
   // ── Page header ────────────────────────────────────────────
   const title = isRu ? "МОНТАЖ" : "MONTAGE";
-  const subtitle = selectedBook && selectedChapter
-    ? `${selectedBook.title} → ${selectedChapter.title}`
+  const subtitle = bookTitle && chapterTitle
+    ? `${bookTitle} → ${chapterTitle}`
     : (isRu ? "Финальный монтаж и мастеринг глав" : "Final chapter montage & mastering");
 
   useEffect(() => {
@@ -49,7 +46,7 @@ const Montage = () => {
     );
   }
 
-  const hasContent = !!selectedChapterId && sceneIds.length > 0;
+  const hasContent = !!chapterId && sceneIds.length > 0;
 
   return (
     <motion.div
@@ -57,33 +54,12 @@ const Montage = () => {
       animate={{ opacity: 1 }}
       className="flex flex-col h-[calc(100vh-3rem)] min-h-0 overflow-hidden"
     >
-      {/* Book/Chapter selectors */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-border shrink-0">
-        <Select value={selectedBookId ?? ""} onValueChange={(v) => { setSelectedBookId(v); setSelectedChapterId(null); }}>
-          <SelectTrigger className="h-8 w-[240px] text-sm font-body">
-            <SelectValue placeholder={isRu ? "Выберите книгу..." : "Select book..."} />
-          </SelectTrigger>
-          <SelectContent>
-            {books.map(b => (
-              <SelectItem key={b.id} value={b.id} className="text-sm">{b.title}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={selectedChapterId ?? ""} onValueChange={setSelectedChapterId} disabled={!selectedBookId}>
-          <SelectTrigger className="h-8 w-[300px] text-sm font-body">
-            <SelectValue placeholder={isRu ? "Выберите главу..." : "Select chapter..."} />
-          </SelectTrigger>
-          <SelectContent>
-            {chapters.map(c => (
-              <SelectItem key={c.id} value={c.id} className="text-sm">
-                {c.chapter_number}. {c.title}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {sceneIds.length > 0 && (
+      {/* Info bar */}
+      {hasContent && (
+        <div className="flex items-center gap-3 px-4 py-1.5 border-b border-border shrink-0">
+          <span className="text-xs text-muted-foreground font-body truncate">
+            {bookTitle} → {chapterTitle}
+          </span>
           <div className="flex items-center gap-2 ml-auto">
             {unrenderedSceneIds.length > 0 && (
               <span className="text-xs text-destructive flex items-center gap-1 font-body">
@@ -95,8 +71,8 @@ const Montage = () => {
               {renderedSceneIds.length}/{scenes.length} {isRu ? "сцен" : "scenes"} · {formatTime(totalDurationSec)}
             </span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Main content */}
       {hasContent ? (
@@ -118,7 +94,7 @@ const Montage = () => {
             clips={clips}
             sceneBoundaries={sceneBoundaries}
             totalDurationSec={totalDurationSec}
-            chapterId={selectedChapterId}
+            chapterId={chapterId}
             isRu={isRu}
           />
         </>
@@ -126,10 +102,12 @@ const Montage = () => {
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
           <div className="text-center space-y-2">
             <p className="text-lg font-display">
-              {isRu ? "Выберите книгу и главу для монтажа" : "Select a book and chapter to montage"}
+              {isRu ? "Нет выбранной главы" : "No chapter selected"}
             </p>
             <p className="text-sm font-body">
-              {isRu ? "Отрендерите сцены в Студии, затем соберите главу здесь" : "Render scenes in Studio, then assemble the chapter here"}
+              {isRu
+                ? "Откройте главу из Студии кнопкой ✂ или вернитесь к последней сессии"
+                : "Open a chapter from Studio via ✂ button or return to your last session"}
             </p>
           </div>
         </div>
