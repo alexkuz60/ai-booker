@@ -42,8 +42,8 @@ interface ChannelPluginsPanelProps {
   trackId?: string;
   /** Per-clip plugin configs from useClipPluginConfigs */
   clipConfigs: Record<string, ClipPluginConfig>;
-  onTogglePlugin: (clipId: string, plugin: "eq" | "comp" | "limiter") => void;
-  onUpdateParams: (clipId: string, plugin: "eq" | "comp" | "limiter", params: Partial<ClipEqConfig> | Partial<ClipCompConfig> | Partial<ClipLimiterConfig>) => void;
+  onTogglePlugin: (clipId: string, plugin: "eq" | "comp" | "limiter" | "panner3d" | "convolver") => void;
+  onUpdateParams: (clipId: string, plugin: "eq" | "comp" | "limiter" | "panner3d" | "convolver", params: Partial<ClipEqConfig> | Partial<ClipCompConfig> | Partial<ClipLimiterConfig> | Partial<ClipPanner3dConfig> | Partial<ClipConvolverConfig>) => void;
 }
 
 // ─── Main component ─────────────────────────────────────────
