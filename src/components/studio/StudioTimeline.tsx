@@ -350,6 +350,7 @@ export function StudioTimeline({
   }, [allTracks, timelineClips]);
   const { scheduleSave: onMixChange } = useMixerPersistence(sceneId ?? null, engineTrackIds);
   const { scheduleSave: onPluginsChange } = usePluginsPersistence(sceneId ?? null, engineTrackIds);
+  const clipPlugins = useClipPluginConfigs(sceneId ?? null);
 
   // ── Layout / zoom ─────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
