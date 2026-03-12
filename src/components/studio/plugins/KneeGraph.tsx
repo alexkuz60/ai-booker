@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 export function KneeGraph({ threshold, ratio, knee, className }: { threshold: number; ratio: number; knee: number; className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useEffect(() => {
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
