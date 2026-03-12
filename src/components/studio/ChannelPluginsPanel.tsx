@@ -456,7 +456,7 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
         <span className="text-[8px] font-mono text-muted-foreground/40 uppercase mt-0.5">PRE</span>
       </div>
 
-      <div className="flex gap-4 flex-1 min-h-0 overflow-auto">
+      <div className="flex gap-4 flex-1 min-h-0 overflow-auto divide-x divide-border/40">
         {/* ── EQ Column ── */}
         <div className="flex-1 min-w-0 flex flex-col gap-2">
           <div className="flex items-center justify-between">
