@@ -193,7 +193,7 @@ class EngineTrack {
   private playerB: Tone.Player | null = null;
   private loopScheduledIds: number[] = [];
 
-  constructor(config: TrackConfig, bus: Tone.Channel) {
+  constructor(config: TrackConfig, bus: Tone.Channel, preloadedBuffer?: ToneAudioBuffer) {
     this.id = config.id;
     this.startSec = config.startSec;
     this.durationSec = config.durationSec;
@@ -236,11 +236,19 @@ class EngineTrack {
     // Chain: Player → PreFX → Channel → Reverb → Splitter → MeterL/R
     //                              └→ MeterMono
     //        Reverb → Bus (main output)
-    this.player = new Tone.Player({
-      url: config.url,
-      fadeIn: 0,
-      fadeOut: this._fadeOutSec,
-    });
+    if (preloadedBuffer) {
+      this.player = new Tone.Player({
+        fadeIn: 0,
+        fadeOut: this._fadeOutSec,
+      });
+      this.player.buffer = preloadedBuffer;
+    } else {
+      this.player = new Tone.Player({
+        url: config.url,
+        fadeIn: 0,
+        fadeOut: this._fadeOutSec,
+      });
+    }
 
     // Wire signal chain
     this.player.connect(this.preFxNode);
@@ -255,11 +263,19 @@ class EngineTrack {
 
     // Create secondary player for crossfade looping
     if (this._loop && this._loopCrossfadeSec > 0) {
-      this.playerB = new Tone.Player({
-        url: config.url,
-        fadeIn: this._loopCrossfadeSec,
-        fadeOut: this._loopCrossfadeSec,
-      });
+      if (preloadedBuffer) {
+        this.playerB = new Tone.Player({
+          fadeIn: this._loopCrossfadeSec,
+          fadeOut: this._loopCrossfadeSec,
+        });
+        this.playerB.buffer = preloadedBuffer;
+      } else {
+        this.playerB = new Tone.Player({
+          url: config.url,
+          fadeIn: this._loopCrossfadeSec,
+          fadeOut: this._loopCrossfadeSec,
+        });
+      }
       this.playerB.connect(this.preFxNode);
     }
 
