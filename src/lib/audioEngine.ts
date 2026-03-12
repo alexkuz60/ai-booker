@@ -628,7 +628,7 @@ class AudioEngine {
 
   // ─── Track management ──────────────────────────────────
 
-  async loadTracks(configs: TrackConfig[]): Promise<void> {
+  async loadTracks(configs: TrackConfig[], onProgress?: (p: LoadProgress) => void): Promise<void> {
     this.stop();
     for (const t of this.tracks.values()) t.dispose();
     this.tracks.clear();
