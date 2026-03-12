@@ -546,6 +546,8 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             onTrim={handleTrim}
             onFadeIn={handleFadeIn}
             onFadeOut={handleFadeOut}
+            onUndo={handleUndo}
+            canUndo={undoStack.length > 0}
           />
         </div>
       )}
