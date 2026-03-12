@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { clearStemCache } from "@/lib/stemCache";
 import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 
 // ─── Types ──────────────────────────────────────────────────
