@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 export function LimiterGraph({ threshold, className }: { threshold: number; className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useEffect(() => {
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
