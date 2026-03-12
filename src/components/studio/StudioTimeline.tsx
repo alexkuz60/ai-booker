@@ -725,6 +725,19 @@ export function StudioTimeline({
               <Playhead positionSec={player.positionSec} zoom={zoom} />
             </div>
           </div>
+
+          {/* ── Plugins right sidebar ── */}
+          {timelineView === "plugins" && (
+            <div className="w-[420px] shrink-0 border-l border-border overflow-auto">
+              <ChannelPluginsPanel
+                isRu={isRu}
+                trackId={pluginsTrackId}
+                trackLabel={pluginsTrackLabel}
+                trackColor={pluginsTrackColor}
+                onMixChange={() => { onMixChange(); onPluginsChange(); }}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
