@@ -132,6 +132,7 @@ export interface ChannelEqState {
 export interface ChannelCompState {
   threshold: number;
   ratio: number;
+  knee: number;
   attack: number;
   release: number;
   bypassed: boolean;
