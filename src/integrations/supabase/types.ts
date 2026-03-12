@@ -284,6 +284,47 @@ export type Database = {
           },
         ]
       }
+      clip_plugin_configs: {
+        Row: {
+          clip_id: string
+          config: Json
+          created_at: string
+          id: string
+          scene_id: string
+          track_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          clip_id: string
+          config?: Json
+          created_at?: string
+          id?: string
+          scene_id: string
+          track_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          clip_id?: string
+          config?: Json
+          created_at?: string
+          id?: string
+          scene_id?: string
+          track_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clip_plugin_configs_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "book_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       convolution_impulses: {
         Row: {
           category: string
