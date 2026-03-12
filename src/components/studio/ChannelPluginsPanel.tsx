@@ -1,10 +1,12 @@
 /**
- * ChannelPluginsPanel — PRE (EQ + Compressor) and POST (Limiter) channel plugin controls
- * for the selected track in StudioTimeline.
+ * ChannelPluginsPanel — PRE (EQ + Compressor) side-by-side and POST (Limiter) below.
+ * EQ: 3-band frequency response graph (LPF, BPF, HPF).
+ * Compressor: Knee/transfer graph + compact sliders.
+ * Limiter: Transfer graph + threshold slider.
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { getAudioEngine, type ChannelEqState, type ChannelCompState, type ChannelLimiterState } from "@/lib/audioEngine";
+import { getAudioEngine } from "@/lib/audioEngine";
 import { Power } from "lucide-react";
 
 // ─── Shared parameter slider ───────────────────────────────
@@ -49,107 +51,333 @@ function BypassButton({ label, bypassed, onToggle }: { label: string; bypassed: 
   );
 }
 
-// ─── EQ Panel (PRE) ─────────────────────────────────────────
+// ─── EQ Frequency Response Graph ────────────────────────────
 
-function ChannelEqPanel({ trackId, isRu, disabled }: { trackId: string; isRu: boolean; disabled: boolean }) {
-  const engine = getAudioEngine();
-  const ms = engine.getTrackMixState(trackId);
-  const init = ms?.eq ?? { low: 0, mid: 0, high: 0, bypassed: true };
-  const [low, setLow] = useState(init.low);
-  const [mid, setMid] = useState(init.mid);
-  const [high, setHigh] = useState(init.high);
+function EqGraph({ low, mid, high }: { low: number; mid: number; high: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Sync when trackId changes
   useEffect(() => {
-    const s = engine.getTrackMixState(trackId)?.eq;
-    if (s) { setLow(s.low); setMid(s.mid); setHigh(s.high); }
-  }, [trackId]);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const dbMin = -14;
+    const dbMax = 14;
+    const range = dbMax - dbMin;
+
+    // Freq range: 20 Hz – 20 kHz (log scale)
+    const fMin = 20;
+    const fMax = 20000;
+    const logMin = Math.log10(fMin);
+    const logMax = Math.log10(fMax);
+
+    const toX = (f: number) => ((Math.log10(f) - logMin) / (logMax - logMin)) * w;
+    const toY = (db: number) => h - ((db - dbMin) / range) * h;
+
+    // Background
+    ctx.fillStyle = "hsla(0, 0%, 5%, 0.95)";
+    ctx.fillRect(0, 0, w, h);
+
+    // Grid
+    ctx.strokeStyle = "hsla(0, 0%, 100%, 0.07)";
+    ctx.lineWidth = 1;
+    for (const f of [50, 100, 200, 500, 1000, 2000, 5000, 10000]) {
+      const x = toX(f);
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    }
+    for (let db = -12; db <= 12; db += 6) {
+      const y = toY(db);
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+
+    // Freq labels
+    ctx.fillStyle = "hsla(0, 0%, 100%, 0.2)";
+    ctx.font = "8px monospace";
+    ctx.textAlign = "center";
+    for (const [f, lbl] of [[100, "100"], [1000, "1k"], [10000, "10k"]] as [number, string][]) {
+      ctx.fillText(lbl, toX(f), h - 2);
+    }
+    // dB labels
+    ctx.textAlign = "right";
+    for (const db of [-12, -6, 0, 6, 12]) {
+      ctx.fillText(`${db > 0 ? "+" : ""}${db}`, w - 2, toY(db) + 3);
+    }
+
+    // Zero line
+    ctx.strokeStyle = "hsla(0, 0%, 100%, 0.15)";
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(0, toY(0)); ctx.lineTo(w, toY(0)); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // EQ3 crossover frequencies (approximate Tone.EQ3 defaults)
+    const lowFreq = 400;   // LPF shelf center
+    const highFreq = 2500; // HPF shelf center
+
+    // Compute per-band response at each frequency point
+    const N = w;
+    const combined = new Float32Array(N);
+
+    for (let i = 0; i < N; i++) {
+      const norm = i / (N - 1);
+      const freq = Math.pow(10, logMin + norm * (logMax - logMin));
+
+      // Simple shelf model: low shelf, mid bell, high shelf
+      // Low shelf: full below lowFreq, rolls off above
+      const lowResp = low / (1 + Math.pow(freq / lowFreq, 2));
+      // High shelf: full above highFreq, rolls off below
+      const highResp = high / (1 + Math.pow(highFreq / freq, 2));
+      // Mid: bell around geometric mean
+      const midFreq = Math.sqrt(lowFreq * highFreq);
+      const midQ = 1.2;
+      const midResp = mid / (1 + Math.pow((freq / midFreq - midFreq / freq) * midQ, 2));
+
+      combined[i] = lowResp + midResp + highResp;
+    }
+
+    // Draw individual band curves
+    const bandConfigs = [
+      { data: (i: number) => { const f = Math.pow(10, logMin + (i / (N-1)) * (logMax - logMin)); return low / (1 + Math.pow(f / lowFreq, 2)); }, color: "hsla(200, 70%, 55%, 0.4)", label: "LPF" },
+      { data: (i: number) => { const f = Math.pow(10, logMin + (i / (N-1)) * (logMax - logMin)); const mf = Math.sqrt(lowFreq * highFreq); return mid / (1 + Math.pow((f / mf - mf / f) * 1.2, 2)); }, color: "hsla(50, 70%, 55%, 0.4)", label: "BPF" },
+      { data: (i: number) => { const f = Math.pow(10, logMin + (i / (N-1)) * (logMax - logMin)); return high / (1 + Math.pow(highFreq / f, 2)); }, color: "hsla(340, 70%, 55%, 0.4)", label: "HPF" },
+    ];
+
+    for (const band of bandConfigs) {
+      ctx.strokeStyle = band.color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i < N; i++) {
+        const x = (i / (N - 1)) * w;
+        const y = toY(band.data(i));
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // Draw combined curve
+    ctx.strokeStyle = "hsl(200, 70%, 60%)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < N; i++) {
+      const x = (i / (N - 1)) * w;
+      const y = toY(combined[i]);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Fill under combined
+    ctx.lineTo(w, toY(0));
+    ctx.lineTo(0, toY(0));
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, "hsla(200, 70%, 55%, 0.12)");
+    grad.addColorStop(0.5, "hsla(200, 70%, 55%, 0.03)");
+    grad.addColorStop(1, "hsla(200, 70%, 55%, 0.12)");
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+  }, [low, mid, high]);
 
   return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[10px] text-muted-foreground/60 font-body">
-        {isRu ? "3-полосный эквалайзер" : "3-Band Equalizer"}
-      </span>
-      <ParamSlider label="Low" value={low} min={-12} max={12} step={0.5} unit=" dB"
-        onChange={v => { setLow(v); engine.setTrackEqLow(trackId, v); }} disabled={disabled} />
-      <ParamSlider label="Mid" value={mid} min={-12} max={12} step={0.5} unit=" dB"
-        onChange={v => { setMid(v); engine.setTrackEqMid(trackId, v); }} disabled={disabled} />
-      <ParamSlider label="High" value={high} min={-12} max={12} step={0.5} unit=" dB"
-        onChange={v => { setHigh(v); engine.setTrackEqHigh(trackId, v); }} disabled={disabled} />
+    <div className="relative rounded-sm border border-border/40 overflow-hidden w-full" style={{ aspectRatio: "2.2" }}>
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
     </div>
   );
 }
 
-// ─── Compressor Panel (PRE) ─────────────────────────────────
+// ─── Compressor Knee Graph ──────────────────────────────────
 
-function ChannelCompPanel({ trackId, isRu, disabled }: { trackId: string; isRu: boolean; disabled: boolean }) {
-  const engine = getAudioEngine();
-  const ms = engine.getTrackMixState(trackId);
-  const init = ms?.comp ?? { threshold: -24, ratio: 3, attack: 0.01, release: 0.1, bypassed: true };
-  const [threshold, setThreshold] = useState(init.threshold);
-  const [ratio, setRatio] = useState(init.ratio);
-  const [attack, setAttack] = useState(init.attack);
-  const [release, setRelease] = useState(init.release);
+function KneeGraph({ threshold, ratio, knee }: { threshold: number; ratio: number; knee: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    const s = engine.getTrackMixState(trackId)?.comp;
-    if (s) { setThreshold(s.threshold); setRatio(s.ratio); setAttack(s.attack); setRelease(s.release); }
-  }, [trackId]);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const dbMin = -60;
+    const dbMax = 0;
+    const range = dbMax - dbMin;
+    const toX = (db: number) => ((db - dbMin) / range) * w;
+    const toY = (db: number) => h - ((db - dbMin) / range) * h;
+
+    const computeOut = (input: number): number => {
+      const halfKnee = knee / 2;
+      if (input <= threshold - halfKnee) return input;
+      if (input >= threshold + halfKnee) return threshold + (input - threshold) / ratio;
+      const x = input - threshold + halfKnee;
+      return input + ((1 / ratio - 1) * x * x) / (2 * knee);
+    };
+
+    ctx.fillStyle = "hsla(0, 0%, 5%, 0.95)";
+    ctx.fillRect(0, 0, w, h);
+
+    // Grid
+    ctx.strokeStyle = "hsla(0, 0%, 100%, 0.07)";
+    ctx.lineWidth = 1;
+    for (let db = -48; db <= 0; db += 12) {
+      const x = toX(db); const y = toY(db);
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+
+    // Unity line
+    ctx.strokeStyle = "hsla(0, 0%, 100%, 0.12)";
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(toX(dbMin), toY(dbMin)); ctx.lineTo(toX(dbMax), toY(dbMax)); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Threshold line
+    ctx.strokeStyle = "hsla(50, 80%, 50%, 0.3)";
+    ctx.setLineDash([2, 2]);
+    const tx = toX(threshold);
+    ctx.beginPath(); ctx.moveTo(tx, 0); ctx.lineTo(tx, h); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Transfer curve
+    ctx.strokeStyle = "hsl(140, 70%, 55%)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i <= w; i++) {
+      const inputDb = dbMin + (i / w) * range;
+      const x = toX(inputDb);
+      const y = toY(computeOut(inputDb));
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Fill
+    ctx.lineTo(toX(dbMax), toY(dbMin));
+    ctx.lineTo(toX(dbMin), toY(dbMin));
+    ctx.closePath();
+    const fillGrad = ctx.createLinearGradient(0, 0, 0, h);
+    fillGrad.addColorStop(0, "hsla(140, 70%, 50%, 0.15)");
+    fillGrad.addColorStop(1, "hsla(140, 70%, 50%, 0.02)");
+    ctx.fillStyle = fillGrad;
+    ctx.fill();
+
+    // Threshold label
+    ctx.fillStyle = "hsla(50, 80%, 60%, 0.8)";
+    ctx.font = "bold 8px monospace";
+    ctx.textAlign = "left";
+    ctx.fillText(`T: ${threshold} dB`, tx + 2, 10);
+  }, [threshold, ratio, knee]);
 
   return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[10px] text-muted-foreground/60 font-body">
-        {isRu ? "Компрессор" : "Compressor"}
-      </span>
-      <ParamSlider label={isRu ? "Порог" : "Threshold"} value={threshold} min={-60} max={0} step={1} unit=" dB"
-        onChange={v => { setThreshold(v); engine.setTrackCompThreshold(trackId, v); }} disabled={disabled} />
-      <ParamSlider label={isRu ? "Соотн." : "Ratio"} value={ratio} min={1} max={20} step={0.5} unit=":1"
-        onChange={v => { setRatio(v); engine.setTrackCompRatio(trackId, v); }} disabled={disabled} />
-      <ParamSlider label={isRu ? "Атака" : "Attack"} value={attack} min={0.001} max={0.5} step={0.001} unit=" s"
-        onChange={v => { setAttack(v); engine.setTrackCompAttack(trackId, v); }} disabled={disabled} />
-      <ParamSlider label={isRu ? "Восст." : "Release"} value={release} min={0.01} max={1.0} step={0.01} unit=" s"
-        onChange={v => { setRelease(v); engine.setTrackCompRelease(trackId, v); }} disabled={disabled} />
+    <div className="relative rounded-sm border border-border/40 overflow-hidden w-full" style={{ aspectRatio: "1" }}>
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
     </div>
   );
 }
 
-// ─── Limiter Panel (POST) ───────────────────────────────────
+// ─── Limiter Graph ──────────────────────────────────────────
 
-function ChannelLimiterPanel({ trackId, isRu, disabled }: { trackId: string; isRu: boolean; disabled: boolean }) {
-  const engine = getAudioEngine();
-  const ms = engine.getTrackMixState(trackId);
-  const init = ms?.limiter ?? { threshold: -3, bypassed: true };
-  const [threshold, setThreshold] = useState(init.threshold);
+function LimiterGraph({ threshold }: { threshold: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    const s = engine.getTrackMixState(trackId)?.limiter;
-    if (s) setThreshold(s.threshold);
-  }, [trackId]);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const dbMin = -60;
+    const dbMax = 0;
+    const range = dbMax - dbMin;
+    const toX = (db: number) => ((db - dbMin) / range) * w;
+    const toY = (db: number) => h - ((db - dbMin) / range) * h;
+    const computeOut = (input: number): number => input <= threshold ? input : threshold;
+
+    ctx.fillStyle = "hsla(0, 0%, 5%, 0.95)";
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = "hsla(0, 0%, 100%, 0.07)";
+    ctx.lineWidth = 1;
+    for (let db = -48; db <= 0; db += 12) {
+      const x = toX(db); const y = toY(db);
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+
+    // Unity
+    ctx.strokeStyle = "hsla(0, 0%, 100%, 0.12)";
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(toX(dbMin), toY(dbMin)); ctx.lineTo(toX(dbMax), toY(dbMax)); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Threshold
+    ctx.strokeStyle = "hsla(0, 70%, 55%, 0.3)";
+    ctx.setLineDash([2, 2]);
+    const ty = toY(threshold);
+    ctx.beginPath(); ctx.moveTo(0, ty); ctx.lineTo(w, ty); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Curve
+    ctx.strokeStyle = "hsl(0, 70%, 60%)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i <= w; i++) {
+      const inputDb = dbMin + (i / w) * range;
+      const x = toX(inputDb);
+      const y = toY(computeOut(inputDb));
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    ctx.lineTo(toX(dbMax), toY(dbMin));
+    ctx.lineTo(toX(dbMin), toY(dbMin));
+    ctx.closePath();
+    const fillGrad = ctx.createLinearGradient(0, 0, 0, h);
+    fillGrad.addColorStop(0, "hsla(0, 70%, 50%, 0.15)");
+    fillGrad.addColorStop(1, "hsla(0, 70%, 50%, 0.02)");
+    ctx.fillStyle = fillGrad;
+    ctx.fill();
+
+    ctx.fillStyle = "hsla(0, 70%, 65%, 0.8)";
+    ctx.font = "bold 8px monospace";
+    ctx.textAlign = "left";
+    ctx.fillText(`T: ${threshold} dB`, 3, ty - 3);
+  }, [threshold]);
 
   return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[10px] text-muted-foreground/60 font-body">
-        {isRu ? "Лимитер" : "Limiter"}
-      </span>
-      <ParamSlider label={isRu ? "Порог" : "Threshold"} value={threshold} min={-30} max={0} step={0.5} unit=" dB"
-        onChange={v => { setThreshold(v); engine.setTrackLimiterThreshold(trackId, v); }} disabled={disabled} />
+    <div className="relative rounded-sm border border-border/40 overflow-hidden w-full" style={{ aspectRatio: "1" }}>
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
     </div>
   );
 }
 
 // ─── Main component ─────────────────────────────────────────
 
-type PluginSection = "eq" | "comp" | "limiter";
-
-const SECTIONS: { id: PluginSection; label: string; labelRu: string; group: "pre" | "post" }[] = [
-  { id: "eq", label: "EQ", labelRu: "EQ", group: "pre" },
-  { id: "comp", label: "CMP", labelRu: "КМП", group: "pre" },
-  { id: "limiter", label: "LIM", labelRu: "ЛИМ", group: "post" },
-];
-
 interface ChannelPluginsPanelProps {
   isRu: boolean;
-  /** The engine track ID (clip ID) to control. Null = no track selected. */
   trackId: string | null;
   trackLabel?: string;
   trackColor?: string;
@@ -158,26 +386,40 @@ interface ChannelPluginsPanelProps {
 
 export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onMixChange }: ChannelPluginsPanelProps) {
   const engine = getAudioEngine();
-  const [activeSection, setActiveSection] = useState<PluginSection>("eq");
 
-  // Bypass states
+  // ── State ──
+  const [eqLow, setEqLow] = useState(0);
+  const [eqMid, setEqMid] = useState(0);
+  const [eqHigh, setEqHigh] = useState(0);
+
+  const [compThreshold, setCompThreshold] = useState(-24);
+  const [compRatio, setCompRatio] = useState(3);
+  const [compKnee, setCompKnee] = useState(10);
+  const [compAttack, setCompAttack] = useState(0.01);
+  const [compRelease, setCompRelease] = useState(0.1);
+
+  const [limThreshold, setLimThreshold] = useState(-3);
+
   const [bypasses, setBypasses] = useState({ eq: true, comp: true, limiter: true });
 
-  // Poll bypass states
+  // ── Sync from engine ──
   useEffect(() => {
     if (!trackId) return;
     const sync = () => {
       const ms = engine.getTrackMixState(trackId);
-      if (ms) {
-        setBypasses({ eq: ms.eq.bypassed, comp: ms.comp.bypassed, limiter: ms.limiter.bypassed });
-      }
+      if (!ms) return;
+      setEqLow(ms.eq.low); setEqMid(ms.eq.mid); setEqHigh(ms.eq.high);
+      setCompThreshold(ms.comp.threshold); setCompRatio(ms.comp.ratio);
+      setCompKnee(ms.comp.knee); setCompAttack(ms.comp.attack); setCompRelease(ms.comp.release);
+      setLimThreshold(ms.limiter.threshold);
+      setBypasses({ eq: ms.eq.bypassed, comp: ms.comp.bypassed, limiter: ms.limiter.bypassed });
     };
     sync();
     const iv = setInterval(sync, 500);
     return () => clearInterval(iv);
   }, [trackId, engine]);
 
-  const toggleBypass = useCallback((section: PluginSection) => {
+  const toggleBypass = useCallback((section: "eq" | "comp" | "limiter") => {
     if (!trackId) return;
     setBypasses(prev => {
       const next = !prev[section];
@@ -199,11 +441,8 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
     );
   }
 
-  const currentGroup = SECTIONS.find(s => s.id === activeSection)?.group ?? "pre";
-  const disabled = bypasses[activeSection];
-
   return (
-    <div className="flex flex-col h-full gap-1 px-2 py-1">
+    <div className="flex flex-col h-full gap-2 px-3 py-2">
       {/* Track label */}
       <div className="flex items-center gap-2 shrink-0">
         <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: trackColor ?? "hsl(var(--primary))" }} />
@@ -212,67 +451,67 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
         </span>
       </div>
 
-      {/* PRE / POST groups + section tabs */}
-      <div className="flex items-center gap-1 shrink-0">
-        <span className="text-[8px] font-mono text-muted-foreground/40 uppercase">PRE</span>
-        {SECTIONS.filter(s => s.group === "pre").map(s => (
-          <button
-            key={s.id}
-            onClick={() => setActiveSection(s.id)}
-            className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase leading-none transition-colors ${
-              activeSection === s.id
-                ? bypasses[s.id]
-                  ? "bg-muted/40 text-muted-foreground font-bold"
-                  : "bg-primary/20 text-primary font-bold"
-                : bypasses[s.id]
-                  ? "text-muted-foreground/30 hover:text-muted-foreground/50"
-                  : "text-foreground/50 hover:text-foreground/80"
-            }`}
-          >
-            {isRu ? s.labelRu : s.label}
-          </button>
-        ))}
-
-        <div className="w-px h-3 bg-border mx-1" />
-
-        <span className="text-[8px] font-mono text-muted-foreground/40 uppercase">POST</span>
-        {SECTIONS.filter(s => s.group === "post").map(s => (
-          <button
-            key={s.id}
-            onClick={() => setActiveSection(s.id)}
-            className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase leading-none transition-colors ${
-              activeSection === s.id
-                ? bypasses[s.id]
-                  ? "bg-muted/40 text-muted-foreground font-bold"
-                  : "bg-primary/20 text-primary font-bold"
-                : bypasses[s.id]
-                  ? "text-muted-foreground/30 hover:text-muted-foreground/50"
-                  : "text-foreground/50 hover:text-foreground/80"
-            }`}
-          >
-            {isRu ? s.labelRu : s.label}
-          </button>
-        ))}
-
-        {/* Bypass toggle for active section */}
-        <button
-          onClick={() => toggleBypass(activeSection)}
-          className={`ml-auto flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono uppercase leading-none transition-colors font-semibold ${
-            bypasses[activeSection]
-              ? "text-muted-foreground/40 bg-transparent border border-border/50"
-              : "text-accent bg-accent/15 border border-accent/50"
-          }`}
-        >
-          <Power className="h-2.5 w-2.5" />
-          {bypasses[activeSection] ? "OFF" : "ON"}
-        </button>
+      {/* PRE section — two columns: EQ | Compressor */}
+      <div className="flex items-start gap-1 shrink-0">
+        <span className="text-[8px] font-mono text-muted-foreground/40 uppercase mt-0.5">PRE</span>
       </div>
 
-      {/* Plugin content */}
-      <div className="flex-1 min-h-0 overflow-auto py-1">
-        {activeSection === "eq" && <ChannelEqPanel trackId={trackId} isRu={isRu} disabled={disabled} />}
-        {activeSection === "comp" && <ChannelCompPanel trackId={trackId} isRu={isRu} disabled={disabled} />}
-        {activeSection === "limiter" && <ChannelLimiterPanel trackId={trackId} isRu={isRu} disabled={disabled} />}
+      <div className="flex gap-4 flex-1 min-h-0 overflow-auto">
+        {/* ── EQ Column ── */}
+        <div className="flex-1 min-w-0 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">
+              {isRu ? "3-полосный EQ" : "3-Band EQ"}
+            </span>
+            <BypassButton label="EQ" bypassed={bypasses.eq} onToggle={() => toggleBypass("eq")} />
+          </div>
+          <EqGraph low={bypasses.eq ? 0 : eqLow} mid={bypasses.eq ? 0 : eqMid} high={bypasses.eq ? 0 : eqHigh} />
+          <div className="flex flex-col gap-1.5">
+            <ParamSlider label="Low" value={eqLow} min={-12} max={12} step={0.5} unit=" dB"
+              onChange={v => { setEqLow(v); engine.setTrackEqLow(trackId, v); onMixChange?.(); }} disabled={bypasses.eq} />
+            <ParamSlider label="Mid" value={eqMid} min={-12} max={12} step={0.5} unit=" dB"
+              onChange={v => { setEqMid(v); engine.setTrackEqMid(trackId, v); onMixChange?.(); }} disabled={bypasses.eq} />
+            <ParamSlider label="High" value={eqHigh} min={-12} max={12} step={0.5} unit=" dB"
+              onChange={v => { setEqHigh(v); engine.setTrackEqHigh(trackId, v); onMixChange?.(); }} disabled={bypasses.eq} />
+          </div>
+        </div>
+
+        {/* ── Compressor Column ── */}
+        <div className="flex-1 min-w-0 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">
+              {isRu ? "Компрессор" : "Compressor"}
+            </span>
+            <BypassButton label="CMP" bypassed={bypasses.comp} onToggle={() => toggleBypass("comp")} />
+          </div>
+          <KneeGraph threshold={compThreshold} ratio={compRatio} knee={compKnee} />
+          <div className="flex flex-col gap-1.5">
+            <ParamSlider label={isRu ? "Порог" : "Threshold"} value={compThreshold} min={-60} max={0} step={1} unit=" dB"
+              onChange={v => { setCompThreshold(v); engine.setTrackCompThreshold(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
+            <ParamSlider label={isRu ? "Соотн." : "Ratio"} value={compRatio} min={1} max={20} step={0.5} unit=":1"
+              onChange={v => { setCompRatio(v); engine.setTrackCompRatio(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
+            <ParamSlider label="Knee" value={compKnee} min={0} max={30} step={1} unit=" dB"
+              onChange={v => { setCompKnee(v); engine.setTrackCompKnee(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
+            <ParamSlider label={isRu ? "Атака" : "Attack"} value={compAttack} min={0.001} max={0.5} step={0.001} unit=" s"
+              onChange={v => { setCompAttack(v); engine.setTrackCompAttack(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
+            <ParamSlider label={isRu ? "Восст." : "Release"} value={compRelease} min={0.01} max={1.0} step={0.01} unit=" s"
+              onChange={v => { setCompRelease(v); engine.setTrackCompRelease(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
+          </div>
+        </div>
+
+        {/* ── Limiter Column (POST) ── */}
+        <div className="w-36 shrink-0 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">
+              <span className="text-[8px] text-muted-foreground/40 mr-1">POST</span>
+              {isRu ? "Лимитер" : "Limiter"}
+            </span>
+            <BypassButton label="LIM" bypassed={bypasses.limiter} onToggle={() => toggleBypass("limiter")} />
+          </div>
+          <LimiterGraph threshold={bypasses.limiter ? 0 : limThreshold} />
+          <ParamSlider label={isRu ? "Порог" : "Threshold"} value={limThreshold} min={-30} max={0} step={0.5} unit=" dB"
+            onChange={v => { setLimThreshold(v); engine.setTrackLimiterThreshold(trackId, v); onMixChange?.(); }} disabled={bypasses.limiter} />
+        </div>
       </div>
     </div>
   );
