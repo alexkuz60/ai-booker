@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Upload, Trash2, Waves, Music } from "lucide-react";
+import { Loader2, Upload, Trash2, Waves, Music, RefreshCw } from "lucide-react";
 
 const CATEGORIES = ["hall", "room", "plate", "chamber", "spring", "outdoor", "special"] as const;
 type ImpulseCategory = typeof CATEGORIES[number];
@@ -37,6 +37,7 @@ interface Impulse {
   channels: number;
   is_public: boolean;
   created_at: string;
+  peaks: number[] | null;
 }
 
 interface ImpulseManagerProps {
@@ -48,6 +49,8 @@ export function ImpulseManager({ isRu }: ImpulseManagerProps) {
   const [impulses, setImpulses] = useState<Impulse[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillProgress, setBackfillProgress] = useState("");
 
   // Form state
   const [name, setName] = useState("");
@@ -159,6 +162,61 @@ export function ImpulseManager({ isRu }: ImpulseManagerProps) {
     }
   };
 
+  /* ─── Backfill Peaks ─────────────────────────────────────────────────── */
+
+  const handleBackfillPeaks = async () => {
+    const missing = impulses.filter(i => !i.peaks || (i.peaks as any[]).length === 0);
+    if (missing.length === 0) {
+      toast.info(isRu ? "Все импульсы уже имеют peaks" : "All impulses already have peaks");
+      return;
+    }
+
+    setBackfilling(true);
+    let done = 0;
+    let errors = 0;
+
+    for (const imp of missing) {
+      setBackfillProgress(`${done + 1}/${missing.length}: ${imp.name}`);
+      try {
+        const { data: urlData } = await supabase.storage
+          .from("impulse-responses")
+          .createSignedUrl(imp.file_path, 600);
+        if (!urlData?.signedUrl) throw new Error("No signed URL");
+
+        const resp = await fetch(urlData.signedUrl);
+        if (!resp.ok) throw new Error(`Fetch ${resp.status}`);
+        const arrayBuf = await resp.arrayBuffer();
+
+        const { computePeaks } = await import("@/lib/irPeaks");
+        const audioCtx = new AudioContext();
+        const decoded = await audioCtx.decodeAudioData(arrayBuf);
+        const peaks = computePeaks(decoded);
+        audioCtx.close();
+
+        const { error } = await supabase
+          .from("convolution_impulses")
+          .update({ peaks } as any)
+          .eq("id", imp.id);
+        if (error) throw error;
+        done++;
+      } catch (e: any) {
+        console.error(`Backfill failed for ${imp.name}:`, e);
+        errors++;
+      }
+    }
+
+    setBackfilling(false);
+    setBackfillProgress("");
+    toast.success(
+      isRu
+        ? `Peaks пересчитаны: ${done} из ${missing.length}${errors ? `, ошибок: ${errors}` : ""}`
+        : `Peaks computed: ${done} of ${missing.length}${errors ? `, errors: ${errors}` : ""}`
+    );
+    await fetchImpulses();
+  };
+
+  const missingPeaksCount = impulses.filter(i => !i.peaks || (i.peaks as any[]).length === 0).length;
+
   return (
     <div className="space-y-6">
       {/* Upload form */}
@@ -217,6 +275,26 @@ export function ImpulseManager({ isRu }: ImpulseManagerProps) {
             {isRu ? "Коллекция импульсов" : "Impulse Collection"}
             <Badge variant="secondary" className="ml-2 text-xs">{impulses.length}</Badge>
           </CardTitle>
+          <div className="ml-auto flex items-center gap-2">
+            {backfilling && (
+              <span className="text-xs text-muted-foreground truncate max-w-48">{backfillProgress}</span>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={backfilling || missingPeaksCount === 0}
+              onClick={handleBackfillPeaks}
+              className="shrink-0"
+            >
+              {backfilling
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+              {isRu ? "Пересчитать peaks" : "Recompute peaks"}
+              {missingPeaksCount > 0 && (
+                <Badge variant="destructive" className="ml-1.5 h-5 px-1.5 text-[10px]">{missingPeaksCount}</Badge>
+              )}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
