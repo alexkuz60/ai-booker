@@ -36,6 +36,16 @@ interface MontageTimelineProps {
 }
 
 export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chapterId, isRu, onSplitAtScene, hasParts }: MontageTimelineProps) {
+  // ── Undo stack ───────────────────────────────────────────────
+  type UndoSnapshot = {
+    trimOverrides: Map<string, { offsetSec: number; newDurationSec: number }>;
+    fadeOverrides: Map<string, { fadeInSec: number; fadeOutSec: number }>;
+  };
+  const [undoStack, setUndoStack] = useState<UndoSnapshot[]>([]);
+  const pushUndo = useCallback((trim: Map<string, { offsetSec: number; newDurationSec: number }>, fade: Map<string, { fadeInSec: number; fadeOutSec: number }>) => {
+    setUndoStack(prev => [...prev.slice(-19), { trimOverrides: new Map(trim), fadeOverrides: new Map(fade) }]);
+  }, []);
+
   // ── Trim overrides: per-clip { offsetSec, newDurationSec } ──
   const [trimOverrides, setTrimOverrides] = useState<Map<string, { offsetSec: number; newDurationSec: number }>>(new Map());
 
