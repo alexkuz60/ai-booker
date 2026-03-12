@@ -37,6 +37,14 @@ export function getStemTracks(isRu: boolean): StemTrack[] {
   ];
 }
 
+export interface MontagePart {
+  id: string;
+  chapter_id: string;
+  part_number: number;
+  scene_ids: string[];
+  user_id: string;
+}
+
 /** @deprecated Use getStemTracks(isRu) instead */
 export const STEM_TRACKS = getStemTracks(false);
 
