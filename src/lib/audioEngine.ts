@@ -82,6 +82,8 @@ export interface TrackConfig {
   loopCrossfadeSec?: number;
   /** Human-readable label for progress display */
   label?: string;
+  /** Stable cache key (e.g. storage audioPath). If set, Cache API is used. */
+  cacheKey?: string;
 }
 
 export interface LoadProgress {
