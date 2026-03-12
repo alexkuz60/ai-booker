@@ -5,7 +5,7 @@
  */
 
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import { Loader2, Scissors, ArrowUpRight, ArrowDownRight, Maximize, AudioWaveform } from "lucide-react";
+import { Loader2, Scissors, ArrowUpRight, ArrowDownRight, Maximize, AudioWaveform, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { chooseLod, type MultiLodPeaks, type StereoPeaks } from "@/lib/waveformPeaks";
 import { useWaveformPeaks, type WaveformStatus } from "@/hooks/useWaveformPeaks";
