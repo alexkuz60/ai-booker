@@ -595,10 +595,20 @@ export function WaveformEditor({
             size="sm"
             className="h-5 px-1.5 text-[10px] gap-0.5"
             disabled={!canUndo}
-            title={isRu ? "Отменить (Undo)" : "Undo"}
+            title={isRu ? "Отменить (Ctrl+Z)" : "Undo (Ctrl+Z)"}
             onClick={onUndo}
           >
             <Undo2 className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 px-1.5 text-[10px] gap-0.5"
+            disabled={!canRedo}
+            title={isRu ? "Повторить (Ctrl+Shift+Z)" : "Redo (Ctrl+Shift+Z)"}
+            onClick={onRedo}
+          >
+            <Redo2 className="h-3 w-3" />
           </Button>
         </div>
       </div>
