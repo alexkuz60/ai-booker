@@ -645,7 +645,7 @@ export function StudioTimeline({
             trackId={pluginsTrackId}
             trackLabel={pluginsTrackLabel}
             trackColor={pluginsTrackColor}
-            onMixChange={onMixChange}
+            onMixChange={() => { onMixChange(); onPluginsChange(); }}
           />
         </div>
       )}
