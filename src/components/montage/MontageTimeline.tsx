@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { ZoomIn, ZoomOut, Maximize2, Play, Pause, Square, Volume2, VolumeX, ChevronUp, ChevronDown, RotateCcw, Loader2, RefreshCw, AlertTriangle, Scissors } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2, Play, Pause, Square, Volume2, VolumeX, ChevronUp, ChevronDown, Loader2, RefreshCw, AlertTriangle, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
-import { resetAudioEngine } from "@/lib/audioEngine";
+
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
 import { TimelineMasterMeter } from "@/components/studio/TimelineMasterMeter";
 import { TimelineRuler } from "@/components/studio/TimelineRuler";
@@ -270,18 +270,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             );
           })()}
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-            title={isRu ? "Сброс аудио движка" : "Reset audio engine"}
-            onClick={() => {
-              resetAudioEngine();
-              toast.success(isRu ? "Аудио движок перезапущен" : "Audio engine restarted");
-            }}
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-          </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("out")}><ZoomOut className="h-3.5 w-3.5" /></Button>
           <Select value={String(montageZoomPercent)} onValueChange={(v) => applyMontageZoom(Number(v))}>
             <SelectTrigger className="h-7 w-[72px] text-xs font-body border-none bg-transparent px-2">

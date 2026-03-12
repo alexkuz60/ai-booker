@@ -10,14 +10,6 @@ export type PlayerState = EngineState;
  * Manages playback of timeline audio clips via the Tone.js-based AudioEngine.
  */
 export function useTimelinePlayer(clips: TimelineClip[]) {
-  const [reloadTrigger, setReloadTrigger] = useState(0);
-
-  // Listen for engine reset events
-  useEffect(() => {
-    const handler = () => setReloadTrigger(n => n + 1);
-    window.addEventListener("audio-engine-reset", handler);
-    return () => window.removeEventListener("audio-engine-reset", handler);
-  }, []);
 
   const engine = getAudioEngine();
 
@@ -36,7 +28,6 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
   });
 
   const loadedKeyRef = useRef<string>("");
-  const loadedReloadRef = useRef<number>(0);
 
   const audioClips = clips.filter((c) => c.hasAudio && c.audioPath);
 
@@ -54,12 +45,9 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     .map((c) => `${c.id}:${c.audioPath}:${c.startSec}:${c.durationSec}:${c.loop ? "L" : ""}`)
     .join("|");
 
-  const needsReload = reloadTrigger !== loadedReloadRef.current;
-
   useEffect(() => {
-    if (clipsKey === loadedKeyRef.current && !needsReload) return;
+    if (clipsKey === loadedKeyRef.current) return;
     loadedKeyRef.current = clipsKey;
-    loadedReloadRef.current = reloadTrigger;
 
     if (audioClips.length === 0) {
       engine.loadTracks([]);
@@ -140,9 +128,9 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
         setLoadProgress({ total: configs.length, done: configs.length, loaded: 0, failed: configs.length, currentId: "", currentLabel: "" });
         const msg = err?.message ?? "";
         if (msg.includes("ctx=suspended") || msg.includes("ctx=closed")) {
-          toast.error("AudioContext не активен. Нажмите кнопку ↺ для сброса движка, затем Play.");
+          toast.error("AudioContext не активен. Перезагрузите страницу и нажмите Play.");
         } else {
-          toast.error("Не удалось загрузить аудиодорожки. Попробуйте кнопку ↺ сброса движка.");
+          toast.error("Не удалось загрузить аудиодорожки. Перезагрузите страницу.");
         }
       }
     };
@@ -153,7 +141,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clipsKey, reloadTrigger]);
+  }, [clipsKey]);
 
   // Retry only failed stems
   const retryFailed = useCallback(async () => {
