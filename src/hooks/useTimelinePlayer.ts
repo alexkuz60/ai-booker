@@ -103,7 +103,11 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       if (cancelled) return;
 
       try {
-        await engine.loadTracks(configs);
+        setLoadProgress({ total: configs.length, done: 0, currentId: "", currentLabel: "" });
+        await engine.loadTracks(configs, (p) => {
+          if (!cancelled) setLoadProgress(p);
+        });
+        setLoadProgress(null);
       } catch (err: any) {
         console.error("[useTimelinePlayer] Failed to load tracks:", err);
         const msg = err?.message ?? "";
