@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
+import { cn } from "@/lib/utils";
 
-export function KneeGraph({ threshold, ratio, knee }: { threshold: number; ratio: number; knee: number }) {
+export function KneeGraph({ threshold, ratio, knee, className }: { threshold: number; ratio: number; knee: number; className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
