@@ -21,6 +21,7 @@ interface WaveformEditorProps {
   positionSec: number;
   scrollLeft: number;
   visibleWidth: number;
+  mixerWidth: number;
   isRu: boolean;
   onSeek: (sec: number) => void;
 }
@@ -77,7 +78,7 @@ function drawChannel(
   for (let i = 0; i <= visiblePeaks; i++) {
     const idx = startIdx + i;
     if (idx >= peakCount) break;
-    const px = ((idx / peakCount) * totalWidthPx - scrollLeftPx) * dpr;
+    const px = (x + (idx / peakCount) * totalWidthPx - scrollLeftPx) * dpr;
     const val = data[idx] || 0;
     const yPos = mid - val * amp;
     if (i === 0) ctx.moveTo(px, yPos * dpr);
@@ -87,7 +88,7 @@ function drawChannel(
   for (let i = visiblePeaks; i >= 0; i--) {
     const idx = startIdx + i;
     if (idx >= peakCount) continue;
-    const px = ((idx / peakCount) * totalWidthPx - scrollLeftPx) * dpr;
+    const px = (x + (idx / peakCount) * totalWidthPx - scrollLeftPx) * dpr;
     const val = data[idx] || 0;
     const yPos = mid + val * amp;
     ctx.lineTo(px, yPos * dpr);
@@ -105,14 +106,14 @@ function drawChannel(
   ctx.strokeStyle = color.replace(")", " / 0.3)").replace("hsl(", "hsl(");
   ctx.lineWidth = 0.5;
   ctx.beginPath();
-  ctx.moveTo(0, mid * dpr);
-  ctx.lineTo(w * dpr, mid * dpr);
+  ctx.moveTo(x * dpr, mid * dpr);
+  ctx.lineTo((x + w) * dpr, mid * dpr);
   ctx.stroke();
 
   // Channel label
   ctx.fillStyle = color.replace(")", " / 0.5)").replace("hsl(", "hsl(");
   ctx.font = `${10 * dpr}px monospace`;
-  ctx.fillText(channelLabel, 4 * dpr, (y + 12) * dpr);
+  ctx.fillText(channelLabel, (x + 4) * dpr, (y + 12) * dpr);
 
   // Selection highlight
   if (selection) {
@@ -146,6 +147,7 @@ export function WaveformEditor({
   positionSec,
   scrollLeft,
   visibleWidth,
+  mixerWidth,
   isRu,
   onSeek,
 }: WaveformEditorProps) {
@@ -195,22 +197,37 @@ export function WaveformEditor({
     ctx.fillStyle = resolveHsl("--background");
     ctx.fillRect(0, 0, w * dpr, h * dpr);
 
+    // Mixer sidebar separator
+    const borderColor = resolveHsl("--border");
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(mixerWidth * dpr, 0);
+    ctx.lineTo(mixerWidth * dpr, h * dpr);
+    ctx.stroke();
+
+    // Offset drawing to after mixer sidebar
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(mixerWidth * dpr, 0, (w - mixerWidth) * dpr, h * dpr);
+    ctx.clip();
+
     const waveColor = resolveHsl("--cyan-glow");
+    const waveW = w - mixerWidth;
 
     // Draw L channel
-    drawChannel(ctx, currentPeaks, 0, 0, w, chH, waveColor, scrollLeft, totalWidthPx, selection, duration, "L");
+    drawChannel(ctx, currentPeaks, mixerWidth, 0, waveW, chH, waveColor, scrollLeft, totalWidthPx, selection, duration, "L");
 
     // Gap line
-    const borderColor = resolveHsl("--border");
     ctx.fillStyle = borderColor.replace(")", " / 0.5)").replace("hsl(", "hsl(");
-    ctx.fillRect(0, chH * dpr, w * dpr, CHANNEL_GAP * dpr);
+    ctx.fillRect(mixerWidth * dpr, chH * dpr, waveW * dpr, CHANNEL_GAP * dpr);
 
     // Draw R channel
-    drawChannel(ctx, currentPeaks, 0, chH + CHANNEL_GAP, w, chH, waveColor, scrollLeft, totalWidthPx, selection, duration, "R");
+    drawChannel(ctx, currentPeaks, mixerWidth, chH + CHANNEL_GAP, waveW, chH, waveColor, scrollLeft, totalWidthPx, selection, duration, "R");
 
     // Playhead
-    const playheadPx = (positionSec / duration) * totalWidthPx - scrollLeft;
-    if (playheadPx >= 0 && playheadPx <= w) {
+    const playheadPx = (positionSec / duration) * totalWidthPx - scrollLeft + mixerWidth;
+    if (playheadPx >= mixerWidth && playheadPx <= w) {
       ctx.strokeStyle = resolveHsl("--primary");
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -218,7 +235,8 @@ export function WaveformEditor({
       ctx.lineTo(playheadPx * dpr, h * dpr);
       ctx.stroke();
     }
-  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, duration, positionSec]);
+    ctx.restore();
+  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, duration, positionSec, mixerWidth]);
 
   // Redraw on RAF when playing
   const rafRef = useRef<number>(0);
@@ -247,10 +265,10 @@ export function WaveformEditor({
       const canvas = canvasRef.current;
       if (!canvas) return 0;
       const rect = canvas.getBoundingClientRect();
-      const px = clientX - rect.left + scrollLeft;
+      const px = clientX - rect.left - mixerWidth + scrollLeft;
       return Math.max(0, Math.min(duration, (px / totalWidthPx) * duration));
     },
-    [scrollLeft, totalWidthPx, duration],
+    [scrollLeft, totalWidthPx, duration, mixerWidth],
   );
 
   const handleMouseDown = useCallback(
