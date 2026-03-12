@@ -245,12 +245,15 @@ class EngineTrack {
     this._clipLenSec = config.clipLenSec ?? config.durationSec;
     this._loopCrossfadeSec = config.loopCrossfadeSec ?? 0;
 
-    // Pre-FX: light compressor, bypassed
+    // PRE: EQ3 (bypassed)
+    this.eqNode = new Tone.EQ3({ low: 0, mid: 0, high: 0 });
+
+    // PRE: Compressor (bypassed)
     this.preFxNode = new Tone.Compressor({
-      threshold: -24,
-      ratio: 3,
-      attack: 0.01,
-      release: 0.1,
+      threshold: this._compThreshold,
+      ratio: this._compRatio,
+      attack: this._compAttack,
+      release: this._compRelease,
     });
 
     // Channel: volume + pan
@@ -258,6 +261,9 @@ class EngineTrack {
       volume: volumeToDB(this._volume),
       pan: this._pan,
     });
+
+    // POST: Limiter (bypassed — set threshold to 0 when bypassed)
+    this.limiterNode = new Tone.Limiter(0);
 
     // Reverb: small room, bypassed
     this.reverbNode = new Tone.Reverb({
@@ -271,9 +277,9 @@ class EngineTrack {
     this.meterL = new Tone.Meter({ smoothing: 0.8 });
     this.meterR = new Tone.Meter({ smoothing: 0.8 });
 
-    // Chain: Player → PreFX → Channel → Reverb → Splitter → MeterL/R
-    //                              └→ MeterMono
-    //        Reverb → Bus (main output)
+    // Chain: Player → EQ3 → Comp → Channel → Limiter → Reverb → Bus
+    //                                  └→ MeterMono
+    //        Reverb → Splitter → MeterL/R
     if (preloadedBuffer) {
       this.player = new Tone.Player({
         fadeIn: 0,
@@ -289,10 +295,12 @@ class EngineTrack {
     }
 
     // Wire signal chain
-    this.player.connect(this.preFxNode);
+    this.player.connect(this.eqNode);
+    this.eqNode.connect(this.preFxNode);
     this.preFxNode.connect(this.channel);
     this.channel.connect(this.meterMono);
-    this.channel.connect(this.reverbNode);
+    this.channel.connect(this.limiterNode);
+    this.limiterNode.connect(this.reverbNode);
     this.reverbNode.connect(bus);
     // Stereo metering tap
     this.reverbNode.connect(this.splitter);
