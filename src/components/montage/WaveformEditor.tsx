@@ -24,6 +24,7 @@ interface WaveformEditorProps {
   mixerWidth: number;
   isRu: boolean;
   onSeek: (sec: number) => void;
+  onTrim?: (trackId: string, startSec: number, endSec: number) => void;
 }
 
 // ── Selection state ──────────────────────────────────────────
