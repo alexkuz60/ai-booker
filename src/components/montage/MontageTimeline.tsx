@@ -4,7 +4,7 @@ import { ZoomIn, ZoomOut, Maximize2, Play, Pause, Square, Volume2, VolumeX, Chev
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
-import { resetAudioEngine } from "@/lib/audioEngine";
+
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
 import { TimelineMasterMeter } from "@/components/studio/TimelineMasterMeter";
 import { TimelineRuler } from "@/components/studio/TimelineRuler";
