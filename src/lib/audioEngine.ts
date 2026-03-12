@@ -697,54 +697,34 @@ class AudioEngine {
         currentId: cfg.id,
         currentLabel: cfg.label ?? cfg.id,
       });
-      const bus = this.getBus(cfg.bus ?? "voice");
-      const track = new EngineTrack(cfg, bus);
-      this.tracks.set(cfg.id, track);
 
-      const timeoutMs = Math.min(900_000, Math.max(120_000, Math.round((cfg.durationSec || 0) * 1200)));
       const startedAt = performance.now();
+      let buffer: Tone.ToneAudioBuffer | null = null;
 
-      const loaded = await new Promise<boolean>((resolve) => {
-        if (track.player.loaded) {
-          resolve(true);
-          return;
-        }
+      try {
+        // Fetch audio data (cache-first if cacheKey provided)
+        const arrayBuf = cfg.cacheKey
+          ? await fetchWithStemCache(cfg.cacheKey, cfg.url)
+          : await fetch(cfg.url).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.arrayBuffer(); });
 
-        let settled = false;
-        const finish = (ok: boolean) => {
-          if (settled) return;
-          settled = true;
-          window.clearTimeout(timeoutId);
-          window.clearInterval(pollId);
-          resolve(ok);
-        };
+        // Decode into ToneAudioBuffer
+        const audioCtx = Tone.getContext().rawContext as AudioContext;
+        const decoded = await audioCtx.decodeAudioData(arrayBuf.slice(0));
+        buffer = new Tone.ToneAudioBuffer(decoded);
 
-        const timeoutId = window.setTimeout(() => {
-          console.warn(`[AudioEngine] Track ${cfg.id} timed out loading after ${timeoutMs}ms`);
-          finish(false);
-        }, timeoutMs);
+        const elapsedMs = Math.round(performance.now() - startedAt);
+        console.log(`[AudioEngine] Track ${cfg.id} fetched+decoded in ${elapsedMs}ms${cfg.cacheKey ? " (cache-aware)" : ""}`);
+      } catch (err) {
+        console.error(`[AudioEngine] Track ${cfg.id} fetch/decode error:`, err);
+      }
 
-        const pollId = window.setInterval(() => {
-          if (!track.player.loaded) return;
-          const elapsedMs = Math.round(performance.now() - startedAt);
-          console.log(`[AudioEngine] Track ${cfg.id} loaded in ${elapsedMs}ms`);
-          finish(true);
-        }, 120);
-
-        const origOnerror = (track.player as any).onerror;
-        (track.player as any).onerror = (err: unknown) => {
-          console.error(`[AudioEngine] Track ${cfg.id} load error:`, err);
-          if (origOnerror) origOnerror(err);
-          finish(false);
-        };
-      });
-
-      if (!loaded) {
-        console.warn(`[AudioEngine] Dropping unloaded track: ${cfg.id}`);
-        track.dispose();
-        this.tracks.delete(cfg.id);
+      if (!buffer) {
+        console.warn(`[AudioEngine] Dropping failed track: ${cfg.id}`);
         dropped++;
       } else {
+        const bus = this.getBus(cfg.bus ?? "voice");
+        const track = new EngineTrack(cfg, bus, buffer);
+        this.tracks.set(cfg.id, track);
         loadedCount++;
       }
 
