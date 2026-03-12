@@ -14,19 +14,7 @@ import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 
 const MIXER_SIDEBAR = 160;
 
-const UNDER_100_STEPS = [5, 10, 15, 25, 50, 75, 100] as const;
-
-function stepZoom(cur: number, dir: "in" | "out"): number {
-  if (dir === "in") {
-    if (cur < 100) return UNDER_100_STEPS.find(s => s > cur + 0.001) ?? 100;
-    return Math.min(1000, (Math.floor(cur / 100) + 1) * 100);
-  }
-  if (cur <= 100) {
-    const lower = UNDER_100_STEPS.filter(s => s < cur - 0.001);
-    return lower.length > 0 ? lower[lower.length - 1] : 5;
-  }
-  return Math.max(100, (Math.ceil(cur / 100) - 1) * 100);
-}
+const MONTAGE_ZOOM_PRESETS = [95, 100, 200, 300, 400, 500] as const;
 
 function formatTime(s: number) {
   const m = Math.floor(s / 60);
