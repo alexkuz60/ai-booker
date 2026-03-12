@@ -227,16 +227,32 @@ export function Panner3DStage({ isRu, allClips, selectedClipId, config, disabled
         {/* Canvas */}
         <div
           ref={containerRef}
-          className={`flex-1 min-w-0 min-h-0 flex items-center justify-center ${disabled || !config.enabled ? "opacity-40 pointer-events-none" : ""}`}
+          className={`flex-1 min-w-0 min-h-0 flex items-center justify-center relative ${disabled || !config.enabled ? "opacity-40 pointer-events-none" : ""}`}
         >
-          <canvas
-            ref={canvasRef}
-            style={{ width: canvasSize, height: canvasSize, borderRadius: 6, cursor: config.enabled ? "crosshair" : "default" }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerLeave={handlePointerUp}
-          />
+          <div className="relative" style={{ width: canvasSize, height: canvasSize }}>
+            <canvas
+              ref={canvasRef}
+              style={{ width: canvasSize, height: canvasSize, borderRadius: 6, cursor: config.enabled ? "crosshair" : "default" }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={(e) => { handlePointerMove(e); handleCanvasHover(e); }}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={(e) => { handlePointerUp(); setTooltip(null); }}
+            />
+            {/* Tooltip overlay */}
+            {tooltip && (
+              <div
+                className="absolute pointer-events-none px-1.5 py-0.5 rounded text-[10px] font-mono text-foreground bg-popover border border-border shadow-md whitespace-nowrap z-10"
+                style={{
+                  left: tooltip.x,
+                  top: tooltip.y - 20,
+                  transform: "translateX(-50%)",
+                }}
+              >
+                <span className="inline-block w-1.5 h-1.5 rounded-full mr-1 align-middle" style={{ backgroundColor: tooltip.color ?? "hsl(var(--primary))" }} />
+                {tooltip.label}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Sliders */}
