@@ -141,7 +141,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clipsKey, reloadTrigger]);
+  }, [clipsKey]);
 
   // Retry only failed stems
   const retryFailed = useCallback(async () => {
