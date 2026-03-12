@@ -208,7 +208,7 @@ export function WaveformEditor({
     // Playhead
     const playheadPx = (positionSec / duration) * totalWidthPx - scrollLeft;
     if (playheadPx >= 0 && playheadPx <= w) {
-      ctx.strokeStyle = "hsl(var(--primary))";
+      ctx.strokeStyle = resolveHsl("--primary");
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(playheadPx * dpr, 0);
