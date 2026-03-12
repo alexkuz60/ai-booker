@@ -720,9 +720,10 @@ export function StudioTimeline({
                 clips={pluginsClips}
                 trackLabel={pluginsTrackLabel}
                 trackColor={pluginsTrackColor}
-                enabledClipIds={pluginEnabledClipIds}
-                onToggleClip={handleToggleClip}
-                onMixChange={() => { onMixChange(); onPluginsChange(); }}
+                trackId={selectedCharacterId ? `char-${selectedCharacterId}` : undefined}
+                clipConfigs={clipPlugins.configs}
+                onTogglePlugin={handleTogglePlugin}
+                onUpdateParams={handleUpdateParams}
               />
             </div>
           ) : (
