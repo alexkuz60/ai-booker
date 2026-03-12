@@ -548,6 +548,12 @@ export function WaveformEditor({
             className="h-5 px-1.5 text-[10px] gap-0.5"
             disabled={!selection}
             title={isRu ? "Fade In" : "Fade In"}
+            onClick={() => {
+              if (selection && trackId && onFadeIn) {
+                onFadeIn(trackId, selection.endSec - selection.startSec);
+                setSelection(null);
+              }
+            }}
           >
             <ArrowUpRight className="h-3 w-3" />
           </Button>
@@ -557,6 +563,12 @@ export function WaveformEditor({
             className="h-5 px-1.5 text-[10px] gap-0.5"
             disabled={!selection}
             title={isRu ? "Fade Out" : "Fade Out"}
+            onClick={() => {
+              if (selection && trackId && onFadeOut) {
+                onFadeOut(trackId, selection.endSec - selection.startSec);
+                setSelection(null);
+              }
+            }}
           >
             <ArrowDownRight className="h-3 w-3" />
           </Button>
