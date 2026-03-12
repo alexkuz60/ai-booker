@@ -184,9 +184,24 @@ class EngineTrack {
   player: Tone.Player;
   channel: Tone.Channel;
 
-  // Pre-FX placeholder (compressor slot, bypassed by default)
+  // PRE chain: EQ3 → Compressor
+  private eqNode: Tone.EQ3;
+  private _eqBypassed = true;
+  private _eqLow = 0;
+  private _eqMid = 0;
+  private _eqHigh = 0;
+
   private preFxNode: Tone.Compressor;
   private _preFxBypassed = true;
+  private _compThreshold = -24;
+  private _compRatio = 3;
+  private _compAttack = 0.01;
+  private _compRelease = 0.1;
+
+  // POST chain: Limiter (after channel, before reverb)
+  private limiterNode: Tone.Limiter;
+  private _limiterBypassed = true;
+  private _limiterThreshold = -3;
 
   // Per-channel reverb
   private reverbNode: Tone.Reverb;
