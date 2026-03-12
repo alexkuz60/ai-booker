@@ -81,14 +81,15 @@ export function ChannelPluginsPanel({
 
   const selectedClip = useMemo(() => clips.find(c => c.id === selectedClipId), [clips, selectedClipId]);
 
-  // Build stage clip infos for Panner3D multi-character view
+  // Build stage clip infos for Panner3D multi-character view (ALL scene clips)
   const stageClips = useMemo((): StageClipInfo[] => {
-    return clips.map(clip => {
+    const source = allSceneClips ?? clips;
+    return source.map(clip => {
       const cfg = clipConfigs[clip.id];
       const panner3d = cfg?.panner3d ?? { enabled: false, positionX: 0, positionY: 0, positionZ: 0, distanceModel: "inverse" as const, refDistance: 1, maxDistance: 10000, rolloffFactor: 1, coneInnerAngle: 360, coneOuterAngle: 360, coneOuterGain: 0 };
-      return { id: clip.id, label: clip.label, color: trackColor ?? undefined, panner3d };
+      return { id: clip.id, label: clip.label, color: clip.charColor ?? trackColor ?? undefined, panner3d };
     });
-  }, [clips, clipConfigs, trackColor]);
+  }, [allSceneClips, clips, clipConfigs, trackColor]);
 
   // Total span for proportional clip widths
   const totalSpanSec = useMemo(() => {
