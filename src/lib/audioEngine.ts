@@ -1114,6 +1114,22 @@ class AudioEngine {
     this.tracks.get(trackId)?.setPreFxBypassed(b);
   }
 
+  // ─── Per-track channel EQ (PRE) ────────────────────────
+  setTrackEqLow(trackId: string, v: number): void { this.tracks.get(trackId)?.setEqLow(v); }
+  setTrackEqMid(trackId: string, v: number): void { this.tracks.get(trackId)?.setEqMid(v); }
+  setTrackEqHigh(trackId: string, v: number): void { this.tracks.get(trackId)?.setEqHigh(v); }
+  setTrackEqBypassed(trackId: string, b: boolean): void { this.tracks.get(trackId)?.setEqBypassed(b); }
+
+  // ─── Per-track channel compressor params ───────────────
+  setTrackCompThreshold(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompThreshold(v); }
+  setTrackCompRatio(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompRatio(v); }
+  setTrackCompAttack(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompAttack(v); }
+  setTrackCompRelease(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompRelease(v); }
+
+  // ─── Per-track channel limiter (POST) ──────────────────
+  setTrackLimiterThreshold(trackId: string, v: number): void { this.tracks.get(trackId)?.setLimiterThreshold(v); }
+  setTrackLimiterBypassed(trackId: string, b: boolean): void { this.tracks.get(trackId)?.setLimiterBypassed(b); }
+
   setTrackFadeIn(trackId: string, sec: number): void {
     this.tracks.get(trackId)?.setFadeIn(sec);
   }
