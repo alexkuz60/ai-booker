@@ -1,6 +1,6 @@
 /**
  * ImpulsesSection — Impulse response management in user's Storage tab.
- * Lists user's own + public impulses, allows upload and delete of own.
+ * Supports batch upload with auto-metadata, inline category/name editing, preview, delete.
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -20,7 +19,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Loader2, Upload, Trash2, ChevronDown, ChevronRight, FolderClosed, Waves, Play, Square,
+  Loader2, Upload, Trash2, ChevronDown, ChevronRight, FolderClosed, Waves,
+  Play, Square, Check, Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -35,6 +35,8 @@ const CAT_LABELS: Record<string, Record<ImpulseCategory, string>> = {
   en: { hall: "Hall", room: "Room", plate: "Plate", chamber: "Chamber", spring: "Spring", outdoor: "Outdoor", special: "Special" },
 };
 
+const VALID_EXTS = ["wav", "flac", "ogg", "mp3"];
+
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
 interface ImpulseRow {
@@ -47,11 +49,24 @@ interface ImpulseRow {
   uploaded_by: string;
   is_public: boolean;
   created_at: string;
+  sample_rate: number;
+  channels: number;
 }
 
 interface ImpulsesSectionProps {
   isRu: boolean;
   userId: string;
+}
+
+/* ─── Helpers ────────────────────────────────────────────────────────────── */
+
+function fileToName(fileName: string): string {
+  return fileName.replace(/\.[^.]+$/, "").replace(/[_-]/g, " ");
+}
+
+function formatDuration(ms: number): string {
+  if (ms <= 0) return "—";
+  return (ms / 1000).toFixed(1) + "s";
 }
 
 /* ─── Component ──────────────────────────────────────────────────────────── */
@@ -62,18 +77,21 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
 
-  // Upload form
-  const [showUpload, setShowUpload] = useState(false);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<ImpulseCategory>("hall");
-  const [file, setFile] = useState<File | null>(null);
+  // Batch upload
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Delete
   const [deleteTarget, setDeleteTarget] = useState<ImpulseRow | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Inline editing
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editCategory, setEditCategory] = useState<ImpulseCategory>("hall");
+  const [editDescription, setEditDescription] = useState("");
+  const [saving, setSaving] = useState(false);
 
   // Preview playback
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -83,7 +101,7 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
     setLoading(true);
     const { data } = await supabase
       .from("convolution_impulses")
-      .select("id, name, category, file_path, duration_ms, description, uploaded_by, is_public, created_at")
+      .select("id, name, category, file_path, duration_ms, description, uploaded_by, is_public, created_at, sample_rate, channels")
       .eq("is_public", true)
       .order("category")
       .order("name");
@@ -93,67 +111,106 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
 
   useEffect(() => { fetchImpulses(); }, [fetchImpulses]);
 
-  const handleUpload = async () => {
-    if (!file || !name.trim()) {
-      toast.error(isRu ? "Укажите название и выберите файл" : "Enter a name and select a file");
-      return;
-    }
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    if (!["wav", "flac", "ogg", "mp3"].includes(ext || "")) {
-      toast.error(isRu ? "Поддерживаются WAV, FLAC, OGG, MP3" : "Supported: WAV, FLAC, OGG, MP3");
+  /* ─── Batch Upload ─────────────────────────────────────────────────────── */
+
+  const handleBatchUpload = async (fileList: FileList) => {
+    const files = Array.from(fileList).filter(f => {
+      const ext = f.name.split(".").pop()?.toLowerCase();
+      return VALID_EXTS.includes(ext || "");
+    });
+    if (files.length === 0) {
+      toast.error(isRu ? "Нет подходящих файлов (WAV, FLAC, OGG, MP3)" : "No valid files (WAV, FLAC, OGG, MP3)");
       return;
     }
 
     setUploading(true);
-    try {
-      // Decode audio to extract metadata
-      let durationMs = 0;
-      let sampleRate = 48000;
-      let channels = 2;
+    let uploaded = 0;
+
+    for (const file of files) {
+      setUploadProgress(`${uploaded + 1}/${files.length}: ${file.name}`);
       try {
-        const arrayBuf = await file.arrayBuffer();
-        const audioCtx = new AudioContext();
-        const decoded = await audioCtx.decodeAudioData(arrayBuf);
-        durationMs = Math.round(decoded.duration * 1000);
-        sampleRate = decoded.sampleRate;
-        channels = decoded.numberOfChannels;
-        audioCtx.close();
-      } catch {
-        console.warn("Could not decode audio metadata, using defaults");
+        // Decode metadata
+        let durationMs = 0;
+        let sampleRate = 48000;
+        let channels = 2;
+        try {
+          const arrayBuf = await file.arrayBuffer();
+          const audioCtx = new AudioContext();
+          const decoded = await audioCtx.decodeAudioData(arrayBuf);
+          durationMs = Math.round(decoded.duration * 1000);
+          sampleRate = decoded.sampleRate;
+          channels = decoded.numberOfChannels;
+          audioCtx.close();
+        } catch { /* defaults */ }
+
+        const filePath = `impulses/${userId}/${Date.now()}_${file.name}`;
+        const { error: storageErr } = await supabase.storage
+          .from("impulse-responses")
+          .upload(filePath, file, { contentType: file.type, upsert: false });
+        if (storageErr) throw storageErr;
+
+        const { error: dbErr } = await supabase
+          .from("convolution_impulses")
+          .insert({
+            name: fileToName(file.name),
+            category: "hall",
+            file_path: filePath,
+            duration_ms: durationMs,
+            sample_rate: sampleRate,
+            channels,
+            uploaded_by: userId,
+            is_public: true,
+          } as any);
+        if (dbErr) throw dbErr;
+        uploaded++;
+      } catch (e: any) {
+        toast.error(`${file.name}: ${e?.message || "error"}`);
       }
+    }
 
-      const filePath = `impulses/${userId}/${Date.now()}_${file.name}`;
-      const { error: storageErr } = await supabase.storage
-        .from("impulse-responses")
-        .upload(filePath, file, { contentType: file.type, upsert: false });
-      if (storageErr) throw storageErr;
+    toast.success(isRu ? `Загружено: ${uploaded} из ${files.length}` : `Uploaded: ${uploaded} of ${files.length}`);
+    setUploading(false);
+    setUploadProgress("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    await fetchImpulses();
+  };
 
-      const { error: dbErr } = await supabase
+  /* ─── Inline Edit ──────────────────────────────────────────────────────── */
+
+  const startEdit = (imp: ImpulseRow) => {
+    setEditingId(imp.id);
+    setEditName(imp.name);
+    setEditCategory(imp.category as ImpulseCategory);
+    setEditDescription(imp.description || "");
+  };
+
+  const saveEdit = async () => {
+    if (!editingId || !editName.trim()) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
         .from("convolution_impulses")
-        .insert({
-          name: name.trim(),
-          description: description.trim() || null,
-          category,
-          file_path: filePath,
-          duration_ms: durationMs,
-          sample_rate: sampleRate,
-          channels,
-          uploaded_by: userId,
-          is_public: true,
-        } as any);
-      if (dbErr) throw dbErr;
-
-      toast.success(isRu ? "Импульс загружен" : "Impulse uploaded");
-      setName(""); setDescription(""); setFile(null); setCategory("hall");
-      setShowUpload(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      await fetchImpulses();
+        .update({
+          name: editName.trim(),
+          category: editCategory,
+          description: editDescription.trim() || null,
+        } as any)
+        .eq("id", editingId);
+      if (error) throw error;
+      setImpulses(prev => prev.map(i =>
+        i.id === editingId
+          ? { ...i, name: editName.trim(), category: editCategory, description: editDescription.trim() || null }
+          : i
+      ));
+      setEditingId(null);
     } catch (e: any) {
-      toast.error(e?.message || "Upload error");
+      toast.error(e?.message || "Save error");
     } finally {
-      setUploading(false);
+      setSaving(false);
     }
   };
+
+  /* ─── Delete ───────────────────────────────────────────────────────────── */
 
   const handleDelete = async (impulse: ImpulseRow) => {
     setDeletingId(impulse.id);
@@ -170,6 +227,8 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
     }
   };
 
+  /* ─── Playback ─────────────────────────────────────────────────────────── */
+
   const togglePlay = async (impulse: ImpulseRow) => {
     if (playingId === impulse.id) {
       audioRef.current?.pause();
@@ -181,7 +240,7 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
         .from("impulse-responses")
         .createSignedUrl(impulse.file_path, 600);
       if (!data?.signedUrl) return;
-      if (audioRef.current) { audioRef.current.pause(); }
+      if (audioRef.current) audioRef.current.pause();
       const audio = new Audio(data.signedUrl);
       audio.onended = () => setPlayingId(null);
       audioRef.current = audio;
@@ -192,15 +251,27 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
     }
   };
 
+  /* ─── Render ───────────────────────────────────────────────────────────── */
+
   const ownCount = impulses.filter(i => i.uploaded_by === userId).length;
 
   return (
     <>
       <div className="border rounded-md overflow-hidden">
+        {/* Hidden batch file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept=".wav,.flac,.ogg,.mp3"
+          className="hidden"
+          onChange={e => e.target.files && handleBatchUpload(e.target.files)}
+        />
+
         <Collapsible open={!collapsed} onOpenChange={() => setCollapsed(c => !c)}>
           <div className="flex items-center border-b border-border">
             <CollapsibleTrigger asChild>
-              <button className="flex-1 flex items-center gap-2 px-4 py-3 text-left hover:bg-muted/40 transition-colors text-cyan-400 border-cyan-400/30">
+              <button className="flex-1 flex items-center gap-2 px-4 py-3 text-left hover:bg-muted/40 transition-colors text-accent border-accent/30">
                 {collapsed ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
                 <Waves className="h-5 w-5 shrink-0" />
                 <span className="text-base font-semibold">{isRu ? "Импульсы (IR)" : "Impulses (IR)"}</span>
@@ -218,59 +289,22 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 mr-2 shrink-0"
-                  onClick={() => setShowUpload(v => !v)}
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
                 >
-                  <Upload className="h-4 w-4" />
+                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>{isRu ? "Загрузить импульс" : "Upload impulse"}</TooltipContent>
+              <TooltipContent>{isRu ? "Загрузить импульсы (пакетно)" : "Upload impulses (batch)"}</TooltipContent>
             </Tooltip>
           </div>
 
           <CollapsibleContent>
-            {/* Upload form */}
-            {showUpload && (
-              <div className="px-4 py-3 border-b border-border bg-muted/20 space-y-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <Label className="text-xs">{isRu ? "Название" : "Name"}</Label>
-                    <Input value={name} onChange={e => setName(e.target.value)} placeholder={isRu ? "Концертный зал" : "Concert Hall"} className="h-8 text-sm" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">{isRu ? "Категория" : "Category"}</Label>
-                    <Select value={category} onValueChange={v => setCategory(v as ImpulseCategory)}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {CATEGORIES.map(c => (
-                          <SelectItem key={c} value={c}>{CAT_LABELS[lang][c]}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1 sm:col-span-2">
-                    <Label className="text-xs">{isRu ? "Описание" : "Description"}</Label>
-                    <Input value={description} onChange={e => setDescription(e.target.value)} placeholder={isRu ? "Необязательно" : "Optional"} className="h-8 text-sm" />
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".wav,.flac,.ogg,.mp3"
-                    onChange={e => {
-                      const f = e.target.files?.[0] || null;
-                      setFile(f);
-                      if (f && !name.trim()) {
-                        setName(f.name.replace(/\.[^.]+$/, "").replace(/[_-]/g, " "));
-                      }
-                    }}
-                    className="h-8 text-sm flex-1"
-                  />
-                  <Button size="sm" onClick={handleUpload} disabled={uploading || !file || !name.trim()}>
-                    {uploading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
-                    {isRu ? "Загрузить" : "Upload"}
-                  </Button>
-                </div>
+            {/* Upload progress */}
+            {uploading && (
+              <div className="px-4 py-2 border-b border-border bg-muted/20 flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                <span className="truncate">{uploadProgress}</span>
               </div>
             )}
 
@@ -280,18 +314,65 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
             ) : impulses.length === 0 ? (
-              <div className="flex items-center justify-center py-6 text-muted-foreground text-sm">
-                <FolderClosed className="h-4 w-4 mr-2 opacity-40" />
-                {isRu ? "Нет импульсов" : "No impulses"}
+              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground text-sm gap-2">
+                <FolderClosed className="h-5 w-5 opacity-40" />
+                <span>{isRu ? "Нет импульсов" : "No impulses"}</span>
+                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="h-3.5 w-3.5 mr-1" />
+                  {isRu ? "Загрузить файлы" : "Upload files"}
+                </Button>
               </div>
             ) : (
-              <div className="divide-y divide-border max-h-80 overflow-y-auto">
+              <div className="divide-y divide-border max-h-96 overflow-y-auto">
                 {impulses.map(imp => {
                   const isOwn = imp.uploaded_by === userId;
+                  const isEditing = editingId === imp.id;
+
+                  if (isEditing) {
+                    return (
+                      <div key={imp.id} className="px-4 py-2.5 bg-muted/20 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={editName}
+                            onChange={e => setEditName(e.target.value)}
+                            className="h-7 text-sm flex-1"
+                            autoFocus
+                            onKeyDown={e => e.key === "Enter" && saveEdit()}
+                          />
+                          <Select value={editCategory} onValueChange={v => setEditCategory(v as ImpulseCategory)}>
+                            <SelectTrigger className="h-7 text-xs w-36">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CATEGORIES.map(c => (
+                                <SelectItem key={c} value={c} className="text-xs">{CAT_LABELS[lang][c]}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={editDescription}
+                            onChange={e => setEditDescription(e.target.value)}
+                            placeholder={isRu ? "Описание (необязательно)" : "Description (optional)"}
+                            className="h-7 text-xs flex-1"
+                            onKeyDown={e => e.key === "Enter" && saveEdit()}
+                          />
+                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={saveEdit} disabled={saving || !editName.trim()}>
+                            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5 text-primary" />}
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground" onClick={() => setEditingId(null)}>
+                            ✕
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div
                       key={imp.id}
-                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors group"
+                      className="flex items-center gap-2 px-4 py-2.5 hover:bg-muted/30 transition-colors group"
                     >
                       <Button
                         variant="ghost"
@@ -307,36 +388,34 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
                       <Badge variant="outline" className="text-[10px] shrink-0">
                         {CAT_LABELS[lang][imp.category as ImpulseCategory] || imp.category}
                       </Badge>
-                      {imp.description && (
-                        <span className="text-[10px] text-muted-foreground truncate max-w-[120px] hidden sm:block" title={imp.description}>
-                          {imp.description}
-                        </span>
-                      )}
+                      <span className="text-[10px] text-muted-foreground shrink-0 hidden sm:block">
+                        {formatDuration(imp.duration_ms)}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground shrink-0 hidden md:block">
+                        {(imp.sample_rate / 1000).toFixed(0)}kHz
+                      </span>
                       {imp.created_at && (
-                        <span className="text-xs text-muted-foreground shrink-0 hidden md:block">
+                        <span className="text-xs text-muted-foreground shrink-0 hidden lg:block">
                           {format(new Date(imp.created_at), "dd.MM.yy")}
                         </span>
                       )}
                       {isOwn && (
-                        <Badge variant="secondary" className="text-[9px] h-4 px-1 shrink-0">
-                          {isRu ? "моё" : "mine"}
-                        </Badge>
-                      )}
-                      {isOwn && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={cn(
-                            "h-7 w-7 text-destructive hover:text-destructive shrink-0",
-                            "opacity-0 group-hover:opacity-100 transition-opacity"
-                          )}
-                          disabled={deletingId === imp.id}
-                          onClick={() => setDeleteTarget(imp)}
-                        >
-                          {deletingId === imp.id
-                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            : <Trash2 className="h-3.5 w-3.5" />}
-                        </Button>
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(imp)}>
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            disabled={deletingId === imp.id}
+                            onClick={() => setDeleteTarget(imp)}
+                          >
+                            {deletingId === imp.id
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : <Trash2 className="h-3.5 w-3.5" />}
+                          </Button>
+                        </div>
                       )}
                     </div>
                   );
