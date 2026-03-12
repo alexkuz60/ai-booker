@@ -82,15 +82,38 @@ export function Panner3DStage({ isRu, allClips, selectedClipId, config, disabled
     ctx.moveTo(0, half); ctx.lineTo(canvasSize, half);
     ctx.stroke();
 
-    // Listener icon at center
-    ctx.fillStyle = "hsla(220, 30%, 60%, 0.8)";
+    // Listener icon — top-down head silhouette (nose pointing up = forward)
+    const hs = Math.max(5, canvasSize * 0.04); // head scale
+    ctx.save();
+    ctx.translate(half, half);
+
+    // Head oval
+    ctx.fillStyle = "hsla(220, 25%, 45%, 0.7)";
     ctx.beginPath();
-    ctx.arc(half, half, 4, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, hs * 1.1, hs * 1.3, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.font = "7px monospace";
-    ctx.fillStyle = "hsla(220, 20%, 50%, 0.7)";
-    ctx.textAlign = "center";
-    ctx.fillText("L", half, half + 11);
+
+    // Left ear
+    ctx.fillStyle = "hsla(220, 25%, 40%, 0.8)";
+    ctx.beginPath();
+    ctx.ellipse(-hs * 1.3, 0, hs * 0.25, hs * 0.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Right ear
+    ctx.beginPath();
+    ctx.ellipse(hs * 1.3, 0, hs * 0.25, hs * 0.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Nose (triangle pointing up = forward/+Z)
+    ctx.fillStyle = "hsla(220, 30%, 55%, 0.9)";
+    ctx.beginPath();
+    ctx.moveTo(0, -hs * 1.7);
+    ctx.lineTo(-hs * 0.35, -hs * 1.15);
+    ctx.lineTo(hs * 0.35, -hs * 1.15);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
 
     // ── Draw all clips (non-selected first, then selected on top) ──
     const sortedClips = [...allClips].sort((a, b) => {
