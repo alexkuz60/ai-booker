@@ -197,22 +197,37 @@ export function WaveformEditor({
     ctx.fillStyle = resolveHsl("--background");
     ctx.fillRect(0, 0, w * dpr, h * dpr);
 
+    // Mixer sidebar separator
+    const borderColor = resolveHsl("--border");
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(mixerWidth * dpr, 0);
+    ctx.lineTo(mixerWidth * dpr, h * dpr);
+    ctx.stroke();
+
+    // Offset drawing to after mixer sidebar
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(mixerWidth * dpr, 0, (w - mixerWidth) * dpr, h * dpr);
+    ctx.clip();
+
     const waveColor = resolveHsl("--cyan-glow");
+    const waveW = w - mixerWidth;
 
     // Draw L channel
-    drawChannel(ctx, currentPeaks, 0, 0, w, chH, waveColor, scrollLeft, totalWidthPx, selection, duration, "L");
+    drawChannel(ctx, currentPeaks, mixerWidth, 0, waveW, chH, waveColor, scrollLeft, totalWidthPx, selection, duration, "L");
 
     // Gap line
-    const borderColor = resolveHsl("--border");
     ctx.fillStyle = borderColor.replace(")", " / 0.5)").replace("hsl(", "hsl(");
-    ctx.fillRect(0, chH * dpr, w * dpr, CHANNEL_GAP * dpr);
+    ctx.fillRect(mixerWidth * dpr, chH * dpr, waveW * dpr, CHANNEL_GAP * dpr);
 
     // Draw R channel
-    drawChannel(ctx, currentPeaks, 0, chH + CHANNEL_GAP, w, chH, waveColor, scrollLeft, totalWidthPx, selection, duration, "R");
+    drawChannel(ctx, currentPeaks, mixerWidth, chH + CHANNEL_GAP, waveW, chH, waveColor, scrollLeft, totalWidthPx, selection, duration, "R");
 
     // Playhead
-    const playheadPx = (positionSec / duration) * totalWidthPx - scrollLeft;
-    if (playheadPx >= 0 && playheadPx <= w) {
+    const playheadPx = (positionSec / duration) * totalWidthPx - scrollLeft + mixerWidth;
+    if (playheadPx >= mixerWidth && playheadPx <= w) {
       ctx.strokeStyle = resolveHsl("--primary");
       ctx.lineWidth = 1.5;
       ctx.beginPath();
