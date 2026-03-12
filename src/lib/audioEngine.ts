@@ -283,6 +283,9 @@ class EngineTrack {
     this._clipLenSec = config.clipLenSec ?? config.durationSec;
     this._loopCrossfadeSec = config.loopCrossfadeSec ?? 0;
     this._telephone = config.segmentType === "telephone";
+    if (this._telephone) {
+      console.log(`[AudioEngine] 📞 Telephone FX chain activated for track ${config.id} (label: ${config.label})`);
+    }
 
     // PRE: EQ3 (bypassed)
     this.eqNode = new Tone.EQ3({ low: 0, mid: 0, high: 0 });
