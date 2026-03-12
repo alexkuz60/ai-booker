@@ -119,7 +119,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
           : `Trimmed ${trimCount} clip(s) on track`,
       );
     }
-  }, [trimmedClips, clips, trimOverrides, fadeOverrides, pushUndo, isRu]);
+  }, [trimmedClips, clips, trimOverrides, pushUndo, isRu]);
 
   // ── Fade overrides: per-clip { fadeInSec, fadeOutSec } ──────
   const [fadeOverrides, setFadeOverrides] = useState<Map<string, { fadeInSec: number; fadeOutSec: number }>>(new Map());
