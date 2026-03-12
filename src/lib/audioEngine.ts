@@ -84,6 +84,8 @@ export interface TrackConfig {
   label?: string;
   /** Stable cache key (e.g. storage audioPath). If set, Cache API is used. */
   cacheKey?: string;
+  /** Segment type from storyboard — used for auto-FX (e.g. 'telephone') */
+  segmentType?: string;
 }
 
 export interface LoadProgress {
@@ -238,6 +240,18 @@ class EngineTrack {
   private meterL: Tone.Meter;
   private meterR: Tone.Meter;
 
+  // Telephone FX chain (inserted between player and eqNode when segmentType==='telephone')
+  private _telephone = false;
+  private _phoneFilter: Tone.Filter | null = null;
+  private _phoneBitCrusher: Tone.BitCrusher | null = null;
+  private _phoneDistortion: Tone.Distortion | null = null;
+  private _phoneComp: Tone.Compressor | null = null;
+  private _phoneNoise: Tone.Noise | null = null;
+  private _phoneNoiseFilter: Tone.Filter | null = null;
+  private _phoneNoiseGain: Tone.Gain | null = null;
+  private _phoneHum: Tone.Oscillator | null = null;
+  private _phoneHumGain: Tone.Gain | null = null;
+
   private _muted = false;
   private _solo = false;
   private _volume = 80;
@@ -268,6 +282,7 @@ class EngineTrack {
     this._loop = config.loop ?? false;
     this._clipLenSec = config.clipLenSec ?? config.durationSec;
     this._loopCrossfadeSec = config.loopCrossfadeSec ?? 0;
+    this._telephone = config.segmentType === "telephone";
 
     // PRE: EQ3 (bypassed)
     this.eqNode = new Tone.EQ3({ low: 0, mid: 0, high: 0 });
@@ -337,8 +352,35 @@ class EngineTrack {
       });
     }
 
-    // Wire signal chain
-    this.player.connect(this.eqNode);
+    // Wire signal chain (with optional telephone insert before EQ)
+    if (this._telephone) {
+      this._phoneFilter = new Tone.Filter({ type: "bandpass", frequency: 1900, Q: 0.8 });
+      this._phoneBitCrusher = new Tone.BitCrusher({ bits: 4 });
+      this._phoneDistortion = new Tone.Distortion({ distortion: 0.2, wet: 0.5 });
+      this._phoneComp = new Tone.Compressor({ threshold: -30, ratio: 12, attack: 0.003, release: 0.25 });
+      // Chain: Player → BandpassFilter → BitCrusher → Distortion → PhoneComp → EQ
+      this.player.connect(this._phoneFilter);
+      this._phoneFilter.connect(this._phoneBitCrusher);
+      this._phoneBitCrusher.connect(this._phoneDistortion);
+      this._phoneDistortion.connect(this._phoneComp);
+      this._phoneComp.connect(this.eqNode);
+
+      // Pink noise (line static)
+      this._phoneNoiseFilter = new Tone.Filter({ type: "bandpass", frequency: 1000, Q: 0.5 });
+      this._phoneNoiseGain = new Tone.Gain(0.015);
+      this._phoneNoise = new Tone.Noise("pink");
+      this._phoneNoise.connect(this._phoneNoiseFilter);
+      this._phoneNoiseFilter.connect(this._phoneNoiseGain);
+      this._phoneNoiseGain.connect(this._phoneFilter); // route noise through same bandpass
+
+      // 50Hz hum (power line)
+      this._phoneHumGain = new Tone.Gain(0.005);
+      this._phoneHum = new Tone.Oscillator(50, "sine");
+      this._phoneHum.connect(this._phoneHumGain);
+      this._phoneHumGain.connect(this._phoneFilter);
+    } else {
+      this.player.connect(this.eqNode);
+    }
     this.eqNode.connect(this.preFxNode);
     this.preFxNode.connect(this.channel);
     this.channel.connect(this.meterMono);
@@ -372,7 +414,7 @@ class EngineTrack {
           fadeOut: this._loopCrossfadeSec,
         });
       }
-      this.playerB.connect(this.eqNode);
+      this.playerB.connect(this._telephone && this._phoneFilter ? this._phoneFilter : this.eqNode);
     }
 
     // Apply bypass states
@@ -395,12 +437,21 @@ class EngineTrack {
       this.scheduledId = Tone.getTransport().schedule((time) => {
         if (this.player.loaded) {
           this.player.fadeIn = this._fadeInSec;
+          // Start telephone noise/hum generators along with the player
+          if (this._telephone) {
+            this._phoneNoise?.start(time);
+            this._phoneHum?.start(time);
+          }
           // Don't limit voice clip duration — let audio play to its natural end.
           // The actual audio may be longer than the estimated durationSec.
           // Only apply duration limit for atmosphere/sfx clips that have explicit fades.
           const hasFadeOut = this._fadeOutSec > 0;
           if (hasFadeOut) {
             this.player.start(time, 0, this.durationSec);
+            if (this._telephone) {
+              this._phoneNoise?.stop(time + this.durationSec);
+              this._phoneHum?.stop(time + this.durationSec);
+            }
           } else {
             this.player.start(time, 0);
           }
@@ -714,6 +765,16 @@ class EngineTrack {
     this.unschedule();
     this.player.dispose();
     this.playerB?.dispose();
+    // Dispose telephone chain
+    this._phoneNoise?.stop(); this._phoneNoise?.dispose();
+    this._phoneHum?.stop(); this._phoneHum?.dispose();
+    this._phoneFilter?.dispose();
+    this._phoneBitCrusher?.dispose();
+    this._phoneDistortion?.dispose();
+    this._phoneComp?.dispose();
+    this._phoneNoiseFilter?.dispose();
+    this._phoneNoiseGain?.dispose();
+    this._phoneHumGain?.dispose();
     this.eqNode.dispose();
     this.preFxNode.dispose();
     this.channel.dispose();

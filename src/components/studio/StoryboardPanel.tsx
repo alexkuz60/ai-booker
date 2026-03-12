@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Database } from "@/integrations/supabase/types";
 import { useAiRoles } from "@/hooks/useAiRoles";
-import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, AudioLines, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck } from "lucide-react";
+import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, AudioLines, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck, Phone } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -56,7 +56,7 @@ interface CharacterOption {
 
 // ─── Segment type config ────────────────────────────────────
 
-const SEGMENT_TYPES = ["epigraph", "narrator", "first_person", "inner_thought", "dialogue", "monologue", "lyric", "footnote"] as const;
+const SEGMENT_TYPES = ["epigraph", "narrator", "first_person", "inner_thought", "dialogue", "monologue", "lyric", "footnote", "telephone"] as const;
 
 const SEGMENT_CONFIG: Record<string, {
   icon: typeof Quote;
@@ -72,6 +72,7 @@ const SEGMENT_CONFIG: Record<string, {
   monologue: { icon: MessageCircle, label_ru: "Монолог", label_en: "Monologue", color: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30" },
   lyric: { icon: Music, label_ru: "Лирика", label_en: "Lyric", color: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
   footnote: { icon: StickyNote, label_ru: "Сноска", label_en: "Footnote", color: "bg-muted text-muted-foreground border-border" },
+  telephone: { icon: Phone, label_ru: "Телефон", label_en: "Telephone", color: "bg-orange-500/20 text-orange-400 border-orange-500/30" },
 };
 
 // ─── Inline sound marker rendering ──────────────────────────
@@ -1126,7 +1127,7 @@ export function StoryboardPanel({
         .insert({
           scene_id: sceneId,
           segment_number: seg.segment_number + 1,
-          segment_type: seg.segment_type as Database["public"]["Enums"]["segment_type"],
+          segment_type: seg.segment_type as any,
           speaker: seg.speaker,
           metadata: { split_silence_ms: 1000 },
         })
@@ -1498,7 +1499,7 @@ export function StoryboardPanel({
 
     const { error } = await supabase
       .from("scene_segments")
-      .update({ segment_type: newType as Database["public"]["Enums"]["segment_type"] })
+      .update({ segment_type: newType as any })
       .in("id", affectedIds);
     if (error) {
       toast.error(isRu ? "Ошибка сохранения типа" : "Failed to save type");

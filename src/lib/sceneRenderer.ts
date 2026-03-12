@@ -181,8 +181,106 @@ async function scheduleBus(
     const source = ctx.createBufferSource();
     source.buffer = buffer;
 
+    // ── Telephone FX chain (if segment is telephone type) ──
+    const isTelephone = clip.segmentType === "telephone";
+    let telephoneOutput: AudioNode = source;
+    if (isTelephone) {
+      // Bandpass filter (400-3400 Hz, center ~1900)
+      const phoneBandpass = ctx.createBiquadFilter();
+      phoneBandpass.type = "bandpass";
+      phoneBandpass.frequency.value = 1900;
+      phoneBandpass.Q.value = 0.8;
+
+      // BitCrusher simulation via waveshaper (quantization effect)
+      const phoneDistortion = ctx.createWaveShaper();
+      const bits = 4;
+      const steps = Math.pow(2, bits);
+      const curve = new Float32Array(44100);
+      for (let i = 0; i < curve.length; i++) {
+        const x = (i * 2) / curve.length - 1;
+        curve[i] = Math.round(x * steps) / steps;
+      }
+      phoneDistortion.curve = curve;
+      phoneDistortion.oversample = "none";
+
+      // Soft clip distortion (mixed 50/50)
+      const phoneClipDry = ctx.createGain();
+      phoneClipDry.gain.value = 0.5;
+      const phoneClipWet = ctx.createGain();
+      phoneClipWet.gain.value = 0.5;
+      const phoneClipShaper = ctx.createWaveShaper();
+      const clipCurve = new Float32Array(44100);
+      for (let i = 0; i < clipCurve.length; i++) {
+        const x = (i * 2) / clipCurve.length - 1;
+        clipCurve[i] = (Math.PI + 0.2) * x / (Math.PI + 0.2 * Math.abs(x)); // soft clip
+      }
+      phoneClipShaper.curve = clipCurve;
+      const phoneClipMerge = ctx.createGain();
+
+      // Heavy compressor
+      const phoneComp = ctx.createDynamicsCompressor();
+      phoneComp.threshold.value = -30;
+      phoneComp.ratio.value = 12;
+      phoneComp.knee.value = 5;
+      phoneComp.attack.value = 0.003;
+      phoneComp.release.value = 0.25;
+
+      // Chain: source → bandpass → bitcrusher → [dry/wet distortion] → compressor
+      source.connect(phoneBandpass);
+      phoneBandpass.connect(phoneDistortion);
+      phoneDistortion.connect(phoneClipDry);
+      phoneDistortion.connect(phoneClipShaper);
+      phoneClipShaper.connect(phoneClipWet);
+      phoneClipDry.connect(phoneClipMerge);
+      phoneClipWet.connect(phoneClipMerge);
+      phoneClipMerge.connect(phoneComp);
+
+      // Pink noise (line static) — schedule for clip duration
+      const noiseLength = Math.ceil(clip.durationSec * sampleRate);
+      const noiseBuffer = ctx.createBuffer(1, noiseLength, sampleRate);
+      const noiseData = noiseBuffer.getChannelData(0);
+      // Simple pink noise approximation (filtered white noise)
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+      for (let i = 0; i < noiseLength; i++) {
+        const white = Math.random() * 2 - 1;
+        b0 = 0.99886 * b0 + white * 0.0555179;
+        b1 = 0.99332 * b1 + white * 0.0750759;
+        b2 = 0.96900 * b2 + white * 0.1538520;
+        b3 = 0.86650 * b3 + white * 0.3104856;
+        b4 = 0.55000 * b4 + white * 0.5329522;
+        b5 = -0.7616 * b5 - white * 0.0168980;
+        noiseData[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.015;
+        b6 = white * 0.115926;
+      }
+      const noiseSource = ctx.createBufferSource();
+      noiseSource.buffer = noiseBuffer;
+      const noiseBandpass = ctx.createBiquadFilter();
+      noiseBandpass.type = "bandpass";
+      noiseBandpass.frequency.value = 1000;
+      noiseBandpass.Q.value = 0.5;
+      noiseSource.connect(noiseBandpass);
+      noiseBandpass.connect(phoneBandpass); // route through same bandpass
+
+      // 50Hz hum (power line)
+      const humLength = Math.ceil(clip.durationSec * sampleRate);
+      const humBuffer = ctx.createBuffer(1, humLength, sampleRate);
+      const humData = humBuffer.getChannelData(0);
+      for (let i = 0; i < humLength; i++) {
+        humData[i] = Math.sin(2 * Math.PI * 50 * i / sampleRate) * 0.005;
+      }
+      const humSource = ctx.createBufferSource();
+      humSource.buffer = humBuffer;
+      humSource.connect(phoneBandpass);
+
+      // Schedule noise and hum at clip start
+      noiseSource.start(clip.startSec);
+      humSource.start(clip.startSec);
+
+      telephoneOutput = phoneComp;
+    }
+
     // ── EQ (3-band biquad approximation) ──
-    let eqOutput: AudioNode = source;
+    let eqOutput: AudioNode = isTelephone ? telephoneOutput : source;
     if (pluginCfg.eq.enabled) {
       const lowShelf = ctx.createBiquadFilter();
       lowShelf.type = "lowshelf";
@@ -200,7 +298,7 @@ async function scheduleBus(
       highShelf.frequency.value = 3200;
       highShelf.gain.value = pluginCfg.eq.high;
 
-      source.connect(lowShelf);
+      (isTelephone ? telephoneOutput : source).connect(lowShelf);
       lowShelf.connect(peaking);
       peaking.connect(highShelf);
       eqOutput = highShelf;
