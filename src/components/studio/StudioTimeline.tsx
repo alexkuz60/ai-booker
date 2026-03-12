@@ -15,6 +15,7 @@ import { useTimelineClips, type TimelineClip, type TypeMappingsByScene } from "@
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { TrackMixerStrip } from "./TrackMixerStrip";
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
+import { usePluginsPersistence } from "@/hooks/usePluginsPersistence";
 import { TimelineMasterMeter } from "./TimelineMasterMeter";
 import { TimelineRuler } from "./TimelineRuler";
 import { TimelineTrack } from "./TimelineTrack";
@@ -347,6 +348,7 @@ export function StudioTimeline({
     return [...ids];
   }, [allTracks, timelineClips]);
   const { scheduleSave: onMixChange } = useMixerPersistence(sceneId ?? null, engineTrackIds);
+  const { scheduleSave: onPluginsChange } = usePluginsPersistence(sceneId ?? null, engineTrackIds);
 
   // ── Layout / zoom ─────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
@@ -643,7 +645,7 @@ export function StudioTimeline({
             trackId={pluginsTrackId}
             trackLabel={pluginsTrackLabel}
             trackColor={pluginsTrackColor}
-            onMixChange={onMixChange}
+            onMixChange={() => { onMixChange(); onPluginsChange(); }}
           />
         </div>
       )}
