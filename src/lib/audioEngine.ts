@@ -499,12 +499,13 @@ class EngineTrack {
 
   setCompThreshold(v: number): void { this._compThreshold = v; this.preFxNode.threshold.value = v; }
   setCompRatio(v: number): void { this._compRatio = v; if (!this._preFxBypassed) this.preFxNode.ratio.value = v; }
+  setCompKnee(v: number): void { this._compKnee = v; this.preFxNode.knee.value = v; }
   setCompAttack(v: number): void { this._compAttack = v; this.preFxNode.attack.value = v; }
   setCompRelease(v: number): void { this._compRelease = v; this.preFxNode.release.value = v; }
 
   get preFxBypassed() { return this._preFxBypassed; }
   get compState(): ChannelCompState {
-    return { threshold: this._compThreshold, ratio: this._compRatio, attack: this._compAttack, release: this._compRelease, bypassed: this._preFxBypassed };
+    return { threshold: this._compThreshold, ratio: this._compRatio, knee: this._compKnee, attack: this._compAttack, release: this._compRelease, bypassed: this._preFxBypassed };
   }
 
   // ── Channel Limiter (POST) ──
