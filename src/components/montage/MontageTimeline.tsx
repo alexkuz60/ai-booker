@@ -57,26 +57,70 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     return () => ro.disconnect();
   }, [timelineCollapsed]);
 
+  const sceneScrollRef = useRef<HTMLDivElement>(null);
+
   const fitZoom = useMemo(() => {
     if (containerWidth <= 0 || duration <= 0) return 1;
     return containerWidth / (duration * 4);
   }, [containerWidth, duration]);
 
+  const [montageZoomPercent, setMontageZoomPercent] = useState<number>(100);
   const [zoomOverride, setZoomOverride] = useState<number | null>(null);
   const zoom = zoomOverride ?? fitZoom;
-  useEffect(() => { setZoomOverride(null); }, [fitZoom]);
 
-  const toPercent = useCallback((z: number) => fitZoom > 0 ? (z / fitZoom) * 100 : 100, [fitZoom]);
-  const displayZoomPercent = Math.round(toPercent(zoom));
+  useEffect(() => { setZoomOverride(null); setMontageZoomPercent(100); }, [fitZoom]);
+
+  const applyMontageZoom = useCallback((percent: number) => {
+    setMontageZoomPercent(percent);
+    const newZoom = percent === 100 ? fitZoom : (fitZoom * percent) / 100;
+    if (percent === 100) {
+      setZoomOverride(null);
+    } else {
+      setZoomOverride(newZoom);
+    }
+    if (percent > 100) {
+      requestAnimationFrame(() => {
+        const el = sceneScrollRef.current;
+        if (!el) return;
+        const px = player.positionSec * newZoom * 4;
+        el.scrollTo({ left: Math.max(0, px - el.clientWidth / 2), behavior: "smooth" });
+      });
+    }
+  }, [fitZoom, player.positionSec]);
 
   const adjustZoom = useCallback((dir: "in" | "out") => {
-    setZoomOverride(prev => {
-      const cur = toPercent(prev ?? fitZoom);
-      return (fitZoom * stepZoom(cur, dir)) / 100;
-    });
-  }, [fitZoom, toPercent]);
+    const presets = MONTAGE_ZOOM_PRESETS;
+    const cur = montageZoomPercent;
+    let next: number;
+    if (dir === "in") {
+      next = presets.find(p => p > cur) ?? presets[presets.length - 1];
+    } else {
+      const lower = [...presets].reverse().find(p => p < cur);
+      next = lower ?? presets[0];
+    }
+    applyMontageZoom(next);
+  }, [montageZoomPercent, applyMontageZoom]);
 
-  const resetZoom = useCallback(() => setZoomOverride(null), []);
+  const resetZoom = useCallback(() => applyMontageZoom(100), [applyMontageZoom]);
+
+  // ── Auto-scroll during playback ───────────────────────────
+  const userScrollingRef = useRef(false);
+  useEffect(() => {
+    const el = sceneScrollRef.current;
+    if (!el) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const onScroll = () => { userScrollingRef.current = true; clearTimeout(timer); timer = setTimeout(() => { userScrollingRef.current = false; }, 600); };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => { el.removeEventListener("scroll", onScroll); clearTimeout(timer); };
+  }, []);
+
+  useEffect(() => {
+    if (player.state !== "playing" || montageZoomPercent <= 100 || userScrollingRef.current) return;
+    const el = sceneScrollRef.current;
+    if (!el) return;
+    const playheadPx = player.positionSec * zoom * 4;
+    el.scrollLeft = Math.max(0, playheadPx - el.clientWidth / 2);
+  }, [player.positionSec, player.state, zoom, montageZoomPercent]);
 
   const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
