@@ -16,6 +16,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
   const [state, setState] = useState<PlayerState>("stopped");
   const [positionSec, setPositionSec] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
+  const [loadProgress, setLoadProgress] = useState<LoadProgress | null>(null);
   const [volume, setVolumeState] = useState(() => {
     try {
       const v = Number(localStorage.getItem("timeline-volume"));
