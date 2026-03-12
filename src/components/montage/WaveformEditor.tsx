@@ -151,6 +151,7 @@ export function WaveformEditor({
   mixerWidth,
   isRu,
   onSeek,
+  onTrim,
 }: WaveformEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
