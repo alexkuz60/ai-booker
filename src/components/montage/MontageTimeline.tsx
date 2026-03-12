@@ -44,6 +44,9 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
 
   const [timelineHeight, setTimelineHeight] = useState(300);
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+  const [editorScrollLeft, setEditorScrollLeft] = useState(0);
+  const [editorVisibleWidth, setEditorVisibleWidth] = useState(0);
 
   // ── Zoom ────────────────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
