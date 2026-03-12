@@ -62,8 +62,9 @@ PDF File
               ▼
 ┌─────────────────────────────────┐
 │  11. Atmosphere + SFX           │  Auto + Freesound + manual
-│  12. Timeline editing           │  ⬜ (drag, snap, fade)
-│  13. Final audio export         │  ⬜
+│  12. Montage Workspace          │  Stem timeline, master chain 🔧
+│  13. Timeline editing             │  ⬜ (drag, snap, fade)
+│  14. Final audio export           │  ⬜
 └─────────────────────────────────┘
 
 🤖 Assistant — available at any stage
