@@ -370,6 +370,41 @@ export type Database = {
         }
         Relationships: []
       }
+      montage_parts: {
+        Row: {
+          chapter_id: string
+          created_at: string
+          id: string
+          part_number: number
+          scene_ids: string[]
+          user_id: string
+        }
+        Insert: {
+          chapter_id: string
+          created_at?: string
+          id?: string
+          part_number?: number
+          scene_ids?: string[]
+          user_id: string
+        }
+        Update: {
+          chapter_id?: string
+          created_at?: string
+          id?: string
+          part_number?: number
+          scene_ids?: string[]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "montage_parts_chapter_id_fkey"
+            columns: ["chapter_id"]
+            isOneToOne: false
+            referencedRelation: "book_chapters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           api_keys: Json | null
