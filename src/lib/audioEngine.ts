@@ -911,8 +911,8 @@ class AudioEngine {
     this.masterSplitter.connect(this.masterMeterR, 1);
     this.masterSplitter.connect(this.masterDCMeterL, 0);
     this.masterSplitter.connect(this.masterDCMeterR, 1);
-    // Connect FFT analyzer to post-master signal (splitter output), independent of reverb wet/bypass
-    this.masterSplitter.connect(this.masterFFT, 0, 0);
+    // Connect FFT analyzer to master reverb output (before destination)
+    this.masterReverb.connect(this.masterFFT);
     this.masterReverb.toDestination();
 
     // Sub-buses → MasterBus
@@ -1481,10 +1481,10 @@ class AudioEngine {
   setFFTSize(size: number): void {
     if (this.masterFFT.size === size) return;
     // Disconnect old node without disposing the upstream
-    try { this.masterSplitter.disconnect(this.masterFFT); } catch { /* may already be disconnected */ }
+    try { this.masterReverb.disconnect(this.masterFFT); } catch { /* may already be disconnected */ }
     this.masterFFT.dispose();
     this.masterFFT = new Tone.FFT(size);
-    this.masterSplitter.connect(this.masterFFT, 0, 0);
+    this.masterReverb.connect(this.masterFFT);
   }
 
   getFFTSize(): number {
