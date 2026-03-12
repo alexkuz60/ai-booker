@@ -20,7 +20,7 @@ import { TimelineMasterMeter } from "./TimelineMasterMeter";
 import { TimelineRuler } from "./TimelineRuler";
 import { TimelineTrack } from "./TimelineTrack";
 import { Playhead } from "./TimelinePlayhead";
-import { ChannelPluginsPanel } from "./ChannelPluginsPanel";
+import { ChannelPluginsPanel, type ClipInfo } from "./ChannelPluginsPanel";
 
 // ─── Types ──────────────────────────────────────────────────
 
