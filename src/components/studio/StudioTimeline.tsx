@@ -16,6 +16,7 @@ import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { TrackMixerStrip } from "./TrackMixerStrip";
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
 import { usePluginsPersistence } from "@/hooks/usePluginsPersistence";
+import { useClipPluginConfigs } from "@/hooks/useClipPluginConfigs";
 import { TimelineMasterMeter } from "./TimelineMasterMeter";
 import { TimelineRuler } from "./TimelineRuler";
 import { TimelineTrack } from "./TimelineTrack";
