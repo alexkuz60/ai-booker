@@ -10,6 +10,7 @@ import { TimelineMasterMeter } from "@/components/studio/TimelineMasterMeter";
 import { TimelineRuler } from "@/components/studio/TimelineRuler";
 import { Playhead } from "@/components/studio/TimelinePlayhead";
 import { TrackMixerStrip } from "@/components/studio/TrackMixerStrip";
+import { WaveformEditor } from "@/components/montage/WaveformEditor";
 import { getStemTracks } from "@/hooks/useMontageData";
 import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 
@@ -41,8 +42,11 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
   const trackIds = useMemo(() => stemTracks.map(t => t.id), [stemTracks]);
   const { scheduleSave: onMixChange } = useMixerPersistence(chapterId, trackIds);
 
-  const [timelineHeight, setTimelineHeight] = useState(300);
+  const [timelineHeight, setTimelineHeight] = useState(450);
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+  const [editorScrollLeft, setEditorScrollLeft] = useState(0);
+  const [editorVisibleWidth, setEditorVisibleWidth] = useState(0);
 
   // ── Zoom ────────────────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
@@ -110,7 +114,16 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     const el = sceneScrollRef.current;
     if (!el) return;
     let timer: ReturnType<typeof setTimeout>;
-    const onScroll = () => { userScrollingRef.current = true; clearTimeout(timer); timer = setTimeout(() => { userScrollingRef.current = false; }, 600); };
+    const onScroll = () => {
+      userScrollingRef.current = true;
+      clearTimeout(timer);
+      timer = setTimeout(() => { userScrollingRef.current = false; }, 600);
+      setEditorScrollLeft(el.scrollLeft);
+      setEditorVisibleWidth(el.clientWidth);
+    };
+    // Initial measure
+    setEditorScrollLeft(el.scrollLeft);
+    setEditorVisibleWidth(el.clientWidth);
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => { el.removeEventListener("scroll", onScroll); clearTimeout(timer); };
   }, []);
@@ -294,14 +307,19 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
           <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${MIXER_SIDEBAR}px` }}>
             <div className="h-6 border-b border-border" />
             {stemTracks.map((track) => (
-              <TrackMixerStrip
+              <div
                 key={track.id}
-                trackId={track.id}
-                label={track.label}
-                color={track.color}
-                expanded={false}
-                onMixChange={onMixChange}
-              />
+                className={`cursor-pointer transition-colors ${selectedTrackId === track.id ? "ring-1 ring-primary/50 bg-primary/5" : ""}`}
+                onClick={() => setSelectedTrackId(selectedTrackId === track.id ? null : track.id)}
+              >
+                <TrackMixerStrip
+                  trackId={track.id}
+                  label={track.label}
+                  color={track.color}
+                  expanded={false}
+                  onMixChange={onMixChange}
+                />
+              </div>
             ))}
           </div>
 
@@ -365,6 +383,23 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             </div>
           </div>
         </div>
+      )}
+
+      {/* Waveform Editor */}
+      {!timelineCollapsed && (
+        <WaveformEditor
+          clips={clips}
+          trackId={selectedTrackId}
+          trackLabel={stemTracks.find(t => t.id === selectedTrackId)?.label ?? ""}
+          trackColor={stemTracks.find(t => t.id === selectedTrackId)?.color ?? "hsl(var(--primary))"}
+          zoom={zoom}
+          duration={duration}
+          positionSec={player.positionSec}
+          scrollLeft={editorScrollLeft}
+          visibleWidth={editorVisibleWidth}
+          isRu={isRu}
+          onSeek={player.seek}
+        />
       )}
     </div>
   );
