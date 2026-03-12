@@ -147,16 +147,7 @@ export function Panner3DStage({ isRu, allClips, selectedClipId, config, disabled
         ctx.globalAlpha = 1;
       }
 
-      // Label for non-selected (always show if enabled)
-      if (!isSelected && isEnabled && canvasSize >= 100) {
-        ctx.font = "6px monospace";
-        ctx.fillStyle = "hsla(220, 20%, 70%, 0.6)";
-        ctx.textAlign = "center";
-        const labelText = clip.label.length > 6 ? clip.label.slice(0, 5) + "…" : clip.label;
-        ctx.fillText(labelText, sx, sz - dotR - 2);
-      }
-
-      // Height indicator (Y) for selected clip
+      // Height indicator (Y) for selected clip only
       if (isSelected && Math.abs(p3d.positionY) > 0.1) {
         ctx.font = "7px monospace";
         ctx.fillStyle = "hsl(45, 80%, 60%)";
@@ -165,6 +156,30 @@ export function Panner3DStage({ isRu, allClips, selectedClipId, config, disabled
       }
     }
   }, [canvasSize, allClips, selectedClipId, config]);
+
+  // Tooltip on hover — find nearest clip dot
+  const handleCanvasHover = useCallback((e: React.PointerEvent) => {
+    if (draggingRef.current) { setTooltip(null); return; }
+    const c = canvasRef.current;
+    if (!c) return;
+    const rect = c.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const half = canvasSize / 2;
+    const scale = half / STAGE_RADIUS;
+    const HIT_R = 10; // px hit radius
+
+    for (const clip of allClips) {
+      const sx = half + clip.panner3d.positionX * scale;
+      const sz = half - clip.panner3d.positionZ * scale;
+      const dx = mx - sx, dy = my - sz;
+      if (dx * dx + dy * dy <= HIT_R * HIT_R) {
+        setTooltip({ x: sx, y: sz, label: clip.label, color: clip.color });
+        return;
+      }
+    }
+    setTooltip(null);
+  }, [canvasSize, allClips]);
 
   // Drag handler
   const worldFromCanvas = useCallback((clientX: number, clientY: number) => {
