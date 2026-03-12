@@ -294,6 +294,7 @@ export async function renderScene(
   durationSec: number,
   userId: string,
   onProgress?: (p: RenderProgress) => void,
+  clipConfigs?: SceneClipConfigs,
 ): Promise<RenderResult> {
   const sampleRate = 44100;
   const report = (phase: RenderProgress["phase"], percent: number) =>
@@ -308,7 +309,6 @@ export async function renderScene(
     const sfxClips = clips.filter(c => classifyClip(c) === "sfx" && c.hasAudio);
 
     const allClips = [...voiceClips, ...atmoClips, ...sfxClips];
-    const totalLoadable = allClips.filter(c => c.audioPath).length;
 
     // Pre-load all buffers with per-clip progress (0–45%)
     const buffers = await preloadClipBuffers(allClips, sampleRate, (loaded, total) => {
@@ -318,10 +318,10 @@ export async function renderScene(
 
     report("rendering", 50);
 
-    // Schedule and render all 3 buses in parallel (atomic)
-    const voiceCtx = scheduleBus(voiceClips, buffers, durationSec, sampleRate);
-    const atmoCtx = scheduleBus(atmoClips, buffers, durationSec, sampleRate);
-    const sfxCtx = scheduleBus(sfxClips, buffers, durationSec, sampleRate);
+    // Schedule and render all 3 buses in parallel (atomic), passing per-clip plugin configs
+    const voiceCtx = scheduleBus(voiceClips, buffers, durationSec, sampleRate, clipConfigs);
+    const atmoCtx = scheduleBus(atmoClips, buffers, durationSec, sampleRate, clipConfigs);
+    const sfxCtx = scheduleBus(sfxClips, buffers, durationSec, sampleRate, clipConfigs);
 
     const [voiceBuf, atmoBuf, sfxBuf] = await Promise.all([
       voiceCtx?.startRendering() ?? Promise.resolve(null),
@@ -372,7 +372,13 @@ export async function renderScene(
 
     report("uploading", 90);
 
-    // Upsert scene_renders record
+    // Snapshot clip plugin configs into render_config
+    const renderConfigSnapshot: Record<string, unknown> = {};
+    if (clipConfigs && Object.keys(clipConfigs).length > 0) {
+      renderConfigSnapshot.clip_plugins = clipConfigs;
+    }
+
+    // Upsert scene_renders record with plugin configs snapshot
     const { error: dbError } = await supabase.from("scene_renders" as any).upsert(
       {
         scene_id: sceneId,
@@ -384,13 +390,37 @@ export async function renderScene(
         atmo_duration_ms: results.atmosphere?.durationMs ?? 0,
         sfx_duration_ms: results.sfx?.durationMs ?? 0,
         status: "ready",
-        render_config: {},
+        render_config: renderConfigSnapshot,
         updated_at: new Date().toISOString(),
       } as any,
       { onConflict: "scene_id" } as any,
     );
 
     if (dbError) console.error("scene_renders upsert error:", dbError);
+
+    // Also snapshot plugin configs into scene_playlists segments
+    if (clipConfigs && Object.keys(clipConfigs).length > 0) {
+      const { data: playlist } = await supabase
+        .from("scene_playlists")
+        .select("segments")
+        .eq("scene_id", sceneId)
+        .maybeSingle();
+
+      if (playlist?.segments && Array.isArray(playlist.segments)) {
+        const updatedSegments = (playlist.segments as Array<Record<string, unknown>>).map(seg => {
+          const segId = seg.segment_id as string;
+          const pluginCfg = clipConfigs[segId];
+          if (pluginCfg) {
+            return { ...seg, plugin_config: pluginCfg };
+          }
+          return seg;
+        });
+        await supabase.from("scene_playlists").update({
+          segments: updatedSegments as unknown as import("@/integrations/supabase/types").Json,
+          updated_at: new Date().toISOString(),
+        }).eq("scene_id", sceneId);
+      }
+    }
 
     report("done", 100);
 
