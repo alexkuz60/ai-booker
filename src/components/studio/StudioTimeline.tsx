@@ -691,44 +691,8 @@ export function StudioTimeline({
               );
             })}
           </div>
-          <div ref={sceneScrollRef} className="flex-1 overflow-x-auto overflow-y-hidden">
-            <div
-              className="relative cursor-crosshair"
-              style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const sec = x / (zoom * 4);
-                const clampedSec = Math.max(0, Math.min(sec, duration));
-                player.seek(clampedSec);
-                centerPlayhead(clampedSec);
-              }}
-            >
-              <div className="sticky top-0 z-20 bg-background">
-                <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} renderPercent={rulerRenderPercent} isRendering={isRendering} />
-              </div>
-              {allTracks.map((track) => (
-                <TimelineTrack
-                  key={track.id}
-                  track={track}
-                  zoom={zoom}
-                  duration={duration}
-                  clips={clipsByTrack.get(track.id)}
-                  selectedSegmentId={selectedSegmentId}
-                  onSelectSegment={onSelectSegment}
-                  synthesizingSegmentIds={synthesizingSegmentIds}
-                  errorSegmentIds={errorSegmentIds}
-                  onSetFade={handleSetFade}
-                  clipFades={clipFades}
-                />
-              ))}
-              <Playhead positionSec={player.positionSec} zoom={zoom} />
-            </div>
-          </div>
-
-          {/* ── Plugins right sidebar ── */}
-          {timelineView === "plugins" && (
-            <div className="w-[420px] shrink-0 border-l border-border overflow-auto">
+          {timelineView === "plugins" ? (
+            <div className="flex-1 overflow-auto border-l border-border">
               <ChannelPluginsPanel
                 isRu={isRu}
                 trackId={pluginsTrackId}
@@ -736,6 +700,41 @@ export function StudioTimeline({
                 trackColor={pluginsTrackColor}
                 onMixChange={() => { onMixChange(); onPluginsChange(); }}
               />
+            </div>
+          ) : (
+            <div ref={sceneScrollRef} className="flex-1 overflow-x-auto overflow-y-hidden">
+              <div
+                className="relative cursor-crosshair"
+                style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const sec = x / (zoom * 4);
+                  const clampedSec = Math.max(0, Math.min(sec, duration));
+                  player.seek(clampedSec);
+                  centerPlayhead(clampedSec);
+                }}
+              >
+                <div className="sticky top-0 z-20 bg-background">
+                  <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} renderPercent={rulerRenderPercent} isRendering={isRendering} />
+                </div>
+                {allTracks.map((track) => (
+                  <TimelineTrack
+                    key={track.id}
+                    track={track}
+                    zoom={zoom}
+                    duration={duration}
+                    clips={clipsByTrack.get(track.id)}
+                    selectedSegmentId={selectedSegmentId}
+                    onSelectSegment={onSelectSegment}
+                    synthesizingSegmentIds={synthesizingSegmentIds}
+                    errorSegmentIds={errorSegmentIds}
+                    onSetFade={handleSetFade}
+                    clipFades={clipFades}
+                  />
+                ))}
+                <Playhead positionSec={player.positionSec} zoom={zoom} />
+              </div>
             </div>
           )}
         </div>
