@@ -265,10 +265,10 @@ export function WaveformEditor({
       const canvas = canvasRef.current;
       if (!canvas) return 0;
       const rect = canvas.getBoundingClientRect();
-      const px = clientX - rect.left + scrollLeft;
+      const px = clientX - rect.left - mixerWidth + scrollLeft;
       return Math.max(0, Math.min(duration, (px / totalWidthPx) * duration));
     },
-    [scrollLeft, totalWidthPx, duration],
+    [scrollLeft, totalWidthPx, duration, mixerWidth],
   );
 
   const handleMouseDown = useCallback(
