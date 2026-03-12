@@ -128,9 +128,9 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
         setLoadProgress({ total: configs.length, done: configs.length, loaded: 0, failed: configs.length, currentId: "", currentLabel: "" });
         const msg = err?.message ?? "";
         if (msg.includes("ctx=suspended") || msg.includes("ctx=closed")) {
-          toast.error("AudioContext не активен. Нажмите кнопку ↺ для сброса движка, затем Play.");
+          toast.error("AudioContext не активен. Перезагрузите страницу и нажмите Play.");
         } else {
-          toast.error("Не удалось загрузить аудиодорожки. Попробуйте кнопку ↺ сброса движка.");
+          toast.error("Не удалось загрузить аудиодорожки. Перезагрузите страницу.");
         }
       }
     };
