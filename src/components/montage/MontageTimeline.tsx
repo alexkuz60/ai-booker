@@ -40,9 +40,11 @@ interface MontageTimelineProps {
   totalDurationSec: number;
   chapterId: string | null;
   isRu: boolean;
+  onSplitAtScene?: (sceneId: string) => void;
+  hasParts?: boolean;
 }
 
-export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chapterId, isRu }: MontageTimelineProps) {
+export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chapterId, isRu, onSplitAtScene, hasParts }: MontageTimelineProps) {
   const player = useTimelinePlayer(clips);
   const duration = player.totalDuration > 0 ? player.totalDuration : totalDurationSec;
 
