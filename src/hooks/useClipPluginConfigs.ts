@@ -169,7 +169,7 @@ export function useClipPluginConfigs(sceneId: string | null) {
   const togglePlugin = useCallback((
     clipId: string,
     trackId: string,
-    plugin: "eq" | "comp" | "limiter",
+    plugin: "eq" | "comp" | "limiter" | "panner3d" | "convolver",
   ) => {
     const engine = getAudioEngine();
     setConfigs(prev => {
