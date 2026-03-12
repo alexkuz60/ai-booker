@@ -211,7 +211,7 @@ export function SpectrumAnalyzer() {
     } catch {}
   }, [mode, smoothing]);
 
-  useEffect(() => { engine.setFFTSize(128); }, [engine]);
+  useEffect(() => { getAudioEngine().setFFTSize(128); }, []);
 
   const smoothRef = useRef<Float32Array | null>(null);
   const modeRef = useRef(mode);
