@@ -213,9 +213,6 @@ export function SpectrumAnalyzer() {
 
   useEffect(() => {
     getAudioEngine().setFFTSize(128);
-    const onReset = () => { getAudioEngine().setFFTSize(128); };
-    window.addEventListener("audio-engine-reset", onReset);
-    return () => window.removeEventListener("audio-engine-reset", onReset);
   }, []);
 
   const smoothRef = useRef<Float32Array | null>(null);
