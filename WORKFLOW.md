@@ -592,6 +592,8 @@ PDF-файл
 │  10a. Микшер                    │  Vol/Pan/Mute/Solo, Pre-FX, Reverb ✅
 │  10b. Мастеринг                 │  EQ→CMP→LIM→FLT→MBC→REV ✅
 │  10c. Метеринг                  │  Stereo VU L/R, FFT Spectrum ✅
+│  10d. Per-Clip плагины          │  EQ→CMP→LIM→PAN3D→CONV ✅
+│  10e. Рендер в стемы            │  Voice/Atmo/SFX → WAV ✅
 └─────────────┬───────────────────┘
               │
               ▼
