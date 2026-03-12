@@ -637,21 +637,8 @@ export function StudioTimeline({
         </div>
       </div>
 
-      {/* Content: Tracks or Plugins */}
-      {!collapsed && timelineView === "plugins" && (
-        <div className="flex-1 min-h-0 overflow-auto">
-          <ChannelPluginsPanel
-            isRu={isRu}
-            trackId={pluginsTrackId}
-            trackLabel={pluginsTrackLabel}
-            trackColor={pluginsTrackColor}
-            onMixChange={() => { onMixChange(); onPluginsChange(); }}
-          />
-        </div>
-      )}
-
-      {/* Tracks — Scene mode only */}
-      {!collapsed && timelineView === "tracks" && (
+      {/* Content: Mixer sidebar + Tracks + optional Plugins right sidebar */}
+      {!collapsed && (
         <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
           <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${sidebarWidth}px` }}>
             <div className="h-6 border-b border-border flex items-center px-2">
@@ -738,6 +725,19 @@ export function StudioTimeline({
               <Playhead positionSec={player.positionSec} zoom={zoom} />
             </div>
           </div>
+
+          {/* ── Plugins right sidebar ── */}
+          {timelineView === "plugins" && (
+            <div className="w-[420px] shrink-0 border-l border-border overflow-auto">
+              <ChannelPluginsPanel
+                isRu={isRu}
+                trackId={pluginsTrackId}
+                trackLabel={pluginsTrackLabel}
+                trackColor={pluginsTrackColor}
+                onMixChange={() => { onMixChange(); onPluginsChange(); }}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
