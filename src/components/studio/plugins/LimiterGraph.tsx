@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
+import { cn } from "@/lib/utils";
 
-export function LimiterGraph({ threshold }: { threshold: number }) {
+export function LimiterGraph({ threshold, className }: { threshold: number; className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
