@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { ZoomIn, ZoomOut, Maximize2, Play, Pause, Square, Volume2, VolumeX, ChevronUp, ChevronDown, RotateCcw, Loader2, RefreshCw, AlertTriangle, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { resetAudioEngine } from "@/lib/audioEngine";
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
@@ -14,19 +15,7 @@ import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 
 const MIXER_SIDEBAR = 160;
 
-const UNDER_100_STEPS = [5, 10, 15, 25, 50, 75, 100] as const;
-
-function stepZoom(cur: number, dir: "in" | "out"): number {
-  if (dir === "in") {
-    if (cur < 100) return UNDER_100_STEPS.find(s => s > cur + 0.001) ?? 100;
-    return Math.min(1000, (Math.floor(cur / 100) + 1) * 100);
-  }
-  if (cur <= 100) {
-    const lower = UNDER_100_STEPS.filter(s => s < cur - 0.001);
-    return lower.length > 0 ? lower[lower.length - 1] : 5;
-  }
-  return Math.max(100, (Math.ceil(cur / 100) - 1) * 100);
-}
+const MONTAGE_ZOOM_PRESETS = [95, 100, 200, 300, 400, 500] as const;
 
 function formatTime(s: number) {
   const m = Math.floor(s / 60);
@@ -68,26 +57,70 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     return () => ro.disconnect();
   }, [timelineCollapsed]);
 
+  const sceneScrollRef = useRef<HTMLDivElement>(null);
+
   const fitZoom = useMemo(() => {
     if (containerWidth <= 0 || duration <= 0) return 1;
     return containerWidth / (duration * 4);
   }, [containerWidth, duration]);
 
+  const [montageZoomPercent, setMontageZoomPercent] = useState<number>(100);
   const [zoomOverride, setZoomOverride] = useState<number | null>(null);
   const zoom = zoomOverride ?? fitZoom;
-  useEffect(() => { setZoomOverride(null); }, [fitZoom]);
 
-  const toPercent = useCallback((z: number) => fitZoom > 0 ? (z / fitZoom) * 100 : 100, [fitZoom]);
-  const displayZoomPercent = Math.round(toPercent(zoom));
+  useEffect(() => { setZoomOverride(null); setMontageZoomPercent(100); }, [fitZoom]);
+
+  const applyMontageZoom = useCallback((percent: number) => {
+    setMontageZoomPercent(percent);
+    const newZoom = percent === 100 ? fitZoom : (fitZoom * percent) / 100;
+    if (percent === 100) {
+      setZoomOverride(null);
+    } else {
+      setZoomOverride(newZoom);
+    }
+    if (percent > 100) {
+      requestAnimationFrame(() => {
+        const el = sceneScrollRef.current;
+        if (!el) return;
+        const px = player.positionSec * newZoom * 4;
+        el.scrollTo({ left: Math.max(0, px - el.clientWidth / 2), behavior: "smooth" });
+      });
+    }
+  }, [fitZoom, player.positionSec]);
 
   const adjustZoom = useCallback((dir: "in" | "out") => {
-    setZoomOverride(prev => {
-      const cur = toPercent(prev ?? fitZoom);
-      return (fitZoom * stepZoom(cur, dir)) / 100;
-    });
-  }, [fitZoom, toPercent]);
+    const presets = MONTAGE_ZOOM_PRESETS;
+    const cur = montageZoomPercent;
+    let next: number;
+    if (dir === "in") {
+      next = presets.find(p => p > cur) ?? presets[presets.length - 1];
+    } else {
+      const lower = [...presets].reverse().find(p => p < cur);
+      next = lower ?? presets[0];
+    }
+    applyMontageZoom(next);
+  }, [montageZoomPercent, applyMontageZoom]);
 
-  const resetZoom = useCallback(() => setZoomOverride(null), []);
+  const resetZoom = useCallback(() => applyMontageZoom(100), [applyMontageZoom]);
+
+  // ── Auto-scroll during playback ───────────────────────────
+  const userScrollingRef = useRef(false);
+  useEffect(() => {
+    const el = sceneScrollRef.current;
+    if (!el) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const onScroll = () => { userScrollingRef.current = true; clearTimeout(timer); timer = setTimeout(() => { userScrollingRef.current = false; }, 600); };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => { el.removeEventListener("scroll", onScroll); clearTimeout(timer); };
+  }, []);
+
+  useEffect(() => {
+    if (player.state !== "playing" || montageZoomPercent <= 100 || userScrollingRef.current) return;
+    const el = sceneScrollRef.current;
+    if (!el) return;
+    const playheadPx = player.positionSec * zoom * 4;
+    el.scrollLeft = Math.max(0, playheadPx - el.clientWidth / 2);
+  }, [player.positionSec, player.state, zoom, montageZoomPercent]);
 
   const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -250,7 +283,16 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("out")}><ZoomOut className="h-3.5 w-3.5" /></Button>
-          <span className="text-xs text-muted-foreground font-body w-10 text-center">{displayZoomPercent}%</span>
+          <Select value={String(montageZoomPercent)} onValueChange={(v) => applyMontageZoom(Number(v))}>
+            <SelectTrigger className="h-7 w-[72px] text-xs font-body border-none bg-transparent px-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MONTAGE_ZOOM_PRESETS.map((p) => (
+                <SelectItem key={p} value={String(p)} className="text-xs">{p}%</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => adjustZoom("in")}><ZoomIn className="h-3.5 w-3.5" /></Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetZoom}><Maximize2 className="h-3.5 w-3.5" /></Button>
         </div>
@@ -275,7 +317,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
           </div>
 
           {/* Timeline area */}
-          <div className="flex-1 overflow-x-auto overflow-y-hidden">
+          <div ref={sceneScrollRef} className="flex-1 overflow-x-auto overflow-y-hidden">
             <div
               className="relative cursor-crosshair"
               style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
