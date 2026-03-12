@@ -25,6 +25,8 @@ interface WaveformEditorProps {
   isRu: boolean;
   onSeek: (sec: number) => void;
   onTrim?: (trackId: string, startSec: number, endSec: number) => void;
+  onFadeIn?: (trackId: string, durationSec: number) => void;
+  onFadeOut?: (trackId: string, durationSec: number) => void;
 }
 
 // ── Selection state ──────────────────────────────────────────
