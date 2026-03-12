@@ -10,6 +10,7 @@ import { ParamSlider } from "./ParamSlider";
 import { BypassButton } from "./BypassButton";
 import { drawPeaksWaveform } from "@/lib/irPeaks";
 import { fetchWithStemCache } from "@/lib/stemCache";
+import { Play, Square } from "lucide-react";
 import type { ClipConvolverConfig } from "@/hooks/useClipPluginConfigs";
 
 interface ConvolverPanelProps {
