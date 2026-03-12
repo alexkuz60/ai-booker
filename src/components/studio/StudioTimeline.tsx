@@ -128,13 +128,14 @@ export function StudioTimeline({
         durationRef.current,
         user.id,
         setRenderProgress,
+        clipPlugins.configs,
       );
       toast.success(isRu ? "Сцена отрендерена" : "Scene rendered");
       onSceneRendered?.(sceneId);
     } catch (err: any) {
       toast.error(isRu ? "Ошибка рендера" : "Render error", { description: err.message });
     }
-  }, [sceneId, user, isRendering, isRu, onSceneRendered]);
+  }, [sceneId, user, isRendering, isRu, onSceneRendered, clipPlugins.configs]);
 
   // Refs for render callback (avoid stale closures)
   const timelineClipsRef = useRef<typeof timelineClips>([]);
