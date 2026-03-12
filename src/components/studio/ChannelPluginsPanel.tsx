@@ -117,7 +117,7 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
               </div>
               <div className="flex gap-2 flex-1 min-h-0">
                 <div className="flex-1 min-w-0 min-h-0">
-                  <EqGraph low={bypasses.eq ? 0 : eqLow} mid={bypasses.eq ? 0 : eqMid} high={bypasses.eq ? 0 : eqHigh} className="h-full" />
+                  <EqGraph low={eqLow} mid={eqMid} high={eqHigh} className="h-full" />
                 </div>
                 <div className="flex flex-col gap-1.5 shrink-0 justify-center" style={{ width: 100 }}>
                   <ParamSlider label="Low" value={eqLow} min={-12} max={12} step={0.5} unit=" dB"
