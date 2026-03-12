@@ -275,6 +275,26 @@ export function ImpulseManager({ isRu }: ImpulseManagerProps) {
             {isRu ? "Коллекция импульсов" : "Impulse Collection"}
             <Badge variant="secondary" className="ml-2 text-xs">{impulses.length}</Badge>
           </CardTitle>
+          <div className="ml-auto flex items-center gap-2">
+            {backfilling && (
+              <span className="text-xs text-muted-foreground truncate max-w-48">{backfillProgress}</span>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={backfilling || missingPeaksCount === 0}
+              onClick={handleBackfillPeaks}
+              className="shrink-0"
+            >
+              {backfilling
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+              {isRu ? "Пересчитать peaks" : "Recompute peaks"}
+              {missingPeaksCount > 0 && (
+                <Badge variant="destructive" className="ml-1.5 h-5 px-1.5 text-[10px]">{missingPeaksCount}</Badge>
+              )}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
