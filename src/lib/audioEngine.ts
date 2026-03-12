@@ -86,12 +86,22 @@ export interface TrackConfig {
 export interface LoadProgress {
   /** Total number of tracks to load */
   total: number;
-  /** Number of tracks loaded so far (including failed) */
+  /** Number of tracks processed so far */
   done: number;
+  /** Successfully loaded tracks */
+  loaded: number;
+  /** Failed tracks */
+  failed: number;
   /** ID of the track currently loading */
   currentId: string;
   /** Label of the currently loading track */
   currentLabel: string;
+}
+
+export interface LoadTracksResult {
+  total: number;
+  loaded: number;
+  dropped: number;
 }
 
 export type EngineState = "stopped" | "playing" | "paused";
@@ -628,7 +638,7 @@ class AudioEngine {
 
   // ─── Track management ──────────────────────────────────
 
-  async loadTracks(configs: TrackConfig[], onProgress?: (p: LoadProgress) => void): Promise<void> {
+  async loadTracks(configs: TrackConfig[], onProgress?: (p: LoadProgress) => void): Promise<LoadTracksResult> {
     this.stop();
     for (const t of this.tracks.values()) t.dispose();
     this.tracks.clear();
@@ -636,7 +646,7 @@ class AudioEngine {
     if (configs.length === 0) {
       this._totalDuration = 0;
       this.notify();
-      return;
+      return { total: 0, loaded: 0, dropped: 0 };
     }
 
     // Ensure AudioContext is running before loading audio buffers
@@ -650,16 +660,24 @@ class AudioEngine {
     }
 
     let dropped = 0;
+    let loadedCount = 0;
 
     // Load large stem files sequentially to avoid decoder/network starvation.
     for (let ci = 0; ci < configs.length; ci++) {
       const cfg = configs[ci];
-      onProgress?.({ total: configs.length, done: ci, currentId: cfg.id, currentLabel: cfg.label ?? cfg.id });
+      onProgress?.({
+        total: configs.length,
+        done: ci,
+        loaded: loadedCount,
+        failed: dropped,
+        currentId: cfg.id,
+        currentLabel: cfg.label ?? cfg.id,
+      });
       const bus = this.getBus(cfg.bus ?? "voice");
       const track = new EngineTrack(cfg, bus);
       this.tracks.set(cfg.id, track);
 
-      const timeoutMs = Math.min(240_000, Math.max(30_000, Math.round((cfg.durationSec || 0) * 350)));
+      const timeoutMs = Math.min(900_000, Math.max(120_000, Math.round((cfg.durationSec || 0) * 1200)));
       const startedAt = performance.now();
 
       const loaded = await new Promise<boolean>((resolve) => {
@@ -702,9 +720,19 @@ class AudioEngine {
         track.dispose();
         this.tracks.delete(cfg.id);
         dropped++;
+      } else {
+        loadedCount++;
       }
+
+      onProgress?.({
+        total: configs.length,
+        done: ci + 1,
+        loaded: loadedCount,
+        failed: dropped,
+        currentId: cfg.id,
+        currentLabel: cfg.label ?? cfg.id,
+      });
     }
-    onProgress?.({ total: configs.length, done: configs.length, currentId: "", currentLabel: "" });
 
     if (this.tracks.size === 0) {
       this._totalDuration = 0;
@@ -721,6 +749,7 @@ class AudioEngine {
     for (const t of this.tracks.values()) t.schedule();
 
     this.notify();
+    return { total: configs.length, loaded: this.tracks.size, dropped };
   }
 
   async addTrack(config: TrackConfig): Promise<void> {

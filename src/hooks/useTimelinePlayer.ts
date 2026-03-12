@@ -104,10 +104,13 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       if (cancelled) return;
 
       try {
-        setLoadProgress({ total: configs.length, done: 0, currentId: "", currentLabel: "" });
-        await engine.loadTracks(configs, (p) => {
+        setLoadProgress({ total: configs.length, done: 0, loaded: 0, failed: 0, currentId: "", currentLabel: "" });
+        const res = await engine.loadTracks(configs, (p) => {
           if (!cancelled) setLoadProgress(p);
         });
+        if (!cancelled && res.dropped > 0) {
+          toast.warning(`Загружено не всё: ${res.loaded}/${res.total}. Часть стемов не декодировалась.`);
+        }
         setLoadProgress(null);
       } catch (err: any) {
         console.error("[useTimelinePlayer] Failed to load tracks:", err);
@@ -142,12 +145,15 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
 
   const play = useCallback(async () => {
     try {
+      if (volume === 0) {
+        toast.warning("Громкость мастера = 0. Увеличьте ползунок справа от Play.");
+      }
       await engine.play();
     } catch (err) {
       console.error("[useTimelinePlayer] play failed:", err);
       toast.error("Не удалось воспроизвести аудио. Проверьте настройки браузера.");
     }
-  }, [engine]);
+  }, [engine, volume]);
 
   const pause = useCallback(() => {
     engine.pause();
