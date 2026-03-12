@@ -317,7 +317,7 @@ export function WaveformEditor({
   }
 
   return (
-    <div className="flex flex-col border-t border-border bg-card/30 shrink-0" style={{ height: EDITOR_HEIGHT }}>
+    <div className="flex flex-col border-t border-border bg-card/30 flex-1 min-h-[120px]">
       {/* Toolbar */}
       <div className="flex items-center justify-between px-3 py-1 border-b border-border/50 shrink-0 h-6">
         <div className="flex items-center gap-2">
