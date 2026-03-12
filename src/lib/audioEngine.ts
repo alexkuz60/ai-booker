@@ -13,6 +13,7 @@
  */
 
 import * as Tone from "tone";
+import { fetchWithStemCache } from "@/lib/stemCache";
 
 // ─── Types ──────────────────────────────────────────────────
 
