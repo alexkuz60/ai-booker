@@ -52,7 +52,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     }).filter(c => c.durationSec > 0.01);
   }, [clips, trimOverrides]);
 
-  const player = useTimelinePlayer(trimmedClips);
+  const player = useTimelinePlayer(fadedClips);
   const duration = player.totalDuration > 0 ? player.totalDuration : totalDurationSec;
 
   const stemTracks = useMemo(() => getStemTracks(isRu), [isRu]);
