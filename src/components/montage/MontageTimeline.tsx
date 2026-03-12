@@ -140,9 +140,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     }
   }, [trimmedClips, clips, trimOverrides, pushUndo, isRu]);
 
-  // ── Fade overrides: per-clip { fadeInSec, fadeOutSec } ──────
-  const [fadeOverrides, setFadeOverrides] = useState<Map<string, { fadeInSec: number; fadeOutSec: number }>>(new Map());
-
   // Apply fade overrides to trimmedClips
   const fadedClips = useMemo(() => {
     if (fadeOverrides.size === 0) return trimmedClips;
