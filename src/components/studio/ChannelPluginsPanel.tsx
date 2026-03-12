@@ -457,7 +457,7 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
       {/* Plugin columns — stretch to bottom */}
       <div className="flex gap-4 flex-1 min-h-0 overflow-auto divide-x divide-border/40">
         {/* ── EQ Column ── */}
-        <div className="flex-1 min-w-0 flex flex-col gap-2">
+        <div style={{ flex: "3 1 0%" }} className="min-w-0 flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">
               {isRu ? "3-полосный EQ" : "3-Band EQ"}
