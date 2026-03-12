@@ -196,6 +196,7 @@ class EngineTrack {
   private _preFxBypassed = true;
   private _compThreshold = -24;
   private _compRatio = 3;
+  private _compKnee = 10;
   private _compAttack = 0.01;
   private _compRelease = 0.1;
 
