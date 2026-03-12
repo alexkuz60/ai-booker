@@ -337,6 +337,8 @@ export function ChannelPluginsPanel({
               <div style={{ flex: "1 1 0%" }} className="min-w-0">
                 <Panner3DStage
                   isRu={isRu}
+                  allClips={stageClips}
+                  selectedClipId={selectedClipId}
                   config={selectedConfig.panner3d}
                   onToggle={() => onTogglePlugin(selectedClipId, "panner3d")}
                   onUpdate={(params) => onUpdateParams(selectedClipId, "panner3d", params)}
