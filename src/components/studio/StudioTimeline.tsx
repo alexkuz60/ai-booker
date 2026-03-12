@@ -444,6 +444,7 @@ export function StudioTimeline({
   const pluginsClips = useMemo((): ClipInfo[] => {
     if (!selectedCharacterId) return [];
     const charTrackId = `char-${selectedCharacterId}`;
+    const trackInfo = charTracks.find(t => t.id === charTrackId);
     return timelineClips
       .filter(c => c.trackId === charTrackId && c.hasAudio && !!c.audioPath)
       .map(c => ({
@@ -452,8 +453,26 @@ export function StudioTimeline({
         segmentType: c.segmentType,
         startSec: c.startSec,
         durationSec: c.durationSec,
+        charColor: trackInfo?.color,
       }));
-  }, [selectedCharacterId, timelineClips]);
+  }, [selectedCharacterId, timelineClips, charTracks]);
+
+  // ALL scene clips across all character tracks (for Panner3D multi-character view)
+  const allSceneClips = useMemo((): ClipInfo[] => {
+    return timelineClips
+      .filter(c => c.trackId.startsWith("char-") && c.hasAudio && !!c.audioPath)
+      .map(c => {
+        const trackInfo = charTracks.find(t => t.id === c.trackId);
+        return {
+          id: c.id,
+          label: c.label || c.segmentType || c.id,
+          segmentType: c.segmentType,
+          startSec: c.startSec,
+          durationSec: c.durationSec,
+          charColor: trackInfo?.color,
+        };
+      });
+  }, [timelineClips, charTracks]);
 
   const pluginsTrackLabel = useMemo(() => {
     if (!selectedCharacterId) return undefined;
@@ -722,6 +741,7 @@ export function StudioTimeline({
               <ChannelPluginsPanel
                 isRu={isRu}
                 clips={pluginsClips}
+                allSceneClips={allSceneClips}
                 trackLabel={pluginsTrackLabel}
                 trackColor={pluginsTrackColor}
                 trackId={selectedCharacterId ? `char-${selectedCharacterId}` : undefined}
