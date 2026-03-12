@@ -420,6 +420,23 @@ export function WaveformEditor({
     ctx.restore();
   }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, duration, positionSec, mixerWidth, trackClips]);
 
+  // ── Keyboard shortcuts (Ctrl+Z / Ctrl+Shift+Z) ─────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!e.ctrlKey) return;
+      if (e.key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          onRedo?.();
+        } else {
+          onUndo?.();
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onUndo, onRedo]);
+
   // Redraw on RAF when playing
   const rafRef = useRef<number>(0);
   useEffect(() => {
