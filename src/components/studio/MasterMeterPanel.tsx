@@ -211,7 +211,12 @@ export function SpectrumAnalyzer() {
     } catch {}
   }, [mode, smoothing]);
 
-  useEffect(() => { getAudioEngine().setFFTSize(128); }, []);
+  useEffect(() => {
+    getAudioEngine().setFFTSize(128);
+    const onReset = () => { getAudioEngine().setFFTSize(128); };
+    window.addEventListener("audio-engine-reset", onReset);
+    return () => window.removeEventListener("audio-engine-reset", onReset);
+  }, []);
 
   const smoothRef = useRef<Float32Array | null>(null);
   const modeRef = useRef(mode);
