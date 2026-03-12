@@ -240,6 +240,18 @@ class EngineTrack {
   private meterL: Tone.Meter;
   private meterR: Tone.Meter;
 
+  // Telephone FX chain (inserted between player and eqNode when segmentType==='telephone')
+  private _telephone = false;
+  private _phoneFilter: Tone.Filter | null = null;
+  private _phoneBitCrusher: Tone.BitCrusher | null = null;
+  private _phoneDistortion: Tone.Distortion | null = null;
+  private _phoneComp: Tone.Compressor | null = null;
+  private _phoneNoise: Tone.Noise | null = null;
+  private _phoneNoiseFilter: Tone.Filter | null = null;
+  private _phoneNoiseGain: Tone.Gain | null = null;
+  private _phoneHum: Tone.Oscillator | null = null;
+  private _phoneHumGain: Tone.Gain | null = null;
+
   private _muted = false;
   private _solo = false;
   private _volume = 80;
