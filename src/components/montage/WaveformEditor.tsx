@@ -31,9 +31,15 @@ interface Selection {
   endSec: number;
 }
 
-const CHANNEL_HEIGHT = 64;
+const CHANNEL_HEIGHT = 96;
 const CHANNEL_GAP = 2;
 const EDITOR_HEIGHT = CHANNEL_HEIGHT * 2 + CHANNEL_GAP + 24; // 2 channels + gap + toolbar
+
+/** Resolve a CSS custom property to a usable hsl() string for Canvas */
+function resolveHsl(varName: string): string {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  return raw ? `hsl(${raw})` : "hsl(190 80% 60%)";
+}
 
 // ── Canvas waveform renderer ─────────────────────────────────
 function drawChannel(
