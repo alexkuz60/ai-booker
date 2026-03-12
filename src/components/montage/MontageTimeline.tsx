@@ -114,7 +114,16 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     const el = sceneScrollRef.current;
     if (!el) return;
     let timer: ReturnType<typeof setTimeout>;
-    const onScroll = () => { userScrollingRef.current = true; clearTimeout(timer); timer = setTimeout(() => { userScrollingRef.current = false; }, 600); };
+    const onScroll = () => {
+      userScrollingRef.current = true;
+      clearTimeout(timer);
+      timer = setTimeout(() => { userScrollingRef.current = false; }, 600);
+      setEditorScrollLeft(el.scrollLeft);
+      setEditorVisibleWidth(el.clientWidth);
+    };
+    // Initial measure
+    setEditorScrollLeft(el.scrollLeft);
+    setEditorVisibleWidth(el.clientWidth);
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => { el.removeEventListener("scroll", onScroll); clearTimeout(timer); };
   }, []);
