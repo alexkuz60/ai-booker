@@ -16,6 +16,7 @@ import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { TrackMixerStrip } from "./TrackMixerStrip";
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
 import { usePluginsPersistence } from "@/hooks/usePluginsPersistence";
+import { useClipPluginConfigs } from "@/hooks/useClipPluginConfigs";
 import { TimelineMasterMeter } from "./TimelineMasterMeter";
 import { TimelineRuler } from "./TimelineRuler";
 import { TimelineTrack } from "./TimelineTrack";
@@ -349,6 +350,7 @@ export function StudioTimeline({
   }, [allTracks, timelineClips]);
   const { scheduleSave: onMixChange } = useMixerPersistence(sceneId ?? null, engineTrackIds);
   const { scheduleSave: onPluginsChange } = usePluginsPersistence(sceneId ?? null, engineTrackIds);
+  const clipPlugins = useClipPluginConfigs(sceneId ?? null);
 
   // ── Layout / zoom ─────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
@@ -459,63 +461,20 @@ export function StudioTimeline({
     return charTracks.find(t => t.id === `char-${selectedCharacterId}`)?.color;
   }, [selectedCharacterId, charTracks]);
 
-  // Per-clip plugin enabled state (all enabled by default)
-  const [pluginEnabledClipIds, setPluginEnabledClipIds] = useState<Set<string>>(new Set());
-  // Auto-enable new clips
-  useEffect(() => {
-    if (pluginsClips.length === 0) return;
-    setPluginEnabledClipIds(prev => {
-      const next = new Set(prev);
-      let changed = false;
-      for (const c of pluginsClips) {
-        if (!next.has(c.id)) { next.add(c.id); changed = true; }
-      }
-      // Remove stale IDs
-      const validIds = new Set(pluginsClips.map(c => c.id));
-      for (const id of next) {
-        if (!validIds.has(id)) { next.delete(id); changed = true; }
-      }
-      return changed ? next : prev;
-    });
-  }, [pluginsClips]);
+  // Per-clip plugin toggle/update handlers (delegated to useClipPluginConfigs)
+  const handleTogglePlugin = useCallback((clipId: string, plugin: "eq" | "comp" | "limiter") => {
+    const charTrackId = selectedCharacterId ? `char-${selectedCharacterId}` : "";
+    clipPlugins.togglePlugin(clipId, charTrackId, plugin);
+    onPluginsChange();
+    onMixChange();
+  }, [clipPlugins, selectedCharacterId, onPluginsChange, onMixChange]);
 
-  const handleToggleClip = useCallback((clipId: string) => {
-    const engine = getAudioEngine();
-    setPluginEnabledClipIds(prev => {
-      const next = new Set(prev);
-      if (next.has(clipId)) {
-        next.delete(clipId);
-        // Bypass all plugins on this clip
-        engine.setTrackEqBypassed(clipId, true);
-        engine.setTrackPreFxBypassed(clipId, true);
-        engine.setTrackLimiterBypassed(clipId, true);
-      } else {
-        next.add(clipId);
-        // Restore plugin state from first enabled clip (copy settings)
-        const firstEnabled = [...prev][0];
-        if (firstEnabled) {
-          const ms = engine.getTrackMixState(firstEnabled);
-          if (ms) {
-            engine.setTrackEqLow(clipId, ms.eq.low);
-            engine.setTrackEqMid(clipId, ms.eq.mid);
-            engine.setTrackEqHigh(clipId, ms.eq.high);
-            engine.setTrackEqBypassed(clipId, ms.eq.bypassed);
-            engine.setTrackCompThreshold(clipId, ms.comp.threshold);
-            engine.setTrackCompRatio(clipId, ms.comp.ratio);
-            engine.setTrackCompKnee(clipId, ms.comp.knee);
-            engine.setTrackCompAttack(clipId, ms.comp.attack);
-            engine.setTrackCompRelease(clipId, ms.comp.release);
-            engine.setTrackPreFxBypassed(clipId, ms.comp.bypassed);
-            engine.setTrackLimiterThreshold(clipId, ms.limiter.threshold);
-            engine.setTrackLimiterBypassed(clipId, ms.limiter.bypassed);
-          }
-        }
-      }
-      onPluginsChange();
-      onMixChange();
-      return next;
-    });
-  }, [onPluginsChange, onMixChange]);
+  const handleUpdateParams = useCallback((clipId: string, plugin: "eq" | "comp" | "limiter", params: any) => {
+    const charTrackId = selectedCharacterId ? `char-${selectedCharacterId}` : "";
+    clipPlugins.updatePluginParams(clipId, charTrackId, plugin, params);
+    onPluginsChange();
+    onMixChange();
+  }, [clipPlugins, selectedCharacterId, onPluginsChange, onMixChange]);
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("studio-timeline-collapsed") === "true"; } catch { return false; }
@@ -761,9 +720,10 @@ export function StudioTimeline({
                 clips={pluginsClips}
                 trackLabel={pluginsTrackLabel}
                 trackColor={pluginsTrackColor}
-                enabledClipIds={pluginEnabledClipIds}
-                onToggleClip={handleToggleClip}
-                onMixChange={() => { onMixChange(); onPluginsChange(); }}
+                trackId={selectedCharacterId ? `char-${selectedCharacterId}` : undefined}
+                clipConfigs={clipPlugins.configs}
+                onTogglePlugin={handleTogglePlugin}
+                onUpdateParams={handleUpdateParams}
               />
             </div>
           ) : (
