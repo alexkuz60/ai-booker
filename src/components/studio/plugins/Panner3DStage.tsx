@@ -1,7 +1,7 @@
 /**
- * Panner3DStage — Interactive 2D top-down canvas for placing a sound source
- * relative to the listener. Renders a grid, listener at center,
- * and a draggable dot for the character's 3D position (X/Z plane, Y=height).
+ * Panner3DStage — Interactive 2D top-down canvas for placing sound sources
+ * relative to the listener. Shows ALL clips/characters on stage simultaneously.
+ * The selected clip is highlighted and draggable; others are dimmed.
  */
 
 import { useRef, useEffect, useCallback, useState } from "react";
@@ -9,8 +9,20 @@ import { ParamSlider } from "./ParamSlider";
 import { BypassButton } from "./BypassButton";
 import type { ClipPanner3dConfig } from "@/hooks/useClipPluginConfigs";
 
+/** Info about a clip to render on the stage */
+export interface StageClipInfo {
+  id: string;
+  label: string;
+  color?: string;
+  panner3d: ClipPanner3dConfig;
+}
+
 interface Panner3DStageProps {
   isRu: boolean;
+  /** All clips in the scene to display on stage */
+  allClips: StageClipInfo[];
+  /** Currently selected clip ID (draggable) */
+  selectedClipId: string | null;
   config: ClipPanner3dConfig;
   disabled?: boolean;
   onToggle: () => void;
@@ -19,7 +31,7 @@ interface Panner3DStageProps {
 
 const STAGE_RADIUS = 10; // world units
 
-export function Panner3DStage({ isRu, config, disabled, onToggle, onUpdate }: Panner3DStageProps) {
+export function Panner3DStage({ isRu, allClips, selectedClipId, config, disabled, onToggle, onUpdate }: Panner3DStageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState(120);
@@ -69,49 +81,89 @@ export function Panner3DStage({ isRu, config, disabled, onToggle, onUpdate }: Pa
     ctx.moveTo(0, half); ctx.lineTo(canvasSize, half);
     ctx.stroke();
 
-    // Listener icon (ear/triangle at center)
+    // Listener icon at center
     ctx.fillStyle = "hsla(220, 30%, 60%, 0.8)";
     ctx.beginPath();
     ctx.arc(half, half, 4, 0, Math.PI * 2);
     ctx.fill();
-    // Label
     ctx.font = "7px monospace";
     ctx.fillStyle = "hsla(220, 20%, 50%, 0.7)";
     ctx.textAlign = "center";
     ctx.fillText("L", half, half + 11);
 
-    // Source dot
-    const sx = half + config.positionX * scale;
-    const sz = half - config.positionZ * scale; // Z is forward = up on screen
-    const dotR = 6;
+    // ── Draw all clips (non-selected first, then selected on top) ──
+    const sortedClips = [...allClips].sort((a, b) => {
+      if (a.id === selectedClipId) return 1;  // selected on top
+      if (b.id === selectedClipId) return -1;
+      return 0;
+    });
 
-    // Distance line
-    ctx.strokeStyle = config.enabled ? "hsla(var(--primary-hsl, 160 60% 50%), 0.4)" : "hsla(0, 0%, 50%, 0.2)";
-    ctx.lineWidth = 1;
-    ctx.setLineDash([2, 2]);
-    ctx.beginPath();
-    ctx.moveTo(half, half);
-    ctx.lineTo(sx, sz);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    for (const clip of sortedClips) {
+      const p3d = clip.panner3d;
+      const isSelected = clip.id === selectedClipId;
+      const isEnabled = p3d.enabled;
 
-    // Source
-    ctx.fillStyle = config.enabled ? "hsl(160 70% 55%)" : "hsl(0 0% 40%)";
-    ctx.beginPath();
-    ctx.arc(sx, sz, dotR, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = config.enabled ? "hsl(160 90% 70%)" : "hsl(0 0% 55%)";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+      const sx = half + p3d.positionX * scale;
+      const sz = half - p3d.positionZ * scale;
+      const dotR = isSelected ? 6 : 4;
 
-    // Height indicator (Y) as a small label
-    if (Math.abs(config.positionY) > 0.1) {
-      ctx.font = "7px monospace";
-      ctx.fillStyle = "hsl(45 80% 60%)";
-      ctx.textAlign = "center";
-      ctx.fillText(`Y:${config.positionY.toFixed(1)}`, sx, sz - dotR - 3);
+      // Distance line
+      if (isEnabled) {
+        ctx.strokeStyle = isSelected
+          ? "hsla(160, 60%, 50%, 0.4)"
+          : `${clip.color ?? "hsla(220, 40%, 50%, 0.2)"}`;
+        ctx.lineWidth = isSelected ? 1 : 0.5;
+        ctx.setLineDash([2, 2]);
+        ctx.beginPath();
+        ctx.moveTo(half, half);
+        ctx.lineTo(sx, sz);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // Dot color
+      const baseColor = clip.color ?? (isEnabled ? "hsl(160, 70%, 55%)" : "hsl(0, 0%, 40%)");
+
+      if (isSelected) {
+        // Selected: bright dot
+        ctx.fillStyle = isEnabled ? "hsl(160, 70%, 55%)" : "hsl(0, 0%, 40%)";
+        ctx.beginPath();
+        ctx.arc(sx, sz, dotR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = isEnabled ? "hsl(160, 90%, 70%)" : "hsl(0, 0%, 55%)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      } else {
+        // Non-selected: dimmed with track color
+        ctx.globalAlpha = isEnabled ? 0.55 : 0.2;
+        ctx.fillStyle = baseColor;
+        ctx.beginPath();
+        ctx.arc(sx, sz, dotR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = baseColor;
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      // Label for non-selected (always show if enabled)
+      if (!isSelected && isEnabled && canvasSize >= 100) {
+        ctx.font = "6px monospace";
+        ctx.fillStyle = "hsla(220, 20%, 70%, 0.6)";
+        ctx.textAlign = "center";
+        const labelText = clip.label.length > 6 ? clip.label.slice(0, 5) + "…" : clip.label;
+        ctx.fillText(labelText, sx, sz - dotR - 2);
+      }
+
+      // Height indicator (Y) for selected clip
+      if (isSelected && Math.abs(p3d.positionY) > 0.1) {
+        ctx.font = "7px monospace";
+        ctx.fillStyle = "hsl(45, 80%, 60%)";
+        ctx.textAlign = "center";
+        ctx.fillText(`Y:${p3d.positionY.toFixed(1)}`, sx, sz - dotR - 3);
+      }
     }
-  }, [canvasSize, config.positionX, config.positionY, config.positionZ, config.enabled]);
+  }, [canvasSize, allClips, selectedClipId, config]);
 
   // Drag handler
   const worldFromCanvas = useCallback((clientX: number, clientY: number) => {
