@@ -219,6 +219,47 @@ function scheduleBus(
       finalOutput = limiter;
     }
 
+    // ── Panner3D ──
+    if (pluginCfg.panner3d?.enabled) {
+      const pannerNode = ctx.createPanner();
+      pannerNode.panningModel = "HRTF";
+      pannerNode.distanceModel = pluginCfg.panner3d.distanceModel ?? "inverse";
+      pannerNode.refDistance = pluginCfg.panner3d.refDistance ?? 1;
+      pannerNode.maxDistance = pluginCfg.panner3d.maxDistance ?? 10000;
+      pannerNode.rolloffFactor = pluginCfg.panner3d.rolloffFactor ?? 1;
+      pannerNode.coneInnerAngle = pluginCfg.panner3d.coneInnerAngle ?? 360;
+      pannerNode.coneOuterAngle = pluginCfg.panner3d.coneOuterAngle ?? 360;
+      pannerNode.coneOuterGain = pluginCfg.panner3d.coneOuterGain ?? 0;
+      pannerNode.positionX.value = pluginCfg.panner3d.positionX ?? 0;
+      pannerNode.positionY.value = pluginCfg.panner3d.positionY ?? 0;
+      pannerNode.positionZ.value = pluginCfg.panner3d.positionZ ?? 0;
+      finalOutput.connect(pannerNode);
+      finalOutput = pannerNode;
+    }
+
+    // ── Convolver ──
+    if (pluginCfg.convolver?.enabled && pluginCfg.convolver.impulseId) {
+      // Load IR inline for offline render
+      try {
+        const impulseRow = await fetchImpulseBuffer(pluginCfg.convolver.impulseId, sampleRate);
+        if (impulseRow) {
+          const dryGain = ctx.createGain();
+          const wetGain = ctx.createGain();
+          const merge = ctx.createGain();
+          const convNode = ctx.createConvolver();
+          convNode.buffer = impulseRow;
+          dryGain.gain.value = 1 - (pluginCfg.convolver.dryWet ?? 0.3);
+          wetGain.gain.value = pluginCfg.convolver.dryWet ?? 0.3;
+          finalOutput.connect(dryGain);
+          finalOutput.connect(convNode);
+          convNode.connect(wetGain);
+          dryGain.connect(merge);
+          wetGain.connect(merge);
+          finalOutput = merge;
+        }
+      } catch { /* skip convolver on error */ }
+    }
+
     // ── Reverb ──
     if (!reverbBypassed) {
       const irLength = Math.ceil(sampleRate * 1.5);
