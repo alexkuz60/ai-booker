@@ -188,7 +188,7 @@ function EqGraph({ low, mid, high }: { low: number; mid: number; high: number })
   }, [low, mid, high]);
 
   return (
-    <div className="relative rounded-sm border border-border/40 overflow-hidden w-full" style={{ aspectRatio: "2.2" }}>
+    <div className="relative rounded-sm border border-border/40 overflow-hidden w-full h-[120px]">
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
     </div>
   );
@@ -283,7 +283,7 @@ function KneeGraph({ threshold, ratio, knee }: { threshold: number; ratio: numbe
   }, [threshold, ratio, knee]);
 
   return (
-    <div className="relative rounded-sm border border-border/40 overflow-hidden w-full" style={{ aspectRatio: "1" }}>
+    <div className="relative rounded-sm border border-border/40 overflow-hidden w-full h-[120px]">
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
     </div>
   );
@@ -368,7 +368,7 @@ function LimiterGraph({ threshold }: { threshold: number }) {
   }, [threshold]);
 
   return (
-    <div className="relative rounded-sm border border-border/40 overflow-hidden w-full" style={{ aspectRatio: "1" }}>
+    <div className="relative rounded-sm border border-border/40 overflow-hidden w-full h-[120px]">
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
     </div>
   );
