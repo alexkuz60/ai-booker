@@ -19,7 +19,9 @@ import { KneeGraph } from "./plugins/KneeGraph";
 import { LimiterGraph } from "./plugins/LimiterGraph";
 import { ParamSlider } from "./plugins/ParamSlider";
 import { BypassButton } from "./plugins/BypassButton";
-import type { ClipPluginConfig, ClipEqConfig, ClipCompConfig, ClipLimiterConfig } from "@/hooks/useClipPluginConfigs";
+import { Panner3DStage } from "./plugins/Panner3DStage";
+import { ConvolverPanel } from "./plugins/ConvolverPanel";
+import type { ClipPluginConfig, ClipEqConfig, ClipCompConfig, ClipLimiterConfig, ClipPanner3dConfig, ClipConvolverConfig } from "@/hooks/useClipPluginConfigs";
 import { DEFAULT_CLIP_PLUGIN_CONFIG } from "@/hooks/useClipPluginConfigs";
 
 // ─── Types ───────────────────────────────────────────────────
