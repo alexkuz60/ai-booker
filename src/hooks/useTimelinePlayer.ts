@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { getAudioEngine, type EngineState, type TrackConfig } from "@/lib/audioEngine";
+import { getAudioEngine, type EngineState, type TrackConfig, type LoadProgress } from "@/lib/audioEngine";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 
 export type PlayerState = EngineState;
