@@ -37,6 +37,7 @@ interface Impulse {
   channels: number;
   is_public: boolean;
   created_at: string;
+  peaks: number[] | null;
 }
 
 interface ImpulseManagerProps {
