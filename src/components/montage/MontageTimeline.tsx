@@ -113,8 +113,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
   const [timelineHeight, setTimelineHeight] = useState(450);
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
-  const [editorScrollLeft, setEditorScrollLeft] = useState(0);
-  const [editorVisibleWidth, setEditorVisibleWidth] = useState(0);
 
   // ── Trim handler ────────────────────────────────────────────
   const handleTrim = useCallback((trackId: string, selStart: number, selEnd: number) => {
