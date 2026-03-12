@@ -188,12 +188,12 @@ export function WaveformEditor({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-  // Background
-    ctx.fillStyle = "hsl(var(--muted))";
+  // Background — resolve CSS variable for canvas
+    ctx.fillStyle = resolveHsl("--background");
     ctx.fillRect(0, 0, w * dpr, h * dpr);
 
     // Cyan waveform color from design system
-    const waveColor = "hsl(var(--cyan-glow))";
+    const waveColor = resolveHsl("--cyan-glow");
 
     // Draw L channel
     drawChannel(ctx, currentPeaks, 0, 0, w, CHANNEL_HEIGHT, waveColor, scrollLeft, totalWidthPx, selection, duration, "L");
