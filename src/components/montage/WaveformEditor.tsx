@@ -461,6 +461,12 @@ export function WaveformEditor({
             className="h-5 px-1.5 text-[10px] gap-0.5"
             disabled={!selection}
             title={isRu ? "Обрезка" : "Trim"}
+            onClick={() => {
+              if (selection && trackId && onTrim) {
+                onTrim(trackId, selection.startSec, selection.endSec);
+                setSelection(null);
+              }
+            }}
           >
             <Scissors className="h-3 w-3" />
           </Button>
