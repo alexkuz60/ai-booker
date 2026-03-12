@@ -880,7 +880,9 @@ Source → EQ (3-band) → Compressor → Limiter → Panner3D → Convolver (IR
 | AI-ассистент | Lovable AI Gateway (Gemini 3 Flash Preview) |
 | TTS | Yandex SpeechKit (v1/v3), ElevenLabs (Multilingual v2), ProxyAPI/OpenAI TTS (gpt-4o-mini-tts, tts-1, tts-1-hd) |
 | SFX/Музыка | ElevenLabs (Sound Effects, Music), Freesound.org |
-| Аудио-движок | Tone.js (Transport, Channel, EQ3, Compressor, Limiter, BiquadFilter, MultibandCompressor, Reverb, FFT, Meter, Split) |
+| Аудио-движок | Tone.js (Transport, Channel, EQ3, Compressor, Limiter, BiquadFilter, MultibandCompressor, Reverb, Convolver, Panner3D, FFT, Meter, Split) |
+| Оффлайн-рендер | OfflineAudioContext (Web Audio API) → WAV PCM 16-bit |
+| Кэширование стемов | Cache API (browser) |
 | Хранение | Lovable Cloud (PostgreSQL + Storage) |
 | Аутентификация | Email + пароль, RLS-политики на все таблицы |
 | AI Roles | 6 специализированных ролей с централизованным реестром моделей |
