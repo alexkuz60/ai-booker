@@ -176,6 +176,16 @@ export function WaveformEditor({
 
   const currentPeaks = peaks?.lods.get(lodLevel) ?? peaks?.lods.get(200) ?? null;
 
+  // ── dB scale helpers ────────────────────────────────────────
+  const DB_MARKS = [0, -6, -12, -18, -30, -60];
+
+  /** Convert dB to linear amplitude 0..1 (-60dB=0, 0dB=1) */
+  function dbToLinear(db: number): number {
+    if (db <= -60) return 0;
+    if (db >= 0) return 1;
+    return Math.pow(10, db / 20);
+  }
+
   // ── Canvas rendering ──────────────────────────────────────
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -197,8 +207,101 @@ export function WaveformEditor({
     ctx.fillStyle = resolveHsl("--background");
     ctx.fillRect(0, 0, w * dpr, h * dpr);
 
-    // Mixer sidebar separator
     const borderColor = resolveHsl("--border");
+    const mutedColor = resolveHsl("--muted-foreground");
+    const waveColor = resolveHsl("--cyan-glow");
+    const waveW = w - mixerWidth;
+
+    // ── dB scale in mixer sidebar area ──────────────────────
+    const drawDbScale = (chY: number, chHeight: number) => {
+      const mid = chY + chHeight / 2;
+      const amp = chHeight / 2 * 0.9;
+
+      ctx.font = `${8 * dpr}px monospace`;
+      ctx.textAlign = "right";
+
+      for (const db of DB_MARKS) {
+        const lin = dbToLinear(db);
+        const yUp = mid - lin * amp;
+        const yDown = mid + lin * amp;
+
+        // Horizontal grid lines across waveform area
+        ctx.strokeStyle = borderColor.replace(")", " / 0.2)").replace("hsl(", "hsl(");
+        ctx.lineWidth = db === 0 ? 0.8 : 0.4;
+        ctx.setLineDash(db === 0 ? [] : [2, 3]);
+
+        // Upper grid line
+        ctx.beginPath();
+        ctx.moveTo(mixerWidth * dpr, yUp * dpr);
+        ctx.lineTo(w * dpr, yUp * dpr);
+        ctx.stroke();
+
+        // Lower grid line (mirror)
+        if (db !== 0) {
+          ctx.beginPath();
+          ctx.moveTo(mixerWidth * dpr, yDown * dpr);
+          ctx.lineTo(w * dpr, yDown * dpr);
+          ctx.stroke();
+        }
+
+        ctx.setLineDash([]);
+
+        // dB labels in sidebar
+        ctx.fillStyle = mutedColor.replace(")", " / 0.5)").replace("hsl(", "hsl(");
+        const label = db === 0 ? " 0" : `${db}`;
+        ctx.fillText(label, (mixerWidth - 4) * dpr, (yUp + 3) * dpr);
+        if (db !== 0 && db !== -60) {
+          ctx.fillText(label, (mixerWidth - 4) * dpr, (yDown + 3) * dpr);
+        }
+      }
+      ctx.textAlign = "left";
+    };
+
+    // Draw dB scales for both channels (in sidebar area, no clipping)
+    drawDbScale(0, chH);
+    drawDbScale(chH + CHANNEL_GAP, chH);
+
+    // ── Time grid (vertical lines) ──────────────────────────
+    const drawTimeGrid = () => {
+      // Determine grid interval based on zoom
+      const pxPerSec = totalWidthPx / duration;
+      let interval = 1; // seconds
+      if (pxPerSec < 10) interval = 30;
+      else if (pxPerSec < 20) interval = 15;
+      else if (pxPerSec < 40) interval = 10;
+      else if (pxPerSec < 80) interval = 5;
+      else if (pxPerSec < 200) interval = 2;
+      else interval = 1;
+
+      const startSec = Math.floor((scrollLeft / totalWidthPx) * duration / interval) * interval;
+      const endSec = Math.ceil(((scrollLeft + waveW) / totalWidthPx) * duration / interval) * interval;
+
+      ctx.font = `${8 * dpr}px monospace`;
+      ctx.textAlign = "center";
+
+      for (let t = startSec; t <= endSec; t += interval) {
+        if (t < 0) continue;
+        const px = (t / duration) * totalWidthPx - scrollLeft + mixerWidth;
+        if (px < mixerWidth || px > w) continue;
+
+        const isMajor = t % (interval * 5) === 0 || interval >= 10;
+        ctx.strokeStyle = borderColor.replace(")", ` / ${isMajor ? 0.2 : 0.1})`).replace("hsl(", "hsl(");
+        ctx.lineWidth = isMajor ? 0.8 : 0.4;
+        ctx.setLineDash(isMajor ? [] : [1, 3]);
+
+        ctx.beginPath();
+        ctx.moveTo(px * dpr, 0);
+        ctx.lineTo(px * dpr, h * dpr);
+        ctx.stroke();
+
+        ctx.setLineDash([]);
+      }
+      ctx.textAlign = "left";
+    };
+
+    drawTimeGrid();
+
+    // Mixer sidebar separator
     ctx.strokeStyle = borderColor;
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -211,9 +314,6 @@ export function WaveformEditor({
     ctx.beginPath();
     ctx.rect(mixerWidth * dpr, 0, (w - mixerWidth) * dpr, h * dpr);
     ctx.clip();
-
-    const waveColor = resolveHsl("--cyan-glow");
-    const waveW = w - mixerWidth;
 
     // Draw L channel
     drawChannel(ctx, currentPeaks, mixerWidth, 0, waveW, chH, waveColor, scrollLeft, totalWidthPx, selection, duration, "L");
