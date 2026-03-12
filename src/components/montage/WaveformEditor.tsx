@@ -306,8 +306,7 @@ export function WaveformEditor({
   if (!trackId) {
     return (
       <div
-        className="flex items-center justify-center border-t border-border bg-card/30"
-        style={{ height: EDITOR_HEIGHT }}
+        className="flex-1 flex items-center justify-center border-t border-border bg-card/30 min-h-[120px]"
       >
         <div className="flex items-center gap-2 text-xs text-muted-foreground font-body">
           <AudioWaveform className="h-4 w-4" />
