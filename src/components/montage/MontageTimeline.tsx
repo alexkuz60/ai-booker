@@ -214,13 +214,13 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
   // ── Clips grouped by track ──────────────────────────────────
   const clipsByTrack = useMemo(() => {
     const map = new Map<string, TimelineClip[]>();
-    for (const clip of clips) {
+    for (const clip of trimmedClips) {
       const list = map.get(clip.trackId) ?? [];
       list.push(clip);
       map.set(clip.trackId, list);
     }
     return map;
-  }, [clips]);
+  }, [trimmedClips]);
 
   return (
     <div
