@@ -179,6 +179,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     totalDuration: Math.max(computedTotalDuration, totalDuration),
     hasAudio: audioClips.length > 0,
     volume,
+    loadProgress,
     changeVolume,
     play,
     pause,
