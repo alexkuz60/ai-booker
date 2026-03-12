@@ -476,19 +476,6 @@ interface PluginGroup {
 
 const PLUGIN_GROUPS: PluginGroup[] = [
   {
-    title: "Pre", titleRu: "Пре",
-    slots: [
-      { id: "eq", label: "EQ", labelRu: "EQ" },
-      { id: "comp", label: "CMP", labelRu: "КМП" },
-    ],
-  },
-  {
-    title: "Post", titleRu: "Пост",
-    slots: [
-      { id: "limit", label: "LIM", labelRu: "ЛИМ" },
-    ],
-  },
-  {
     title: "Master", titleRu: "Мастер",
     slots: [
       { id: "filter", label: "FLT", labelRu: "ФЛТ" },

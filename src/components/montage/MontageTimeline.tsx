@@ -184,7 +184,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             {player.state === "playing" ? (
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={player.pause}><Pause className="h-3.5 w-3.5" /></Button>
             ) : (
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={player.play} disabled={!player.hasAudio}><Play className="h-3.5 w-3.5" /></Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={player.play} disabled={!player.hasAudio || (player.loadProgress != null && player.loadProgress.total > 0 && player.loadProgress.done < player.loadProgress.total)}><Play className="h-3.5 w-3.5" /></Button>
             )}
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={player.stop} disabled={player.state === "stopped"}><Square className="h-3 w-3" /></Button>
             <span className="text-[11px] text-muted-foreground font-mono min-w-[70px] text-center tabular-nums">
