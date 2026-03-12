@@ -302,86 +302,103 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
 
       {/* Stem tracks */}
       {!timelineCollapsed && (
-        <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
-          {/* Mixer sidebar */}
-          <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${MIXER_SIDEBAR}px` }}>
-            <div className="h-6 border-b border-border" />
-            {stemTracks.map((track) => (
+        <div ref={tracksContainerRef} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <div className="flex min-h-0" style={{ flex: "0 0 auto" }}>
+            {/* Mixer sidebar — stems only */}
+            <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${MIXER_SIDEBAR}px` }}>
+              <div className="h-6 border-b border-border" />
+              {stemTracks.map((track) => (
+                <div
+                  key={track.id}
+                  className={`cursor-pointer transition-colors ${selectedTrackId === track.id ? "ring-1 ring-primary/50 bg-primary/5" : ""}`}
+                  onClick={() => setSelectedTrackId(selectedTrackId === track.id ? null : track.id)}
+                >
+                  <TrackMixerStrip
+                    trackId={track.id}
+                    label={track.label}
+                    color={track.color}
+                    expanded={false}
+                    onMixChange={onMixChange}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Timeline area — stems only */}
+            <div ref={sceneScrollRef} className="flex-1 overflow-x-auto overflow-y-hidden">
               <div
-                key={track.id}
-                className={`cursor-pointer transition-colors ${selectedTrackId === track.id ? "ring-1 ring-primary/50 bg-primary/5" : ""}`}
-                onClick={() => setSelectedTrackId(selectedTrackId === track.id ? null : track.id)}
+                className="relative cursor-crosshair"
+                style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  player.seek(Math.max(0, Math.min(x / (zoom * 4), duration)));
+                }}
               >
-                <TrackMixerStrip
-                  trackId={track.id}
-                  label={track.label}
-                  color={track.color}
-                  expanded={false}
-                  onMixChange={onMixChange}
-                />
+                <div className="sticky top-0 z-20 bg-background">
+                  <TimelineRuler
+                    zoom={zoom}
+                    duration={duration}
+                    sceneBoundaries={sceneBoundaries}
+                    loadPercent={
+                      player.loadProgress && player.loadProgress.total > 0
+                        ? Math.round((player.loadProgress.done / player.loadProgress.total) * 100)
+                        : null
+                    }
+                    isLoading={
+                      player.loadProgress != null &&
+                      player.loadProgress.total > 0 &&
+                      player.loadProgress.done < player.loadProgress.total
+                    }
+                    loadLabel={player.loadProgress?.currentLabel || undefined}
+                  />
+                </div>
+
+                {stemTracks.map((track) => {
+                  const trackClips = clipsByTrack.get(track.id) ?? [];
+                  return (
+                    <div key={track.id} className="h-10 border-b border-border/50 relative">
+                      {trackClips.map((clip) => {
+                        const left = clip.startSec * zoom * 4;
+                        const width = clip.durationSec * zoom * 4;
+                        return (
+                          <div
+                            key={clip.id}
+                            className="absolute top-1 bottom-1 rounded-sm opacity-80 hover:opacity-100 transition-opacity"
+                            style={{ left: `${left}px`, width: `${width}px`, backgroundColor: track.color }}
+                            title={`${clip.label} (${clip.durationSec.toFixed(1)}s)`}
+                          >
+                            {width > 50 && (
+                              <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
+                                {clip.label}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+
+                <Playhead positionSec={player.positionSec} zoom={zoom} />
               </div>
-            ))}
-          </div>
-
-          {/* Timeline area */}
-          <div ref={sceneScrollRef} className="flex-1 overflow-x-auto overflow-y-hidden">
-            <div
-              className="relative cursor-crosshair"
-              style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                player.seek(Math.max(0, Math.min(x / (zoom * 4), duration)));
-              }}
-            >
-              <div className="sticky top-0 z-20 bg-background">
-                <TimelineRuler
-                  zoom={zoom}
-                  duration={duration}
-                  sceneBoundaries={sceneBoundaries}
-                  loadPercent={
-                    player.loadProgress && player.loadProgress.total > 0
-                      ? Math.round((player.loadProgress.done / player.loadProgress.total) * 100)
-                      : null
-                  }
-                  isLoading={
-                    player.loadProgress != null &&
-                    player.loadProgress.total > 0 &&
-                    player.loadProgress.done < player.loadProgress.total
-                  }
-                  loadLabel={player.loadProgress?.currentLabel || undefined}
-                />
-              </div>
-
-              {stemTracks.map((track) => {
-                const trackClips = clipsByTrack.get(track.id) ?? [];
-                return (
-                  <div key={track.id} className="h-10 border-b border-border/50 relative">
-                    {trackClips.map((clip) => {
-                      const left = clip.startSec * zoom * 4;
-                      const width = clip.durationSec * zoom * 4;
-                      return (
-                        <div
-                          key={clip.id}
-                          className="absolute top-1 bottom-1 rounded-sm opacity-80 hover:opacity-100 transition-opacity"
-                          style={{ left: `${left}px`, width: `${width}px`, backgroundColor: track.color }}
-                          title={`${clip.label} (${clip.durationSec.toFixed(1)}s)`}
-                        >
-                          {width > 50 && (
-                            <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
-                              {clip.label}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-
-              <Playhead positionSec={player.positionSec} zoom={zoom} />
             </div>
           </div>
+
+          {/* Waveform Editor — fills remaining space */}
+          <WaveformEditor
+            clips={clips}
+            trackId={selectedTrackId}
+            trackLabel={stemTracks.find(t => t.id === selectedTrackId)?.label ?? ""}
+            trackColor={stemTracks.find(t => t.id === selectedTrackId)?.color ?? "hsl(var(--primary))"}
+            zoom={zoom}
+            duration={duration}
+            positionSec={player.positionSec}
+            scrollLeft={editorScrollLeft}
+            visibleWidth={editorVisibleWidth}
+            isRu={isRu}
+            onSeek={player.seek}
+          />
         </div>
       )}
 
