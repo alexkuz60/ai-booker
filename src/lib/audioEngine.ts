@@ -463,7 +463,23 @@ class EngineTrack {
   get volumeValue() { return this._volume; }
   get panValue() { return this._pan; }
 
-  // ── Pre-FX ──
+  // ── Channel EQ (PRE) ──
+
+  setEqLow(v: number): void { this._eqLow = v; if (!this._eqBypassed) this.eqNode.low.value = v; }
+  setEqMid(v: number): void { this._eqMid = v; if (!this._eqBypassed) this.eqNode.mid.value = v; }
+  setEqHigh(v: number): void { this._eqHigh = v; if (!this._eqBypassed) this.eqNode.high.value = v; }
+  setEqBypassed(b: boolean): void { this._eqBypassed = b; this.applyEqBypass(); }
+  private applyEqBypass(): void {
+    if (this._eqBypassed) {
+      this.eqNode.low.value = 0; this.eqNode.mid.value = 0; this.eqNode.high.value = 0;
+    } else {
+      this.eqNode.low.value = this._eqLow; this.eqNode.mid.value = this._eqMid; this.eqNode.high.value = this._eqHigh;
+    }
+  }
+  get eqBypassed() { return this._eqBypassed; }
+  get eqState(): ChannelEqState { return { low: this._eqLow, mid: this._eqMid, high: this._eqHigh, bypassed: this._eqBypassed }; }
+
+  // ── Channel Compressor (PRE) ──
 
   setPreFxBypassed(b: boolean): void {
     this._preFxBypassed = b;
@@ -471,15 +487,32 @@ class EngineTrack {
   }
 
   private applyPreFxBypass(): void {
-    // Bypass by setting ratio to 1 (no compression)
     if (this._preFxBypassed) {
       this.preFxNode.ratio.value = 1;
     } else {
-      this.preFxNode.ratio.value = 3;
+      this.preFxNode.ratio.value = this._compRatio;
     }
   }
 
+  setCompThreshold(v: number): void { this._compThreshold = v; this.preFxNode.threshold.value = v; }
+  setCompRatio(v: number): void { this._compRatio = v; if (!this._preFxBypassed) this.preFxNode.ratio.value = v; }
+  setCompAttack(v: number): void { this._compAttack = v; this.preFxNode.attack.value = v; }
+  setCompRelease(v: number): void { this._compRelease = v; this.preFxNode.release.value = v; }
+
   get preFxBypassed() { return this._preFxBypassed; }
+  get compState(): ChannelCompState {
+    return { threshold: this._compThreshold, ratio: this._compRatio, attack: this._compAttack, release: this._compRelease, bypassed: this._preFxBypassed };
+  }
+
+  // ── Channel Limiter (POST) ──
+
+  setLimiterThreshold(v: number): void { this._limiterThreshold = v; if (!this._limiterBypassed) this.limiterNode.threshold.value = v; }
+  setLimiterBypassed(b: boolean): void { this._limiterBypassed = b; this.applyLimiterBypass(); }
+  private applyLimiterBypass(): void {
+    this.limiterNode.threshold.value = this._limiterBypassed ? 0 : this._limiterThreshold;
+  }
+  get limiterBypassed() { return this._limiterBypassed; }
+  get limiterState(): ChannelLimiterState { return { threshold: this._limiterThreshold, bypassed: this._limiterBypassed }; }
 
   // ── Reverb ──
 
@@ -541,6 +574,9 @@ class EngineTrack {
       preFxBypassed: this._preFxBypassed,
       muted: this._muted,
       solo: this._solo,
+      eq: this.eqState,
+      comp: this.compState,
+      limiter: this.limiterState,
     };
   }
 
@@ -550,8 +586,10 @@ class EngineTrack {
     this.unschedule();
     this.player.dispose();
     this.playerB?.dispose();
+    this.eqNode.dispose();
     this.preFxNode.dispose();
     this.channel.dispose();
+    this.limiterNode.dispose();
     this.reverbNode.dispose();
     this.meterMono.dispose();
     this.splitter.dispose();
