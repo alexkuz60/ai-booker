@@ -741,6 +741,7 @@ export function StudioTimeline({
               <ChannelPluginsPanel
                 isRu={isRu}
                 clips={pluginsClips}
+                allSceneClips={allSceneClips}
                 trackLabel={pluginsTrackLabel}
                 trackColor={pluginsTrackColor}
                 trackId={selectedCharacterId ? `char-${selectedCharacterId}` : undefined}
