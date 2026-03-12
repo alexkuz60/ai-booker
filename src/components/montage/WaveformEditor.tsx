@@ -199,7 +199,8 @@ export function WaveformEditor({
     drawChannel(ctx, currentPeaks, 0, 0, w, CHANNEL_HEIGHT, waveColor, scrollLeft, totalWidthPx, selection, duration, "L");
 
     // Gap line
-    ctx.fillStyle = "hsl(var(--border) / 0.5)";
+    const borderColor = resolveHsl("--border");
+    ctx.fillStyle = borderColor.replace(")", " / 0.5)").replace("hsl(", "hsl(");
     ctx.fillRect(0, CHANNEL_HEIGHT * dpr, w * dpr, CHANNEL_GAP * dpr);
 
     // Draw R channel
