@@ -24,6 +24,7 @@ interface WaveformEditorProps {
   mixerWidth: number;
   isRu: boolean;
   onSeek: (sec: number) => void;
+  onTrim?: (trackId: string, startSec: number, endSec: number) => void;
 }
 
 // ── Selection state ──────────────────────────────────────────
@@ -150,6 +151,7 @@ export function WaveformEditor({
   mixerWidth,
   isRu,
   onSeek,
+  onTrim,
 }: WaveformEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -459,6 +461,12 @@ export function WaveformEditor({
             className="h-5 px-1.5 text-[10px] gap-0.5"
             disabled={!selection}
             title={isRu ? "Обрезка" : "Trim"}
+            onClick={() => {
+              if (selection && trackId && onTrim) {
+                onTrim(trackId, selection.startSec, selection.endSec);
+                setSelection(null);
+              }
+            }}
           >
             <Scissors className="h-3 w-3" />
           </Button>
