@@ -465,14 +465,18 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
             </span>
             <BypassButton label="EQ" bypassed={bypasses.eq} onToggle={() => toggleBypass("eq")} />
           </div>
-          <EqGraph low={bypasses.eq ? 0 : eqLow} mid={bypasses.eq ? 0 : eqMid} high={bypasses.eq ? 0 : eqHigh} />
-          <div className="flex flex-col gap-1.5">
-            <ParamSlider label="Low" value={eqLow} min={-12} max={12} step={0.5} unit=" dB"
-              onChange={v => { setEqLow(v); engine.setTrackEqLow(trackId, v); onMixChange?.(); }} disabled={bypasses.eq} />
-            <ParamSlider label="Mid" value={eqMid} min={-12} max={12} step={0.5} unit=" dB"
-              onChange={v => { setEqMid(v); engine.setTrackEqMid(trackId, v); onMixChange?.(); }} disabled={bypasses.eq} />
-            <ParamSlider label="High" value={eqHigh} min={-12} max={12} step={0.5} unit=" dB"
-              onChange={v => { setEqHigh(v); engine.setTrackEqHigh(trackId, v); onMixChange?.(); }} disabled={bypasses.eq} />
+          <div className="flex gap-2 items-start">
+            <div className="flex-1 min-w-0">
+              <EqGraph low={bypasses.eq ? 0 : eqLow} mid={bypasses.eq ? 0 : eqMid} high={bypasses.eq ? 0 : eqHigh} />
+            </div>
+            <div className="flex flex-col gap-1.5 shrink-0" style={{ width: 100 }}>
+              <ParamSlider label="Low" value={eqLow} min={-12} max={12} step={0.5} unit=" dB"
+                onChange={v => { setEqLow(v); engine.setTrackEqLow(trackId, v); onMixChange?.(); }} disabled={bypasses.eq} />
+              <ParamSlider label="Mid" value={eqMid} min={-12} max={12} step={0.5} unit=" dB"
+                onChange={v => { setEqMid(v); engine.setTrackEqMid(trackId, v); onMixChange?.(); }} disabled={bypasses.eq} />
+              <ParamSlider label="High" value={eqHigh} min={-12} max={12} step={0.5} unit=" dB"
+                onChange={v => { setEqHigh(v); engine.setTrackEqHigh(trackId, v); onMixChange?.(); }} disabled={bypasses.eq} />
+            </div>
           </div>
         </div>
 
@@ -484,18 +488,22 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
             </span>
             <BypassButton label="CMP" bypassed={bypasses.comp} onToggle={() => toggleBypass("comp")} />
           </div>
-          <KneeGraph threshold={compThreshold} ratio={compRatio} knee={compKnee} />
-          <div className="flex flex-col gap-1.5">
-            <ParamSlider label={isRu ? "Порог" : "Threshold"} value={compThreshold} min={-60} max={0} step={1} unit=" dB"
-              onChange={v => { setCompThreshold(v); engine.setTrackCompThreshold(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
-            <ParamSlider label={isRu ? "Соотн." : "Ratio"} value={compRatio} min={1} max={20} step={0.5} unit=":1"
-              onChange={v => { setCompRatio(v); engine.setTrackCompRatio(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
-            <ParamSlider label="Knee" value={compKnee} min={0} max={30} step={1} unit=" dB"
-              onChange={v => { setCompKnee(v); engine.setTrackCompKnee(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
-            <ParamSlider label={isRu ? "Атака" : "Attack"} value={compAttack} min={0.001} max={0.5} step={0.001} unit=" s"
-              onChange={v => { setCompAttack(v); engine.setTrackCompAttack(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
-            <ParamSlider label={isRu ? "Восст." : "Release"} value={compRelease} min={0.01} max={1.0} step={0.01} unit=" s"
-              onChange={v => { setCompRelease(v); engine.setTrackCompRelease(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
+          <div className="flex gap-2 items-start">
+            <div className="flex-1 min-w-0">
+              <KneeGraph threshold={compThreshold} ratio={compRatio} knee={compKnee} />
+            </div>
+            <div className="flex flex-col gap-1.5 shrink-0" style={{ width: 100 }}>
+              <ParamSlider label={isRu ? "Порог" : "Threshold"} value={compThreshold} min={-60} max={0} step={1} unit=" dB"
+                onChange={v => { setCompThreshold(v); engine.setTrackCompThreshold(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
+              <ParamSlider label={isRu ? "Соотн." : "Ratio"} value={compRatio} min={1} max={20} step={0.5} unit=":1"
+                onChange={v => { setCompRatio(v); engine.setTrackCompRatio(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
+              <ParamSlider label="Knee" value={compKnee} min={0} max={30} step={1} unit=" dB"
+                onChange={v => { setCompKnee(v); engine.setTrackCompKnee(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
+              <ParamSlider label={isRu ? "Атака" : "Attack"} value={compAttack} min={0.001} max={0.5} step={0.001} unit=" s"
+                onChange={v => { setCompAttack(v); engine.setTrackCompAttack(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
+              <ParamSlider label={isRu ? "Восст." : "Release"} value={compRelease} min={0.01} max={1.0} step={0.01} unit=" s"
+                onChange={v => { setCompRelease(v); engine.setTrackCompRelease(trackId, v); onMixChange?.(); }} disabled={bypasses.comp} />
+            </div>
           </div>
         </div>
 
