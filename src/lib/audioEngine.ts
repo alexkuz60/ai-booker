@@ -86,12 +86,22 @@ export interface TrackConfig {
 export interface LoadProgress {
   /** Total number of tracks to load */
   total: number;
-  /** Number of tracks loaded so far (including failed) */
+  /** Number of tracks processed so far */
   done: number;
+  /** Successfully loaded tracks */
+  loaded: number;
+  /** Failed tracks */
+  failed: number;
   /** ID of the track currently loading */
   currentId: string;
   /** Label of the currently loading track */
   currentLabel: string;
+}
+
+export interface LoadTracksResult {
+  total: number;
+  loaded: number;
+  dropped: number;
 }
 
 export type EngineState = "stopped" | "playing" | "paused";
