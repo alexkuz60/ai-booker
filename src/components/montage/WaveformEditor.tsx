@@ -246,7 +246,7 @@ export function WaveformEditor({
   }, [scenePositionSec, editorZoom, editorZoomPercent]);
 
   // Peaks for scene clips on selected track
-  const { status, peaks, error } = useWaveformPeaks(sceneClips, trackId);
+  const { status, peaks, error } = useWaveformPeaks(sceneClips, trackId, sceneDuration);
 
   // Choose LOD based on visible area
   const visibleWidth = editorContainerWidth;
