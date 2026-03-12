@@ -122,6 +122,26 @@ export interface MasterMeterData {
   peakR: number;
 }
 
+export interface ChannelEqState {
+  low: number;   // dB, -12..12
+  mid: number;
+  high: number;
+  bypassed: boolean;
+}
+
+export interface ChannelCompState {
+  threshold: number;
+  ratio: number;
+  attack: number;
+  release: number;
+  bypassed: boolean;
+}
+
+export interface ChannelLimiterState {
+  threshold: number;  // dB, -30..0
+  bypassed: boolean;
+}
+
 export interface TrackMixState {
   volume: number;       // 0-100
   pan: number;          // -1..1
@@ -130,6 +150,9 @@ export interface TrackMixState {
   preFxBypassed: boolean;
   muted: boolean;
   solo: boolean;
+  eq: ChannelEqState;
+  comp: ChannelCompState;
+  limiter: ChannelLimiterState;
 }
 
 export interface EngineSnapshot {
@@ -161,9 +184,24 @@ class EngineTrack {
   player: Tone.Player;
   channel: Tone.Channel;
 
-  // Pre-FX placeholder (compressor slot, bypassed by default)
+  // PRE chain: EQ3 → Compressor
+  private eqNode: Tone.EQ3;
+  private _eqBypassed = true;
+  private _eqLow = 0;
+  private _eqMid = 0;
+  private _eqHigh = 0;
+
   private preFxNode: Tone.Compressor;
   private _preFxBypassed = true;
+  private _compThreshold = -24;
+  private _compRatio = 3;
+  private _compAttack = 0.01;
+  private _compRelease = 0.1;
+
+  // POST chain: Limiter (after channel, before reverb)
+  private limiterNode: Tone.Limiter;
+  private _limiterBypassed = true;
+  private _limiterThreshold = -3;
 
   // Per-channel reverb
   private reverbNode: Tone.Reverb;
@@ -207,12 +245,15 @@ class EngineTrack {
     this._clipLenSec = config.clipLenSec ?? config.durationSec;
     this._loopCrossfadeSec = config.loopCrossfadeSec ?? 0;
 
-    // Pre-FX: light compressor, bypassed
+    // PRE: EQ3 (bypassed)
+    this.eqNode = new Tone.EQ3({ low: 0, mid: 0, high: 0 });
+
+    // PRE: Compressor (bypassed)
     this.preFxNode = new Tone.Compressor({
-      threshold: -24,
-      ratio: 3,
-      attack: 0.01,
-      release: 0.1,
+      threshold: this._compThreshold,
+      ratio: this._compRatio,
+      attack: this._compAttack,
+      release: this._compRelease,
     });
 
     // Channel: volume + pan
@@ -220,6 +261,9 @@ class EngineTrack {
       volume: volumeToDB(this._volume),
       pan: this._pan,
     });
+
+    // POST: Limiter (bypassed — set threshold to 0 when bypassed)
+    this.limiterNode = new Tone.Limiter(0);
 
     // Reverb: small room, bypassed
     this.reverbNode = new Tone.Reverb({
@@ -233,9 +277,9 @@ class EngineTrack {
     this.meterL = new Tone.Meter({ smoothing: 0.8 });
     this.meterR = new Tone.Meter({ smoothing: 0.8 });
 
-    // Chain: Player → PreFX → Channel → Reverb → Splitter → MeterL/R
-    //                              └→ MeterMono
-    //        Reverb → Bus (main output)
+    // Chain: Player → EQ3 → Comp → Channel → Limiter → Reverb → Bus
+    //                                  └→ MeterMono
+    //        Reverb → Splitter → MeterL/R
     if (preloadedBuffer) {
       this.player = new Tone.Player({
         fadeIn: 0,
@@ -251,10 +295,12 @@ class EngineTrack {
     }
 
     // Wire signal chain
-    this.player.connect(this.preFxNode);
+    this.player.connect(this.eqNode);
+    this.eqNode.connect(this.preFxNode);
     this.preFxNode.connect(this.channel);
     this.channel.connect(this.meterMono);
-    this.channel.connect(this.reverbNode);
+    this.channel.connect(this.limiterNode);
+    this.limiterNode.connect(this.reverbNode);
     this.reverbNode.connect(bus);
     // Stereo metering tap
     this.reverbNode.connect(this.splitter);
@@ -276,11 +322,13 @@ class EngineTrack {
           fadeOut: this._loopCrossfadeSec,
         });
       }
-      this.playerB.connect(this.preFxNode);
+      this.playerB.connect(this.eqNode);
     }
 
     // Apply bypass states
+    this.applyEqBypass();
     this.applyPreFxBypass();
+    this.applyLimiterBypass();
     this.applyReverbBypass();
   }
 
@@ -415,7 +463,23 @@ class EngineTrack {
   get volumeValue() { return this._volume; }
   get panValue() { return this._pan; }
 
-  // ── Pre-FX ──
+  // ── Channel EQ (PRE) ──
+
+  setEqLow(v: number): void { this._eqLow = v; if (!this._eqBypassed) this.eqNode.low.value = v; }
+  setEqMid(v: number): void { this._eqMid = v; if (!this._eqBypassed) this.eqNode.mid.value = v; }
+  setEqHigh(v: number): void { this._eqHigh = v; if (!this._eqBypassed) this.eqNode.high.value = v; }
+  setEqBypassed(b: boolean): void { this._eqBypassed = b; this.applyEqBypass(); }
+  private applyEqBypass(): void {
+    if (this._eqBypassed) {
+      this.eqNode.low.value = 0; this.eqNode.mid.value = 0; this.eqNode.high.value = 0;
+    } else {
+      this.eqNode.low.value = this._eqLow; this.eqNode.mid.value = this._eqMid; this.eqNode.high.value = this._eqHigh;
+    }
+  }
+  get eqBypassed() { return this._eqBypassed; }
+  get eqState(): ChannelEqState { return { low: this._eqLow, mid: this._eqMid, high: this._eqHigh, bypassed: this._eqBypassed }; }
+
+  // ── Channel Compressor (PRE) ──
 
   setPreFxBypassed(b: boolean): void {
     this._preFxBypassed = b;
@@ -423,15 +487,32 @@ class EngineTrack {
   }
 
   private applyPreFxBypass(): void {
-    // Bypass by setting ratio to 1 (no compression)
     if (this._preFxBypassed) {
       this.preFxNode.ratio.value = 1;
     } else {
-      this.preFxNode.ratio.value = 3;
+      this.preFxNode.ratio.value = this._compRatio;
     }
   }
 
+  setCompThreshold(v: number): void { this._compThreshold = v; this.preFxNode.threshold.value = v; }
+  setCompRatio(v: number): void { this._compRatio = v; if (!this._preFxBypassed) this.preFxNode.ratio.value = v; }
+  setCompAttack(v: number): void { this._compAttack = v; this.preFxNode.attack.value = v; }
+  setCompRelease(v: number): void { this._compRelease = v; this.preFxNode.release.value = v; }
+
   get preFxBypassed() { return this._preFxBypassed; }
+  get compState(): ChannelCompState {
+    return { threshold: this._compThreshold, ratio: this._compRatio, attack: this._compAttack, release: this._compRelease, bypassed: this._preFxBypassed };
+  }
+
+  // ── Channel Limiter (POST) ──
+
+  setLimiterThreshold(v: number): void { this._limiterThreshold = v; if (!this._limiterBypassed) this.limiterNode.threshold.value = v; }
+  setLimiterBypassed(b: boolean): void { this._limiterBypassed = b; this.applyLimiterBypass(); }
+  private applyLimiterBypass(): void {
+    this.limiterNode.threshold.value = this._limiterBypassed ? 0 : this._limiterThreshold;
+  }
+  get limiterBypassed() { return this._limiterBypassed; }
+  get limiterState(): ChannelLimiterState { return { threshold: this._limiterThreshold, bypassed: this._limiterBypassed }; }
 
   // ── Reverb ──
 
@@ -493,6 +574,9 @@ class EngineTrack {
       preFxBypassed: this._preFxBypassed,
       muted: this._muted,
       solo: this._solo,
+      eq: this.eqState,
+      comp: this.compState,
+      limiter: this.limiterState,
     };
   }
 
@@ -502,8 +586,10 @@ class EngineTrack {
     this.unschedule();
     this.player.dispose();
     this.playerB?.dispose();
+    this.eqNode.dispose();
     this.preFxNode.dispose();
     this.channel.dispose();
+    this.limiterNode.dispose();
     this.reverbNode.dispose();
     this.meterMono.dispose();
     this.splitter.dispose();
@@ -1027,6 +1113,22 @@ class AudioEngine {
   setTrackPreFxBypassed(trackId: string, b: boolean): void {
     this.tracks.get(trackId)?.setPreFxBypassed(b);
   }
+
+  // ─── Per-track channel EQ (PRE) ────────────────────────
+  setTrackEqLow(trackId: string, v: number): void { this.tracks.get(trackId)?.setEqLow(v); }
+  setTrackEqMid(trackId: string, v: number): void { this.tracks.get(trackId)?.setEqMid(v); }
+  setTrackEqHigh(trackId: string, v: number): void { this.tracks.get(trackId)?.setEqHigh(v); }
+  setTrackEqBypassed(trackId: string, b: boolean): void { this.tracks.get(trackId)?.setEqBypassed(b); }
+
+  // ─── Per-track channel compressor params ───────────────
+  setTrackCompThreshold(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompThreshold(v); }
+  setTrackCompRatio(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompRatio(v); }
+  setTrackCompAttack(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompAttack(v); }
+  setTrackCompRelease(trackId: string, v: number): void { this.tracks.get(trackId)?.setCompRelease(v); }
+
+  // ─── Per-track channel limiter (POST) ──────────────────
+  setTrackLimiterThreshold(trackId: string, v: number): void { this.tracks.get(trackId)?.setLimiterThreshold(v); }
+  setTrackLimiterBypassed(trackId: string, b: boolean): void { this.tracks.get(trackId)?.setLimiterBypassed(b); }
 
   setTrackFadeIn(trackId: string, sec: number): void {
     this.tracks.get(trackId)?.setFadeIn(sec);

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { getAudioEngine } from "@/lib/audioEngine";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
-import { ChevronUp, ChevronDown, Plus, Film, Play, Pause, Square, Volume2, VolumeX, PanelLeftClose, PanelLeftOpen, Download, Loader2 } from "lucide-react";
+import { ChevronUp, ChevronDown, Plus, Film, Play, Pause, Square, Volume2, VolumeX, PanelLeftClose, PanelLeftOpen, Download, Loader2, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -19,6 +19,7 @@ import { TimelineMasterMeter } from "./TimelineMasterMeter";
 import { TimelineRuler } from "./TimelineRuler";
 import { TimelineTrack } from "./TimelineTrack";
 import { Playhead } from "./TimelinePlayhead";
+import { ChannelPluginsPanel } from "./ChannelPluginsPanel";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -427,6 +428,30 @@ export function StudioTimeline({
     });
   }, [zoom, sceneZoomPercent]);
 
+  // ── Timeline view mode: "tracks" or "plugins" ─────────────
+  type TimelineView = "tracks" | "plugins";
+  const [timelineView, setTimelineView] = useState<TimelineView>("tracks");
+
+  // Selected track for channel plugins (use first clip of selected character track, or first available)
+  const pluginsTrackId = useMemo(() => {
+    if (!selectedCharacterId) return null;
+    const charTrackId = `char-${selectedCharacterId}`;
+    const clipIds = timelineClips
+      .filter(c => c.trackId === charTrackId && c.hasAudio && !!c.audioPath)
+      .map(c => c.id);
+    return clipIds[0] ?? null;
+  }, [selectedCharacterId, timelineClips]);
+
+  const pluginsTrackLabel = useMemo(() => {
+    if (!selectedCharacterId) return undefined;
+    return charTracks.find(t => t.id === `char-${selectedCharacterId}`)?.label;
+  }, [selectedCharacterId, charTracks]);
+
+  const pluginsTrackColor = useMemo(() => {
+    if (!selectedCharacterId) return undefined;
+    return charTracks.find(t => t.id === `char-${selectedCharacterId}`)?.color;
+  }, [selectedCharacterId, charTracks]);
+
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("studio-timeline-collapsed") === "true"; } catch { return false; }
   });
@@ -596,14 +621,35 @@ export function StudioTimeline({
             )}
           </Button>
           <div className="w-px h-4 bg-border mx-1" />
+          <Button
+            variant={timelineView === "plugins" ? "secondary" : "ghost"}
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setTimelineView(v => v === "plugins" ? "tracks" : "plugins")}
+            title={isRu ? "Канальные плагины" : "Channel Plugins"}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+          </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7">
-            <Plus className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
 
+      {/* Content: Tracks or Plugins */}
+      {!collapsed && timelineView === "plugins" && (
+        <div className="flex-1 min-h-0 overflow-auto">
+          <ChannelPluginsPanel
+            isRu={isRu}
+            trackId={pluginsTrackId}
+            trackLabel={pluginsTrackLabel}
+            trackColor={pluginsTrackColor}
+            onMixChange={onMixChange}
+          />
+        </div>
+      )}
+
       {/* Tracks — Scene mode only */}
-      {!collapsed && (
+      {!collapsed && timelineView === "tracks" && (
         <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
           <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${sidebarWidth}px` }}>
             <div className="h-6 border-b border-border flex items-center px-2">
