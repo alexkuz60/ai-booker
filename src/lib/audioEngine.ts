@@ -1481,10 +1481,10 @@ class AudioEngine {
   setFFTSize(size: number): void {
     if (this.masterFFT.size === size) return;
     // Disconnect old node without disposing the upstream
-    try { this.masterReverb.disconnect(this.masterFFT); } catch { /* may already be disconnected */ }
+    try { this.masterSplitter.disconnect(this.masterFFT); } catch { /* may already be disconnected */ }
     this.masterFFT.dispose();
     this.masterFFT = new Tone.FFT(size);
-    this.masterReverb.connect(this.masterFFT);
+    this.masterSplitter.connect(this.masterFFT);
   }
 
   getFFTSize(): number {
