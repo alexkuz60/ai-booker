@@ -35,7 +35,23 @@ interface MontageTimelineProps {
 }
 
 export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chapterId, isRu, onSplitAtScene, hasParts }: MontageTimelineProps) {
-  const player = useTimelinePlayer(clips);
+  // ── Trim overrides: per-clip { offsetSec, newDurationSec } ──
+  const [trimOverrides, setTrimOverrides] = useState<Map<string, { offsetSec: number; newDurationSec: number }>>(new Map());
+
+  const trimmedClips = useMemo(() => {
+    if (trimOverrides.size === 0) return clips;
+    return clips.map(clip => {
+      const t = trimOverrides.get(clip.id);
+      if (!t) return clip;
+      return {
+        ...clip,
+        startSec: clip.startSec + t.offsetSec,
+        durationSec: t.newDurationSec,
+      };
+    }).filter(c => c.durationSec > 0.01);
+  }, [clips, trimOverrides]);
+
+  const player = useTimelinePlayer(trimmedClips);
   const duration = player.totalDuration > 0 ? player.totalDuration : totalDurationSec;
 
   const stemTracks = useMemo(() => getStemTracks(isRu), [isRu]);
@@ -47,6 +63,53 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [editorScrollLeft, setEditorScrollLeft] = useState(0);
   const [editorVisibleWidth, setEditorVisibleWidth] = useState(0);
+
+  // ── Trim handler ────────────────────────────────────────────
+  const handleTrim = useCallback((trackId: string, selStart: number, selEnd: number) => {
+    const trackClips = trimmedClips.filter(c => c.trackId === trackId);
+    if (trackClips.length === 0) return;
+
+    const newOverrides = new Map(trimOverrides);
+    let trimCount = 0;
+
+    for (const clip of trackClips) {
+      const clipEnd = clip.startSec + clip.durationSec;
+      // Original clip values (before any trim)
+      const origClip = clips.find(c => c.id === clip.id);
+      if (!origClip) continue;
+      const existingTrim = trimOverrides.get(clip.id);
+      const prevOffset = existingTrim?.offsetSec ?? 0;
+
+      // No overlap — remove clip entirely
+      if (clip.startSec >= selEnd || clipEnd <= selStart) {
+        newOverrides.set(clip.id, { offsetSec: prevOffset, newDurationSec: 0 });
+        trimCount++;
+        continue;
+      }
+
+      // Partial overlap — trim head and/or tail
+      const trimHead = Math.max(0, selStart - clip.startSec);
+      const trimTail = Math.max(0, clipEnd - selEnd);
+      const newDur = clip.durationSec - trimHead - trimTail;
+
+      if (trimHead > 0.01 || trimTail > 0.01) {
+        newOverrides.set(clip.id, {
+          offsetSec: prevOffset + trimHead,
+          newDurationSec: Math.max(0, newDur),
+        });
+        trimCount++;
+      }
+    }
+
+    if (trimCount > 0) {
+      setTrimOverrides(newOverrides);
+      toast.success(
+        isRu
+          ? `Обрезано ${trimCount} клип(ов) на треке`
+          : `Trimmed ${trimCount} clip(s) on track`,
+      );
+    }
+  }, [trimmedClips, clips, trimOverrides, isRu]);
 
   // ── Zoom ────────────────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
