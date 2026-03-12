@@ -84,17 +84,20 @@ export function ImpulseManager({ isRu }: ImpulseManagerProps) {
 
     setUploading(true);
     try {
-      // Decode audio to extract metadata
+      // Decode audio to extract metadata + peaks
       let durationMs = 0;
       let sampleRate = 48000;
       let channels = 2;
+      let peaks: number[] | null = null;
       try {
+        const { computePeaks } = await import("@/lib/irPeaks");
         const arrayBuf = await file.arrayBuffer();
         const audioCtx = new AudioContext();
         const decoded = await audioCtx.decodeAudioData(arrayBuf);
         durationMs = Math.round(decoded.duration * 1000);
         sampleRate = decoded.sampleRate;
         channels = decoded.numberOfChannels;
+        peaks = computePeaks(decoded);
         audioCtx.close();
       } catch {
         console.warn("Could not decode audio metadata, using defaults");
