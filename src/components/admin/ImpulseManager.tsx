@@ -162,6 +162,61 @@ export function ImpulseManager({ isRu }: ImpulseManagerProps) {
     }
   };
 
+  /* ─── Backfill Peaks ─────────────────────────────────────────────────── */
+
+  const handleBackfillPeaks = async () => {
+    const missing = impulses.filter(i => !i.peaks || (i.peaks as any[]).length === 0);
+    if (missing.length === 0) {
+      toast.info(isRu ? "Все импульсы уже имеют peaks" : "All impulses already have peaks");
+      return;
+    }
+
+    setBackfilling(true);
+    let done = 0;
+    let errors = 0;
+
+    for (const imp of missing) {
+      setBackfillProgress(`${done + 1}/${missing.length}: ${imp.name}`);
+      try {
+        const { data: urlData } = await supabase.storage
+          .from("impulse-responses")
+          .createSignedUrl(imp.file_path, 600);
+        if (!urlData?.signedUrl) throw new Error("No signed URL");
+
+        const resp = await fetch(urlData.signedUrl);
+        if (!resp.ok) throw new Error(`Fetch ${resp.status}`);
+        const arrayBuf = await resp.arrayBuffer();
+
+        const { computePeaks } = await import("@/lib/irPeaks");
+        const audioCtx = new AudioContext();
+        const decoded = await audioCtx.decodeAudioData(arrayBuf);
+        const peaks = computePeaks(decoded);
+        audioCtx.close();
+
+        const { error } = await supabase
+          .from("convolution_impulses")
+          .update({ peaks } as any)
+          .eq("id", imp.id);
+        if (error) throw error;
+        done++;
+      } catch (e: any) {
+        console.error(`Backfill failed for ${imp.name}:`, e);
+        errors++;
+      }
+    }
+
+    setBackfilling(false);
+    setBackfillProgress("");
+    toast.success(
+      isRu
+        ? `Peaks пересчитаны: ${done} из ${missing.length}${errors ? `, ошибок: ${errors}` : ""}`
+        : `Peaks computed: ${done} of ${missing.length}${errors ? `, errors: ${errors}` : ""}`
+    );
+    await fetchImpulses();
+  };
+
+  const missingPeaksCount = impulses.filter(i => !i.peaks || (i.peaks as any[]).length === 0).length;
+
   return (
     <div className="space-y-6">
       {/* Upload form */}
