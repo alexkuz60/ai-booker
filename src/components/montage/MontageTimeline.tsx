@@ -36,18 +36,38 @@ interface MontageTimelineProps {
 }
 
 export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chapterId, isRu, onSplitAtScene, hasParts }: MontageTimelineProps) {
-  // ── Undo stack ───────────────────────────────────────────────
+  // ── Trim & Fade overrides ──────────────────────────────────
+  const [trimOverrides, setTrimOverrides] = useState<Map<string, { offsetSec: number; newDurationSec: number }>>(new Map());
+  const [fadeOverrides, setFadeOverrides] = useState<Map<string, { fadeInSec: number; fadeOutSec: number }>>(new Map());
+
+  // ── Undo stack (snapshots of both overrides) ───────────────
   type UndoSnapshot = {
     trimOverrides: Map<string, { offsetSec: number; newDurationSec: number }>;
     fadeOverrides: Map<string, { fadeInSec: number; fadeOutSec: number }>;
   };
   const [undoStack, setUndoStack] = useState<UndoSnapshot[]>([]);
-  const pushUndo = useCallback((trim: Map<string, { offsetSec: number; newDurationSec: number }>, fade: Map<string, { fadeInSec: number; fadeOutSec: number }>) => {
-    setUndoStack(prev => [...prev.slice(-19), { trimOverrides: new Map(trim), fadeOverrides: new Map(fade) }]);
+  const trimRef = useRef(trimOverrides);
+  trimRef.current = trimOverrides;
+  const fadeRef = useRef(fadeOverrides);
+  fadeRef.current = fadeOverrides;
+
+  const pushUndo = useCallback(() => {
+    setUndoStack(prev => [...prev.slice(-19), {
+      trimOverrides: new Map(trimRef.current),
+      fadeOverrides: new Map(fadeRef.current),
+    }]);
   }, []);
 
-  // ── Trim overrides: per-clip { offsetSec, newDurationSec } ──
-  const [trimOverrides, setTrimOverrides] = useState<Map<string, { offsetSec: number; newDurationSec: number }>>(new Map());
+  const handleUndo = useCallback(() => {
+    setUndoStack(prev => {
+      if (prev.length === 0) return prev;
+      const snapshot = prev[prev.length - 1];
+      setTrimOverrides(snapshot.trimOverrides);
+      setFadeOverrides(snapshot.fadeOverrides);
+      toast.success(isRu ? "Отменено" : "Undone");
+      return prev.slice(0, -1);
+    });
+  }, [isRu]);
 
   const trimmedClips = useMemo(() => {
     if (trimOverrides.size === 0) return clips;
@@ -62,7 +82,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     }).filter(c => c.durationSec > 0.01);
   }, [clips, trimOverrides]);
 
-
   const stemTracks = useMemo(() => getStemTracks(isRu), [isRu]);
   const trackIds = useMemo(() => stemTracks.map(t => t.id), [stemTracks]);
   const { scheduleSave: onMixChange } = useMixerPersistence(chapterId, trackIds);
@@ -75,7 +94,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
 
   // ── Trim handler ────────────────────────────────────────────
   const handleTrim = useCallback((trackId: string, selStart: number, selEnd: number) => {
-    pushUndo(trimOverrides, fadeOverrides);
+    pushUndo();
     const trackClips = trimmedClips.filter(c => c.trackId === trackId);
     if (trackClips.length === 0) return;
 
