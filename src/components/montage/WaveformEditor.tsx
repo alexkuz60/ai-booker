@@ -376,8 +376,7 @@ export function WaveformEditor({
       <div ref={containerRef} className="flex-1 min-h-0 relative cursor-crosshair">
         <canvas
           ref={canvasRef}
-          className="w-full"
-          style={{ height: CHANNEL_HEIGHT * 2 + CHANNEL_GAP }}
+          className="w-full h-full"
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
