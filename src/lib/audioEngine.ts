@@ -205,6 +205,25 @@ class EngineTrack {
   private _limiterBypassed = true;
   private _limiterThreshold = -3;
 
+  // POST chain: Panner3D (after limiter, before convolver)
+  private panner3dNode: Tone.Panner3D;
+  private _panner3dBypassed = true;
+  private _panner3dX = 0;
+  private _panner3dY = 0;
+  private _panner3dZ = 0;
+  private _panner3dDistanceModel: DistanceModelType = "inverse";
+  private _panner3dRefDistance = 1;
+  private _panner3dMaxDistance = 10000;
+  private _panner3dRolloffFactor = 1;
+  private _panner3dConeInnerAngle = 360;
+  private _panner3dConeOuterAngle = 360;
+  private _panner3dConeOuterGain = 0;
+
+  // POST chain: Convolver (after panner3d, before reverb)
+  private convolverNode: Tone.Convolver;
+  private _convolverBypassed = true;
+  private _convolverDryWet = 0.3;
+
   // Per-channel reverb
   private reverbNode: Tone.Reverb;
   private _reverbBypassed = true;
