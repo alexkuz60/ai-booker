@@ -56,6 +56,7 @@ interface ChannelPluginsPanelProps {
 export function ChannelPluginsPanel({
   isRu,
   clips,
+  allSceneClips,
   trackLabel,
   trackColor,
   trackId,
