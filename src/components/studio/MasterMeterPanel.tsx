@@ -218,6 +218,8 @@ export function SpectrumAnalyzer() {
   modeRef.current = mode;
   const smoothingRef = useRef(smoothing);
   smoothingRef.current = smoothing;
+  const rmsHoldRef = useRef(-Infinity);
+  const rmsHoldTimeRef = useRef(0);
 
   useEffect(() => {
     let raf: number;
@@ -363,7 +365,17 @@ export function SpectrumAnalyzer() {
         powerSum += lin * lin;
       }
       const rmsDb = usableBins > 0 ? 10 * Math.log10(powerSum / usableBins) : -Infinity;
-      const rmsStr = fmtDb(rmsDb);
+      // Peak-hold behaviour: only update displayed RMS if new value is higher, else decay after 1.5s
+      const now = performance.now();
+      const RMS_HOLD_MS = 1500;
+      const RMS_FALL_RATE = 20; // dB/sec
+      if (rmsDb >= rmsHoldRef.current) {
+        rmsHoldRef.current = rmsDb;
+        rmsHoldTimeRef.current = now;
+      } else if (now - rmsHoldTimeRef.current > RMS_HOLD_MS) {
+        rmsHoldRef.current -= RMS_FALL_RATE * (1 / 60);
+      }
+      const rmsStr = fmtDb(rmsHoldRef.current);
 
       const peakL = meter.peakL;
       const peakR = meter.peakR;
