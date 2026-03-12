@@ -26,16 +26,66 @@ export interface ClipLimiterConfig {
   threshold: number;
 }
 
+export interface ClipPanner3dConfig {
+  enabled: boolean;
+  positionX: number;   // -10..10
+  positionY: number;   // -10..10 (height)
+  positionZ: number;   // -10..10
+  distanceModel: "linear" | "inverse" | "exponential";
+  refDistance: number;
+  maxDistance: number;
+  rolloffFactor: number;
+  coneInnerAngle: number;
+  coneOuterAngle: number;
+  coneOuterGain: number;
+}
+
+export interface ClipConvolverConfig {
+  enabled: boolean;
+  impulseId: string | null;   // FK → convolution_impulses
+  dryWet: number;             // 0..1
+  preDelaySec: number;        // 0..0.5
+  wetFilterEnabled: boolean;
+  wetFilterType: "lowpass" | "highpass";
+  wetFilterFreq: number;      // Hz
+}
+
 export interface ClipPluginConfig {
   eq: ClipEqConfig;
   comp: ClipCompConfig;
   limiter: ClipLimiterConfig;
+  panner3d: ClipPanner3dConfig;
+  convolver: ClipConvolverConfig;
 }
+
+export const DEFAULT_PANNER3D_CONFIG: ClipPanner3dConfig = {
+  enabled: false,
+  positionX: 0, positionY: 0, positionZ: 0,
+  distanceModel: "inverse",
+  refDistance: 1,
+  maxDistance: 10000,
+  rolloffFactor: 1,
+  coneInnerAngle: 360,
+  coneOuterAngle: 360,
+  coneOuterGain: 0,
+};
+
+export const DEFAULT_CONVOLVER_CONFIG: ClipConvolverConfig = {
+  enabled: false,
+  impulseId: null,
+  dryWet: 0.3,
+  preDelaySec: 0,
+  wetFilterEnabled: false,
+  wetFilterType: "lowpass",
+  wetFilterFreq: 8000,
+};
 
 export const DEFAULT_CLIP_PLUGIN_CONFIG: ClipPluginConfig = {
   eq: { enabled: false, low: 0, mid: 0, high: 0 },
   comp: { enabled: false, threshold: -24, ratio: 3, knee: 10, attack: 0.01, release: 0.1 },
   limiter: { enabled: false, threshold: -3 },
+  panner3d: { ...DEFAULT_PANNER3D_CONFIG },
+  convolver: { ...DEFAULT_CONVOLVER_CONFIG },
 };
 
 /** All clip configs for a scene, keyed by clipId */
