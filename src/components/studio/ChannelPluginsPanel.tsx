@@ -508,7 +508,7 @@ export function ChannelPluginsPanel({ isRu, trackId, trackLabel, trackColor, onM
         </div>
 
         {/* ── Limiter Column (POST) ── */}
-        <div className="w-36 shrink-0 flex flex-col gap-2">
+        <div className="w-36 shrink-0 flex flex-col gap-2 pl-4">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">
               <span className="text-[8px] text-muted-foreground/40 mr-1">POST</span>
