@@ -371,6 +371,9 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
           </ScrollArea>
         </div>
 
+        {/* ─── Impulses Section ─── */}
+        <ImpulsesSection isRu={isRu} userId={userId} />
+
         {/* ─── Orphaned Files Section ─── */}
         <OrphanedFilesSection isRu={isRu} userId={userId} onPreview={handlePreview} />
 
