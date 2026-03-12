@@ -10,7 +10,7 @@ import { TimelineMasterMeter } from "@/components/studio/TimelineMasterMeter";
 import { TimelineRuler } from "@/components/studio/TimelineRuler";
 import { Playhead } from "@/components/studio/TimelinePlayhead";
 import { TrackMixerStrip } from "@/components/studio/TrackMixerStrip";
-import { STEM_TRACKS } from "@/hooks/useMontageData";
+import { getStemTracks } from "@/hooks/useMontageData";
 import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 
 const MIXER_SIDEBAR = 160;
