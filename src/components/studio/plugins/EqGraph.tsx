@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 export function EqGraph({ low, mid, high, className }: { low: number; mid: number; high: number; className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useEffect(() => {
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
