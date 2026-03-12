@@ -401,23 +401,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
           />
         </div>
       )}
-
-      {/* Waveform Editor */}
-      {!timelineCollapsed && (
-        <WaveformEditor
-          clips={clips}
-          trackId={selectedTrackId}
-          trackLabel={stemTracks.find(t => t.id === selectedTrackId)?.label ?? ""}
-          trackColor={stemTracks.find(t => t.id === selectedTrackId)?.color ?? "hsl(var(--primary))"}
-          zoom={zoom}
-          duration={duration}
-          positionSec={player.positionSec}
-          scrollLeft={editorScrollLeft}
-          visibleWidth={editorVisibleWidth}
-          isRu={isRu}
-          onSeek={player.seek}
-        />
-      )}
     </div>
   );
 }
