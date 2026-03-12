@@ -322,11 +322,13 @@ class EngineTrack {
           fadeOut: this._loopCrossfadeSec,
         });
       }
-      this.playerB.connect(this.preFxNode);
+      this.playerB.connect(this.eqNode);
     }
 
     // Apply bypass states
+    this.applyEqBypass();
     this.applyPreFxBypass();
+    this.applyLimiterBypass();
     this.applyReverbBypass();
   }
 
