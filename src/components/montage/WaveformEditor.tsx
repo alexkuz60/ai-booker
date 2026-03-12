@@ -31,9 +31,15 @@ interface Selection {
   endSec: number;
 }
 
-const CHANNEL_HEIGHT = 64;
+const CHANNEL_HEIGHT = 96;
 const CHANNEL_GAP = 2;
 const EDITOR_HEIGHT = CHANNEL_HEIGHT * 2 + CHANNEL_GAP + 24; // 2 channels + gap + toolbar
+
+/** Resolve a CSS custom property to a usable hsl() string for Canvas */
+function resolveHsl(varName: string): string {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  return raw ? `hsl(${raw})` : "hsl(190 80% 60%)";
+}
 
 // ── Canvas waveform renderer ─────────────────────────────────
 function drawChannel(
@@ -115,10 +121,10 @@ function drawChannel(
     const sx = Math.max(0, selStartPx) * dpr;
     const sw = (Math.min(w, selEndPx) - Math.max(0, selStartPx)) * dpr;
     if (sw > 0) {
-      ctx.fillStyle = "hsl(var(--primary) / 0.15)";
+      ctx.fillStyle = resolveHsl("--primary").replace(")", " / 0.15)").replace("hsl(", "hsl(");
       ctx.fillRect(sx, y * dpr, sw, h * dpr);
       // Selection edges
-      ctx.strokeStyle = "hsl(var(--primary) / 0.6)";
+      ctx.strokeStyle = resolveHsl("--primary").replace(")", " / 0.6)").replace("hsl(", "hsl(");
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(sx, y * dpr);
@@ -182,18 +188,19 @@ export function WaveformEditor({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-  // Background
-    ctx.fillStyle = "hsl(var(--muted))";
+  // Background — resolve CSS variable for canvas
+    ctx.fillStyle = resolveHsl("--background");
     ctx.fillRect(0, 0, w * dpr, h * dpr);
 
     // Cyan waveform color from design system
-    const waveColor = "hsl(var(--cyan-glow))";
+    const waveColor = resolveHsl("--cyan-glow");
 
     // Draw L channel
     drawChannel(ctx, currentPeaks, 0, 0, w, CHANNEL_HEIGHT, waveColor, scrollLeft, totalWidthPx, selection, duration, "L");
 
     // Gap line
-    ctx.fillStyle = "hsl(var(--border) / 0.5)";
+    const borderColor = resolveHsl("--border");
+    ctx.fillStyle = borderColor.replace(")", " / 0.5)").replace("hsl(", "hsl(");
     ctx.fillRect(0, CHANNEL_HEIGHT * dpr, w * dpr, CHANNEL_GAP * dpr);
 
     // Draw R channel
@@ -202,7 +209,7 @@ export function WaveformEditor({
     // Playhead
     const playheadPx = (positionSec / duration) * totalWidthPx - scrollLeft;
     if (playheadPx >= 0 && playheadPx <= w) {
-      ctx.strokeStyle = "hsl(var(--primary))";
+      ctx.strokeStyle = resolveHsl("--primary");
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(playheadPx * dpr, 0);
