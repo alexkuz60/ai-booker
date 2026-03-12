@@ -75,6 +75,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
 
   // ── Trim handler ────────────────────────────────────────────
   const handleTrim = useCallback((trackId: string, selStart: number, selEnd: number) => {
+    pushUndo(trimOverrides, fadeOverrides);
     const trackClips = trimmedClips.filter(c => c.trackId === trackId);
     if (trackClips.length === 0) return;
 
