@@ -192,12 +192,23 @@ export function ChannelPluginsPanel({
                         <span className="font-mono text-xs">CMP</span>
                         <span className="ml-auto text-[10px] text-muted-foreground">{isRu ? "Компрессор" : "Compressor"}</span>
                       </ContextMenuCheckboxItem>
+                      <ContextMenuSeparator />
+                      <ContextMenuLabel className="text-[10px] font-mono uppercase text-muted-foreground/40">
+                        {isRu ? "Пространственные" : "Spatial"}
+                      </ContextMenuLabel>
                       <ContextMenuCheckboxItem
-                        checked={clipConfigs[clip.id]?.limiter?.enabled ?? false}
-                        onCheckedChange={() => onTogglePlugin(clip.id, "limiter")}
+                        checked={clipConfigs[clip.id]?.panner3d?.enabled ?? false}
+                        onCheckedChange={() => onTogglePlugin(clip.id, "panner3d")}
                       >
-                        <span className="font-mono text-xs">LIM</span>
-                        <span className="ml-auto text-[10px] text-muted-foreground">{isRu ? "Лимитер" : "Limiter"}</span>
+                        <span className="font-mono text-xs">3D</span>
+                        <span className="ml-auto text-[10px] text-muted-foreground">Panner3D</span>
+                      </ContextMenuCheckboxItem>
+                      <ContextMenuCheckboxItem
+                        checked={clipConfigs[clip.id]?.convolver?.enabled ?? false}
+                        onCheckedChange={() => onTogglePlugin(clip.id, "convolver")}
+                      >
+                        <span className="font-mono text-xs">IR</span>
+                        <span className="ml-auto text-[10px] text-muted-foreground">{isRu ? "Конвольвер" : "Convolver"}</span>
                       </ContextMenuCheckboxItem>
                     </ContextMenuContent>
                   </ContextMenu>
