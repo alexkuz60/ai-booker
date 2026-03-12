@@ -123,6 +123,9 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     });
   }, [trimmedClips, fadeOverrides]);
 
+  const player = useTimelinePlayer(fadedClips);
+  const duration = player.totalDuration > 0 ? player.totalDuration : totalDurationSec;
+
   const handleFadeIn = useCallback((trackId: string, fadeDurationSec: number) => {
     const affected = fadedClips.filter(c => c.trackId === trackId);
     if (affected.length === 0) return;
