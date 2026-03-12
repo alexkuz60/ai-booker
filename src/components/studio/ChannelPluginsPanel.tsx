@@ -116,6 +116,13 @@ export function ChannelPluginsPanel({
     });
   }, [enabledIds, engine, onMixChange]);
 
+  // Compute total duration span for proportional clip widths
+  const totalSpanSec = useMemo(() => {
+    if (clips.length === 0) return 0;
+    const maxEnd = Math.max(...clips.map(c => c.startSec + c.durationSec));
+    return maxEnd;
+  }, [clips]);
+
   if (clips.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground/50 text-xs font-body">
@@ -125,13 +132,6 @@ export function ChannelPluginsPanel({
   }
 
   const noEnabled = enabledIds.length === 0;
-
-  // Compute total duration span for proportional clip widths
-  const totalSpanSec = useMemo(() => {
-    if (clips.length === 0) return 0;
-    const maxEnd = Math.max(...clips.map(c => c.startSec + c.durationSec));
-    return maxEnd;
-  }, [clips]);
 
   return (
     <div className="flex flex-col h-full px-3 py-2">
