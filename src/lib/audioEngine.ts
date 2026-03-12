@@ -765,6 +765,16 @@ class EngineTrack {
     this.unschedule();
     this.player.dispose();
     this.playerB?.dispose();
+    // Dispose telephone chain
+    this._phoneNoise?.stop(); this._phoneNoise?.dispose();
+    this._phoneHum?.stop(); this._phoneHum?.dispose();
+    this._phoneFilter?.dispose();
+    this._phoneBitCrusher?.dispose();
+    this._phoneDistortion?.dispose();
+    this._phoneComp?.dispose();
+    this._phoneNoiseFilter?.dispose();
+    this._phoneNoiseGain?.dispose();
+    this._phoneHumGain?.dispose();
     this.eqNode.dispose();
     this.preFxNode.dispose();
     this.channel.dispose();
