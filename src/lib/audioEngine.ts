@@ -749,7 +749,62 @@ class AudioEngine {
     for (const t of this.tracks.values()) t.schedule();
 
     this.notify();
-    return { total: configs.length, loaded: this.tracks.size, dropped };
+    return { total: configs.length, loaded: loadedCount, dropped };
+  }
+
+  /**
+   * Load additional tracks into an already-loaded engine (e.g. retry failed stems).
+   * Does NOT clear existing tracks — only adds new ones.
+   */
+  async loadAdditionalTracks(configs: TrackConfig[], onProgress?: (p: LoadProgress) => void): Promise<LoadTracksResult> {
+    if (configs.length === 0) return { total: 0, loaded: 0, dropped: 0 };
+
+    const wasPlaying = this._state === "playing";
+    if (wasPlaying) this.pause();
+
+    if (Tone.getContext().state !== "running") {
+      try { await Tone.start(); } catch (_) { /* noop */ }
+    }
+
+    let dropped = 0;
+    let loadedCount = 0;
+
+    for (let ci = 0; ci < configs.length; ci++) {
+      const cfg = configs[ci];
+      onProgress?.({ total: configs.length, done: ci, loaded: loadedCount, failed: dropped, currentId: cfg.id, currentLabel: cfg.label ?? cfg.id });
+
+      const bus = this.getBus(cfg.bus ?? "voice");
+      const track = new EngineTrack(cfg, bus);
+      this.tracks.set(cfg.id, track);
+
+      const timeoutMs = Math.min(900_000, Math.max(120_000, Math.round((cfg.durationSec || 0) * 1200)));
+      const loaded = await new Promise<boolean>((resolve) => {
+        if (track.player.loaded) { resolve(true); return; }
+        let settled = false;
+        const finish = (ok: boolean) => { if (settled) return; settled = true; window.clearTimeout(tid); window.clearInterval(pid); resolve(ok); };
+        const tid = window.setTimeout(() => finish(false), timeoutMs);
+        const pid = window.setInterval(() => { if (track.player.loaded) finish(true); }, 120);
+        (track.player as any).onerror = () => finish(false);
+      });
+
+      if (!loaded) {
+        track.dispose();
+        this.tracks.delete(cfg.id);
+        dropped++;
+      } else {
+        loadedCount++;
+        track.schedule();
+      }
+
+      onProgress?.({ total: configs.length, done: ci + 1, loaded: loadedCount, failed: dropped, currentId: cfg.id, currentLabel: cfg.label ?? cfg.id });
+    }
+
+    this._totalDuration = this.tracks.size > 0
+      ? Math.max(...Array.from(this.tracks.values()).map(t => t.startSec + t.durationSec))
+      : 0;
+
+    this.notify();
+    return { total: configs.length, loaded: loadedCount, dropped };
   }
 
   async addTrack(config: TrackConfig): Promise<void> {
