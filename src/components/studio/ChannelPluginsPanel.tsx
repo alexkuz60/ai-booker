@@ -368,7 +368,7 @@ function LimiterGraph({ threshold }: { threshold: number }) {
   }, [threshold]);
 
   return (
-    <div className="relative rounded-sm border border-border/40 overflow-hidden w-full" style={{ aspectRatio: "1" }}>
+    <div className="relative rounded-sm border border-border/40 overflow-hidden w-full h-[120px]">
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
     </div>
   );
