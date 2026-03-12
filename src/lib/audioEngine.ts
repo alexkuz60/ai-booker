@@ -243,7 +243,7 @@ class EngineTrack {
   // Telephone FX chain (inserted between player and eqNode when segmentType==='telephone')
   private _telephone = false;
   private _phoneFilter: Tone.Filter | null = null;
-  private _phoneBitCrusher: Tone.BitCrusher | null = null;
+  private _phoneCrusher: Tone.WaveShaper | null = null;
   private _phoneDistortion: Tone.Distortion | null = null;
   private _phoneComp: Tone.Compressor | null = null;
   private _phoneNoise: Tone.Noise | null = null;
@@ -283,6 +283,9 @@ class EngineTrack {
     this._clipLenSec = config.clipLenSec ?? config.durationSec;
     this._loopCrossfadeSec = config.loopCrossfadeSec ?? 0;
     this._telephone = config.segmentType === "telephone";
+    if (this._telephone) {
+      console.log(`[AudioEngine] 📞 Telephone FX chain activated for track ${config.id} (label: ${config.label})`);
+    }
 
     // PRE: EQ3 (bypassed)
     this.eqNode = new Tone.EQ3({ low: 0, mid: 0, high: 0 });
@@ -355,15 +358,25 @@ class EngineTrack {
     // Wire signal chain (with optional telephone insert before EQ)
     if (this._telephone) {
       this._phoneFilter = new Tone.Filter({ type: "bandpass", frequency: 1900, Q: 0.8 });
-      this._phoneBitCrusher = new Tone.BitCrusher({ bits: 4 });
+      // WaveShaper-based bit crusher (no AudioWorklet dependency)
+      const bits = 4;
+      const steps = Math.pow(2, bits);
+      const curveLen = 8192;
+      const curve = new Float32Array(curveLen);
+      for (let i = 0; i < curveLen; i++) {
+        const x = (i * 2) / curveLen - 1;
+        curve[i] = Math.round(x * steps) / steps;
+      }
+      this._phoneCrusher = new Tone.WaveShaper(curve, curveLen);
       this._phoneDistortion = new Tone.Distortion({ distortion: 0.2, wet: 0.5 });
       this._phoneComp = new Tone.Compressor({ threshold: -30, ratio: 12, attack: 0.003, release: 0.25 });
-      // Chain: Player → BandpassFilter → BitCrusher → Distortion → PhoneComp → EQ
+      // Chain: Player → BandpassFilter → WaveShaper(crush) → Distortion → PhoneComp → EQ
       this.player.connect(this._phoneFilter);
-      this._phoneFilter.connect(this._phoneBitCrusher);
-      this._phoneBitCrusher.connect(this._phoneDistortion);
+      this._phoneFilter.connect(this._phoneCrusher);
+      this._phoneCrusher.connect(this._phoneDistortion);
       this._phoneDistortion.connect(this._phoneComp);
       this._phoneComp.connect(this.eqNode);
+      console.log(`[AudioEngine] 📞 Telephone chain wired: Filter→Crusher→Distortion→Comp→EQ`);
 
       // Pink noise (line static)
       this._phoneNoiseFilter = new Tone.Filter({ type: "bandpass", frequency: 1000, Q: 0.5 });
@@ -769,7 +782,7 @@ class EngineTrack {
     this._phoneNoise?.stop(); this._phoneNoise?.dispose();
     this._phoneHum?.stop(); this._phoneHum?.dispose();
     this._phoneFilter?.dispose();
-    this._phoneBitCrusher?.dispose();
+    this._phoneCrusher?.dispose();
     this._phoneDistortion?.dispose();
     this._phoneComp?.dispose();
     this._phoneNoiseFilter?.dispose();

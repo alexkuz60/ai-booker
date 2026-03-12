@@ -183,6 +183,9 @@ async function scheduleBus(
 
     // ── Telephone FX chain (if segment is telephone type) ──
     const isTelephone = clip.segmentType === "telephone";
+    if (isTelephone) {
+      console.log(`[SceneRenderer] 📞 Applying telephone FX to clip ${clip.id} (${clip.label}), segmentType=${clip.segmentType}`);
+    }
     let telephoneOutput: AudioNode = source;
     if (isTelephone) {
       // Bandpass filter (400-3400 Hz, center ~1900)
