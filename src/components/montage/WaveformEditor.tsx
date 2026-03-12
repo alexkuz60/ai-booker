@@ -147,6 +147,7 @@ export function WaveformEditor({
   positionSec,
   scrollLeft,
   visibleWidth,
+  mixerWidth,
   isRu,
   onSeek,
 }: WaveformEditorProps) {
