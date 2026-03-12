@@ -78,7 +78,7 @@ function drawChannel(
   for (let i = 0; i <= visiblePeaks; i++) {
     const idx = startIdx + i;
     if (idx >= peakCount) break;
-    const px = ((idx / peakCount) * totalWidthPx - scrollLeftPx) * dpr;
+    const px = (x + (idx / peakCount) * totalWidthPx - scrollLeftPx) * dpr;
     const val = data[idx] || 0;
     const yPos = mid - val * amp;
     if (i === 0) ctx.moveTo(px, yPos * dpr);
@@ -88,7 +88,7 @@ function drawChannel(
   for (let i = visiblePeaks; i >= 0; i--) {
     const idx = startIdx + i;
     if (idx >= peakCount) continue;
-    const px = ((idx / peakCount) * totalWidthPx - scrollLeftPx) * dpr;
+    const px = (x + (idx / peakCount) * totalWidthPx - scrollLeftPx) * dpr;
     const val = data[idx] || 0;
     const yPos = mid + val * amp;
     ctx.lineTo(px, yPos * dpr);
@@ -106,14 +106,14 @@ function drawChannel(
   ctx.strokeStyle = color.replace(")", " / 0.3)").replace("hsl(", "hsl(");
   ctx.lineWidth = 0.5;
   ctx.beginPath();
-  ctx.moveTo(0, mid * dpr);
-  ctx.lineTo(w * dpr, mid * dpr);
+  ctx.moveTo(x * dpr, mid * dpr);
+  ctx.lineTo((x + w) * dpr, mid * dpr);
   ctx.stroke();
 
   // Channel label
   ctx.fillStyle = color.replace(")", " / 0.5)").replace("hsl(", "hsl(");
   ctx.font = `${10 * dpr}px monospace`;
-  ctx.fillText(channelLabel, 4 * dpr, (y + 12) * dpr);
+  ctx.fillText(channelLabel, (x + 4) * dpr, (y + 12) * dpr);
 
   // Selection highlight
   if (selection) {
