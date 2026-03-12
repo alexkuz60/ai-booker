@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 
+import { getAudioEngine } from "@/lib/audioEngine";
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
 import { TimelineMasterMeter } from "@/components/studio/TimelineMasterMeter";
 import { TimelineRuler } from "@/components/studio/TimelineRuler";
@@ -51,8 +52,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     }).filter(c => c.durationSec > 0.01);
   }, [clips, trimOverrides]);
 
-  const player = useTimelinePlayer(trimmedClips);
-  const duration = player.totalDuration > 0 ? player.totalDuration : totalDurationSec;
 
   const stemTracks = useMemo(() => getStemTracks(isRu), [isRu]);
   const trackIds = useMemo(() => stemTracks.map(t => t.id), [stemTracks]);
@@ -110,6 +109,59 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
       );
     }
   }, [trimmedClips, clips, trimOverrides, isRu]);
+
+  // ── Fade overrides: per-clip { fadeInSec, fadeOutSec } ──────
+  const [fadeOverrides, setFadeOverrides] = useState<Map<string, { fadeInSec: number; fadeOutSec: number }>>(new Map());
+
+  // Apply fade overrides to trimmedClips
+  const fadedClips = useMemo(() => {
+    if (fadeOverrides.size === 0) return trimmedClips;
+    return trimmedClips.map(clip => {
+      const f = fadeOverrides.get(clip.id);
+      if (!f) return clip;
+      return { ...clip, fadeInSec: f.fadeInSec, fadeOutSec: f.fadeOutSec };
+    });
+  }, [trimmedClips, fadeOverrides]);
+
+  const player = useTimelinePlayer(fadedClips);
+  const duration = player.totalDuration > 0 ? player.totalDuration : totalDurationSec;
+
+  const handleFadeIn = useCallback((trackId: string, fadeDurationSec: number) => {
+    const affected = fadedClips.filter(c => c.trackId === trackId);
+    if (affected.length === 0) return;
+    const newOverrides = new Map(fadeOverrides);
+    let count = 0;
+    for (const clip of affected) {
+      const existing = fadeOverrides.get(clip.id);
+      newOverrides.set(clip.id, {
+        fadeInSec: Math.min(fadeDurationSec, clip.durationSec * 0.5),
+        fadeOutSec: existing?.fadeOutSec ?? clip.fadeOutSec ?? 0,
+      });
+      count++;
+      // Apply to audio engine
+      const engine = getAudioEngine();
+      engine.setTrackFadeIn?.(clip.id, Math.min(fadeDurationSec, clip.durationSec * 0.5));
+    }
+    setFadeOverrides(newOverrides);
+    toast.success(isRu ? `Fade In: ${fadeDurationSec.toFixed(2)}s` : `Fade In: ${fadeDurationSec.toFixed(2)}s`);
+  }, [fadedClips, fadeOverrides, isRu]);
+
+  const handleFadeOut = useCallback((trackId: string, fadeDurationSec: number) => {
+    const affected = fadedClips.filter(c => c.trackId === trackId);
+    if (affected.length === 0) return;
+    const newOverrides = new Map(fadeOverrides);
+    for (const clip of affected) {
+      const existing = fadeOverrides.get(clip.id);
+      newOverrides.set(clip.id, {
+        fadeInSec: existing?.fadeInSec ?? clip.fadeInSec ?? 0,
+        fadeOutSec: Math.min(fadeDurationSec, clip.durationSec * 0.5),
+      });
+      const engine = getAudioEngine();
+      engine.setTrackFadeOut?.(clip.id, Math.min(fadeDurationSec, clip.durationSec * 0.5));
+    }
+    setFadeOverrides(newOverrides);
+    toast.success(isRu ? `Fade Out: ${fadeDurationSec.toFixed(2)}s` : `Fade Out: ${fadeDurationSec.toFixed(2)}s`);
+  }, [fadedClips, fadeOverrides, isRu]);
 
   // ── Zoom ────────────────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
@@ -450,7 +502,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
 
           {/* Waveform Editor — fills remaining space */}
           <WaveformEditor
-            clips={trimmedClips}
+            clips={fadedClips}
             trackId={selectedTrackId}
             trackLabel={stemTracks.find(t => t.id === selectedTrackId)?.label ?? ""}
             trackColor={stemTracks.find(t => t.id === selectedTrackId)?.color ?? "hsl(var(--primary))"}
@@ -463,6 +515,8 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             isRu={isRu}
             onSeek={player.seek}
             onTrim={handleTrim}
+            onFadeIn={handleFadeIn}
+            onFadeOut={handleFadeOut}
           />
         </div>
       )}
