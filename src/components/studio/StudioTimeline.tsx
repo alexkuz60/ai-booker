@@ -119,6 +119,8 @@ export function StudioTimeline({
       ? 100
       : null;
 
+  const clipPluginsRef = useRef<Record<string, import("@/hooks/useClipPluginConfigs").ClipPluginConfig>>({});
+
   const handleRenderScene = useCallback(async () => {
     if (!sceneId || !user || isRendering) return;
     try {
@@ -128,14 +130,14 @@ export function StudioTimeline({
         durationRef.current,
         user.id,
         setRenderProgress,
-        clipPlugins.configs,
+        clipPluginsRef.current,
       );
       toast.success(isRu ? "Сцена отрендерена" : "Scene rendered");
       onSceneRendered?.(sceneId);
     } catch (err: any) {
       toast.error(isRu ? "Ошибка рендера" : "Render error", { description: err.message });
     }
-  }, [sceneId, user, isRendering, isRu, onSceneRendered, clipPlugins.configs]);
+  }, [sceneId, user, isRendering, isRu, onSceneRendered]);
 
   // Refs for render callback (avoid stale closures)
   const timelineClipsRef = useRef<typeof timelineClips>([]);
