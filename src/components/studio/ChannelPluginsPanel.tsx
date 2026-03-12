@@ -23,6 +23,8 @@ export interface ClipInfo {
   id: string;
   label: string;         // e.g. segment type or short name
   segmentType?: string;  // narrator, dialogue, etc.
+  startSec: number;
+  durationSec: number;
 }
 
 interface ChannelPluginsPanelProps {

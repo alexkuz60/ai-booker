@@ -444,6 +444,8 @@ export function StudioTimeline({
         id: c.id,
         label: c.label || c.segmentType || c.id,
         segmentType: c.segmentType,
+        startSec: c.startSec,
+        durationSec: c.durationSec,
       }));
   }, [selectedCharacterId, timelineClips]);
 
