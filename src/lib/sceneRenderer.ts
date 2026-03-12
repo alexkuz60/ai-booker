@@ -127,15 +127,40 @@ function writeString(view: DataView, offset: number, str: string) {
   }
 }
 
+/* ─── IR loader for convolver ─── */
+
+async function fetchImpulseBuffer(impulseId: string, sampleRate: number): Promise<AudioBuffer | null> {
+  try {
+    const { data: impulse } = await supabase
+      .from("convolution_impulses")
+      .select("file_path")
+      .eq("id", impulseId)
+      .maybeSingle();
+    if (!impulse?.file_path) return null;
+
+    const { data: urlData } = await supabase.storage
+      .from("impulse-responses")
+      .createSignedUrl(impulse.file_path, 600);
+    if (!urlData?.signedUrl) return null;
+
+    const resp = await fetch(urlData.signedUrl);
+    const arrayBuf = await resp.arrayBuffer();
+    const decodeCtx = new OfflineAudioContext(2, 1, sampleRate);
+    return await decodeCtx.decodeAudioData(arrayBuf);
+  } catch {
+    return null;
+  }
+}
+
 /* ─── Bus scheduling (atomic render) ─── */
 
-function scheduleBus(
+async function scheduleBus(
   clips: TimelineClip[],
   buffers: Map<string, AudioBuffer>,
   durationSec: number,
   sampleRate: number,
   clipConfigs?: SceneClipConfigs,
-): OfflineAudioContext | null {
+): Promise<OfflineAudioContext | null> {
   const withAudio = clips.filter(c => buffers.has(c.id));
   if (withAudio.length === 0) return null;
 
