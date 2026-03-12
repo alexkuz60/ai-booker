@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { ImpulsesSection } from './ImpulsesSection';
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 
@@ -369,6 +370,9 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
             )}
           </ScrollArea>
         </div>
+
+        {/* ─── Impulses Section ─── */}
+        <ImpulsesSection isRu={isRu} userId={userId} />
 
         {/* ─── Orphaned Files Section ─── */}
         <OrphanedFilesSection isRu={isRu} userId={userId} onPreview={handlePreview} />
