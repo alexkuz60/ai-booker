@@ -13,6 +13,7 @@
  */
 
 import * as Tone from "tone";
+import { fetchWithStemCache } from "@/lib/stemCache";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -81,6 +82,8 @@ export interface TrackConfig {
   loopCrossfadeSec?: number;
   /** Human-readable label for progress display */
   label?: string;
+  /** Stable cache key (e.g. storage audioPath). If set, Cache API is used. */
+  cacheKey?: string;
 }
 
 export interface LoadProgress {
@@ -190,7 +193,7 @@ class EngineTrack {
   private playerB: Tone.Player | null = null;
   private loopScheduledIds: number[] = [];
 
-  constructor(config: TrackConfig, bus: Tone.Channel) {
+  constructor(config: TrackConfig, bus: Tone.Channel, preloadedBuffer?: Tone.ToneAudioBuffer) {
     this.id = config.id;
     this.startSec = config.startSec;
     this.durationSec = config.durationSec;
@@ -233,11 +236,19 @@ class EngineTrack {
     // Chain: Player → PreFX → Channel → Reverb → Splitter → MeterL/R
     //                              └→ MeterMono
     //        Reverb → Bus (main output)
-    this.player = new Tone.Player({
-      url: config.url,
-      fadeIn: 0,
-      fadeOut: this._fadeOutSec,
-    });
+    if (preloadedBuffer) {
+      this.player = new Tone.Player({
+        fadeIn: 0,
+        fadeOut: this._fadeOutSec,
+      });
+      this.player.buffer = preloadedBuffer;
+    } else {
+      this.player = new Tone.Player({
+        url: config.url,
+        fadeIn: 0,
+        fadeOut: this._fadeOutSec,
+      });
+    }
 
     // Wire signal chain
     this.player.connect(this.preFxNode);
@@ -252,11 +263,19 @@ class EngineTrack {
 
     // Create secondary player for crossfade looping
     if (this._loop && this._loopCrossfadeSec > 0) {
-      this.playerB = new Tone.Player({
-        url: config.url,
-        fadeIn: this._loopCrossfadeSec,
-        fadeOut: this._loopCrossfadeSec,
-      });
+      if (preloadedBuffer) {
+        this.playerB = new Tone.Player({
+          fadeIn: this._loopCrossfadeSec,
+          fadeOut: this._loopCrossfadeSec,
+        });
+        this.playerB.buffer = preloadedBuffer;
+      } else {
+        this.playerB = new Tone.Player({
+          url: config.url,
+          fadeIn: this._loopCrossfadeSec,
+          fadeOut: this._loopCrossfadeSec,
+        });
+      }
       this.playerB.connect(this.preFxNode);
     }
 
@@ -678,54 +697,34 @@ class AudioEngine {
         currentId: cfg.id,
         currentLabel: cfg.label ?? cfg.id,
       });
-      const bus = this.getBus(cfg.bus ?? "voice");
-      const track = new EngineTrack(cfg, bus);
-      this.tracks.set(cfg.id, track);
 
-      const timeoutMs = Math.min(900_000, Math.max(120_000, Math.round((cfg.durationSec || 0) * 1200)));
       const startedAt = performance.now();
+      let buffer: Tone.ToneAudioBuffer | null = null;
 
-      const loaded = await new Promise<boolean>((resolve) => {
-        if (track.player.loaded) {
-          resolve(true);
-          return;
-        }
+      try {
+        // Fetch audio data (cache-first if cacheKey provided)
+        const arrayBuf = cfg.cacheKey
+          ? await fetchWithStemCache(cfg.cacheKey, cfg.url)
+          : await fetch(cfg.url).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.arrayBuffer(); });
 
-        let settled = false;
-        const finish = (ok: boolean) => {
-          if (settled) return;
-          settled = true;
-          window.clearTimeout(timeoutId);
-          window.clearInterval(pollId);
-          resolve(ok);
-        };
+        // Decode into ToneAudioBuffer
+        const audioCtx = Tone.getContext().rawContext as AudioContext;
+        const decoded = await audioCtx.decodeAudioData(arrayBuf.slice(0));
+        buffer = new Tone.ToneAudioBuffer(decoded);
 
-        const timeoutId = window.setTimeout(() => {
-          console.warn(`[AudioEngine] Track ${cfg.id} timed out loading after ${timeoutMs}ms`);
-          finish(false);
-        }, timeoutMs);
+        const elapsedMs = Math.round(performance.now() - startedAt);
+        console.log(`[AudioEngine] Track ${cfg.id} fetched+decoded in ${elapsedMs}ms${cfg.cacheKey ? " (cache-aware)" : ""}`);
+      } catch (err) {
+        console.error(`[AudioEngine] Track ${cfg.id} fetch/decode error:`, err);
+      }
 
-        const pollId = window.setInterval(() => {
-          if (!track.player.loaded) return;
-          const elapsedMs = Math.round(performance.now() - startedAt);
-          console.log(`[AudioEngine] Track ${cfg.id} loaded in ${elapsedMs}ms`);
-          finish(true);
-        }, 120);
-
-        const origOnerror = (track.player as any).onerror;
-        (track.player as any).onerror = (err: unknown) => {
-          console.error(`[AudioEngine] Track ${cfg.id} load error:`, err);
-          if (origOnerror) origOnerror(err);
-          finish(false);
-        };
-      });
-
-      if (!loaded) {
-        console.warn(`[AudioEngine] Dropping unloaded track: ${cfg.id}`);
-        track.dispose();
-        this.tracks.delete(cfg.id);
+      if (!buffer) {
+        console.warn(`[AudioEngine] Dropping failed track: ${cfg.id}`);
         dropped++;
       } else {
+        const bus = this.getBus(cfg.bus ?? "voice");
+        const track = new EngineTrack(cfg, bus, buffer);
+        this.tracks.set(cfg.id, track);
         loadedCount++;
       }
 
@@ -778,25 +777,27 @@ class AudioEngine {
       const cfg = configs[ci];
       onProgress?.({ total: configs.length, done: ci, loaded: loadedCount, failed: dropped, currentId: cfg.id, currentLabel: cfg.label ?? cfg.id });
 
-      const bus = this.getBus(cfg.bus ?? "voice");
-      const track = new EngineTrack(cfg, bus);
-      this.tracks.set(cfg.id, track);
+      const startedAt = performance.now();
+      let buffer: Tone.ToneAudioBuffer | null = null;
 
-      const timeoutMs = Math.min(900_000, Math.max(120_000, Math.round((cfg.durationSec || 0) * 1200)));
-      const loaded = await new Promise<boolean>((resolve) => {
-        if (track.player.loaded) { resolve(true); return; }
-        let settled = false;
-        const finish = (ok: boolean) => { if (settled) return; settled = true; window.clearTimeout(tid); window.clearInterval(pid); resolve(ok); };
-        const tid = window.setTimeout(() => finish(false), timeoutMs);
-        const pid = window.setInterval(() => { if (track.player.loaded) finish(true); }, 120);
-        (track.player as any).onerror = () => finish(false);
-      });
+      try {
+        const arrayBuf = cfg.cacheKey
+          ? await fetchWithStemCache(cfg.cacheKey, cfg.url)
+          : await fetch(cfg.url).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.arrayBuffer(); });
+        const audioCtx = Tone.getContext().rawContext as AudioContext;
+        const decoded = await audioCtx.decodeAudioData(arrayBuf.slice(0));
+        buffer = new Tone.ToneAudioBuffer(decoded);
+        console.log(`[AudioEngine] Additional track ${cfg.id} loaded in ${Math.round(performance.now() - startedAt)}ms`);
+      } catch (err) {
+        console.error(`[AudioEngine] Additional track ${cfg.id} fetch/decode error:`, err);
+      }
 
-      if (!loaded) {
-        track.dispose();
-        this.tracks.delete(cfg.id);
+      if (!buffer) {
         dropped++;
       } else {
+        const bus = this.getBus(cfg.bus ?? "voice");
+        const track = new EngineTrack(cfg, bus, buffer);
+        this.tracks.set(cfg.id, track);
         loadedCount++;
         track.schedule();
       }

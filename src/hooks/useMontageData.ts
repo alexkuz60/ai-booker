@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { clearStemCache } from "@/lib/stemCache";
 import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 
 // ─── Types ──────────────────────────────────────────────────
@@ -66,6 +67,8 @@ export function useMontageData() {
   const [loading, setLoading] = useState(true);
   const [sceneRenders, setSceneRenders] = useState<SceneRender[]>([]);
 
+  const prevChapterIdRef = useRef<string | null>(null);
+
   // ── Resolve context: sessionStorage (from Studio) → localStorage (last used) ──
   useEffect(() => {
     const studioBookId = sessionStorage.getItem("montage_book_id");
@@ -76,7 +79,6 @@ export function useMontageData() {
       sessionStorage.removeItem("montage_chapter_id");
       setBookId(studioBookId);
       setChapterId(studioChapterId);
-      // Fetch titles for header
       fetchTitles(studioBookId, studioChapterId);
     } else {
       const saved = loadContext();
@@ -89,6 +91,14 @@ export function useMontageData() {
     }
     setLoading(false);
   }, []);
+
+  // ── Clear stem cache when chapter changes ──
+  useEffect(() => {
+    if (chapterId && prevChapterIdRef.current && chapterId !== prevChapterIdRef.current) {
+      clearStemCache();
+    }
+    prevChapterIdRef.current = chapterId;
+  }, [chapterId]);
 
   async function fetchTitles(bId: string, cId: string) {
     const [bookRes, chapterRes] = await Promise.all([

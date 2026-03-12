@@ -108,6 +108,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
           clipLenSec: clip.clipLenSec,
           loopCrossfadeSec: clip.loopCrossfadeSec,
           label: clip.label,
+          cacheKey: clip.audioPath,
         });
       }
 
