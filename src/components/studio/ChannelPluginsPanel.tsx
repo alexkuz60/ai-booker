@@ -19,7 +19,9 @@ import { KneeGraph } from "./plugins/KneeGraph";
 import { LimiterGraph } from "./plugins/LimiterGraph";
 import { ParamSlider } from "./plugins/ParamSlider";
 import { BypassButton } from "./plugins/BypassButton";
-import type { ClipPluginConfig, ClipEqConfig, ClipCompConfig, ClipLimiterConfig } from "@/hooks/useClipPluginConfigs";
+import { Panner3DStage } from "./plugins/Panner3DStage";
+import { ConvolverPanel } from "./plugins/ConvolverPanel";
+import type { ClipPluginConfig, ClipEqConfig, ClipCompConfig, ClipLimiterConfig, ClipPanner3dConfig, ClipConvolverConfig } from "@/hooks/useClipPluginConfigs";
 import { DEFAULT_CLIP_PLUGIN_CONFIG } from "@/hooks/useClipPluginConfigs";
 
 // ─── Types ───────────────────────────────────────────────────
@@ -40,8 +42,8 @@ interface ChannelPluginsPanelProps {
   trackId?: string;
   /** Per-clip plugin configs from useClipPluginConfigs */
   clipConfigs: Record<string, ClipPluginConfig>;
-  onTogglePlugin: (clipId: string, plugin: "eq" | "comp" | "limiter") => void;
-  onUpdateParams: (clipId: string, plugin: "eq" | "comp" | "limiter", params: Partial<ClipEqConfig> | Partial<ClipCompConfig> | Partial<ClipLimiterConfig>) => void;
+  onTogglePlugin: (clipId: string, plugin: "eq" | "comp" | "limiter" | "panner3d" | "convolver") => void;
+  onUpdateParams: (clipId: string, plugin: "eq" | "comp" | "limiter" | "panner3d" | "convolver", params: Partial<ClipEqConfig> | Partial<ClipCompConfig> | Partial<ClipLimiterConfig> | Partial<ClipPanner3dConfig> | Partial<ClipConvolverConfig>) => void;
 }
 
 // ─── Main component ─────────────────────────────────────────
@@ -86,6 +88,8 @@ export function ChannelPluginsPanel({
     if (cfg.eq.enabled) count++;
     if (cfg.comp.enabled) count++;
     if (cfg.limiter.enabled) count++;
+    if (cfg.panner3d.enabled) count++;
+    if (cfg.convolver.enabled) count++;
     return count;
   }, [clipConfigs]);
 
@@ -188,12 +192,23 @@ export function ChannelPluginsPanel({
                         <span className="font-mono text-xs">CMP</span>
                         <span className="ml-auto text-[10px] text-muted-foreground">{isRu ? "Компрессор" : "Compressor"}</span>
                       </ContextMenuCheckboxItem>
+                      <ContextMenuSeparator />
+                      <ContextMenuLabel className="text-[10px] font-mono uppercase text-muted-foreground/40">
+                        {isRu ? "Пространственные" : "Spatial"}
+                      </ContextMenuLabel>
                       <ContextMenuCheckboxItem
-                        checked={clipConfigs[clip.id]?.limiter?.enabled ?? false}
-                        onCheckedChange={() => onTogglePlugin(clip.id, "limiter")}
+                        checked={clipConfigs[clip.id]?.panner3d?.enabled ?? false}
+                        onCheckedChange={() => onTogglePlugin(clip.id, "panner3d")}
                       >
-                        <span className="font-mono text-xs">LIM</span>
-                        <span className="ml-auto text-[10px] text-muted-foreground">{isRu ? "Лимитер" : "Limiter"}</span>
+                        <span className="font-mono text-xs">3D</span>
+                        <span className="ml-auto text-[10px] text-muted-foreground">Panner3D</span>
+                      </ContextMenuCheckboxItem>
+                      <ContextMenuCheckboxItem
+                        checked={clipConfigs[clip.id]?.convolver?.enabled ?? false}
+                        onCheckedChange={() => onTogglePlugin(clip.id, "convolver")}
+                      >
+                        <span className="font-mono text-xs">IR</span>
+                        <span className="ml-auto text-[10px] text-muted-foreground">{isRu ? "Конвольвер" : "Convolver"}</span>
                       </ContextMenuCheckboxItem>
                     </ContextMenuContent>
                   </ContextMenu>
@@ -311,23 +326,41 @@ export function ChannelPluginsPanel({
 
         {/* ═══ Tab 2: Spatial ═══ */}
         <TabsContent value="spatial" className="flex-1 min-h-0 overflow-auto mt-2">
-          <div className="flex gap-6 h-full text-muted-foreground/40 text-[10px] font-mono uppercase">
-            <div className="flex-1 flex flex-col items-center justify-center gap-2 border border-dashed border-border/30 rounded">
-              <Waves className="h-5 w-5" />
-              <span>{isRu ? "Стерео расширение" : "Stereo Width"}</span>
-              <span className="text-[8px]">{isRu ? "Скоро" : "Coming soon"}</span>
+          {!selectedClipId ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground/40 text-xs font-body">
+              {isRu ? "Выберите клип для настройки" : "Select a clip to configure"}
             </div>
-            <div className="flex-1 flex flex-col items-center justify-center gap-2 border border-dashed border-border/30 rounded">
-              <Waves className="h-5 w-5" />
-              <span>{isRu ? "Сцена" : "Stage Placement"}</span>
-              <span className="text-[8px]">{isRu ? "Скоро" : "Coming soon"}</span>
+          ) : (
+            <div className="flex gap-4 h-full divide-x divide-border/40">
+              {/* ── Panner3D Column ── */}
+              <div style={{ flex: "1 1 0%" }} className="min-w-0">
+                <Panner3DStage
+                  isRu={isRu}
+                  config={selectedConfig.panner3d}
+                  onToggle={() => onTogglePlugin(selectedClipId, "panner3d")}
+                  onUpdate={(params) => onUpdateParams(selectedClipId, "panner3d", params)}
+                />
+              </div>
+
+              {/* ── Convolver Column ── */}
+              <div style={{ flex: "1 1 0%" }} className="min-w-0 pl-4">
+                <ConvolverPanel
+                  isRu={isRu}
+                  config={selectedConfig.convolver}
+                  clipId={selectedClipId}
+                  onToggle={() => onTogglePlugin(selectedClipId, "convolver")}
+                  onUpdate={(params) => onUpdateParams(selectedClipId, "convolver", params)}
+                />
+              </div>
+
+              {/* ── Stereo Width placeholder ── */}
+              <div style={{ flex: "0.6 1 0%" }} className="min-w-0 pl-4 flex flex-col items-center justify-center gap-2 text-muted-foreground/30">
+                <Waves className="h-4 w-4" />
+                <span className="text-[9px] font-mono uppercase">{isRu ? "Ширина" : "Width"}</span>
+                <span className="text-[7px] font-mono">{isRu ? "Скоро" : "Soon"}</span>
+              </div>
             </div>
-            <div className="flex-1 flex flex-col items-center justify-center gap-2 border border-dashed border-border/30 rounded">
-              <Waves className="h-5 w-5" />
-              <span>{isRu ? "Свёрточный ревербератор" : "Convolution Reverb"}</span>
-              <span className="text-[8px]">{isRu ? "Скоро" : "Coming soon"}</span>
-            </div>
-          </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

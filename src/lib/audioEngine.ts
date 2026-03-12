@@ -205,6 +205,28 @@ class EngineTrack {
   private _limiterBypassed = true;
   private _limiterThreshold = -3;
 
+  // POST chain: Panner3D (after limiter, before convolver)
+  private panner3dNode: Tone.Panner3D;
+  private _panner3dBypassed = true;
+  private _panner3dX = 0;
+  private _panner3dY = 0;
+  private _panner3dZ = 0;
+  private _panner3dDistanceModel: DistanceModelType = "inverse";
+  private _panner3dRefDistance = 1;
+  private _panner3dMaxDistance = 10000;
+  private _panner3dRolloffFactor = 1;
+  private _panner3dConeInnerAngle = 360;
+  private _panner3dConeOuterAngle = 360;
+  private _panner3dConeOuterGain = 0;
+
+  // POST chain: Convolver (after panner3d, before reverb)
+  private convolverNode: Tone.Convolver;
+  private _convolverBypassed = true;
+  private _convolverDryWet = 0.3;
+  private _convolverDryGain: Tone.Gain;
+  private _convolverWetGain: Tone.Gain;
+  private _convolverMerge: Tone.Gain;
+
   // Per-channel reverb
   private reverbNode: Tone.Reverb;
   private _reverbBypassed = true;
@@ -268,6 +290,24 @@ class EngineTrack {
     // POST: Limiter (bypassed — set threshold to 0 when bypassed)
     this.limiterNode = new Tone.Limiter(0);
 
+    // POST: Panner3D (bypassed by default — at origin = transparent)
+    this.panner3dNode = new Tone.Panner3D({
+      positionX: 0, positionY: 0, positionZ: 0,
+      distanceModel: "inverse",
+      refDistance: 1,
+      maxDistance: 10000,
+      rolloffFactor: 1,
+      coneInnerAngle: 360,
+      coneOuterAngle: 360,
+      coneOuterGain: 0,
+    });
+
+    // POST: Convolver with manual dry/wet routing
+    this.convolverNode = new Tone.Convolver();
+    this._convolverDryGain = new Tone.Gain(1);
+    this._convolverWetGain = new Tone.Gain(0);
+    this._convolverMerge = new Tone.Gain(1);
+
     // Reverb: small room, bypassed
     this.reverbNode = new Tone.Reverb({
       decay: 1.5,
@@ -280,7 +320,7 @@ class EngineTrack {
     this.meterL = new Tone.Meter({ smoothing: 0.8 });
     this.meterR = new Tone.Meter({ smoothing: 0.8 });
 
-    // Chain: Player → EQ3 → Comp → Channel → Limiter → Reverb → Bus
+    // Chain: Player → EQ3 → Comp → Channel → Limiter → Panner3D → [ConvolverDry/Wet] → Reverb → Bus
     //                                  └→ MeterMono
     //        Reverb → Splitter → MeterL/R
     if (preloadedBuffer) {
@@ -303,7 +343,14 @@ class EngineTrack {
     this.preFxNode.connect(this.channel);
     this.channel.connect(this.meterMono);
     this.channel.connect(this.limiterNode);
-    this.limiterNode.connect(this.reverbNode);
+    this.limiterNode.connect(this.panner3dNode);
+    // Panner3D → convolver dry/wet split → merge → reverb
+    this.panner3dNode.connect(this._convolverDryGain);
+    this.panner3dNode.connect(this.convolverNode);
+    this.convolverNode.connect(this._convolverWetGain);
+    this._convolverDryGain.connect(this._convolverMerge);
+    this._convolverWetGain.connect(this._convolverMerge);
+    this._convolverMerge.connect(this.reverbNode);
     this.reverbNode.connect(bus);
     // Stereo metering tap
     this.reverbNode.connect(this.splitter);
@@ -332,6 +379,8 @@ class EngineTrack {
     this.applyEqBypass();
     this.applyPreFxBypass();
     this.applyLimiterBypass();
+    this.applyPanner3dBypass();
+    this.applyConvolverBypass();
     this.applyReverbBypass();
   }
 
@@ -518,6 +567,81 @@ class EngineTrack {
   get limiterBypassed() { return this._limiterBypassed; }
   get limiterState(): ChannelLimiterState { return { threshold: this._limiterThreshold, bypassed: this._limiterBypassed }; }
 
+  // ── Panner3D ──
+
+  setPanner3dBypassed(b: boolean): void {
+    this._panner3dBypassed = b;
+    this.applyPanner3dBypass();
+  }
+
+  private applyPanner3dBypass(): void {
+    if (this._panner3dBypassed) {
+      this.panner3dNode.positionX.value = 0;
+      this.panner3dNode.positionY.value = 0;
+      this.panner3dNode.positionZ.value = 0;
+    } else {
+      this.panner3dNode.positionX.value = this._panner3dX;
+      this.panner3dNode.positionY.value = this._panner3dY;
+      this.panner3dNode.positionZ.value = this._panner3dZ;
+    }
+  }
+
+  setPanner3dPosition(x: number, y: number, z: number): void {
+    this._panner3dX = x; this._panner3dY = y; this._panner3dZ = z;
+    if (!this._panner3dBypassed) {
+      this.panner3dNode.positionX.value = x;
+      this.panner3dNode.positionY.value = y;
+      this.panner3dNode.positionZ.value = z;
+    }
+  }
+
+  setPanner3dParams(p: { distanceModel?: DistanceModelType; refDistance?: number; maxDistance?: number; rolloffFactor?: number; coneInnerAngle?: number; coneOuterAngle?: number; coneOuterGain?: number }): void {
+    if (p.distanceModel !== undefined) { this._panner3dDistanceModel = p.distanceModel; this.panner3dNode.distanceModel = p.distanceModel; }
+    if (p.refDistance !== undefined) { this._panner3dRefDistance = p.refDistance; this.panner3dNode.refDistance = p.refDistance; }
+    if (p.maxDistance !== undefined) { this._panner3dMaxDistance = p.maxDistance; this.panner3dNode.maxDistance = p.maxDistance; }
+    if (p.rolloffFactor !== undefined) { this._panner3dRolloffFactor = p.rolloffFactor; this.panner3dNode.rolloffFactor = p.rolloffFactor; }
+    if (p.coneInnerAngle !== undefined) { this._panner3dConeInnerAngle = p.coneInnerAngle; this.panner3dNode.coneInnerAngle = p.coneInnerAngle; }
+    if (p.coneOuterAngle !== undefined) { this._panner3dConeOuterAngle = p.coneOuterAngle; this.panner3dNode.coneOuterAngle = p.coneOuterAngle; }
+    if (p.coneOuterGain !== undefined) { this._panner3dConeOuterGain = p.coneOuterGain; this.panner3dNode.coneOuterGain = p.coneOuterGain; }
+  }
+
+  get panner3dBypassed() { return this._panner3dBypassed; }
+
+  // ── Convolver ──
+
+  setConvolverBypassed(b: boolean): void {
+    this._convolverBypassed = b;
+    this.applyConvolverBypass();
+  }
+
+  private applyConvolverBypass(): void {
+    if (this._convolverBypassed) {
+      this._convolverDryGain.gain.value = 1;
+      this._convolverWetGain.gain.value = 0;
+    } else {
+      this._convolverDryGain.gain.value = 1 - this._convolverDryWet;
+      this._convolverWetGain.gain.value = this._convolverDryWet;
+    }
+  }
+
+  setConvolverDryWet(w: number): void {
+    this._convolverDryWet = Math.max(0, Math.min(1, w));
+    if (!this._convolverBypassed) {
+      this._convolverDryGain.gain.value = 1 - this._convolverDryWet;
+      this._convolverWetGain.gain.value = this._convolverDryWet;
+    }
+  }
+
+  async loadConvolverIR(url: string): Promise<void> {
+    try {
+      await this.convolverNode.load(url);
+    } catch (e) {
+      console.error("[EngineTrack] Failed to load convolver IR:", e);
+    }
+  }
+
+  get convolverBypassed() { return this._convolverBypassed; }
+
   // ── Reverb ──
 
   setReverbWet(w: number): void {
@@ -594,6 +718,11 @@ class EngineTrack {
     this.preFxNode.dispose();
     this.channel.dispose();
     this.limiterNode.dispose();
+    this.panner3dNode.dispose();
+    this.convolverNode.dispose();
+    this._convolverDryGain.dispose();
+    this._convolverWetGain.dispose();
+    this._convolverMerge.dispose();
     this.reverbNode.dispose();
     this.meterMono.dispose();
     this.splitter.dispose();
@@ -1134,6 +1263,16 @@ class AudioEngine {
   // ─── Per-track channel limiter (POST) ──────────────────
   setTrackLimiterThreshold(trackId: string, v: number): void { this.tracks.get(trackId)?.setLimiterThreshold(v); }
   setTrackLimiterBypassed(trackId: string, b: boolean): void { this.tracks.get(trackId)?.setLimiterBypassed(b); }
+
+  // ─── Per-track Panner3D (POST) ─────────────────────────
+  setTrackPanner3dBypassed(trackId: string, b: boolean): void { this.tracks.get(trackId)?.setPanner3dBypassed(b); }
+  setTrackPanner3dPosition(trackId: string, x: number, y: number, z: number): void { this.tracks.get(trackId)?.setPanner3dPosition(x, y, z); }
+  setTrackPanner3dParams(trackId: string, p: { distanceModel?: DistanceModelType; refDistance?: number; maxDistance?: number; rolloffFactor?: number; coneInnerAngle?: number; coneOuterAngle?: number; coneOuterGain?: number }): void { this.tracks.get(trackId)?.setPanner3dParams(p); }
+
+  // ─── Per-track Convolver (POST) ────────────────────────
+  setTrackConvolverBypassed(trackId: string, b: boolean): void { this.tracks.get(trackId)?.setConvolverBypassed(b); }
+  setTrackConvolverDryWet(trackId: string, w: number): void { this.tracks.get(trackId)?.setConvolverDryWet(w); }
+  async loadTrackConvolverIR(trackId: string, url: string): Promise<void> { await this.tracks.get(trackId)?.loadConvolverIR(url); }
 
   setTrackFadeIn(trackId: string, sec: number): void {
     this.tracks.get(trackId)?.setFadeIn(sec);

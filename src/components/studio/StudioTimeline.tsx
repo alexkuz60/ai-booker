@@ -466,14 +466,14 @@ export function StudioTimeline({
   }, [selectedCharacterId, charTracks]);
 
   // Per-clip plugin toggle/update handlers (delegated to useClipPluginConfigs)
-  const handleTogglePlugin = useCallback((clipId: string, plugin: "eq" | "comp" | "limiter") => {
+  const handleTogglePlugin = useCallback((clipId: string, plugin: "eq" | "comp" | "limiter" | "panner3d" | "convolver") => {
     const charTrackId = selectedCharacterId ? `char-${selectedCharacterId}` : "";
     clipPlugins.togglePlugin(clipId, charTrackId, plugin);
     onPluginsChange();
     onMixChange();
   }, [clipPlugins, selectedCharacterId, onPluginsChange, onMixChange]);
 
-  const handleUpdateParams = useCallback((clipId: string, plugin: "eq" | "comp" | "limiter", params: any) => {
+  const handleUpdateParams = useCallback((clipId: string, plugin: "eq" | "comp" | "limiter" | "panner3d" | "convolver", params: any) => {
     const charTrackId = selectedCharacterId ? `char-${selectedCharacterId}` : "";
     clipPlugins.updatePluginParams(clipId, charTrackId, plugin, params);
     onPluginsChange();

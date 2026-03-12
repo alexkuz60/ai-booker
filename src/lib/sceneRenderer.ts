@@ -127,15 +127,40 @@ function writeString(view: DataView, offset: number, str: string) {
   }
 }
 
+/* ─── IR loader for convolver ─── */
+
+async function fetchImpulseBuffer(impulseId: string, sampleRate: number): Promise<AudioBuffer | null> {
+  try {
+    const { data: impulse } = await supabase
+      .from("convolution_impulses")
+      .select("file_path")
+      .eq("id", impulseId)
+      .maybeSingle();
+    if (!impulse?.file_path) return null;
+
+    const { data: urlData } = await supabase.storage
+      .from("impulse-responses")
+      .createSignedUrl(impulse.file_path, 600);
+    if (!urlData?.signedUrl) return null;
+
+    const resp = await fetch(urlData.signedUrl);
+    const arrayBuf = await resp.arrayBuffer();
+    const decodeCtx = new OfflineAudioContext(2, 1, sampleRate);
+    return await decodeCtx.decodeAudioData(arrayBuf);
+  } catch {
+    return null;
+  }
+}
+
 /* ─── Bus scheduling (atomic render) ─── */
 
-function scheduleBus(
+async function scheduleBus(
   clips: TimelineClip[],
   buffers: Map<string, AudioBuffer>,
   durationSec: number,
   sampleRate: number,
   clipConfigs?: SceneClipConfigs,
-): OfflineAudioContext | null {
+): Promise<OfflineAudioContext | null> {
   const withAudio = clips.filter(c => buffers.has(c.id));
   if (withAudio.length === 0) return null;
 
@@ -217,6 +242,47 @@ function scheduleBus(
       limiter.release.value = 0.01;
       panner.connect(limiter);
       finalOutput = limiter;
+    }
+
+    // ── Panner3D ──
+    if (pluginCfg.panner3d?.enabled) {
+      const pannerNode = ctx.createPanner();
+      pannerNode.panningModel = "HRTF";
+      pannerNode.distanceModel = pluginCfg.panner3d.distanceModel ?? "inverse";
+      pannerNode.refDistance = pluginCfg.panner3d.refDistance ?? 1;
+      pannerNode.maxDistance = pluginCfg.panner3d.maxDistance ?? 10000;
+      pannerNode.rolloffFactor = pluginCfg.panner3d.rolloffFactor ?? 1;
+      pannerNode.coneInnerAngle = pluginCfg.panner3d.coneInnerAngle ?? 360;
+      pannerNode.coneOuterAngle = pluginCfg.panner3d.coneOuterAngle ?? 360;
+      pannerNode.coneOuterGain = pluginCfg.panner3d.coneOuterGain ?? 0;
+      pannerNode.positionX.value = pluginCfg.panner3d.positionX ?? 0;
+      pannerNode.positionY.value = pluginCfg.panner3d.positionY ?? 0;
+      pannerNode.positionZ.value = pluginCfg.panner3d.positionZ ?? 0;
+      finalOutput.connect(pannerNode);
+      finalOutput = pannerNode;
+    }
+
+    // ── Convolver ──
+    if (pluginCfg.convolver?.enabled && pluginCfg.convolver.impulseId) {
+      // Load IR inline for offline render
+      try {
+        const impulseRow = await fetchImpulseBuffer(pluginCfg.convolver.impulseId, sampleRate);
+        if (impulseRow) {
+          const dryGain = ctx.createGain();
+          const wetGain = ctx.createGain();
+          const merge = ctx.createGain();
+          const convNode = ctx.createConvolver();
+          convNode.buffer = impulseRow;
+          dryGain.gain.value = 1 - (pluginCfg.convolver.dryWet ?? 0.3);
+          wetGain.gain.value = pluginCfg.convolver.dryWet ?? 0.3;
+          finalOutput.connect(dryGain);
+          finalOutput.connect(convNode);
+          convNode.connect(wetGain);
+          dryGain.connect(merge);
+          wetGain.connect(merge);
+          finalOutput = merge;
+        }
+      } catch { /* skip convolver on error */ }
     }
 
     // ── Reverb ──
@@ -319,9 +385,11 @@ export async function renderScene(
     report("rendering", 50);
 
     // Schedule and render all 3 buses in parallel (atomic), passing per-clip plugin configs
-    const voiceCtx = scheduleBus(voiceClips, buffers, durationSec, sampleRate, clipConfigs);
-    const atmoCtx = scheduleBus(atmoClips, buffers, durationSec, sampleRate, clipConfigs);
-    const sfxCtx = scheduleBus(sfxClips, buffers, durationSec, sampleRate, clipConfigs);
+    const [voiceCtx, atmoCtx, sfxCtx] = await Promise.all([
+      scheduleBus(voiceClips, buffers, durationSec, sampleRate, clipConfigs),
+      scheduleBus(atmoClips, buffers, durationSec, sampleRate, clipConfigs),
+      scheduleBus(sfxClips, buffers, durationSec, sampleRate, clipConfigs),
+    ]);
 
     const [voiceBuf, atmoBuf, sfxBuf] = await Promise.all([
       voiceCtx?.startRendering() ?? Promise.resolve(null),

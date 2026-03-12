@@ -26,16 +26,66 @@ export interface ClipLimiterConfig {
   threshold: number;
 }
 
+export interface ClipPanner3dConfig {
+  enabled: boolean;
+  positionX: number;   // -10..10
+  positionY: number;   // -10..10 (height)
+  positionZ: number;   // -10..10
+  distanceModel: "linear" | "inverse" | "exponential";
+  refDistance: number;
+  maxDistance: number;
+  rolloffFactor: number;
+  coneInnerAngle: number;
+  coneOuterAngle: number;
+  coneOuterGain: number;
+}
+
+export interface ClipConvolverConfig {
+  enabled: boolean;
+  impulseId: string | null;   // FK → convolution_impulses
+  dryWet: number;             // 0..1
+  preDelaySec: number;        // 0..0.5
+  wetFilterEnabled: boolean;
+  wetFilterType: "lowpass" | "highpass";
+  wetFilterFreq: number;      // Hz
+}
+
 export interface ClipPluginConfig {
   eq: ClipEqConfig;
   comp: ClipCompConfig;
   limiter: ClipLimiterConfig;
+  panner3d: ClipPanner3dConfig;
+  convolver: ClipConvolverConfig;
 }
+
+export const DEFAULT_PANNER3D_CONFIG: ClipPanner3dConfig = {
+  enabled: false,
+  positionX: 0, positionY: 0, positionZ: 0,
+  distanceModel: "inverse",
+  refDistance: 1,
+  maxDistance: 10000,
+  rolloffFactor: 1,
+  coneInnerAngle: 360,
+  coneOuterAngle: 360,
+  coneOuterGain: 0,
+};
+
+export const DEFAULT_CONVOLVER_CONFIG: ClipConvolverConfig = {
+  enabled: false,
+  impulseId: null,
+  dryWet: 0.3,
+  preDelaySec: 0,
+  wetFilterEnabled: false,
+  wetFilterType: "lowpass",
+  wetFilterFreq: 8000,
+};
 
 export const DEFAULT_CLIP_PLUGIN_CONFIG: ClipPluginConfig = {
   eq: { enabled: false, low: 0, mid: 0, high: 0 },
   comp: { enabled: false, threshold: -24, ratio: 3, knee: 10, attack: 0.01, release: 0.1 },
   limiter: { enabled: false, threshold: -3 },
+  panner3d: { ...DEFAULT_PANNER3D_CONFIG },
+  convolver: { ...DEFAULT_CONVOLVER_CONFIG },
 };
 
 /** All clip configs for a scene, keyed by clipId */
@@ -119,7 +169,7 @@ export function useClipPluginConfigs(sceneId: string | null) {
   const togglePlugin = useCallback((
     clipId: string,
     trackId: string,
-    plugin: "eq" | "comp" | "limiter",
+    plugin: "eq" | "comp" | "limiter" | "panner3d" | "convolver",
   ) => {
     const engine = getAudioEngine();
     setConfigs(prev => {
@@ -150,8 +200,8 @@ export function useClipPluginConfigs(sceneId: string | null) {
   const updatePluginParams = useCallback((
     clipId: string,
     trackId: string,
-    plugin: "eq" | "comp" | "limiter",
-    params: Partial<ClipEqConfig> | Partial<ClipCompConfig> | Partial<ClipLimiterConfig>,
+    plugin: "eq" | "comp" | "limiter" | "panner3d" | "convolver",
+    params: Partial<ClipEqConfig> | Partial<ClipCompConfig> | Partial<ClipLimiterConfig> | Partial<ClipPanner3dConfig> | Partial<ClipConvolverConfig>,
   ) => {
     const engine = getAudioEngine();
     setConfigs(prev => {
@@ -212,5 +262,26 @@ function applyConfigToEngine(engine: ReturnType<typeof getAudioEngine>, clipId: 
   engine.setTrackLimiterBypassed(clipId, !cfg.limiter.enabled);
   if (cfg.limiter.enabled) {
     engine.setTrackLimiterThreshold(clipId, cfg.limiter.threshold);
+  }
+
+  // Panner3D
+  engine.setTrackPanner3dBypassed(clipId, !cfg.panner3d.enabled);
+  if (cfg.panner3d.enabled) {
+    engine.setTrackPanner3dPosition(clipId, cfg.panner3d.positionX, cfg.panner3d.positionY, cfg.panner3d.positionZ);
+    engine.setTrackPanner3dParams(clipId, {
+      distanceModel: cfg.panner3d.distanceModel,
+      refDistance: cfg.panner3d.refDistance,
+      maxDistance: cfg.panner3d.maxDistance,
+      rolloffFactor: cfg.panner3d.rolloffFactor,
+      coneInnerAngle: cfg.panner3d.coneInnerAngle,
+      coneOuterAngle: cfg.panner3d.coneOuterAngle,
+      coneOuterGain: cfg.panner3d.coneOuterGain,
+    });
+  }
+
+  // Convolver
+  engine.setTrackConvolverBypassed(clipId, !cfg.convolver.enabled);
+  if (cfg.convolver.enabled) {
+    engine.setTrackConvolverDryWet(clipId, cfg.convolver.dryWet);
   }
 }

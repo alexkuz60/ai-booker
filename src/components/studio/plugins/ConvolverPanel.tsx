@@ -1,0 +1,265 @@
+/**
+ * ConvolverPanel — IR catalog selector + waveform visualization + dry/wet + filter controls.
+ * Loads impulse responses from the convolution_impulses table and storage.
+ */
+
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ParamSlider } from "./ParamSlider";
+import { BypassButton } from "./BypassButton";
+import type { ClipConvolverConfig } from "@/hooks/useClipPluginConfigs";
+
+interface ConvolverPanelProps {
+  isRu: boolean;
+  config: ClipConvolverConfig;
+  clipId: string;
+  disabled?: boolean;
+  onToggle: () => void;
+  onUpdate: (params: Partial<ClipConvolverConfig>) => void;
+}
+
+interface ImpulseRow {
+  id: string;
+  name: string;
+  category: string;
+  file_path: string;
+  duration_ms: number;
+  description: string | null;
+}
+
+export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpdate }: ConvolverPanelProps) {
+  const [impulses, setImpulses] = useState<ImpulseRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [irBuffer, setIrBuffer] = useState<AudioBuffer | null>(null);
+
+  // Load catalog
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from("convolution_impulses")
+        .select("id, name, category, file_path, duration_ms, description")
+        .eq("is_public", true)
+        .order("category")
+        .order("name");
+      setImpulses(data ?? []);
+      setLoading(false);
+    })();
+  }, []);
+
+  // Group by category
+  const grouped = useMemo(() => {
+    const map = new Map<string, ImpulseRow[]>();
+    for (const imp of impulses) {
+      const list = map.get(imp.category) ?? [];
+      list.push(imp);
+      map.set(imp.category, list);
+    }
+    return map;
+  }, [impulses]);
+
+  // Load IR waveform for visualization when impulse changes
+  useEffect(() => {
+    if (!config.impulseId) { setIrBuffer(null); return; }
+    const impulse = impulses.find(i => i.id === config.impulseId);
+    if (!impulse) return;
+
+    (async () => {
+      try {
+        const { data: urlData } = await supabase.storage
+          .from("impulse-responses")
+          .createSignedUrl(impulse.file_path, 600);
+        if (!urlData?.signedUrl) return;
+
+        const resp = await fetch(urlData.signedUrl);
+        const arrayBuf = await resp.arrayBuffer();
+        const audioCtx = new AudioContext();
+        const decoded = await audioCtx.decodeAudioData(arrayBuf);
+        setIrBuffer(decoded);
+        audioCtx.close();
+      } catch {
+        setIrBuffer(null);
+      }
+    })();
+  }, [config.impulseId, impulses]);
+
+  // Draw waveform
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = c.clientWidth;
+    const h = c.clientHeight;
+    c.width = w * dpr;
+    c.height = h * dpr;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+
+    // Background
+    ctx.fillStyle = "hsl(220 15% 8%)";
+    ctx.fillRect(0, 0, w, h);
+
+    if (!irBuffer) {
+      ctx.font = "9px monospace";
+      ctx.fillStyle = "hsl(220 10% 35%)";
+      ctx.textAlign = "center";
+      ctx.fillText(isRu ? "Выберите IR" : "Select IR", w / 2, h / 2 + 3);
+      return;
+    }
+
+    const data = irBuffer.getChannelData(0);
+    const step = Math.max(1, Math.floor(data.length / w));
+    ctx.strokeStyle = "hsl(175 50% 45%)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const mid = h / 2;
+    for (let x = 0; x < w; x++) {
+      const idx = x * step;
+      let max = 0;
+      for (let j = 0; j < step && idx + j < data.length; j++) {
+        const v = Math.abs(data[idx + j]);
+        if (v > max) max = v;
+      }
+      const y = mid - max * mid * 0.9;
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    // Mirror
+    for (let x = w - 1; x >= 0; x--) {
+      const idx = x * step;
+      let max = 0;
+      for (let j = 0; j < step && idx + j < data.length; j++) {
+        const v = Math.abs(data[idx + j]);
+        if (v > max) max = v;
+      }
+      const y = mid + max * mid * 0.9;
+      ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = "hsla(175, 50%, 45%, 0.15)";
+    ctx.fill();
+    ctx.stroke();
+  }, [irBuffer, isRu]);
+
+  // Handle IR change → also load into engine
+  const handleImpulseChange = useCallback(async (impulseId: string) => {
+    onUpdate({ impulseId });
+
+    const impulse = impulses.find(i => i.id === impulseId);
+    if (!impulse) return;
+
+    // Load IR into audio engine for realtime preview
+    try {
+      const { data: urlData } = await supabase.storage
+        .from("impulse-responses")
+        .createSignedUrl(impulse.file_path, 600);
+      if (urlData?.signedUrl) {
+        const { getAudioEngine } = await import("@/lib/audioEngine");
+        await getAudioEngine().loadTrackConvolverIR(clipId, urlData.signedUrl);
+      }
+    } catch (e) {
+      console.error("Failed to load IR into engine:", e);
+    }
+  }, [impulses, clipId, onUpdate]);
+
+  const selectedImpulse = impulses.find(i => i.id === config.impulseId);
+
+  return (
+    <div className="flex flex-col gap-2 h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between shrink-0">
+        <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">
+          {isRu ? "Свёрточный реверб" : "Convolution Reverb"}
+        </span>
+        <BypassButton label="IR" bypassed={!config.enabled} onToggle={onToggle} />
+      </div>
+
+      <div className={`flex flex-col gap-2 flex-1 min-h-0 ${disabled || !config.enabled ? "opacity-40 pointer-events-none" : ""}`}>
+        {/* IR Selector */}
+        <div className="shrink-0">
+          <Select
+            value={config.impulseId ?? ""}
+            onValueChange={handleImpulseChange}
+            disabled={!config.enabled || loading}
+          >
+            <SelectTrigger className="h-6 text-[10px] font-mono">
+              <SelectValue placeholder={loading ? (isRu ? "Загрузка…" : "Loading…") : (isRu ? "Импульс…" : "Impulse…")} />
+            </SelectTrigger>
+            <SelectContent>
+              {[...grouped.entries()].map(([cat, items]) => (
+                <div key={cat}>
+                  <div className="px-2 py-1 text-[9px] font-mono uppercase text-muted-foreground/50">{cat}</div>
+                  {items.map(imp => (
+                    <SelectItem key={imp.id} value={imp.id} className="text-[10px] font-mono">
+                      {imp.name}
+                      {imp.duration_ms > 0 && <span className="ml-1 text-muted-foreground/50">{(imp.duration_ms / 1000).toFixed(1)}s</span>}
+                    </SelectItem>
+                  ))}
+                </div>
+              ))}
+            </SelectContent>
+          </Select>
+          {selectedImpulse?.description && (
+            <p className="text-[8px] text-muted-foreground/40 mt-0.5 truncate">{selectedImpulse.description}</p>
+          )}
+        </div>
+
+        {/* Waveform */}
+        <div className="flex-1 min-h-0" style={{ minHeight: 40 }}>
+          <canvas ref={canvasRef} className="w-full h-full rounded" style={{ display: "block" }} />
+        </div>
+
+        {/* Controls */}
+        <div className="flex gap-3 shrink-0">
+          <div className="flex-1">
+            <ParamSlider label="Dry/Wet" value={config.dryWet} min={0} max={1} step={0.01} onChange={v => onUpdate({ dryWet: v })} disabled={!config.enabled} />
+          </div>
+          <div className="flex-1">
+            <ParamSlider label="Pre-delay" value={config.preDelaySec} min={0} max={0.5} step={0.005} unit=" s" onChange={v => onUpdate({ preDelaySec: v })} disabled={!config.enabled} />
+          </div>
+        </div>
+
+        {/* Wet filter */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => onUpdate({ wetFilterEnabled: !config.wetFilterEnabled })}
+            className={`text-[8px] font-mono px-1.5 py-0.5 rounded border transition-colors ${
+              config.wetFilterEnabled
+                ? "border-primary/50 text-primary bg-primary/10"
+                : "border-border/30 text-muted-foreground/40"
+            }`}
+            disabled={!config.enabled}
+          >
+            {isRu ? "Фильтр" : "Filter"}
+          </button>
+          {config.wetFilterEnabled && (
+            <>
+              <button
+                onClick={() => onUpdate({ wetFilterType: config.wetFilterType === "lowpass" ? "highpass" : "lowpass" })}
+                className="text-[8px] font-mono text-muted-foreground/60 hover:text-foreground/80"
+                disabled={!config.enabled}
+              >
+                {config.wetFilterType === "lowpass" ? "LP" : "HP"}
+              </button>
+              <div className="flex-1">
+                <ParamSlider
+                  label={isRu ? "Частота" : "Freq"}
+                  value={config.wetFilterFreq}
+                  min={100}
+                  max={16000}
+                  step={50}
+                  unit=" Hz"
+                  onChange={v => onUpdate({ wetFilterFreq: v })}
+                  disabled={!config.enabled}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
