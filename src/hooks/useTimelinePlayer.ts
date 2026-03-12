@@ -116,7 +116,8 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
         } else {
           toast.error("Не удалось загрузить аудиодорожки. Попробуйте кнопку ↺ сброса движка.");
         }
-      }
+        }
+        setLoadProgress(null);
     };
 
     loadAll();

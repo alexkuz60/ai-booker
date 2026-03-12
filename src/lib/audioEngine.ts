@@ -704,6 +704,7 @@ class AudioEngine {
         dropped++;
       }
     }
+    onProgress?.({ total: configs.length, done: configs.length, currentId: "", currentLabel: "" });
 
     if (this.tracks.size === 0) {
       this._totalDuration = 0;
