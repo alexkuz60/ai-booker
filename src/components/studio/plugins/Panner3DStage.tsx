@@ -164,7 +164,7 @@ export function Panner3DStage({ isRu, allClips, selectedClipId, config, disabled
         ctx.stroke();
       } else {
         // Non-selected: dimmed with track color
-        ctx.globalAlpha = isEnabled ? 0.55 : 0.2;
+        ctx.globalAlpha = isEnabled ? 0.75 : 0.3;
         ctx.fillStyle = baseColor;
         ctx.beginPath();
         ctx.arc(sx, sz, dotR, 0, Math.PI * 2);
