@@ -621,8 +621,16 @@ export function StudioTimeline({
             )}
           </Button>
           <div className="w-px h-4 bg-border mx-1" />
+          <Button
+            variant={timelineView === "plugins" ? "secondary" : "ghost"}
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setTimelineView(v => v === "plugins" ? "tracks" : "plugins")}
+            title={isRu ? "Канальные плагины" : "Channel Plugins"}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+          </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7">
-            <Plus className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
