@@ -1288,6 +1288,70 @@ class AudioEngine {
     return { fadeInSec: t.fadeInSec, fadeOutSec: t.fadeOutSec };
   }
 
+  // ─── Clip preview (solo audition through full FX chain) ───
+
+  private _previewTrackId: string | null = null;
+  private _previewWasSolo = false;
+  private _previewPrevMutes: Map<string, boolean> = new Map();
+
+  /**
+   * Preview a single clip through its full signal chain (incl. convolver).
+   * Mutes all other tracks, seeks to clip start, plays, and restores on stop.
+   */
+  async previewClip(trackId: string): Promise<void> {
+    const track = this.tracks.get(trackId);
+    if (!track) return;
+
+    await Tone.start();
+
+    // If already previewing this clip, stop
+    if (this._previewTrackId === trackId && this._state === "playing") {
+      this.stopPreview();
+      return;
+    }
+
+    // If already previewing another clip, clean up first
+    if (this._previewTrackId) {
+      this.stopPreview();
+    }
+
+    // Save mute states of all other tracks
+    this._previewPrevMutes.clear();
+    this._previewWasSolo = track.solo;
+    for (const [id, t] of this.tracks) {
+      this._previewPrevMutes.set(id, t.muted);
+      if (id !== trackId) {
+        t.setMuted(true);
+      } else {
+        t.setMuted(false);
+      }
+    }
+    this._previewTrackId = trackId;
+
+    // Seek to clip start and play
+    this.seek(track.startSec);
+    await this.play();
+  }
+
+  /** Stop preview and restore mute states. */
+  stopPreview(): void {
+    if (!this._previewTrackId) return;
+
+    this.stop();
+
+    // Restore mute states
+    for (const [id, wasMuted] of this._previewPrevMutes) {
+      this.tracks.get(id)?.setMuted(wasMuted);
+    }
+    this._previewPrevMutes.clear();
+    this._previewTrackId = null;
+  }
+
+  /** Whether a clip is being previewed. */
+  get previewingTrackId(): string | null {
+    return this._previewTrackId;
+  }
+
   // ─── Metering ─────────────────────────────────────────
 
   getTrackMeter(trackId: string): TrackMeterData | null {

@@ -10,6 +10,7 @@ import { ParamSlider } from "./ParamSlider";
 import { BypassButton } from "./BypassButton";
 import { drawPeaksWaveform } from "@/lib/irPeaks";
 import { fetchWithStemCache } from "@/lib/stemCache";
+import { Play, Square } from "lucide-react";
 import type { ClipConvolverConfig } from "@/hooks/useClipPluginConfigs";
 
 interface ConvolverPanelProps {
@@ -36,6 +37,7 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpd
   const [loading, setLoading] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [fallbackPeaks, setFallbackPeaks] = useState<number[] | null>(null);
+  const [previewing, setPreviewing] = useState(false);
 
   // Load catalog
   useEffect(() => {
@@ -160,6 +162,31 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpd
     }
   }, [impulses, clipId, onUpdate]);
 
+  // Preview clip through convolver
+  const handlePreview = useCallback(async () => {
+    try {
+      const { getAudioEngine } = await import("@/lib/audioEngine");
+      const engine = getAudioEngine();
+      if (previewing) {
+        engine.stopPreview();
+        setPreviewing(false);
+      } else {
+        await engine.previewClip(clipId);
+        setPreviewing(true);
+        // Listen for engine state changes to detect when preview ends
+        const checkInterval = setInterval(() => {
+          if (engine.previewingTrackId !== clipId) {
+            setPreviewing(false);
+            clearInterval(checkInterval);
+          }
+        }, 300);
+      }
+    } catch (e) {
+      console.error("Preview error:", e);
+      setPreviewing(false);
+    }
+  }, [clipId, previewing]);
+
   return (
     <div className="flex flex-col gap-2 h-full">
       {/* Header */}
@@ -200,9 +227,24 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpd
           )}
         </div>
 
-        {/* Waveform */}
-        <div className="flex-1 min-h-0" style={{ minHeight: 40 }}>
+        {/* Waveform + preview */}
+        <div className="flex-1 min-h-0 relative" style={{ minHeight: 40 }}>
           <canvas ref={canvasRef} className="w-full h-full rounded" style={{ display: "block" }} />
+          {config.impulseId && (
+            <button
+              onClick={handlePreview}
+              className={`absolute top-1 right-1 p-1 rounded transition-colors ${
+                previewing
+                  ? "bg-primary/30 text-primary"
+                  : "bg-background/60 text-muted-foreground/60 hover:text-foreground/80 hover:bg-background/80"
+              }`}
+              title={isRu ? (previewing ? "Остановить" : "Прослушать клип с IR") : (previewing ? "Stop" : "Preview clip with IR")}
+            >
+              {previewing
+                ? <Square className="h-3 w-3 fill-current" />
+                : <Play className="h-3 w-3 fill-current" />}
+            </button>
+          )}
         </div>
 
         {/* Controls */}
