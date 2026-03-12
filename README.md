@@ -20,6 +20,9 @@ AI-Booker is a web application for automated audiobook production in a **radio p
 | 🎬 **Storyboard Editor** | Segment merge/split, silence pauses, inline narration detection, speaker attribution |
 | 🎵 **Atmosphere Engine** | AI-generated ambient sounds, music & SFX (ElevenLabs) + Freesound.org integration |
 | 🎛️ **DAW Timeline** | Multi-track playback, per-track mixer, master effects chain (EQ→CMP→LIM→FLT→MBC→REV) |
+| 🔌 **Per-Clip Plugins** | Individual EQ, Compressor, Limiter, 3D Panner, Convolver (IR) per clip |
+| 🏛️ **Convolution Reverb** | IR library (7 categories), waveform preview, real-time clip audition through IR |
+| 🎞️ **Offline Render** | Scene → 3 WAV stems (Voice/Atmo/SFX) with per-clip FX via OfflineAudioContext |
 | 🔊 **Pro Mastering** | 5-band parametric filter, 3-band multiband compressor, stereo VU metering, FFT spectrum |
 | 🤖 **AI Roles** | 6 specialized AI roles (Screenwriter, Profiler, Director, etc.) with dedicated models |
 | 💬 **AI Assistant** | Context-aware chat assistant that guides through the production workflow |
