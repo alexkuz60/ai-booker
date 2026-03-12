@@ -163,6 +163,7 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
             channels,
             uploaded_by: userId,
             is_public: true,
+            peaks,
           } as any);
         if (dbErr) throw dbErr;
         uploaded++;

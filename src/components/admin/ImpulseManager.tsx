@@ -122,6 +122,7 @@ export function ImpulseManager({ isRu }: ImpulseManagerProps) {
           channels,
           uploaded_by: (await supabase.auth.getUser()).data.user?.id,
           is_public: true,
+          peaks,
         } as any);
       if (dbErr) throw dbErr;
 
