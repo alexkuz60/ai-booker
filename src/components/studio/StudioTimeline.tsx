@@ -119,6 +119,8 @@ export function StudioTimeline({
       ? 100
       : null;
 
+  const clipPluginsRef = useRef<Record<string, import("@/hooks/useClipPluginConfigs").ClipPluginConfig>>({});
+
   const handleRenderScene = useCallback(async () => {
     if (!sceneId || !user || isRendering) return;
     try {
@@ -128,6 +130,7 @@ export function StudioTimeline({
         durationRef.current,
         user.id,
         setRenderProgress,
+        clipPluginsRef.current,
       );
       toast.success(isRu ? "Сцена отрендерена" : "Scene rendered");
       onSceneRendered?.(sceneId);
@@ -351,6 +354,7 @@ export function StudioTimeline({
   const { scheduleSave: onMixChange } = useMixerPersistence(sceneId ?? null, engineTrackIds);
   const { scheduleSave: onPluginsChange } = usePluginsPersistence(sceneId ?? null, engineTrackIds);
   const clipPlugins = useClipPluginConfigs(sceneId ?? null);
+  clipPluginsRef.current = clipPlugins.configs;
 
   // ── Layout / zoom ─────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);

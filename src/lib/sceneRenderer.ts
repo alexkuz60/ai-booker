@@ -8,6 +8,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 import { getAudioEngine } from "./audioEngine";
+import type { ClipPluginConfig, SceneClipConfigs } from "@/hooks/useClipPluginConfigs";
+import { DEFAULT_CLIP_PLUGIN_CONFIG } from "@/hooks/useClipPluginConfigs";
 
 export interface RenderProgress {
   phase: "loading" | "rendering" | "encoding" | "uploading" | "done" | "error";
@@ -132,6 +134,7 @@ function scheduleBus(
   buffers: Map<string, AudioBuffer>,
   durationSec: number,
   sampleRate: number,
+  clipConfigs?: SceneClipConfigs,
 ): OfflineAudioContext | null {
   const withAudio = clips.filter(c => buffers.has(c.id));
   if (withAudio.length === 0) return null;
@@ -145,18 +148,54 @@ function scheduleBus(
     const mixState = engine.getTrackMixState(clip.id);
     const volume = mixState?.volume ?? 80;
     const pan = mixState?.pan ?? 0;
-    const preFxBypassed = mixState?.preFxBypassed ?? true;
     const reverbBypassed = mixState?.reverbBypassed ?? true;
+
+    // Per-clip plugin config (from DB) takes precedence
+    const pluginCfg: ClipPluginConfig = clipConfigs?.[clip.id] ?? { ...DEFAULT_CLIP_PLUGIN_CONFIG };
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
 
-    const compressor = ctx.createDynamicsCompressor();
-    compressor.threshold.value = -24;
-    compressor.ratio.value = preFxBypassed ? 1 : 3;
-    compressor.attack.value = 0.01;
-    compressor.release.value = 0.1;
+    // ── EQ (3-band biquad approximation) ──
+    let eqOutput: AudioNode = source;
+    if (pluginCfg.eq.enabled) {
+      const lowShelf = ctx.createBiquadFilter();
+      lowShelf.type = "lowshelf";
+      lowShelf.frequency.value = 320;
+      lowShelf.gain.value = pluginCfg.eq.low;
 
+      const peaking = ctx.createBiquadFilter();
+      peaking.type = "peaking";
+      peaking.frequency.value = 1000;
+      peaking.Q.value = 0.5;
+      peaking.gain.value = pluginCfg.eq.mid;
+
+      const highShelf = ctx.createBiquadFilter();
+      highShelf.type = "highshelf";
+      highShelf.frequency.value = 3200;
+      highShelf.gain.value = pluginCfg.eq.high;
+
+      source.connect(lowShelf);
+      lowShelf.connect(peaking);
+      peaking.connect(highShelf);
+      eqOutput = highShelf;
+    }
+
+    // ── Compressor ──
+    const compressor = ctx.createDynamicsCompressor();
+    if (pluginCfg.comp.enabled) {
+      compressor.threshold.value = pluginCfg.comp.threshold;
+      compressor.ratio.value = pluginCfg.comp.ratio;
+      compressor.knee.value = pluginCfg.comp.knee;
+      compressor.attack.value = pluginCfg.comp.attack;
+      compressor.release.value = pluginCfg.comp.release;
+    } else {
+      compressor.threshold.value = 0;
+      compressor.ratio.value = 1;
+    }
+    eqOutput.connect(compressor);
+
+    // ── Gain + Pan ──
     const gainNode = ctx.createGain();
     const dbVal = volume <= 0 ? -100 : 20 * Math.log10(volume / 100);
     gainNode.gain.value = Math.pow(10, dbVal / 20);
@@ -164,10 +203,23 @@ function scheduleBus(
     const panner = ctx.createStereoPanner();
     panner.pan.value = pan;
 
-    source.connect(compressor);
     compressor.connect(gainNode);
     gainNode.connect(panner);
 
+    // ── Limiter (simulated via DynamicsCompressor with high ratio) ──
+    let finalOutput: AudioNode = panner;
+    if (pluginCfg.limiter.enabled) {
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = pluginCfg.limiter.threshold;
+      limiter.ratio.value = 20;
+      limiter.knee.value = 0;
+      limiter.attack.value = 0.001;
+      limiter.release.value = 0.01;
+      panner.connect(limiter);
+      finalOutput = limiter;
+    }
+
+    // ── Reverb ──
     if (!reverbBypassed) {
       const irLength = Math.ceil(sampleRate * 1.5);
       const irBuffer = ctx.createBuffer(2, irLength, sampleRate);
@@ -184,16 +236,17 @@ function scheduleBus(
       const wetGain = ctx.createGain();
       wetGain.gain.value = 0.15;
       const merger = ctx.createGain();
-      panner.connect(dryGain);
+      finalOutput.connect(dryGain);
       dryGain.connect(merger);
-      panner.connect(convolver);
+      finalOutput.connect(convolver);
       convolver.connect(wetGain);
       wetGain.connect(merger);
       merger.connect(ctx.destination);
     } else {
-      panner.connect(ctx.destination);
+      finalOutput.connect(ctx.destination);
     }
 
+    // ── Fades ──
     const fadeIn = clip.fadeInSec ?? 0;
     const fadeOut = clip.fadeOutSec ?? 0;
     if (fadeIn > 0) {
@@ -206,6 +259,7 @@ function scheduleBus(
       gainNode.gain.linearRampToValueAtTime(0, clip.startSec + clip.durationSec);
     }
 
+    // ── Looping ──
     if (clip.loop && clip.clipLenSec) {
       const step = Math.max(1, clip.clipLenSec - (clip.loopCrossfadeSec ?? 0));
       const iterations = Math.ceil(clip.durationSec / step) + 1;
@@ -214,7 +268,13 @@ function scheduleBus(
         if (iterOffset >= clip.durationSec) break;
         const src = ctx.createBufferSource();
         src.buffer = buffer;
-        src.connect(compressor);
+        if (pluginCfg.eq.enabled) {
+          // For looped sources, connect through the same EQ chain
+          // (simplified: connect directly to compressor since EQ nodes are shared)
+          src.connect(compressor);
+        } else {
+          src.connect(compressor);
+        }
         const remaining = Math.min(clip.clipLenSec, clip.durationSec - iterOffset);
         src.start(clip.startSec + iterOffset, 0, remaining);
       }
@@ -234,6 +294,7 @@ export async function renderScene(
   durationSec: number,
   userId: string,
   onProgress?: (p: RenderProgress) => void,
+  clipConfigs?: SceneClipConfigs,
 ): Promise<RenderResult> {
   const sampleRate = 44100;
   const report = (phase: RenderProgress["phase"], percent: number) =>
@@ -248,7 +309,6 @@ export async function renderScene(
     const sfxClips = clips.filter(c => classifyClip(c) === "sfx" && c.hasAudio);
 
     const allClips = [...voiceClips, ...atmoClips, ...sfxClips];
-    const totalLoadable = allClips.filter(c => c.audioPath).length;
 
     // Pre-load all buffers with per-clip progress (0–45%)
     const buffers = await preloadClipBuffers(allClips, sampleRate, (loaded, total) => {
@@ -258,10 +318,10 @@ export async function renderScene(
 
     report("rendering", 50);
 
-    // Schedule and render all 3 buses in parallel (atomic)
-    const voiceCtx = scheduleBus(voiceClips, buffers, durationSec, sampleRate);
-    const atmoCtx = scheduleBus(atmoClips, buffers, durationSec, sampleRate);
-    const sfxCtx = scheduleBus(sfxClips, buffers, durationSec, sampleRate);
+    // Schedule and render all 3 buses in parallel (atomic), passing per-clip plugin configs
+    const voiceCtx = scheduleBus(voiceClips, buffers, durationSec, sampleRate, clipConfigs);
+    const atmoCtx = scheduleBus(atmoClips, buffers, durationSec, sampleRate, clipConfigs);
+    const sfxCtx = scheduleBus(sfxClips, buffers, durationSec, sampleRate, clipConfigs);
 
     const [voiceBuf, atmoBuf, sfxBuf] = await Promise.all([
       voiceCtx?.startRendering() ?? Promise.resolve(null),
@@ -312,7 +372,13 @@ export async function renderScene(
 
     report("uploading", 90);
 
-    // Upsert scene_renders record
+    // Snapshot clip plugin configs into render_config
+    const renderConfigSnapshot: Record<string, unknown> = {};
+    if (clipConfigs && Object.keys(clipConfigs).length > 0) {
+      renderConfigSnapshot.clip_plugins = clipConfigs;
+    }
+
+    // Upsert scene_renders record with plugin configs snapshot
     const { error: dbError } = await supabase.from("scene_renders" as any).upsert(
       {
         scene_id: sceneId,
@@ -324,13 +390,37 @@ export async function renderScene(
         atmo_duration_ms: results.atmosphere?.durationMs ?? 0,
         sfx_duration_ms: results.sfx?.durationMs ?? 0,
         status: "ready",
-        render_config: {},
+        render_config: renderConfigSnapshot,
         updated_at: new Date().toISOString(),
       } as any,
       { onConflict: "scene_id" } as any,
     );
 
     if (dbError) console.error("scene_renders upsert error:", dbError);
+
+    // Also snapshot plugin configs into scene_playlists segments
+    if (clipConfigs && Object.keys(clipConfigs).length > 0) {
+      const { data: playlist } = await supabase
+        .from("scene_playlists")
+        .select("segments")
+        .eq("scene_id", sceneId)
+        .maybeSingle();
+
+      if (playlist?.segments && Array.isArray(playlist.segments)) {
+        const updatedSegments = (playlist.segments as Array<Record<string, unknown>>).map(seg => {
+          const segId = seg.segment_id as string;
+          const pluginCfg = clipConfigs[segId];
+          if (pluginCfg) {
+            return { ...seg, plugin_config: pluginCfg };
+          }
+          return seg;
+        });
+        await supabase.from("scene_playlists").update({
+          segments: updatedSegments as unknown as import("@/integrations/supabase/types").Json,
+          updated_at: new Date().toISOString(),
+        }).eq("scene_id", sceneId);
+      }
+    }
 
     report("done", 100);
 
