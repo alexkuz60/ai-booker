@@ -106,6 +106,22 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
 
     setUploading(true);
     try {
+      // Decode audio to extract metadata
+      let durationMs = 0;
+      let sampleRate = 48000;
+      let channels = 2;
+      try {
+        const arrayBuf = await file.arrayBuffer();
+        const audioCtx = new AudioContext();
+        const decoded = await audioCtx.decodeAudioData(arrayBuf);
+        durationMs = Math.round(decoded.duration * 1000);
+        sampleRate = decoded.sampleRate;
+        channels = decoded.numberOfChannels;
+        audioCtx.close();
+      } catch {
+        console.warn("Could not decode audio metadata, using defaults");
+      }
+
       const filePath = `impulses/${userId}/${Date.now()}_${file.name}`;
       const { error: storageErr } = await supabase.storage
         .from("impulse-responses")
@@ -119,9 +135,9 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
           description: description.trim() || null,
           category,
           file_path: filePath,
-          duration_ms: 0,
-          sample_rate: 48000,
-          channels: 2,
+          duration_ms: durationMs,
+          sample_rate: sampleRate,
+          channels,
           uploaded_by: userId,
           is_public: true,
         } as any);
