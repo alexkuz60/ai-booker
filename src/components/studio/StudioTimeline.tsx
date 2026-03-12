@@ -434,14 +434,17 @@ export function StudioTimeline({
   type TimelineView = "tracks" | "plugins";
   const [timelineView, setTimelineView] = useState<TimelineView>("tracks");
 
-  // Selected track for channel plugins (use first clip of selected character track, or first available)
-  const pluginsTrackId = useMemo(() => {
-    if (!selectedCharacterId) return null;
+  // Selected track clips for channel plugins
+  const pluginsClips = useMemo((): ClipInfo[] => {
+    if (!selectedCharacterId) return [];
     const charTrackId = `char-${selectedCharacterId}`;
-    const clipIds = timelineClips
+    return timelineClips
       .filter(c => c.trackId === charTrackId && c.hasAudio && !!c.audioPath)
-      .map(c => c.id);
-    return clipIds[0] ?? null;
+      .map(c => ({
+        id: c.id,
+        label: c.label || c.segmentType || c.id,
+        segmentType: c.segmentType,
+      }));
   }, [selectedCharacterId, timelineClips]);
 
   const pluginsTrackLabel = useMemo(() => {
@@ -453,6 +456,64 @@ export function StudioTimeline({
     if (!selectedCharacterId) return undefined;
     return charTracks.find(t => t.id === `char-${selectedCharacterId}`)?.color;
   }, [selectedCharacterId, charTracks]);
+
+  // Per-clip plugin enabled state (all enabled by default)
+  const [pluginEnabledClipIds, setPluginEnabledClipIds] = useState<Set<string>>(new Set());
+  // Auto-enable new clips
+  useEffect(() => {
+    if (pluginsClips.length === 0) return;
+    setPluginEnabledClipIds(prev => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const c of pluginsClips) {
+        if (!next.has(c.id)) { next.add(c.id); changed = true; }
+      }
+      // Remove stale IDs
+      const validIds = new Set(pluginsClips.map(c => c.id));
+      for (const id of next) {
+        if (!validIds.has(id)) { next.delete(id); changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [pluginsClips]);
+
+  const handleToggleClip = useCallback((clipId: string) => {
+    const engine = getAudioEngine();
+    setPluginEnabledClipIds(prev => {
+      const next = new Set(prev);
+      if (next.has(clipId)) {
+        next.delete(clipId);
+        // Bypass all plugins on this clip
+        engine.setTrackEqBypassed(clipId, true);
+        engine.setTrackPreFxBypassed(clipId, true);
+        engine.setTrackLimiterBypassed(clipId, true);
+      } else {
+        next.add(clipId);
+        // Restore plugin state from first enabled clip (copy settings)
+        const firstEnabled = [...prev][0];
+        if (firstEnabled) {
+          const ms = engine.getTrackMixState(firstEnabled);
+          if (ms) {
+            engine.setTrackEqLow(clipId, ms.eq.low);
+            engine.setTrackEqMid(clipId, ms.eq.mid);
+            engine.setTrackEqHigh(clipId, ms.eq.high);
+            engine.setTrackEqBypassed(clipId, ms.eq.bypassed);
+            engine.setTrackCompThreshold(clipId, ms.comp.threshold);
+            engine.setTrackCompRatio(clipId, ms.comp.ratio);
+            engine.setTrackCompKnee(clipId, ms.comp.knee);
+            engine.setTrackCompAttack(clipId, ms.comp.attack);
+            engine.setTrackCompRelease(clipId, ms.comp.release);
+            engine.setTrackPreFxBypassed(clipId, ms.comp.bypassed);
+            engine.setTrackLimiterThreshold(clipId, ms.limiter.threshold);
+            engine.setTrackLimiterBypassed(clipId, ms.limiter.bypassed);
+          }
+        }
+      }
+      onPluginsChange();
+      onMixChange();
+      return next;
+    });
+  }, [onPluginsChange, onMixChange]);
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("studio-timeline-collapsed") === "true"; } catch { return false; }
