@@ -331,6 +331,74 @@ export function WaveformEditor({
     // Draw R channel
     drawChannel(ctx, currentPeaks, mixerWidth, chH + CHANNEL_GAP, waveW, chH, waveColor, scrollLeft, totalWidthPx, selection, duration, "R");
 
+    // ── Draw fade envelopes for each clip ───────────────────
+    const fadeColor = resolveHsl("--primary");
+    for (const clip of trackClips) {
+      const fadeIn = clip.fadeInSec ?? 0;
+      const fadeOut = clip.fadeOutSec ?? 0;
+      if (fadeIn <= 0 && fadeOut <= 0) continue;
+
+      const clipStartPx = (clip.startSec / duration) * totalWidthPx - scrollLeft + mixerWidth;
+      const clipEndPx = ((clip.startSec + clip.durationSec) / duration) * totalWidthPx - scrollLeft + mixerWidth;
+
+      // Fade In envelope (triangle from bottom-left to top)
+      if (fadeIn > 0) {
+        const fadeEndPx = ((clip.startSec + fadeIn) / duration) * totalWidthPx - scrollLeft + mixerWidth;
+        const x0 = Math.max(mixerWidth, clipStartPx);
+        const x1 = Math.min(w, fadeEndPx);
+        if (x1 > x0) {
+          // Shaded area
+          ctx.fillStyle = fadeColor.replace(")", " / 0.12)").replace("hsl(", "hsl(");
+          ctx.beginPath();
+          ctx.moveTo(x0 * dpr, 0);
+          ctx.lineTo(x0 * dpr, h * dpr);
+          ctx.lineTo(x1 * dpr, 0);
+          ctx.closePath();
+          ctx.fill();
+          // Envelope line
+          ctx.strokeStyle = fadeColor.replace(")", " / 0.7)").replace("hsl(", "hsl(");
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([3, 2]);
+          ctx.beginPath();
+          ctx.moveTo(x0 * dpr, h * dpr);
+          ctx.lineTo(x1 * dpr, 0);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          // "FI" label
+          ctx.fillStyle = fadeColor.replace(")", " / 0.6)").replace("hsl(", "hsl(");
+          ctx.font = `${9 * dpr}px monospace`;
+          ctx.fillText("FI", ((x0 + x1) / 2 - 4) * dpr, (h - 4) * dpr);
+        }
+      }
+
+      // Fade Out envelope (triangle from top to bottom-right)
+      if (fadeOut > 0) {
+        const fadeStartPx = ((clip.startSec + clip.durationSec - fadeOut) / duration) * totalWidthPx - scrollLeft + mixerWidth;
+        const x0 = Math.max(mixerWidth, fadeStartPx);
+        const x1 = Math.min(w, clipEndPx);
+        if (x1 > x0) {
+          ctx.fillStyle = fadeColor.replace(")", " / 0.12)").replace("hsl(", "hsl(");
+          ctx.beginPath();
+          ctx.moveTo(x0 * dpr, 0);
+          ctx.lineTo(x1 * dpr, 0);
+          ctx.lineTo(x1 * dpr, h * dpr);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = fadeColor.replace(")", " / 0.7)").replace("hsl(", "hsl(");
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([3, 2]);
+          ctx.beginPath();
+          ctx.moveTo(x0 * dpr, 0);
+          ctx.lineTo(x1 * dpr, h * dpr);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = fadeColor.replace(")", " / 0.6)").replace("hsl(", "hsl(");
+          ctx.font = `${9 * dpr}px monospace`;
+          ctx.fillText("FO", ((x0 + x1) / 2 - 4) * dpr, 12 * dpr);
+        }
+      }
+    }
+
     // Playhead
     const playheadPx = (positionSec / duration) * totalWidthPx - scrollLeft + mixerWidth;
     if (playheadPx >= mixerWidth && playheadPx <= w) {
@@ -342,7 +410,7 @@ export function WaveformEditor({
       ctx.stroke();
     }
     ctx.restore();
-  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, duration, positionSec, mixerWidth]);
+  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, duration, positionSec, mixerWidth, trackClips]);
 
   // Redraw on RAF when playing
   const rafRef = useRef<number>(0);
