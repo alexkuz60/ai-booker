@@ -28,7 +28,9 @@ interface WaveformEditorProps {
   onFadeIn?: (trackId: string, durationSec: number) => void;
   onFadeOut?: (trackId: string, durationSec: number) => void;
   onUndo?: () => void;
+  onRedo?: () => void;
   canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 // ── Selection state ──────────────────────────────────────────
