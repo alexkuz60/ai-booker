@@ -782,7 +782,7 @@ class EngineTrack {
     this._phoneNoise?.stop(); this._phoneNoise?.dispose();
     this._phoneHum?.stop(); this._phoneHum?.dispose();
     this._phoneFilter?.dispose();
-    this._phoneBitCrusher?.dispose();
+    this._phoneCrusher?.dispose();
     this._phoneDistortion?.dispose();
     this._phoneComp?.dispose();
     this._phoneNoiseFilter?.dispose();
