@@ -307,14 +307,19 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
           <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${MIXER_SIDEBAR}px` }}>
             <div className="h-6 border-b border-border" />
             {stemTracks.map((track) => (
-              <TrackMixerStrip
+              <div
                 key={track.id}
-                trackId={track.id}
-                label={track.label}
-                color={track.color}
-                expanded={false}
-                onMixChange={onMixChange}
-              />
+                className={`cursor-pointer transition-colors ${selectedTrackId === track.id ? "ring-1 ring-primary/50 bg-primary/5" : ""}`}
+                onClick={() => setSelectedTrackId(selectedTrackId === track.id ? null : track.id)}
+              >
+                <TrackMixerStrip
+                  trackId={track.id}
+                  label={track.label}
+                  color={track.color}
+                  expanded={false}
+                  onMixChange={onMixChange}
+                />
+              </div>
             ))}
           </div>
 
