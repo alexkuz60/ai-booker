@@ -1264,6 +1264,16 @@ class AudioEngine {
   setTrackLimiterThreshold(trackId: string, v: number): void { this.tracks.get(trackId)?.setLimiterThreshold(v); }
   setTrackLimiterBypassed(trackId: string, b: boolean): void { this.tracks.get(trackId)?.setLimiterBypassed(b); }
 
+  // ─── Per-track Panner3D (POST) ─────────────────────────
+  setTrackPanner3dBypassed(trackId: string, b: boolean): void { this.tracks.get(trackId)?.setPanner3dBypassed(b); }
+  setTrackPanner3dPosition(trackId: string, x: number, y: number, z: number): void { this.tracks.get(trackId)?.setPanner3dPosition(x, y, z); }
+  setTrackPanner3dParams(trackId: string, p: { distanceModel?: DistanceModelType; refDistance?: number; maxDistance?: number; rolloffFactor?: number; coneInnerAngle?: number; coneOuterAngle?: number; coneOuterGain?: number }): void { this.tracks.get(trackId)?.setPanner3dParams(p); }
+
+  // ─── Per-track Convolver (POST) ────────────────────────
+  setTrackConvolverBypassed(trackId: string, b: boolean): void { this.tracks.get(trackId)?.setConvolverBypassed(b); }
+  setTrackConvolverDryWet(trackId: string, w: number): void { this.tracks.get(trackId)?.setConvolverDryWet(w); }
+  async loadTrackConvolverIR(trackId: string, url: string): Promise<void> { await this.tracks.get(trackId)?.loadConvolverIR(url); }
+
   setTrackFadeIn(trackId: string, sec: number): void {
     this.tracks.get(trackId)?.setFadeIn(sec);
   }
