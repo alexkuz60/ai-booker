@@ -470,9 +470,9 @@ export function MasterEffectsTabs({ isRu }: MasterEffectsTabsProps) {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 min-h-0 overflow-auto relative">
+      <div className="flex-1 min-h-0 relative overflow-hidden">
         {/* Keep SpectrumAnalyzer always mounted so FFT loop stays active */}
-        <div className={activeTab === "spectrum" ? "absolute inset-0" : "absolute inset-0 invisible pointer-events-none"}>
+        <div className={activeTab === "spectrum" ? "w-full h-full" : "w-0 h-0 overflow-hidden absolute"}>
           <SpectrumAnalyzer />
         </div>
         {activeTab === "eq" && (
