@@ -254,6 +254,7 @@ class EngineTrack {
     this.preFxNode = new Tone.Compressor({
       threshold: this._compThreshold,
       ratio: this._compRatio,
+      knee: this._compKnee,
       attack: this._compAttack,
       release: this._compRelease,
     });
