@@ -79,7 +79,7 @@ PDF File
 | Audio Engine | Tone.js + Web Audio API (OfflineAudioContext, Convolver, Panner3D, EQ, Compressor, Limiter, FFT) |
 | PDF Processing | pdfjs-dist (browser-side) |
 | AI Analysis | Lovable AI Gateway (Gemini, GPT-5), ProxyAPI, OpenRouter |
-| TTS | Yandex SpeechKit (v1/v3), ElevenLabs, ProxyAPI/OpenAI TTS |
+| TTS | Yandex SpeechKit (v1/v3), SaluteSpeech (Sber), ElevenLabs, ProxyAPI/OpenAI TTS |
 | Sound Design | ElevenLabs (SFX, Music), Freesound.org |
 | Backend | Lovable Cloud (PostgreSQL + Storage + Edge Functions) |
 | Auth | Email + password, Row-Level Security on all tables |

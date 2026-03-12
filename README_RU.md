@@ -79,7 +79,7 @@ PDF-файл
 | Аудио-движок | Tone.js + Web Audio API (OfflineAudioContext, Convolver, Panner3D, EQ, Compressor, Limiter, FFT) |
 | PDF-обработка | pdfjs-dist (браузерная) |
 | AI-анализ | Lovable AI Gateway (Gemini, GPT-5), ProxyAPI, OpenRouter |
-| TTS | Yandex SpeechKit (v1/v3), ElevenLabs, ProxyAPI/OpenAI TTS |
+| TTS | Yandex SpeechKit (v1/v3), SaluteSpeech (Sber), ElevenLabs, ProxyAPI/OpenAI TTS |
 | Саунд-дизайн | ElevenLabs (SFX, Music), Freesound.org |
 | Бэкенд | Lovable Cloud (PostgreSQL + Storage + Edge Functions) |
 | Авторизация | Email + пароль, RLS-политики на все таблицы |
