@@ -36,8 +36,38 @@ interface MontageTimelineProps {
 }
 
 export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chapterId, isRu, onSplitAtScene, hasParts }: MontageTimelineProps) {
-  // ── Trim overrides: per-clip { offsetSec, newDurationSec } ──
+  // ── Trim & Fade overrides ──────────────────────────────────
   const [trimOverrides, setTrimOverrides] = useState<Map<string, { offsetSec: number; newDurationSec: number }>>(new Map());
+  const [fadeOverrides, setFadeOverrides] = useState<Map<string, { fadeInSec: number; fadeOutSec: number }>>(new Map());
+
+  // ── Undo stack (snapshots of both overrides) ───────────────
+  type UndoSnapshot = {
+    trimOverrides: Map<string, { offsetSec: number; newDurationSec: number }>;
+    fadeOverrides: Map<string, { fadeInSec: number; fadeOutSec: number }>;
+  };
+  const [undoStack, setUndoStack] = useState<UndoSnapshot[]>([]);
+  const trimRef = useRef(trimOverrides);
+  trimRef.current = trimOverrides;
+  const fadeRef = useRef(fadeOverrides);
+  fadeRef.current = fadeOverrides;
+
+  const pushUndo = useCallback(() => {
+    setUndoStack(prev => [...prev.slice(-19), {
+      trimOverrides: new Map(trimRef.current),
+      fadeOverrides: new Map(fadeRef.current),
+    }]);
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    setUndoStack(prev => {
+      if (prev.length === 0) return prev;
+      const snapshot = prev[prev.length - 1];
+      setTrimOverrides(snapshot.trimOverrides);
+      setFadeOverrides(snapshot.fadeOverrides);
+      toast.success(isRu ? "Отменено" : "Undone");
+      return prev.slice(0, -1);
+    });
+  }, [isRu]);
 
   const trimmedClips = useMemo(() => {
     if (trimOverrides.size === 0) return clips;
@@ -52,7 +82,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     }).filter(c => c.durationSec > 0.01);
   }, [clips, trimOverrides]);
 
-
   const stemTracks = useMemo(() => getStemTracks(isRu), [isRu]);
   const trackIds = useMemo(() => stemTracks.map(t => t.id), [stemTracks]);
   const { scheduleSave: onMixChange } = useMixerPersistence(chapterId, trackIds);
@@ -65,6 +94,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
 
   // ── Trim handler ────────────────────────────────────────────
   const handleTrim = useCallback((trackId: string, selStart: number, selEnd: number) => {
+    pushUndo();
     const trackClips = trimmedClips.filter(c => c.trackId === trackId);
     if (trackClips.length === 0) return;
 
@@ -108,10 +138,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
           : `Trimmed ${trimCount} clip(s) on track`,
       );
     }
-  }, [trimmedClips, clips, trimOverrides, isRu]);
-
-  // ── Fade overrides: per-clip { fadeInSec, fadeOutSec } ──────
-  const [fadeOverrides, setFadeOverrides] = useState<Map<string, { fadeInSec: number; fadeOutSec: number }>>(new Map());
+  }, [trimmedClips, clips, trimOverrides, pushUndo, isRu]);
 
   // Apply fade overrides to trimmedClips
   const fadedClips = useMemo(() => {
@@ -127,6 +154,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
   const duration = player.totalDuration > 0 ? player.totalDuration : totalDurationSec;
 
   const handleFadeIn = useCallback((trackId: string, fadeDurationSec: number) => {
+    pushUndo();
     const affected = fadedClips.filter(c => c.trackId === trackId);
     if (affected.length === 0) return;
     const newOverrides = new Map(fadeOverrides);
@@ -147,6 +175,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
   }, [fadedClips, fadeOverrides, isRu]);
 
   const handleFadeOut = useCallback((trackId: string, fadeDurationSec: number) => {
+    pushUndo();
     const affected = fadedClips.filter(c => c.trackId === trackId);
     if (affected.length === 0) return;
     const newOverrides = new Map(fadeOverrides);
@@ -517,6 +546,8 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             onTrim={handleTrim}
             onFadeIn={handleFadeIn}
             onFadeOut={handleFadeOut}
+            onUndo={handleUndo}
+            canUndo={undoStack.length > 0}
           />
         </div>
       )}

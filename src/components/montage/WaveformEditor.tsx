@@ -5,7 +5,7 @@
  */
 
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import { Loader2, Scissors, ArrowUpRight, ArrowDownRight, Maximize, AudioWaveform } from "lucide-react";
+import { Loader2, Scissors, ArrowUpRight, ArrowDownRight, Maximize, AudioWaveform, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { chooseLod, type MultiLodPeaks, type StereoPeaks } from "@/lib/waveformPeaks";
 import { useWaveformPeaks, type WaveformStatus } from "@/hooks/useWaveformPeaks";
@@ -27,6 +27,8 @@ interface WaveformEditorProps {
   onTrim?: (trackId: string, startSec: number, endSec: number) => void;
   onFadeIn?: (trackId: string, durationSec: number) => void;
   onFadeOut?: (trackId: string, durationSec: number) => void;
+  onUndo?: () => void;
+  canUndo?: boolean;
 }
 
 // ── Selection state ──────────────────────────────────────────
@@ -156,6 +158,8 @@ export function WaveformEditor({
   onTrim,
   onFadeIn,
   onFadeOut,
+  onUndo,
+  canUndo,
 }: WaveformEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -580,6 +584,17 @@ export function WaveformEditor({
             title={isRu ? "Нормализация" : "Normalize"}
           >
             <Maximize className="h-3 w-3" />
+          </Button>
+          <div className="w-px h-3 bg-border/50 mx-0.5" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 px-1.5 text-[10px] gap-0.5"
+            disabled={!canUndo}
+            title={isRu ? "Отменить (Undo)" : "Undo"}
+            onClick={onUndo}
+          >
+            <Undo2 className="h-3 w-3" />
           </Button>
         </div>
       </div>
