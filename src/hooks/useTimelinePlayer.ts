@@ -145,12 +145,15 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
 
   const play = useCallback(async () => {
     try {
+      if (volume === 0) {
+        toast.warning("Громкость мастера = 0. Увеличьте ползунок справа от Play.");
+      }
       await engine.play();
     } catch (err) {
       console.error("[useTimelinePlayer] play failed:", err);
       toast.error("Не удалось воспроизвести аудио. Проверьте настройки браузера.");
     }
-  }, [engine]);
+  }, [engine, volume]);
 
   const pause = useCallback(() => {
     engine.pause();
