@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { clearStemCache } from "@/lib/stemCache";
@@ -27,6 +27,14 @@ export interface StemTrack {
   id: string;
   label: string;
   color: string;
+}
+
+export interface MontagePart {
+  id: string;
+  chapter_id: string;
+  part_number: number;
+  scene_ids: string[];
+  user_id: string;
 }
 
 export const STEM_TRACKS: StemTrack[] = [
@@ -67,9 +75,13 @@ export function useMontageData() {
   const [loading, setLoading] = useState(true);
   const [sceneRenders, setSceneRenders] = useState<SceneRender[]>([]);
 
+  // ── Parts state ──
+  const [parts, setParts] = useState<MontagePart[]>([]);
+  const [activePartIdx, setActivePartIdx] = useState(0);
+
   const prevChapterIdRef = useRef<string | null>(null);
 
-  // ── Resolve context: sessionStorage (from Studio) → localStorage (last used) ──
+  // ── Resolve context ──
   useEffect(() => {
     const studioBookId = sessionStorage.getItem("montage_book_id");
     const studioChapterId = sessionStorage.getItem("montage_chapter_id");
@@ -137,6 +149,20 @@ export function useMontageData() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sceneIds.join(",")]);
 
+  // ── Load montage parts ──
+  useEffect(() => {
+    if (!chapterId) { setParts([]); setActivePartIdx(0); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("montage_parts")
+        .select("*")
+        .eq("chapter_id", chapterId)
+        .order("part_number");
+      setParts((data ?? []) as MontagePart[]);
+      setActivePartIdx(0);
+    })();
+  }, [chapterId]);
+
   // Renders map
   const rendersMap = useMemo(() => {
     const m = new Map<string, SceneRender>();
@@ -147,13 +173,21 @@ export function useMontageData() {
   const renderedSceneIds = useMemo(() => sceneIds.filter(id => rendersMap.has(id)), [sceneIds, rendersMap]);
   const unrenderedSceneIds = useMemo(() => sceneIds.filter(id => !rendersMap.has(id)), [sceneIds, rendersMap]);
 
-  // Build timeline clips from rendered stems
+  // ── Active scene IDs (filtered by part if parts exist) ──
+  const activeSceneIds = useMemo(() => {
+    if (parts.length === 0) return sceneIds; // no parts = show all
+    const part = parts[activePartIdx];
+    if (!part) return sceneIds;
+    return part.scene_ids;
+  }, [parts, activePartIdx, sceneIds]);
+
+  // Build timeline clips from rendered stems (using active scene IDs)
   const { clips, sceneBoundaries, totalDurationSec } = useMemo(() => {
     const clips: TimelineClip[] = [];
     const boundaries: SceneBoundary[] = [];
     let offset = 0;
 
-    for (const sceneId of sceneIds) {
+    for (const sceneId of activeSceneIds) {
       const render = rendersMap.get(sceneId);
       if (!render) continue;
 
@@ -196,7 +230,84 @@ export function useMontageData() {
     }
 
     return { clips, sceneBoundaries: boundaries, totalDurationSec: offset };
-  }, [sceneIds, rendersMap, scenes]);
+  }, [activeSceneIds, rendersMap, scenes]);
+
+  // ── Split chapter at transport position ──
+  const splitAtScene = useCallback(async (splitAfterSceneId: string) => {
+    if (!chapterId || !user) return;
+
+    const splitIdx = sceneIds.indexOf(splitAfterSceneId);
+    if (splitIdx < 0 || splitIdx >= sceneIds.length - 1) return; // can't split at last scene
+
+    const beforeIds = sceneIds.slice(0, splitIdx + 1);
+    const afterIds = sceneIds.slice(splitIdx + 1);
+
+    if (parts.length === 0) {
+      // First split: create 2 parts
+      const { data } = await supabase
+        .from("montage_parts")
+        .upsert([
+          { chapter_id: chapterId, part_number: 1, scene_ids: beforeIds, user_id: user.id },
+          { chapter_id: chapterId, part_number: 2, scene_ids: afterIds, user_id: user.id },
+        ], { onConflict: "chapter_id,part_number" })
+        .select();
+      setParts((data ?? []) as MontagePart[]);
+    } else {
+      // Find which existing part contains the split scene, split it
+      const partIdx = parts.findIndex(p => p.scene_ids.includes(splitAfterSceneId));
+      if (partIdx < 0) return;
+
+      const part = parts[partIdx];
+      const sceneIdxInPart = part.scene_ids.indexOf(splitAfterSceneId);
+      if (sceneIdxInPart < 0 || sceneIdxInPart >= part.scene_ids.length - 1) return;
+
+      const keepIds = part.scene_ids.slice(0, sceneIdxInPart + 1);
+      const newPartIds = part.scene_ids.slice(sceneIdxInPart + 1);
+
+      // Update current part, shift all subsequent parts, insert new
+      const newParts = [...parts];
+      newParts[partIdx] = { ...part, scene_ids: keepIds };
+
+      // Insert new part after current
+      const insertedPart: MontagePart = {
+        id: crypto.randomUUID(),
+        chapter_id: chapterId,
+        part_number: partIdx + 2,
+        scene_ids: newPartIds,
+        user_id: user.id,
+      };
+
+      // Shift subsequent parts
+      for (let i = partIdx + 1; i < newParts.length; i++) {
+        newParts[i] = { ...newParts[i], part_number: newParts[i].part_number + 1 };
+      }
+      newParts.splice(partIdx + 1, 0, insertedPart);
+
+      // Re-number and save all
+      const upsertData = newParts.map((p, i) => ({
+        chapter_id: chapterId,
+        part_number: i + 1,
+        scene_ids: p.scene_ids,
+        user_id: user.id,
+      }));
+
+      // Delete all existing parts for this chapter, then insert fresh
+      await supabase.from("montage_parts").delete().eq("chapter_id", chapterId);
+      const { data } = await supabase
+        .from("montage_parts")
+        .insert(upsertData)
+        .select();
+      setParts((data ?? []) as MontagePart[]);
+    }
+  }, [chapterId, user, sceneIds, parts]);
+
+  // ── Remove all parts (merge back) ──
+  const removeParts = useCallback(async () => {
+    if (!chapterId) return;
+    await supabase.from("montage_parts").delete().eq("chapter_id", chapterId);
+    setParts([]);
+    setActivePartIdx(0);
+  }, [chapterId]);
 
   return {
     bookId, bookTitle,
@@ -204,5 +315,9 @@ export function useMontageData() {
     scenes, sceneIds, loading,
     renderedSceneIds, unrenderedSceneIds,
     clips, sceneBoundaries, totalDurationSec,
+    // Parts
+    parts, activePartIdx, setActivePartIdx,
+    splitAtScene, removeParts,
+    activeSceneIds,
   };
 }
