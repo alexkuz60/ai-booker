@@ -353,6 +353,54 @@ export function SpectrumAnalyzer() {
         if (m.bin < usableBins) ctx.fillText(m.label, m.bin * barWidth, h - 2);
       });
 
+      // ─── RMS / Peak overlay (top-right) ───────────────────
+      const meter = getAudioEngine().getMasterMeter();
+      const fmtDb = (db: number) => db <= -96 ? "-∞" : `${db >= 0 ? "+" : ""}${db.toFixed(1)}`;
+      // Compute RMS from FFT bins (approximate power sum)
+      let powerSum = 0;
+      for (let i = 0; i < usableBins; i++) {
+        const lin = Math.pow(10, fftData[i] / 20);
+        powerSum += lin * lin;
+      }
+      const rmsDb = usableBins > 0 ? 10 * Math.log10(powerSum / usableBins) : -Infinity;
+      const rmsStr = fmtDb(rmsDb);
+
+      const peakL = meter.peakL;
+      const peakR = meter.peakR;
+      const peakMax = Math.max(peakL, peakR);
+      const isClip = peakMax >= 0;
+
+      // Background pill
+      const pillW = 130;
+      const pillH = 28;
+      const px = w - pillW - 4;
+      const py = 4;
+      ctx.fillStyle = "hsla(0, 0%, 0%, 0.65)";
+      ctx.beginPath();
+      ctx.roundRect(px, py, pillW, pillH, 4);
+      ctx.fill();
+
+      ctx.font = "bold 9px monospace";
+      ctx.textAlign = "left";
+      const col1 = px + 4;
+      const col2 = px + 68;
+
+      // RMS row
+      ctx.fillStyle = "hsla(140, 60%, 60%, 0.9)";
+      ctx.fillText("RMS", col1, py + 11);
+      ctx.fillStyle = "hsla(0, 0%, 100%, 0.85)";
+      ctx.fillText(rmsStr + " dB", col1 + 26, py + 11);
+
+      // Peak row
+      ctx.fillStyle = isClip ? "hsl(0, 90%, 60%)" : "hsla(50, 80%, 60%, 0.9)";
+      ctx.fillText("PK", col1, py + 23);
+      ctx.fillStyle = "hsla(0, 0%, 100%, 0.7)";
+      ctx.font = "9px monospace";
+      const pkLStr = fmtDb(peakL);
+      const pkRStr = fmtDb(peakR);
+      ctx.fillText(`L${pkLStr}`, col1 + 18, py + 23);
+      ctx.fillText(`R${pkRStr}`, col2, py + 23);
+
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
