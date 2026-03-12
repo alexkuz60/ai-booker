@@ -287,6 +287,22 @@ class EngineTrack {
     // POST: Limiter (bypassed — set threshold to 0 when bypassed)
     this.limiterNode = new Tone.Limiter(0);
 
+    // POST: Panner3D (bypassed by default — at origin = transparent)
+    this.panner3dNode = new Tone.Panner3D({
+      positionX: 0, positionY: 0, positionZ: 0,
+      distanceModel: "inverse",
+      refDistance: 1,
+      maxDistance: 10000,
+      rolloffFactor: 1,
+      coneInnerAngle: 360,
+      coneOuterAngle: 360,
+      coneOuterGain: 0,
+    });
+
+    // POST: Convolver (bypassed — wet=0)
+    this.convolverNode = new Tone.Convolver();
+    this.convolverNode.wet.value = 0;
+
     // Reverb: small room, bypassed
     this.reverbNode = new Tone.Reverb({
       decay: 1.5,
