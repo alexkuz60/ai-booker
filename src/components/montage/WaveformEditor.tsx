@@ -182,19 +182,22 @@ export function WaveformEditor({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Background
-    ctx.fillStyle = "hsl(220 15% 6%)";
+  // Background
+    ctx.fillStyle = "hsl(var(--muted))";
     ctx.fillRect(0, 0, w * dpr, h * dpr);
 
+    // Cyan waveform color from design system
+    const waveColor = "hsl(var(--cyan-glow))";
+
     // Draw L channel
-    drawChannel(ctx, currentPeaks, 0, 0, w, CHANNEL_HEIGHT, trackColor, scrollLeft, totalWidthPx, selection, duration, "L");
+    drawChannel(ctx, currentPeaks, 0, 0, w, CHANNEL_HEIGHT, waveColor, scrollLeft, totalWidthPx, selection, duration, "L");
 
     // Gap line
     ctx.fillStyle = "hsl(var(--border) / 0.5)";
     ctx.fillRect(0, CHANNEL_HEIGHT * dpr, w * dpr, CHANNEL_GAP * dpr);
 
     // Draw R channel
-    drawChannel(ctx, currentPeaks, 0, CHANNEL_HEIGHT + CHANNEL_GAP, w, CHANNEL_HEIGHT, trackColor, scrollLeft, totalWidthPx, selection, duration, "R");
+    drawChannel(ctx, currentPeaks, 0, CHANNEL_HEIGHT + CHANNEL_GAP, w, CHANNEL_HEIGHT, waveColor, scrollLeft, totalWidthPx, selection, duration, "R");
 
     // Playhead
     const playheadPx = (positionSec / duration) * totalWidthPx - scrollLeft;
