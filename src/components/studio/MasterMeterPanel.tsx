@@ -223,7 +223,7 @@ export function SpectrumAnalyzer() {
   modeRef.current = mode;
   const smoothingRef = useRef(smoothing);
   smoothingRef.current = smoothing;
-  const rmsHoldRef = useRef(-Infinity);
+  const rmsHoldRef = useRef(DB_MIN);
   const rmsHoldTimeRef = useRef(0);
 
   useEffect(() => {
@@ -267,7 +267,7 @@ export function SpectrumAnalyzer() {
       if (!rawData || rawData.length === 0) { raf = requestAnimationFrame(draw); return; }
       const usableBins = Math.max(1, Math.floor(rawData.length * 0.9));
       const barWidth = w / usableBins;
-      const dbMin = -80;
+      const dbMin = DB_MIN;
       const dbMax = 0;
       const dbRange = dbMax - dbMin;
 
@@ -367,14 +367,17 @@ export function SpectrumAnalyzer() {
 
       // ─── RMS / Peak overlay (top-right) ───────────────────
       const meter = getAudioEngine().getMasterMeter();
-      const fmtDb = (db: number) => db <= -96 ? "-∞" : `${db >= 0 ? "+" : ""}${db.toFixed(1)}`;
+      const fmtDb = (db: number) => {
+        const safe = Number.isFinite(db) ? Math.max(DB_MIN, db) : DB_MIN;
+        return `${safe >= 0 ? "+" : ""}${safe.toFixed(1)}`;
+      };
       // Compute RMS from FFT bins (approximate power sum)
       let powerSum = 0;
       for (let i = 0; i < usableBins; i++) {
         const lin = Math.pow(10, fftData[i] / 20);
         powerSum += lin * lin;
       }
-      const rmsDb = usableBins > 0 ? 10 * Math.log10(powerSum / usableBins) : -Infinity;
+      const rmsDb = usableBins > 0 ? 10 * Math.log10(powerSum / usableBins) : DB_MIN;
       // Peak-hold behaviour: only update displayed RMS if new value is higher, else decay after 1.5s
       const now = performance.now();
       const RMS_HOLD_MS = 1500;
