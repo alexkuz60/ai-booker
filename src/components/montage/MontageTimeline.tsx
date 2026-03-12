@@ -502,7 +502,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
 
           {/* Waveform Editor — fills remaining space */}
           <WaveformEditor
-            clips={trimmedClips}
+            clips={fadedClips}
             trackId={selectedTrackId}
             trackLabel={stemTracks.find(t => t.id === selectedTrackId)?.label ?? ""}
             trackColor={stemTracks.find(t => t.id === selectedTrackId)?.color ?? "hsl(var(--primary))"}
@@ -515,6 +515,8 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             isRu={isRu}
             onSeek={player.seek}
             onTrim={handleTrim}
+            onFadeIn={handleFadeIn}
+            onFadeOut={handleFadeOut}
           />
         </div>
       )}
