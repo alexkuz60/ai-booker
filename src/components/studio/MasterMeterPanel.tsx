@@ -223,7 +223,7 @@ export function SpectrumAnalyzer() {
   modeRef.current = mode;
   const smoothingRef = useRef(smoothing);
   smoothingRef.current = smoothing;
-  const rmsHoldRef = useRef(-Infinity);
+  const rmsHoldRef = useRef(DB_MIN);
   const rmsHoldTimeRef = useRef(0);
 
   useEffect(() => {
