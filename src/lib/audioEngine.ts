@@ -379,6 +379,8 @@ class EngineTrack {
     this.applyEqBypass();
     this.applyPreFxBypass();
     this.applyLimiterBypass();
+    this.applyPanner3dBypass();
+    this.applyConvolverBypass();
     this.applyReverbBypass();
   }
 
