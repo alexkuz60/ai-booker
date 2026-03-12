@@ -88,24 +88,29 @@ export function Panner3DStage({ isRu, allClips, selectedClipId, config, disabled
     ctx.translate(half, half);
 
     // Head oval
-    ctx.fillStyle = "hsla(220, 25%, 45%, 0.7)";
+    ctx.fillStyle = "hsla(220, 25%, 40%, 0.35)";
     ctx.beginPath();
     ctx.ellipse(0, 0, hs * 1.1, hs * 1.3, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = "hsla(220, 20%, 50%, 0.4)";
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
 
     // Left ear
-    ctx.fillStyle = "hsla(220, 25%, 40%, 0.8)";
+    ctx.fillStyle = "hsla(220, 25%, 38%, 0.35)";
     ctx.beginPath();
     ctx.ellipse(-hs * 1.3, 0, hs * 0.25, hs * 0.55, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.stroke();
 
     // Right ear
     ctx.beginPath();
     ctx.ellipse(hs * 1.3, 0, hs * 0.25, hs * 0.55, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.stroke();
 
     // Nose (triangle pointing up = forward/+Z)
-    ctx.fillStyle = "hsla(220, 30%, 55%, 0.9)";
+    ctx.fillStyle = "hsla(220, 30%, 50%, 0.4)";
     ctx.beginPath();
     ctx.moveTo(0, -hs * 1.7);
     ctx.lineTo(-hs * 0.35, -hs * 1.15);
