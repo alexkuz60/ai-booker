@@ -96,6 +96,11 @@
 - [x] Freesound: поиск, прослушивание и сохранение SFX из Freesound.org
 - [x] Раскадровка: слияние и разбиение сегментов, настраиваемые паузы тишины
 - [x] AI Roles: централизованный реестр ролей (6 ролей), назначение моделей, UI в Профиле
+- [x] **Per-Clip плагины**: EQ, Compressor, Limiter, Panner3D, Convolver — индивидуальная цепочка на каждый клип
+- [x] **Свёрточная реверберация (Convolver)**: библиотека IR, waveform-визуализация, preview clip через IR (solo-режим)
+- [x] **Рендеринг сцены в стемы**: Voice/Atmo/SFX → WAV (OfflineAudioContext) с per-clip FX
+- [x] **Stem Cache**: Cache API для кэширования рендеренных стемов
+- [x] **IR Management**: пакетная загрузка/редактирование/прослушивание в профиле + backfill peaks в админке
 - [ ] Atmosphere Engine: batch-генерация атмосферы по главе
 - [ ] Atmosphere Engine: интеграция с таймлайном (клипы из scene_atmospheres на треках)
 - [ ] Интерактивный таймлайн (drag, snap)

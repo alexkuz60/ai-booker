@@ -76,7 +76,7 @@ PDF-файл
 | Слой | Технология |
 |------|------------|
 | Фронтенд | React, TypeScript, Vite, Tailwind CSS, shadcn/ui, Framer Motion |
-| Аудио-движок | Tone.js (Transport, Channel, EQ, Compressor, Limiter, Filter, MBC, Reverb, FFT) |
+| Аудио-движок | Tone.js + Web Audio API (OfflineAudioContext, Convolver, Panner3D, EQ, Compressor, Limiter, FFT) |
 | PDF-обработка | pdfjs-dist (браузерная) |
 | AI-анализ | Lovable AI Gateway (Gemini, GPT-5), ProxyAPI, OpenRouter |
 | TTS | Yandex SpeechKit (v1/v3), ElevenLabs, ProxyAPI/OpenAI TTS |

@@ -269,6 +269,70 @@ MasterBus → EQ3 → Compressor → Limiter → Filter1→…→Filter5 → MBC
 - Фаза 7: Gain reduction metering для компрессора/MBC
 - Фаза 8: Пресеты мастеринга
 
+---
+
+## Модуль 2.2: Per-Clip плагины (Channel Strip)
+
+**Статус:** ✅ Реализовано
+
+### Сигнальная цепочка
+```
+Source → EQ (3-band) → Compressor → Limiter → Panner3D → Convolver (IR) → Channel
+```
+
+### Плагины
+
+| Плагин | Описание | UI | Статус |
+|--------|----------|-----|--------|
+| **EQ** | 3-полосный эквалайзер (±12 dB) | Слайдеры + интерактивный график | ✅ |
+| **Compressor** | Динамическая обработка (Threshold/Ratio/Attack/Release/Knee) | Слайдеры + knee-график | ✅ |
+| **Limiter** | Ограничение пиков (Threshold/Release) | Слайдеры + limiter-график | ✅ |
+| **Panner3D** | Пространственная 3D-панорама | Интерактивная Canvas-сцена (X/Y/Z) | ✅ |
+| **Convolver** | Свёрточная реверберация (IR) | Waveform-визуализация + селектор IR + wet/dry | ✅ |
+
+### Архитектурные решения
+- **Персистентность:** таблица `clip_plugin_configs` (scene_id, clip_id, track_id, config: jsonb), debounce 400ms
+- **Хук:** `useClipPluginConfigs(sceneId)` — загрузка, сохранение, применение к движку
+- **UI:** `ChannelPluginsPanel` — табовый интерфейс с inline bypass на каждый плагин
+- **Defaults:** все плагины disabled по умолчанию; включение не влияет на другие клипы
+
+### Preview Clip через IR ✅
+- Кнопка Play на waveform импульса → движок солирует текущий трек → воспроизведение с применением полной FX-цепи
+- По завершении/остановке — автовосстановление оригинальных мьют-состояний
+
+---
+
+## Модуль 2.3: Рендеринг сцены в стемы
+
+**Статус:** ✅ Реализовано
+
+### Архитектура
+- `src/lib/sceneRenderer.ts` — оффлайн-рендеринг через `OfflineAudioContext`
+- 3 стема: Voice / Atmosphere / SFX → WAV (PCM 16-bit)
+- Per-clip эффекты применяются при рендере (EQ, Comp, Limiter, Panner3D, Convolver)
+- Параллельный рендер трёх контекстов
+- Результаты → `user-media/audio-ready/` + `scene_renders` таблица
+
+### Stem Cache ✅
+- `src/lib/stemCache.ts` — Cache API для кэширования загруженных стемов
+- Cache-first стратегия: кэш → fetch + store
+- Очистка при смене главы, удаление при ре-рендере
+
+---
+
+## Модуль 2.4: Управление импульсами (IR Management)
+
+**Статус:** ✅ Реализовано
+
+| Параметр | Реализация | Детали |
+|----------|------------|--------|
+| **Хранение** | Бакет `impulse-responses` + таблица `convolution_impulses` | Публичный read, CRUD — только автор |
+| **Метаданные** | name, category, description, duration_ms, sample_rate, channels, peaks | Вычисляются при загрузке |
+| **Категории** | 7: hall, room, plate, chamber, spring, outdoor, special | Ru/En локализация |
+| **Профиль: ImpulsesSection** | Пакетная загрузка, inline-редактирование, прослушивание, удаление | ✅ |
+| **Админка: ImpulseManager** | Загрузка, удаление, backfill peaks (массовый пересчёт waveform) | ✅ |
+| **Waveform peaks** | `computePeaks()` в `src/lib/irPeaks.ts` + Canvas-отрисовка | Для визуализации в ConvolverPanel |
+
 ### Рекомендации по улучшению промптов
 - **Визионер:** Добавить требование описывать user journey для каждого модуля
 - **Стратег:** Включить обязательные секции: Data Model, UI Flow, Error Handling, Provider Strategy

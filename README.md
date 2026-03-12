@@ -76,7 +76,7 @@ PDF File
 | Layer | Technology |
 |-------|------------|
 | Frontend | React, TypeScript, Vite, Tailwind CSS, shadcn/ui, Framer Motion |
-| Audio Engine | Tone.js (Transport, Channel, EQ, Compressor, Limiter, Filter, MBC, Reverb, FFT) |
+| Audio Engine | Tone.js + Web Audio API (OfflineAudioContext, Convolver, Panner3D, EQ, Compressor, Limiter, FFT) |
 | PDF Processing | pdfjs-dist (browser-side) |
 | AI Analysis | Lovable AI Gateway (Gemini, GPT-5), ProxyAPI, OpenRouter |
 | TTS | Yandex SpeechKit (v1/v3), ElevenLabs, ProxyAPI/OpenAI TTS |
