@@ -273,10 +273,15 @@ export function SpectrumAnalyzer() {
 
       const alpha = smoothingRef.current;
       if (!smoothRef.current || smoothRef.current.length !== rawData.length) {
-        smoothRef.current = new Float32Array(rawData);
+        smoothRef.current = new Float32Array(rawData.length);
+        for (let i = 0; i < rawData.length; i++) {
+          smoothRef.current[i] = Number.isFinite(rawData[i]) ? rawData[i] : dbMin;
+        }
       } else {
         for (let i = 0; i < rawData.length; i++) {
-          smoothRef.current[i] = alpha * smoothRef.current[i] + (1 - alpha) * rawData[i];
+          const raw = Number.isFinite(rawData[i]) ? rawData[i] : dbMin;
+          const prev = Number.isFinite(smoothRef.current[i]) ? smoothRef.current[i] : raw;
+          smoothRef.current[i] = alpha * prev + (1 - alpha) * raw;
         }
       }
       const fftData = smoothRef.current;
