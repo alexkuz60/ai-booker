@@ -437,12 +437,21 @@ class EngineTrack {
       this.scheduledId = Tone.getTransport().schedule((time) => {
         if (this.player.loaded) {
           this.player.fadeIn = this._fadeInSec;
+          // Start telephone noise/hum generators along with the player
+          if (this._telephone) {
+            this._phoneNoise?.start(time);
+            this._phoneHum?.start(time);
+          }
           // Don't limit voice clip duration — let audio play to its natural end.
           // The actual audio may be longer than the estimated durationSec.
           // Only apply duration limit for atmosphere/sfx clips that have explicit fades.
           const hasFadeOut = this._fadeOutSec > 0;
           if (hasFadeOut) {
             this.player.start(time, 0, this.durationSec);
+            if (this._telephone) {
+              this._phoneNoise?.stop(time + this.durationSec);
+              this._phoneHum?.stop(time + this.durationSec);
+            }
           } else {
             this.player.start(time, 0);
           }
