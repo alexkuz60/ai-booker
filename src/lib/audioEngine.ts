@@ -652,7 +652,9 @@ class AudioEngine {
     let dropped = 0;
 
     // Load large stem files sequentially to avoid decoder/network starvation.
-    for (const cfg of configs) {
+    for (let ci = 0; ci < configs.length; ci++) {
+      const cfg = configs[ci];
+      onProgress?.({ total: configs.length, done: ci, currentId: cfg.id, currentLabel: cfg.label ?? cfg.id });
       const bus = this.getBus(cfg.bus ?? "voice");
       const track = new EngineTrack(cfg, bus);
       this.tracks.set(cfg.id, track);
