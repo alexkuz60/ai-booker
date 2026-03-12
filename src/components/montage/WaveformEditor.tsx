@@ -121,10 +121,10 @@ function drawChannel(
     const sx = Math.max(0, selStartPx) * dpr;
     const sw = (Math.min(w, selEndPx) - Math.max(0, selStartPx)) * dpr;
     if (sw > 0) {
-      ctx.fillStyle = "hsl(var(--primary) / 0.15)";
+      ctx.fillStyle = resolveHsl("--primary").replace(")", " / 0.15)").replace("hsl(", "hsl(");
       ctx.fillRect(sx, y * dpr, sw, h * dpr);
       // Selection edges
-      ctx.strokeStyle = "hsl(var(--primary) / 0.6)";
+      ctx.strokeStyle = resolveHsl("--primary").replace(")", " / 0.6)").replace("hsl(", "hsl(");
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(sx, y * dpr);
