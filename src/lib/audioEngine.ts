@@ -243,7 +243,7 @@ class EngineTrack {
   // Telephone FX chain (inserted between player and eqNode when segmentType==='telephone')
   private _telephone = false;
   private _phoneFilter: Tone.Filter | null = null;
-  private _phoneBitCrusher: Tone.BitCrusher | null = null;
+  private _phoneCrusher: Tone.WaveShaper | null = null;
   private _phoneDistortion: Tone.Distortion | null = null;
   private _phoneComp: Tone.Compressor | null = null;
   private _phoneNoise: Tone.Noise | null = null;
