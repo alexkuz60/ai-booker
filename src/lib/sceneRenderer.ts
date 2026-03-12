@@ -8,6 +8,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 import { getAudioEngine } from "./audioEngine";
+import type { ClipPluginConfig, SceneClipConfigs } from "@/hooks/useClipPluginConfigs";
+import { DEFAULT_CLIP_PLUGIN_CONFIG } from "@/hooks/useClipPluginConfigs";
 
 export interface RenderProgress {
   phase: "loading" | "rendering" | "encoding" | "uploading" | "done" | "error";
