@@ -54,6 +54,8 @@ PDF File
 │  10a. Mixer                     │  Vol/Pan/Mute/Solo, Pre-FX, Reverb
 │  10b. Mastering                 │  EQ→CMP→LIM→FLT→MBC→REV
 │  10c. Metering                  │  Stereo VU L/R, FFT Spectrum
+│  10d. Per-Clip Plugins          │  EQ→CMP→LIM→PAN3D→CONV
+│  10e. Render to Stems           │  Voice/Atmo/SFX → WAV
 └─────────────┬───────────────────┘
               │
               ▼
