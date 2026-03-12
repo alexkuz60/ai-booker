@@ -241,6 +241,11 @@ export default function Admin() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Impulse Response Manager */}
+      <div className="mt-8">
+        <ImpulseManager isRu={isRu} />
+      </div>
     </motion.div>
   );
 }
