@@ -54,14 +54,12 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     .map((c) => `${c.id}:${c.audioPath}:${c.startSec}:${c.durationSec}:${c.loop ? "L" : ""}`)
     .join("|");
 
-  // When engine instance changes, invalidate loaded key to force reload
-  const needsReload = engineInstanceId !== loadedEngineIdRef.current;
+  const needsReload = reloadTrigger !== loadedReloadRef.current;
 
   useEffect(() => {
-    // Skip if same clips AND same engine instance
     if (clipsKey === loadedKeyRef.current && !needsReload) return;
     loadedKeyRef.current = clipsKey;
-    loadedEngineIdRef.current = engineInstanceId;
+    loadedReloadRef.current = reloadTrigger;
 
     if (audioClips.length === 0) {
       engine.loadTracks([]);
