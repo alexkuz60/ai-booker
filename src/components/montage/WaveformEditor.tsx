@@ -531,7 +531,7 @@ export function WaveformEditor({
       }
 
       if (fadeOut > 0) {
-        const fadeStartSec = Math.max(0, clip.startSec + clip.durationSec - fadeOut - signalWindow.startSec);
+        const fadeStartSec = Math.max(0, clip.startSec + clip.durationSec - fadeOut);
         const fadeStartPx = (Math.min(displayDurationSec, fadeStartSec) / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
         const x0 = Math.max(DB_ZONE_WIDTH, fadeStartPx);
         const x1 = Math.min(w, clipEndPx);
