@@ -11,7 +11,7 @@
  * NO normalisation is applied — the signal is captured as-is.
  */
 
-import { supabase } from "@/integrations/supabase/client";
+
 import { getAudioEngine } from "./audioEngine";
 import { fetchWithStemCache } from "./stemCache";
 import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
