@@ -52,8 +52,7 @@ const CHANNEL_GAP = 2;
 const DB_ZONE_WIDTH = 36;
 
 const EDITOR_ZOOM_PRESETS = [100, 200, 300, 400, 500] as const;
-const SIGNAL_ACTIVITY_FLOOR = 0.00035;
-const SIGNAL_ACTIVITY_RATIO = 0.015;
+const SIGNAL_ACTIVITY_THRESHOLD = 0.002;
 const SIGNAL_MIN_ACTIVE_BINS = 3;
 const SIGNAL_PAD_FRAC = 0.01;
 
@@ -308,16 +307,17 @@ export function WaveformEditor({
     const peakCount = signalDetectionPeaks.left.length;
     if (peakCount <= 1) return fallback;
 
-    let maxAbs = 0;
+    // Real non-silent end from computed peaks (not from DB clip duration metadata)
+    const NON_ZERO_EPSILON = 1e-5;
+    let lastNonZeroIdx = -1;
+
     for (let i = 0; i < peakCount; i++) {
       const v = Math.max(
         Math.abs(signalDetectionPeaks.left[i] ?? 0),
         Math.abs(signalDetectionPeaks.right[i] ?? 0),
       );
-      if (v > maxAbs) maxAbs = v;
+      if (v >= NON_ZERO_EPSILON) lastNonZeroIdx = i;
     }
-
-    const threshold = Math.max(SIGNAL_ACTIVITY_FLOOR, maxAbs * SIGNAL_ACTIVITY_RATIO);
 
     let startIdx = -1;
     let endIdx = -1;
@@ -330,7 +330,7 @@ export function WaveformEditor({
         Math.abs(signalDetectionPeaks.right[i] ?? 0),
       );
 
-      if (v >= threshold) {
+      if (v >= SIGNAL_ACTIVITY_THRESHOLD) {
         if (runStart < 0) runStart = i;
         runLen += 1;
       } else if (runStart >= 0) {
@@ -348,14 +348,18 @@ export function WaveformEditor({
       endIdx = peakCount - 1;
     }
 
-    if (startIdx < 0 || endIdx < startIdx) return fallback;
+    const baseEndIdx =
+      startIdx >= 0 && endIdx >= startIdx
+        ? endIdx
+        : lastNonZeroIdx;
+
+    if (baseEndIdx < 0) return fallback;
 
     const pad = Math.max(2, Math.floor(peakCount * SIGNAL_PAD_FRAC));
-    const paddedEndIdx = Math.min(peakCount - 1, endIdx + pad);
+    const paddedEndIdx = Math.min(peakCount - 1, baseEndIdx + pad);
     const rawEndFrac = (paddedEndIdx + 1) / peakCount;
 
-    const detectedEndSec = Math.min(sceneDuration, rawEndFrac * sceneDuration);
-    const endSec = Math.max(0.05, Math.min(sceneDuration, detectedEndSec));
+    const endSec = Math.max(0.05, Math.min(sceneDuration, rawEndFrac * sceneDuration));
 
     return {
       startFrac: 0,
