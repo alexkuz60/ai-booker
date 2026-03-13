@@ -1,13 +1,36 @@
 /**
  * Multi-LOD stereo waveform peak computation + Cache API storage.
  * 
- * LOD levels: 200 (overview), 800 (medium), 3200 (detail)
+ * LOD levels are computed dynamically per scene based on:
+ *   sceneDuration * sampleRate * maxZoom / displayWidth
  * Each LOD stores separate L/R channel peaks as Float32Array pairs.
  */
 
-const PEAK_CACHE_NAME = "booker-waveform-peaks-v1";
-const LOD_LEVELS = [200, 800, 3200] as const;
-export type LodLevel = typeof LOD_LEVELS[number];
+const PEAK_CACHE_NAME = "booker-waveform-peaks-v2";
+
+/** LodLevel is now a plain number — computed dynamically per scene. */
+export type LodLevel = number;
+
+const MAX_ZOOM = 5; // 500%
+const DEFAULT_DISPLAY_WIDTH = 1600;
+
+/**
+ * Compute dynamic LOD levels for a scene.
+ * Highest LOD = sceneDuration * 44100 * maxZoom / displayWidth
+ * Returns 3 levels: overview, medium, detail.
+ */
+export function computeLodLevels(
+  sceneDurationSec: number,
+  displayWidthPx: number = DEFAULT_DISPLAY_WIDTH,
+): LodLevel[] {
+  if (sceneDurationSec <= 0 || displayWidthPx <= 0) return [200, 800, 3200];
+  const maxPeaks = Math.ceil(sceneDurationSec * 44100 * MAX_ZOOM / displayWidthPx);
+  // 3 tiers: overview (~1/16), medium (~1/4), detail (full)
+  const detail = Math.max(3200, maxPeaks);
+  const medium = Math.max(800, Math.ceil(detail / 4));
+  const overview = Math.max(200, Math.ceil(detail / 16));
+  return [overview, medium, detail];
+}
 
 export interface StereoPeaks {
   left: Float32Array;
