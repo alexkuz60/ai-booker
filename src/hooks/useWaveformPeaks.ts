@@ -2,15 +2,19 @@
  * React hook for loading audio and computing/caching stereo waveform peaks
  * for a SCENE: decodes ALL clips, places their peaks at correct scene-local
  * positions, and merges into a single scene-wide MultiLodPeaks structure.
+ * 
+ * LOD levels are computed dynamically:
+ *   maxPeaks = sceneDuration * 44100 * maxZoom / displayWidth
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchWithStemCache } from "@/lib/stemCache";
 import {
   type MultiLodPeaks,
   type StereoPeaks,
   type LodLevel,
+  computeLodLevels,
   loadCachedPeaks,
   savePeaksToCache,
 } from "@/lib/waveformPeaks";
@@ -23,8 +27,6 @@ export interface WaveformPeaksState {
   peaks: MultiLodPeaks | null;
   error: string | null;
 }
-
-const LOD_LEVELS: readonly LodLevel[] = [200, 800, 3200];
 
 /**
  * Compute scene-wide multi-LOD peaks from decoded per-clip AudioBuffers.
