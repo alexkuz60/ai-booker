@@ -809,15 +809,6 @@ export function WaveformEditor({
           >
             <ArrowDownRight className="h-3 w-3" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-5 px-1.5 text-[10px] gap-0.5"
-            disabled={!selection || isPlaying}
-            title={isRu ? "Нормализация" : "Normalize"}
-          >
-            <Maximize className="h-3 w-3" />
-          </Button>
           <div className="w-px h-3 bg-border/50 mx-0.5" />
           <Button
             variant="ghost"
