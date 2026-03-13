@@ -13,6 +13,13 @@ import { chooseLod, type MultiLodPeaks, type StereoPeaks } from "@/lib/waveformP
 import { useWaveformPeaks, type WaveformStatus } from "@/hooks/useWaveformPeaks";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 
+/** Scene-local segment boundary (from scene_playlists) */
+export interface SegmentBoundary {
+  startSec: number;
+  durationSec: number;
+  label?: string;
+}
+
 interface WaveformEditorProps {
   /** Clips for the selected track WITHIN the current scene (scene-local startSec) */
   sceneClips: TimelineClip[];
@@ -29,6 +36,8 @@ interface WaveformEditorProps {
   isRu: boolean;
   /** Whether transport is currently playing — disables edit controls */
   isPlaying?: boolean;
+  /** Segment boundaries from scene_playlists (scene-local coords, relative to scene silence start) */
+  segmentBoundaries?: SegmentBoundary[];
   /** Seek callback — receives scene-relative seconds */
   onSeek: (sceneRelativeSec: number) => void;
   onTrim?: (trackId: string, startSec: number, endSec: number) => void;
@@ -181,6 +190,7 @@ export function WaveformEditor({
   mixerWidth,
   isRu,
   isPlaying = false,
+  segmentBoundaries,
   onSeek,
   onTrim,
   onFadeIn,
@@ -556,27 +566,25 @@ export function WaveformEditor({
       signalWindow.endFrac,
     );
 
-    // ── Draw clip boundaries (vertical separators) ────────────
-    if (sceneClips.length > 0) {
-      const clipBorderColor = resolveHsl("--muted-foreground");
+    // ── Draw segment boundaries from scene_playlists ────────────
+    const boundaries = segmentBoundaries ?? [];
+    if (boundaries.length > 1) {
+      const segBorderColor = resolveHsl("--muted-foreground");
       ctx.save();
-      for (const clip of sceneClips) {
-        const clipStartLocal = clip.startSec - signalWindow.startSec;
-        const clipEndLocal = clip.startSec + clip.durationSec - signalWindow.startSec;
+      for (let si = 1; si < boundaries.length; si++) {
+        const seg = boundaries[si];
+        const localSec = seg.startSec - signalWindow.startSec;
+        if (localSec <= 0.01 || localSec >= displayDurationSec - 0.01) continue;
+        const px = (localSec / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
+        if (px < DB_ZONE_WIDTH || px > w) continue;
 
-        for (const localSec of [clipStartLocal, clipEndLocal]) {
-          if (localSec <= 0.01 || localSec >= displayDurationSec - 0.01) continue;
-          const px = (localSec / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
-          if (px < DB_ZONE_WIDTH || px > w) continue;
-
-          ctx.strokeStyle = clipBorderColor.replace(")", " / 0.4)").replace("hsl(", "hsl(");
-          ctx.lineWidth = 1;
-          ctx.setLineDash([3, 4]);
-          ctx.beginPath();
-          ctx.moveTo(px * dpr, 0);
-          ctx.lineTo(px * dpr, h * dpr);
-          ctx.stroke();
-        }
+        ctx.strokeStyle = segBorderColor.replace(")", " / 0.35)").replace("hsl(", "hsl(");
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath();
+        ctx.moveTo(px * dpr, 0);
+        ctx.lineTo(px * dpr, h * dpr);
+        ctx.stroke();
       }
       ctx.setLineDash([]);
       ctx.restore();
@@ -662,7 +670,7 @@ export function WaveformEditor({
       ctx.stroke();
     }
     ctx.restore();
-  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, displayDurationSec, displayPositionSec, sceneClips, signalWindow.startSec, signalWindow.startFrac, signalWindow.endFrac]);
+  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, displayDurationSec, displayPositionSec, sceneClips, signalWindow.startSec, signalWindow.startFrac, signalWindow.endFrac, segmentBoundaries]);
 
   // ── Keyboard shortcuts (Ctrl+Z / Ctrl+Shift+Z) ─────────────
   useEffect(() => {

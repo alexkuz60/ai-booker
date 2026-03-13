@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
+import { supabase } from "@/integrations/supabase/client";
 
 import { getAudioEngine } from "@/lib/audioEngine";
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
@@ -12,7 +13,7 @@ import { TimelineMasterMeter } from "@/components/studio/TimelineMasterMeter";
 import { TimelineRuler } from "@/components/studio/TimelineRuler";
 import { Playhead } from "@/components/studio/TimelinePlayhead";
 import { TrackMixerStrip } from "@/components/studio/TrackMixerStrip";
-import { WaveformEditor } from "@/components/montage/WaveformEditor";
+import { WaveformEditor, type SegmentBoundary } from "@/components/montage/WaveformEditor";
 import { getStemTracks } from "@/hooks/useMontageData";
 import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 
@@ -364,6 +365,38 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     ? `${isRu ? "Сцена" : "Scene"} ${currentSceneIdx + 1}/${sceneBoundaries.length}`
     : "";
 
+  // ── Fetch segment boundaries from scene_playlists ───────────
+  const [segmentBoundaries, setSegmentBoundaries] = useState<SegmentBoundary[]>([]);
+  const currentSceneId = currentBoundary?.sceneId ?? null;
+  const silenceSec = currentBoundary?.silenceSec ?? 2;
+
+  useEffect(() => {
+    if (!currentSceneId) { setSegmentBoundaries([]); return; }
+    let cancelled = false;
+    supabase
+      .from("scene_playlists")
+      .select("segments")
+      .eq("scene_id", currentSceneId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        if (!data?.segments || !Array.isArray(data.segments)) {
+          setSegmentBoundaries([]);
+          return;
+        }
+        const segs = (data.segments as Array<Record<string, unknown>>)
+          .filter((s) => typeof s.start_ms === "number" && typeof s.duration_ms === "number")
+          .sort((a, b) => (a.start_ms as number) - (b.start_ms as number))
+          .map((s) => ({
+            startSec: (s.start_ms as number) / 1000,
+            durationSec: (s.duration_ms as number) / 1000,
+            label: (s.speaker as string) ?? undefined,
+          }));
+        setSegmentBoundaries(segs);
+      });
+    return () => { cancelled = true; };
+  }, [currentSceneId]);
+
   const handleSceneSeek = useCallback(
     (sceneRelativeSec: number) => {
       player.seek(sceneStartSec + sceneRelativeSec);
@@ -647,6 +680,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             mixerWidth={MIXER_SIDEBAR}
             isRu={isRu}
             isPlaying={player.state === "playing"}
+            segmentBoundaries={segmentBoundaries}
             onSeek={handleSceneSeek}
             onTrim={handleTrim}
             onFadeIn={handleFadeIn}
