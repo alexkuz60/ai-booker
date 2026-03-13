@@ -160,6 +160,21 @@ const Montage = () => {
           </div>
         </div>
       )}
+
+      {/* Render dialog */}
+      {user && (
+        <RenderDialog
+          open={renderDialogOpen}
+          onOpenChange={setRenderDialogOpen}
+          clips={clips}
+          totalDurationSec={totalDurationSec}
+          userId={user.id}
+          bookTitle={bookTitle}
+          chapterTitle={chapterTitle}
+          partNumber={activePartNumber}
+          isRu={isRu}
+        />
+      )}
     </motion.div>
   );
 };
