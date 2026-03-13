@@ -277,33 +277,25 @@ export function WaveformEditor({
     return Array.from(peaks.lods.keys()).sort((a, b) => a - b);
   }, [peaks]);
 
-  // Scene viewport window: always map the full scene to full editor width at 100% zoom
-  const signalWindow = useMemo(() => {
+  // Scene viewport contract: 100% zoom ALWAYS means full scene width (including silence).
+  const displayDurationSec = useMemo(() => {
     const fallbackDuration = sceneClips.reduce((maxEnd, clip) => Math.max(maxEnd, clip.startSec + clip.durationSec), 0.05);
-    const durationSec = Math.max(0.05, sceneDuration > 0 ? sceneDuration : fallbackDuration);
-
-    return {
-      startFrac: 0,
-      endFrac: 1,
-      startSec: 0,
-      durationSec,
-    };
+    return Math.max(0.05, sceneDuration > 0 ? sceneDuration : fallbackDuration);
   }, [sceneDuration, sceneClips]);
 
-  // Choose LOD based on visible area in the detected signal window
+  // Choose LOD based on visible area of the full scene window
   const visibleWidth = editorContainerWidth;
   const visibleDurationSec = visibleWidth > 0 && totalWidthPx > 0
-    ? (visibleWidth / totalWidthPx) * signalWindow.durationSec
-    : signalWindow.durationSec;
+    ? (visibleWidth / totalWidthPx) * displayDurationSec
+    : displayDurationSec;
   const lodLevel = useMemo(
-    () => chooseLod(visibleWidth, signalWindow.durationSec, visibleDurationSec, lodLevels),
-    [visibleWidth, signalWindow.durationSec, visibleDurationSec, lodLevels],
+    () => chooseLod(visibleWidth, displayDurationSec, visibleDurationSec, lodLevels),
+    [visibleWidth, displayDurationSec, visibleDurationSec, lodLevels],
   );
 
   const currentPeaks = peaks?.lods.get(lodLevel) ?? (peaks ? peaks.lods.values().next().value : null);
 
-  const displayDurationSec = signalWindow.durationSec;
-  const displayPositionSec = Math.max(0, Math.min(scenePositionSec - signalWindow.startSec, displayDurationSec));
+  const displayPositionSec = Math.max(0, Math.min(scenePositionSec - SCENE_VIEWPORT_START_SEC, displayDurationSec));
 
   // ── dB scale helpers ────────────────────────────────────────
   const DB_MARKS = [0, -6, -12, -18, -30, -60];
