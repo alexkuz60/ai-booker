@@ -778,17 +778,6 @@ export function WaveformEditor({
           )}
           {status === "loading" && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
           {error && <span className="text-[10px] text-destructive">{error}</span>}
-          {/* Debug: LOD info + scene timing */}
-          {currentPeaks && (
-            <span className="text-[10px] text-muted-foreground/60 font-mono ml-1">
-              LOD:{lodLevel.toLocaleString()}|{currentPeaks.left.length.toLocaleString()}pk
-            </span>
-          )}
-          {debugSceneStartSec != null && debugSceneEndSec != null && (
-            <span className="text-[10px] text-muted-foreground/40 font-mono ml-1" title="sceneStart..sceneEnd (sceneDur)">
-              [{formatTimePrecise(debugSceneStartSec)}→{formatTimePrecise(debugSceneEndSec)} Δ{displayDurationSec.toFixed(1)}s]
-            </span>
-          )}
         </div>
 
         <div className="flex items-center gap-1">
