@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
 import { useLanguage } from "@/hooks/useLanguage";
+import { usePageHeader } from "@/hooks/usePageHeader";
 import { t } from "@/pages/parser/i18n";
 import { NAV_WIDTH_KEY, NAV_STATE_KEY } from "@/pages/parser/types";
 import type { Scene, ChapterStatus } from "@/pages/parser/types";
@@ -25,9 +26,16 @@ import ChapterDetailPanel from "@/components/parser/ChapterDetailPanel";
 export default function Parser() {
   const { user } = useAuth();
   const { isRu } = useLanguage();
+  const { setPageHeader } = usePageHeader();
 
   const { value: selectedModel, update: setSelectedModel } = useCloudSettings('parser-model', DEFAULT_MODEL_ID);
   const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
+  const [navRestoredFromStorage] = useState<boolean>(() => {
+    try {
+      const saved = sessionStorage.getItem(NAV_STATE_KEY);
+      return !!saved;
+    } catch { return false; }
+  });
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(() => {
     try {
       const saved = sessionStorage.getItem(NAV_STATE_KEY);
@@ -72,6 +80,52 @@ export default function Parser() {
     partGroups, partlessIndices,
   } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName, bookId: bookId ?? undefined });
 
+  // ── Reset handler (must be above headerRight useMemo) ──
+  const handleReset = () => {
+    bookReset();
+    setSelectedIndices(new Set());
+    setLastClickedIdx(null);
+    setExpandedNodes(new Set());
+    resetAnalysis();
+    sessionStorage.removeItem(NAV_STATE_KEY);
+  };
+
+  // ── Page header (unified with AppLayout) ──
+  const headerRight = useMemo(() => {
+    if (step === "workspace") {
+      return (
+        <div className="flex items-center gap-3">
+          <ModelSelector value={selectedModel} onChange={setSelectedModel} isRu={isRu} userApiKeys={userApiKeys} />
+          <div className="text-xs text-muted-foreground font-body">
+            {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} · {totalScenes} {t("scenes", isRu)}
+          </div>
+          <Button variant="outline" size="sm" onClick={handleReset} className="gap-1.5">
+            <ArrowLeft className="h-3 w-3" />
+            {t("libraryBack", isRu)}
+          </Button>
+        </div>
+      );
+    }
+    if (step === "upload") {
+      return (
+        <Button variant="ghost" size="sm" onClick={() => setStep("library")} className="gap-1.5">
+          <ArrowLeft className="h-3 w-3" />
+          {t("libraryBack", isRu)}
+        </Button>
+      );
+    }
+    return undefined;
+  }, [step, selectedModel, setSelectedModel, isRu, userApiKeys, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep]);
+
+  useEffect(() => {
+    const title = t("parserTitle", isRu);
+    const subtitle = step === "workspace" && fileName
+      ? fileName.replace('.pdf', '')
+      : t("parserSubtitle", isRu);
+    setPageHeader({ title, subtitle, headerRight });
+    return () => setPageHeader({});
+  }, [isRu, step, fileName, headerRight, setPageHeader]);
+
   // Persist nav state to sessionStorage
   useEffect(() => {
     try {
@@ -82,15 +136,6 @@ export default function Parser() {
       }));
     } catch {}
   }, [selectedIndices, lastClickedIdx, expandedNodes]);
-
-  const handleReset = () => {
-    bookReset();
-    setSelectedIndices(new Set());
-    setLastClickedIdx(null);
-    setExpandedNodes(new Set());
-    resetAnalysis();
-    sessionStorage.removeItem(NAV_STATE_KEY);
-  };
 
   const handleOpenPdf = (page?: number) => {
     const suffix = page ? `#page=${page}` : '';
@@ -262,6 +307,8 @@ export default function Parser() {
   };
 
   useEffect(() => {
+    // Skip auto-expand if nav state was restored from sessionStorage
+    if (navRestoredFromStorage) return;
     if (tocEntries.length > 0 && expandedNodes.size === 0) {
       const allKeys = new Set<string>();
       tocEntries.forEach((e, idx) => {
@@ -276,7 +323,7 @@ export default function Parser() {
       });
       setExpandedNodes(allKeys);
     }
-  }, [tocEntries]);
+  }, [tocEntries, navRestoredFromStorage]);
 
   useEffect(() => {
     if (!user) return;
@@ -288,31 +335,6 @@ export default function Parser() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col h-full">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-foreground">{t("parserTitle", isRu)}</h1>
-          <p className="text-sm text-muted-foreground font-body">{t("parserSubtitle", isRu)}</p>
-        </div>
-        {step === "workspace" && (
-          <div className="flex items-center gap-3">
-            <ModelSelector value={selectedModel} onChange={setSelectedModel} isRu={isRu} userApiKeys={userApiKeys} />
-            <div className="text-xs text-muted-foreground">
-              {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} • {totalScenes} {t("scenes", isRu)}
-            </div>
-            <Button variant="outline" size="sm" onClick={handleReset} className="gap-1.5">
-              <ArrowLeft className="h-3 w-3" />
-              {t("libraryBack", isRu)}
-            </Button>
-          </div>
-        )}
-        {step === "upload" && (
-          <Button variant="ghost" size="sm" onClick={() => setStep("library")} className="gap-1.5">
-            <ArrowLeft className="h-3 w-3" />
-            {t("libraryBack", isRu)}
-          </Button>
-        )}
-      </div>
-
       <div className="flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
           {step === "library" && (
