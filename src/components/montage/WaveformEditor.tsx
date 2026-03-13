@@ -515,24 +515,32 @@ export function WaveformEditor({
 
     // ── Draw segment boundaries from scene_playlists ────────────
     const boundaries = segmentBoundaries ?? [];
-    console.log("[WaveformSegments]", { count: boundaries.length, boundaries: boundaries.slice(0, 5).map(b => `${b.startSec.toFixed(2)}s`) });
-    if (boundaries.length > 1) {
-      const segBorderColor = resolveHsl("--muted-foreground");
+    if (boundaries.length > 0) {
+      const segColor = "hsl(50 100% 55%)"; // bright yellow
       ctx.save();
-      for (let si = 1; si < boundaries.length; si++) {
+      for (let si = 0; si < boundaries.length; si++) {
         const seg = boundaries[si];
         const localSec = seg.startSec;
-        if (localSec <= 0.01 || localSec >= displayDurationSec - 0.01) continue;
+        // Skip boundaries at the very start/end of scene
+        if (si > 0 && (localSec <= 0.01 || localSec >= displayDurationSec - 0.01)) continue;
         const px = (localSec / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
         if (px < DB_ZONE_WIDTH || px > w) continue;
 
-        ctx.strokeStyle = segBorderColor.replace(")", " / 0.35)").replace("hsl(", "hsl(");
+        // Dashed yellow line
+        ctx.strokeStyle = segColor.replace(")", " / 0.6)").replace("hsl(", "hsl(");
         ctx.lineWidth = 1;
         ctx.setLineDash([3, 4]);
         ctx.beginPath();
         ctx.moveTo(px * dpr, 0);
         ctx.lineTo(px * dpr, h * dpr);
         ctx.stroke();
+
+        // Number label on every boundary (1-based segment number)
+        const segNum = si + 1;
+        ctx.setLineDash([]);
+        ctx.fillStyle = segColor;
+        ctx.font = `bold ${9 * dpr}px monospace`;
+        ctx.fillText(`${segNum}`, (px + 2) * dpr, 10 * dpr);
       }
       ctx.setLineDash([]);
       ctx.restore();
