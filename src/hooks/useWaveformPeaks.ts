@@ -39,7 +39,7 @@ function computeScenePeaks(
 ): MultiLodPeaks {
   if (sceneDuration <= 0) {
     const empty = new Map<LodLevel, StereoPeaks>();
-    for (const lod of LOD_LEVELS) {
+    for (const lod of lodLevels) {
       empty.set(lod, {
         left: new Float32Array(lod),
         right: new Float32Array(lod),
