@@ -631,20 +631,6 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
           ))}
         </div>
 
-        {/* Action buttons */}
-        <div className="flex flex-col gap-1.5 mt-auto pt-2 border-t border-border/30">
-          <Button
-            variant="hero"
-            size="sm"
-            className="h-7 text-[10px] gap-1.5 font-mono uppercase w-full justify-start"
-            disabled={renderDisabled}
-            onClick={onRender}
-            title={isRu ? "Рендер финального файла главы/части" : "Render final chapter/part file"}
-          >
-            <FileAudio className="h-3 w-3 shrink-0" />
-            {isRu ? "Рендер" : "Render"}
-          </Button>
-        </div>
       </div>
     </div>
   );
