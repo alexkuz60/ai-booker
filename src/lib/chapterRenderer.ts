@@ -372,9 +372,11 @@ export async function renderChapter(opts: {
       const source = offlineCtx.createBufferSource();
       source.buffer = buffer;
 
-      // Apply per-track volume & pan from live engine
+      // Per-track volume & pan: use persisted mixer settings if available,
+      // otherwise unity gain (stems are pre-rendered at full volume)
       const mixState = engine.getTrackMixState(clip.id);
-      const volume = mixState?.volume ?? 80;
+      // If engine track exists and has meaningful volume, use it; otherwise default to 100 (unity)
+      const volume = (mixState && mixState.volume > 0) ? mixState.volume : 100;
       const pan = mixState?.pan ?? 0;
 
       const gainDb = volume <= 0 ? -Infinity : 20 * Math.log10(volume / 100);
