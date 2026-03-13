@@ -129,7 +129,6 @@ const Montage = () => {
                   renderDisabled={clips.length === 0}
                 />
               </div>
-              </div>
               <div className="flex-1 min-h-0 p-2">
                 <MasterEffectsTabs isRu={isRu} />
               </div>
