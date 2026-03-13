@@ -1,12 +1,14 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Loader2, AlertCircle } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
+import { useAuth } from "@/hooks/useAuth";
 import { useMontageData } from "@/hooks/useMontageData";
 import { MasterMeterPanel } from "@/components/studio/MasterMeterPanel";
 import { MasterEffectsTabs } from "@/components/studio/MasterEffectsTabs";
 import { MontageTimeline } from "@/components/montage/MontageTimeline";
+import { RenderDialog } from "@/components/montage/RenderDialog";
 import { Button } from "@/components/ui/button";
 
 const SIDEBAR_WIDTH = 280;
