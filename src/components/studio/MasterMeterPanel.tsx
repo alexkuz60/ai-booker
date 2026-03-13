@@ -659,7 +659,7 @@ export function SpectrumAnalyzer() {
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [staticData]);
+  }, [staticData, cursorBin]);
 
   return (
     <div className="flex flex-col gap-1 h-full">
