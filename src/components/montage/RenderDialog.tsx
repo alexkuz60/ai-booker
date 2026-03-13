@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileAudio, Download, Loader2, CheckCircle, AlertCircle } from "lucide-react";
-import { renderChapter, type ChapterRenderProgress } from "@/lib/chapterRenderer";
+import { renderChapter, type ChapterRenderProgress, type ExportFormat, type WavBitDepth, type Mp3Bitrate } from "@/lib/chapterRenderer";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 
 interface RenderDialogProps {
@@ -58,7 +59,7 @@ const PHASE_LABELS = {
   loading: { en: "Loading stems…", ru: "Загрузка стемов…" },
   rendering: { en: "Rendering…", ru: "Рендеринг…" },
   normalizing: { en: "Normalizing to −0.5 dB…", ru: "Нормализация до −0.5 дБ…" },
-  encoding: { en: "Encoding WAV…", ru: "Кодирование WAV…" },
+  encoding: { en: "Encoding…", ru: "Кодирование…" },
   done: { en: "Done!", ru: "Готово!" },
   error: { en: "Error", ru: "Ошибка" },
 };
@@ -76,13 +77,21 @@ export function RenderDialog({
 
   const [fileName, setFileName] = useState(defaultName);
   const [normalize, setNormalize] = useState(true);
+  const [format, setFormat] = useState<ExportFormat>("wav");
+  const [wavBitDepth, setWavBitDepth] = useState<WavBitDepth>(16);
+  const [mp3Bitrate, setMp3Bitrate] = useState<Mp3Bitrate>(192);
   const [rendering, setRendering] = useState(false);
   const [progress, setProgress] = useState<ChapterRenderProgress | null>(null);
-  const [result, setResult] = useState<{ fileSizeBytes: number } | null>(null);
+  const [result, setResult] = useState<{ fileSizeBytes: number; format: ExportFormat } | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const abortRef = useRef(false);
 
-  const safeName = sanitizeFileName(fileName.trim() || defaultName) + ".wav";
+  const fileExt = format === "mp3" ? ".mp3" : ".wav";
+  const safeName = sanitizeFileName(fileName.trim() || defaultName) + fileExt;
+
+  const formatInfo = format === "wav"
+    ? `WAV ${wavBitDepth}-bit / 44100 Hz / Stereo`
+    : `MP3 ${mp3Bitrate} kbps / 44100 Hz / Stereo`;
 
   const handleRender = useCallback(async () => {
     if (!userId || clips.length === 0) return;
@@ -97,18 +106,21 @@ export function RenderDialog({
         clips,
         totalDurationSec,
         normalize,
+        format,
+        wavBitDepth,
+        mp3Bitrate,
         onProgress: (p) => { if (!abortRef.current) setProgress(p); },
       });
 
       const url = URL.createObjectURL(res.blob);
       setBlobUrl(url);
-      setResult({ fileSizeBytes: res.fileSizeBytes });
+      setResult({ fileSizeBytes: res.fileSizeBytes, format: res.format });
     } catch (e: any) {
       console.error("[RenderDialog] Render failed:", e);
     } finally {
       setRendering(false);
     }
-  }, [userId, clips, totalDurationSec, blobUrl]);
+  }, [userId, clips, totalDurationSec, normalize, format, wavBitDepth, mp3Bitrate, blobUrl]);
 
   const handleClose = useCallback(() => {
     if (rendering) return;
@@ -141,12 +153,13 @@ export function RenderDialog({
           {/* Info */}
           <div className="text-xs text-muted-foreground font-body space-y-0.5">
             <p>{bookTitle} → {chapterTitle}{partNumber ? ` (${isRu ? "Часть" : "Part"} ${partNumber})` : ""}</p>
-            <p>{isRu ? "Длительность" : "Duration"}: {formatDuration(totalDurationSec)} · WAV 16-bit / 44100 Hz / Stereo</p>
+            <p>{isRu ? "Длительность" : "Duration"}: {formatDuration(totalDurationSec)} · {formatInfo}</p>
           </div>
 
-          {/* File name input */}
+          {/* Settings */}
           {!rendering && !isDone && (
             <div className="space-y-3">
+              {/* File name */}
               <div className="space-y-1.5">
                 <Label className="text-xs font-body">
                   {isRu ? "Имя файла" : "File name"}
@@ -158,9 +171,66 @@ export function RenderDialog({
                     className="h-8 text-xs font-mono flex-1"
                     placeholder={defaultName}
                   />
-                  <span className="text-xs text-muted-foreground font-mono">.wav</span>
+                  <span className="text-xs text-muted-foreground font-mono">{fileExt}</span>
                 </div>
               </div>
+
+              {/* Format & quality row */}
+              <div className="flex items-end gap-2">
+                <div className="space-y-1.5 flex-1">
+                  <Label className="text-xs font-body">
+                    {isRu ? "Формат" : "Format"}
+                  </Label>
+                  <Select value={format} onValueChange={(v) => setFormat(v as ExportFormat)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="wav">WAV</SelectItem>
+                      <SelectItem value="mp3">MP3</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {format === "wav" && (
+                  <div className="space-y-1.5 flex-1">
+                    <Label className="text-xs font-body">
+                      {isRu ? "Битность" : "Bit depth"}
+                    </Label>
+                    <Select value={String(wavBitDepth)} onValueChange={(v) => setWavBitDepth(Number(v) as WavBitDepth)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="16">16-bit PCM</SelectItem>
+                        <SelectItem value="24">24-bit PCM</SelectItem>
+                        <SelectItem value="32">32-bit Float</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {format === "mp3" && (
+                  <div className="space-y-1.5 flex-1">
+                    <Label className="text-xs font-body">
+                      {isRu ? "Битрейт" : "Bitrate"}
+                    </Label>
+                    <Select value={String(mp3Bitrate)} onValueChange={(v) => setMp3Bitrate(Number(v) as Mp3Bitrate)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="128">128 kbps</SelectItem>
+                        <SelectItem value="192">192 kbps</SelectItem>
+                        <SelectItem value="256">256 kbps</SelectItem>
+                        <SelectItem value="320">320 kbps</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              {/* Normalize checkbox */}
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="normalize"

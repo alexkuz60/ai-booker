@@ -523,17 +523,24 @@ export async function renderChapter(opts: {
       onProgress?.({ phase: "normalizing", percent: 80 });
     }
 
-    // ── Phase 4: Encode WAV ──
+    // ── Phase 4: Encode ──
     onProgress?.({ phase: "encoding", percent: 82 });
-    const wavBlob = encodeWav(renderedBuffer);
-    onProgress?.({ phase: "encoding", percent: 95 });
 
+    let blob: Blob;
+    if (format === "mp3") {
+      blob = await encodeMp3(renderedBuffer, mp3Bitrate);
+    } else {
+      blob = encodeWav(renderedBuffer, wavBitDepth);
+    }
+
+    onProgress?.({ phase: "encoding", percent: 95 });
     onProgress?.({ phase: "done", percent: 100 });
 
     return {
-      blob: wavBlob,
+      blob,
       durationSec: totalDurationSec,
-      fileSizeBytes: wavBlob.size,
+      fileSizeBytes: blob.size,
+      format,
     };
   } catch (e: any) {
     onProgress?.({ phase: "error", percent: 0, error: e.message ?? String(e) });
