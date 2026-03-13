@@ -22,6 +22,7 @@ function formatTime(s: number) {
 const Montage = () => {
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
+  const { user } = useAuth();
 
   const {
     bookTitle, chapterId, chapterTitle,
