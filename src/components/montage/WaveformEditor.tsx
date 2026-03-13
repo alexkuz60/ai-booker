@@ -46,6 +46,8 @@ interface Selection {
 
 const CHANNEL_HEIGHT = 96;
 const CHANNEL_GAP = 2;
+/** Narrow dB-label zone inside the editor (independent of the timeline mixer sidebar) */
+const DB_ZONE_WIDTH = 36;
 
 const EDITOR_ZOOM_PRESETS = [100, 200, 300, 400, 500] as const;
 
