@@ -26,6 +26,7 @@ import ChapterDetailPanel from "@/components/parser/ChapterDetailPanel";
 export default function Parser() {
   const { user } = useAuth();
   const { isRu } = useLanguage();
+  const { setPageHeader } = usePageHeader();
 
   const { value: selectedModel, update: setSelectedModel } = useCloudSettings('parser-model', DEFAULT_MODEL_ID);
   const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
