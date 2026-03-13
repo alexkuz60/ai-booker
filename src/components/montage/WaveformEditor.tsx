@@ -352,7 +352,7 @@ export function WaveformEditor({
 
         if (db !== 0) {
           ctx.beginPath();
-          ctx.moveTo(mixerWidth * dpr, yDown * dpr);
+          ctx.moveTo(DB_ZONE_WIDTH * dpr, yDown * dpr);
           ctx.lineTo(w * dpr, yDown * dpr);
           ctx.stroke();
         }
