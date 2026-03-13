@@ -335,31 +335,6 @@ export default function Parser() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col h-full">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-foreground">{t("parserTitle", isRu)}</h1>
-          <p className="text-sm text-muted-foreground font-body">{t("parserSubtitle", isRu)}</p>
-        </div>
-        {step === "workspace" && (
-          <div className="flex items-center gap-3">
-            <ModelSelector value={selectedModel} onChange={setSelectedModel} isRu={isRu} userApiKeys={userApiKeys} />
-            <div className="text-xs text-muted-foreground">
-              {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} • {totalScenes} {t("scenes", isRu)}
-            </div>
-            <Button variant="outline" size="sm" onClick={handleReset} className="gap-1.5">
-              <ArrowLeft className="h-3 w-3" />
-              {t("libraryBack", isRu)}
-            </Button>
-          </div>
-        )}
-        {step === "upload" && (
-          <Button variant="ghost" size="sm" onClick={() => setStep("library")} className="gap-1.5">
-            <ArrowLeft className="h-3 w-3" />
-            {t("libraryBack", isRu)}
-          </Button>
-        )}
-      </div>
-
       <div className="flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
           {step === "library" && (
