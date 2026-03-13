@@ -445,7 +445,7 @@ export function WaveformEditor({
 
     // Gap line
     ctx.fillStyle = borderColor.replace(")", " / 0.5)").replace("hsl(", "hsl(");
-    ctx.fillRect(mixerWidth * dpr, chH * dpr, waveW * dpr, CHANNEL_GAP * dpr);
+    ctx.fillRect(DB_ZONE_WIDTH * dpr, chH * dpr, waveW * dpr, CHANNEL_GAP * dpr);
 
     // Draw R channel
     drawChannel(
