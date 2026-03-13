@@ -80,6 +80,16 @@ export default function Parser() {
     partGroups, partlessIndices,
   } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName, bookId: bookId ?? undefined });
 
+  // ── Reset handler (must be above headerRight useMemo) ──
+  const handleReset = () => {
+    bookReset();
+    setSelectedIndices(new Set());
+    setLastClickedIdx(null);
+    setExpandedNodes(new Set());
+    resetAnalysis();
+    sessionStorage.removeItem(NAV_STATE_KEY);
+  };
+
   // ── Page header (unified with AppLayout) ──
   const headerRight = useMemo(() => {
     if (step === "workspace") {
@@ -115,26 +125,6 @@ export default function Parser() {
     setPageHeader({ title, subtitle, headerRight });
     return () => setPageHeader({});
   }, [isRu, step, fileName, headerRight, setPageHeader]);
-
-  // Persist nav state to sessionStorage
-  useEffect(() => {
-    try {
-      sessionStorage.setItem(NAV_STATE_KEY, JSON.stringify({
-        selected: Array.from(selectedIndices),
-        lastClicked: lastClickedIdx,
-        expanded: Array.from(expandedNodes),
-      }));
-    } catch {}
-  }, [selectedIndices, lastClickedIdx, expandedNodes]);
-
-  const handleReset = () => {
-    bookReset();
-    setSelectedIndices(new Set());
-    setLastClickedIdx(null);
-    setExpandedNodes(new Set());
-    resetAnalysis();
-    sessionStorage.removeItem(NAV_STATE_KEY);
-  };
 
   const handleOpenPdf = (page?: number) => {
     const suffix = page ? `#page=${page}` : '';
