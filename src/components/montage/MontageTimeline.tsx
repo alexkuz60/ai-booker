@@ -345,27 +345,11 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
 
   /**
    * Waveform viewport contract:
-   * - 100% zoom = активный stem заполняет всю ширину редактора
-   * - начало viewport всегда в начале сцены (включая стартовую тишину)
-   * - конец viewport привязан к окончанию активного stem (fallback: конец сцены)
+   * - 100% zoom = полная длительность АКТИВНОЙ сцены на всю ширину редактора
+   * - длительность = (конец активной сцены - старт активной сцены), включая стартовую тишину
+   * - никогда не использовать длительность всей главы
    */
-  const waveformViewportEndSec = useMemo(() => {
-    if (!currentBoundary) return sceneEndSec;
-    if (!selectedTrackId) return sceneEndSec;
-
-    const selectedSceneClips = fadedClips.filter(
-      (c) => c.sceneId === currentBoundary.sceneId && c.trackId === selectedTrackId,
-    );
-
-    if (selectedSceneClips.length === 0) return sceneEndSec;
-
-    return selectedSceneClips.reduce(
-      (maxEnd, clip) => Math.max(maxEnd, Math.min(sceneEndSec, clip.startSec + clip.durationSec)),
-      sceneStartSec,
-    );
-  }, [currentBoundary, selectedTrackId, fadedClips, sceneEndSec, sceneStartSec]);
-
-  const waveformSceneDuration = Math.max(0.05, waveformViewportEndSec - sceneStartSec);
+  const waveformSceneDuration = Math.max(0.05, sceneEndSec - sceneStartSec);
   const waveformScenePositionSec = Math.max(
     0,
     Math.min(player.positionSec - sceneStartSec, waveformSceneDuration),
@@ -380,11 +364,11 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
         ...c,
         startSec: Math.max(0, c.startSec - sceneStartSec),
         durationSec:
-          Math.min(c.startSec + c.durationSec, waveformViewportEndSec) -
+          Math.min(c.startSec + c.durationSec, sceneEndSec) -
           Math.max(c.startSec, sceneStartSec),
       }))
       .filter((c) => c.durationSec > 0.001);
-  }, [fadedClips, selectedTrackId, currentBoundary, sceneStartSec, waveformViewportEndSec]);
+  }, [fadedClips, selectedTrackId, currentBoundary, sceneStartSec, sceneEndSec]);
 
   const waveformSceneLabel = currentBoundary
     ? `${isRu ? "Сцена" : "Scene"} ${currentSceneIdx + 1}/${sceneBoundaries.length}`

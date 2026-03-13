@@ -342,6 +342,6 @@ Source → EQ (3-band) → Compressor → Limiter → Panner3D → Convolver (IR
 ---
 
 ## Montage Waveform Contract (анти-регресс)
-- `WaveformEditor`: на **100% zoom** волна активного stem всегда заполняет **всю ширину вьюпорта редактора**.
-- Начало viewport фиксировано в начале сцены (с учётом стартовой тишины), конец viewport — по завершению активного stem (fallback: конец сцены).
-- Координаты волны, playhead, trim/fade и сегментных разделителей считаются в **едином scene-local viewport** (`0..sceneViewportDuration`) без авто-сжатия по «active signal span».
+- `WaveformEditor`: на **100% zoom** полная ширина viewport всегда равна **длительности активной сцены + стартовой паузы**.
+- Источник длительности viewport: только границы активной сцены (`sceneStart..sceneEnd`), **никогда не длительность всей главы**.
+- Координаты волны, playhead, trim/fade и сегментных разделителей считаются в **едином scene-local времени** (`0..sceneDuration`) без авто-сжатия по «active signal span».
