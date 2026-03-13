@@ -177,6 +177,7 @@ export function WaveformEditor({
   sceneLabel,
   mixerWidth,
   isRu,
+  isPlaying = false,
   onSeek,
   onTrim,
   onFadeIn,
