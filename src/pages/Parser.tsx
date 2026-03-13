@@ -28,6 +28,12 @@ export default function Parser() {
 
   const { value: selectedModel, update: setSelectedModel } = useCloudSettings('parser-model', DEFAULT_MODEL_ID);
   const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
+  const [navRestoredFromStorage] = useState<boolean>(() => {
+    try {
+      const saved = sessionStorage.getItem(NAV_STATE_KEY);
+      return !!saved;
+    } catch { return false; }
+  });
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(() => {
     try {
       const saved = sessionStorage.getItem(NAV_STATE_KEY);
