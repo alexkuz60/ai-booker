@@ -52,6 +52,8 @@ const CHANNEL_GAP = 2;
 const DB_ZONE_WIDTH = 36;
 
 const EDITOR_ZOOM_PRESETS = [100, 200, 300, 400, 500] as const;
+const SIGNAL_ACTIVITY_THRESHOLD = 0.002;
+const SIGNAL_PAD_FRAC = 0.01;
 
 /** Resolve a CSS custom property to a usable hsl() string for Canvas */
 function resolveHsl(varName: string): string {
