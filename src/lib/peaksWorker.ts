@@ -92,9 +92,9 @@ function computeInWorker(data: PeaksWorkerInput): PeaksWorkerOutput {
 self.onmessage = (e: MessageEvent<PeaksWorkerInput>) => {
   const result = computeInWorker(e.data);
   // Transfer all Float32Array buffers back for zero-copy
-  const transferables: ArrayBuffer[] = [];
+  const transferables: Transferable[] = [];
   for (const lod of result.lods) {
-    transferables.push(lod.left.buffer, lod.right.buffer);
+    transferables.push(lod.left.buffer as ArrayBuffer, lod.right.buffer as ArrayBuffer);
   }
   (self as unknown as Worker).postMessage(result, transferables);
 };
