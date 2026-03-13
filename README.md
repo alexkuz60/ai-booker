@@ -23,10 +23,10 @@ AI-Booker is a web application for automated audiobook production in a **radio p
 | 🔌 **Per-Clip Plugins** | Individual EQ, Compressor, Limiter, 3D Panner, Convolver (IR) per clip |
 | 🏛️ **Convolution Reverb** | IR library (7 categories), waveform preview, real-time clip audition through IR |
 | 🎞️ **Offline Render** | Scene → 3 WAV stems (Voice/Atmo/SFX) with per-clip FX via OfflineAudioContext |
-| 🔊 **Pro Mastering** | 5-band parametric filter, 3-band multiband compressor, stereo VU metering, FFT spectrum |
+| 🔊 **Pro Mastering** | 5-band parametric filter, 3-band multiband compressor, stereo VU metering, FFT spectrum with click-to-analyze (frequency + note/octave detection) |
 | 🤖 **AI Roles** | 6 specialized AI roles (Screenwriter, Profiler, Director, etc.) with dedicated models |
 | 💬 **AI Assistant** | Context-aware chat assistant that guides through the production workflow |
-| 🎬 **Montage Workspace** | Final chapter assembly: 3-stem timeline (Voice/Atmo/SFX), per-clip Trim/Fade with Undo/Redo, chapter splitting for performance, stereo waveform editor, full mastering chain |
+| 🎬 **Montage Workspace** | Final chapter assembly: 3-stem timeline (Voice/Atmo/SFX), per-clip Trim/Fade with Undo/Redo, chapter splitting, stereo waveform editor with click-cursor frequency analysis, full mastering chain |
 
 ---
 
