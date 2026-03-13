@@ -176,37 +176,40 @@ export function WaveformEditor({
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<number>(0);
 
-  // ── Editor-local zoom (100% = scene fits) ─────────────────
+  // ── Editor-local zoom (100% = scene fits entire width) ─────
   const [editorZoomPercent, setEditorZoomPercent] = useState(100);
   const [editorContainerWidth, setEditorContainerWidth] = useState(0);
 
-  // Measure available width
+  // Measure available waveform width (excluding mixer sidebar)
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const measure = () => setEditorContainerWidth(el.clientWidth - mixerWidth);
+    const measure = () => {
+      const w = el.clientWidth - mixerWidth;
+      setEditorContainerWidth(w > 0 ? w : 0);
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
   }, [mixerWidth]);
 
-  // Fit zoom: makes scene fill the available width
-  const fitZoom = useMemo(() => {
-    if (editorContainerWidth <= 0 || sceneDuration <= 0) return 1;
-    return editorContainerWidth / (sceneDuration * 4);
-  }, [editorContainerWidth, sceneDuration]);
+  // At 100% zoom: totalWidthPx === editorContainerWidth (scene fills editor exactly).
+  // At N%: totalWidthPx = editorContainerWidth * N / 100.
+  const totalWidthPx = editorContainerWidth > 0
+    ? editorContainerWidth * editorZoomPercent / 100
+    : 100;
 
-  const editorZoom = editorZoomPercent === 100 ? fitZoom : (fitZoom * editorZoomPercent) / 100;
-  const totalWidthPx = sceneDuration * editorZoom * 4;
-
-  // Reset zoom when scene changes
+  // Reset zoom + scroll when scene changes
   const prevSceneLabelRef = useRef(sceneLabel);
   useEffect(() => {
     if (sceneLabel !== prevSceneLabelRef.current) {
       prevSceneLabelRef.current = sceneLabel;
       setEditorZoomPercent(100);
       setSelection(null);
+      setScrollLeft(0);
+      const el = editorScrollRef.current;
+      if (el) el.scrollLeft = 0;
     }
   }, [sceneLabel]);
 
@@ -240,10 +243,10 @@ export function WaveformEditor({
     if (editorZoomPercent <= 100 || userScrollingRef.current) return;
     const el = editorScrollRef.current;
     if (!el) return;
-    const playheadPx = scenePositionSec * editorZoom * 4;
+    const playheadPx = (scenePositionSec / sceneDuration) * totalWidthPx;
     const target = Math.max(0, playheadPx - el.clientWidth / 2);
     el.scrollLeft = target;
-  }, [scenePositionSec, editorZoom, editorZoomPercent]);
+  }, [scenePositionSec, sceneDuration, totalWidthPx, editorZoomPercent]);
 
   // Peaks for scene clips on selected track
   const { status, peaks, error } = useWaveformPeaks(sceneClips, trackId, sceneDuration, editorContainerWidth || 1600);
