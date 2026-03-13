@@ -69,14 +69,18 @@ function computeChannelPeaks(data: Float32Array, peakCount: number): Float32Arra
 
 /**
  * Compute multi-LOD stereo peaks from an AudioBuffer.
+ * Uses default LOD levels; for scene-specific LODs use computeScenePeaks in the hook.
  */
-export function computeMultiLodPeaks(buffer: AudioBuffer): MultiLodPeaks {
+export function computeMultiLodPeaks(
+  buffer: AudioBuffer,
+  lodLevels: LodLevel[] = [200, 800, 3200],
+): MultiLodPeaks {
   const left = buffer.getChannelData(0);
   const right = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : left;
 
   const lods = new Map<LodLevel, StereoPeaks>();
 
-  for (const level of LOD_LEVELS) {
+  for (const level of lodLevels) {
     lods.set(level, {
       left: computeChannelPeaks(left, level),
       right: computeChannelPeaks(right, level),
