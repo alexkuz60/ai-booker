@@ -38,6 +38,10 @@ interface WaveformEditorProps {
   isPlaying?: boolean;
   /** Segment boundaries from scene_playlists (scene-local coords, relative to scene silence start) */
   segmentBoundaries?: SegmentBoundary[];
+  /** Absolute scene start in chapter timeline (for dev indicator) */
+  debugSceneStartSec?: number;
+  /** Absolute scene end in chapter timeline (for dev indicator) */
+  debugSceneEndSec?: number;
   /** Seek callback — receives scene-relative seconds */
   onSeek: (sceneRelativeSec: number) => void;
   onTrim?: (trackId: string, startSec: number, endSec: number) => void;
@@ -180,6 +184,8 @@ export function WaveformEditor({
   isRu,
   isPlaying = false,
   segmentBoundaries,
+  debugSceneStartSec,
+  debugSceneEndSec,
   onSeek,
   onTrim,
   onFadeIn,
@@ -721,10 +727,15 @@ export function WaveformEditor({
           )}
           {status === "loading" && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
           {error && <span className="text-[10px] text-destructive">{error}</span>}
-          {/* Debug: LOD info */}
+          {/* Debug: LOD info + scene timing */}
           {currentPeaks && (
             <span className="text-[10px] text-muted-foreground/60 font-mono ml-1">
               LOD:{lodLevel.toLocaleString()}|{currentPeaks.left.length.toLocaleString()}pk
+            </span>
+          )}
+          {debugSceneStartSec != null && debugSceneEndSec != null && (
+            <span className="text-[10px] text-muted-foreground/40 font-mono ml-1" title="sceneStart..sceneEnd (sceneDur)">
+              [{formatTimePrecise(debugSceneStartSec)}→{formatTimePrecise(debugSceneEndSec)} Δ{displayDurationSec.toFixed(1)}s]
             </span>
           )}
         </div>
