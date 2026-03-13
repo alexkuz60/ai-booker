@@ -588,7 +588,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
 
             // Seek handler: convert scene-local → absolute
             const handleSceneSeek = (sceneRelativeSec: number) => {
-              player.seek(sceneStartSec + sceneRelativeSec);
+              player.seek(audioStartSec + sceneRelativeSec);
             };
 
             return (
