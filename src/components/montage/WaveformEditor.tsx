@@ -429,7 +429,7 @@ export function WaveformEditor({
     drawChannel(
       ctx,
       currentPeaks,
-      mixerWidth,
+      DB_ZONE_WIDTH,
       0,
       waveW,
       chH,
