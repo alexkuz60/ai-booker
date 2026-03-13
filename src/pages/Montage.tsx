@@ -42,10 +42,23 @@ const Montage = () => {
     ? `${bookTitle} → ${chapterTitle}`
     : (isRu ? "Финальный монтаж и мастеринг глав" : "Final chapter montage & mastering");
 
+  const renderButton = hasContent ? (
+    <Button
+      variant="hero"
+      size="sm"
+      className="gap-1.5 h-7 text-xs"
+      onClick={() => setRenderDialogOpen(true)}
+      disabled={clips.length === 0}
+    >
+      <FileAudio className="h-3.5 w-3.5" />
+      {isRu ? "Рендер" : "Render"}
+    </Button>
+  ) : undefined;
+
   useEffect(() => {
-    setPageHeader({ title, subtitle });
+    setPageHeader({ title, subtitle, headerRight: renderButton });
     return () => setPageHeader({});
-  }, [title, subtitle]);
+  }, [title, subtitle, hasContent, clips.length]);
 
   if (loading) {
     return (
