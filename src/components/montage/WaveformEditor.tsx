@@ -1,7 +1,7 @@
 /**
  * WaveformEditor — professional stereo L/R waveform display with selection,
  * trim, fade in/out, normalize. Canvas-based with virtual rendering.
- * Operates in SCENE-LOCAL coordinates: 100% zoom = scene start + active signal span.
+ * Operates in SCENE-LOCAL coordinates: 100% zoom = ВСЯ длительность сцены на всю ширину вьюпорта редактора.
  * Transport position is relative to scene start.
  */
 
@@ -59,6 +59,7 @@ const CHANNEL_HEIGHT = 96;
 const CHANNEL_GAP = 2;
 /** Narrow dB-label zone inside the editor (independent of the timeline mixer sidebar) */
 const DB_ZONE_WIDTH = 36;
+const SCENE_VIEWPORT_START_SEC = 0;
 
 const EDITOR_ZOOM_PRESETS = [100, 200, 300, 400, 500] as const;
 
@@ -82,24 +83,17 @@ function drawChannel(
   selection: Selection | null,
   totalDuration: number,
   channelLabel: string,
-  signalStartFrac: number,
-  signalEndFrac: number,
 ) {
   const dpr = window.devicePixelRatio || 1;
 
   const peakCount = peaks.left.length;
-  const clampedStartFrac = Math.max(0, Math.min(1, signalStartFrac));
-  const clampedEndFrac = Math.max(clampedStartFrac + 1 / Math.max(1, peakCount), Math.min(1, signalEndFrac));
-  const spanFrac = Math.max(1 / Math.max(1, peakCount), clampedEndFrac - clampedStartFrac);
 
-  // Which portion of the SIGNAL window to draw
-  const viewStartFrac = scrollLeftPx / totalWidthPx;
+  // Always render full scene timeline; zoom/scroll is handled by totalWidthPx + scrollLeftPx.
+  const viewStartFrac = Math.max(0, scrollLeftPx / totalWidthPx);
   const viewEndFrac = Math.min(1, (scrollLeftPx + w) / totalWidthPx);
-  const globalStartFrac = clampedStartFrac + viewStartFrac * spanFrac;
-  const globalEndFrac = clampedStartFrac + viewEndFrac * spanFrac;
 
-  const startIdx = Math.max(0, Math.floor(globalStartFrac * peakCount));
-  const endIdx = Math.min(peakCount, Math.ceil(globalEndFrac * peakCount));
+  const startIdx = Math.max(0, Math.floor(viewStartFrac * peakCount));
+  const endIdx = Math.min(peakCount, Math.ceil(viewEndFrac * peakCount));
   const visiblePeaks = endIdx - startIdx;
 
   if (visiblePeaks <= 0) return;
