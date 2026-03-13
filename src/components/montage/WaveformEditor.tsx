@@ -462,7 +462,6 @@ export function WaveformEditor({
     ctx.fillRect(DB_ZONE_WIDTH * dpr, chH * dpr, waveW * dpr, CHANNEL_GAP * dpr);
 
     // ── Time scale on the L/R divider ────────────────────────
-    console.log("[WaveformDraw]", { displayDurationSec, totalWidthPx, scrollLeft, waveW: waveW, editorW: w });
     {
       const dividerY = chH; // top of the gap
       const timeStep = 10; // seconds
@@ -516,6 +515,7 @@ export function WaveformEditor({
 
     // ── Draw segment boundaries from scene_playlists ────────────
     const boundaries = segmentBoundaries ?? [];
+    console.log("[WaveformSegments]", { count: boundaries.length, boundaries: boundaries.slice(0, 5).map(b => `${b.startSec.toFixed(2)}s`) });
     if (boundaries.length > 1) {
       const segBorderColor = resolveHsl("--muted-foreground");
       ctx.save();
