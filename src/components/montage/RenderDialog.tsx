@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { FileAudio, Download, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { renderChapter, type ChapterRenderProgress } from "@/lib/chapterRenderer";
