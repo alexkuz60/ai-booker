@@ -925,8 +925,8 @@ export function WaveformEditor({
           {/* Canvas is viewport-sized, pinned via sticky; drawing uses scrollLeft for virtual offset */}
           <canvas
             ref={canvasRef}
-            className="absolute inset-0"
-            style={{ width: "100%", height: "100%", position: "sticky", left: 0 }}
+            className="sticky left-0 top-0 block"
+            style={{ width: "100%", height: "100%" }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
