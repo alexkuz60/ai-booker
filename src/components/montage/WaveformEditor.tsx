@@ -1,7 +1,7 @@
 /**
  * WaveformEditor — professional stereo L/R waveform display with selection,
  * trim, fade in/out, normalize. Canvas-based with virtual rendering.
- * Operates in SCENE-LOCAL coordinates: 100% zoom = scene start + active signal span.
+ * Operates in SCENE-LOCAL coordinates: 100% zoom = ВСЯ длительность сцены на всю ширину вьюпорта редактора.
  * Transport position is relative to scene start.
  */
 
@@ -59,6 +59,7 @@ const CHANNEL_HEIGHT = 96;
 const CHANNEL_GAP = 2;
 /** Narrow dB-label zone inside the editor (independent of the timeline mixer sidebar) */
 const DB_ZONE_WIDTH = 36;
+const SCENE_VIEWPORT_START_SEC = 0;
 
 const EDITOR_ZOOM_PRESETS = [100, 200, 300, 400, 500] as const;
 
@@ -82,24 +83,17 @@ function drawChannel(
   selection: Selection | null,
   totalDuration: number,
   channelLabel: string,
-  signalStartFrac: number,
-  signalEndFrac: number,
 ) {
   const dpr = window.devicePixelRatio || 1;
 
   const peakCount = peaks.left.length;
-  const clampedStartFrac = Math.max(0, Math.min(1, signalStartFrac));
-  const clampedEndFrac = Math.max(clampedStartFrac + 1 / Math.max(1, peakCount), Math.min(1, signalEndFrac));
-  const spanFrac = Math.max(1 / Math.max(1, peakCount), clampedEndFrac - clampedStartFrac);
 
-  // Which portion of the SIGNAL window to draw
-  const viewStartFrac = scrollLeftPx / totalWidthPx;
+  // Always render full scene timeline; zoom/scroll is handled by totalWidthPx + scrollLeftPx.
+  const viewStartFrac = Math.max(0, scrollLeftPx / totalWidthPx);
   const viewEndFrac = Math.min(1, (scrollLeftPx + w) / totalWidthPx);
-  const globalStartFrac = clampedStartFrac + viewStartFrac * spanFrac;
-  const globalEndFrac = clampedStartFrac + viewEndFrac * spanFrac;
 
-  const startIdx = Math.max(0, Math.floor(globalStartFrac * peakCount));
-  const endIdx = Math.min(peakCount, Math.ceil(globalEndFrac * peakCount));
+  const startIdx = Math.max(0, Math.floor(viewStartFrac * peakCount));
+  const endIdx = Math.min(peakCount, Math.ceil(viewEndFrac * peakCount));
   const visiblePeaks = endIdx - startIdx;
 
   if (visiblePeaks <= 0) return;
@@ -114,8 +108,7 @@ function drawChannel(
     const idx = startIdx + i;
     if (idx >= peakCount) break;
     const idxFrac = idx / peakCount;
-    const localFrac = (idxFrac - clampedStartFrac) / spanFrac;
-    const px = (x + localFrac * totalWidthPx - scrollLeftPx) * dpr;
+    const px = (x + idxFrac * totalWidthPx - scrollLeftPx) * dpr;
     const val = data[idx] || 0;
     const yPos = mid - val * amp;
     if (i === 0) ctx.moveTo(px, yPos * dpr);
@@ -126,8 +119,7 @@ function drawChannel(
     const idx = startIdx + i;
     if (idx >= peakCount) continue;
     const idxFrac = idx / peakCount;
-    const localFrac = (idxFrac - clampedStartFrac) / spanFrac;
-    const px = (x + localFrac * totalWidthPx - scrollLeftPx) * dpr;
+    const px = (x + idxFrac * totalWidthPx - scrollLeftPx) * dpr;
     const val = data[idx] || 0;
     const yPos = mid + val * amp;
     ctx.lineTo(px, yPos * dpr);
@@ -285,33 +277,25 @@ export function WaveformEditor({
     return Array.from(peaks.lods.keys()).sort((a, b) => a - b);
   }, [peaks]);
 
-  // Scene viewport window: always map the full scene to full editor width at 100% zoom
-  const signalWindow = useMemo(() => {
+  // Scene viewport contract: 100% zoom ALWAYS means full scene width (including silence).
+  const displayDurationSec = useMemo(() => {
     const fallbackDuration = sceneClips.reduce((maxEnd, clip) => Math.max(maxEnd, clip.startSec + clip.durationSec), 0.05);
-    const durationSec = Math.max(0.05, sceneDuration > 0 ? sceneDuration : fallbackDuration);
-
-    return {
-      startFrac: 0,
-      endFrac: 1,
-      startSec: 0,
-      durationSec,
-    };
+    return Math.max(0.05, sceneDuration > 0 ? sceneDuration : fallbackDuration);
   }, [sceneDuration, sceneClips]);
 
-  // Choose LOD based on visible area in the detected signal window
+  // Choose LOD based on visible area of the full scene window
   const visibleWidth = editorContainerWidth;
   const visibleDurationSec = visibleWidth > 0 && totalWidthPx > 0
-    ? (visibleWidth / totalWidthPx) * signalWindow.durationSec
-    : signalWindow.durationSec;
+    ? (visibleWidth / totalWidthPx) * displayDurationSec
+    : displayDurationSec;
   const lodLevel = useMemo(
-    () => chooseLod(visibleWidth, signalWindow.durationSec, visibleDurationSec, lodLevels),
-    [visibleWidth, signalWindow.durationSec, visibleDurationSec, lodLevels],
+    () => chooseLod(visibleWidth, displayDurationSec, visibleDurationSec, lodLevels),
+    [visibleWidth, displayDurationSec, visibleDurationSec, lodLevels],
   );
 
   const currentPeaks = peaks?.lods.get(lodLevel) ?? (peaks ? peaks.lods.values().next().value : null);
 
-  const displayDurationSec = signalWindow.durationSec;
-  const displayPositionSec = Math.max(0, Math.min(scenePositionSec - signalWindow.startSec, displayDurationSec));
+  const displayPositionSec = Math.max(0, Math.min(scenePositionSec - SCENE_VIEWPORT_START_SEC, displayDurationSec));
 
   // ── dB scale helpers ────────────────────────────────────────
   const DB_MARKS = [0, -6, -12, -18, -30, -60];
@@ -459,8 +443,6 @@ export function WaveformEditor({
       selection,
       displayDurationSec,
       "L",
-      signalWindow.startFrac,
-      signalWindow.endFrac,
     );
 
     // Gap line
@@ -481,8 +463,6 @@ export function WaveformEditor({
       selection,
       displayDurationSec,
       "R",
-      signalWindow.startFrac,
-      signalWindow.endFrac,
     );
 
     // ── Draw segment boundaries from scene_playlists ────────────
@@ -492,7 +472,7 @@ export function WaveformEditor({
       ctx.save();
       for (let si = 1; si < boundaries.length; si++) {
         const seg = boundaries[si];
-        const localSec = seg.startSec - signalWindow.startSec;
+        const localSec = seg.startSec;
         if (localSec <= 0.01 || localSec >= displayDurationSec - 0.01) continue;
         const px = (localSec / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
         if (px < DB_ZONE_WIDTH || px > w) continue;
@@ -516,15 +496,15 @@ export function WaveformEditor({
       const fadeOut = clip.fadeOutSec ?? 0;
       if (fadeIn <= 0 && fadeOut <= 0) continue;
 
-      const clipStartSec = clip.startSec - signalWindow.startSec;
-      const clipEndSec = clip.startSec + clip.durationSec - signalWindow.startSec;
+      const clipStartSec = clip.startSec;
+      const clipEndSec = clip.startSec + clip.durationSec;
       if (clipEndSec <= 0 || clipStartSec >= displayDurationSec) continue;
 
       const clipStartPx = (Math.max(0, clipStartSec) / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
       const clipEndPx = (Math.min(displayDurationSec, clipEndSec) / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
 
       if (fadeIn > 0) {
-        const fadeEndSec = Math.min(displayDurationSec, clip.startSec + fadeIn - signalWindow.startSec);
+        const fadeEndSec = Math.min(displayDurationSec, clip.startSec + fadeIn);
         const fadeEndPx = (Math.max(0, fadeEndSec) / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
         const x0 = Math.max(DB_ZONE_WIDTH, clipStartPx);
         const x1 = Math.min(w, fadeEndPx);
@@ -551,7 +531,7 @@ export function WaveformEditor({
       }
 
       if (fadeOut > 0) {
-        const fadeStartSec = Math.max(0, clip.startSec + clip.durationSec - fadeOut - signalWindow.startSec);
+        const fadeStartSec = Math.max(0, clip.startSec + clip.durationSec - fadeOut);
         const fadeStartPx = (Math.min(displayDurationSec, fadeStartSec) / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
         const x0 = Math.max(DB_ZONE_WIDTH, fadeStartPx);
         const x1 = Math.min(w, clipEndPx);
@@ -589,7 +569,7 @@ export function WaveformEditor({
       ctx.stroke();
     }
     ctx.restore();
-  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, displayDurationSec, displayPositionSec, sceneClips, signalWindow.startSec, signalWindow.startFrac, signalWindow.endFrac, segmentBoundaries]);
+  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, displayDurationSec, displayPositionSec, sceneClips, segmentBoundaries]);
 
   // ── Keyboard shortcuts (Ctrl+Z / Ctrl+Shift+Z) ─────────────
   useEffect(() => {
@@ -676,10 +656,10 @@ export function WaveformEditor({
       if (end - start < 0.05) {
         // Click — seek (scene-relative)
         setSelection(null);
-        onSeek(signalWindow.startSec + sec);
+        onSeek(SCENE_VIEWPORT_START_SEC + sec);
       }
     },
-    [isDragging, pxToSec, onSeek, signalWindow.startSec],
+    [isDragging, pxToSec, onSeek],
   );
 
   // ── Zoom controls ─────────────────────────────────────────
@@ -790,7 +770,7 @@ export function WaveformEditor({
             title={isRu ? "Обрезка" : "Trim"}
             onClick={() => {
               if (selection && trackId && onTrim) {
-                onTrim(trackId, selection.startSec + signalWindow.startSec, selection.endSec + signalWindow.startSec);
+                onTrim(trackId, selection.startSec + SCENE_VIEWPORT_START_SEC, selection.endSec + SCENE_VIEWPORT_START_SEC);
                 setSelection(null);
               }
             }}
