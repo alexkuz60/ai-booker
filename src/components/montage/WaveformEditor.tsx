@@ -768,7 +768,7 @@ export function WaveformEditor({
             variant="ghost"
             size="sm"
             className="h-5 px-1.5 text-[10px] gap-0.5"
-            disabled={!selection}
+            disabled={!selection || isPlaying}
             title={isRu ? "Обрезка" : "Trim"}
             onClick={() => {
               if (selection && trackId && onTrim) {
