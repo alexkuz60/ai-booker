@@ -649,6 +649,12 @@ export function SpectrumAnalyzer() {
       ctx.fillText(`L${pkLStr}`, col1 + 18, py + 23);
       ctx.fillText(`R${pkRStr}`, col2, py + 23);
 
+      // Draw cursor marker on live spectrum
+      const cBin = cursorBinRef.current;
+      if (cBin !== null && cBin < usableBins) {
+        drawCursorMarker(ctx, w, h, cBin, usableBins, 128, 44100, fftData, dbMin, dbMax);
+      }
+
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
