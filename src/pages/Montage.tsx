@@ -1,12 +1,14 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Loader2, AlertCircle } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
+import { useAuth } from "@/hooks/useAuth";
 import { useMontageData } from "@/hooks/useMontageData";
 import { MasterMeterPanel } from "@/components/studio/MasterMeterPanel";
 import { MasterEffectsTabs } from "@/components/studio/MasterEffectsTabs";
 import { MontageTimeline } from "@/components/montage/MontageTimeline";
+import { RenderDialog } from "@/components/montage/RenderDialog";
 import { Button } from "@/components/ui/button";
 
 const SIDEBAR_WIDTH = 280;
@@ -20,6 +22,7 @@ function formatTime(s: number) {
 const Montage = () => {
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
+  const { user } = useAuth();
 
   const {
     bookTitle, chapterId, chapterTitle,
@@ -29,6 +32,9 @@ const Montage = () => {
     parts, activePartIdx, setActivePartIdx,
     splitAtScene, removeParts, activeSceneIds,
   } = useMontageData();
+
+  const [renderDialogOpen, setRenderDialogOpen] = useState(false);
+  const activePartNumber = parts.length > 0 ? parts[activePartIdx]?.part_number ?? null : null;
 
   // ── Page header ────────────────────────────────────────────
   const title = isRu ? "МОНТАЖ" : "MONTAGE";
@@ -116,7 +122,12 @@ const Montage = () => {
           <div className="flex-1 min-h-0 overflow-hidden p-4">
             <div className="h-full rounded-lg border border-border bg-card/50 overflow-hidden flex">
               <div className="shrink-0 border-r border-border" style={{ width: `${SIDEBAR_WIDTH}px` }}>
-                <MasterMeterPanel isRu={isRu} width={SIDEBAR_WIDTH} />
+                <MasterMeterPanel
+                  isRu={isRu}
+                  width={SIDEBAR_WIDTH}
+                  onRender={() => setRenderDialogOpen(true)}
+                  renderDisabled={clips.length === 0}
+                />
               </div>
               <div className="flex-1 min-h-0 p-2">
                 <MasterEffectsTabs isRu={isRu} />
@@ -148,6 +159,21 @@ const Montage = () => {
             </p>
           </div>
         </div>
+      )}
+
+      {/* Render dialog */}
+      {user && (
+        <RenderDialog
+          open={renderDialogOpen}
+          onOpenChange={setRenderDialogOpen}
+          clips={clips}
+          totalDurationSec={totalDurationSec}
+          userId={user.id}
+          bookTitle={bookTitle}
+          chapterTitle={chapterTitle}
+          partNumber={activePartNumber}
+          isRu={isRu}
+        />
       )}
     </motion.div>
   );
