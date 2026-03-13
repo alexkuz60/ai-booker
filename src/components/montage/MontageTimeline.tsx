@@ -560,10 +560,12 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             }
             const currentBoundary = sceneBoundaries[currentSceneIdx];
             const nextBoundary = sceneBoundaries[currentSceneIdx + 1];
-            const sceneStartSec = currentBoundary?.startSec ?? 0;
+            // Audio starts AFTER the silence gap
+            const silenceSec = currentBoundary?.silenceSec ?? 0;
+            const audioStartSec = (currentBoundary?.startSec ?? 0) + silenceSec;
             const sceneEndSec = nextBoundary?.startSec ?? duration;
-            const sceneDuration = sceneEndSec - sceneStartSec;
-            const scenePositionSec = Math.max(0, Math.min(pos - sceneStartSec, sceneDuration));
+            const sceneDuration = Math.max(0, sceneEndSec - audioStartSec);
+            const scenePositionSec = Math.max(0, Math.min(pos - audioStartSec, sceneDuration));
             const sceneId = currentBoundary?.sceneId ?? "";
 
             // Filter clips for selected track within this scene, re-map to scene-local coordinates
@@ -571,12 +573,12 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
               .filter(c => c.trackId === selectedTrackId)
               .filter(c => {
                 const clipEnd = c.startSec + c.durationSec;
-                return clipEnd > sceneStartSec && c.startSec < sceneEndSec;
+                return clipEnd > audioStartSec && c.startSec < sceneEndSec;
               })
               .map(c => ({
                 ...c,
-                startSec: Math.max(0, c.startSec - sceneStartSec),
-                durationSec: Math.min(c.startSec + c.durationSec, sceneEndSec) - Math.max(c.startSec, sceneStartSec),
+                startSec: Math.max(0, c.startSec - audioStartSec),
+                durationSec: Math.min(c.startSec + c.durationSec, sceneEndSec) - Math.max(c.startSec, audioStartSec),
               }));
 
             // Scene label
@@ -586,7 +588,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
 
             // Seek handler: convert scene-local → absolute
             const handleSceneSeek = (sceneRelativeSec: number) => {
-              player.seek(sceneStartSec + sceneRelativeSec);
+              player.seek(audioStartSec + sceneRelativeSec);
             };
 
             return (
