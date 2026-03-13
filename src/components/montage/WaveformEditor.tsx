@@ -754,22 +754,23 @@ export function WaveformEditor({
         </div>
       </div>
 
-      {/* Canvas with independent scroll */}
+      {/* Canvas with virtual-scroll rendering */}
       <div ref={containerRef} className="flex-1 min-h-0 relative flex">
-        {/* dB sidebar placeholder — fixed left */}
-        <div ref={editorScrollRef} className="flex-1 overflow-x-auto overflow-y-hidden cursor-crosshair">
-          <div style={{ width: `${totalWidthPx + mixerWidth}px`, height: "100%" }}>
-            <canvas
-              ref={canvasRef}
-              style={{ width: `${totalWidthPx + mixerWidth}px`, height: "100%" }}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={() => {
-                if (isDragging) setIsDragging(false);
-              }}
-            />
-          </div>
+        <div ref={editorScrollRef} className="flex-1 overflow-x-auto overflow-y-hidden cursor-crosshair relative">
+          {/* Invisible spacer — gives the scrollbar the correct total width */}
+          <div style={{ width: `${totalWidthPx + mixerWidth}px`, height: "1px", pointerEvents: "none" }} />
+          {/* Canvas is viewport-sized, pinned via sticky; drawing uses scrollLeft for virtual offset */}
+          <canvas
+            ref={canvasRef}
+            className="absolute inset-0"
+            style={{ width: "100%", height: "100%", position: "sticky", left: 0 }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={() => {
+              if (isDragging) setIsDragging(false);
+            }}
+          />
         </div>
       </div>
     </div>
