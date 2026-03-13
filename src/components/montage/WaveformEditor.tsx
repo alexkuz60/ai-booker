@@ -286,13 +286,21 @@ export function WaveformEditor({
     return peaks.lods.get(desc[0]) ?? peaks.lods.values().next().value ?? null;
   }, [peaks]);
 
-  // Auto-detect active signal window so 100% zoom fills the editor with meaningful audio
+  // End of active signal; 100% zoom stretches [sceneStart..activeEnd] to full viewport width
   const signalWindow = useMemo(() => {
+    const clipEndFallback = Math.max(
+      0.05,
+      Math.min(
+        sceneDuration,
+        sceneClips.reduce((maxEnd, clip) => Math.max(maxEnd, clip.startSec + clip.durationSec), 0),
+      ) || sceneDuration,
+    );
+
     const fallback = {
       startFrac: 0,
-      endFrac: 1,
+      endFrac: sceneDuration > 0 ? clipEndFallback / sceneDuration : 1,
       startSec: 0,
-      durationSec: Math.max(0.05, sceneDuration),
+      durationSec: clipEndFallback,
     };
 
     if (!signalDetectionPeaks || sceneDuration <= 0) return fallback;
@@ -300,35 +308,62 @@ export function WaveformEditor({
     const peakCount = signalDetectionPeaks.left.length;
     if (peakCount <= 1) return fallback;
 
+    let maxAbs = 0;
+    for (let i = 0; i < peakCount; i++) {
+      const v = Math.max(
+        Math.abs(signalDetectionPeaks.left[i] ?? 0),
+        Math.abs(signalDetectionPeaks.right[i] ?? 0),
+      );
+      if (v > maxAbs) maxAbs = v;
+    }
+
+    const threshold = Math.max(SIGNAL_ACTIVITY_FLOOR, maxAbs * SIGNAL_ACTIVITY_RATIO);
+
     let startIdx = -1;
     let endIdx = -1;
+    let runStart = -1;
+    let runLen = 0;
 
     for (let i = 0; i < peakCount; i++) {
-      const v = Math.max(Math.abs(signalDetectionPeaks.left[i] ?? 0), Math.abs(signalDetectionPeaks.right[i] ?? 0));
-      if (v >= SIGNAL_ACTIVITY_THRESHOLD) {
-        if (startIdx < 0) startIdx = i;
-        endIdx = i;
+      const v = Math.max(
+        Math.abs(signalDetectionPeaks.left[i] ?? 0),
+        Math.abs(signalDetectionPeaks.right[i] ?? 0),
+      );
+
+      if (v >= threshold) {
+        if (runStart < 0) runStart = i;
+        runLen += 1;
+      } else if (runStart >= 0) {
+        if (runLen >= SIGNAL_MIN_ACTIVE_BINS) {
+          if (startIdx < 0) startIdx = runStart;
+          endIdx = i - 1;
+        }
+        runStart = -1;
+        runLen = 0;
       }
+    }
+
+    if (runStart >= 0 && runLen >= SIGNAL_MIN_ACTIVE_BINS) {
+      if (startIdx < 0) startIdx = runStart;
+      endIdx = peakCount - 1;
     }
 
     if (startIdx < 0 || endIdx < startIdx) return fallback;
 
     const pad = Math.max(2, Math.floor(peakCount * SIGNAL_PAD_FRAC));
     const paddedEndIdx = Math.min(peakCount - 1, endIdx + pad);
-
     const rawEndFrac = (paddedEndIdx + 1) / peakCount;
 
-    // 100% = from scene start (0) to end of active signal (including leading silence)
-    const endSec = Math.min(sceneDuration, rawEndFrac * sceneDuration);
-    const durationSec = Math.max(0.05, endSec);
+    const detectedEndSec = Math.min(sceneDuration, rawEndFrac * sceneDuration);
+    const endSec = Math.max(0.05, Math.min(sceneDuration, detectedEndSec));
 
     return {
       startFrac: 0,
       endFrac: sceneDuration > 0 ? endSec / sceneDuration : 1,
       startSec: 0,
-      durationSec,
+      durationSec: endSec,
     };
-  }, [signalDetectionPeaks, sceneDuration]);
+  }, [signalDetectionPeaks, sceneDuration, sceneClips]);
 
   // Choose LOD based on visible area in the detected signal window
   const visibleWidth = editorContainerWidth;
