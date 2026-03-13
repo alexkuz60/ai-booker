@@ -609,8 +609,8 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
                 trackId={selectedTrackId}
                 trackLabel={stemTracks.find(t => t.id === selectedTrackId)?.label ?? ""}
                 trackColor={stemTracks.find(t => t.id === selectedTrackId)?.color ?? "hsl(var(--primary))"}
-                sceneDuration={sceneDuration}
-                scenePositionSec={scenePositionSec}
+                sceneDuration={trackDuration}
+                scenePositionSec={trackPositionSec}
                 sceneLabel={sceneLabel}
                 mixerWidth={MIXER_SIDEBAR}
                 isRu={isRu}
