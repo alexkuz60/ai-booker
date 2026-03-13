@@ -64,7 +64,7 @@ PDF File
 ┌─────────────────────────────────┐
 │  11. Atmosphere + SFX           │  Auto + Freesound + manual
 │  12. **Montage Workspace**      │  ✅ 3-stem timeline, chapter parts, waveform editor, mastering
-│  13. Final export                 │  ⬜
+│  13. **Chapter Render**         │  ✅ WAV/MP3 export, normalization, direct download
 └─────────────────────────────────┘
 
 🤖 Assistant — available at any stage
