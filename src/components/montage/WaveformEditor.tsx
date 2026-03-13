@@ -312,23 +312,19 @@ export function WaveformEditor({
     if (startIdx < 0 || endIdx < startIdx) return fallback;
 
     const pad = Math.max(2, Math.floor(peakCount * SIGNAL_PAD_FRAC));
-    const paddedStartIdx = Math.max(0, startIdx - pad);
     const paddedEndIdx = Math.min(peakCount - 1, endIdx + pad);
 
-    const rawStartFrac = paddedStartIdx / peakCount;
     const rawEndFrac = (paddedEndIdx + 1) / peakCount;
 
-    const rawDurationSec = (rawEndFrac - rawStartFrac) * sceneDuration;
-    const durationSec = Math.max(0.05, rawDurationSec);
-    const maxStartSec = Math.max(0, sceneDuration - durationSec);
-    const startSec = Math.min(rawStartFrac * sceneDuration, maxStartSec);
-    const endSec = Math.min(sceneDuration, startSec + durationSec);
+    // 100% = from scene start (0) to end of active signal (including leading silence)
+    const endSec = Math.min(sceneDuration, rawEndFrac * sceneDuration);
+    const durationSec = Math.max(0.05, endSec);
 
     return {
-      startFrac: sceneDuration > 0 ? startSec / sceneDuration : 0,
+      startFrac: 0,
       endFrac: sceneDuration > 0 ? endSec / sceneDuration : 1,
-      startSec,
-      durationSec: Math.max(0.05, endSec - startSec),
+      startSec: 0,
+      durationSec,
     };
   }, [signalDetectionPeaks, sceneDuration]);
 
