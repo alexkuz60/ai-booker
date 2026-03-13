@@ -93,22 +93,28 @@ export function computeMultiLodPeaks(buffer: AudioBuffer): MultiLodPeaks {
  * Choose the best LOD level for the current zoom/viewport.
  * Aim for ~2-4 peaks per visible pixel.
  */
+/**
+ * Choose the best LOD level for the current zoom/viewport.
+ * Accepts dynamic lodLevels array.
+ */
 export function chooseLod(
   visibleWidthPx: number,
   totalDurationSec: number,
   visibleDurationSec: number,
+  lodLevels: LodLevel[] = [200, 800, 3200],
 ): LodLevel {
-  if (visibleWidthPx <= 0 || visibleDurationSec <= 0) return 200;
+  if (visibleWidthPx <= 0 || visibleDurationSec <= 0) return lodLevels[0];
   
   const peaksPerPixel = 2;
   const neededPeaks = visibleWidthPx * peaksPerPixel;
   const neededTotal = Math.round(neededPeaks * (totalDurationSec / visibleDurationSec));
   
   // Pick smallest LOD that gives enough detail
-  for (const level of LOD_LEVELS) {
+  const sorted = [...lodLevels].sort((a, b) => a - b);
+  for (const level of sorted) {
     if (level >= neededTotal) return level;
   }
-  return LOD_LEVELS[LOD_LEVELS.length - 1];
+  return sorted[sorted.length - 1];
 }
 
 // ── Cache API persistence ────────────────────────────────
