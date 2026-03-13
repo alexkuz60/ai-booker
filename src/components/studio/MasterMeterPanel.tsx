@@ -188,6 +188,8 @@ function PeakMeterSection() {
 
 // ─── FFT Spectrum Analyzer (exported for use in MasterEffectsTabs) ───
 
+import { subscribeStaticSpectrum, getStaticSpectrum, type StaticSpectrumData } from "@/lib/staticSpectrum";
+
 type SpectrumMode = "bars" | "line" | "mirror";
 const SPECTRUM_MODES: { id: SpectrumMode; label: string }[] = [
   { id: "bars", label: "▮▮" },
@@ -197,6 +199,7 @@ const SPECTRUM_MODES: { id: SpectrumMode; label: string }[] = [
 
 export function SpectrumAnalyzer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [staticData, setStaticData] = useState<StaticSpectrumData | null>(getStaticSpectrum);
 
   const [mode, setMode] = useState<SpectrumMode>(() => {
     try { return (localStorage.getItem("spectrum-mode") as SpectrumMode) || "bars"; } catch { return "bars"; }
