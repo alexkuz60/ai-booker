@@ -69,15 +69,24 @@ function drawChannel(
   selection: Selection | null,
   totalDuration: number,
   channelLabel: string,
+  signalStartFrac: number,
+  signalEndFrac: number,
 ) {
   const dpr = window.devicePixelRatio || 1;
 
-  // Which portion of the peaks to draw
-  const startFrac = scrollLeftPx / totalWidthPx;
-  const endFrac = Math.min(1, (scrollLeftPx + w) / totalWidthPx);
   const peakCount = peaks.left.length;
-  const startIdx = Math.floor(startFrac * peakCount);
-  const endIdx = Math.ceil(endFrac * peakCount);
+  const clampedStartFrac = Math.max(0, Math.min(1, signalStartFrac));
+  const clampedEndFrac = Math.max(clampedStartFrac + 1 / Math.max(1, peakCount), Math.min(1, signalEndFrac));
+  const spanFrac = Math.max(1 / Math.max(1, peakCount), clampedEndFrac - clampedStartFrac);
+
+  // Which portion of the SIGNAL window to draw
+  const viewStartFrac = scrollLeftPx / totalWidthPx;
+  const viewEndFrac = Math.min(1, (scrollLeftPx + w) / totalWidthPx);
+  const globalStartFrac = clampedStartFrac + viewStartFrac * spanFrac;
+  const globalEndFrac = clampedStartFrac + viewEndFrac * spanFrac;
+
+  const startIdx = Math.max(0, Math.floor(globalStartFrac * peakCount));
+  const endIdx = Math.min(peakCount, Math.ceil(globalEndFrac * peakCount));
   const visiblePeaks = endIdx - startIdx;
 
   if (visiblePeaks <= 0) return;
@@ -91,7 +100,9 @@ function drawChannel(
   for (let i = 0; i <= visiblePeaks; i++) {
     const idx = startIdx + i;
     if (idx >= peakCount) break;
-    const px = (x + (idx / peakCount) * totalWidthPx - scrollLeftPx) * dpr;
+    const idxFrac = idx / peakCount;
+    const localFrac = (idxFrac - clampedStartFrac) / spanFrac;
+    const px = (x + localFrac * totalWidthPx - scrollLeftPx) * dpr;
     const val = data[idx] || 0;
     const yPos = mid - val * amp;
     if (i === 0) ctx.moveTo(px, yPos * dpr);
@@ -101,7 +112,9 @@ function drawChannel(
   for (let i = visiblePeaks; i >= 0; i--) {
     const idx = startIdx + i;
     if (idx >= peakCount) continue;
-    const px = (x + (idx / peakCount) * totalWidthPx - scrollLeftPx) * dpr;
+    const idxFrac = idx / peakCount;
+    const localFrac = (idxFrac - clampedStartFrac) / spanFrac;
+    const px = (x + localFrac * totalWidthPx - scrollLeftPx) * dpr;
     const val = data[idx] || 0;
     const yPos = mid + val * amp;
     ctx.lineTo(px, yPos * dpr);
@@ -267,6 +280,53 @@ export function WaveformEditor({
 
   const currentPeaks = peaks?.lods.get(lodLevel) ?? (peaks ? peaks.lods.values().next().value : null);
 
+  const signalWindow = useMemo(() => {
+    if (!peaks || sceneDuration <= 0) {
+      return { startFrac: 0, endFrac: 1, startSec: 0, durationSec: Math.max(0.05, sceneDuration) };
+    }
+
+    const allLods = Array.from(peaks.lods.values());
+    if (allLods.length === 0) {
+      return { startFrac: 0, endFrac: 1, startSec: 0, durationSec: Math.max(0.05, sceneDuration) };
+    }
+
+    const detailLod = allLods.reduce((best, lod) =>
+      lod.left.length > best.left.length ? lod : best,
+    );
+
+    const threshold = 0.002;
+    let first = -1;
+    let last = -1;
+
+    for (let i = 0; i < detailLod.left.length; i++) {
+      if ((detailLod.left[i] ?? 0) > threshold || (detailLod.right[i] ?? 0) > threshold) {
+        first = i;
+        break;
+      }
+    }
+
+    for (let i = detailLod.left.length - 1; i >= 0; i--) {
+      if ((detailLod.left[i] ?? 0) > threshold || (detailLod.right[i] ?? 0) > threshold) {
+        last = i;
+        break;
+      }
+    }
+
+    if (first < 0 || last <= first) {
+      return { startFrac: 0, endFrac: 1, startSec: 0, durationSec: Math.max(0.05, sceneDuration) };
+    }
+
+    const startFrac = first / detailLod.left.length;
+    const endFrac = Math.min(1, (last + 1) / detailLod.left.length);
+    const startSec = startFrac * sceneDuration;
+    const durationSec = Math.max(0.05, (endFrac - startFrac) * sceneDuration);
+
+    return { startFrac, endFrac, startSec, durationSec };
+  }, [peaks, sceneDuration]);
+
+  const displayDurationSec = signalWindow.durationSec;
+  const displayPositionSec = Math.max(0, Math.min(scenePositionSec - signalWindow.startSec, displayDurationSec));
+
   // ── dB scale helpers ────────────────────────────────────────
   const DB_MARKS = [0, -6, -12, -18, -30, -60];
 
@@ -348,7 +408,7 @@ export function WaveformEditor({
 
     // ── Time grid (vertical lines) — scene-local ────────────
     const drawTimeGrid = () => {
-      const pxPerSec = totalWidthPx / sceneDuration;
+      const pxPerSec = totalWidthPx / displayDurationSec;
       let interval = 1;
       if (pxPerSec < 10) interval = 30;
       else if (pxPerSec < 20) interval = 15;
@@ -357,15 +417,15 @@ export function WaveformEditor({
       else if (pxPerSec < 200) interval = 2;
       else interval = 1;
 
-      const startSec = Math.floor((scrollLeft / totalWidthPx) * sceneDuration / interval) * interval;
-      const endSec = Math.ceil(((scrollLeft + waveW) / totalWidthPx) * sceneDuration / interval) * interval;
+      const startSec = Math.floor((scrollLeft / totalWidthPx) * displayDurationSec / interval) * interval;
+      const endSec = Math.ceil(((scrollLeft + waveW) / totalWidthPx) * displayDurationSec / interval) * interval;
 
       ctx.font = `${8 * dpr}px monospace`;
       ctx.textAlign = "center";
 
       for (let t = startSec; t <= endSec; t += interval) {
         if (t < 0) continue;
-        const px = (t / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
+        const px = (t / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
         if (px < mixerWidth || px > w) continue;
 
         const isMajor = t % (interval * 5) === 0 || interval >= 10;
@@ -400,14 +460,44 @@ export function WaveformEditor({
     ctx.clip();
 
     // Draw L channel
-    drawChannel(ctx, currentPeaks, mixerWidth, 0, waveW, chH, waveColor, scrollLeft, totalWidthPx, selection, sceneDuration, "L");
+    drawChannel(
+      ctx,
+      currentPeaks,
+      mixerWidth,
+      0,
+      waveW,
+      chH,
+      waveColor,
+      scrollLeft,
+      totalWidthPx,
+      selection,
+      displayDurationSec,
+      "L",
+      signalWindow.startFrac,
+      signalWindow.endFrac,
+    );
 
     // Gap line
     ctx.fillStyle = borderColor.replace(")", " / 0.5)").replace("hsl(", "hsl(");
     ctx.fillRect(mixerWidth * dpr, chH * dpr, waveW * dpr, CHANNEL_GAP * dpr);
 
     // Draw R channel
-    drawChannel(ctx, currentPeaks, mixerWidth, chH + CHANNEL_GAP, waveW, chH, waveColor, scrollLeft, totalWidthPx, selection, sceneDuration, "R");
+    drawChannel(
+      ctx,
+      currentPeaks,
+      mixerWidth,
+      chH + CHANNEL_GAP,
+      waveW,
+      chH,
+      waveColor,
+      scrollLeft,
+      totalWidthPx,
+      selection,
+      displayDurationSec,
+      "R",
+      signalWindow.startFrac,
+      signalWindow.endFrac,
+    );
 
     // ── Draw fade envelopes for each clip ───────────────────
     const fadeColor = resolveHsl("--primary");
@@ -416,11 +506,16 @@ export function WaveformEditor({
       const fadeOut = clip.fadeOutSec ?? 0;
       if (fadeIn <= 0 && fadeOut <= 0) continue;
 
-      const clipStartPx = (clip.startSec / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
-      const clipEndPx = ((clip.startSec + clip.durationSec) / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
+      const clipStartSec = clip.startSec - signalWindow.startSec;
+      const clipEndSec = clip.startSec + clip.durationSec - signalWindow.startSec;
+      if (clipEndSec <= 0 || clipStartSec >= displayDurationSec) continue;
+
+      const clipStartPx = (Math.max(0, clipStartSec) / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
+      const clipEndPx = (Math.min(displayDurationSec, clipEndSec) / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
 
       if (fadeIn > 0) {
-        const fadeEndPx = ((clip.startSec + fadeIn) / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
+        const fadeEndSec = Math.min(displayDurationSec, clip.startSec + fadeIn - signalWindow.startSec);
+        const fadeEndPx = (Math.max(0, fadeEndSec) / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
         const x0 = Math.max(mixerWidth, clipStartPx);
         const x1 = Math.min(w, fadeEndPx);
         if (x1 > x0) {
@@ -446,7 +541,8 @@ export function WaveformEditor({
       }
 
       if (fadeOut > 0) {
-        const fadeStartPx = ((clip.startSec + clip.durationSec - fadeOut) / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
+        const fadeStartSec = Math.max(0, clip.startSec + clip.durationSec - fadeOut - signalWindow.startSec);
+        const fadeStartPx = (Math.min(displayDurationSec, fadeStartSec) / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
         const x0 = Math.max(mixerWidth, fadeStartPx);
         const x1 = Math.min(w, clipEndPx);
         if (x1 > x0) {
@@ -473,7 +569,7 @@ export function WaveformEditor({
     }
 
     // Playhead — scene-relative
-    const playheadPx = (scenePositionSec / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
+    const playheadPx = (displayPositionSec / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
     if (playheadPx >= mixerWidth && playheadPx <= w) {
       ctx.strokeStyle = resolveHsl("--primary");
       ctx.lineWidth = 1.5;
@@ -483,7 +579,7 @@ export function WaveformEditor({
       ctx.stroke();
     }
     ctx.restore();
-  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, sceneDuration, scenePositionSec, mixerWidth, sceneClips]);
+  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, displayDurationSec, displayPositionSec, mixerWidth, sceneClips, signalWindow.startSec, signalWindow.startFrac, signalWindow.endFrac]);
 
   // ── Keyboard shortcuts (Ctrl+Z / Ctrl+Shift+Z) ─────────────
   useEffect(() => {
@@ -525,9 +621,9 @@ export function WaveformEditor({
       if (!canvas) return 0;
       const rect = canvas.getBoundingClientRect();
       const px = clientX - rect.left - mixerWidth + scrollLeft;
-      return Math.max(0, Math.min(sceneDuration, (px / totalWidthPx) * sceneDuration));
+      return Math.max(0, Math.min(displayDurationSec, (px / totalWidthPx) * displayDurationSec));
     },
-    [scrollLeft, totalWidthPx, sceneDuration, mixerWidth],
+    [scrollLeft, totalWidthPx, displayDurationSec, mixerWidth],
   );
 
   const handleMouseDown = useCallback(
@@ -570,10 +666,10 @@ export function WaveformEditor({
       if (end - start < 0.05) {
         // Click — seek (scene-relative)
         setSelection(null);
-        onSeek(sec);
+        onSeek(signalWindow.startSec + sec);
       }
     },
-    [isDragging, pxToSec, onSeek],
+    [isDragging, pxToSec, onSeek, signalWindow.startSec],
   );
 
   // ── Zoom controls ─────────────────────────────────────────
@@ -584,11 +680,11 @@ export function WaveformEditor({
         const el = editorScrollRef.current;
         if (!el) return;
         const newTotalW = editorContainerWidth * percent / 100;
-        const px = (scenePositionSec / sceneDuration) * newTotalW;
+        const px = (displayPositionSec / displayDurationSec) * newTotalW;
         el.scrollTo({ left: Math.max(0, px - el.clientWidth / 2), behavior: "smooth" });
       });
     }
-  }, [editorContainerWidth, scenePositionSec, sceneDuration]);
+  }, [editorContainerWidth, displayPositionSec, displayDurationSec]);
 
   const adjustEditorZoom = useCallback((dir: "in" | "out") => {
     const presets = EDITOR_ZOOM_PRESETS;
@@ -646,7 +742,7 @@ export function WaveformEditor({
         <div className="flex items-center gap-1">
           {/* Scene-local time */}
           <span className="text-[10px] text-muted-foreground font-mono tabular-nums mr-1">
-            {formatTimePrecise(scenePositionSec)} / {formatTimePrecise(sceneDuration)}
+            {formatTimePrecise(displayPositionSec)} / {formatTimePrecise(displayDurationSec)}
           </span>
 
           {selectionInfo && (
@@ -684,7 +780,7 @@ export function WaveformEditor({
             title={isRu ? "Обрезка" : "Trim"}
             onClick={() => {
               if (selection && trackId && onTrim) {
-                onTrim(trackId, selection.startSec, selection.endSec);
+                onTrim(trackId, selection.startSec + signalWindow.startSec, selection.endSec + signalWindow.startSec);
                 setSelection(null);
               }
             }}

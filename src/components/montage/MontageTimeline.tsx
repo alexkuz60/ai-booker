@@ -586,12 +586,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
                 durationSec: Math.min(c.startSec + c.durationSec, sceneEndSec) - Math.max(c.startSec, audioStartSec),
               }));
 
-            // For the waveform editor, use the selected TRACK's clip span
-            // so the waveform fills the viewport (not the full multi-stem scene duration)
-            const trackDuration = sceneClips.length > 0
-              ? sceneClips.reduce((max, c) => Math.max(max, c.startSec + c.durationSec), 0)
-              : sceneDuration;
-            const trackPositionSec = Math.max(0, Math.min(scenePositionSec, trackDuration));
 
             // Scene label
             const sceneLabel = currentBoundary
@@ -609,8 +603,8 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
                 trackId={selectedTrackId}
                 trackLabel={stemTracks.find(t => t.id === selectedTrackId)?.label ?? ""}
                 trackColor={stemTracks.find(t => t.id === selectedTrackId)?.color ?? "hsl(var(--primary))"}
-                sceneDuration={trackDuration}
-                scenePositionSec={trackPositionSec}
+                sceneDuration={sceneDuration}
+                scenePositionSec={scenePositionSec}
                 sceneLabel={sceneLabel}
                 mixerWidth={MIXER_SIDEBAR}
                 isRu={isRu}
