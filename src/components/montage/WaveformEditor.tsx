@@ -656,10 +656,10 @@ export function WaveformEditor({
       if (end - start < 0.05) {
         // Click — seek (scene-relative)
         setSelection(null);
-        onSeek(signalWindow.startSec + sec);
+        onSeek(SCENE_VIEWPORT_START_SEC + sec);
       }
     },
-    [isDragging, pxToSec, onSeek, signalWindow.startSec],
+    [isDragging, pxToSec, onSeek],
   );
 
   // ── Zoom controls ─────────────────────────────────────────
