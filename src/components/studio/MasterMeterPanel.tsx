@@ -505,6 +505,10 @@ interface MasterMeterPanelProps {
   onRender?: () => void;
   normalizeDisabled?: boolean;
   renderDisabled?: boolean;
+  /** Progress message shown below buttons */
+  progressMessage?: string | null;
+  /** Progress percent 0-100 */
+  progressPercent?: number | null;
 }
 
 export function MasterMeterPanel({ isRu, width, onNormalize, onRender, normalizeDisabled, renderDisabled }: MasterMeterPanelProps) {
