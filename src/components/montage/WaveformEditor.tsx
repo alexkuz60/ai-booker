@@ -833,7 +833,7 @@ export function WaveformEditor({
             variant="ghost"
             size="sm"
             className="h-5 px-1.5 text-[10px] gap-0.5"
-            disabled={!canRedo}
+            disabled={!canRedo || isPlaying}
             title={isRu ? "Повторить (Ctrl+Shift+Z)" : "Redo (Ctrl+Shift+Z)"}
             onClick={onRedo}
           >
