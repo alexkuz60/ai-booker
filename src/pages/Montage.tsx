@@ -131,7 +131,7 @@ const Montage = () => {
 
       {/* Main content */}
       {hasContent ? (
-        <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">
+        <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0" autoSaveId="montage-split">
           {/* Effects workspace */}
           <ResizablePanel defaultSize={55} minSize={25}>
             <div className="h-full overflow-hidden p-4">
