@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
 import { useLanguage } from "@/hooks/useLanguage";
+import { usePageHeader } from "@/hooks/usePageHeader";
 import { t } from "@/pages/parser/i18n";
 import { NAV_WIDTH_KEY, NAV_STATE_KEY } from "@/pages/parser/types";
 import type { Scene, ChapterStatus } from "@/pages/parser/types";
