@@ -45,8 +45,6 @@ export interface MontagePart {
   user_id: string;
 }
 
-/** @deprecated Use getStemTracks(isRu) instead */
-export const STEM_TRACKS = getStemTracks(false);
 
 const LS_KEY = "montage_last_context";
 
