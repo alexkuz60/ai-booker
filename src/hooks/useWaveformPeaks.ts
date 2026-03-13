@@ -121,6 +121,7 @@ export function useWaveformPeaks(
   trackClips: TimelineClip[],
   trackId: string | null,
   sceneDuration: number = 0,
+  displayWidthPx: number = 1600,
 ): WaveformPeaksState {
   const [state, setState] = useState<WaveformPeaksState>({
     status: "idle",
