@@ -115,7 +115,7 @@ async function encodeMp3(buffer: AudioBuffer, bitrate: Mp3Bitrate = 192): Promis
   const encoder = new Mp3Encoder(numChannels, sampleRate, bitrate);
 
   const BLOCK = 1152;
-  const mp3Parts: Uint8Array[] = [];
+  const mp3Parts: ArrayBuffer[] = [];
 
   // Convert float [-1,1] → Int16
   const toInt16 = (data: Float32Array): Int16Array => {
