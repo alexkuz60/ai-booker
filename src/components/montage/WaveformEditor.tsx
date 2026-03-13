@@ -61,9 +61,6 @@ const CHANNEL_GAP = 2;
 const DB_ZONE_WIDTH = 36;
 
 const EDITOR_ZOOM_PRESETS = [100, 200, 300, 400, 500] as const;
-const SIGNAL_ACTIVITY_THRESHOLD = 0.002;
-const SIGNAL_MIN_ACTIVE_BINS = 3;
-const SIGNAL_PAD_FRAC = 0.01;
 
 /** Resolve a CSS custom property to a usable hsl() string for Canvas */
 function resolveHsl(varName: string): string {
@@ -288,96 +285,18 @@ export function WaveformEditor({
     return Array.from(peaks.lods.keys()).sort((a, b) => a - b);
   }, [peaks]);
 
-  // Use the densest LOD for signal-window detection (stable regardless of current zoom)
-  const signalDetectionPeaks = useMemo(() => {
-    if (!peaks) return null;
-    const desc = Array.from(peaks.lods.keys()).sort((a, b) => b - a);
-    return peaks.lods.get(desc[0]) ?? peaks.lods.values().next().value ?? null;
-  }, [peaks]);
-
-  // End of active signal; 100% zoom stretches [sceneStart..activeEnd] to full viewport width
+  // Scene viewport window: always map the full scene to full editor width at 100% zoom
   const signalWindow = useMemo(() => {
-    const clipEndSec = Math.max(
-      0.05,
-      Math.min(
-        sceneDuration,
-        sceneClips.reduce((maxEnd, clip) => Math.max(maxEnd, clip.startSec + clip.durationSec), 0),
-      ) || sceneDuration,
-    );
-
-    const fallback = {
-      startFrac: 0,
-      endFrac: sceneDuration > 0 ? clipEndSec / sceneDuration : 1,
-      startSec: 0,
-      durationSec: clipEndSec,
-    };
-
-    if (!signalDetectionPeaks || sceneDuration <= 0) return fallback;
-
-    const peakCount = signalDetectionPeaks.left.length;
-    if (peakCount <= 1) return fallback;
-
-    // Real non-silent end from computed peaks (not from DB clip duration metadata)
-    const NON_ZERO_EPSILON = 1e-5;
-    let lastNonZeroIdx = -1;
-
-    for (let i = 0; i < peakCount; i++) {
-      const v = Math.max(
-        Math.abs(signalDetectionPeaks.left[i] ?? 0),
-        Math.abs(signalDetectionPeaks.right[i] ?? 0),
-      );
-      if (v >= NON_ZERO_EPSILON) lastNonZeroIdx = i;
-    }
-
-    let startIdx = -1;
-    let endIdx = -1;
-    let runStart = -1;
-    let runLen = 0;
-
-    for (let i = 0; i < peakCount; i++) {
-      const v = Math.max(
-        Math.abs(signalDetectionPeaks.left[i] ?? 0),
-        Math.abs(signalDetectionPeaks.right[i] ?? 0),
-      );
-
-      if (v >= SIGNAL_ACTIVITY_THRESHOLD) {
-        if (runStart < 0) runStart = i;
-        runLen += 1;
-      } else if (runStart >= 0) {
-        if (runLen >= SIGNAL_MIN_ACTIVE_BINS) {
-          if (startIdx < 0) startIdx = runStart;
-          endIdx = i - 1;
-        }
-        runStart = -1;
-        runLen = 0;
-      }
-    }
-
-    if (runStart >= 0 && runLen >= SIGNAL_MIN_ACTIVE_BINS) {
-      if (startIdx < 0) startIdx = runStart;
-      endIdx = peakCount - 1;
-    }
-
-    // Never cut tail: use the furthest point between threshold-based end and real non-zero end
-    const baseEndIdx = Math.max(endIdx, lastNonZeroIdx);
-
-    if (baseEndIdx < 0) return fallback;
-
-    const pad = Math.max(2, Math.floor(peakCount * SIGNAL_PAD_FRAC));
-    const paddedEndIdx = Math.min(peakCount - 1, baseEndIdx + pad);
-    const rawEndFrac = (paddedEndIdx + 1) / peakCount;
-    const detectedEndSec = Math.max(0.05, Math.min(sceneDuration, rawEndFrac * sceneDuration));
-
-    // Clamp by selected track clip span to prevent drift to chapter-scale width
-    const endSec = Math.max(0.05, Math.min(clipEndSec, detectedEndSec));
+    const fallbackDuration = sceneClips.reduce((maxEnd, clip) => Math.max(maxEnd, clip.startSec + clip.durationSec), 0.05);
+    const durationSec = Math.max(0.05, sceneDuration > 0 ? sceneDuration : fallbackDuration);
 
     return {
       startFrac: 0,
-      endFrac: sceneDuration > 0 ? endSec / sceneDuration : 1,
+      endFrac: 1,
       startSec: 0,
-      durationSec: endSec,
+      durationSec,
     };
-  }, [signalDetectionPeaks, sceneDuration, sceneClips]);
+  }, [sceneDuration, sceneClips]);
 
   // Choose LOD based on visible area in the detected signal window
   const visibleWidth = editorContainerWidth;

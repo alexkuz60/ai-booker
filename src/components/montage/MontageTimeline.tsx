@@ -373,6 +373,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
   useEffect(() => {
     if (!currentSceneId) { setSegmentBoundaries([]); return; }
     let cancelled = false;
+
     supabase
       .from("scene_playlists")
       .select("segments")
@@ -384,18 +385,27 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
           setSegmentBoundaries([]);
           return;
         }
+
         const segs = (data.segments as Array<Record<string, unknown>>)
           .filter((s) => typeof s.start_ms === "number" && typeof s.duration_ms === "number")
-          .sort((a, b) => (a.start_ms as number) - (b.start_ms as number))
-          .map((s) => ({
-            startSec: (s.start_ms as number) / 1000,
-            durationSec: (s.duration_ms as number) / 1000,
-            label: (s.speaker as string) ?? undefined,
-          }));
+          .map((s) => {
+            const startAbsSec = (s.start_ms as number) / 1000;
+            const durationSec = (s.duration_ms as number) / 1000;
+            const startSec = startAbsSec - sceneStartSec;
+            return {
+              startSec,
+              durationSec,
+              label: (s.speaker as string) ?? undefined,
+            };
+          })
+          .filter((s) => s.durationSec > 0 && s.startSec < waveformSceneDuration && s.startSec + s.durationSec > 0)
+          .sort((a, b) => a.startSec - b.startSec);
+
         setSegmentBoundaries(segs);
       });
+
     return () => { cancelled = true; };
-  }, [currentSceneId]);
+  }, [currentSceneId, sceneStartSec, waveformSceneDuration]);
 
   const handleSceneSeek = useCallback(
     (sceneRelativeSec: number) => {
