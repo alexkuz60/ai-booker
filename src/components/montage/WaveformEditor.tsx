@@ -632,6 +632,12 @@ export function WaveformEditor({
           )}
           {status === "loading" && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
           {error && <span className="text-[10px] text-destructive">{error}</span>}
+          {/* Debug: LOD info */}
+          {currentPeaks && (
+            <span className="text-[10px] text-muted-foreground/60 font-mono ml-1">
+              LOD:{lodLevel.toLocaleString()}|{currentPeaks.left.length.toLocaleString()}pk
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-1">
