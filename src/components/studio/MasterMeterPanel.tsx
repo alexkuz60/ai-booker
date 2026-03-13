@@ -501,11 +501,9 @@ const PLUGIN_GROUPS: PluginGroup[] = [
 interface MasterMeterPanelProps {
   isRu: boolean;
   width: number;
-  onRender?: () => void;
-  renderDisabled?: boolean;
 }
 
-export function MasterMeterPanel({ isRu, width, onRender, renderDisabled }: MasterMeterPanelProps) {
+export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
   const engine = getAudioEngine();
 
   const [pluginStates, setPluginStates] = useState(() => {
