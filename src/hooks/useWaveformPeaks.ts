@@ -231,7 +231,7 @@ export function useWaveformPeaks(
         });
       }
     }
-  }, [trackId, clipsKey, trackClips, sceneDuration]);
+  }, [trackId, clipsKey, trackClips, sceneDuration, displayWidthPx]);
 
   useEffect(() => {
     loadPeaks();
