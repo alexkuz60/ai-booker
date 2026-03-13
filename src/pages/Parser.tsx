@@ -80,6 +80,42 @@ export default function Parser() {
     partGroups, partlessIndices,
   } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName, bookId: bookId ?? undefined });
 
+  // ── Page header (unified with AppLayout) ──
+  const headerRight = useMemo(() => {
+    if (step === "workspace") {
+      return (
+        <div className="flex items-center gap-3">
+          <ModelSelector value={selectedModel} onChange={setSelectedModel} isRu={isRu} userApiKeys={userApiKeys} />
+          <div className="text-xs text-muted-foreground font-body">
+            {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} · {totalScenes} {t("scenes", isRu)}
+          </div>
+          <Button variant="outline" size="sm" onClick={handleReset} className="gap-1.5">
+            <ArrowLeft className="h-3 w-3" />
+            {t("libraryBack", isRu)}
+          </Button>
+        </div>
+      );
+    }
+    if (step === "upload") {
+      return (
+        <Button variant="ghost" size="sm" onClick={() => setStep("library")} className="gap-1.5">
+          <ArrowLeft className="h-3 w-3" />
+          {t("libraryBack", isRu)}
+        </Button>
+      );
+    }
+    return undefined;
+  }, [step, selectedModel, setSelectedModel, isRu, userApiKeys, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep]);
+
+  useEffect(() => {
+    const title = t("parserTitle", isRu);
+    const subtitle = step === "workspace" && fileName
+      ? fileName.replace('.pdf', '')
+      : t("parserSubtitle", isRu);
+    setPageHeader({ title, subtitle, headerRight });
+    return () => setPageHeader({});
+  }, [isRu, step, fileName, headerRight, setPageHeader]);
+
   // Persist nav state to sessionStorage
   useEffect(() => {
     try {
