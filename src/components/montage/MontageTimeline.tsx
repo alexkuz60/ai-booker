@@ -313,17 +313,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     el.scrollLeft = Math.max(0, playheadPx - el.clientWidth / 2);
   }, [player.positionSec, player.state, zoom, montageZoomPercent]);
 
-  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    const startY = e.clientY;
-    const startH = timelineHeight;
-    const onMove = (ev: MouseEvent) => {
-      setTimelineHeight(Math.min(Math.max(160, startH + (startY - ev.clientY)), Math.floor(window.innerHeight * 0.6)));
-    };
-    const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  }, [timelineHeight]);
 
   // ── Clips grouped by track ──────────────────────────────────
   const clipsByTrack = useMemo(() => {
