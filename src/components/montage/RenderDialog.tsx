@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { FileAudio, Download, Loader2, CheckCircle, AlertCircle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { renderChapter, type ChapterRenderProgress } from "@/lib/chapterRenderer";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 
@@ -33,7 +32,6 @@ function formatFileSize(bytes: number): string {
 }
 
 function sanitizeFileName(name: string): string {
-  // Transliterate Cyrillic to Latin, then remove/replace unsafe chars
   const transliterated = name
     .replace(/[а-яё]/gi, (char) => {
       const map: Record<string, string> = {
@@ -48,9 +46,9 @@ function sanitizeFileName(name: string): string {
       };
       return map[char] || char;
     })
-    .replace(/\s+/g, '_')           // spaces → underscores
-    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')  // illegal chars
-    .replace(/_{2,}/g, '_')         // collapse multiple underscores
+    .replace(/\s+/g, '_')
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+    .replace(/_{2,}/g, '_')
     .trim();
   return transliterated || 'render';
 }
@@ -59,7 +57,6 @@ const PHASE_LABELS = {
   loading: { en: "Loading stems…", ru: "Загрузка стемов…" },
   rendering: { en: "Rendering…", ru: "Рендеринг…" },
   encoding: { en: "Encoding WAV…", ru: "Кодирование WAV…" },
-  uploading: { en: "Uploading…", ru: "Загрузка файла…" },
   done: { en: "Done!", ru: "Готово!" },
   error: { en: "Error", ru: "Ошибка" },
 };
@@ -69,66 +66,55 @@ export function RenderDialog({
   bookTitle, chapterTitle, partNumber, isRu,
 }: RenderDialogProps) {
 
-  // Default filename
   const defaultName = [
     sanitizeFileName(bookTitle),
     sanitizeFileName(chapterTitle),
     partNumber ? `part${partNumber}` : null,
   ].filter(Boolean).join("_");
 
-  const [folderPath, setFolderPath] = useState("chapter-renders");
   const [fileName, setFileName] = useState(defaultName);
   const [rendering, setRendering] = useState(false);
   const [progress, setProgress] = useState<ChapterRenderProgress | null>(null);
-  const [result, setResult] = useState<{ storagePath: string; fileSizeBytes: number } | null>(null);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [result, setResult] = useState<{ fileSizeBytes: number } | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const abortRef = useRef(false);
+
+  const safeName = sanitizeFileName(fileName.trim() || defaultName) + ".wav";
 
   const handleRender = useCallback(async () => {
     if (!userId || clips.length === 0) return;
     setRendering(true);
     setProgress(null);
     setResult(null);
-    setDownloadUrl(null);
+    if (blobUrl) { URL.revokeObjectURL(blobUrl); setBlobUrl(null); }
     abortRef.current = false;
-
-    const safeName = sanitizeFileName(fileName.trim() || defaultName);
-    const safeFolder = folderPath.replace(/^\/+|\/+$/g, "") || "chapter-renders";
-    const storagePath = `${userId}/${safeFolder}/${safeName}.wav`;
 
     try {
       const res = await renderChapter({
         clips,
         totalDurationSec,
-        userId,
-        storagePath,
-        onProgress: (p) => {
-          if (!abortRef.current) setProgress(p);
-        },
+        onProgress: (p) => { if (!abortRef.current) setProgress(p); },
       });
-      setResult({ storagePath: res.storagePath, fileSizeBytes: res.fileSizeBytes });
 
-      // Get download URL
-      const { data } = await supabase.storage
-        .from("user-media")
-        .createSignedUrl(res.storagePath, 3600);
-      if (data?.signedUrl) setDownloadUrl(data.signedUrl);
+      const url = URL.createObjectURL(res.blob);
+      setBlobUrl(url);
+      setResult({ fileSizeBytes: res.fileSizeBytes });
     } catch (e: any) {
       console.error("[RenderDialog] Render failed:", e);
     } finally {
       setRendering(false);
     }
-  }, [userId, clips, totalDurationSec, fileName, folderPath, defaultName]);
+  }, [userId, clips, totalDurationSec, blobUrl]);
 
   const handleClose = useCallback(() => {
-    if (rendering) return; // prevent close during render
+    if (rendering) return;
     abortRef.current = true;
     setProgress(null);
     setResult(null);
-    setDownloadUrl(null);
+    if (blobUrl) { URL.revokeObjectURL(blobUrl); setBlobUrl(null); }
     setFileName(defaultName);
     onOpenChange(false);
-  }, [rendering, defaultName, onOpenChange]);
+  }, [rendering, defaultName, onOpenChange, blobUrl]);
 
   const phaseLabel = progress
     ? (isRu ? PHASE_LABELS[progress.phase].ru : PHASE_LABELS[progress.phase].en)
@@ -154,35 +140,22 @@ export function RenderDialog({
             <p>{isRu ? "Длительность" : "Duration"}: {formatDuration(totalDurationSec)} · WAV 16-bit / 44100 Hz / Stereo</p>
           </div>
 
-          {/* File path inputs */}
+          {/* File name input */}
           {!rendering && !isDone && (
-            <>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-body">
-                  {isRu ? "Папка в хранилище" : "Storage folder"}
-                </Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-body">
+                {isRu ? "Имя файла" : "File name"}
+              </Label>
+              <div className="flex items-center gap-1">
                 <Input
-                  value={folderPath}
-                  onChange={(e) => setFolderPath(e.target.value)}
-                  className="h-8 text-xs font-mono"
-                  placeholder="chapter-renders"
+                  value={fileName}
+                  onChange={(e) => setFileName(e.target.value)}
+                  className="h-8 text-xs font-mono flex-1"
+                  placeholder={defaultName}
                 />
+                <span className="text-xs text-muted-foreground font-mono">.wav</span>
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-body">
-                  {isRu ? "Имя файла" : "File name"}
-                </Label>
-                <div className="flex items-center gap-1">
-                  <Input
-                    value={fileName}
-                    onChange={(e) => setFileName(e.target.value)}
-                    className="h-8 text-xs font-mono flex-1"
-                    placeholder={defaultName}
-                  />
-                  <span className="text-xs text-muted-foreground font-mono">.wav</span>
-                </div>
-              </div>
-            </>
+            </div>
           )}
 
           {/* Progress */}
@@ -207,19 +180,19 @@ export function RenderDialog({
                 <span className="font-body">{isRu ? "Рендер завершён" : "Render complete"}</span>
               </div>
               <div className="text-xs text-muted-foreground font-mono space-y-0.5">
-                <p>{result.storagePath}</p>
+                <p>{safeName}</p>
                 <p>{formatFileSize(result.fileSizeBytes)}</p>
               </div>
-              {downloadUrl && (
+              {blobUrl && (
                 <Button
                   variant="outline"
                   size="sm"
                   className="h-8 gap-1.5 text-xs w-full"
                   asChild
                 >
-                  <a href={downloadUrl} download={`${sanitizeFileName(fileName)}.wav`}>
+                  <a href={blobUrl} download={safeName}>
                     <Download className="h-3.5 w-3.5" />
-                    {isRu ? "Скачать" : "Download"}
+                    {isRu ? "Скачать на диск" : "Save to disk"}
                   </a>
                 </Button>
               )}
