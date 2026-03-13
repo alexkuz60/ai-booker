@@ -110,7 +110,8 @@ export function chooseLod(
 ): LodLevel {
   if (visibleWidthPx <= 0 || visibleDurationSec <= 0) return lodLevels[0];
   
-  const peaksPerPixel = 2;
+  // 4 peaks/px: 2 per pixel × 2 channels (L+R) for full stereo density
+  const peaksPerPixel = 4;
   const neededPeaks = visibleWidthPx * peaksPerPixel;
   const neededTotal = Math.round(neededPeaks * (totalDurationSec / visibleDurationSec));
   
