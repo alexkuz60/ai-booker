@@ -35,6 +35,7 @@ export interface WaveformPeaksState {
 function computeScenePeaks(
   clipBuffers: { clip: TimelineClip; buffer: AudioBuffer }[],
   sceneDuration: number,
+  lodLevels: LodLevel[],
 ): MultiLodPeaks {
   if (sceneDuration <= 0) {
     const empty = new Map<LodLevel, StereoPeaks>();
