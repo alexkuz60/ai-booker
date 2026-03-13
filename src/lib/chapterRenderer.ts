@@ -340,6 +340,7 @@ export async function renderChapter(opts: {
     onProgress?.({ phase: "loading", percent: 0 });
 
     const stemClips = clips.filter(c => c.hasAudio && c.audioPath);
+    console.log(`[ChapterRenderer] Total clips: ${clips.length}, stem clips: ${stemClips.length}`);
     const buffers = new Map<string, AudioBuffer>();
     let loaded = 0;
 
@@ -349,6 +350,8 @@ export async function renderChapter(opts: {
       loaded++;
       onProgress?.({ phase: "loading", percent: Math.round((loaded / stemClips.length) * 40) });
     }
+
+    console.log(`[ChapterRenderer] Loaded ${buffers.size}/${stemClips.length} buffers`);
 
     // ── Phase 2: Offline render ──
     onProgress?.({ phase: "rendering", percent: 40 });
@@ -361,6 +364,7 @@ export async function renderChapter(opts: {
     masterOutput.connect(offlineCtx.destination);
 
     // Schedule all clips into the offline context
+    let scheduled = 0;
     for (const clip of stemClips) {
       const buffer = buffers.get(clip.id);
       if (!buffer) continue;
@@ -373,11 +377,16 @@ export async function renderChapter(opts: {
       const volume = mixState?.volume ?? 80;
       const pan = mixState?.pan ?? 0;
 
+      const gainDb = volume <= 0 ? -Infinity : 20 * Math.log10(volume / 100);
+      const gainLinear = volume <= 0 ? 0 : Math.pow(10, gainDb / 20);
+
       const gainNode = offlineCtx.createGain();
-      gainNode.gain.value = volume <= 0 ? 0 : Math.pow(10, (20 * Math.log10(volume / 100)) / 20);
+      gainNode.gain.value = gainLinear;
 
       const panNode = offlineCtx.createStereoPanner();
       panNode.pan.value = pan;
+
+      console.log(`[ChapterRenderer] Schedule: ${clip.id} at ${clip.startSec.toFixed(2)}s, dur=${clip.durationSec.toFixed(2)}s, vol=${volume}, gain=${gainLinear.toFixed(4)}, bufDur=${buffer.duration.toFixed(2)}s`);
 
       // Fade in/out
       const fadeIn = clip.fadeInSec ?? 0;
@@ -385,14 +394,13 @@ export async function renderChapter(opts: {
       const clipDur = clip.durationSec;
 
       if (fadeIn > 0) {
+        const targetGain = gainLinear;
         gainNode.gain.setValueAtTime(0, clip.startSec);
-        gainNode.gain.linearRampToValueAtTime(
-          gainNode.gain.value, clip.startSec + fadeIn
-        );
+        gainNode.gain.linearRampToValueAtTime(targetGain, clip.startSec + fadeIn);
       }
       if (fadeOut > 0) {
         const fadeStart = clip.startSec + clipDur - fadeOut;
-        gainNode.gain.setValueAtTime(gainNode.gain.value, fadeStart);
+        gainNode.gain.setValueAtTime(gainLinear, fadeStart);
         gainNode.gain.linearRampToValueAtTime(0, clip.startSec + clipDur);
       }
 
@@ -401,10 +409,23 @@ export async function renderChapter(opts: {
       panNode.connect(masterInput);
 
       source.start(clip.startSec);
+      scheduled++;
     }
+
+    console.log(`[ChapterRenderer] Scheduled ${scheduled} sources, rendering ${totalSamples} samples (${totalDurationSec.toFixed(1)}s)`);
 
     // Render
     const renderedBuffer = await offlineCtx.startRendering();
+
+    // Check if rendered buffer has audio
+    const ch0 = renderedBuffer.getChannelData(0);
+    let renderedPeak = 0;
+    for (let i = 0; i < ch0.length; i += 1000) {
+      const abs = Math.abs(ch0[i]);
+      if (abs > renderedPeak) renderedPeak = abs;
+    }
+    console.log(`[ChapterRenderer] Rendered buffer peak: ${renderedPeak.toFixed(6)}, duration: ${renderedBuffer.duration.toFixed(2)}s`);
+
     onProgress?.({ phase: "rendering", percent: 70 });
 
     // ── Phase 3: Encode WAV ──
