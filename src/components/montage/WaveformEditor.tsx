@@ -472,7 +472,7 @@ export function WaveformEditor({
       ctx.save();
       for (let si = 1; si < boundaries.length; si++) {
         const seg = boundaries[si];
-        const localSec = seg.startSec - signalWindow.startSec;
+        const localSec = seg.startSec;
         if (localSec <= 0.01 || localSec >= displayDurationSec - 0.01) continue;
         const px = (localSec / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
         if (px < DB_ZONE_WIDTH || px > w) continue;
