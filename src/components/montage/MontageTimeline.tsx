@@ -112,7 +112,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
   const trackIds = useMemo(() => stemTracks.map(t => t.id), [stemTracks]);
   const { scheduleSave: onMixChange } = useMixerPersistence(chapterId, trackIds);
 
-  const [timelineHeight, setTimelineHeight] = useState(450);
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 
@@ -314,17 +313,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     el.scrollLeft = Math.max(0, playheadPx - el.clientWidth / 2);
   }, [player.positionSec, player.state, zoom, montageZoomPercent]);
 
-  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    const startY = e.clientY;
-    const startH = timelineHeight;
-    const onMove = (ev: MouseEvent) => {
-      setTimelineHeight(Math.min(Math.max(160, startH + (startY - ev.clientY)), Math.floor(window.innerHeight * 0.6)));
-    };
-    const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  }, [timelineHeight]);
 
   // ── Clips grouped by track ──────────────────────────────────
   const clipsByTrack = useMemo(() => {
@@ -439,18 +427,8 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
 
   return (
     <div
-      className="flex flex-col bg-background border-t border-border shrink-0"
-      style={{ height: timelineCollapsed ? 41 : timelineHeight }}
+      className="flex flex-col bg-background border-t border-border h-full min-h-0"
     >
-      {!timelineCollapsed && (
-        <div
-          onMouseDown={handleResizeMouseDown}
-          className="h-2 cursor-row-resize hover:bg-primary/30 bg-border/50 transition-colors shrink-0 flex items-center justify-center"
-        >
-          <div className="w-8 h-0.5 rounded-full bg-muted-foreground/30" />
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
         <div className="flex items-center gap-3">
