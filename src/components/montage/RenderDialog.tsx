@@ -92,7 +92,7 @@ export function RenderDialog({
     setDownloadUrl(null);
     abortRef.current = false;
 
-    const safeName = sanitizeFileName(fileName) || defaultName;
+    const safeName = sanitizeFileName(fileName.trim() || defaultName);
     const safeFolder = folderPath.replace(/^\/+|\/+$/g, "") || "chapter-renders";
     const storagePath = `${userId}/${safeFolder}/${safeName}.wav`;
 
