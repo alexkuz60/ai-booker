@@ -188,7 +188,119 @@ function PeakMeterSection() {
 
 // ─── FFT Spectrum Analyzer (exported for use in MasterEffectsTabs) ───
 
+import { subscribeStaticSpectrum, getStaticSpectrum, type StaticSpectrumData } from "@/lib/staticSpectrum";
+
 type SpectrumMode = "bars" | "line" | "mirror";
+
+function drawStaticSpectrum(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  data: StaticSpectrumData,
+  mode: SpectrumMode,
+) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // Dark background with cyan tint
+  ctx.fillStyle = "hsla(190, 15%, 5%, 0.97)";
+  ctx.fillRect(0, 0, w, h);
+
+  const bins = data.bins;
+  const usableBins = bins.length;
+  const barWidth = w / usableBins;
+  const dbMin = -80;
+  const dbMax = 0;
+  const dbRange = dbMax - dbMin;
+
+  // dB grid
+  const dbGridLevels = [-6, -12, -24, -48];
+  ctx.strokeStyle = "hsla(190, 30%, 50%, 0.12)";
+  ctx.lineWidth = 1;
+  ctx.font = "9px monospace";
+  ctx.fillStyle = "hsla(190, 40%, 60%, 0.35)";
+  ctx.textAlign = "left";
+  dbGridLevels.forEach(dbLvl => {
+    const normalized = Math.max(0, Math.min(1, (dbLvl - dbMin) / dbRange));
+    const gy = h - normalized * h;
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke();
+    ctx.fillText(`${dbLvl}`, 2, gy - 2);
+  });
+
+  // Static gradient (cyan-based)
+  const gradient = ctx.createLinearGradient(0, h, 0, 0);
+  gradient.addColorStop(0, "hsl(190, 60%, 30%)");
+  gradient.addColorStop(0.4, "hsl(180, 70%, 40%)");
+  gradient.addColorStop(0.7, "hsl(170, 80%, 50%)");
+  gradient.addColorStop(0.9, "hsl(50, 80%, 55%)");
+  gradient.addColorStop(1, "hsl(0, 75%, 55%)");
+
+  if (mode === "bars" || mode === "mirror") {
+    ctx.fillStyle = gradient;
+    for (let i = 0; i < usableBins; i++) {
+      const normalized = Math.max(0, Math.min(1, (bins[i] - dbMin) / dbRange));
+      if (mode === "mirror") {
+        const halfH = h / 2;
+        const barH = normalized * halfH;
+        ctx.fillRect(i * barWidth, halfH - barH, barWidth - 0.5, barH);
+        ctx.fillStyle = "hsl(200, 60%, 35%)";
+        ctx.fillRect(i * barWidth, halfH + 1, barWidth - 0.5, barH);
+        ctx.fillStyle = gradient;
+      } else {
+        ctx.fillRect(i * barWidth, h - normalized * h, barWidth - 0.5, normalized * h);
+      }
+    }
+  } else {
+    // Line mode
+    ctx.strokeStyle = "hsl(180, 70%, 55%)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < usableBins; i++) {
+      const normalized = Math.max(0, Math.min(1, (bins[i] - dbMin) / dbRange));
+      const x = i * barWidth + barWidth / 2;
+      const y = h - normalized * h;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.lineTo((usableBins - 1) * barWidth + barWidth / 2, h);
+    ctx.lineTo(barWidth / 2, h);
+    ctx.closePath();
+    const fillGrad = ctx.createLinearGradient(0, 0, 0, h);
+    fillGrad.addColorStop(0, "hsla(180, 70%, 50%, 0.8)");
+    fillGrad.addColorStop(0.5, "hsla(190, 60%, 40%, 0.4)");
+    fillGrad.addColorStop(1, "hsla(200, 50%, 30%, 0.15)");
+    ctx.fillStyle = fillGrad;
+    ctx.fill();
+  }
+
+  // Frequency labels
+  ctx.fillStyle = "hsla(0, 0%, 100%, 0.7)";
+  ctx.font = "bold 10px monospace";
+  ctx.textAlign = "center";
+  const markers = [
+    { bin: 2, label: "100" }, { bin: 6, label: "500" },
+    { bin: 12, label: "1k" }, { bin: 24, label: "2k" },
+    { bin: 48, label: "5k" }, { bin: 80, label: "10k" },
+  ];
+  markers.forEach(m => {
+    if (m.bin < usableBins) ctx.fillText(m.label, m.bin * barWidth, h - 2);
+  });
+
+  // "STATIC" label + data label
+  ctx.fillStyle = "hsl(180, 70%, 55%)";
+  ctx.font = "bold 10px monospace";
+  ctx.textAlign = "right";
+  ctx.fillText("STATIC", w - 6, 12);
+  ctx.fillStyle = "hsla(180, 50%, 70%, 0.8)";
+  ctx.font = "9px monospace";
+  ctx.fillText(data.label, w - 6, 24);
+}
+
 const SPECTRUM_MODES: { id: SpectrumMode; label: string }[] = [
   { id: "bars", label: "▮▮" },
   { id: "line", label: "〜" },
@@ -197,6 +309,7 @@ const SPECTRUM_MODES: { id: SpectrumMode; label: string }[] = [
 
 export function SpectrumAnalyzer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [staticData, setStaticData] = useState<StaticSpectrumData | null>(getStaticSpectrum);
 
   const [mode, setMode] = useState<SpectrumMode>(() => {
     try { return (localStorage.getItem("spectrum-mode") as SpectrumMode) || "bars"; } catch { return "bars"; }
@@ -216,6 +329,14 @@ export function SpectrumAnalyzer() {
     getAudioEngine().setFFTSize(128);
   }, []);
 
+  // Subscribe to static spectrum updates
+  useEffect(() => {
+    return subscribeStaticSpectrum(setStaticData);
+  }, []);
+
+  const staticDataRef = useRef(staticData);
+  staticDataRef.current = staticData;
+
   const smoothRef = useRef<Float32Array | null>(null);
   const modeRef = useRef(mode);
   modeRef.current = mode;
@@ -230,6 +351,13 @@ export function SpectrumAnalyzer() {
       const canvas = canvasRef.current;
       if (!canvas) { raf = requestAnimationFrame(draw); return; }
       const ctx = canvas.getContext("2d");
+
+      // If static data available, render it and stop animation loop
+      const sd = staticDataRef.current;
+      if (sd) {
+        drawStaticSpectrum(canvas, ctx!, sd, modeRef.current);
+        return; // Don't request next frame — static snapshot
+      }
       if (!ctx) { raf = requestAnimationFrame(draw); return; }
 
       const dpr = window.devicePixelRatio || 1;
@@ -426,7 +554,7 @@ export function SpectrumAnalyzer() {
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [staticData]);
 
   return (
     <div className="flex flex-col gap-1 h-full">

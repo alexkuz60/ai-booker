@@ -6,11 +6,14 @@
  */
 
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import { Loader2, Scissors, ArrowUpRight, ArrowDownRight, AudioWaveform, Undo2, Redo2, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { Loader2, Scissors, ArrowUpRight, ArrowDownRight, AudioWaveform, Undo2, Redo2, ZoomIn, ZoomOut, Maximize2, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { chooseLod, type MultiLodPeaks, type StereoPeaks } from "@/lib/waveformPeaks";
 import { useWaveformPeaks, type WaveformStatus } from "@/hooks/useWaveformPeaks";
+import { supabase } from "@/integrations/supabase/client";
+import { fetchWithStemCache } from "@/lib/stemCache";
+import { computeFFTAtPosition, computeAveragedFFT, setStaticSpectrum } from "@/lib/staticSpectrum";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 
 /** Scene-local segment boundary (from scene_playlists) */
@@ -195,6 +198,9 @@ export function WaveformEditor({
   const [selection, setSelection] = useState<Selection | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<number>(0);
+  const [staticSpectrumActive, setStaticSpectrumActive] = useState(false);
+  const audioBufferRef = useRef<AudioBuffer | null>(null);
+  const loadingBufferRef = useRef(false);
 
   // ── Editor-local zoom (100% = scene fits entire width) ─────
   const [editorZoomPercent, setEditorZoomPercent] = useState(100);
@@ -639,6 +645,84 @@ export function WaveformEditor({
     return () => window.removeEventListener("keydown", handler);
   }, [onUndo, onRedo]);
 
+  // ── Static spectrum computation ──────────────────────────────
+  const loadAudioBuffer = useCallback(async () => {
+    if (loadingBufferRef.current || audioBufferRef.current) return audioBufferRef.current;
+    const clip = sceneClips.find(c => c.hasAudio && c.audioPath);
+    if (!clip?.audioPath) return null;
+    loadingBufferRef.current = true;
+    try {
+      const { data } = await supabase.storage.from("user-media").createSignedUrl(clip.audioPath, 600);
+      if (!data?.signedUrl) return null;
+      const arrayBuf = await fetchWithStemCache(clip.audioPath, data.signedUrl);
+      const decodeCtx = new OfflineAudioContext(2, 44100 * 60, 44100);
+      const decoded = await decodeCtx.decodeAudioData(arrayBuf.slice(0));
+      audioBufferRef.current = decoded;
+      return decoded;
+    } catch (e) {
+      console.warn("[WaveformEditor] Failed to load buffer for static FFT:", e);
+      return null;
+    } finally {
+      loadingBufferRef.current = false;
+    }
+  }, [sceneClips]);
+
+  // Clear buffer when scene changes
+  useEffect(() => {
+    audioBufferRef.current = null;
+  }, [sceneLabel]);
+
+  // Cleanup static spectrum on unmount or deactivation
+  useEffect(() => {
+    if (!staticSpectrumActive) {
+      setStaticSpectrum(null);
+    }
+    return () => setStaticSpectrum(null);
+  }, [staticSpectrumActive]);
+
+  const handleStaticSpectrum = useCallback(async () => {
+    if (staticSpectrumActive) {
+      setStaticSpectrumActive(false);
+      setStaticSpectrum(null);
+      return;
+    }
+    const buf = await loadAudioBuffer();
+    if (!buf) return;
+
+    const FFT_SIZE = 256; // 128 bins output
+    let bins: Float32Array;
+    let label: string;
+
+    if (selection && selection.endSec - selection.startSec > 0.05) {
+      bins = computeAveragedFFT(buf, selection.startSec, selection.endSec, FFT_SIZE, 24);
+      label = `AVG ${formatTimePrecise(selection.startSec)}–${formatTimePrecise(selection.endSec)}`;
+    } else {
+      bins = computeFFTAtPosition(buf, displayPositionSec, FFT_SIZE);
+      label = `@ ${formatTimePrecise(displayPositionSec)}`;
+    }
+
+    setStaticSpectrum({ bins, label });
+    setStaticSpectrumActive(true);
+  }, [staticSpectrumActive, selection, displayPositionSec, loadAudioBuffer]);
+
+  // Update static spectrum when playhead moves (if active & no selection & stopped)
+  useEffect(() => {
+    if (!staticSpectrumActive || isPlaying || !audioBufferRef.current) return;
+    if (selection && selection.endSec - selection.startSec > 0.05) return; // selection mode — don't update on playhead
+    const buf = audioBufferRef.current;
+    const bins = computeFFTAtPosition(buf, displayPositionSec, 256);
+    setStaticSpectrum({ bins, label: `@ ${formatTimePrecise(displayPositionSec)}` });
+  }, [staticSpectrumActive, displayPositionSec, isPlaying, selection]);
+
+  // Update static spectrum when selection changes (if active)
+  useEffect(() => {
+    if (!staticSpectrumActive || !audioBufferRef.current || !selection) return;
+    if (selection.endSec - selection.startSec < 0.05) return;
+    const buf = audioBufferRef.current;
+    const bins = computeAveragedFFT(buf, selection.startSec, selection.endSec, 256, 24);
+    setStaticSpectrum({ bins, label: `AVG ${formatTimePrecise(selection.startSec)}–${formatTimePrecise(selection.endSec)}` });
+  }, [staticSpectrumActive, selection]);
+
   // Redraw on RAF for smooth playhead
   const rafRef = useRef<number>(0);
   useEffect(() => {
@@ -851,6 +935,19 @@ export function WaveformEditor({
             }}
           >
             <ArrowDownRight className="h-3 w-3" />
+          </Button>
+          <div className="w-px h-3 bg-border/50 mx-0.5" />
+          <Button
+            variant={staticSpectrumActive ? "default" : "ghost"}
+            size="sm"
+            className="h-5 px-1.5 text-[10px] gap-0.5"
+            disabled={isPlaying}
+            title={isRu
+              ? (selection ? "Усреднённый спектр выделения" : "Статический спектр в позиции")
+              : (selection ? "Averaged spectrum of selection" : "Static spectrum at position")}
+            onClick={handleStaticSpectrum}
+          >
+            <BarChart3 className="h-3 w-3" />
           </Button>
           <div className="w-px h-3 bg-border/50 mx-0.5" />
           <Button
