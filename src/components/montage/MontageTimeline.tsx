@@ -616,12 +616,12 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
               .filter(c => c.trackId === selectedTrackId)
               .filter(c => {
                 const clipEnd = c.startSec + c.durationSec;
-                return clipEnd > audioStartSec && c.startSec < sceneEndSec;
+                return clipEnd > sceneStartSec && c.startSec < sceneEndSec;
               })
               .map(c => ({
                 ...c,
-                startSec: Math.max(0, c.startSec - audioStartSec),
-                durationSec: Math.min(c.startSec + c.durationSec, sceneEndSec) - Math.max(c.startSec, audioStartSec),
+                startSec: Math.max(0, c.startSec - sceneStartSec),
+                durationSec: Math.min(c.startSec + c.durationSec, sceneEndSec) - Math.max(c.startSec, sceneStartSec),
               }));
 
 
@@ -632,7 +632,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
 
             // Seek handler: convert scene-local → absolute
             const handleSceneSeek = (sceneRelativeSec: number) => {
-              player.seek(audioStartSec + sceneRelativeSec);
+              player.seek(sceneStartSec + sceneRelativeSec);
             };
 
             return (
