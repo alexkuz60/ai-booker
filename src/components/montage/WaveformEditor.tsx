@@ -1,7 +1,7 @@
 /**
  * WaveformEditor — professional stereo L/R waveform display with selection,
  * trim, fade in/out, normalize. Canvas-based with virtual rendering.
- * Operates in SCENE-LOCAL coordinates: 100% zoom = full scene visible.
+ * Operates in SCENE-LOCAL coordinates: 100% zoom = scene start + active signal span.
  * Transport position is relative to scene start.
  */
 
