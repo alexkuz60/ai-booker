@@ -131,33 +131,39 @@ const Montage = () => {
 
       {/* Main content */}
       {hasContent ? (
-        <>
+        <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">
           {/* Effects workspace */}
-          <div className="flex-1 min-h-0 overflow-hidden p-4">
-            <div className="h-full rounded-lg border border-border bg-card/50 overflow-hidden flex">
-              <div className="shrink-0 border-r border-border" style={{ width: `${SIDEBAR_WIDTH}px` }}>
-                <MasterMeterPanel
-                  isRu={isRu}
-                  width={SIDEBAR_WIDTH}
-                />
-              </div>
-              <div className="flex-1 min-h-0 p-2">
-                <MasterEffectsTabs isRu={isRu} />
+          <ResizablePanel defaultSize={55} minSize={25}>
+            <div className="h-full overflow-hidden p-4">
+              <div className="h-full rounded-lg border border-border bg-card/50 overflow-hidden flex">
+                <div className="shrink-0 border-r border-border" style={{ width: `${SIDEBAR_WIDTH}px` }}>
+                  <MasterMeterPanel
+                    isRu={isRu}
+                    width={SIDEBAR_WIDTH}
+                  />
+                </div>
+                <div className="flex-1 min-h-0 p-2">
+                  <MasterEffectsTabs isRu={isRu} />
+                </div>
               </div>
             </div>
-          </div>
+          </ResizablePanel>
+
+          <ResizableHandle />
 
           {/* Timeline */}
-          <MontageTimeline
-            clips={clips}
-            sceneBoundaries={sceneBoundaries}
-            totalDurationSec={totalDurationSec}
-            chapterId={chapterId}
-            isRu={isRu}
-            onSplitAtScene={splitAtScene}
-            hasParts={parts.length > 0}
-          />
-        </>
+          <ResizablePanel defaultSize={45} minSize={20}>
+            <MontageTimeline
+              clips={clips}
+              sceneBoundaries={sceneBoundaries}
+              totalDurationSec={totalDurationSec}
+              chapterId={chapterId}
+              isRu={isRu}
+              onSplitAtScene={splitAtScene}
+              hasParts={parts.length > 0}
+            />
+          </ResizablePanel>
+        </ResizablePanelGroup>
       ) : (
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
           <div className="text-center space-y-2">
