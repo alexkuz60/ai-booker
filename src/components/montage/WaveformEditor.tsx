@@ -198,6 +198,9 @@ export function WaveformEditor({
   const [selection, setSelection] = useState<Selection | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<number>(0);
+  const [staticSpectrumActive, setStaticSpectrumActive] = useState(false);
+  const audioBufferRef = useRef<AudioBuffer | null>(null);
+  const loadingBufferRef = useRef(false);
 
   // ── Editor-local zoom (100% = scene fits entire width) ─────
   const [editorZoomPercent, setEditorZoomPercent] = useState(100);
