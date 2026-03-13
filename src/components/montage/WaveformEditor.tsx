@@ -361,9 +361,9 @@ export function WaveformEditor({
 
         ctx.fillStyle = mutedColor.replace(")", " / 0.5)").replace("hsl(", "hsl(");
         const label = db === 0 ? " 0" : `${db}`;
-        ctx.fillText(label, (mixerWidth - 4) * dpr, (yUp + 3) * dpr);
+        ctx.fillText(label, (DB_ZONE_WIDTH - 4) * dpr, (yUp + 3) * dpr);
         if (db !== 0 && db !== -60) {
-          ctx.fillText(label, (mixerWidth - 4) * dpr, (yDown + 3) * dpr);
+          ctx.fillText(label, (DB_ZONE_WIDTH - 4) * dpr, (yDown + 3) * dpr);
         }
       }
       ctx.textAlign = "left";
