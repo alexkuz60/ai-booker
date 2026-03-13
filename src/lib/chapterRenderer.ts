@@ -95,8 +95,23 @@ async function fetchStemBuffer(
     if (!urlData?.signedUrl) return null;
 
     const arrayBuf = await fetchWithStemCache(audioPath, urlData.signedUrl);
-    const decodeCtx = new OfflineAudioContext(2, 1, sampleRate);
-    return await decodeCtx.decodeAudioData(arrayBuf);
+    console.log(`[ChapterRenderer] Decoding stem: ${audioPath}, bytes=${arrayBuf.byteLength}`);
+
+    // Use a sufficiently long context for decoding (some browsers need this)
+    const decodeCtx = new OfflineAudioContext(2, sampleRate * 60, sampleRate);
+    const decoded = await decodeCtx.decodeAudioData(arrayBuf.slice(0));
+    console.log(`[ChapterRenderer] Decoded: ch=${decoded.numberOfChannels}, len=${decoded.length}, sr=${decoded.sampleRate}, dur=${decoded.duration.toFixed(2)}s`);
+
+    // Verify buffer actually has audio content
+    const ch0 = decoded.getChannelData(0);
+    let peak = 0;
+    for (let i = 0; i < ch0.length; i += 100) {
+      const abs = Math.abs(ch0[i]);
+      if (abs > peak) peak = abs;
+    }
+    console.log(`[ChapterRenderer] Peak amplitude: ${peak.toFixed(6)}`);
+
+    return decoded;
   } catch (e) {
     console.warn("[ChapterRenderer] Failed to load stem:", audioPath, e);
     return null;
