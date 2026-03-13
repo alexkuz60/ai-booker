@@ -23,12 +23,13 @@ export function computeLodLevels(
   sceneDurationSec: number,
   displayWidthPx: number = DEFAULT_DISPLAY_WIDTH,
 ): LodLevel[] {
-  if (sceneDurationSec <= 0 || displayWidthPx <= 0) return [200, 800, 3200];
-  const maxPeaks = Math.ceil(sceneDurationSec * 44100 * MAX_ZOOM / displayWidthPx);
+  if (sceneDurationSec <= 0 || displayWidthPx <= 0) return [400, 1600, 6400];
+  // ×2 for stereo: each channel (L/R) needs full peak density independently
+  const maxPeaks = Math.ceil(sceneDurationSec * 44100 * MAX_ZOOM / displayWidthPx) * 2;
   // 3 tiers: overview (~1/16), medium (~1/4), detail (full)
-  const detail = Math.max(3200, maxPeaks);
-  const medium = Math.max(800, Math.ceil(detail / 4));
-  const overview = Math.max(200, Math.ceil(detail / 16));
+  const detail = Math.max(6400, maxPeaks);
+  const medium = Math.max(1600, Math.ceil(detail / 4));
+  const overview = Math.max(400, Math.ceil(detail / 16));
   return [overview, medium, detail];
 }
 
@@ -73,7 +74,7 @@ function computeChannelPeaks(data: Float32Array, peakCount: number): Float32Arra
  */
 export function computeMultiLodPeaks(
   buffer: AudioBuffer,
-  lodLevels: LodLevel[] = [200, 800, 3200],
+  lodLevels: LodLevel[] = [400, 1600, 6400],
 ): MultiLodPeaks {
   const left = buffer.getChannelData(0);
   const right = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : left;
@@ -105,11 +106,12 @@ export function chooseLod(
   visibleWidthPx: number,
   totalDurationSec: number,
   visibleDurationSec: number,
-  lodLevels: LodLevel[] = [200, 800, 3200],
+  lodLevels: LodLevel[] = [400, 1600, 6400],
 ): LodLevel {
   if (visibleWidthPx <= 0 || visibleDurationSec <= 0) return lodLevels[0];
   
-  const peaksPerPixel = 2;
+  // 4 peaks/px: 2 per pixel × 2 channels (L+R) for full stereo density
+  const peaksPerPixel = 4;
   const neededPeaks = visibleWidthPx * peaksPerPixel;
   const neededTotal = Math.round(neededPeaks * (totalDurationSec / visibleDurationSec));
   
