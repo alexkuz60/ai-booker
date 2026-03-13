@@ -439,8 +439,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
 
   return (
     <div
-      className="flex flex-col bg-background border-t border-border shrink-0"
-      style={{ height: timelineCollapsed ? 41 : timelineHeight }}
+      className="flex flex-col bg-background border-t border-border h-full min-h-0"
     >
       {!timelineCollapsed && (
         <div
