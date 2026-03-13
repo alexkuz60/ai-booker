@@ -350,6 +350,18 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
    * - никогда не использовать длительность всей главы
    */
   const waveformSceneDuration = Math.max(0.05, sceneEndSec - sceneStartSec);
+  // DEBUG: waveform timing diagnosis
+  console.log("[WaveformDiag]", {
+    sceneIdx: currentSceneIdx,
+    sceneId: currentBoundary?.sceneId,
+    sceneStartSec,
+    sceneEndSec,
+    waveformSceneDuration: sceneEndSec - sceneStartSec,
+    nextBoundaryStart: nextBoundary?.startSec,
+    selectedTrackId,
+    clipsInScene: fadedClips.filter(c => c.sceneId === currentBoundary?.sceneId).length,
+    totalChapterDuration: duration,
+  });
   const waveformScenePositionSec = Math.max(
     0,
     Math.min(player.positionSec - sceneStartSec, waveformSceneDuration),
