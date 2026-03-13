@@ -108,8 +108,7 @@ function drawChannel(
     const idx = startIdx + i;
     if (idx >= peakCount) break;
     const idxFrac = idx / peakCount;
-    const localFrac = (idxFrac - clampedStartFrac) / spanFrac;
-    const px = (x + localFrac * totalWidthPx - scrollLeftPx) * dpr;
+    const px = (x + idxFrac * totalWidthPx - scrollLeftPx) * dpr;
     const val = data[idx] || 0;
     const yPos = mid - val * amp;
     if (i === 0) ctx.moveTo(px, yPos * dpr);
@@ -120,8 +119,7 @@ function drawChannel(
     const idx = startIdx + i;
     if (idx >= peakCount) continue;
     const idxFrac = idx / peakCount;
-    const localFrac = (idxFrac - clampedStartFrac) / spanFrac;
-    const px = (x + localFrac * totalWidthPx - scrollLeftPx) * dpr;
+    const px = (x + idxFrac * totalWidthPx - scrollLeftPx) * dpr;
     const val = data[idx] || 0;
     const yPos = mid + val * amp;
     ctx.lineTo(px, yPos * dpr);
