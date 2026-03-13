@@ -515,6 +515,7 @@ export function WaveformEditor({
 
     // ── Draw segment boundaries from scene_playlists ────────────
     const boundaries = segmentBoundaries ?? [];
+    console.log("[WaveformSegments]", { count: boundaries.length, boundaries: boundaries.slice(0, 5).map(b => `${b.startSec.toFixed(2)}s`) });
     if (boundaries.length > 1) {
       const segBorderColor = resolveHsl("--muted-foreground");
       ctx.save();
