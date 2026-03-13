@@ -219,6 +219,14 @@ export function SpectrumAnalyzer() {
     getAudioEngine().setFFTSize(128);
   }, []);
 
+  // Subscribe to static spectrum updates
+  useEffect(() => {
+    return subscribeStaticSpectrum(setStaticData);
+  }, []);
+
+  const staticDataRef = useRef(staticData);
+  staticDataRef.current = staticData;
+
   const smoothRef = useRef<Float32Array | null>(null);
   const modeRef = useRef(mode);
   modeRef.current = mode;
@@ -233,6 +241,13 @@ export function SpectrumAnalyzer() {
       const canvas = canvasRef.current;
       if (!canvas) { raf = requestAnimationFrame(draw); return; }
       const ctx = canvas.getContext("2d");
+
+      // If static data available, render it and stop animation loop
+      const sd = staticDataRef.current;
+      if (sd) {
+        drawStaticSpectrum(canvas, ctx!, sd, modeRef.current);
+        return; // Don't request next frame — static snapshot
+      }
       if (!ctx) { raf = requestAnimationFrame(draw); return; }
 
       const dpr = window.devicePixelRatio || 1;
