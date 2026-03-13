@@ -190,6 +190,7 @@ export function WaveformEditor({
   mixerWidth,
   isRu,
   isPlaying = false,
+  segmentBoundaries,
   onSeek,
   onTrim,
   onFadeIn,
