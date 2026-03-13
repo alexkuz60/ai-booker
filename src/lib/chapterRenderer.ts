@@ -114,7 +114,7 @@ async function encodeMp3(buffer: AudioBuffer, bitrate: Mp3Bitrate = 192): Promis
   const encoder = new Mp3Encoder(numChannels, sampleRate, bitrate);
 
   const BLOCK = 1152;
-  const mp3Parts: BlobPart[] = [];
+  const mp3Parts: Blob[] = [];
 
   // Convert float [-1,1] → Int16
   const toInt16 = (data: Float32Array): Int16Array => {
@@ -134,11 +134,11 @@ async function encodeMp3(buffer: AudioBuffer, bitrate: Mp3Bitrate = 192): Promis
     const lChunk = left.subarray(i, end);
     const rChunk = right.subarray(i, end);
     const mp3buf = encoder.encodeBuffer(lChunk, rChunk);
-    if (mp3buf.length > 0) mp3Parts.push(new Blob([mp3buf]));
+    if (mp3buf.length > 0) mp3Parts.push(new Blob([new Uint8Array(mp3buf).buffer as ArrayBuffer]));
   }
 
   const tail = encoder.flush();
-  if (tail.length > 0) mp3Parts.push(new Blob([tail]));
+  if (tail.length > 0) mp3Parts.push(new Blob([new Uint8Array(tail).buffer as ArrayBuffer]));
 
   return new Blob(mp3Parts, { type: "audio/mpeg" });
 }
