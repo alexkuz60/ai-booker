@@ -700,6 +700,8 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             isRu={isRu}
             isPlaying={player.state === "playing"}
             segmentBoundaries={segmentBoundaries}
+            debugSceneStartSec={sceneStartSec}
+            debugSceneEndSec={sceneEndSec}
             onSeek={handleSceneSeek}
             onTrim={handleTrim}
             onFadeIn={handleFadeIn}
