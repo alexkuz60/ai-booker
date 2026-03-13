@@ -307,16 +307,17 @@ export function WaveformEditor({
     const peakCount = signalDetectionPeaks.left.length;
     if (peakCount <= 1) return fallback;
 
-    let maxAbs = 0;
+    // Real non-silent end from computed peaks (not from DB clip duration metadata)
+    const NON_ZERO_EPSILON = 1e-5;
+    let lastNonZeroIdx = -1;
+
     for (let i = 0; i < peakCount; i++) {
       const v = Math.max(
         Math.abs(signalDetectionPeaks.left[i] ?? 0),
         Math.abs(signalDetectionPeaks.right[i] ?? 0),
       );
-      if (v > maxAbs) maxAbs = v;
+      if (v >= NON_ZERO_EPSILON) lastNonZeroIdx = i;
     }
-
-    const threshold = Math.max(SIGNAL_ACTIVITY_FLOOR, maxAbs * SIGNAL_ACTIVITY_RATIO);
 
     let startIdx = -1;
     let endIdx = -1;
@@ -329,7 +330,7 @@ export function WaveformEditor({
         Math.abs(signalDetectionPeaks.right[i] ?? 0),
       );
 
-      if (v >= threshold) {
+      if (v >= SIGNAL_ACTIVITY_THRESHOLD) {
         if (runStart < 0) runStart = i;
         runLen += 1;
       } else if (runStart >= 0) {
@@ -347,14 +348,18 @@ export function WaveformEditor({
       endIdx = peakCount - 1;
     }
 
-    if (startIdx < 0 || endIdx < startIdx) return fallback;
+    const baseEndIdx =
+      startIdx >= 0 && endIdx >= startIdx
+        ? endIdx
+        : lastNonZeroIdx;
+
+    if (baseEndIdx < 0) return fallback;
 
     const pad = Math.max(2, Math.floor(peakCount * SIGNAL_PAD_FRAC));
-    const paddedEndIdx = Math.min(peakCount - 1, endIdx + pad);
+    const paddedEndIdx = Math.min(peakCount - 1, baseEndIdx + pad);
     const rawEndFrac = (paddedEndIdx + 1) / peakCount;
 
-    const detectedEndSec = Math.min(sceneDuration, rawEndFrac * sceneDuration);
-    const endSec = Math.max(0.05, Math.min(sceneDuration, detectedEndSec));
+    const endSec = Math.max(0.05, Math.min(sceneDuration, rawEndFrac * sceneDuration));
 
     return {
       startFrac: 0,
