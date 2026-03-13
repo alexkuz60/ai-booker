@@ -54,7 +54,7 @@ function computeScenePeaks(
   const sampleRate = clipBuffers[0]?.buffer.sampleRate ?? 44100;
   const lods = new Map<LodLevel, StereoPeaks>();
 
-  for (const lodLevel of LOD_LEVELS) {
+  for (const lodLevel of lodLevels) {
     const leftPeaks = new Float32Array(lodLevel);
     const rightPeaks = new Float32Array(lodLevel);
     const secPerBin = sceneDuration / lodLevel;
