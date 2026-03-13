@@ -683,7 +683,20 @@ export function SpectrumAnalyzer() {
           />
         </div>
       </div>
-      <div className="flex-1 min-h-0 relative rounded-sm border border-border/40 overflow-hidden">
+      <div
+        className="flex-1 min-h-0 relative rounded-sm border border-border/40 overflow-hidden cursor-crosshair"
+        onClick={(e) => {
+          const canvas = canvasRef.current;
+          if (!canvas) return;
+          const rect = canvas.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const w = rect.width;
+          const fftSize = 128;
+          const usableBins = Math.floor((fftSize / 2) * 0.9);
+          const bin = Math.floor((x / w) * usableBins);
+          setCursorBin(prev => prev === bin ? null : Math.max(0, Math.min(bin, usableBins - 1)));
+        }}
+      >
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
       </div>
     </div>
