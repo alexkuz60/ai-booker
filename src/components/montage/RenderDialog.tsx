@@ -146,18 +146,30 @@ export function RenderDialog({
 
           {/* File name input */}
           {!rendering && !isDone && (
-            <div className="space-y-1.5">
-              <Label className="text-xs font-body">
-                {isRu ? "Имя файла" : "File name"}
-              </Label>
-              <div className="flex items-center gap-1">
-                <Input
-                  value={fileName}
-                  onChange={(e) => setFileName(e.target.value)}
-                  className="h-8 text-xs font-mono flex-1"
-                  placeholder={defaultName}
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-body">
+                  {isRu ? "Имя файла" : "File name"}
+                </Label>
+                <div className="flex items-center gap-1">
+                  <Input
+                    value={fileName}
+                    onChange={(e) => setFileName(e.target.value)}
+                    className="h-8 text-xs font-mono flex-1"
+                    placeholder={defaultName}
+                  />
+                  <span className="text-xs text-muted-foreground font-mono">.wav</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="normalize"
+                  checked={normalize}
+                  onCheckedChange={(v) => setNormalize(!!v)}
                 />
-                <span className="text-xs text-muted-foreground font-mono">.wav</span>
+                <Label htmlFor="normalize" className="text-xs font-body cursor-pointer">
+                  {isRu ? "Нормализация до −0.5 dB" : "Normalize to −0.5 dB"}
+                </Label>
               </div>
             </div>
           )}
