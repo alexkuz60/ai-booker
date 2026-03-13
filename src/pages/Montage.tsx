@@ -33,6 +33,9 @@ const Montage = () => {
     splitAtScene, removeParts, activeSceneIds,
   } = useMontageData();
 
+  const [renderDialogOpen, setRenderDialogOpen] = useState(false);
+  const activePartNumber = parts.length > 0 ? parts[activePartIdx]?.part_number ?? null : null;
+
   // ── Page header ────────────────────────────────────────────
   const title = isRu ? "МОНТАЖ" : "MONTAGE";
   const subtitle = bookTitle && chapterTitle
