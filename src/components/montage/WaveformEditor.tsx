@@ -348,10 +348,8 @@ export function WaveformEditor({
       endIdx = peakCount - 1;
     }
 
-    const baseEndIdx =
-      startIdx >= 0 && endIdx >= startIdx
-        ? endIdx
-        : lastNonZeroIdx;
+    // Never cut tail: use the furthest point between threshold-based end and real non-zero end
+    const baseEndIdx = Math.max(endIdx, lastNonZeroIdx);
 
     if (baseEndIdx < 0) return fallback;
 
