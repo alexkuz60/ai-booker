@@ -621,9 +621,9 @@ export function WaveformEditor({
       if (!canvas) return 0;
       const rect = canvas.getBoundingClientRect();
       const px = clientX - rect.left - mixerWidth + scrollLeft;
-      return Math.max(0, Math.min(sceneDuration, (px / totalWidthPx) * sceneDuration));
+      return Math.max(0, Math.min(displayDurationSec, (px / totalWidthPx) * displayDurationSec));
     },
-    [scrollLeft, totalWidthPx, sceneDuration, mixerWidth],
+    [scrollLeft, totalWidthPx, displayDurationSec, mixerWidth],
   );
 
   const handleMouseDown = useCallback(
@@ -666,10 +666,10 @@ export function WaveformEditor({
       if (end - start < 0.05) {
         // Click — seek (scene-relative)
         setSelection(null);
-        onSeek(sec);
+        onSeek(signalWindow.startSec + sec);
       }
     },
-    [isDragging, pxToSec, onSeek],
+    [isDragging, pxToSec, onSeek, signalWindow.startSec],
   );
 
   // ── Zoom controls ─────────────────────────────────────────
@@ -680,11 +680,11 @@ export function WaveformEditor({
         const el = editorScrollRef.current;
         if (!el) return;
         const newTotalW = editorContainerWidth * percent / 100;
-        const px = (scenePositionSec / sceneDuration) * newTotalW;
+        const px = (displayPositionSec / displayDurationSec) * newTotalW;
         el.scrollTo({ left: Math.max(0, px - el.clientWidth / 2), behavior: "smooth" });
       });
     }
-  }, [editorContainerWidth, scenePositionSec, sceneDuration]);
+  }, [editorContainerWidth, displayPositionSec, displayDurationSec]);
 
   const adjustEditorZoom = useCallback((dir: "in" | "out") => {
     const presets = EDITOR_ZOOM_PRESETS;
