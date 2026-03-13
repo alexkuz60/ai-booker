@@ -35,13 +35,13 @@ export interface ChapterRenderResult {
   format: ExportFormat;
 }
 
-// ─── WAV encoder (16-bit PCM) ────────────────────────────────
+// ─── WAV encoder (configurable bit depth) ───────────────────
 
-function encodeWav(buffer: AudioBuffer): Blob {
+function encodeWav(buffer: AudioBuffer, bitDepth: WavBitDepth = 16): Blob {
   const numChannels = buffer.numberOfChannels;
   const sampleRate = buffer.sampleRate;
   const length = buffer.length;
-  const bytesPerSample = 2;
+  const bytesPerSample = bitDepth / 8;
   const blockAlign = numChannels * bytesPerSample;
   const dataSize = length * blockAlign;
   const headerSize = 44;
@@ -56,17 +56,21 @@ function encodeWav(buffer: AudioBuffer): Blob {
     }
   }
 
+  // For 32-bit float we use format code 3 (IEEE float), otherwise 1 (PCM)
+  const isFloat = bitDepth === 32;
+  const formatCode = isFloat ? 3 : 1;
+
   writeString(0, "RIFF");
   view.setUint32(4, totalSize - 8, true);
   writeString(8, "WAVE");
   writeString(12, "fmt ");
   view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
+  view.setUint16(20, formatCode, true);
   view.setUint16(22, numChannels, true);
   view.setUint32(24, sampleRate, true);
   view.setUint32(28, sampleRate * blockAlign, true);
   view.setUint16(32, blockAlign, true);
-  view.setUint16(34, 16, true);
+  view.setUint16(34, bitDepth, true);
   writeString(36, "data");
   view.setUint32(40, dataSize, true);
 
@@ -79,12 +83,65 @@ function encodeWav(buffer: AudioBuffer): Blob {
   for (let i = 0; i < length; i++) {
     for (let ch = 0; ch < numChannels; ch++) {
       const sample = Math.max(-1, Math.min(1, channels[ch][i]));
-      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-      offset += 2;
+      if (bitDepth === 16) {
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      } else if (bitDepth === 24) {
+        const val = sample < 0 ? sample * 0x800000 : sample * 0x7FFFFF;
+        const intVal = Math.round(val);
+        view.setUint8(offset, intVal & 0xFF);
+        view.setUint8(offset + 1, (intVal >> 8) & 0xFF);
+        view.setUint8(offset + 2, (intVal >> 16) & 0xFF);
+      } else {
+        // 32-bit float
+        view.setFloat32(offset, sample, true);
+      }
+      offset += bytesPerSample;
     }
   }
 
   return new Blob([arrayBuffer], { type: "audio/wav" });
+}
+
+// ─── MP3 encoder (lamejs) ────────────────────────────────────
+
+async function encodeMp3(buffer: AudioBuffer, bitrate: Mp3Bitrate = 192): Promise<Blob> {
+  // @ts-ignore — lamejs doesn't have proper types
+  const lamejs = await import("lamejs");
+  const Mp3Encoder = lamejs.default?.Mp3Encoder ?? lamejs.Mp3Encoder;
+
+  const numChannels = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const length = buffer.length;
+  const encoder = new Mp3Encoder(numChannels, sampleRate, bitrate);
+
+  const BLOCK = 1152;
+  const mp3Parts: Int8Array[] = [];
+
+  // Convert float [-1,1] → Int16
+  const toInt16 = (data: Float32Array): Int16Array => {
+    const out = new Int16Array(data.length);
+    for (let i = 0; i < data.length; i++) {
+      const s = Math.max(-1, Math.min(1, data[i]));
+      out[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    return out;
+  };
+
+  const left = toInt16(buffer.getChannelData(0));
+  const right = numChannels > 1 ? toInt16(buffer.getChannelData(1)) : left;
+
+  for (let i = 0; i < length; i += BLOCK) {
+    const end = Math.min(i + BLOCK, length);
+    const lChunk = left.subarray(i, end);
+    const rChunk = right.subarray(i, end);
+    const mp3buf = encoder.encodeBuffer(lChunk, rChunk);
+    if (mp3buf.length > 0) mp3Parts.push(new Int8Array(mp3buf));
+  }
+
+  const tail = encoder.flush();
+  if (tail.length > 0) mp3Parts.push(new Int8Array(tail));
+
+  return new Blob(mp3Parts, { type: "audio/mpeg" });
 }
 
 // ─── Audio buffer loading ────────────────────────────────────
