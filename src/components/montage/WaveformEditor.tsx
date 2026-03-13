@@ -451,8 +451,6 @@ export function WaveformEditor({
       selection,
       displayDurationSec,
       "L",
-      signalWindow.startFrac,
-      signalWindow.endFrac,
     );
 
     // Gap line
@@ -473,8 +471,6 @@ export function WaveformEditor({
       selection,
       displayDurationSec,
       "R",
-      signalWindow.startFrac,
-      signalWindow.endFrac,
     );
 
     // ── Draw segment boundaries from scene_playlists ────────────
