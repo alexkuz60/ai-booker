@@ -566,27 +566,25 @@ export function WaveformEditor({
       signalWindow.endFrac,
     );
 
-    // ── Draw clip boundaries (vertical separators) ────────────
-    if (sceneClips.length > 0) {
-      const clipBorderColor = resolveHsl("--muted-foreground");
+    // ── Draw segment boundaries from scene_playlists ────────────
+    const boundaries = segmentBoundaries ?? [];
+    if (boundaries.length > 1) {
+      const segBorderColor = resolveHsl("--muted-foreground");
       ctx.save();
-      for (const clip of sceneClips) {
-        const clipStartLocal = clip.startSec - signalWindow.startSec;
-        const clipEndLocal = clip.startSec + clip.durationSec - signalWindow.startSec;
+      for (let si = 1; si < boundaries.length; si++) {
+        const seg = boundaries[si];
+        const localSec = seg.startSec - signalWindow.startSec;
+        if (localSec <= 0.01 || localSec >= displayDurationSec - 0.01) continue;
+        const px = (localSec / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
+        if (px < DB_ZONE_WIDTH || px > w) continue;
 
-        for (const localSec of [clipStartLocal, clipEndLocal]) {
-          if (localSec <= 0.01 || localSec >= displayDurationSec - 0.01) continue;
-          const px = (localSec / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
-          if (px < DB_ZONE_WIDTH || px > w) continue;
-
-          ctx.strokeStyle = clipBorderColor.replace(")", " / 0.4)").replace("hsl(", "hsl(");
-          ctx.lineWidth = 1;
-          ctx.setLineDash([3, 4]);
-          ctx.beginPath();
-          ctx.moveTo(px * dpr, 0);
-          ctx.lineTo(px * dpr, h * dpr);
-          ctx.stroke();
-        }
+        ctx.strokeStyle = segBorderColor.replace(")", " / 0.35)").replace("hsl(", "hsl(");
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath();
+        ctx.moveTo(px * dpr, 0);
+        ctx.lineTo(px * dpr, h * dpr);
+        ctx.stroke();
       }
       ctx.setLineDash([]);
       ctx.restore();
