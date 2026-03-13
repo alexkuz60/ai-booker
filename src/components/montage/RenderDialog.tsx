@@ -92,7 +92,7 @@ export function RenderDialog({
     setDownloadUrl(null);
     abortRef.current = false;
 
-    const safeName = sanitizeFileName(fileName) || defaultName;
+    const safeName = sanitizeFileName(fileName.trim() || defaultName);
     const safeFolder = folderPath.replace(/^\/+|\/+$/g, "") || "chapter-renders";
     const storagePath = `${userId}/${safeFolder}/${safeName}.wav`;
 
@@ -245,7 +245,7 @@ export function RenderDialog({
                 variant="hero"
                 size="sm"
                 onClick={handleRender}
-                disabled={!fileName.trim() || clips.length === 0}
+                disabled={clips.length === 0}
                 className="gap-1.5"
               >
                 <FileAudio className="h-3.5 w-3.5" />
