@@ -558,8 +558,8 @@ export function WaveformEditor({
     }
 
     // Playhead — scene-relative
-    const playheadPx = (displayPositionSec / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
-    if (playheadPx >= mixerWidth && playheadPx <= w) {
+    const playheadPx = (displayPositionSec / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
+    if (playheadPx >= DB_ZONE_WIDTH && playheadPx <= w) {
       ctx.strokeStyle = resolveHsl("--primary");
       ctx.lineWidth = 1.5;
       ctx.beginPath();
