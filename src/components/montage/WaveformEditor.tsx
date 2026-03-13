@@ -46,6 +46,8 @@ interface Selection {
 
 const CHANNEL_HEIGHT = 96;
 const CHANNEL_GAP = 2;
+/** Narrow dB-label zone inside the editor (independent of the timeline mixer sidebar) */
+const DB_ZONE_WIDTH = 36;
 
 const EDITOR_ZOOM_PRESETS = [100, 200, 300, 400, 500] as const;
 
@@ -193,19 +195,19 @@ export function WaveformEditor({
   const [editorZoomPercent, setEditorZoomPercent] = useState(100);
   const [editorContainerWidth, setEditorContainerWidth] = useState(0);
 
-  // Measure available waveform width (excluding mixer sidebar)
+  // Measure available waveform width (excluding dB label zone)
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const measure = () => {
-      const w = el.clientWidth - mixerWidth;
+      const w = el.clientWidth - DB_ZONE_WIDTH;
       setEditorContainerWidth(w > 0 ? w : 0);
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [mixerWidth]);
+  }, []);
 
   // At 100% zoom: totalWidthPx === editorContainerWidth (scene fills editor exactly).
   // At N%: totalWidthPx = editorContainerWidth * N / 100.
@@ -324,7 +326,7 @@ export function WaveformEditor({
     const borderColor = resolveHsl("--border");
     const mutedColor = resolveHsl("--muted-foreground");
     const waveColor = resolveHsl("--cyan-glow");
-    const waveW = w - mixerWidth;
+    const waveW = w - DB_ZONE_WIDTH;
 
     // ── dB scale in mixer sidebar area ──────────────────────
     const drawDbScale = (chY: number, chHeight: number) => {
@@ -344,13 +346,13 @@ export function WaveformEditor({
         ctx.setLineDash(db === 0 ? [] : [2, 3]);
 
         ctx.beginPath();
-        ctx.moveTo(mixerWidth * dpr, yUp * dpr);
+        ctx.moveTo(DB_ZONE_WIDTH * dpr, yUp * dpr);
         ctx.lineTo(w * dpr, yUp * dpr);
         ctx.stroke();
 
         if (db !== 0) {
           ctx.beginPath();
-          ctx.moveTo(mixerWidth * dpr, yDown * dpr);
+          ctx.moveTo(DB_ZONE_WIDTH * dpr, yDown * dpr);
           ctx.lineTo(w * dpr, yDown * dpr);
           ctx.stroke();
         }
@@ -359,9 +361,9 @@ export function WaveformEditor({
 
         ctx.fillStyle = mutedColor.replace(")", " / 0.5)").replace("hsl(", "hsl(");
         const label = db === 0 ? " 0" : `${db}`;
-        ctx.fillText(label, (mixerWidth - 4) * dpr, (yUp + 3) * dpr);
+        ctx.fillText(label, (DB_ZONE_WIDTH - 4) * dpr, (yUp + 3) * dpr);
         if (db !== 0 && db !== -60) {
-          ctx.fillText(label, (mixerWidth - 4) * dpr, (yDown + 3) * dpr);
+          ctx.fillText(label, (DB_ZONE_WIDTH - 4) * dpr, (yDown + 3) * dpr);
         }
       }
       ctx.textAlign = "left";
@@ -389,8 +391,8 @@ export function WaveformEditor({
 
       for (let t = startSec; t <= endSec; t += interval) {
         if (t < 0) continue;
-        const px = (t / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
-        if (px < mixerWidth || px > w) continue;
+        const px = (t / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
+        if (px < DB_ZONE_WIDTH || px > w) continue;
 
         const isMajor = t % (interval * 5) === 0 || interval >= 10;
         ctx.strokeStyle = borderColor.replace(")", ` / ${isMajor ? 0.2 : 0.1})`).replace("hsl(", "hsl(");
@@ -413,21 +415,21 @@ export function WaveformEditor({
     ctx.strokeStyle = borderColor;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(mixerWidth * dpr, 0);
-    ctx.lineTo(mixerWidth * dpr, h * dpr);
+    ctx.moveTo(DB_ZONE_WIDTH * dpr, 0);
+    ctx.lineTo(DB_ZONE_WIDTH * dpr, h * dpr);
     ctx.stroke();
 
     // Clip to waveform area
     ctx.save();
     ctx.beginPath();
-    ctx.rect(mixerWidth * dpr, 0, (w - mixerWidth) * dpr, h * dpr);
+    ctx.rect(DB_ZONE_WIDTH * dpr, 0, (w - DB_ZONE_WIDTH) * dpr, h * dpr);
     ctx.clip();
 
     // Draw L channel
     drawChannel(
       ctx,
       currentPeaks,
-      mixerWidth,
+      DB_ZONE_WIDTH,
       0,
       waveW,
       chH,
@@ -443,13 +445,13 @@ export function WaveformEditor({
 
     // Gap line
     ctx.fillStyle = borderColor.replace(")", " / 0.5)").replace("hsl(", "hsl(");
-    ctx.fillRect(mixerWidth * dpr, chH * dpr, waveW * dpr, CHANNEL_GAP * dpr);
+    ctx.fillRect(DB_ZONE_WIDTH * dpr, chH * dpr, waveW * dpr, CHANNEL_GAP * dpr);
 
     // Draw R channel
     drawChannel(
       ctx,
       currentPeaks,
-      mixerWidth,
+      DB_ZONE_WIDTH,
       chH + CHANNEL_GAP,
       waveW,
       chH,
@@ -471,8 +473,8 @@ export function WaveformEditor({
         const clip = sceneClips[ci];
         const localSec = clip.startSec - signalWindow.startSec;
         if (localSec <= 0 || localSec >= displayDurationSec) continue;
-        const px = (localSec / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
-        if (px < mixerWidth || px > w) continue;
+        const px = (localSec / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
+        if (px < DB_ZONE_WIDTH || px > w) continue;
 
         ctx.strokeStyle = clipBorderColor.replace(")", " / 0.35)").replace("hsl(", "hsl(");
         ctx.lineWidth = 1;
@@ -497,13 +499,13 @@ export function WaveformEditor({
       const clipEndSec = clip.startSec + clip.durationSec - signalWindow.startSec;
       if (clipEndSec <= 0 || clipStartSec >= displayDurationSec) continue;
 
-      const clipStartPx = (Math.max(0, clipStartSec) / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
-      const clipEndPx = (Math.min(displayDurationSec, clipEndSec) / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
+      const clipStartPx = (Math.max(0, clipStartSec) / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
+      const clipEndPx = (Math.min(displayDurationSec, clipEndSec) / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
 
       if (fadeIn > 0) {
         const fadeEndSec = Math.min(displayDurationSec, clip.startSec + fadeIn - signalWindow.startSec);
-        const fadeEndPx = (Math.max(0, fadeEndSec) / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
-        const x0 = Math.max(mixerWidth, clipStartPx);
+        const fadeEndPx = (Math.max(0, fadeEndSec) / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
+        const x0 = Math.max(DB_ZONE_WIDTH, clipStartPx);
         const x1 = Math.min(w, fadeEndPx);
         if (x1 > x0) {
           ctx.fillStyle = fadeColor.replace(")", " / 0.12)").replace("hsl(", "hsl(");
@@ -529,8 +531,8 @@ export function WaveformEditor({
 
       if (fadeOut > 0) {
         const fadeStartSec = Math.max(0, clip.startSec + clip.durationSec - fadeOut - signalWindow.startSec);
-        const fadeStartPx = (Math.min(displayDurationSec, fadeStartSec) / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
-        const x0 = Math.max(mixerWidth, fadeStartPx);
+        const fadeStartPx = (Math.min(displayDurationSec, fadeStartSec) / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
+        const x0 = Math.max(DB_ZONE_WIDTH, fadeStartPx);
         const x1 = Math.min(w, clipEndPx);
         if (x1 > x0) {
           ctx.fillStyle = fadeColor.replace(")", " / 0.12)").replace("hsl(", "hsl(");
@@ -556,8 +558,8 @@ export function WaveformEditor({
     }
 
     // Playhead — scene-relative
-    const playheadPx = (displayPositionSec / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
-    if (playheadPx >= mixerWidth && playheadPx <= w) {
+    const playheadPx = (displayPositionSec / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
+    if (playheadPx >= DB_ZONE_WIDTH && playheadPx <= w) {
       ctx.strokeStyle = resolveHsl("--primary");
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -566,7 +568,7 @@ export function WaveformEditor({
       ctx.stroke();
     }
     ctx.restore();
-  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, displayDurationSec, displayPositionSec, mixerWidth, sceneClips, signalWindow.startSec, signalWindow.startFrac, signalWindow.endFrac]);
+  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, displayDurationSec, displayPositionSec, sceneClips, signalWindow.startSec, signalWindow.startFrac, signalWindow.endFrac]);
 
   // ── Keyboard shortcuts (Ctrl+Z / Ctrl+Shift+Z) ─────────────
   useEffect(() => {
@@ -607,10 +609,10 @@ export function WaveformEditor({
       const canvas = canvasRef.current;
       if (!canvas) return 0;
       const rect = canvas.getBoundingClientRect();
-      const px = clientX - rect.left - mixerWidth + scrollLeft;
+      const px = clientX - rect.left - DB_ZONE_WIDTH + scrollLeft;
       return Math.max(0, Math.min(displayDurationSec, (px / totalWidthPx) * displayDurationSec));
     },
-    [scrollLeft, totalWidthPx, displayDurationSec, mixerWidth],
+    [scrollLeft, totalWidthPx, displayDurationSec],
   );
 
   const handleMouseDown = useCallback(
@@ -857,7 +859,7 @@ export function WaveformEditor({
       <div ref={containerRef} className="flex-1 min-h-0 relative flex">
         <div ref={editorScrollRef} className="flex-1 overflow-x-auto overflow-y-hidden cursor-crosshair relative">
           {/* Invisible spacer — gives the scrollbar the correct total width */}
-          <div style={{ width: `${totalWidthPx + mixerWidth}px`, height: "1px", pointerEvents: "none" }} />
+          <div style={{ width: `${totalWidthPx + DB_ZONE_WIDTH}px`, height: "1px", pointerEvents: "none" }} />
           {/* Canvas is viewport-sized, pinned via sticky; drawing uses scrollLeft for virtual offset */}
           <canvas
             ref={canvasRef}
