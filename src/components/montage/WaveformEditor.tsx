@@ -253,7 +253,7 @@ export function WaveformEditor({
 
   // Available LOD levels from computed peaks
   const lodLevels = useMemo(() => {
-    if (!peaks) return [200, 800, 3200];
+    if (!peaks) return [400, 1600, 6400];
     return Array.from(peaks.lods.keys()).sort((a, b) => a - b);
   }, [peaks]);
 
