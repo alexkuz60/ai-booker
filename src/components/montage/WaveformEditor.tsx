@@ -195,19 +195,19 @@ export function WaveformEditor({
   const [editorZoomPercent, setEditorZoomPercent] = useState(100);
   const [editorContainerWidth, setEditorContainerWidth] = useState(0);
 
-  // Measure available waveform width (excluding mixer sidebar)
+  // Measure available waveform width (excluding dB label zone)
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const measure = () => {
-      const w = el.clientWidth - mixerWidth;
+      const w = el.clientWidth - DB_ZONE_WIDTH;
       setEditorContainerWidth(w > 0 ? w : 0);
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [mixerWidth]);
+  }, []);
 
   // At 100% zoom: totalWidthPx === editorContainerWidth (scene fills editor exactly).
   // At N%: totalWidthPx = editorContainerWidth * N / 100.
