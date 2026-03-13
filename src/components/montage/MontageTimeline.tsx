@@ -112,7 +112,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
   const trackIds = useMemo(() => stemTracks.map(t => t.id), [stemTracks]);
   const { scheduleSave: onMixChange } = useMixerPersistence(chapterId, trackIds);
 
-  const [timelineHeight, setTimelineHeight] = useState(450);
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 
