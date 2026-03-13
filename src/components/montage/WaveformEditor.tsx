@@ -742,7 +742,7 @@ export function WaveformEditor({
         <div className="flex items-center gap-1">
           {/* Scene-local time */}
           <span className="text-[10px] text-muted-foreground font-mono tabular-nums mr-1">
-            {formatTimePrecise(scenePositionSec)} / {formatTimePrecise(sceneDuration)}
+            {formatTimePrecise(displayPositionSec)} / {formatTimePrecise(displayDurationSec)}
           </span>
 
           {selectionInfo && (
