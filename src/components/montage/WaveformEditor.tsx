@@ -146,10 +146,10 @@ function drawChannel(
   ctx.font = `${10 * dpr}px monospace`;
   ctx.fillText(channelLabel, (x + 4) * dpr, (y + 12) * dpr);
 
-  // Selection highlight
+  // Selection highlight (must include x offset for DB_ZONE area, same as waveform drawing)
   if (selection) {
-    const selStartPx = (selection.startSec / totalDuration) * totalWidthPx - scrollLeftPx;
-    const selEndPx = (selection.endSec / totalDuration) * totalWidthPx - scrollLeftPx;
+    const selStartPx = x + (selection.startSec / totalDuration) * totalWidthPx - scrollLeftPx;
+    const selEndPx = x + (selection.endSec / totalDuration) * totalWidthPx - scrollLeftPx;
     const sx = Math.max(0, selStartPx) * dpr;
     const sw = (Math.min(w, selEndPx) - Math.max(0, selStartPx)) * dpr;
     if (sw > 0) {
