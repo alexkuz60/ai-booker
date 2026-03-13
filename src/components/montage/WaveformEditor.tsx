@@ -326,7 +326,7 @@ export function WaveformEditor({
     const borderColor = resolveHsl("--border");
     const mutedColor = resolveHsl("--muted-foreground");
     const waveColor = resolveHsl("--cyan-glow");
-    const waveW = w - mixerWidth;
+    const waveW = w - DB_ZONE_WIDTH;
 
     // ── dB scale in mixer sidebar area ──────────────────────
     const drawDbScale = (chY: number, chHeight: number) => {
