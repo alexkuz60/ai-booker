@@ -209,7 +209,9 @@ export function useWaveformPeaks(
         }
 
         // Compute scene-wide merged peaks
-        const peaks = computeScenePeaks(clipBuffers, sceneDuration);
+        // Compute dynamic LOD levels based on scene params
+        const lodLevels = computeLodLevels(sceneDuration, displayWidthPx);
+        const peaks = computeScenePeaks(clipBuffers, sceneDuration, lodLevels);
 
         // Cache (fire-and-forget)
         savePeaksToCache(compositeCacheKey, peaks);
