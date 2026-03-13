@@ -322,6 +322,55 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     return map;
   }, [trimmedClips]);
 
+  // ── Current scene context for WaveformEditor ────────────────
+  const currentSceneIdx = useMemo(() => {
+    if (sceneBoundaries.length === 0) return 0;
+    for (let i = sceneBoundaries.length - 1; i >= 0; i--) {
+      if (player.positionSec >= sceneBoundaries[i].startSec) return i;
+    }
+    return 0;
+  }, [player.positionSec, sceneBoundaries]);
+
+  const currentBoundary = sceneBoundaries[currentSceneIdx];
+  const nextBoundary = sceneBoundaries[currentSceneIdx + 1];
+  const sceneStartSec = currentBoundary?.startSec ?? 0;
+
+  const sceneEndSec = useMemo(() => {
+    if (nextBoundary) return nextBoundary.startSec;
+    return fadedClips
+      .filter((c) => c.sceneId === currentBoundary?.sceneId)
+      .reduce((max, c) => Math.max(max, c.startSec + c.durationSec), sceneStartSec);
+  }, [nextBoundary, fadedClips, currentBoundary?.sceneId, sceneStartSec]);
+
+  const waveformSceneDuration = Math.max(0, sceneEndSec - sceneStartSec);
+  const waveformScenePositionSec = Math.max(0, Math.min(player.positionSec - sceneStartSec, waveformSceneDuration));
+
+  const waveformSceneClips = useMemo(() => {
+    if (!selectedTrackId || !currentBoundary) return [];
+
+    return fadedClips
+      .filter((c) => c.trackId === selectedTrackId && c.sceneId === currentBoundary.sceneId)
+      .map((c) => ({
+        ...c,
+        startSec: Math.max(0, c.startSec - sceneStartSec),
+        durationSec:
+          Math.min(c.startSec + c.durationSec, sceneEndSec) -
+          Math.max(c.startSec, sceneStartSec),
+      }))
+      .filter((c) => c.durationSec > 0.001);
+  }, [fadedClips, selectedTrackId, currentBoundary, sceneStartSec, sceneEndSec]);
+
+  const waveformSceneLabel = currentBoundary
+    ? `${isRu ? "Сцена" : "Scene"} ${currentSceneIdx + 1}/${sceneBoundaries.length}`
+    : "";
+
+  const handleSceneSeek = useCallback(
+    (sceneRelativeSec: number) => {
+      player.seek(sceneStartSec + sceneRelativeSec);
+    },
+    [player.seek, sceneStartSec],
+  );
+
   return (
     <div
       className="flex flex-col bg-background border-t border-border shrink-0"
@@ -587,77 +636,26 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
           </div>
 
       {/* Waveform Editor — scene-scoped */}
-          {(() => {
-            // Determine which scene the transport is in
-            const pos = player.positionSec;
-            let currentSceneIdx = 0;
-            for (let i = sceneBoundaries.length - 1; i >= 0; i--) {
-              if (pos >= sceneBoundaries[i].startSec) {
-                currentSceneIdx = i;
-                break;
-              }
-            }
-            const currentBoundary = sceneBoundaries[currentSceneIdx];
-            const nextBoundary = sceneBoundaries[currentSceneIdx + 1];
-            // Scene starts at boundary (including leading silence)
-            const sceneStartSec = currentBoundary?.startSec ?? 0;
-            // Scene ends at next boundary start, or for the last scene — at the end of its last clip
-            const sceneEndSec = nextBoundary
-              ? nextBoundary.startSec
-              : fadedClips
-                  .filter(c => c.sceneId === currentBoundary?.sceneId)
-                  .reduce((max, c) => Math.max(max, c.startSec + c.durationSec), sceneStartSec);
-            const sceneDuration = Math.max(0, sceneEndSec - sceneStartSec);
-            const scenePositionSec = Math.max(0, Math.min(pos - sceneStartSec, sceneDuration));
-            const sceneId = currentBoundary?.sceneId ?? "";
-
-            // Filter clips for selected track within this scene, re-map to scene-local coordinates
-            const sceneClips = fadedClips
-              .filter(c => c.trackId === selectedTrackId)
-              .filter(c => {
-                const clipEnd = c.startSec + c.durationSec;
-                return clipEnd > sceneStartSec && c.startSec < sceneEndSec;
-              })
-              .map(c => ({
-                ...c,
-                startSec: Math.max(0, c.startSec - sceneStartSec),
-                durationSec: Math.min(c.startSec + c.durationSec, sceneEndSec) - Math.max(c.startSec, sceneStartSec),
-              }));
-
-
-            // Scene label
-            const sceneLabel = currentBoundary
-              ? `${isRu ? "Сцена" : "Scene"} ${currentSceneIdx + 1}/${sceneBoundaries.length}`
-              : "";
-
-            // Seek handler: convert scene-local → absolute
-            const handleSceneSeek = (sceneRelativeSec: number) => {
-              player.seek(sceneStartSec + sceneRelativeSec);
-            };
-
-            return (
-              <WaveformEditor
-                sceneClips={sceneClips}
-                trackId={selectedTrackId}
-                trackLabel={stemTracks.find(t => t.id === selectedTrackId)?.label ?? ""}
-                trackColor={stemTracks.find(t => t.id === selectedTrackId)?.color ?? "hsl(var(--primary))"}
-                sceneDuration={sceneDuration}
-                scenePositionSec={scenePositionSec}
-                sceneLabel={sceneLabel}
-                mixerWidth={MIXER_SIDEBAR}
-                isRu={isRu}
-                isPlaying={player.state === "playing"}
-                onSeek={handleSceneSeek}
-                onTrim={handleTrim}
-                onFadeIn={handleFadeIn}
-                onFadeOut={handleFadeOut}
-                onUndo={handleUndo}
-                onRedo={handleRedo}
-                canUndo={undoStack.length > 0}
-                canRedo={redoStack.length > 0}
-              />
-            );
-          })()}
+          <WaveformEditor
+            sceneClips={waveformSceneClips}
+            trackId={selectedTrackId}
+            trackLabel={stemTracks.find(t => t.id === selectedTrackId)?.label ?? ""}
+            trackColor={stemTracks.find(t => t.id === selectedTrackId)?.color ?? "hsl(var(--primary))"}
+            sceneDuration={waveformSceneDuration}
+            scenePositionSec={waveformScenePositionSec}
+            sceneLabel={waveformSceneLabel}
+            mixerWidth={MIXER_SIDEBAR}
+            isRu={isRu}
+            isPlaying={player.state === "playing"}
+            onSeek={handleSceneSeek}
+            onTrim={handleTrim}
+            onFadeIn={handleFadeIn}
+            onFadeOut={handleFadeOut}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            canUndo={undoStack.length > 0}
+            canRedo={redoStack.length > 0}
+          />
         </div>
       )}
     </div>

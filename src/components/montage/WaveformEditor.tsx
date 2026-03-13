@@ -287,7 +287,7 @@ export function WaveformEditor({
 
   // End of active signal; 100% zoom stretches [sceneStart..activeEnd] to full viewport width
   const signalWindow = useMemo(() => {
-    const clipEndFallback = Math.max(
+    const clipEndSec = Math.max(
       0.05,
       Math.min(
         sceneDuration,
@@ -297,9 +297,9 @@ export function WaveformEditor({
 
     const fallback = {
       startFrac: 0,
-      endFrac: sceneDuration > 0 ? clipEndFallback / sceneDuration : 1,
+      endFrac: sceneDuration > 0 ? clipEndSec / sceneDuration : 1,
       startSec: 0,
-      durationSec: clipEndFallback,
+      durationSec: clipEndSec,
     };
 
     if (!signalDetectionPeaks || sceneDuration <= 0) return fallback;
@@ -358,8 +358,10 @@ export function WaveformEditor({
     const pad = Math.max(2, Math.floor(peakCount * SIGNAL_PAD_FRAC));
     const paddedEndIdx = Math.min(peakCount - 1, baseEndIdx + pad);
     const rawEndFrac = (paddedEndIdx + 1) / peakCount;
+    const detectedEndSec = Math.max(0.05, Math.min(sceneDuration, rawEndFrac * sceneDuration));
 
-    const endSec = Math.max(0.05, Math.min(sceneDuration, rawEndFrac * sceneDuration));
+    // Clamp by selected track clip span to prevent drift to chapter-scale width
+    const endSec = Math.max(0.05, Math.min(clipEndSec, detectedEndSec));
 
     return {
       startFrac: 0,
