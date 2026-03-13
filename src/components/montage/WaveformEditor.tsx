@@ -499,13 +499,13 @@ export function WaveformEditor({
       const clipEndSec = clip.startSec + clip.durationSec - signalWindow.startSec;
       if (clipEndSec <= 0 || clipStartSec >= displayDurationSec) continue;
 
-      const clipStartPx = (Math.max(0, clipStartSec) / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
-      const clipEndPx = (Math.min(displayDurationSec, clipEndSec) / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
+      const clipStartPx = (Math.max(0, clipStartSec) / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
+      const clipEndPx = (Math.min(displayDurationSec, clipEndSec) / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
 
       if (fadeIn > 0) {
         const fadeEndSec = Math.min(displayDurationSec, clip.startSec + fadeIn - signalWindow.startSec);
-        const fadeEndPx = (Math.max(0, fadeEndSec) / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
-        const x0 = Math.max(mixerWidth, clipStartPx);
+        const fadeEndPx = (Math.max(0, fadeEndSec) / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
+        const x0 = Math.max(DB_ZONE_WIDTH, clipStartPx);
         const x1 = Math.min(w, fadeEndPx);
         if (x1 > x0) {
           ctx.fillStyle = fadeColor.replace(")", " / 0.12)").replace("hsl(", "hsl(");
