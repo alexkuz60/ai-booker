@@ -823,7 +823,7 @@ export function WaveformEditor({
             variant="ghost"
             size="sm"
             className="h-5 px-1.5 text-[10px] gap-0.5"
-            disabled={!canUndo}
+            disabled={!canUndo || isPlaying}
             title={isRu ? "Отменить (Ctrl+Z)" : "Undo (Ctrl+Z)"}
             onClick={onUndo}
           >
