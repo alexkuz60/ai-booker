@@ -310,11 +310,9 @@ function buildMasterChain(ctx: OfflineAudioContext): {
 export async function renderChapter(opts: {
   clips: TimelineClip[];
   totalDurationSec: number;
-  userId: string;
-  storagePath: string;
   onProgress?: (p: ChapterRenderProgress) => void;
 }): Promise<ChapterRenderResult> {
-  const { clips, totalDurationSec, userId, storagePath, onProgress } = opts;
+  const { clips, totalDurationSec, onProgress } = opts;
   const SAMPLE_RATE = 44100;
   const engine = getAudioEngine();
 
@@ -397,24 +395,12 @@ export async function renderChapter(opts: {
     // ── Phase 3: Encode WAV ──
     onProgress?.({ phase: "encoding", percent: 70 });
     const wavBlob = encodeWav(renderedBuffer);
-    onProgress?.({ phase: "encoding", percent: 85 });
-
-    // ── Phase 4: Upload ──
-    onProgress?.({ phase: "uploading", percent: 85 });
-
-    const { error: uploadError } = await supabase.storage
-      .from("user-media")
-      .upload(storagePath, wavBlob, {
-        contentType: "audio/wav",
-        upsert: true,
-      });
-
-    if (uploadError) throw uploadError;
+    onProgress?.({ phase: "encoding", percent: 95 });
 
     onProgress?.({ phase: "done", percent: 100 });
 
     return {
-      storagePath,
+      blob: wavBlob,
       durationSec: totalDurationSec,
       fileSizeBytes: wavBlob.size,
     };
