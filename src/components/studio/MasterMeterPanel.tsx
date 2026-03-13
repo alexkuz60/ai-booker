@@ -492,6 +492,7 @@ export function SpectrumAnalyzer() {
       const rawData = getAudioEngine().getFFTData();
       if (!rawData || rawData.length === 0) { raf = requestAnimationFrame(draw); return; }
       const usableBins = Math.max(1, Math.floor(rawData.length * 0.9));
+      usableBinsRef.current = usableBins;
       const barWidth = w / usableBins;
       const dbMin = DB_MIN;
       const dbMax = 0;
