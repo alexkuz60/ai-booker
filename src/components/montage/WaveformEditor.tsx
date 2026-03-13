@@ -780,7 +780,7 @@ export function WaveformEditor({
             title={isRu ? "Обрезка" : "Trim"}
             onClick={() => {
               if (selection && trackId && onTrim) {
-                onTrim(trackId, selection.startSec, selection.endSec);
+                onTrim(trackId, selection.startSec + signalWindow.startSec, selection.endSec + signalWindow.startSec);
                 setSelection(null);
               }
             }}
