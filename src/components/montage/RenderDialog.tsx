@@ -75,6 +75,7 @@ export function RenderDialog({
   ].filter(Boolean).join("_");
 
   const [fileName, setFileName] = useState(defaultName);
+  const [normalize, setNormalize] = useState(true);
   const [rendering, setRendering] = useState(false);
   const [progress, setProgress] = useState<ChapterRenderProgress | null>(null);
   const [result, setResult] = useState<{ fileSizeBytes: number } | null>(null);
