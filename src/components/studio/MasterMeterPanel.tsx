@@ -7,7 +7,8 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import type { MasterMeterData } from "@/lib/audioEngine";
 import { getAudioEngine } from "@/lib/audioEngine";
-import { Sliders, Power } from "lucide-react";
+import { Sliders, Power, Maximize, FileAudio } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -500,9 +501,13 @@ const PLUGIN_GROUPS: PluginGroup[] = [
 interface MasterMeterPanelProps {
   isRu: boolean;
   width: number;
+  onNormalize?: () => void;
+  onRender?: () => void;
+  normalizeDisabled?: boolean;
+  renderDisabled?: boolean;
 }
 
-export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
+export function MasterMeterPanel({ isRu, width, onNormalize, onRender, normalizeDisabled, renderDisabled }: MasterMeterPanelProps) {
   const engine = getAudioEngine();
 
   const [pluginStates, setPluginStates] = useState(() => {
@@ -628,6 +633,32 @@ export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
               })}
             </div>
           ))}
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex flex-col gap-1.5 mt-auto pt-2 border-t border-border/30">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-[10px] gap-1.5 font-mono uppercase w-full justify-start"
+            disabled={normalizeDisabled}
+            onClick={onNormalize}
+            title={isRu ? "Нормализация громкости всех сцен до -0.5 dB" : "Normalize all scenes loudness to -0.5 dB"}
+          >
+            <Maximize className="h-3 w-3 shrink-0" />
+            {isRu ? "Нормализация" : "Normalize"}
+          </Button>
+          <Button
+            variant="hero"
+            size="sm"
+            className="h-7 text-[10px] gap-1.5 font-mono uppercase w-full justify-start"
+            disabled={renderDisabled}
+            onClick={onRender}
+            title={isRu ? "Рендер финального файла главы/части" : "Render final chapter/part file"}
+          >
+            <FileAudio className="h-3 w-3 shrink-0" />
+            {isRu ? "Рендер" : "Render"}
+          </Button>
         </div>
       </div>
     </div>
