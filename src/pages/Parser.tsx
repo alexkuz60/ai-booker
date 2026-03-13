@@ -126,6 +126,17 @@ export default function Parser() {
     return () => setPageHeader({});
   }, [isRu, step, fileName, headerRight, setPageHeader]);
 
+  // Persist nav state to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(NAV_STATE_KEY, JSON.stringify({
+        selected: Array.from(selectedIndices),
+        lastClicked: lastClickedIdx,
+        expanded: Array.from(expandedNodes),
+      }));
+    } catch {}
+  }, [selectedIndices, lastClickedIdx, expandedNodes]);
+
   const handleOpenPdf = (page?: number) => {
     const suffix = page ? `#page=${page}` : '';
     if (file) {
