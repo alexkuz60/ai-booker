@@ -765,22 +765,6 @@ export function WaveformEditor({
             variant="ghost"
             size="sm"
             className="h-5 px-1.5 text-[10px] gap-0.5"
-            title={isRu ? "Вставить тишину" : "Insert silence"}
-            onClick={() => {
-              // Insert silence at playhead position or selection start
-              const insertAt = selection ? selection.startSec : displayPositionSec;
-              console.log("[WaveformEditor] Insert silence at", insertAt.toFixed(3), "sec (scene-relative)");
-              // TODO: wire to actual silence insertion callback
-            }}
-          >
-            <Plus className="h-3 w-3" />
-            <span className="hidden sm:inline">{isRu ? "Тишина" : "Silence"}</span>
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-5 px-1.5 text-[10px] gap-0.5"
             disabled={!selection}
             title={isRu ? "Обрезка" : "Trim"}
             onClick={() => {
