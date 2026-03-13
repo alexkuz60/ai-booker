@@ -6,11 +6,14 @@
  */
 
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import { Loader2, Scissors, ArrowUpRight, ArrowDownRight, AudioWaveform, Undo2, Redo2, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { Loader2, Scissors, ArrowUpRight, ArrowDownRight, AudioWaveform, Undo2, Redo2, ZoomIn, ZoomOut, Maximize2, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { chooseLod, type MultiLodPeaks, type StereoPeaks } from "@/lib/waveformPeaks";
 import { useWaveformPeaks, type WaveformStatus } from "@/hooks/useWaveformPeaks";
+import { supabase } from "@/integrations/supabase/client";
+import { fetchWithStemCache } from "@/lib/stemCache";
+import { computeFFTAtPosition, computeAveragedFFT, setStaticSpectrum } from "@/lib/staticSpectrum";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 
 /** Scene-local segment boundary (from scene_playlists) */
