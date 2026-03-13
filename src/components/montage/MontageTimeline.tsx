@@ -177,6 +177,20 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
   const player = useTimelinePlayer(fadedClips);
   const duration = player.totalDuration > 0 ? player.totalDuration : totalDurationSec;
 
+  // ── Spacebar play/pause ──────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON") return;
+      e.preventDefault();
+      if (player.state === "playing") player.pause();
+      else player.play();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [player]);
+
   const handleFadeIn = useCallback((trackId: string, fadeDurationSec: number) => {
     pushUndo();
     const affected = fadedClips.filter(c => c.trackId === trackId);
