@@ -135,7 +135,7 @@ async function encodeMp3(buffer: AudioBuffer, bitrate: Mp3Bitrate = 192): Promis
     const lChunk = left.subarray(i, end);
     const rChunk = right.subarray(i, end);
     const mp3buf = encoder.encodeBuffer(lChunk, rChunk);
-    if (mp3buf.length > 0) mp3Parts.push((mp3buf as Uint8Array).buffer);
+    if (mp3buf.length > 0) mp3Parts.push(new Blob([mp3buf]));
   }
 
   const tail = encoder.flush();
