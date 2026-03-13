@@ -105,9 +105,8 @@ function encodeWav(buffer: AudioBuffer, bitDepth: WavBitDepth = 16): Blob {
 // ─── MP3 encoder (lamejs) ────────────────────────────────────
 
 async function encodeMp3(buffer: AudioBuffer, bitrate: Mp3Bitrate = 192): Promise<Blob> {
-  // @ts-ignore — lamejs doesn't have proper types
-  const lamejs = await import("lamejs");
-  const Mp3Encoder = lamejs.default?.Mp3Encoder ?? lamejs.Mp3Encoder;
+  // @ts-ignore — lamejs fork types
+  const { Mp3Encoder } = await import("@breezystack/lamejs");
 
   const numChannels = buffer.numberOfChannels;
   const sampleRate = buffer.sampleRate;
