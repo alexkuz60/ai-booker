@@ -36,6 +36,8 @@ const Montage = () => {
   const [renderDialogOpen, setRenderDialogOpen] = useState(false);
   const activePartNumber = parts.length > 0 ? parts[activePartIdx]?.part_number ?? null : null;
 
+  const hasContent = !!chapterId && sceneIds.length > 0;
+
   // ── Page header ────────────────────────────────────────────
   const title = isRu ? "МОНТАЖ" : "MONTAGE";
   const subtitle = bookTitle && chapterTitle
@@ -67,8 +69,6 @@ const Montage = () => {
       </div>
     );
   }
-
-  const hasContent = !!chapterId && sceneIds.length > 0;
 
   // Count rendered/unrendered for active part only
   const activeRendered = activeSceneIds.filter(id => renderedSceneIds.includes(id));
