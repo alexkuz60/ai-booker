@@ -473,8 +473,8 @@ export function WaveformEditor({
         const clip = sceneClips[ci];
         const localSec = clip.startSec - signalWindow.startSec;
         if (localSec <= 0 || localSec >= displayDurationSec) continue;
-        const px = (localSec / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
-        if (px < mixerWidth || px > w) continue;
+        const px = (localSec / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
+        if (px < DB_ZONE_WIDTH || px > w) continue;
 
         ctx.strokeStyle = clipBorderColor.replace(")", " / 0.35)").replace("hsl(", "hsl(");
         ctx.lineWidth = 1;
