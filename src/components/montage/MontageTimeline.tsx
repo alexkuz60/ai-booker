@@ -441,15 +441,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     <div
       className="flex flex-col bg-background border-t border-border h-full min-h-0"
     >
-      {!timelineCollapsed && (
-        <div
-          onMouseDown={handleResizeMouseDown}
-          className="h-2 cursor-row-resize hover:bg-primary/30 bg-border/50 transition-colors shrink-0 flex items-center justify-center"
-        >
-          <div className="w-8 h-0.5 rounded-full bg-muted-foreground/30" />
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
         <div className="flex items-center gap-3">
