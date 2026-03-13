@@ -505,13 +505,9 @@ interface MasterMeterPanelProps {
   onRender?: () => void;
   normalizeDisabled?: boolean;
   renderDisabled?: boolean;
-  /** Progress message shown below buttons */
-  progressMessage?: string | null;
-  /** Progress percent 0-100 */
-  progressPercent?: number | null;
 }
 
-export function MasterMeterPanel({ isRu, width, onNormalize, onRender, normalizeDisabled, renderDisabled, progressMessage, progressPercent }: MasterMeterPanelProps) {
+export function MasterMeterPanel({ isRu, width, onNormalize, onRender, normalizeDisabled, renderDisabled }: MasterMeterPanelProps) {
   const engine = getAudioEngine();
 
   const [pluginStates, setPluginStates] = useState(() => {
@@ -641,21 +637,6 @@ export function MasterMeterPanel({ isRu, width, onNormalize, onRender, normalize
 
         {/* Action buttons */}
         <div className="flex flex-col gap-1.5 mt-auto pt-2 border-t border-border/30">
-          {progressMessage && (
-            <div className="flex flex-col gap-1">
-              {progressPercent != null && progressPercent > 0 && progressPercent < 100 && (
-                <div className="w-full h-1 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all duration-300"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
-              )}
-              <span className="text-[9px] text-muted-foreground font-mono leading-tight truncate">
-                {progressMessage}
-              </span>
-            </div>
-          )}
           <Button
             variant="outline"
             size="sm"
