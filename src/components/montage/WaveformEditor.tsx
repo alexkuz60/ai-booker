@@ -69,15 +69,24 @@ function drawChannel(
   selection: Selection | null,
   totalDuration: number,
   channelLabel: string,
+  signalStartFrac: number,
+  signalEndFrac: number,
 ) {
   const dpr = window.devicePixelRatio || 1;
 
-  // Which portion of the peaks to draw
-  const startFrac = scrollLeftPx / totalWidthPx;
-  const endFrac = Math.min(1, (scrollLeftPx + w) / totalWidthPx);
   const peakCount = peaks.left.length;
-  const startIdx = Math.floor(startFrac * peakCount);
-  const endIdx = Math.ceil(endFrac * peakCount);
+  const clampedStartFrac = Math.max(0, Math.min(1, signalStartFrac));
+  const clampedEndFrac = Math.max(clampedStartFrac + 1 / Math.max(1, peakCount), Math.min(1, signalEndFrac));
+  const spanFrac = Math.max(1 / Math.max(1, peakCount), clampedEndFrac - clampedStartFrac);
+
+  // Which portion of the SIGNAL window to draw
+  const viewStartFrac = scrollLeftPx / totalWidthPx;
+  const viewEndFrac = Math.min(1, (scrollLeftPx + w) / totalWidthPx);
+  const globalStartFrac = clampedStartFrac + viewStartFrac * spanFrac;
+  const globalEndFrac = clampedStartFrac + viewEndFrac * spanFrac;
+
+  const startIdx = Math.max(0, Math.floor(globalStartFrac * peakCount));
+  const endIdx = Math.min(peakCount, Math.ceil(globalEndFrac * peakCount));
   const visiblePeaks = endIdx - startIdx;
 
   if (visiblePeaks <= 0) return;
@@ -91,7 +100,9 @@ function drawChannel(
   for (let i = 0; i <= visiblePeaks; i++) {
     const idx = startIdx + i;
     if (idx >= peakCount) break;
-    const px = (x + (idx / peakCount) * totalWidthPx - scrollLeftPx) * dpr;
+    const idxFrac = idx / peakCount;
+    const localFrac = (idxFrac - clampedStartFrac) / spanFrac;
+    const px = (x + localFrac * totalWidthPx - scrollLeftPx) * dpr;
     const val = data[idx] || 0;
     const yPos = mid - val * amp;
     if (i === 0) ctx.moveTo(px, yPos * dpr);
@@ -101,7 +112,9 @@ function drawChannel(
   for (let i = visiblePeaks; i >= 0; i--) {
     const idx = startIdx + i;
     if (idx >= peakCount) continue;
-    const px = (x + (idx / peakCount) * totalWidthPx - scrollLeftPx) * dpr;
+    const idxFrac = idx / peakCount;
+    const localFrac = (idxFrac - clampedStartFrac) / spanFrac;
+    const px = (x + localFrac * totalWidthPx - scrollLeftPx) * dpr;
     const val = data[idx] || 0;
     const yPos = mid + val * amp;
     ctx.lineTo(px, yPos * dpr);
