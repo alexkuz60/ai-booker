@@ -388,9 +388,16 @@ export async function renderChapter(opts: {
   clips: TimelineClip[];
   totalDurationSec: number;
   normalize?: boolean;
+  format?: ExportFormat;
+  wavBitDepth?: WavBitDepth;
+  mp3Bitrate?: Mp3Bitrate;
   onProgress?: (p: ChapterRenderProgress) => void;
 }): Promise<ChapterRenderResult> {
-  const { clips, totalDurationSec, normalize = true, onProgress } = opts;
+  const {
+    clips, totalDurationSec, normalize = true,
+    format = "wav", wavBitDepth = 16, mp3Bitrate = 192,
+    onProgress,
+  } = opts;
   const SAMPLE_RATE = 44100;
   const engine = getAudioEngine();
 
