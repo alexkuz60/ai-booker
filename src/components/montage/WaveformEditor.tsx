@@ -391,8 +391,8 @@ export function WaveformEditor({
 
       for (let t = startSec; t <= endSec; t += interval) {
         if (t < 0) continue;
-        const px = (t / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
-        if (px < mixerWidth || px > w) continue;
+        const px = (t / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
+        if (px < DB_ZONE_WIDTH || px > w) continue;
 
         const isMajor = t % (interval * 5) === 0 || interval >= 10;
         ctx.strokeStyle = borderColor.replace(")", ` / ${isMajor ? 0.2 : 0.1})`).replace("hsl(", "hsl(");
