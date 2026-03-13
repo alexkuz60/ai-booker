@@ -557,23 +557,26 @@ export function WaveformEditor({
     );
 
     // ── Draw clip boundaries (vertical separators) ────────────
-    if (sceneClips.length > 1) {
+    if (sceneClips.length > 0) {
       const clipBorderColor = resolveHsl("--muted-foreground");
       ctx.save();
-      for (let ci = 1; ci < sceneClips.length; ci++) {
-        const clip = sceneClips[ci];
-        const localSec = clip.startSec - signalWindow.startSec;
-        if (localSec <= 0 || localSec >= displayDurationSec) continue;
-        const px = (localSec / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
-        if (px < DB_ZONE_WIDTH || px > w) continue;
+      for (const clip of sceneClips) {
+        const clipStartLocal = clip.startSec - signalWindow.startSec;
+        const clipEndLocal = clip.startSec + clip.durationSec - signalWindow.startSec;
 
-        ctx.strokeStyle = clipBorderColor.replace(")", " / 0.35)").replace("hsl(", "hsl(");
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3, 4]);
-        ctx.beginPath();
-        ctx.moveTo(px * dpr, 0);
-        ctx.lineTo(px * dpr, h * dpr);
-        ctx.stroke();
+        for (const localSec of [clipStartLocal, clipEndLocal]) {
+          if (localSec <= 0.01 || localSec >= displayDurationSec - 0.01) continue;
+          const px = (localSec / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
+          if (px < DB_ZONE_WIDTH || px > w) continue;
+
+          ctx.strokeStyle = clipBorderColor.replace(")", " / 0.4)").replace("hsl(", "hsl(");
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 4]);
+          ctx.beginPath();
+          ctx.moveTo(px * dpr, 0);
+          ctx.lineTo(px * dpr, h * dpr);
+          ctx.stroke();
+        }
       }
       ctx.setLineDash([]);
       ctx.restore();
