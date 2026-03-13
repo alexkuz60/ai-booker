@@ -256,10 +256,10 @@ export function WaveformEditor({
     if (editorZoomPercent <= 100 || userScrollingRef.current) return;
     const el = editorScrollRef.current;
     if (!el) return;
-    const playheadPx = (scenePositionSec / sceneDuration) * totalWidthPx;
+    const playheadPx = (displayPositionSec / displayDurationSec) * totalWidthPx;
     const target = Math.max(0, playheadPx - el.clientWidth / 2);
     el.scrollLeft = target;
-  }, [scenePositionSec, sceneDuration, totalWidthPx, editorZoomPercent]);
+  }, [displayPositionSec, displayDurationSec, totalWidthPx, editorZoomPercent]);
 
   // Peaks for scene clips on selected track
   const { status, peaks, error } = useWaveformPeaks(sceneClips, trackId, sceneDuration, editorContainerWidth || 1600);
@@ -272,10 +272,12 @@ export function WaveformEditor({
 
   // Choose LOD based on visible area
   const visibleWidth = editorContainerWidth;
-  const visibleDurationSec = visibleWidth > 0 && totalWidthPx > 0 ? (visibleWidth / totalWidthPx) * sceneDuration : sceneDuration;
+  const visibleDurationSec = visibleWidth > 0 && totalWidthPx > 0
+    ? (visibleWidth / totalWidthPx) * displayDurationSec
+    : displayDurationSec;
   const lodLevel = useMemo(
-    () => chooseLod(visibleWidth, sceneDuration, visibleDurationSec, lodLevels),
-    [visibleWidth, sceneDuration, visibleDurationSec, lodLevels],
+    () => chooseLod(visibleWidth, displayDurationSec, visibleDurationSec, lodLevels),
+    [visibleWidth, displayDurationSec, visibleDurationSec, lodLevels],
   );
 
   const currentPeaks = peaks?.lods.get(lodLevel) ?? (peaks ? peaks.lods.values().next().value : null);
