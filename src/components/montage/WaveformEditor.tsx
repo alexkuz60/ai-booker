@@ -277,23 +277,72 @@ export function WaveformEditor({
     return Array.from(peaks.lods.keys()).sort((a, b) => a - b);
   }, [peaks]);
 
-  // Choose LOD based on visible area
+  // Use the densest LOD for signal-window detection (stable regardless of current zoom)
+  const signalDetectionPeaks = useMemo(() => {
+    if (!peaks) return null;
+    const desc = Array.from(peaks.lods.keys()).sort((a, b) => b - a);
+    return peaks.lods.get(desc[0]) ?? peaks.lods.values().next().value ?? null;
+  }, [peaks]);
+
+  // Auto-detect active signal window so 100% zoom fills the editor with meaningful audio
+  const signalWindow = useMemo(() => {
+    const fallback = {
+      startFrac: 0,
+      endFrac: 1,
+      startSec: 0,
+      durationSec: Math.max(0.05, sceneDuration),
+    };
+
+    if (!signalDetectionPeaks || sceneDuration <= 0) return fallback;
+
+    const peakCount = signalDetectionPeaks.left.length;
+    if (peakCount <= 1) return fallback;
+
+    let startIdx = -1;
+    let endIdx = -1;
+
+    for (let i = 0; i < peakCount; i++) {
+      const v = Math.max(Math.abs(signalDetectionPeaks.left[i] ?? 0), Math.abs(signalDetectionPeaks.right[i] ?? 0));
+      if (v >= SIGNAL_ACTIVITY_THRESHOLD) {
+        if (startIdx < 0) startIdx = i;
+        endIdx = i;
+      }
+    }
+
+    if (startIdx < 0 || endIdx < startIdx) return fallback;
+
+    const pad = Math.max(2, Math.floor(peakCount * SIGNAL_PAD_FRAC));
+    const paddedStartIdx = Math.max(0, startIdx - pad);
+    const paddedEndIdx = Math.min(peakCount - 1, endIdx + pad);
+
+    const rawStartFrac = paddedStartIdx / peakCount;
+    const rawEndFrac = (paddedEndIdx + 1) / peakCount;
+
+    const rawDurationSec = (rawEndFrac - rawStartFrac) * sceneDuration;
+    const durationSec = Math.max(0.05, rawDurationSec);
+    const maxStartSec = Math.max(0, sceneDuration - durationSec);
+    const startSec = Math.min(rawStartFrac * sceneDuration, maxStartSec);
+    const endSec = Math.min(sceneDuration, startSec + durationSec);
+
+    return {
+      startFrac: sceneDuration > 0 ? startSec / sceneDuration : 0,
+      endFrac: sceneDuration > 0 ? endSec / sceneDuration : 1,
+      startSec,
+      durationSec: Math.max(0.05, endSec - startSec),
+    };
+  }, [signalDetectionPeaks, sceneDuration]);
+
+  // Choose LOD based on visible area in the detected signal window
   const visibleWidth = editorContainerWidth;
-  const visibleDurationSec = visibleWidth > 0 && totalWidthPx > 0 ? (visibleWidth / totalWidthPx) * sceneDuration : sceneDuration;
+  const visibleDurationSec = visibleWidth > 0 && totalWidthPx > 0
+    ? (visibleWidth / totalWidthPx) * signalWindow.durationSec
+    : signalWindow.durationSec;
   const lodLevel = useMemo(
-    () => chooseLod(visibleWidth, sceneDuration, visibleDurationSec, lodLevels),
-    [visibleWidth, sceneDuration, visibleDurationSec, lodLevels],
+    () => chooseLod(visibleWidth, signalWindow.durationSec, visibleDurationSec, lodLevels),
+    [visibleWidth, signalWindow.durationSec, visibleDurationSec, lodLevels],
   );
 
   const currentPeaks = peaks?.lods.get(lodLevel) ?? (peaks ? peaks.lods.values().next().value : null);
-
-  // Show entire scene including silence — no signal cropping
-  const signalWindow = useMemo(() => ({
-    startFrac: 0,
-    endFrac: 1,
-    startSec: 0,
-    durationSec: Math.max(0.05, sceneDuration),
-  }), [sceneDuration]);
 
   const displayDurationSec = signalWindow.durationSec;
   const displayPositionSec = Math.max(0, Math.min(scenePositionSec - signalWindow.startSec, displayDurationSec));
