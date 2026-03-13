@@ -56,6 +56,7 @@ function sanitizeFileName(name: string): string {
 const PHASE_LABELS = {
   loading: { en: "Loading stems…", ru: "Загрузка стемов…" },
   rendering: { en: "Rendering…", ru: "Рендеринг…" },
+  normalizing: { en: "Normalizing to −0.5 dB…", ru: "Нормализация до −0.5 дБ…" },
   encoding: { en: "Encoding WAV…", ru: "Кодирование WAV…" },
   done: { en: "Done!", ru: "Готово!" },
   error: { en: "Error", ru: "Ошибка" },
