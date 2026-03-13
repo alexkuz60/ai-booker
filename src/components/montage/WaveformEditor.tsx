@@ -499,6 +499,29 @@ export function WaveformEditor({
       signalWindow.endFrac,
     );
 
+    // ── Draw clip boundaries (vertical separators) ────────────
+    if (sceneClips.length > 1) {
+      const clipBorderColor = resolveHsl("--muted-foreground");
+      ctx.save();
+      for (let ci = 1; ci < sceneClips.length; ci++) {
+        const clip = sceneClips[ci];
+        const localSec = clip.startSec - signalWindow.startSec;
+        if (localSec <= 0 || localSec >= displayDurationSec) continue;
+        const px = (localSec / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
+        if (px < mixerWidth || px > w) continue;
+
+        ctx.strokeStyle = clipBorderColor.replace(")", " / 0.35)").replace("hsl(", "hsl(");
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath();
+        ctx.moveTo(px * dpr, 0);
+        ctx.lineTo(px * dpr, h * dpr);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
     // ── Draw fade envelopes for each clip ───────────────────
     const fadeColor = resolveHsl("--primary");
     for (const clip of sceneClips) {
