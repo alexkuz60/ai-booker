@@ -346,7 +346,7 @@ export function WaveformEditor({
         ctx.setLineDash(db === 0 ? [] : [2, 3]);
 
         ctx.beginPath();
-        ctx.moveTo(mixerWidth * dpr, yUp * dpr);
+        ctx.moveTo(DB_ZONE_WIDTH * dpr, yUp * dpr);
         ctx.lineTo(w * dpr, yUp * dpr);
         ctx.stroke();
 
