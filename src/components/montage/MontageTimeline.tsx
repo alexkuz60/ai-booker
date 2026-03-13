@@ -680,6 +680,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             mixerWidth={MIXER_SIDEBAR}
             isRu={isRu}
             isPlaying={player.state === "playing"}
+            segmentBoundaries={segmentBoundaries}
             onSeek={handleSceneSeek}
             onTrim={handleTrim}
             onFadeIn={handleFadeIn}
