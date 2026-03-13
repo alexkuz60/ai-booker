@@ -268,6 +268,8 @@ export default function Parser() {
   };
 
   useEffect(() => {
+    // Skip auto-expand if nav state was restored from sessionStorage
+    if (navRestoredFromStorage) return;
     if (tocEntries.length > 0 && expandedNodes.size === 0) {
       const allKeys = new Set<string>();
       tocEntries.forEach((e, idx) => {
@@ -282,7 +284,7 @@ export default function Parser() {
       });
       setExpandedNodes(allKeys);
     }
-  }, [tocEntries]);
+  }, [tocEntries, navRestoredFromStorage]);
 
   useEffect(() => {
     if (!user) return;
