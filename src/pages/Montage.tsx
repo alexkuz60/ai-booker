@@ -122,7 +122,13 @@ const Montage = () => {
           <div className="flex-1 min-h-0 overflow-hidden p-4">
             <div className="h-full rounded-lg border border-border bg-card/50 overflow-hidden flex">
               <div className="shrink-0 border-r border-border" style={{ width: `${SIDEBAR_WIDTH}px` }}>
-                <MasterMeterPanel isRu={isRu} width={SIDEBAR_WIDTH} />
+                <MasterMeterPanel
+                  isRu={isRu}
+                  width={SIDEBAR_WIDTH}
+                  onRender={() => setRenderDialogOpen(true)}
+                  renderDisabled={clips.length === 0}
+                />
+              </div>
               </div>
               <div className="flex-1 min-h-0 p-2">
                 <MasterEffectsTabs isRu={isRu} />
