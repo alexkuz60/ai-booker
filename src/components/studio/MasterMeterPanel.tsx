@@ -401,6 +401,7 @@ export function SpectrumAnalyzer() {
   const [cursorBin, setCursorBin] = useState<number | null>(null);
   const cursorBinRef = useRef<number | null>(null);
   cursorBinRef.current = cursorBin;
+  const usableBinsRef = useRef<number>(57); // fallback
 
   const [mode, setMode] = useState<SpectrumMode>(() => {
     try { return (localStorage.getItem("spectrum-mode") as SpectrumMode) || "bars"; } catch { return "bars"; }
