@@ -27,6 +27,8 @@ interface WaveformEditorProps {
   sceneLabel: string;
   mixerWidth: number;
   isRu: boolean;
+  /** Whether transport is currently playing — disables edit controls */
+  isPlaying?: boolean;
   /** Seek callback — receives scene-relative seconds */
   onSeek: (sceneRelativeSec: number) => void;
   onTrim?: (trackId: string, startSec: number, endSec: number) => void;
