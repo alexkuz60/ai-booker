@@ -184,6 +184,8 @@ export function WaveformEditor({
   isRu,
   isPlaying = false,
   segmentBoundaries,
+  debugSceneStartSec,
+  debugSceneEndSec,
   onSeek,
   onTrim,
   onFadeIn,
