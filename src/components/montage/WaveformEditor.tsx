@@ -206,19 +206,25 @@ export function WaveformEditor({
   const [editorZoomPercent, setEditorZoomPercent] = useState(100);
   const [editorContainerWidth, setEditorContainerWidth] = useState(0);
 
-  // Measure available waveform width (excluding dB label zone)
+  // Measure available waveform width (excluding dB label zone).
+  // IMPORTANT: depends on trackId because component can render "empty" state first (no container mounted).
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el) {
+      setEditorContainerWidth(0);
+      return;
+    }
+
     const measure = () => {
       const w = el.clientWidth - DB_ZONE_WIDTH;
       setEditorContainerWidth(w > 0 ? w : 0);
     };
+
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [trackId]);
 
   // At 100% zoom: totalWidthPx === editorContainerWidth (scene fills editor exactly).
   // At N%: totalWidthPx = editorContainerWidth * N / 100.
