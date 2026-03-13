@@ -106,7 +106,7 @@ export function chooseLod(
   visibleWidthPx: number,
   totalDurationSec: number,
   visibleDurationSec: number,
-  lodLevels: LodLevel[] = [200, 800, 3200],
+  lodLevels: LodLevel[] = [400, 1600, 6400],
 ): LodLevel {
   if (visibleWidthPx <= 0 || visibleDurationSec <= 0) return lodLevels[0];
   
