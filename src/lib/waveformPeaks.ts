@@ -74,7 +74,7 @@ function computeChannelPeaks(data: Float32Array, peakCount: number): Float32Arra
  */
 export function computeMultiLodPeaks(
   buffer: AudioBuffer,
-  lodLevels: LodLevel[] = [200, 800, 3200],
+  lodLevels: LodLevel[] = [400, 1600, 6400],
 ): MultiLodPeaks {
   const left = buffer.getChannelData(0);
   const right = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : left;
