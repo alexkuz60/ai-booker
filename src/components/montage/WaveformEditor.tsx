@@ -246,17 +246,23 @@ export function WaveformEditor({
   }, [scenePositionSec, editorZoom, editorZoomPercent]);
 
   // Peaks for scene clips on selected track
-  const { status, peaks, error } = useWaveformPeaks(sceneClips, trackId, sceneDuration);
+  const { status, peaks, error } = useWaveformPeaks(sceneClips, trackId, sceneDuration, editorContainerWidth || 1600);
+
+  // Available LOD levels from computed peaks
+  const lodLevels = useMemo(() => {
+    if (!peaks) return [200, 800, 3200];
+    return Array.from(peaks.lods.keys()).sort((a, b) => a - b);
+  }, [peaks]);
 
   // Choose LOD based on visible area
   const visibleWidth = editorContainerWidth;
   const visibleDurationSec = visibleWidth > 0 && totalWidthPx > 0 ? (visibleWidth / totalWidthPx) * sceneDuration : sceneDuration;
   const lodLevel = useMemo(
-    () => chooseLod(visibleWidth, sceneDuration, visibleDurationSec),
-    [visibleWidth, sceneDuration, visibleDurationSec],
+    () => chooseLod(visibleWidth, sceneDuration, visibleDurationSec, lodLevels),
+    [visibleWidth, sceneDuration, visibleDurationSec, lodLevels],
   );
 
-  const currentPeaks = peaks?.lods.get(lodLevel) ?? peaks?.lods.get(200) ?? null;
+  const currentPeaks = peaks?.lods.get(lodLevel) ?? (peaks ? peaks.lods.values().next().value : null);
 
   // ── dB scale helpers ────────────────────────────────────────
   const DB_MARKS = [0, -6, -12, -18, -30, -60];

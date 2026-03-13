@@ -2,15 +2,19 @@
  * React hook for loading audio and computing/caching stereo waveform peaks
  * for a SCENE: decodes ALL clips, places their peaks at correct scene-local
  * positions, and merges into a single scene-wide MultiLodPeaks structure.
+ * 
+ * LOD levels are computed dynamically:
+ *   maxPeaks = sceneDuration * 44100 * maxZoom / displayWidth
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchWithStemCache } from "@/lib/stemCache";
 import {
   type MultiLodPeaks,
   type StereoPeaks,
   type LodLevel,
+  computeLodLevels,
   loadCachedPeaks,
   savePeaksToCache,
 } from "@/lib/waveformPeaks";
@@ -24,8 +28,6 @@ export interface WaveformPeaksState {
   error: string | null;
 }
 
-const LOD_LEVELS: readonly LodLevel[] = [200, 800, 3200];
-
 /**
  * Compute scene-wide multi-LOD peaks from decoded per-clip AudioBuffers.
  * Each clip is placed at its scene-local startSec within the total sceneDuration.
@@ -33,10 +35,11 @@ const LOD_LEVELS: readonly LodLevel[] = [200, 800, 3200];
 function computeScenePeaks(
   clipBuffers: { clip: TimelineClip; buffer: AudioBuffer }[],
   sceneDuration: number,
+  lodLevels: LodLevel[],
 ): MultiLodPeaks {
   if (sceneDuration <= 0) {
     const empty = new Map<LodLevel, StereoPeaks>();
-    for (const lod of LOD_LEVELS) {
+    for (const lod of lodLevels) {
       empty.set(lod, {
         left: new Float32Array(lod),
         right: new Float32Array(lod),
@@ -51,7 +54,7 @@ function computeScenePeaks(
   const sampleRate = clipBuffers[0]?.buffer.sampleRate ?? 44100;
   const lods = new Map<LodLevel, StereoPeaks>();
 
-  for (const lodLevel of LOD_LEVELS) {
+  for (const lodLevel of lodLevels) {
     const leftPeaks = new Float32Array(lodLevel);
     const rightPeaks = new Float32Array(lodLevel);
     const secPerBin = sceneDuration / lodLevel;
@@ -118,6 +121,7 @@ export function useWaveformPeaks(
   trackClips: TimelineClip[],
   trackId: string | null,
   sceneDuration: number = 0,
+  displayWidthPx: number = 1600,
 ): WaveformPeaksState {
   const [state, setState] = useState<WaveformPeaksState>({
     status: "idle",
@@ -205,7 +209,9 @@ export function useWaveformPeaks(
         }
 
         // Compute scene-wide merged peaks
-        const peaks = computeScenePeaks(clipBuffers, sceneDuration);
+        // Compute dynamic LOD levels based on scene params
+        const lodLevels = computeLodLevels(sceneDuration, displayWidthPx);
+        const peaks = computeScenePeaks(clipBuffers, sceneDuration, lodLevels);
 
         // Cache (fire-and-forget)
         savePeaksToCache(compositeCacheKey, peaks);
@@ -225,7 +231,7 @@ export function useWaveformPeaks(
         });
       }
     }
-  }, [trackId, clipsKey, trackClips, sceneDuration]);
+  }, [trackId, clipsKey, trackClips, sceneDuration, displayWidthPx]);
 
   useEffect(() => {
     loadPeaks();
