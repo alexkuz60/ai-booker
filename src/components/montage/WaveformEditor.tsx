@@ -6,7 +6,7 @@
  */
 
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import { Loader2, Scissors, ArrowUpRight, ArrowDownRight, Maximize, AudioWaveform, Undo2, Redo2, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { Loader2, Scissors, ArrowUpRight, ArrowDownRight, Maximize, AudioWaveform, Undo2, Redo2, ZoomIn, ZoomOut, Maximize2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { chooseLod, type MultiLodPeaks, type StereoPeaks } from "@/lib/waveformPeaks";
@@ -280,49 +280,13 @@ export function WaveformEditor({
 
   const currentPeaks = peaks?.lods.get(lodLevel) ?? (peaks ? peaks.lods.values().next().value : null);
 
-  const signalWindow = useMemo(() => {
-    if (!peaks || sceneDuration <= 0) {
-      return { startFrac: 0, endFrac: 1, startSec: 0, durationSec: Math.max(0.05, sceneDuration) };
-    }
-
-    const allLods = Array.from(peaks.lods.values());
-    if (allLods.length === 0) {
-      return { startFrac: 0, endFrac: 1, startSec: 0, durationSec: Math.max(0.05, sceneDuration) };
-    }
-
-    const detailLod = allLods.reduce((best, lod) =>
-      lod.left.length > best.left.length ? lod : best,
-    );
-
-    const threshold = 0.002;
-    let first = -1;
-    let last = -1;
-
-    for (let i = 0; i < detailLod.left.length; i++) {
-      if ((detailLod.left[i] ?? 0) > threshold || (detailLod.right[i] ?? 0) > threshold) {
-        first = i;
-        break;
-      }
-    }
-
-    for (let i = detailLod.left.length - 1; i >= 0; i--) {
-      if ((detailLod.left[i] ?? 0) > threshold || (detailLod.right[i] ?? 0) > threshold) {
-        last = i;
-        break;
-      }
-    }
-
-    if (first < 0 || last <= first) {
-      return { startFrac: 0, endFrac: 1, startSec: 0, durationSec: Math.max(0.05, sceneDuration) };
-    }
-
-    const startFrac = first / detailLod.left.length;
-    const endFrac = Math.min(1, (last + 1) / detailLod.left.length);
-    const startSec = startFrac * sceneDuration;
-    const durationSec = Math.max(0.05, (endFrac - startFrac) * sceneDuration);
-
-    return { startFrac, endFrac, startSec, durationSec };
-  }, [peaks, sceneDuration]);
+  // Show entire scene including silence — no signal cropping
+  const signalWindow = useMemo(() => ({
+    startFrac: 0,
+    endFrac: 1,
+    startSec: 0,
+    durationSec: Math.max(0.05, sceneDuration),
+  }), [sceneDuration]);
 
   const displayDurationSec = signalWindow.durationSec;
   const displayPositionSec = Math.max(0, Math.min(scenePositionSec - signalWindow.startSec, displayDurationSec));
@@ -794,6 +758,22 @@ export function WaveformEditor({
           </Button>
 
           <div className="w-px h-3 bg-border/50 mx-0.5" />
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 px-1.5 text-[10px] gap-0.5"
+            title={isRu ? "Вставить тишину" : "Insert silence"}
+            onClick={() => {
+              // Insert silence at playhead position or selection start
+              const insertAt = selection ? selection.startSec : displayPositionSec;
+              console.log("[WaveformEditor] Insert silence at", insertAt.toFixed(3), "sec (scene-relative)");
+              // TODO: wire to actual silence insertion callback
+            }}
+          >
+            <Plus className="h-3 w-3" />
+            <span className="hidden sm:inline">{isRu ? "Тишина" : "Silence"}</span>
+          </Button>
 
           <Button
             variant="ghost"
