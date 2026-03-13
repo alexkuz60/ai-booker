@@ -19,13 +19,13 @@ import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 // ─── Public types ────────────────────────────────────────────
 
 export interface ChapterRenderProgress {
-  phase: "loading" | "rendering" | "encoding" | "uploading" | "done" | "error";
+  phase: "loading" | "rendering" | "encoding" | "done" | "error";
   percent: number;
   error?: string;
 }
 
 export interface ChapterRenderResult {
-  storagePath: string;
+  blob: Blob;
   durationSec: number;
   fileSizeBytes: number;
 }
