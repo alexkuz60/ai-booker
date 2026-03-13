@@ -462,6 +462,7 @@ export function WaveformEditor({
     ctx.fillRect(DB_ZONE_WIDTH * dpr, chH * dpr, waveW * dpr, CHANNEL_GAP * dpr);
 
     // ── Time scale on the L/R divider ────────────────────────
+    console.log("[WaveformDraw]", { displayDurationSec, totalWidthPx, scrollLeft, waveW: waveW, editorW: w });
     {
       const dividerY = chH; // top of the gap
       const timeStep = 10; // seconds
