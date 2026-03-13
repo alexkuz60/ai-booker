@@ -568,7 +568,7 @@ export function WaveformEditor({
       ctx.stroke();
     }
     ctx.restore();
-  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, displayDurationSec, displayPositionSec, mixerWidth, sceneClips, signalWindow.startSec, signalWindow.startFrac, signalWindow.endFrac]);
+  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, displayDurationSec, displayPositionSec, sceneClips, signalWindow.startSec, signalWindow.startFrac, signalWindow.endFrac]);
 
   // ── Keyboard shortcuts (Ctrl+Z / Ctrl+Shift+Z) ─────────────
   useEffect(() => {
