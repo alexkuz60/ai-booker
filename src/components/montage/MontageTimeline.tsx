@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { ZoomIn, ZoomOut, Maximize2, Play, Pause, Square, Volume2, VolumeX, ChevronUp, ChevronDown, Loader2, RefreshCw, AlertTriangle, Scissors } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2, Play, Pause, Square, Volume2, VolumeX, ChevronUp, ChevronDown, Loader2, RefreshCw, AlertTriangle, Scissors, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 
 import { getAudioEngine } from "@/lib/audioEngine";
@@ -408,6 +409,44 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
               </button>
               <input type="range" min={0} max={100} value={player.volume} onChange={e => player.changeVolume(Number(e.target.value))} className="w-[72px] h-0.5 accent-primary cursor-pointer volume-slider-sm" />
             </div>
+
+            {/* Insert silence */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-[10px] gap-1 text-muted-foreground hover:text-primary ml-1"
+                  title={isRu ? "Вставить тишину" : "Insert silence"}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span className="font-body">{isRu ? "Тишина" : "Silence"}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-2" align="start">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-muted-foreground font-body mb-1">
+                    {isRu ? "Длительность тишины" : "Silence duration"}
+                  </span>
+                  <div className="flex gap-1">
+                    {[0.25, 0.5, 1.0, 2.0].map((dur) => (
+                      <Button
+                        key={dur}
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-3 text-xs font-mono"
+                        onClick={() => {
+                          console.log(`[MontageTimeline] Insert silence ${dur}s at position ${player.positionSec.toFixed(3)}s`);
+                          toast.info(isRu ? `Тишина ${dur}с (в разработке)` : `Silence ${dur}s (coming soon)`);
+                        }}
+                      >
+                        {dur}s
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 

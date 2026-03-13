@@ -6,7 +6,7 @@
  */
 
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import { Loader2, Scissors, ArrowUpRight, ArrowDownRight, Maximize, AudioWaveform, Undo2, Redo2, ZoomIn, ZoomOut, Maximize2, Plus } from "lucide-react";
+import { Loader2, Scissors, ArrowUpRight, ArrowDownRight, Maximize, AudioWaveform, Undo2, Redo2, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { chooseLod, type MultiLodPeaks, type StereoPeaks } from "@/lib/waveformPeaks";
@@ -760,22 +760,6 @@ export function WaveformEditor({
           </Button>
 
           <div className="w-px h-3 bg-border/50 mx-0.5" />
-
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-5 px-1.5 text-[10px] gap-0.5"
-            title={isRu ? "Вставить тишину" : "Insert silence"}
-            onClick={() => {
-              // Insert silence at playhead position or selection start
-              const insertAt = selection ? selection.startSec : displayPositionSec;
-              console.log("[WaveformEditor] Insert silence at", insertAt.toFixed(3), "sec (scene-relative)");
-              // TODO: wire to actual silence insertion callback
-            }}
-          >
-            <Plus className="h-3 w-3" />
-            <span className="hidden sm:inline">{isRu ? "Тишина" : "Silence"}</span>
-          </Button>
 
           <Button
             variant="ghost"
