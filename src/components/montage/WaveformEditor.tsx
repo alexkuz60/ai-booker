@@ -13,6 +13,13 @@ import { chooseLod, type MultiLodPeaks, type StereoPeaks } from "@/lib/waveformP
 import { useWaveformPeaks, type WaveformStatus } from "@/hooks/useWaveformPeaks";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 
+/** Scene-local segment boundary (from scene_playlists) */
+export interface SegmentBoundary {
+  startSec: number;
+  durationSec: number;
+  label?: string;
+}
+
 interface WaveformEditorProps {
   /** Clips for the selected track WITHIN the current scene (scene-local startSec) */
   sceneClips: TimelineClip[];
@@ -29,6 +36,8 @@ interface WaveformEditorProps {
   isRu: boolean;
   /** Whether transport is currently playing — disables edit controls */
   isPlaying?: boolean;
+  /** Segment boundaries from scene_playlists (scene-local coords, relative to scene silence start) */
+  segmentBoundaries?: SegmentBoundary[];
   /** Seek callback — receives scene-relative seconds */
   onSeek: (sceneRelativeSec: number) => void;
   onTrim?: (trackId: string, startSec: number, endSec: number) => void;
