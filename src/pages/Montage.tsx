@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, FileAudio } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { useAuth } from "@/hooks/useAuth";
@@ -36,16 +36,31 @@ const Montage = () => {
   const [renderDialogOpen, setRenderDialogOpen] = useState(false);
   const activePartNumber = parts.length > 0 ? parts[activePartIdx]?.part_number ?? null : null;
 
+  const hasContent = !!chapterId && sceneIds.length > 0;
+
   // ── Page header ────────────────────────────────────────────
   const title = isRu ? "МОНТАЖ" : "MONTAGE";
   const subtitle = bookTitle && chapterTitle
     ? `${bookTitle} → ${chapterTitle}`
     : (isRu ? "Финальный монтаж и мастеринг глав" : "Final chapter montage & mastering");
 
+  const renderButton = hasContent ? (
+    <Button
+      variant="hero"
+      size="sm"
+      className="gap-1.5 h-7 text-xs"
+      onClick={() => setRenderDialogOpen(true)}
+      disabled={clips.length === 0}
+    >
+      <FileAudio className="h-3.5 w-3.5" />
+      {isRu ? "Рендер" : "Render"}
+    </Button>
+  ) : undefined;
+
   useEffect(() => {
-    setPageHeader({ title, subtitle });
+    setPageHeader({ title, subtitle, headerRight: renderButton });
     return () => setPageHeader({});
-  }, [title, subtitle]);
+  }, [title, subtitle, hasContent, clips.length]);
 
   if (loading) {
     return (
@@ -54,8 +69,6 @@ const Montage = () => {
       </div>
     );
   }
-
-  const hasContent = !!chapterId && sceneIds.length > 0;
 
   // Count rendered/unrendered for active part only
   const activeRendered = activeSceneIds.filter(id => renderedSceneIds.includes(id));
@@ -125,8 +138,6 @@ const Montage = () => {
                 <MasterMeterPanel
                   isRu={isRu}
                   width={SIDEBAR_WIDTH}
-                  onRender={() => setRenderDialogOpen(true)}
-                  renderDisabled={clips.length === 0}
                 />
               </div>
               <div className="flex-1 min-h-0 p-2">
