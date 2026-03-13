@@ -307,9 +307,100 @@ const SPECTRUM_MODES: { id: SpectrumMode; label: string }[] = [
   { id: "mirror", label: "⫼" },
 ];
 
+/* ── helpers: frequency → note ── */
+const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+function freqToNote(hz: number): string {
+  if (hz <= 0) return "";
+  const midi = 12 * Math.log2(hz / 440) + 69;
+  const rounded = Math.round(midi);
+  const name = NOTE_NAMES[((rounded % 12) + 12) % 12];
+  const octave = Math.floor(rounded / 12) - 1;
+  const cents = Math.round((midi - rounded) * 100);
+  const cStr = cents >= 0 ? `+${cents}` : `${cents}`;
+  return `${name}${octave} ${cStr}¢`;
+}
+
+function binToFreq(bin: number, fftSize: number, sampleRate: number): number {
+  return (bin * sampleRate) / fftSize;
+}
+
+/** Draw the cursor marker on the spectrum canvas */
+function drawCursorMarker(
+  ctx: CanvasRenderingContext2D,
+  w: number, h: number,
+  cursorBin: number, usableBins: number,
+  fftSize: number, sampleRate: number,
+  bins: Float32Array | null,
+  dbMin: number, dbMax: number,
+) {
+  const barWidth = w / usableBins;
+  const x = cursorBin * barWidth + barWidth / 2;
+  const hz = binToFreq(cursorBin, fftSize, sampleRate);
+  const note = freqToNote(hz);
+  const hzLabel = hz >= 1000 ? `${(hz / 1000).toFixed(2)} kHz` : `${hz.toFixed(1)} Hz`;
+
+  // vertical line
+  ctx.save();
+  ctx.strokeStyle = "hsla(45, 100%, 65%, 0.85)";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // dB value at cursor
+  let dbLabel = "";
+  if (bins && cursorBin >= 0 && cursorBin < bins.length) {
+    dbLabel = `${bins[cursorBin].toFixed(1)} dB`;
+  }
+
+  // label background
+  const labels = [hzLabel, note, dbLabel].filter(Boolean);
+  ctx.font = "bold 10px monospace";
+  const maxLabelW = Math.max(...labels.map(l => ctx.measureText(l).width));
+  const padX = 6, padY = 3, lineH = 13;
+  const boxW = maxLabelW + padX * 2;
+  const boxH = labels.length * lineH + padY * 2;
+  let bx = x + 6;
+  if (bx + boxW > w) bx = x - boxW - 6;
+  const by = 6;
+
+  ctx.fillStyle = "hsla(0, 0%, 0%, 0.82)";
+  ctx.fillRect(bx, by, boxW, boxH);
+  ctx.strokeStyle = "hsla(45, 100%, 65%, 0.5)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(bx, by, boxW, boxH);
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = "hsl(45, 100%, 70%)";
+  ctx.fillText(hzLabel, bx + padX, by + padY + 10);
+  if (note) {
+    ctx.fillStyle = "hsl(180, 70%, 70%)";
+    ctx.fillText(note, bx + padX, by + padY + 10 + lineH);
+  }
+  if (dbLabel) {
+    ctx.fillStyle = "hsla(0, 0%, 100%, 0.8)";
+    ctx.fillText(dbLabel, bx + padX, by + padY + 10 + lineH * (note ? 2 : 1));
+  }
+
+  // small diamond on the spectrum
+  ctx.fillStyle = "hsl(45, 100%, 65%)";
+  if (bins && cursorBin < bins.length) {
+    const norm = Math.max(0, Math.min(1, (bins[cursorBin] - dbMin) / (dbMax - dbMin)));
+    const dy = h - norm * h;
+    ctx.beginPath();
+    ctx.moveTo(x, dy - 4); ctx.lineTo(x + 4, dy);
+    ctx.lineTo(x, dy + 4); ctx.lineTo(x - 4, dy);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+
 export function SpectrumAnalyzer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [staticData, setStaticData] = useState<StaticSpectrumData | null>(getStaticSpectrum);
+  const [cursorBin, setCursorBin] = useState<number | null>(null);
+  const cursorBinRef = useRef<number | null>(null);
+  cursorBinRef.current = cursorBin;
 
   const [mode, setMode] = useState<SpectrumMode>(() => {
     try { return (localStorage.getItem("spectrum-mode") as SpectrumMode) || "bars"; } catch { return "bars"; }
