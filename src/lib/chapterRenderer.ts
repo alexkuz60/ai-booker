@@ -325,9 +325,10 @@ function buildMasterChain(ctx: OfflineAudioContext): {
 export async function renderChapter(opts: {
   clips: TimelineClip[];
   totalDurationSec: number;
+  normalize?: boolean;
   onProgress?: (p: ChapterRenderProgress) => void;
 }): Promise<ChapterRenderResult> {
-  const { clips, totalDurationSec, onProgress } = opts;
+  const { clips, totalDurationSec, normalize = true, onProgress } = opts;
   const SAMPLE_RATE = 44100;
   const engine = getAudioEngine();
 
