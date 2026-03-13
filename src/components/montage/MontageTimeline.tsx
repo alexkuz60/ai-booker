@@ -322,6 +322,55 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     return map;
   }, [trimmedClips]);
 
+  // ── Current scene context for WaveformEditor ────────────────
+  const currentSceneIdx = useMemo(() => {
+    if (sceneBoundaries.length === 0) return 0;
+    for (let i = sceneBoundaries.length - 1; i >= 0; i--) {
+      if (player.positionSec >= sceneBoundaries[i].startSec) return i;
+    }
+    return 0;
+  }, [player.positionSec, sceneBoundaries]);
+
+  const currentBoundary = sceneBoundaries[currentSceneIdx];
+  const nextBoundary = sceneBoundaries[currentSceneIdx + 1];
+  const sceneStartSec = currentBoundary?.startSec ?? 0;
+
+  const sceneEndSec = useMemo(() => {
+    if (nextBoundary) return nextBoundary.startSec;
+    return fadedClips
+      .filter((c) => c.sceneId === currentBoundary?.sceneId)
+      .reduce((max, c) => Math.max(max, c.startSec + c.durationSec), sceneStartSec);
+  }, [nextBoundary, fadedClips, currentBoundary?.sceneId, sceneStartSec]);
+
+  const waveformSceneDuration = Math.max(0, sceneEndSec - sceneStartSec);
+  const waveformScenePositionSec = Math.max(0, Math.min(player.positionSec - sceneStartSec, waveformSceneDuration));
+
+  const waveformSceneClips = useMemo(() => {
+    if (!selectedTrackId || !currentBoundary) return [];
+
+    return fadedClips
+      .filter((c) => c.trackId === selectedTrackId && c.sceneId === currentBoundary.sceneId)
+      .map((c) => ({
+        ...c,
+        startSec: Math.max(0, c.startSec - sceneStartSec),
+        durationSec:
+          Math.min(c.startSec + c.durationSec, sceneEndSec) -
+          Math.max(c.startSec, sceneStartSec),
+      }))
+      .filter((c) => c.durationSec > 0.001);
+  }, [fadedClips, selectedTrackId, currentBoundary, sceneStartSec, sceneEndSec]);
+
+  const waveformSceneLabel = currentBoundary
+    ? `${isRu ? "Сцена" : "Scene"} ${currentSceneIdx + 1}/${sceneBoundaries.length}`
+    : "";
+
+  const handleSceneSeek = useCallback(
+    (sceneRelativeSec: number) => {
+      player.seek(sceneStartSec + sceneRelativeSec);
+    },
+    [player.seek, sceneStartSec],
+  );
+
   return (
     <div
       className="flex flex-col bg-background border-t border-border shrink-0"
