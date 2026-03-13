@@ -421,37 +421,38 @@ export async function renderChapter(opts: {
     const renderedBuffer = await offlineCtx.startRendering();
     onProgress?.({ phase: "rendering", percent: 70 });
 
-    // ── Phase 3: Normalize to -0.5 dB peak ──
-    onProgress?.({ phase: "normalizing", percent: 72 });
+    // ── Phase 3: Normalize to -0.5 dB peak (optional) ──
+    if (normalize) {
+      onProgress?.({ phase: "normalizing", percent: 72 });
 
-    const numCh = renderedBuffer.numberOfChannels;
-    const len = renderedBuffer.length;
+      const numCh = renderedBuffer.numberOfChannels;
+      const len = renderedBuffer.length;
 
-    // Find global peak across all channels
-    let globalPeak = 0;
-    for (let ch = 0; ch < numCh; ch++) {
-      const data = renderedBuffer.getChannelData(ch);
-      for (let i = 0; i < len; i++) {
-        const abs = Math.abs(data[i]);
-        if (abs > globalPeak) globalPeak = abs;
-      }
-    }
-
-    const targetPeak = Math.pow(10, -0.5 / 20); // -0.5 dB ≈ 0.9441
-    console.log(`[ChapterRenderer] Peak: ${globalPeak.toFixed(6)} (${globalPeak > 0 ? (20 * Math.log10(globalPeak)).toFixed(2) : '-inf'} dB), target: ${targetPeak.toFixed(6)} (-0.5 dB)`);
-
-    if (globalPeak > 0) {
-      const gain = targetPeak / globalPeak;
-      console.log(`[ChapterRenderer] Normalizing: gain = ${gain.toFixed(6)} (${(20 * Math.log10(gain)).toFixed(2)} dB delta)`);
+      let globalPeak = 0;
       for (let ch = 0; ch < numCh; ch++) {
         const data = renderedBuffer.getChannelData(ch);
         for (let i = 0; i < len; i++) {
-          data[i] *= gain;
+          const abs = Math.abs(data[i]);
+          if (abs > globalPeak) globalPeak = abs;
         }
       }
-    }
 
-    onProgress?.({ phase: "normalizing", percent: 80 });
+      const targetPeak = Math.pow(10, -0.5 / 20); // -0.5 dB ≈ 0.9441
+      console.log(`[ChapterRenderer] Peak: ${globalPeak.toFixed(6)} (${globalPeak > 0 ? (20 * Math.log10(globalPeak)).toFixed(2) : '-inf'} dB), target: ${targetPeak.toFixed(6)} (-0.5 dB)`);
+
+      if (globalPeak > 0) {
+        const gain = targetPeak / globalPeak;
+        console.log(`[ChapterRenderer] Normalizing: gain = ${gain.toFixed(6)} (${(20 * Math.log10(gain)).toFixed(2)} dB delta)`);
+        for (let ch = 0; ch < numCh; ch++) {
+          const data = renderedBuffer.getChannelData(ch);
+          for (let i = 0; i < len; i++) {
+            data[i] *= gain;
+          }
+        }
+      }
+
+      onProgress?.({ phase: "normalizing", percent: 80 });
+    }
 
     // ── Phase 4: Encode WAV ──
     onProgress?.({ phase: "encoding", percent: 82 });

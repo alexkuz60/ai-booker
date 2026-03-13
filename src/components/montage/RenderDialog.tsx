@@ -96,6 +96,7 @@ export function RenderDialog({
       const res = await renderChapter({
         clips,
         totalDurationSec,
+        normalize,
         onProgress: (p) => { if (!abortRef.current) setProgress(p); },
       });
 
