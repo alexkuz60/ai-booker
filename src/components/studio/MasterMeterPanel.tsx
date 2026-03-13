@@ -447,6 +447,14 @@ export function SpectrumAnalyzer() {
       const sd = staticDataRef.current;
       if (sd) {
         drawStaticSpectrum(canvas, ctx!, sd, modeRef.current);
+        // Draw cursor on static spectrum
+        const cBin = cursorBinRef.current;
+        if (cBin !== null) {
+          const sw = canvas.clientWidth;
+          const sh = canvas.clientHeight;
+          const usable = sd.bins.length;
+          drawCursorMarker(ctx!, sw, sh, cBin, usable, usable * 2, 44100, sd.bins, -80, 0);
+        }
         return; // Don't request next frame — static snapshot
       }
       if (!ctx) { raf = requestAnimationFrame(draw); return; }
