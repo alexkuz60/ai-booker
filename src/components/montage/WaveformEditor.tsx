@@ -583,12 +583,12 @@ export function WaveformEditor({
       requestAnimationFrame(() => {
         const el = editorScrollRef.current;
         if (!el) return;
-        const newZoom = (fitZoom * percent) / 100;
-        const px = scenePositionSec * newZoom * 4;
+        const newTotalW = editorContainerWidth * percent / 100;
+        const px = (scenePositionSec / sceneDuration) * newTotalW;
         el.scrollTo({ left: Math.max(0, px - el.clientWidth / 2), behavior: "smooth" });
       });
     }
-  }, [fitZoom, scenePositionSec]);
+  }, [editorContainerWidth, scenePositionSec, sceneDuration]);
 
   const adjustEditorZoom = useCallback((dir: "in" | "out") => {
     const presets = EDITOR_ZOOM_PRESETS;
