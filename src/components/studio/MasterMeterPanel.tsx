@@ -511,7 +511,7 @@ interface MasterMeterPanelProps {
   progressPercent?: number | null;
 }
 
-export function MasterMeterPanel({ isRu, width, onNormalize, onRender, normalizeDisabled, renderDisabled }: MasterMeterPanelProps) {
+export function MasterMeterPanel({ isRu, width, onNormalize, onRender, normalizeDisabled, renderDisabled, progressMessage, progressPercent }: MasterMeterPanelProps) {
   const engine = getAudioEngine();
 
   const [pluginStates, setPluginStates] = useState(() => {
