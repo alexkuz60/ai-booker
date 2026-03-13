@@ -507,7 +507,7 @@ interface MasterMeterPanelProps {
   renderDisabled?: boolean;
 }
 
-export function MasterMeterPanel({ isRu, width }: MasterMeterPanelProps) {
+export function MasterMeterPanel({ isRu, width, onNormalize, onRender, normalizeDisabled, renderDisabled }: MasterMeterPanelProps) {
   const engine = getAudioEngine();
 
   const [pluginStates, setPluginStates] = useState(() => {
