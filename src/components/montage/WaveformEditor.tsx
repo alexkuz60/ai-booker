@@ -1,7 +1,7 @@
 /**
  * WaveformEditor — professional stereo L/R waveform display with selection,
  * trim, fade in/out, normalize. Canvas-based with virtual rendering.
- * Operates in SCENE-LOCAL coordinates: 100% zoom = full scene visible.
+ * Operates in SCENE-LOCAL coordinates: 100% zoom = scene start + active signal span.
  * Transport position is relative to scene start.
  */
 
@@ -52,7 +52,9 @@ const CHANNEL_GAP = 2;
 const DB_ZONE_WIDTH = 36;
 
 const EDITOR_ZOOM_PRESETS = [100, 200, 300, 400, 500] as const;
-const SIGNAL_ACTIVITY_THRESHOLD = 0.002;
+const SIGNAL_ACTIVITY_FLOOR = 0.00035;
+const SIGNAL_ACTIVITY_RATIO = 0.015;
+const SIGNAL_MIN_ACTIVE_BINS = 3;
 const SIGNAL_PAD_FRAC = 0.01;
 
 /** Resolve a CSS custom property to a usable hsl() string for Canvas */
@@ -284,13 +286,21 @@ export function WaveformEditor({
     return peaks.lods.get(desc[0]) ?? peaks.lods.values().next().value ?? null;
   }, [peaks]);
 
-  // Auto-detect active signal window so 100% zoom fills the editor with meaningful audio
+  // End of active signal; 100% zoom stretches [sceneStart..activeEnd] to full viewport width
   const signalWindow = useMemo(() => {
+    const clipEndFallback = Math.max(
+      0.05,
+      Math.min(
+        sceneDuration,
+        sceneClips.reduce((maxEnd, clip) => Math.max(maxEnd, clip.startSec + clip.durationSec), 0),
+      ) || sceneDuration,
+    );
+
     const fallback = {
       startFrac: 0,
-      endFrac: 1,
+      endFrac: sceneDuration > 0 ? clipEndFallback / sceneDuration : 1,
       startSec: 0,
-      durationSec: Math.max(0.05, sceneDuration),
+      durationSec: clipEndFallback,
     };
 
     if (!signalDetectionPeaks || sceneDuration <= 0) return fallback;
@@ -298,35 +308,62 @@ export function WaveformEditor({
     const peakCount = signalDetectionPeaks.left.length;
     if (peakCount <= 1) return fallback;
 
+    let maxAbs = 0;
+    for (let i = 0; i < peakCount; i++) {
+      const v = Math.max(
+        Math.abs(signalDetectionPeaks.left[i] ?? 0),
+        Math.abs(signalDetectionPeaks.right[i] ?? 0),
+      );
+      if (v > maxAbs) maxAbs = v;
+    }
+
+    const threshold = Math.max(SIGNAL_ACTIVITY_FLOOR, maxAbs * SIGNAL_ACTIVITY_RATIO);
+
     let startIdx = -1;
     let endIdx = -1;
+    let runStart = -1;
+    let runLen = 0;
 
     for (let i = 0; i < peakCount; i++) {
-      const v = Math.max(Math.abs(signalDetectionPeaks.left[i] ?? 0), Math.abs(signalDetectionPeaks.right[i] ?? 0));
-      if (v >= SIGNAL_ACTIVITY_THRESHOLD) {
-        if (startIdx < 0) startIdx = i;
-        endIdx = i;
+      const v = Math.max(
+        Math.abs(signalDetectionPeaks.left[i] ?? 0),
+        Math.abs(signalDetectionPeaks.right[i] ?? 0),
+      );
+
+      if (v >= threshold) {
+        if (runStart < 0) runStart = i;
+        runLen += 1;
+      } else if (runStart >= 0) {
+        if (runLen >= SIGNAL_MIN_ACTIVE_BINS) {
+          if (startIdx < 0) startIdx = runStart;
+          endIdx = i - 1;
+        }
+        runStart = -1;
+        runLen = 0;
       }
+    }
+
+    if (runStart >= 0 && runLen >= SIGNAL_MIN_ACTIVE_BINS) {
+      if (startIdx < 0) startIdx = runStart;
+      endIdx = peakCount - 1;
     }
 
     if (startIdx < 0 || endIdx < startIdx) return fallback;
 
     const pad = Math.max(2, Math.floor(peakCount * SIGNAL_PAD_FRAC));
     const paddedEndIdx = Math.min(peakCount - 1, endIdx + pad);
-
     const rawEndFrac = (paddedEndIdx + 1) / peakCount;
 
-    // 100% = from scene start (0) to end of active signal (including leading silence)
-    const endSec = Math.min(sceneDuration, rawEndFrac * sceneDuration);
-    const durationSec = Math.max(0.05, endSec);
+    const detectedEndSec = Math.min(sceneDuration, rawEndFrac * sceneDuration);
+    const endSec = Math.max(0.05, Math.min(sceneDuration, detectedEndSec));
 
     return {
       startFrac: 0,
       endFrac: sceneDuration > 0 ? endSec / sceneDuration : 1,
       startSec: 0,
-      durationSec,
+      durationSec: endSec,
     };
-  }, [signalDetectionPeaks, sceneDuration]);
+  }, [signalDetectionPeaks, sceneDuration, sceneClips]);
 
   // Choose LOD based on visible area in the detected signal window
   const visibleWidth = editorContainerWidth;
@@ -888,8 +925,8 @@ export function WaveformEditor({
           {/* Canvas is viewport-sized, pinned via sticky; drawing uses scrollLeft for virtual offset */}
           <canvas
             ref={canvasRef}
-            className="absolute inset-0"
-            style={{ width: "100%", height: "100%", position: "sticky", left: 0 }}
+            className="sticky left-0 top-0 block"
+            style={{ width: "100%", height: "100%" }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
