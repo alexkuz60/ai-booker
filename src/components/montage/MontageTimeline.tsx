@@ -551,7 +551,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
                         size="sm"
                         className="h-7 px-3 text-xs font-mono"
                         onClick={() => {
-                          console.log(`[MontageTimeline] Insert silence ${dur}s at position ${player.positionSec.toFixed(3)}s`);
                           toast.info(isRu ? `Тишина ${dur}с (в разработке)` : `Silence ${dur}s (coming soon)`);
                         }}
                       >
