@@ -859,7 +859,7 @@ export function WaveformEditor({
       <div ref={containerRef} className="flex-1 min-h-0 relative flex">
         <div ref={editorScrollRef} className="flex-1 overflow-x-auto overflow-y-hidden cursor-crosshair relative">
           {/* Invisible spacer — gives the scrollbar the correct total width */}
-          <div style={{ width: `${totalWidthPx + mixerWidth}px`, height: "1px", pointerEvents: "none" }} />
+          <div style={{ width: `${totalWidthPx + DB_ZONE_WIDTH}px`, height: "1px", pointerEvents: "none" }} />
           {/* Canvas is viewport-sized, pinned via sticky; drawing uses scrollLeft for virtual offset */}
           <canvas
             ref={canvasRef}
