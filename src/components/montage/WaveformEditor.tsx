@@ -415,14 +415,14 @@ export function WaveformEditor({
     ctx.strokeStyle = borderColor;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(mixerWidth * dpr, 0);
-    ctx.lineTo(mixerWidth * dpr, h * dpr);
+    ctx.moveTo(DB_ZONE_WIDTH * dpr, 0);
+    ctx.lineTo(DB_ZONE_WIDTH * dpr, h * dpr);
     ctx.stroke();
 
     // Clip to waveform area
     ctx.save();
     ctx.beginPath();
-    ctx.rect(mixerWidth * dpr, 0, (w - mixerWidth) * dpr, h * dpr);
+    ctx.rect(DB_ZONE_WIDTH * dpr, 0, (w - DB_ZONE_WIDTH) * dpr, h * dpr);
     ctx.clip();
 
     // Draw L channel
