@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { FileAudio, Download, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { renderChapter, type ChapterRenderProgress } from "@/lib/chapterRenderer";
@@ -74,6 +75,7 @@ export function RenderDialog({
   ].filter(Boolean).join("_");
 
   const [fileName, setFileName] = useState(defaultName);
+  const [normalize, setNormalize] = useState(true);
   const [rendering, setRendering] = useState(false);
   const [progress, setProgress] = useState<ChapterRenderProgress | null>(null);
   const [result, setResult] = useState<{ fileSizeBytes: number } | null>(null);
@@ -94,6 +96,7 @@ export function RenderDialog({
       const res = await renderChapter({
         clips,
         totalDurationSec,
+        normalize,
         onProgress: (p) => { if (!abortRef.current) setProgress(p); },
       });
 
@@ -143,18 +146,30 @@ export function RenderDialog({
 
           {/* File name input */}
           {!rendering && !isDone && (
-            <div className="space-y-1.5">
-              <Label className="text-xs font-body">
-                {isRu ? "Имя файла" : "File name"}
-              </Label>
-              <div className="flex items-center gap-1">
-                <Input
-                  value={fileName}
-                  onChange={(e) => setFileName(e.target.value)}
-                  className="h-8 text-xs font-mono flex-1"
-                  placeholder={defaultName}
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-body">
+                  {isRu ? "Имя файла" : "File name"}
+                </Label>
+                <div className="flex items-center gap-1">
+                  <Input
+                    value={fileName}
+                    onChange={(e) => setFileName(e.target.value)}
+                    className="h-8 text-xs font-mono flex-1"
+                    placeholder={defaultName}
+                  />
+                  <span className="text-xs text-muted-foreground font-mono">.wav</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="normalize"
+                  checked={normalize}
+                  onCheckedChange={(v) => setNormalize(!!v)}
                 />
-                <span className="text-xs text-muted-foreground font-mono">.wav</span>
+                <Label htmlFor="normalize" className="text-xs font-body cursor-pointer">
+                  {isRu ? "Нормализация до −0.5 dB" : "Normalize to −0.5 dB"}
+                </Label>
               </div>
             </div>
           )}
