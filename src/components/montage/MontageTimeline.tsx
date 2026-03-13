@@ -364,18 +364,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
    * - никогда не использовать длительность всей главы
    */
   const waveformSceneDuration = Math.max(0.05, sceneEndSec - sceneStartSec);
-  // DEBUG: waveform timing diagnosis
-  console.log("[WaveformDiag]", {
-    sceneIdx: currentSceneIdx,
-    sceneId: currentBoundary?.sceneId,
-    sceneStartSec,
-    sceneEndSec,
-    waveformSceneDuration: sceneEndSec - sceneStartSec,
-    nextBoundaryStart: nextBoundary?.startSec,
-    selectedTrackId,
-    clipsInScene: fadedClips.filter(c => c.sceneId === currentBoundary?.sceneId).length,
-    totalChapterDuration: duration,
-  });
   const waveformScenePositionSec = Math.max(
     0,
     Math.min(player.positionSec - sceneStartSec, waveformSceneDuration),
@@ -563,7 +551,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
                         size="sm"
                         className="h-7 px-3 text-xs font-mono"
                         onClick={() => {
-                          console.log(`[MontageTimeline] Insert silence ${dur}s at position ${player.positionSec.toFixed(3)}s`);
                           toast.info(isRu ? `Тишина ${dur}с (в разработке)` : `Silence ${dur}s (coming soon)`);
                         }}
                       >
@@ -726,8 +713,6 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             isRu={isRu}
             isPlaying={player.state === "playing"}
             segmentBoundaries={segmentBoundaries}
-            debugSceneStartSec={sceneStartSec}
-            debugSceneEndSec={sceneEndSec}
             onSeek={handleSceneSeek}
             onTrim={handleTrim}
             onFadeIn={handleFadeIn}
