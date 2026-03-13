@@ -563,7 +563,12 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
             // Audio starts AFTER the silence gap
             const silenceSec = currentBoundary?.silenceSec ?? 0;
             const audioStartSec = (currentBoundary?.startSec ?? 0) + silenceSec;
-            const sceneEndSec = nextBoundary?.startSec ?? duration;
+            // Scene ends at next boundary start, or for the last scene — at the end of its last clip
+            const sceneEndSec = nextBoundary
+              ? nextBoundary.startSec
+              : fadedClips
+                  .filter(c => c.sceneId === currentBoundary?.sceneId)
+                  .reduce((max, c) => Math.max(max, c.startSec + c.durationSec), audioStartSec);
             const sceneDuration = Math.max(0, sceneEndSec - audioStartSec);
             const scenePositionSec = Math.max(0, Math.min(pos - audioStartSec, sceneDuration));
             const sceneId = currentBoundary?.sceneId ?? "";
