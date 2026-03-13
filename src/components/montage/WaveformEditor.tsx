@@ -408,7 +408,7 @@ export function WaveformEditor({
 
     // ── Time grid (vertical lines) — scene-local ────────────
     const drawTimeGrid = () => {
-      const pxPerSec = totalWidthPx / sceneDuration;
+      const pxPerSec = totalWidthPx / displayDurationSec;
       let interval = 1;
       if (pxPerSec < 10) interval = 30;
       else if (pxPerSec < 20) interval = 15;
@@ -417,15 +417,15 @@ export function WaveformEditor({
       else if (pxPerSec < 200) interval = 2;
       else interval = 1;
 
-      const startSec = Math.floor((scrollLeft / totalWidthPx) * sceneDuration / interval) * interval;
-      const endSec = Math.ceil(((scrollLeft + waveW) / totalWidthPx) * sceneDuration / interval) * interval;
+      const startSec = Math.floor((scrollLeft / totalWidthPx) * displayDurationSec / interval) * interval;
+      const endSec = Math.ceil(((scrollLeft + waveW) / totalWidthPx) * displayDurationSec / interval) * interval;
 
       ctx.font = `${8 * dpr}px monospace`;
       ctx.textAlign = "center";
 
       for (let t = startSec; t <= endSec; t += interval) {
         if (t < 0) continue;
-        const px = (t / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
+        const px = (t / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
         if (px < mixerWidth || px > w) continue;
 
         const isMajor = t % (interval * 5) === 0 || interval >= 10;
@@ -460,14 +460,44 @@ export function WaveformEditor({
     ctx.clip();
 
     // Draw L channel
-    drawChannel(ctx, currentPeaks, mixerWidth, 0, waveW, chH, waveColor, scrollLeft, totalWidthPx, selection, sceneDuration, "L");
+    drawChannel(
+      ctx,
+      currentPeaks,
+      mixerWidth,
+      0,
+      waveW,
+      chH,
+      waveColor,
+      scrollLeft,
+      totalWidthPx,
+      selection,
+      displayDurationSec,
+      "L",
+      signalWindow.startFrac,
+      signalWindow.endFrac,
+    );
 
     // Gap line
     ctx.fillStyle = borderColor.replace(")", " / 0.5)").replace("hsl(", "hsl(");
     ctx.fillRect(mixerWidth * dpr, chH * dpr, waveW * dpr, CHANNEL_GAP * dpr);
 
     // Draw R channel
-    drawChannel(ctx, currentPeaks, mixerWidth, chH + CHANNEL_GAP, waveW, chH, waveColor, scrollLeft, totalWidthPx, selection, sceneDuration, "R");
+    drawChannel(
+      ctx,
+      currentPeaks,
+      mixerWidth,
+      chH + CHANNEL_GAP,
+      waveW,
+      chH,
+      waveColor,
+      scrollLeft,
+      totalWidthPx,
+      selection,
+      displayDurationSec,
+      "R",
+      signalWindow.startFrac,
+      signalWindow.endFrac,
+    );
 
     // ── Draw fade envelopes for each clip ───────────────────
     const fadeColor = resolveHsl("--primary");
@@ -476,11 +506,16 @@ export function WaveformEditor({
       const fadeOut = clip.fadeOutSec ?? 0;
       if (fadeIn <= 0 && fadeOut <= 0) continue;
 
-      const clipStartPx = (clip.startSec / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
-      const clipEndPx = ((clip.startSec + clip.durationSec) / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
+      const clipStartSec = clip.startSec - signalWindow.startSec;
+      const clipEndSec = clip.startSec + clip.durationSec - signalWindow.startSec;
+      if (clipEndSec <= 0 || clipStartSec >= displayDurationSec) continue;
+
+      const clipStartPx = (Math.max(0, clipStartSec) / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
+      const clipEndPx = (Math.min(displayDurationSec, clipEndSec) / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
 
       if (fadeIn > 0) {
-        const fadeEndPx = ((clip.startSec + fadeIn) / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
+        const fadeEndSec = Math.min(displayDurationSec, clip.startSec + fadeIn - signalWindow.startSec);
+        const fadeEndPx = (Math.max(0, fadeEndSec) / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
         const x0 = Math.max(mixerWidth, clipStartPx);
         const x1 = Math.min(w, fadeEndPx);
         if (x1 > x0) {
@@ -506,7 +541,8 @@ export function WaveformEditor({
       }
 
       if (fadeOut > 0) {
-        const fadeStartPx = ((clip.startSec + clip.durationSec - fadeOut) / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
+        const fadeStartSec = Math.max(0, clip.startSec + clip.durationSec - fadeOut - signalWindow.startSec);
+        const fadeStartPx = (Math.min(displayDurationSec, fadeStartSec) / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
         const x0 = Math.max(mixerWidth, fadeStartPx);
         const x1 = Math.min(w, clipEndPx);
         if (x1 > x0) {
@@ -533,7 +569,7 @@ export function WaveformEditor({
     }
 
     // Playhead — scene-relative
-    const playheadPx = (scenePositionSec / sceneDuration) * totalWidthPx - scrollLeft + mixerWidth;
+    const playheadPx = (displayPositionSec / displayDurationSec) * totalWidthPx - scrollLeft + mixerWidth;
     if (playheadPx >= mixerWidth && playheadPx <= w) {
       ctx.strokeStyle = resolveHsl("--primary");
       ctx.lineWidth = 1.5;
@@ -543,7 +579,7 @@ export function WaveformEditor({
       ctx.stroke();
     }
     ctx.restore();
-  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, sceneDuration, scenePositionSec, mixerWidth, sceneClips]);
+  }, [currentPeaks, trackColor, scrollLeft, totalWidthPx, selection, displayDurationSec, displayPositionSec, mixerWidth, sceneClips, signalWindow.startSec, signalWindow.startFrac, signalWindow.endFrac]);
 
   // ── Keyboard shortcuts (Ctrl+Z / Ctrl+Shift+Z) ─────────────
   useEffect(() => {
