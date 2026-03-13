@@ -645,6 +645,84 @@ export function WaveformEditor({
     return () => window.removeEventListener("keydown", handler);
   }, [onUndo, onRedo]);
 
+  // ── Static spectrum computation ──────────────────────────────
+  const loadAudioBuffer = useCallback(async () => {
+    if (loadingBufferRef.current || audioBufferRef.current) return audioBufferRef.current;
+    const clip = sceneClips.find(c => c.hasAudio && c.audioPath);
+    if (!clip?.audioPath) return null;
+    loadingBufferRef.current = true;
+    try {
+      const { data } = await supabase.storage.from("user-media").createSignedUrl(clip.audioPath, 600);
+      if (!data?.signedUrl) return null;
+      const arrayBuf = await fetchWithStemCache(clip.audioPath, data.signedUrl);
+      const decodeCtx = new OfflineAudioContext(2, 44100 * 60, 44100);
+      const decoded = await decodeCtx.decodeAudioData(arrayBuf.slice(0));
+      audioBufferRef.current = decoded;
+      return decoded;
+    } catch (e) {
+      console.warn("[WaveformEditor] Failed to load buffer for static FFT:", e);
+      return null;
+    } finally {
+      loadingBufferRef.current = false;
+    }
+  }, [sceneClips]);
+
+  // Clear buffer when scene changes
+  useEffect(() => {
+    audioBufferRef.current = null;
+  }, [sceneLabel]);
+
+  // Cleanup static spectrum on unmount or deactivation
+  useEffect(() => {
+    if (!staticSpectrumActive) {
+      setStaticSpectrum(null);
+    }
+    return () => setStaticSpectrum(null);
+  }, [staticSpectrumActive]);
+
+  const handleStaticSpectrum = useCallback(async () => {
+    if (staticSpectrumActive) {
+      setStaticSpectrumActive(false);
+      setStaticSpectrum(null);
+      return;
+    }
+    const buf = await loadAudioBuffer();
+    if (!buf) return;
+
+    const FFT_SIZE = 256; // 128 bins output
+    let bins: Float32Array;
+    let label: string;
+
+    if (selection && selection.endSec - selection.startSec > 0.05) {
+      bins = computeAveragedFFT(buf, selection.startSec, selection.endSec, FFT_SIZE, 24);
+      label = `AVG ${formatTimePrecise(selection.startSec)}–${formatTimePrecise(selection.endSec)}`;
+    } else {
+      bins = computeFFTAtPosition(buf, displayPositionSec, FFT_SIZE);
+      label = `@ ${formatTimePrecise(displayPositionSec)}`;
+    }
+
+    setStaticSpectrum({ bins, label });
+    setStaticSpectrumActive(true);
+  }, [staticSpectrumActive, selection, displayPositionSec, loadAudioBuffer]);
+
+  // Update static spectrum when playhead moves (if active & no selection & stopped)
+  useEffect(() => {
+    if (!staticSpectrumActive || isPlaying || !audioBufferRef.current) return;
+    if (selection && selection.endSec - selection.startSec > 0.05) return; // selection mode — don't update on playhead
+    const buf = audioBufferRef.current;
+    const bins = computeFFTAtPosition(buf, displayPositionSec, 256);
+    setStaticSpectrum({ bins, label: `@ ${formatTimePrecise(displayPositionSec)}` });
+  }, [staticSpectrumActive, displayPositionSec, isPlaying, selection]);
+
+  // Update static spectrum when selection changes (if active)
+  useEffect(() => {
+    if (!staticSpectrumActive || !audioBufferRef.current || !selection) return;
+    if (selection.endSec - selection.startSec < 0.05) return;
+    const buf = audioBufferRef.current;
+    const bins = computeAveragedFFT(buf, selection.startSec, selection.endSec, 256, 24);
+    setStaticSpectrum({ bins, label: `AVG ${formatTimePrecise(selection.startSec)}–${formatTimePrecise(selection.endSec)}` });
+  }, [staticSpectrumActive, selection]);
+
   // Redraw on RAF for smooth playhead
   const rafRef = useRef<number>(0);
   useEffect(() => {
