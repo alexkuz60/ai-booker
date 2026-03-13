@@ -27,6 +27,8 @@ interface WaveformEditorProps {
   sceneLabel: string;
   mixerWidth: number;
   isRu: boolean;
+  /** Whether transport is currently playing — disables edit controls */
+  isPlaying?: boolean;
   /** Seek callback — receives scene-relative seconds */
   onSeek: (sceneRelativeSec: number) => void;
   onTrim?: (trackId: string, startSec: number, endSec: number) => void;
@@ -175,6 +177,7 @@ export function WaveformEditor({
   sceneLabel,
   mixerWidth,
   isRu,
+  isPlaying = false,
   onSeek,
   onTrim,
   onFadeIn,
@@ -573,7 +576,7 @@ export function WaveformEditor({
   // ── Keyboard shortcuts (Ctrl+Z / Ctrl+Shift+Z) ─────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (!e.ctrlKey) return;
+      if (!e.ctrlKey || isPlaying) return;
       if (e.key === "z") {
         e.preventDefault();
         if (e.shiftKey) {
@@ -765,7 +768,7 @@ export function WaveformEditor({
             variant="ghost"
             size="sm"
             className="h-5 px-1.5 text-[10px] gap-0.5"
-            disabled={!selection}
+            disabled={!selection || isPlaying}
             title={isRu ? "Обрезка" : "Trim"}
             onClick={() => {
               if (selection && trackId && onTrim) {
@@ -780,7 +783,7 @@ export function WaveformEditor({
             variant="ghost"
             size="sm"
             className="h-5 px-1.5 text-[10px] gap-0.5"
-            disabled={!selection}
+            disabled={!selection || isPlaying}
             title={isRu ? "Fade In" : "Fade In"}
             onClick={() => {
               if (selection && trackId && onFadeIn) {
@@ -795,7 +798,7 @@ export function WaveformEditor({
             variant="ghost"
             size="sm"
             className="h-5 px-1.5 text-[10px] gap-0.5"
-            disabled={!selection}
+            disabled={!selection || isPlaying}
             title={isRu ? "Fade Out" : "Fade Out"}
             onClick={() => {
               if (selection && trackId && onFadeOut) {
@@ -810,7 +813,7 @@ export function WaveformEditor({
             variant="ghost"
             size="sm"
             className="h-5 px-1.5 text-[10px] gap-0.5"
-            disabled={!selection}
+            disabled={!selection || isPlaying}
             title={isRu ? "Нормализация" : "Normalize"}
           >
             <Maximize className="h-3 w-3" />
@@ -820,7 +823,7 @@ export function WaveformEditor({
             variant="ghost"
             size="sm"
             className="h-5 px-1.5 text-[10px] gap-0.5"
-            disabled={!canUndo}
+            disabled={!canUndo || isPlaying}
             title={isRu ? "Отменить (Ctrl+Z)" : "Undo (Ctrl+Z)"}
             onClick={onUndo}
           >
@@ -830,7 +833,7 @@ export function WaveformEditor({
             variant="ghost"
             size="sm"
             className="h-5 px-1.5 text-[10px] gap-0.5"
-            disabled={!canRedo}
+            disabled={!canRedo || isPlaying}
             title={isRu ? "Повторить (Ctrl+Shift+Z)" : "Redo (Ctrl+Shift+Z)"}
             onClick={onRedo}
           >
