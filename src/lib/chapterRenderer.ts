@@ -139,7 +139,7 @@ async function encodeMp3(buffer: AudioBuffer, bitrate: Mp3Bitrate = 192): Promis
   }
 
   const tail = encoder.flush();
-  if (tail.length > 0) mp3Parts.push((tail as Uint8Array).buffer);
+  if (tail.length > 0) mp3Parts.push(new Blob([tail]));
 
   return new Blob(mp3Parts, { type: "audio/mpeg" });
 }
