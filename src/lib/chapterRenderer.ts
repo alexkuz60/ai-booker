@@ -18,6 +18,10 @@ import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 
 // ─── Public types ────────────────────────────────────────────
 
+export type ExportFormat = "wav" | "mp3";
+export type WavBitDepth = 16 | 24 | 32;
+export type Mp3Bitrate = 128 | 192 | 256 | 320;
+
 export interface ChapterRenderProgress {
   phase: "loading" | "rendering" | "normalizing" | "encoding" | "done" | "error";
   percent: number;
@@ -28,6 +32,7 @@ export interface ChapterRenderResult {
   blob: Blob;
   durationSec: number;
   fileSizeBytes: number;
+  format: ExportFormat;
 }
 
 // ─── WAV encoder (16-bit PCM) ────────────────────────────────
