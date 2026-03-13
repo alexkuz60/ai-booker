@@ -1,8 +1,8 @@
 /**
  * React hook for loading audio and computing/caching stereo waveform peaks
- * for a SCENE: decodes ALL clips, places their peaks at correct scene-local
- * positions, and merges into a single scene-wide MultiLodPeaks structure.
- * 
+ * for a SCENE: decodes ALL clips, sends raw channel data to a Web Worker
+ * for off-thread peak computation, then caches the result.
+ *
  * LOD levels are computed dynamically:
  *   maxPeaks = sceneDuration * 44100 * maxZoom / displayWidth
  */
@@ -18,7 +18,11 @@ import {
   loadCachedPeaks,
   savePeaksToCache,
 } from "@/lib/waveformPeaks";
+import type { ClipChannelData, PeaksWorkerOutput } from "@/lib/peaksWorker";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
+
+// Vite Web Worker import (inline, no separate bundle file needed)
+import PeaksWorkerUrl from "@/lib/peaksWorker.ts?worker&url";
 
 export type WaveformStatus = "idle" | "loading" | "ready" | "error";
 
@@ -28,94 +32,77 @@ export interface WaveformPeaksState {
   error: string | null;
 }
 
-/**
- * Compute scene-wide multi-LOD peaks from decoded per-clip AudioBuffers.
- * Each clip is placed at its scene-local startSec within the total sceneDuration.
- */
-function computeScenePeaks(
-  clipBuffers: { clip: TimelineClip; buffer: AudioBuffer }[],
-  sceneDuration: number,
-  lodLevels: LodLevel[],
-): MultiLodPeaks {
-  if (sceneDuration <= 0) {
-    const empty = new Map<LodLevel, StereoPeaks>();
-    for (const lod of lodLevels) {
-      empty.set(lod, {
-        left: new Float32Array(lod),
-        right: new Float32Array(lod),
-        sampleRate: 44100,
-        duration: 0,
-        lodLevel: lod,
-      });
-    }
-    return { lods: empty, sampleRate: 44100, duration: 0 };
-  }
+/** Singleton worker instance — reused across all hook instances */
+let sharedWorker: Worker | null = null;
+let workerIdCounter = 0;
+const pendingJobs = new Map<number, {
+  resolve: (v: PeaksWorkerOutput) => void;
+  reject: (e: Error) => void;
+}>();
 
-  const sampleRate = clipBuffers[0]?.buffer.sampleRate ?? 44100;
-  const lods = new Map<LodLevel, StereoPeaks>();
-
-  for (const lodLevel of lodLevels) {
-    const leftPeaks = new Float32Array(lodLevel);
-    const rightPeaks = new Float32Array(lodLevel);
-    const secPerBin = sceneDuration / lodLevel;
-
-    for (const { clip, buffer } of clipBuffers) {
-      const clipStart = clip.startSec;
-      const clipDur = clip.durationSec;
-      const clipEnd = clipStart + clipDur;
-      const leftData = buffer.getChannelData(0);
-      const rightData = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : leftData;
-      const bufDur = buffer.duration;
-
-      // Which LOD bins does this clip occupy?
-      const binStart = Math.max(0, Math.floor(clipStart / secPerBin));
-      const binEnd = Math.min(lodLevel, Math.ceil(clipEnd / secPerBin));
-
-      for (let i = binStart; i < binEnd; i++) {
-        // Time range of this bin within the scene
-        const binTimeSec = i * secPerBin;
-        const binTimeEndSec = (i + 1) * secPerBin;
-
-        // Corresponding time range within the audio buffer
-        const audioStartSec = Math.max(0, binTimeSec - clipStart);
-        const audioEndSec = Math.min(bufDur, binTimeEndSec - clipStart);
-
-        if (audioEndSec <= audioStartSec) continue;
-
-        // Sample range
-        const sStart = Math.floor(audioStartSec * sampleRate);
-        const sEnd = Math.min(leftData.length, Math.ceil(audioEndSec * sampleRate));
-
-        let maxL = 0;
-        let maxR = 0;
-        for (let j = sStart; j < sEnd; j++) {
-          const vl = Math.abs(leftData[j]);
-          const vr = Math.abs(rightData[j]);
-          if (vl > maxL) maxL = vl;
-          if (vr > maxR) maxR = vr;
-        }
-
-        // Take the max of existing and new (clips can overlap)
-        if (maxL > leftPeaks[i]) leftPeaks[i] = maxL;
-        if (maxR > rightPeaks[i]) rightPeaks[i] = maxR;
+function getWorker(): Worker {
+  if (!sharedWorker) {
+    sharedWorker = new Worker(PeaksWorkerUrl, { type: "module" });
+    sharedWorker.onmessage = (e: MessageEvent<PeaksWorkerOutput & { _jobId: number }>) => {
+      const { _jobId, ...result } = e.data;
+      const job = pendingJobs.get(_jobId);
+      if (job) {
+        pendingJobs.delete(_jobId);
+        job.resolve(result);
       }
-    }
+    };
+    sharedWorker.onerror = (e) => {
+      // Reject all pending jobs
+      for (const [id, job] of pendingJobs) {
+        job.reject(new Error(e.message || "Worker error"));
+        pendingJobs.delete(id);
+      }
+    };
+  }
+  return sharedWorker;
+}
 
-    lods.set(lodLevel, {
-      left: leftPeaks,
-      right: rightPeaks,
-      sampleRate,
-      duration: sceneDuration,
-      lodLevel,
+function postToWorker(
+  clips: ClipChannelData[],
+  sceneDuration: number,
+  lodLevels: number[],
+  sampleRate: number,
+): Promise<PeaksWorkerOutput> {
+  return new Promise((resolve, reject) => {
+    const jobId = ++workerIdCounter;
+    pendingJobs.set(jobId, { resolve, reject });
+
+    const worker = getWorker();
+    // Collect transferables (channel data Float32Arrays)
+    const transferables: Transferable[] = [];
+    for (const c of clips) {
+      transferables.push(c.left.buffer as ArrayBuffer, c.right.buffer as ArrayBuffer);
+    }
+    worker.postMessage(
+      { clips, sceneDuration, lodLevels, sampleRate, _jobId: jobId },
+      transferables,
+    );
+  });
+}
+
+function workerOutputToMultiLod(output: PeaksWorkerOutput): MultiLodPeaks {
+  const lods = new Map<LodLevel, StereoPeaks>();
+  for (const lod of output.lods) {
+    lods.set(lod.lodLevel, {
+      left: lod.left,
+      right: lod.right,
+      sampleRate: output.sampleRate,
+      duration: output.duration,
+      lodLevel: lod.lodLevel,
     });
   }
-
-  return { lods, sampleRate, duration: sceneDuration };
+  return { lods, sampleRate: output.sampleRate, duration: output.duration };
 }
 
 /**
  * Load and compute waveform peaks for ALL clips of a track within a scene.
  * Peaks are positioned according to each clip's scene-local startSec.
+ * Heavy computation runs in a Web Worker to keep UI responsive.
  */
 export function useWaveformPeaks(
   trackClips: TimelineClip[],
@@ -144,7 +131,6 @@ export function useWaveformPeaks(
       return;
     }
 
-    // Abort any previous load
     abortRef.current?.abort();
     const abort = new AbortController();
     abortRef.current = abort;
@@ -158,27 +144,24 @@ export function useWaveformPeaks(
         return;
       }
 
-      // Cache key = combination of all paths + scene duration
       const compositeCacheKey = `scene_${trackId}_${clipsKey}`;
 
-      // Try cache
+      // Try cache first
       const cached = await loadCachedPeaks(compositeCacheKey);
       if (cached && !abort.signal.aborted) {
         setState({ status: "ready", peaks: cached, error: null });
         return;
       }
 
-      // Decode ALL clips' audio
+      // Decode ALL clips' audio on main thread (decodeAudioData needs AudioContext)
       const audioCtx = new AudioContext();
       try {
-        const clipBuffers: { clip: TimelineClip; buffer: AudioBuffer }[] = [];
+        const workerClips: ClipChannelData[] = [];
 
         for (const clip of audioClips) {
           if (abort.signal.aborted) return;
 
           const path = clip.audioPath!;
-
-          // Get signed URL
           const { data: signedData, error: signError } = await supabase.storage
             .from("user-media")
             .createSignedUrl(path, 600);
@@ -187,31 +170,45 @@ export function useWaveformPeaks(
             console.warn(`[useWaveformPeaks] Skip clip ${clip.id}: ${signError?.message}`);
             continue;
           }
-
           if (abort.signal.aborted) return;
 
-          // Fetch audio data
           const arrayBuf = await fetchWithStemCache(path, signedData.signedUrl);
           if (abort.signal.aborted) return;
 
-          // Decode
           const buffer = await audioCtx.decodeAudioData(arrayBuf.slice(0));
           if (abort.signal.aborted) return;
 
-          clipBuffers.push({ clip, buffer });
+          // Extract raw channel data as copies (originals tied to AudioBuffer)
+          const left = new Float32Array(buffer.getChannelData(0));
+          const right = buffer.numberOfChannels > 1
+            ? new Float32Array(buffer.getChannelData(1))
+            : new Float32Array(left);
+
+          workerClips.push({
+            startSec: clip.startSec,
+            durationSec: clip.durationSec,
+            bufferDuration: buffer.duration,
+            sampleRate: buffer.sampleRate,
+            left,
+            right,
+          });
         }
 
         if (abort.signal.aborted) return;
 
-        if (clipBuffers.length === 0) {
+        if (workerClips.length === 0) {
           setState({ status: "idle", peaks: null, error: null });
           return;
         }
 
-        // Compute scene-wide merged peaks
-        // Compute dynamic LOD levels based on scene params
+        // Compute peaks in Web Worker (off main thread)
         const lodLevels = computeLodLevels(sceneDuration, displayWidthPx);
-        const peaks = computeScenePeaks(clipBuffers, sceneDuration, lodLevels);
+        const sampleRate = workerClips[0].sampleRate;
+        const output = await postToWorker(workerClips, sceneDuration, lodLevels, sampleRate);
+
+        if (abort.signal.aborted) return;
+
+        const peaks = workerOutputToMultiLod(output);
 
         // Cache (fire-and-forget)
         savePeaksToCache(compositeCacheKey, peaks);
