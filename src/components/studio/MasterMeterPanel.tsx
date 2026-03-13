@@ -707,8 +707,7 @@ export function SpectrumAnalyzer() {
           const rect = canvas.getBoundingClientRect();
           const x = e.clientX - rect.left;
           const w = rect.width;
-          const fftSize = 128;
-          const usableBins = Math.floor((fftSize / 2) * 0.9);
+          const usableBins = usableBinsRef.current;
           const bin = Math.floor((x / w) * usableBins);
           setCursorBin(prev => prev === bin ? null : Math.max(0, Math.min(bin, usableBins - 1)));
         }}
