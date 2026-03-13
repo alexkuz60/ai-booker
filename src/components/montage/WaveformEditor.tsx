@@ -576,7 +576,7 @@ export function WaveformEditor({
   // ── Keyboard shortcuts (Ctrl+Z / Ctrl+Shift+Z) ─────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (!e.ctrlKey) return;
+      if (!e.ctrlKey || isPlaying) return;
       if (e.key === "z") {
         e.preventDefault();
         if (e.shiftKey) {
