@@ -187,9 +187,6 @@ export default function Profile() {
             />
           </TabsContent>
 
-          <TabsContent value="ai-roles">
-            <AiRolesTab apiKeys={apiKeys} isRu={isRu} />
-          </TabsContent>
         </Tabs>
       </section>
 
