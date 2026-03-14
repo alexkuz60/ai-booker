@@ -443,8 +443,9 @@ Deno.serve(async (req) => {
     const { text, user_api_key, user_model, provider, mode, chapter_title, openrouter_api_key, lang } = body;
     const effectiveLang = lang || 'en';
 
-    if (!text || text.trim().length < 50) {
-      return new Response(JSON.stringify({ error: "Text too short for analysis (min 50 chars)" }),
+    const minLen = mode === "enrich" ? 10 : 50;
+    if (!text || text.trim().length < minLen) {
+      return new Response(JSON.stringify({ error: `Text too short for analysis (min ${minLen} chars)` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
