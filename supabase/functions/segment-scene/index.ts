@@ -270,11 +270,22 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
       }
 
       const phrases = splitPhrases(seg.text);
-      const phraseRows = phrases.map((text, j) => ({
-        segment_id: inserted.id,
-        phrase_number: j + 1,
-        text,
-      }));
+      // For lyric segments, auto-annotate each phrase with "slow" spanning full text
+      const phraseRows = phrases.map((text, j) => {
+        const row: { segment_id: string; phrase_number: number; text: string; metadata?: Record<string, unknown> } = {
+          segment_id: inserted.id,
+          phrase_number: j + 1,
+          text,
+        };
+        if (segType === "lyric") {
+          row.metadata = {
+            annotations: [
+              { type: "slow", start: 0, end: text.length, rate: 0.9 },
+            ],
+          };
+        }
+        return row;
+      });
 
       const { data: insertedPhrases, error: pErr } = await supabase
         .from("segment_phrases")
