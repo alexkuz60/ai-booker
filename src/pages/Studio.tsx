@@ -36,6 +36,22 @@ const Studio = () => {
   const [errorSegmentIds, setErrorSegmentIds] = useState<Set<string>>(new Set());
   const [clipsRefreshToken, setClipsRefreshToken] = useState(0);
 
+  // Bump refresh token when synthesis finishes (set goes from non-empty to empty)
+  const prevSynthRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (prevSynthRef.current.size > 0 && synthesizingSegmentIds.size === 0) {
+      setClipsRefreshToken(t => t + 1);
+    }
+    prevSynthRef.current = synthesizingSegmentIds;
+  }, [synthesizingSegmentIds]);
+  const [renderedSceneIds, setRenderedSceneIds] = useState<Set<string>>(new Set());
+  const [fullyRenderedSceneIds, setFullyRenderedSceneIds] = useState<Set<string>>(new Set());
+  const [staleAudioSceneIds, setStaleAudioSceneIds] = useState<Set<string>>(new Set());
+  const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
+  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
+  const [silenceSec, setSilenceSec] = useState<number>(2);
+  const chapterSceneIds = chapter?.scenes.map(s => s.id).filter(Boolean) as string[] | undefined;
+
   // Multi-select state
   const [selectedSceneIndices, setSelectedSceneIndices] = useState<Set<number>>(new Set());
   const [batchSceneIds, setBatchSceneIds] = useState<string[] | null>(null);
