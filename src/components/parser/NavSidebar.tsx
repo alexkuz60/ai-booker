@@ -370,6 +370,16 @@ export default function NavSidebar({
             >
               <ChevronRightIcon className="h-3.5 w-3.5" />
             </Button>
+            {onMergeEntries && selectedIndices.size >= 2 && (
+              <Button
+                variant="ghost" size="icon"
+                className="h-6 w-6 text-primary hover:text-primary"
+                title={isRu ? "Объединить выбранные" : "Merge selected"}
+                onClick={() => onMergeEntries(selectedArray)}
+              >
+                <Merge className="h-3.5 w-3.5" />
+              </Button>
+            )}
             <Button
               variant="ghost" size="icon"
               className="h-6 w-6 text-destructive hover:text-destructive"
