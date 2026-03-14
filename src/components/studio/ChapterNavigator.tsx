@@ -240,6 +240,41 @@ export function ChapterNavigator({
   }, [chapter.scenes.map(s => s.id).join(","), clipsRefreshToken]);
 
   const staleCount = staleAudioSceneIds?.size ?? 0;
+  const lastClickedIdxRef = useRef<number | null>(null);
+
+  const handleSceneClick = useCallback((idx: number, e: React.MouseEvent) => {
+    // Multi-select with Ctrl/Cmd or Shift
+    if ((e.ctrlKey || e.metaKey) && onSelectedSceneIndicesChange) {
+      const next = new Set(selectedSceneIndices ?? []);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      onSelectedSceneIndicesChange(next);
+      lastClickedIdxRef.current = idx;
+      return;
+    }
+    if (e.shiftKey && onSelectedSceneIndicesChange && lastClickedIdxRef.current !== null) {
+      const from = Math.min(lastClickedIdxRef.current, idx);
+      const to = Math.max(lastClickedIdxRef.current, idx);
+      const next = new Set(selectedSceneIndices ?? []);
+      for (let i = from; i <= to; i++) next.add(i);
+      onSelectedSceneIndicesChange(next);
+      return;
+    }
+    // Normal click: clear multi-select, select single
+    if (onSelectedSceneIndicesChange) onSelectedSceneIndicesChange(new Set());
+    lastClickedIdxRef.current = idx;
+    onSelectScene(idx);
+  }, [onSelectScene, onSelectedSceneIndicesChange, selectedSceneIndices]);
+
+  const multiCount = selectedSceneIndices?.size ?? 0;
+  const handleBatchAnalyzeClick = useCallback(() => {
+    if (!onBatchAnalyze || !selectedSceneIndices || multiCount === 0) return;
+    const ids = [...selectedSceneIndices]
+      .sort((a, b) => a - b)
+      .map(i => chapter.scenes[i]?.id)
+      .filter(Boolean) as string[];
+    if (ids.length > 0) onBatchAnalyze(ids);
+  }, [onBatchAnalyze, selectedSceneIndices, multiCount, chapter.scenes]);
+
 
   const handleBatchResynth = async () => {
     if (!staleAudioSceneIds || staleCount === 0) return;
