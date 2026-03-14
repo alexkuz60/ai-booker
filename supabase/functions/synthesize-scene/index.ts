@@ -504,8 +504,10 @@ function escapeXml(s: string): string {
 // and stanza pauses (1000ms) between blank-line-separated strophes.
 
 function buildLyricSsml(text: string): string {
+  // Note: Yandex v1 does NOT support <prosody> — only <break> and basic tags.
+  // Speed reduction is handled via the `speed` parameter in the TTS call.
   const lines = text.split(/\n/);
-  let ssml = '<speak><prosody rate="90%">';
+  let ssml = '<speak>';
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (line === "") {
@@ -519,7 +521,7 @@ function buildLyricSsml(text: string): string {
       }
     }
   }
-  ssml += '</prosody></speak>';
+  ssml += '</speak>';
   return ssml;
 }
 
