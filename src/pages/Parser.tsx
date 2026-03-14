@@ -331,6 +331,7 @@ export default function Parser() {
   };
 
   const changeLevel = (indices: number[], delta: number) => {
+    pushSnapshot(getCurrentSnapshot());
     setTocEntries(prev => {
       const next = prev.map(e => ({ ...e }));
       const allAffected = new Set<number>();
