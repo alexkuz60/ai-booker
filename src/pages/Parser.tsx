@@ -408,6 +408,7 @@ export default function Parser() {
       ? t("deleteEntryConfirm", isRu).replace("{title}", tocEntries[indices[0]]?.title || "")
       : t("deleteMultiConfirm", isRu).replace("{count}", String(count));
     if (!window.confirm(confirmMsg)) return;
+    pushSnapshot(getCurrentSnapshot());
 
     // Collect all indices to delete (each entry + deeper children)
     const toDelete = new Set<number>();
