@@ -139,6 +139,14 @@ function SceneCards({
           <Button
             variant="ghost" size="sm"
             className="h-6 px-2 text-xs text-muted-foreground"
+            onClick={() => handleCleanup("footnote_auto", 0)}
+          >
+            <Footprints className="h-3 w-3 mr-1" />
+            {t("cleanupFootnoteAuto", isRu)}
+          </Button>
+          <Button
+            variant="ghost" size="sm"
+            className="h-6 px-2 text-xs text-muted-foreground"
             onClick={() => handleCleanup("fix_punctuation_spaces", 0)}
           >
             <SpellCheck className="h-3 w-3 mr-1" />
