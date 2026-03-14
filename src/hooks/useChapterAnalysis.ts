@@ -342,7 +342,27 @@ export function useChapterAnalysis({
         return next;
       });
       toast.error(userError, { duration: 8000 });
+    } finally {
+      setIsAnalyzing(false);
     }
+  };
+
+  const stopAnalysis = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    prefetchingRef.current = false;
+    setIsAnalyzing(false);
+    setAnalysisLog(prev => [...prev, isRu ? "⏹️ Анализ остановлен пользователем" : "⏹️ Analysis stopped by user"]);
+    // Set current analyzing chapters to error so user can resume
+    setChapterResults(prev => {
+      const next = new Map(prev);
+      for (const [idx, result] of next) {
+        if (result.status === "analyzing") {
+          next.set(idx, { ...result, status: "error" });
+        }
+      }
+      return next;
+    });
   };
 
   // ─── Background Prefetch ───
@@ -364,6 +384,7 @@ export function useChapterAnalysis({
     prefetchingRef.current = true;
     (async () => {
       for (const pendingIdx of nextPending) {
+        if (abortRef.current?.signal.aborted) break;
         const current = chapterResults.get(pendingIdx);
         if (current?.status === "pending") await analyzeChapter(pendingIdx);
       }
@@ -372,10 +393,13 @@ export function useChapterAnalysis({
   }, [chapterResults, tocEntries]);
 
   const resetAnalysis = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
     prefetchingRef.current = false;
     userStartedAnalysis.current = false;
+    setIsAnalyzing(false);
     setAnalysisLog([]);
   };
 
-  return { analysisLog, analyzeChapter, resetAnalysis };
+  return { analysisLog, analyzeChapter, resetAnalysis, stopAnalysis, isAnalyzing };
 }
