@@ -200,8 +200,10 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
         let reasoningText = reasoning;
         if (Array.isArray(reasoningDetails)) {
           for (const rd of reasoningDetails) {
-            if (rd && typeof rd === "object" && "content" in (rd as Record<string, unknown>)) {
-              reasoningText += "\n" + String((rd as Record<string, unknown>).content || "");
+            if (rd && typeof rd === "object") {
+              const rdObj = rd as Record<string, unknown>;
+              const rdText = String(rdObj.content || rdObj.text || "");
+              if (rdText) reasoningText += "\n" + rdText;
             }
           }
         }
