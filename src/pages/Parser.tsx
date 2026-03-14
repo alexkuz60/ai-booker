@@ -128,8 +128,6 @@ export default function Parser() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [step, handleUndo, handleRedo]);
-
-
   // ── Auto-sync scene results to local project when chapters get analyzed ──
   const lastSyncedRef = useRef("");
   useEffect(() => {
@@ -551,6 +549,19 @@ export default function Parser() {
     }
   }, [tocEntries, navRestoredFromStorage]);
 
+  // Handle scene content updates from cleanup actions
+  const handleScenesUpdate = useCallback((updatedScenes: Scene[]) => {
+    if (selectedIdx === null) return;
+    setChapterResults(prev => {
+      const next = new Map(prev);
+      const existing = next.get(selectedIdx);
+      if (existing) {
+        next.set(selectedIdx, { ...existing, scenes: updatedScenes });
+      }
+      return next;
+    });
+  }, [selectedIdx, setChapterResults]);
+
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col h-full">
@@ -636,9 +647,10 @@ export default function Parser() {
                        childCount={selectedChildCount}
                        roleModels={{
                          screenwriter: getModelForRole("screenwriter"),
-                         director: getModelForRole("director"),
-                       }}
-                     />
+                          director: getModelForRole("director"),
+                        }}
+                        onScenesUpdate={handleScenesUpdate}
+                      />
                    </div>
                   </div>
                 </ResizablePanel>

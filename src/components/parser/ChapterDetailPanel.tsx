@@ -1,7 +1,8 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, useCallback, Fragment } from "react";
 import { motion } from "framer-motion";
 import {
-  FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock, RefreshCw, Palette, StopCircle
+  FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock, RefreshCw, Palette, StopCircle,
+  Trash2, Hash, Scissors, SpellCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,8 +11,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator, ContextMenuLabel,
+} from "@/components/ui/context-menu";
 import { RoleBadge, RoleBadges } from "@/components/ui/RoleBadge";
 import { t, tSceneType, tMood, tSceneTitle } from "@/pages/parser/i18n";
+import { useContentCleanup, type CleanupAction } from "@/hooks/useContentCleanup";
+import { toast } from "sonner";
 import type { TocChapter, Scene, ChapterStatus } from "@/pages/parser/types";
 import { SCENE_TYPE_COLORS } from "@/pages/parser/types";
 import { estimateDurationSec, formatDuration } from "@/lib/durationEstimate";
@@ -59,7 +65,7 @@ function renderMarkedText(text: string) {
   });
 }
 
-interface ChapterDetailPanelProps {
+export interface ChapterDetailPanelProps {
   isRu: boolean;
   selectedIdx: number | null;
   selectedEntry: TocChapter | null;
@@ -71,15 +77,43 @@ interface ChapterDetailPanelProps {
   childCount?: number;
   /** Current model names for role badges */
   roleModels?: { screenwriter?: string; director?: string };
+  /** Callback when scenes are modified by cleanup actions */
+  onScenesUpdate?: (scenes: Scene[]) => void;
 }
 
-function SceneCards({ scenes, isRu, roleModels }: { scenes: Scene[]; isRu: boolean; roleModels?: { screenwriter?: string; director?: string } }) {
+function SceneCards({
+  scenes, isRu, roleModels, onScenesUpdate,
+}: {
+  scenes: Scene[];
+  isRu: boolean;
+  roleModels?: { screenwriter?: string; director?: string };
+  onScenesUpdate?: (scenes: Scene[]) => void;
+}) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const { applyCleanup } = useContentCleanup();
 
   const totalDuration = useMemo(() => {
     const totalChars = scenes.reduce((sum, sc) => sum + (sc.content?.length ?? sc.content_preview?.length ?? 0), 0);
     return { sec: estimateDurationSec(totalChars), formatted: formatDuration(estimateDurationSec(totalChars)) };
   }, [scenes]);
+
+  const getSelectedText = useCallback(() => {
+    const sel = window.getSelection();
+    return sel?.toString().trim() || "";
+  }, []);
+
+  const handleCleanup = useCallback((action: CleanupAction, sceneIndex: number) => {
+    const selectedText = getSelectedText();
+    if (action !== "fix_punctuation_spaces" && !selectedText) {
+      toast.info(t("cleanupNoSelection", isRu));
+      return;
+    }
+    const result = applyCleanup(action, scenes, selectedText, sceneIndex);
+    if (result.changeCount > 0 && onScenesUpdate) {
+      onScenesUpdate(result.scenes);
+    }
+    toast(result.summary, { duration: 3000 });
+  }, [scenes, isRu, applyCleanup, getSelectedText, onScenesUpdate]);
 
   return (
     <div className="space-y-2">
@@ -87,10 +121,20 @@ function SceneCards({ scenes, isRu, roleModels }: { scenes: Scene[]; isRu: boole
         <h3 className="text-sm font-semibold text-muted-foreground">
           {scenes.length} {t("scenes", isRu)}
         </h3>
-        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Clock className="h-3 w-3" />
-          ≈ {totalDuration.formatted}
-        </span>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost" size="sm"
+            className="h-6 px-2 text-xs text-muted-foreground"
+            onClick={() => handleCleanup("fix_punctuation_spaces", 0)}
+          >
+            <SpellCheck className="h-3 w-3 mr-1" />
+            {t("cleanupFixSpaces", isRu)}
+          </Button>
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            ≈ {totalDuration.formatted}
+          </span>
+        </div>
       </div>
       {scenes.map((sc, i) => {
         const colorCls = SCENE_TYPE_COLORS[sc.scene_type] || SCENE_TYPE_COLORS.mixed;
@@ -101,45 +145,65 @@ function SceneCards({ scenes, isRu, roleModels }: { scenes: Scene[]; isRu: boole
         const sceneDur = formatDuration(estimateDurationSec(content.length));
 
         return (
-          <Card
-            key={`${sc.scene_number}-${i}`}
-            className={hasMore ? "cursor-pointer" : ""}
-            onClick={() => hasMore && setExpandedId(isExpanded ? null : i)}
-          >
-            <CardContent className="py-3 px-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-base font-medium flex items-center gap-1.5">
-                  <RoleBadge roleId="screenwriter" model={roleModels?.screenwriter} isRu={isRu} size={13} />
-                  {t("scenePrefix", isRu)} {sc.scene_number}: {tSceneTitle(sc.title, isRu)}
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <Badge variant="outline" className={`text-xs ${colorCls}`}>
-                    {tSceneType(sc.scene_type, isRu)}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">{tMood(sc.mood, isRu)}</Badge>
-                  <Badge variant="outline" className="text-xs font-mono">
-                    {sc.bpm} BPM
-                  </Badge>
-                  <RoleBadge roleId="director" model={roleModels?.director} isRu={isRu} size={12} />
-                  <span className="text-[10px] text-muted-foreground font-mono ml-1">
-                    {sceneDur}
-                  </span>
-                  {hasMore && (
-                    <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+          <ContextMenu key={`${sc.scene_number}-${i}`}>
+            <ContextMenuTrigger asChild>
+              <Card
+                className={hasMore ? "cursor-pointer" : ""}
+                onClick={() => hasMore && setExpandedId(isExpanded ? null : i)}
+              >
+                <CardContent className="py-3 px-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-base font-medium flex items-center gap-1.5">
+                      <RoleBadge roleId="screenwriter" model={roleModels?.screenwriter} isRu={isRu} size={13} />
+                      {t("scenePrefix", isRu)} {sc.scene_number}: {tSceneTitle(sc.title, isRu)}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant="outline" className={`text-xs ${colorCls}`}>
+                        {tSceneType(sc.scene_type, isRu)}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">{tMood(sc.mood, isRu)}</Badge>
+                      <Badge variant="outline" className="text-xs font-mono">
+                        {sc.bpm} BPM
+                      </Badge>
+                      <RoleBadge roleId="director" model={roleModels?.director} isRu={isRu} size={12} />
+                      <span className="text-[10px] text-muted-foreground font-mono ml-1">
+                        {sceneDur}
+                      </span>
+                      {hasMore && (
+                        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                      )}
+                    </div>
+                  </div>
+                  {content && (
+                    <p className="text-sm text-muted-foreground whitespace-pre-line select-text">
+                      {isExpanded ? renderMarkedText(content) : (
+                        <>
+                          {renderMarkedText(preview)}{hasMore && "…"}
+                        </>
+                      )}
+                    </p>
                   )}
-                </div>
-              </div>
-              {content && (
-                <p className="text-sm text-muted-foreground whitespace-pre-line">
-                  {isExpanded ? renderMarkedText(content) : (
-                    <>
-                      {renderMarkedText(preview)}{hasMore && "…"}
-                    </>
-                  )}
-                </p>
-              )}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </ContextMenuTrigger>
+            <ContextMenuContent className="w-64">
+              <ContextMenuLabel>{t("cleanupLabel", isRu)}</ContextMenuLabel>
+              <ContextMenuSeparator />
+              <ContextMenuItem onClick={() => handleCleanup("header", i)} className="gap-2">
+                <Trash2 className="h-4 w-4 text-muted-foreground" />
+                {t("cleanupHeader", isRu)}
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => handleCleanup("page_number", i)} className="gap-2">
+                <Hash className="h-4 w-4 text-muted-foreground" />
+                {t("cleanupPageNum", isRu)}
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem onClick={() => handleCleanup("chapter_split", i)} className="gap-2">
+                <Scissors className="h-4 w-4 text-muted-foreground" />
+                {t("cleanupChapterSplit", isRu)}
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
         );
       })}
     </div>
@@ -147,7 +211,7 @@ function SceneCards({ scenes, isRu, roleModels }: { scenes: Scene[]; isRu: boole
 }
 
 export default function ChapterDetailPanel({
-  isRu, selectedIdx, selectedEntry, selectedResult, analysisLog, onAnalyze, onStopAnalysis, isAnalyzing, childCount = 0, roleModels,
+  isRu, selectedIdx, selectedEntry, selectedResult, analysisLog, onAnalyze, onStopAnalysis, isAnalyzing, childCount = 0, roleModels, onScenesUpdate,
 }: ChapterDetailPanelProps) {
   const [reanalyzeOpen, setReanalyzeOpen] = useState(false);
 
@@ -296,7 +360,7 @@ export default function ChapterDetailPanel({
 
         {/* Scene cards */}
         {selectedResult?.status === "done" && selectedResult.scenes.length > 0 && (
-          <SceneCards scenes={selectedResult.scenes} isRu={isRu} roleModels={roleModels} />
+          <SceneCards scenes={selectedResult.scenes} isRu={isRu} roleModels={roleModels} onScenesUpdate={onScenesUpdate} />
         )}
 
         {/* Done but empty */}

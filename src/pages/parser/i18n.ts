@@ -174,6 +174,14 @@ const texts: Record<string, { ru: string; en: string }> = {
   errNetwork: { ru: "Ошибка сети. Проверьте подключение к интернету.", en: "Network error. Check your internet connection." },
   errGeneric: { ru: "Ошибка анализа", en: "Analysis error" },
   errChapterFailed: { ru: "Не удалось проанализировать главу", en: "Failed to analyze chapter" },
+
+  // Content cleanup context menu
+  cleanupHeader: { ru: "Колонтитул — удалить похожие", en: "Header/Footer — remove similar" },
+  cleanupPageNum: { ru: "Номер страницы — удалить похожие", en: "Page number — remove similar" },
+  cleanupChapterSplit: { ru: "Раздел главы — разделить сцену", en: "Chapter section — split scene" },
+  cleanupFixSpaces: { ru: "Исправить пробелы у знаков препинания", en: "Fix punctuation spacing" },
+  cleanupNoSelection: { ru: "Выделите текст для действия", en: "Select text for action" },
+  cleanupLabel: { ru: "Очистка текста", en: "Text cleanup" },
 };
 
 function normalizeToken(value: string): string {
