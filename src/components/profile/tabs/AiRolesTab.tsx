@@ -107,9 +107,14 @@ export function AiRolesTab({ apiKeys, isRu }: AiRolesTabProps) {
             size="sm"
             onClick={resetAll}
             className="gap-1.5 text-xs shrink-0"
+            title={isRu
+              ? (hasPreEditSnapshot ? "Вернуть набор моделей, с которым работали" : "Сбросить к настройкам по умолчанию")
+              : (hasPreEditSnapshot ? "Restore last working model set" : "Reset to defaults")}
           >
             <RotateCcw className="h-3 w-3" />
-            {isRu ? "Сбросить" : "Reset"}
+            {isRu
+              ? (hasPreEditSnapshot ? "Вернуть" : "Сбросить")
+              : (hasPreEditSnapshot ? "Restore" : "Reset")}
           </Button>
         )}
       </div>
