@@ -340,23 +340,13 @@ function applyAnnotationsSsml(text: string, annotations: PhraseAnnotation[]): st
           ranges.push({ start: a.start, end: a.end, openTag: '<emphasis>', closeTag: '</emphasis>' });
           break;
         case "whisper":
-          ranges.push({ start: a.start, end: a.end, openTag: '<prosody volume="silent">', closeTag: '</prosody>' });
-          break;
         case "slow":
-          ranges.push({ start: a.start, end: a.end, openTag: `<prosody rate="${a.rate ?? 0.7}">`, closeTag: '</prosody>' });
-          break;
         case "fast":
-          ranges.push({ start: a.start, end: a.end, openTag: `<prosody rate="${a.rate ?? 1.4}">`, closeTag: '</prosody>' });
-          break;
-        // Emotions: Yandex SSML doesn't have native emotion tags, use prosody hints
         case "joy":
-          ranges.push({ start: a.start, end: a.end, openTag: '<prosody pitch="+10%">', closeTag: '</prosody>' });
-          break;
         case "sadness":
-          ranges.push({ start: a.start, end: a.end, openTag: '<prosody rate="0.85" pitch="-5%">', closeTag: '</prosody>' });
-          break;
         case "anger":
-          ranges.push({ start: a.start, end: a.end, openTag: '<prosody rate="1.1" volume="loud">', closeTag: '</prosody>' });
+          // Yandex v1 rejects <prosody>; keep text plain for these annotations.
+          // Tempo/emotion can still be influenced by voice/overall speed params.
           break;
       }
     }

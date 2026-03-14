@@ -1665,12 +1665,24 @@ export function StoryboardPanel({
     setCurrentlySynthesizingIds(new Set([segmentId]));
     onSynthesizingChange?.(new Set([segmentId]));
     try {
-      // Delete existing audio record to force re-synthesis
-      await supabase.from("segment_audio").delete().eq("segment_id", segmentId);
+      // Keep existing audio until new synthesis is confirmed ready.
       const { data, error } = await supabase.functions.invoke("synthesize-scene", {
         body: { scene_id: sceneId, language: isRu ? "ru" : "en", force: true, segment_ids: [segmentId] },
       });
       if (error) throw error;
+
+      const synth = data as {
+        errors?: number;
+        results?: Array<{ segment_id: string; status: string; error?: string }>;
+      };
+      const segmentResult = synth.results?.find((r) => r.segment_id === segmentId);
+
+      if (!segmentResult || segmentResult.status !== "ready") {
+        throw new Error(
+          segmentResult?.error || (isRu ? "Синтез вернул неполный результат" : "Synthesis returned partial result")
+        );
+      }
+
       toast.success(isRu ? "Блок пересинтезирован" : "Segment re-synthesized");
       // Clear this segment from error set on success
       onErrorSegmentsChange?.(new Set());
@@ -1680,7 +1692,9 @@ export function StoryboardPanel({
       await loadAudioStatus(segments.map(s => s.segment_id));
     } catch (err: any) {
       console.error("Re-synth failed:", err);
-      toast.error(isRu ? "Ошибка ре-синтеза" : "Re-synthesis failed");
+      toast.error(isRu ? "Ошибка ре-синтеза" : "Re-synthesis failed", {
+        description: err?.message,
+      });
       onErrorSegmentsChange?.(new Set([segmentId]));
       // Reload status even on error to reflect current state
       await loadAudioStatus(segments.map(s => s.segment_id));
