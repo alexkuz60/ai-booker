@@ -146,7 +146,7 @@ function SceneCards({
       </div>
       {scenes.map((sc, i) => {
         const colorCls = SCENE_TYPE_COLORS[sc.scene_type] || SCENE_TYPE_COLORS.mixed;
-        const isExpanded = expandedId === i;
+        const isExpanded = expandedIds.has(i);
         const content = sc.content || sc.content_preview || "";
         const preview = content.slice(0, 100);
         const hasMore = content.length > 100;
@@ -155,13 +155,19 @@ function SceneCards({
         return (
           <ContextMenu key={`${sc.scene_number}-${i}`}>
             <ContextMenuTrigger asChild>
-              <Card
-                className={hasMore ? "cursor-pointer" : ""}
-                onClick={() => hasMore && setExpandedId(isExpanded ? null : i)}
-              >
+              <Card>
                 <CardContent className="py-3 px-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-base font-medium flex items-center gap-1.5">
+                      {hasMore && (
+                        <button
+                          type="button"
+                          onClick={(e) => toggleExpand(i, e)}
+                          className="p-0.5 -ml-1 rounded hover:bg-accent transition-colors"
+                        >
+                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isExpanded ? "rotate-180" : "-rotate-90"}`} />
+                        </button>
+                      )}
                       <RoleBadge roleId="screenwriter" model={roleModels?.screenwriter} isRu={isRu} size={13} />
                       {t("scenePrefix", isRu)} {sc.scene_number}: {tSceneTitle(sc.title, isRu)}
                     </span>
@@ -177,9 +183,6 @@ function SceneCards({
                       <span className="text-[10px] text-muted-foreground font-mono ml-1">
                         {sceneDur}
                       </span>
-                      {hasMore && (
-                        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
-                      )}
                     </div>
                   </div>
                   {content && (
