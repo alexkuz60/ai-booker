@@ -90,6 +90,26 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
     snapshotTakenRef.current = false;
   }, [setOverrides, preEditSnapshot, setPreEditSnapshot]);
 
+  /** Load a preset — apply all its model mappings as overrides */
+  const loadPreset = useCallback(
+    (models: AiRoleModelMap) => {
+      // Snapshot before loading
+      if (!snapshotTakenRef.current && preEditSnapshot === null) {
+        setPreEditSnapshot({ ...overrides });
+        snapshotTakenRef.current = true;
+      }
+      // Convert resolved models to overrides (skip if matches default)
+      const next: AiRoleModelMap = {};
+      for (const [roleId, modelId] of Object.entries(models)) {
+        if (modelId && modelId !== defaults[roleId as AiRoleId]) {
+          next[roleId as AiRoleId] = modelId;
+        }
+      }
+      setOverrides(next);
+    },
+    [setOverrides, defaults, preEditSnapshot, setPreEditSnapshot, overrides],
+  );
+
   /** Full resolved map */
   const resolvedModels = useMemo(() => {
     const result: Record<AiRoleId, string> = { ...defaults };
@@ -115,6 +135,7 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
     getPromptForRole,
     setModelForRole,
     resetAll,
+    loadPreset,
     availableModels,
     isAdmin,
     loaded,
