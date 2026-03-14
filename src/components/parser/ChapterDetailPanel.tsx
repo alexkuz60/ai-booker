@@ -360,7 +360,7 @@ export default function ChapterDetailPanel({
 
         {/* Scene cards */}
         {selectedResult?.status === "done" && selectedResult.scenes.length > 0 && (
-          <SceneCards scenes={selectedResult.scenes} isRu={isRu} roleModels={roleModels} />
+          <SceneCards scenes={selectedResult.scenes} isRu={isRu} roleModels={roleModels} onScenesUpdate={onScenesUpdate} />
         )}
 
         {/* Done but empty */}
