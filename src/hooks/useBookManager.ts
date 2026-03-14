@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  extractOutline, flattenTocWithRanges, type TocEntry
+  extractOutline, extractTocFromText, flattenTocWithRanges, type TocEntry
 } from "@/lib/pdf-extract";
 import { t } from "@/pages/parser/i18n";
 import type {
