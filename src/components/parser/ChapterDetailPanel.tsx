@@ -147,7 +147,7 @@ function SceneCards({ scenes, isRu, roleModels }: { scenes: Scene[]; isRu: boole
 }
 
 export default function ChapterDetailPanel({
-  isRu, selectedIdx, selectedEntry, selectedResult, analysisLog, onAnalyze, childCount = 0, roleModels,
+  isRu, selectedIdx, selectedEntry, selectedResult, analysisLog, onAnalyze, onStopAnalysis, isAnalyzing, childCount = 0, roleModels,
 }: ChapterDetailPanelProps) {
   const [reanalyzeOpen, setReanalyzeOpen] = useState(false);
 
