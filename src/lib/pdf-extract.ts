@@ -318,40 +318,52 @@ export async function extractTocFromText(
       lines.push({ text: currentLine.trim(), fontSize: maxFontSizeInLine, y: currentY });
     }
 
-    // Check first ~5 lines of the page for heading patterns
+    // Check first ~8 lines of the page for heading patterns
     const topLines = lines.slice(0, 8);
     for (const line of topLines) {
       const text = line.text.trim();
       if (!text || text.length > 120) continue;
 
       // Check part patterns first (level 0)
+      let matched = false;
       for (const pat of PART_PATTERNS) {
         const m = text.match(pat);
         if (m) {
           const suffix = m[3]?.trim();
           const title = suffix ? `${m[1]} ${m[2]}. ${suffix}` : `${m[1]} ${m[2]}`;
           entries.push({ title, pageNumber: pageNum, level: 0 });
+          matched = true;
           break;
         }
       }
+      if (matched) continue;
 
-      // Check chapter patterns (level 1 if parts exist, else 0)
+      // Check chapter patterns (Глава, Chapter, Акт, Act)
       for (const pat of CHAPTER_PATTERNS) {
         const m = text.match(pat);
         if (m) {
           const suffix = m[3]?.trim();
           const title = suffix ? `${m[1]} ${m[2]}. ${suffix}` : `${m[1]} ${m[2]}`;
-          // Check if already added as part
           if (!entries.some(e => e.pageNumber === pageNum)) {
             entries.push({ title, pageNumber: pageNum, level: 0 });
           }
+          matched = true;
           break;
         }
       }
+      if (matched) continue;
 
       // Standalone Roman numeral on a line with larger font
       if (ROMAN_ONLY.test(text) && line.fontSize > medianHeight * 1.2) {
         if (!entries.some(e => e.pageNumber === pageNum)) {
+          entries.push({ title: text, pageNumber: pageNum, level: 0 });
+        }
+      }
+
+      // Detect bold/large-font short titles at page top (first 3 lines only)
+      // that look like section titles but don't match keyword patterns
+      if (lines.indexOf(line) < 3 && line.fontSize > medianHeight * 1.4 && text.length < 80 && text.length > 2) {
+        if (!entries.some(e => e.pageNumber === pageNum) && !/^\d{1,4}$/.test(text)) {
           entries.push({ title: text, pageNumber: pageNum, level: 0 });
         }
       }
