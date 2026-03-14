@@ -120,7 +120,7 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
     try {
       const [partsRes, chaptersRes, pdfBlob] = await Promise.all([
         supabase.from('book_parts').select('id, part_number, title').eq('book_id', book.id).order('part_number'),
-        supabase.from('book_chapters').select('id, chapter_number, title, scene_type, mood, bpm, part_id, level').eq('book_id', book.id).order('chapter_number'),
+        supabase.from('book_chapters').select('id, chapter_number, title, scene_type, mood, bpm, part_id, level, start_page, end_page').eq('book_id', book.id).order('chapter_number'),
         book.file_path
           ? supabase.storage.from('book-uploads').download(book.file_path).then(r => r.data)
           : Promise.resolve(null),
