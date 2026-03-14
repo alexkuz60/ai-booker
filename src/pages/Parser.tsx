@@ -426,18 +426,6 @@ export default function Parser() {
     const { toDelete } = pendingDelete;
     pushSnapshot(getCurrentSnapshot());
 
-    // Collect all indices to delete (each entry + deeper children)
-    const toDelete = new Set<number>();
-    for (const idx of indices) {
-      toDelete.add(idx);
-      const entry = tocEntries[idx];
-      for (let i = idx + 1; i < tocEntries.length; i++) {
-        if (tocEntries[i].level <= entry.level) break;
-        if (tocEntries[i].sectionType !== entry.sectionType) break;
-        toDelete.add(i);
-      }
-    }
-
     // Delete from DB
     for (const di of toDelete) {
       const chapterId = chapterIdMap.get(di);
