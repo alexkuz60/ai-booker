@@ -85,7 +85,6 @@ export default function Parser() {
   } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName, bookId: bookId ?? undefined });
 
   // ── Warn when analysis-relevant models change ──
-  const analysisRoles = new Set<AiRoleId>(["screenwriter", "director"]);
   const handleRoleModelChanged = useCallback((roleId: AiRoleId) => {
     if (roleId !== "screenwriter" && roleId !== "director") return;
     let analyzedCount = 0;
