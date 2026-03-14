@@ -7,6 +7,8 @@ import { CharactersPanel, type CharactersPanelHandle } from "./CharactersPanel";
 import { AtmospherePanel } from "./AtmospherePanel";
 import { FinishedChaptersPanel } from "./FinishedChaptersPanel";
 import { BatchSegmentationPanel } from "./BatchSegmentationPanel";
+import { RoleBadge } from "@/components/ui/RoleBadge";
+import { useAiRoles } from "@/hooks/useAiRoles";
 
 interface StudioWorkspaceProps {
   isRu: boolean;
