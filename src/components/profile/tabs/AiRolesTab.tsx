@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useAiRoles } from "@/hooks/useAiRoles";
+import { AiRolePresets } from "./AiRolePresets";
 import { AI_ROLE_LIST, TIER_LABELS, type AiRoleId } from "@/config/aiRoles";
 import type { ModelRegistryEntry } from "@/config/modelRegistry";
 
