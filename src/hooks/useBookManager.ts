@@ -19,7 +19,7 @@ interface UseBookManagerParams {
   projectStorage?: ProjectStorage | null;
 }
 
-export function useBookManager({ userId, isRu }: UseBookManagerParams) {
+export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerParams) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>(() =>
