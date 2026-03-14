@@ -582,7 +582,7 @@ export function ChapterNavigator({
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-0.5">
-                {chapter.scenes.map((scene, idx) => {
+              {chapter.scenes.map((scene, idx) => {
                   const colorClass = SCENE_TYPE_COLORS[scene.scene_type] || SCENE_TYPE_COLORS.mixed;
                   const est = estimateSceneDuration(scene);
                   const actualMs = scene.id ? playlistDurations.get(scene.id) : undefined;
@@ -591,6 +591,7 @@ export function ChapterNavigator({
                    const isStale = staleAudioSceneIds?.has(scene.id || "");
                    const isActual = !!actualSec;
                    const sceneRender = scene.id ? renderStatus.get(scene.id) : undefined;
+                   const isMultiSelected = selectedSceneIndices?.has(idx);
 
                   const durationColor = isStale
                     ? "text-yellow-500"
@@ -601,11 +602,12 @@ export function ChapterNavigator({
                   return (
                     <button
                       key={idx}
-                      onClick={() => onSelectScene(idx)}
+                      onClick={(e) => handleSceneClick(idx, e)}
                       className={cn(
                         "w-full flex items-center gap-2 pl-9 pr-3 py-2 text-sm font-body rounded-md transition-colors text-left",
                         "hover:bg-accent/50",
-                        selectedSceneIdx === idx && "bg-primary/10 text-primary border-r-2 border-primary"
+                        isMultiSelected && "bg-primary/15 border-l-2 border-primary",
+                        !isMultiSelected && selectedSceneIdx === idx && "bg-primary/10 text-primary border-r-2 border-primary"
                       )}
                     >
                       <span className={cn("px-1.5 py-0.5 rounded text-[10px] border shrink-0", colorClass)}>
