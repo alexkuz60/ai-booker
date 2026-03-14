@@ -1,12 +1,15 @@
 import { useState, useMemo, Fragment } from "react";
 import { motion } from "framer-motion";
 import {
-  FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock
+  FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock, RefreshCw, Palette
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
 import { t, tSceneType, tMood, tSceneTitle } from "@/pages/parser/i18n";
 import type { TocChapter, Scene, ChapterStatus } from "@/pages/parser/types";
 import { SCENE_TYPE_COLORS } from "@/pages/parser/types";
@@ -61,7 +64,7 @@ interface ChapterDetailPanelProps {
   selectedEntry: TocChapter | null;
   selectedResult: { scenes: Scene[]; status: ChapterStatus } | null | undefined;
   analysisLog: string[];
-  onAnalyze: (idx: number) => void;
+  onAnalyze: (idx: number, mode?: "full" | "enrich") => void;
   childCount?: number;
 }
 
@@ -139,6 +142,8 @@ function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
 export default function ChapterDetailPanel({
   isRu, selectedIdx, selectedEntry, selectedResult, analysisLog, onAnalyze, childCount = 0,
 }: ChapterDetailPanelProps) {
+  const [reanalyzeOpen, setReanalyzeOpen] = useState(false);
+
   if (selectedIdx === null || !selectedEntry) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground">
@@ -178,7 +183,7 @@ export default function ChapterDetailPanel({
                 </Button>
               )}
               {selectedResult?.status === "done" && (
-                <Button variant="ghost" size="sm" onClick={() => onAnalyze(selectedIdx)} className="gap-2 text-muted-foreground">
+                <Button variant="ghost" size="sm" onClick={() => setReanalyzeOpen(true)} className="gap-2 text-muted-foreground">
                   <Zap className="h-4 w-4" />
                   {t("reanalyze", isRu)}
                 </Button>
@@ -273,6 +278,37 @@ export default function ChapterDetailPanel({
             </CardContent>
           </Card>
         )}
+        {/* Re-analysis mode dialog */}
+        <Dialog open={reanalyzeOpen} onOpenChange={setReanalyzeOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{t("reanalyzeDialogTitle", isRu)}</DialogTitle>
+              <DialogDescription>{t("reanalyzeDialogDesc", isRu)}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 pt-2">
+              <button
+                className="w-full text-left rounded-lg border border-border p-4 hover:bg-accent/50 transition-colors space-y-1"
+                onClick={() => { setReanalyzeOpen(false); onAnalyze(selectedIdx!, "full"); }}
+              >
+                <div className="flex items-center gap-2 font-medium text-sm">
+                  <RefreshCw className="h-4 w-4 text-primary" />
+                  {t("reanalyzeFull", isRu)}
+                </div>
+                <p className="text-xs text-muted-foreground">{t("reanalyzeFullDesc", isRu)}</p>
+              </button>
+              <button
+                className="w-full text-left rounded-lg border border-border p-4 hover:bg-accent/50 transition-colors space-y-1"
+                onClick={() => { setReanalyzeOpen(false); onAnalyze(selectedIdx!, "enrich"); }}
+              >
+                <div className="flex items-center gap-2 font-medium text-sm">
+                  <Palette className="h-4 w-4 text-primary" />
+                  {t("reanalyzeEnrich", isRu)}
+                </div>
+                <p className="text-xs text-muted-foreground">{t("reanalyzeEnrichDesc", isRu)}</p>
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </ScrollArea>
   );

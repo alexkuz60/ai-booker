@@ -64,7 +64,7 @@ export function useChapterAnalysis({
   };
 
   // ─── Two-stage Chapter Analysis (with resume) ─────────────
-  const analyzeChapter = async (idx: number) => {
+  const analyzeChapter = async (idx: number, mode: "full" | "enrich" | "auto" = "auto") => {
     if (!pdfRef || !userId) return;
     const entry = tocEntries[idx];
     if (!entry) return;
@@ -95,7 +95,20 @@ export function useChapterAnalysis({
     let scenes: Scene[] = existingResult?.scenes || [];
     const wasFullyDone = existingResult?.status === 'done' && scenes.length > 0 && scenes.every(sc => !needsEnrichment(sc));
 
-    if (wasFullyDone && existingChId) {
+    // Determine effective mode
+    if (mode === "enrich" && wasFullyDone && existingChId) {
+      // Reset metadata to pending so enrichment re-runs
+      addLog(isRu ? "🔄 Сброс метаданных сцен для переобогащения..." : "🔄 Resetting scene metadata for re-enrichment...");
+      for (const sc of scenes) {
+        sc.scene_type = 'pending';
+        sc.mood = '';
+        sc.bpm = 0;
+        if (sc.id) {
+          await supabase.from('book_scenes').update({ scene_type: null, mood: null, bpm: null }).eq('id', sc.id);
+        }
+      }
+      // scenes stay intact, skip to stage 2
+    } else if (wasFullyDone && existingChId && mode !== "enrich") {
       addLog(t("logClearing", isRu));
       await supabase.from('book_scenes').delete().eq('chapter_id', existingChId);
       scenes = [];
