@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/resizable";
 import { type StudioChapter } from "@/lib/studioChapter";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAuth } from "@/hooks/useAuth";
 import { ChapterNavigator, EmptyNavigator } from "@/components/studio/ChapterNavigator";
 import { StudioWorkspace } from "@/components/studio/StudioWorkspace";
 import { StudioTimeline } from "@/components/studio/StudioTimeline";
@@ -15,6 +16,7 @@ import { estimateChapterDuration, estimateSceneDuration, formatDuration } from "
 import { supabase } from "@/integrations/supabase/client";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { useStudioSession } from "@/hooks/useStudioSession";
+import { AiRolesButton } from "@/components/AiRolesButton";
 
 const Studio = () => {
   const { isRu } = useLanguage();
