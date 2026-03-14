@@ -2,7 +2,6 @@ import { motion } from "framer-motion";
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Clock, Loader2 } from "lucide-react";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
-import { Clock, Loader2 } from "lucide-react";
 import {
   ResizablePanelGroup,
   ResizablePanel,
