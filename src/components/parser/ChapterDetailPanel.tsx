@@ -71,7 +71,7 @@ interface ChapterDetailPanelProps {
   roleModels?: { screenwriter?: string; director?: string };
 }
 
-function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
+function SceneCards({ scenes, isRu, roleModels }: { scenes: Scene[]; isRu: boolean; roleModels?: { screenwriter?: string; director?: string } }) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const totalDuration = useMemo(() => {
