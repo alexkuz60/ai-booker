@@ -67,8 +67,26 @@ export async function extractOutline(file: File): Promise<{ outline: TocEntry[];
 }
 
 /**
- * Extract text from specific page ranges of a PDF.
+ * Join an array of lines into a paragraph, removing soft hyphens
+ * (line-break word splits like "пре-" + "красный" → "прекрасный").
+ * Preserves real hyphens (e.g. "кто-то", "из-за", dash before uppercase).
  */
+function dehyphenate(lines: string[]): string {
+  if (lines.length === 0) return '';
+  let result = lines[0];
+  for (let i = 1; i < lines.length; i++) {
+    const next = lines[i];
+    if (result.endsWith('-') && next.length > 0 && /^[a-zа-яёü]/.test(next)) {
+      result = result.slice(0, -1) + next;
+    } else {
+      result += ' ' + next;
+    }
+  }
+  return result;
+}
+
+/**
+ * Extract text from specific page ranges of a PDF.
 /**
  * Extract text from specific page ranges of a PDF,
  * preserving paragraph breaks using Y-coordinate gaps between text items.
