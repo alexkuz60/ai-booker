@@ -499,6 +499,44 @@ function escapeXml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// ── Lyric (verse/poetry) SSML builder ────────────────────────────────
+// Wraps verse text in <prosody rate="90%">, adds line-end pauses (400ms)
+// and stanza pauses (1000ms) between blank-line-separated strophes.
+
+function buildLyricSsml(text: string): string {
+  const lines = text.split(/\n/);
+  let ssml = '<speak><prosody rate="90%">';
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line === "") {
+      // Stanza break
+      ssml += ' <break time="1000ms"/> ';
+    } else {
+      ssml += escapeXml(line);
+      // Line-end pause (unless last line)
+      if (i < lines.length - 1 && lines[i + 1]?.trim() !== "") {
+        ssml += ' <break time="400ms"/> ';
+      }
+    }
+  }
+  ssml += '</prosody></speak>';
+  return ssml;
+}
+
+// Format lyric text for non-SSML providers (ProxyAPI, v3)
+function formatLyricText(text: string): { text: string; extraInstructions: string[] } {
+  // Replace line breaks with "..." for pauses, double breaks with "......"
+  let modified = text
+    .replace(/\n\s*\n/g, "\n......\n") // stanza breaks → long pause
+    .replace(/\n/g, "... ");          // line breaks → short pause
+  const instructions = [
+    "Read this as poetry/verse with expressive intonation",
+    "Slow down slightly, respect the rhythm and meter",
+    "Make meaningful pauses at line endings and longer pauses between stanzas",
+  ];
+  return { text: modified, extraInstructions: instructions };
+}
+
 // ── Narrator voice for inline narrations ─────────────────────────────
 // If scene has first_person segments with a speaker, use that character's voice
 // (the scene is narrated from their perspective). Otherwise fall back to Narrator/Рассказчик.
@@ -969,12 +1007,13 @@ Deno.serve(async (req) => {
           // ── STANDARD SINGLE-PASS SYNTHESIS ────────────────
           let result: { audio: Uint8Array; durationMs: number } | { error: string };
           const hasAnnot = segmentHasAnnotations[i];
+          const isLyric = seg.segment_type === "lyric";
 
           if (isSaluteSpeechVoice) {
-            // SaluteSpeech: use SSML for annotations, plain text otherwise
-            if (hasAnnot) {
-              const ssml = buildSegmentSsml(seg.id);
-              console.log(`SaluteSpeech SSML for segment ${seg.id}: ${ssml.length} chars`);
+            // SaluteSpeech: use SSML for lyrics or annotations, plain text otherwise
+            if (isLyric || hasAnnot) {
+              const ssml = isLyric && !hasAnnot ? buildLyricSsml(text) : buildSegmentSsml(seg.id);
+              console.log(`SaluteSpeech ${isLyric ? 'lyric ' : ''}SSML for segment ${seg.id}: ${ssml.length} chars`);
               result = await callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, {
                 ssml,
                 voice: voiceConfig.voice,
@@ -988,35 +1027,41 @@ Deno.serve(async (req) => {
               });
             }
           } else if (isProxyApiVoice && proxyApiKey) {
-            // ProxyAPI: apply text markers + extra instructions from annotations
-            const annotated = hasAnnot ? buildSegmentAnnotatedText(seg.id) : { text, extraInstructions: [] };
+            // ProxyAPI: apply text markers + extra instructions from annotations / lyrics
+            const annotated = hasAnnot
+              ? buildSegmentAnnotatedText(seg.id)
+              : isLyric
+                ? formatLyricText(text)
+                : { text, extraInstructions: [] };
             const baseInstructions = (voiceConfig as any).instructions || "";
             const fullInstructions = [baseInstructions, ...annotated.extraInstructions].filter(Boolean).join(". ");
             result = await callProxyApiTts(proxyApiKey, {
               text: annotated.text,
               voice: voiceConfig.voice,
               model: (voiceConfig as any).model,
-              speed: voiceConfig.speed,
+              speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
               instructions: fullInstructions || undefined,
             });
-          } else if (!isV3Voice && hasAnnot) {
-            // Yandex v1: use SSML with annotation tags
-            const ssml = buildSegmentSsml(seg.id);
-            console.log(`Annotated SSML for segment ${seg.id}: ${ssml.length} chars`);
+          } else if (!isV3Voice && (hasAnnot || isLyric)) {
+            // Yandex v1: use SSML with annotation tags or lyric prosody
+            const ssml = isLyric && !hasAnnot ? buildLyricSsml(text) : buildSegmentSsml(seg.id);
+            console.log(`${isLyric ? 'Lyric ' : 'Annotated '}SSML for segment ${seg.id}: ${ssml.length} chars`);
             result = await callTts(yandexTtsUrl, authHeader, {
               ssml,
               voice: voiceConfig.voice,
               speed: voiceConfig.speed,
               lang: langCode,
             });
-          } else if (isV3Voice && hasAnnot) {
-            // Yandex v3: apply text markers (pauses as "...", instructions ignored)
-            const annotated = buildSegmentAnnotatedText(seg.id);
+          } else if (isV3Voice && (hasAnnot || isLyric)) {
+            // Yandex v3: apply text markers or lyric formatting
+            const annotated = hasAnnot
+              ? buildSegmentAnnotatedText(seg.id)
+              : formatLyricText(text);
             result = await callTts(yandexTtsUrl, authHeader, {
               text: annotated.text,
               voice: voiceConfig.voice,
               role: voiceConfig.role,
-              speed: voiceConfig.speed,
+              speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
               pitchShift: voiceConfig.pitchShift,
               volume: voiceConfig.volume,
               lang: langCode,

@@ -85,9 +85,10 @@ Rules:
 - "inner_thought" = character's internal thoughts, reflections
 - "dialogue" = spoken lines in a conversation (when multiple characters speak in sequence); set "speaker" to the character name
 - "monologue" = a single standalone spoken line (direct speech) NOT part of a back-and-forth exchange; set "speaker" to the character name. Use this when a character speaks once and the scene continues with narration, not another character's reply
-- "lyric" = songs, poems, verses
+- "lyric" = songs, poems, verses, rhymed text, recitations. IMPORTANT: detect poetry even when embedded in prose — if a passage has verse structure (line breaks with rhythm/rhyme, stanza grouping, or meter), classify it as "lyric". Songs sung by characters are also "lyric" with "speaker" set to the singer. Preserve original line breaks in the "text" field for poetry.
 - "epigraph" = epigraphs, quotes at the start
 - "footnote" = footnotes, author comments
+- "telephone" = phone conversations
 - Inline sound markers like [gunshot] should remain in the text as-is
 
 IMPORTANT — Inline narrator detection:
@@ -246,6 +247,10 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
       if (seg.inline_narrations && seg.inline_narrations.length > 0) {
         metadata.inline_narrations = seg.inline_narrations;
       }
+      // Mark lyric segments for special TTS handling
+      if (segType === "lyric") {
+        metadata.is_verse = true;
+      }
 
       const { data: inserted, error: segErr } = await supabase
         .from("scene_segments")
@@ -265,11 +270,22 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
       }
 
       const phrases = splitPhrases(seg.text);
-      const phraseRows = phrases.map((text, j) => ({
-        segment_id: inserted.id,
-        phrase_number: j + 1,
-        text,
-      }));
+      // For lyric segments, auto-annotate each phrase with "slow" spanning full text
+      const phraseRows = phrases.map((text, j) => {
+        const row: { segment_id: string; phrase_number: number; text: string; metadata?: Record<string, unknown> } = {
+          segment_id: inserted.id,
+          phrase_number: j + 1,
+          text,
+        };
+        if (segType === "lyric") {
+          row.metadata = {
+            annotations: [
+              { type: "slow", start: 0, end: text.length, rate: 0.9 },
+            ],
+          };
+        }
+        return row;
+      });
 
       const { data: insertedPhrases, error: pErr } = await supabase
         .from("segment_phrases")

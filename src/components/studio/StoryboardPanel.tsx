@@ -71,7 +71,7 @@ const SEGMENT_CONFIG: Record<string, {
   inner_thought: { icon: Brain, label_ru: "Мысли", label_en: "Thoughts", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" },
   dialogue: { icon: MessageSquare, label_ru: "Диалог", label_en: "Dialogue", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
   monologue: { icon: MessageCircle, label_ru: "Монолог", label_en: "Monologue", color: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30" },
-  lyric: { icon: Music, label_ru: "Лирика", label_en: "Lyric", color: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
+  lyric: { icon: Music, label_ru: "Стих", label_en: "Verse", color: "bg-pink-500/20 text-pink-400 border-pink-500/30" },
   footnote: { icon: StickyNote, label_ru: "Сноска", label_en: "Footnote", color: "bg-muted text-muted-foreground border-border" },
   telephone: { icon: Phone, label_ru: "Телефон", label_en: "Telephone", color: "bg-orange-500/20 text-orange-400 border-orange-500/30" },
 };
@@ -2083,6 +2083,17 @@ export function StoryboardPanel({
                       isRu={isRu}
                       onChange={(newSpeaker) => updateSpeaker(seg.segment_id, newSpeaker)}
                     />
+                  )}
+                  {/* Lyric voice recommendation */}
+                  {seg.segment_type === "lyric" && (
+                    <span
+                      className="text-[10px] text-pink-400 italic"
+                      title={isRu
+                        ? "Рекомендация: Yandex filipp/madirus (SSML контроль), OpenAI Onyx (натуральность), Sber Bora (эмоции)"
+                        : "Tip: Yandex filipp/madirus (SSML control), OpenAI Onyx (natural), Sber Bora (emotions)"}
+                    >
+                      🎭 {isRu ? "стих" : "verse"}
+                    </span>
                   )}
                   {/* Audio status indicator */}
                   {(() => {
