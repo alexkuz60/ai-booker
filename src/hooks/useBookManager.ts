@@ -240,6 +240,20 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
 
       setChapterResults(initMap);
       setStep("workspace");
+
+      // ── Dual-write: sync to local project ──
+      if (projectStorage?.isReady) {
+        syncStructureToLocal(projectStorage, {
+          bookId: book.id,
+          title: book.title || book.file_name.replace('.pdf', ''),
+          fileName: book.file_name,
+          toc: normalizeLevels(savedToc),
+          parts: parts.map(p => ({ id: p.id, title: p.title, partNumber: p.part_number })),
+          chapterIdMap: newChapterIdMap,
+          chapterResults: initMap,
+        });
+      }
+
       const pdfStatus = restoredPdf
         ? ` (${t("pdfRestored", isRu)})`
         : ` (${t("pdfNotFound", isRu)})`;
