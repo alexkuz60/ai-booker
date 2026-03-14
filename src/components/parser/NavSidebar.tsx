@@ -9,6 +9,8 @@ import { t, tSection } from "@/pages/parser/i18n";
 import type { TocChapter, SectionType, ChapterStatus, Scene } from "@/pages/parser/types";
 import { SECTION_ICONS } from "@/pages/parser/types";
 import { estimateDurationSec, formatDuration } from "@/lib/durationEstimate";
+import { RoleBadges } from "@/components/ui/RoleBadge";
+import type { AiRoleId } from "@/config/aiRoles";
 
 interface NavSidebarProps {
   isRu: boolean;
