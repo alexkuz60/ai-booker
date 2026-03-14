@@ -2084,6 +2084,17 @@ export function StoryboardPanel({
                       onChange={(newSpeaker) => updateSpeaker(seg.segment_id, newSpeaker)}
                     />
                   )}
+                  {/* Lyric voice recommendation */}
+                  {seg.segment_type === "lyric" && (
+                    <span
+                      className="text-[10px] text-pink-400 italic"
+                      title={isRu
+                        ? "Рекомендация: Yandex filipp/madirus (SSML контроль), OpenAI Onyx (натуральность), Sber Bora (эмоции)"
+                        : "Tip: Yandex filipp/madirus (SSML control), OpenAI Onyx (natural), Sber Bora (emotions)"}
+                    >
+                      🎭 {isRu ? "стих" : "verse"}
+                    </span>
+                  )}
                   {/* Audio status indicator */}
                   {(() => {
                     const audio = audioStatus.get(seg.segment_id);
