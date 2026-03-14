@@ -230,6 +230,155 @@ export async function extractTextFromPdf(
 }
 
 /**
+ * Fallback TOC extraction by scanning page text for chapter heading patterns.
+ * Used when the PDF has no embedded outline/bookmarks.
+ *
+ * Detects patterns like:
+ * - "Глава 1", "ГЛАВА ПЕРВАЯ", "Глава I"
+ * - "Chapter 1", "CHAPTER ONE"
+ * - "Часть 1" / "Part 1" (treated as level 0)
+ * - Standalone Roman numerals (I, II, III...) or Arabic numbers as headings
+ */
+export async function extractTocFromText(
+  pdf: pdfjsLib.PDFDocumentProxy
+): Promise<TocEntry[]> {
+  const totalPages = pdf.numPages;
+  const entries: { title: string; pageNumber: number; level: number }[] = [];
+
+  // Patterns for chapter/part headings
+  const CHAPTER_PATTERNS = [
+    // Russian: Глава N / Глава Первая / ГЛАВА N
+    /^(глава)\s+(\d+|[IVXLCDM]+|[а-яё]+(?:\s+[а-яё]+)?)\s*[.:]?\s*(.*)/i,
+    // English: Chapter N
+    /^(chapter)\s+(\d+|[IVXLCDM]+|[a-z]+(?:\s+[a-z]+)?)\s*[.:]?\s*(.*)/i,
+  ];
+
+  const PART_PATTERNS = [
+    /^(часть)\s+(\d+|[IVXLCDM]+|[а-яё]+)\s*[.:]?\s*(.*)/i,
+    /^(part)\s+(\d+|[IVXLCDM]+|[a-z]+)\s*[.:]?\s*(.*)/i,
+    /^(книга)\s+(\d+|[IVXLCDM]+|[а-яё]+)\s*[.:]?\s*(.*)/i,
+    /^(book)\s+(\d+|[IVXLCDM]+)\s*[.:]?\s*(.*)/i,
+  ];
+
+  // Standalone Roman numeral heading (I, II, III, IV, etc.)
+  const ROMAN_ONLY = /^([IVXLCDM]{1,6})$/;
+
+  for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const content = await page.getTextContent();
+    const items = content.items.filter((it: any) => typeof it.str === 'string');
+
+    if (items.length === 0) continue;
+
+    // Group items by Y coordinate to form lines
+    const lines: { text: string; fontSize: number; y: number }[] = [];
+    let currentLine = '';
+    let currentY: number | null = null;
+    let currentFontSize = 0;
+    let maxFontSizeInLine = 0;
+
+    const viewport = page.getViewport({ scale: 1 });
+    const heights: number[] = [];
+    for (const item of items) {
+      const h = Math.abs((item as any).transform?.[3] || 0);
+      if (h > 0) heights.push(h);
+    }
+    const medianHeight = heights.length > 0
+      ? heights.sort((a, b) => a - b)[Math.floor(heights.length / 2)]
+      : 12;
+
+    for (const item of items) {
+      const t = (item as any).transform;
+      const y = t ? t[5] : null;
+      const fontSize = t ? Math.abs(t[3]) : 0;
+      const str: string = (item as any).str;
+
+      if (currentY !== null && y !== null && Math.abs(currentY - y) > medianHeight * 0.5) {
+        if (currentLine.trim()) {
+          lines.push({ text: currentLine.trim(), fontSize: maxFontSizeInLine, y: currentY });
+        }
+        currentLine = str;
+        currentY = y;
+        maxFontSizeInLine = fontSize;
+      } else {
+        const needsSpace = currentLine && str && !currentLine.endsWith(' ') && !str.startsWith(' ');
+        currentLine += (needsSpace ? ' ' : '') + str;
+        if (currentY === null) currentY = y;
+        maxFontSizeInLine = Math.max(maxFontSizeInLine, fontSize);
+      }
+    }
+    if (currentLine.trim() && currentY !== null) {
+      lines.push({ text: currentLine.trim(), fontSize: maxFontSizeInLine, y: currentY });
+    }
+
+    // Check first ~5 lines of the page for heading patterns
+    const topLines = lines.slice(0, 8);
+    for (const line of topLines) {
+      const text = line.text.trim();
+      if (!text || text.length > 120) continue;
+
+      // Check part patterns first (level 0)
+      for (const pat of PART_PATTERNS) {
+        const m = text.match(pat);
+        if (m) {
+          const suffix = m[3]?.trim();
+          const title = suffix ? `${m[1]} ${m[2]}. ${suffix}` : `${m[1]} ${m[2]}`;
+          entries.push({ title, pageNumber: pageNum, level: 0 });
+          break;
+        }
+      }
+
+      // Check chapter patterns (level 1 if parts exist, else 0)
+      for (const pat of CHAPTER_PATTERNS) {
+        const m = text.match(pat);
+        if (m) {
+          const suffix = m[3]?.trim();
+          const title = suffix ? `${m[1]} ${m[2]}. ${suffix}` : `${m[1]} ${m[2]}`;
+          // Check if already added as part
+          if (!entries.some(e => e.pageNumber === pageNum)) {
+            entries.push({ title, pageNumber: pageNum, level: 0 });
+          }
+          break;
+        }
+      }
+
+      // Standalone Roman numeral on a line with larger font
+      if (ROMAN_ONLY.test(text) && line.fontSize > medianHeight * 1.2) {
+        if (!entries.some(e => e.pageNumber === pageNum)) {
+          entries.push({ title: text, pageNumber: pageNum, level: 0 });
+        }
+      }
+    }
+  }
+
+  // Assign proper levels: if we found parts, chapters become level 1
+  const hasParts = entries.some(e => {
+    for (const pat of PART_PATTERNS) {
+      if (pat.test(e.title)) return true;
+    }
+    return false;
+  });
+
+  if (hasParts) {
+    for (const e of entries) {
+      let isPart = false;
+      for (const pat of PART_PATTERNS) {
+        if (pat.test(e.title)) { isPart = true; break; }
+      }
+      e.level = isPart ? 0 : 1;
+    }
+  }
+
+  // Convert to TocEntry format
+  return entries.map(e => ({
+    title: e.title,
+    pageNumber: e.pageNumber,
+    level: e.level,
+    children: [],
+  }));
+}
+
+/**
  * Flatten the hierarchical TOC into a list with page ranges,
  * grouping by the given level (0=parts, 1=chapters).
  */
