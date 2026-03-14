@@ -395,16 +395,9 @@ export default function Parser() {
               fileInputRef={fileInputRef}
               onFileSelect={handleFileSelect}
               storageBackend={storageBackend}
-              onCreateLocalProject={async () => {
-                try {
-                  const title = isRu ? "Новая книга" : "New Book";
-                  await createProject(title, "", user?.id || "", isRu ? "ru" : "en");
-                  toast({ title: isRu ? "Проект создан" : "Project created" });
-                } catch (err: any) {
-                  if (err?.name !== "AbortError") {
-                    toast({ title: isRu ? "Ошибка" : "Error", description: String(err?.message || err), variant: "destructive" });
-                  }
-                }
+              onCreateLocalProject={() => {
+                setNewProjectName("");
+                setNewProjectDialogOpen(true);
               }}
               onOpenLocalProject={async () => {
                 try {
