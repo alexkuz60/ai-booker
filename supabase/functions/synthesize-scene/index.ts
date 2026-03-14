@@ -1042,24 +1042,26 @@ Deno.serve(async (req) => {
               speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
               instructions: fullInstructions || undefined,
             });
-          } else if (!isV3Voice && hasAnnot) {
-            // Yandex v1: use SSML with annotation tags
-            const ssml = buildSegmentSsml(seg.id);
-            console.log(`Annotated SSML for segment ${seg.id}: ${ssml.length} chars`);
+          } else if (!isV3Voice && (hasAnnot || isLyric)) {
+            // Yandex v1: use SSML with annotation tags or lyric prosody
+            const ssml = isLyric && !hasAnnot ? buildLyricSsml(text) : buildSegmentSsml(seg.id);
+            console.log(`${isLyric ? 'Lyric ' : 'Annotated '}SSML for segment ${seg.id}: ${ssml.length} chars`);
             result = await callTts(yandexTtsUrl, authHeader, {
               ssml,
               voice: voiceConfig.voice,
               speed: voiceConfig.speed,
               lang: langCode,
             });
-          } else if (isV3Voice && hasAnnot) {
-            // Yandex v3: apply text markers (pauses as "...", instructions ignored)
-            const annotated = buildSegmentAnnotatedText(seg.id);
+          } else if (isV3Voice && (hasAnnot || isLyric)) {
+            // Yandex v3: apply text markers or lyric formatting
+            const annotated = hasAnnot
+              ? buildSegmentAnnotatedText(seg.id)
+              : formatLyricText(text);
             result = await callTts(yandexTtsUrl, authHeader, {
               text: annotated.text,
               voice: voiceConfig.voice,
               role: voiceConfig.role,
-              speed: voiceConfig.speed,
+              speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
               pitchShift: voiceConfig.pitchShift,
               volume: voiceConfig.volume,
               lang: langCode,
