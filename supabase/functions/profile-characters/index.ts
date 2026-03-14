@@ -124,12 +124,12 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
     tool_choice: { type: "function", function: { name: "save_character_profiles" } },
   };
 
-  const jsonPromptSuffix = `\n\nIMPORTANT: Return ONLY a valid JSON object with a "characters" array. No markdown, no explanations. Example format:\n{"characters": [{"name": "...", "aliases": [...], "gender": "male", "age_group": "adult", "temperament": "...", "speech_style": "...", "description": "..."}]}`;
+  const jsonPromptSuffix = `\n\nCRITICAL INSTRUCTION: You MUST respond with ONLY a valid JSON object. No explanations, no markdown fences, no text before or after. The response must start with { and end with }.\nRequired format:\n{"characters": [{"name": "...", "aliases": ["..."], "gender": "male|female|unknown", "age_group": "child|teen|young|adult|elder|unknown", "temperament": "...", "speech_style": "...", "description": "..."}]}`;
   const plainPayload = {
     model: usedModel,
     messages: [
       { role: "system", content: systemPrompt + jsonPromptSuffix },
-      { role: "user", content: userPrompt },
+      { role: "user", content: userPrompt + "\n\nRespond with ONLY the JSON object, nothing else." },
     ],
     temperature: 0.3,
     max_tokens: 4096,
