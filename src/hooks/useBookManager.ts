@@ -436,6 +436,9 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
           .insert({
             book_id: book.id, chapter_number: i + 1, title: ch.title,
             scene_type: ch.sectionType !== 'content' ? ch.sectionType : null,
+            level: ch.level,
+            start_page: ch.startPage,
+            end_page: ch.endPage,
             ...(partId ? { part_id: partId } : {}),
           })
           .select('id').single();
