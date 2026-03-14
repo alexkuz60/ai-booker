@@ -333,12 +333,17 @@ export default function Parser() {
   const changeStartPage = (idx: number, newPage: number) => {
     setTocEntries(prev => {
       const next = prev.map((e, i) => i === idx ? { ...e, startPage: newPage } : e);
-      // Also update endPage of previous entry if applicable
       if (idx > 0 && next[idx - 1].endPage === prev[idx].startPage) {
         next[idx - 1] = { ...next[idx - 1], endPage: newPage };
+        // Persist previous entry's endPage
+        const prevChId = chapterIdMap.get(idx - 1);
+        if (prevChId) supabase.from('book_chapters').update({ end_page: newPage }).eq('id', prevChId).then();
       }
       return next;
     });
+    // Persist to DB
+    const chId = chapterIdMap.get(idx);
+    if (chId) supabase.from('book_chapters').update({ start_page: newPage }).eq('id', chId).then();
   };
 
   const renamePart = (oldTitle: string, newTitle: string) => {

@@ -120,7 +120,7 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
     try {
       const [partsRes, chaptersRes, pdfBlob] = await Promise.all([
         supabase.from('book_parts').select('id, part_number, title').eq('book_id', book.id).order('part_number'),
-        supabase.from('book_chapters').select('id, chapter_number, title, scene_type, mood, bpm, part_id, level').eq('book_id', book.id).order('chapter_number'),
+        supabase.from('book_chapters').select('id, chapter_number, title, scene_type, mood, bpm, part_id, level, start_page, end_page').eq('book_id', book.id).order('chapter_number'),
         book.file_path
           ? supabase.storage.from('book-uploads').download(book.file_path).then(r => r.data)
           : Promise.resolve(null),
@@ -198,10 +198,13 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
       const savedToc: TocChapter[] = chapters.map((ch, i) => {
         const pdfInfo = tocFromPdf[i];
         const dbLevel = ch.level;
+        // Prefer DB-stored pages, fallback to PDF outline
+        const dbStartPage = (ch as any).start_page || 0;
+        const dbEndPage = (ch as any).end_page || 0;
         return {
           title: ch.title,
-          startPage: pdfInfo?.startPage || 0,
-          endPage: pdfInfo?.endPage || 0,
+          startPage: dbStartPage || pdfInfo?.startPage || 0,
+          endPage: dbEndPage || pdfInfo?.endPage || 0,
           level: dbLevel != null ? dbLevel : (pdfInfo?.level ?? (hasParts && ch.part_id ? 1 : 0)),
           partTitle: ch.part_id ? partById.get(ch.part_id) : undefined,
           sectionType: classifySection(ch.title),
@@ -436,6 +439,9 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
           .insert({
             book_id: book.id, chapter_number: i + 1, title: ch.title,
             scene_type: ch.sectionType !== 'content' ? ch.sectionType : null,
+            level: ch.level,
+            start_page: ch.startPage,
+            end_page: ch.endPage,
             ...(partId ? { part_id: partId } : {}),
           })
           .select('id').single();

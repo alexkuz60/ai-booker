@@ -21,11 +21,13 @@ export type Database = {
           chapter_number: number
           content: string | null
           created_at: string
+          end_page: number
           id: string
           level: number
           mood: string | null
           part_id: string | null
           scene_type: string | null
+          start_page: number
           title: string
         }
         Insert: {
@@ -34,11 +36,13 @@ export type Database = {
           chapter_number?: number
           content?: string | null
           created_at?: string
+          end_page?: number
           id?: string
           level?: number
           mood?: string | null
           part_id?: string | null
           scene_type?: string | null
+          start_page?: number
           title?: string
         }
         Update: {
@@ -47,11 +51,13 @@ export type Database = {
           chapter_number?: number
           content?: string | null
           created_at?: string
+          end_page?: number
           id?: string
           level?: number
           mood?: string | null
           part_id?: string | null
           scene_type?: string | null
+          start_page?: number
           title?: string
         }
         Relationships: [
