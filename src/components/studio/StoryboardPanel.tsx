@@ -2,663 +2,26 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Database } from "@/integrations/supabase/types";
 import { useAiRoles } from "@/hooks/useAiRoles";
-import { Loader2, Sparkles, Quote, User, BookOpen, MessageSquare, Brain, Music, StickyNote, Volume2, Pencil, Check, ChevronDown, HelpCircle, AudioLines, CheckCircle2, XCircle, Search, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck, Phone } from "lucide-react";
+import { Loader2, Sparkles, BookOpen, AudioLines, CheckCircle2, XCircle, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck } from "lucide-react";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuLabel, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent } from "@/components/ui/context-menu";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   type PhraseAnnotation,
   type TtsProvider,
-  type AnnotationType,
-  getAvailableAnnotations,
-  ANNOTATION_STYLES,
-  isInsertionAnnotation,
   resolveProvider,
 } from "./phraseAnnotations";
 
-// ─── Types ──────────────────────────────────────────────────
-
-interface Phrase {
-  phrase_id: string;
-  phrase_number: number;
-  text: string;
-  annotations?: PhraseAnnotation[];
-}
-
-interface InlineNarration {
-  text: string;
-  insert_after: string;
-}
-
-interface Segment {
-  segment_id: string;
-  segment_number: number;
-  segment_type: string;
-  speaker: string | null;
-  phrases: Phrase[];
-  inline_narrations?: InlineNarration[];
-  split_silence_ms?: number;
-}
-
-interface CharacterOption {
-  id: string;
-  name: string;
-  color: string | null;
-  voiceConfig?: Record<string, unknown>;
-}
-
-// ─── Segment type config ────────────────────────────────────
-
-const SEGMENT_TYPES = ["epigraph", "narrator", "first_person", "inner_thought", "dialogue", "monologue", "lyric", "footnote", "telephone"] as const;
-
-const SEGMENT_CONFIG: Record<string, {
-  icon: typeof Quote;
-  label_ru: string;
-  label_en: string;
-  color: string;
-}> = {
-  epigraph: { icon: Quote, label_ru: "Эпиграф", label_en: "Epigraph", color: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
-  narrator: { icon: BookOpen, label_ru: "Рассказчик", label_en: "Narrator", color: "bg-green-500/20 text-green-400 border-green-500/30" },
-  first_person: { icon: User, label_ru: "От первого лица", label_en: "First Person", color: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30" },
-  inner_thought: { icon: Brain, label_ru: "Мысли", label_en: "Thoughts", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" },
-  dialogue: { icon: MessageSquare, label_ru: "Диалог", label_en: "Dialogue", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
-  monologue: { icon: MessageCircle, label_ru: "Монолог", label_en: "Monologue", color: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30" },
-  lyric: { icon: Music, label_ru: "Стих", label_en: "Verse", color: "bg-pink-500/20 text-pink-400 border-pink-500/30" },
-  footnote: { icon: StickyNote, label_ru: "Сноска", label_en: "Footnote", color: "bg-muted text-muted-foreground border-border" },
-  telephone: { icon: Phone, label_ru: "Телефон", label_en: "Telephone", color: "bg-orange-500/20 text-orange-400 border-orange-500/30" },
-};
-
-// ─── Inline sound marker rendering ──────────────────────────
-
-function renderPhraseText(text: string) {
-  const parts = text.split(/(\[[^\]]+\])/g);
-  return parts.map((part, i) => {
-    if (/^\[.+\]$/.test(part)) {
-      return (
-        <span key={i} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-accent text-accent-foreground text-xs font-medium mx-0.5">
-          <Volume2 className="h-3 w-3" />
-          {part.slice(1, -1)}
-        </span>
-      );
-    }
-    return <span key={i}>{part}</span>;
-  });
-}
-
-// ─── Render text with annotations ───────────────────────────
-
-function renderAnnotatedText(text: string, annotations?: PhraseAnnotation[]) {
-  // First apply sound marker rendering, then overlay annotations
-  if (!annotations || annotations.length === 0) return renderPhraseText(text);
-
-  // Build a list of styled ranges and insertions
-  type Span = { start: number; end: number; type: AnnotationType };
-  type Insert = { offset: number; type: AnnotationType };
-  const ranges: Span[] = [];
-  const inserts: Insert[] = [];
-
-  for (const a of annotations) {
-    if (isInsertionAnnotation(a.type)) {
-      inserts.push({ offset: a.offset ?? 0, type: a.type });
-    } else if (a.start !== undefined && a.end !== undefined) {
-      ranges.push({ start: a.start, end: a.end, type: a.type });
-    }
-  }
-
-  // Sort ranges by start
-  ranges.sort((a, b) => a.start - b.start);
-  inserts.sort((a, b) => a.offset - b.offset);
-
-  // Build character-level style map
-  const charStyles = new Array(text.length).fill(null) as (AnnotationType | null)[];
-  for (const r of ranges) {
-    for (let i = r.start; i < Math.min(r.end, text.length); i++) {
-      charStyles[i] = r.type;
-    }
-  }
-
-  // Build fragments
-  const fragments: React.ReactNode[] = [];
-  let insertIdx = 0;
-  let i = 0;
-
-  while (i < text.length) {
-    // Insert any insertions at this offset
-    while (insertIdx < inserts.length && inserts[insertIdx].offset <= i) {
-      const ins = inserts[insertIdx];
-      const style = ANNOTATION_STYLES[ins.type];
-      fragments.push(
-        <span key={`ins-${insertIdx}`} className="text-muted-foreground text-xs select-none">
-          {style.prefix || ""}
-        </span>
-      );
-      insertIdx++;
-    }
-
-    const currentStyle = charStyles[i];
-    let j = i;
-    while (j < text.length && charStyles[j] === currentStyle) j++;
-
-    const chunk = text.slice(i, j);
-
-    if (currentStyle) {
-      const style = ANNOTATION_STYLES[currentStyle];
-      fragments.push(
-        <span key={`r-${i}`} className={cn(style.className, "relative")}>
-          {style.prefix && <span className="text-[10px] select-none">{style.prefix}</span>}
-          {chunk}
-          {style.suffix && <span className="text-[10px] select-none">{style.suffix}</span>}
-        </span>
-      );
-    } else {
-      // Apply sound marker rendering to plain chunks
-      const parts = chunk.split(/(\[[^\]]+\])/g);
-      for (const [pi, part] of parts.entries()) {
-        if (/^\[.+\]$/.test(part)) {
-          fragments.push(
-            <span key={`s-${i}-${pi}`} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-accent text-accent-foreground text-xs font-medium mx-0.5">
-              <Volume2 className="h-3 w-3" />
-              {part.slice(1, -1)}
-            </span>
-          );
-        } else if (part) {
-          fragments.push(<span key={`t-${i}-${pi}`}>{part}</span>);
-        }
-      }
-    }
-    i = j;
-  }
-
-  // Trailing insertions
-  while (insertIdx < inserts.length) {
-    const ins = inserts[insertIdx];
-    const style = ANNOTATION_STYLES[ins.type];
-    fragments.push(
-      <span key={`ins-${insertIdx}`} className="text-muted-foreground text-xs select-none">
-        {style.prefix || ""}
-      </span>
-    );
-    insertIdx++;
-  }
-
-  return fragments;
-}
-
-// ─── Editable phrase with context menu ──────────────────────
-
-function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onAnnotate, onRemoveAnnotation }: {
-  phrase: Phrase;
-  isRu: boolean;
-  onSave: (id: string, text: string) => void;
-  onSplit: (phraseId: string, textBefore: string, textAfter: string) => void;
-  ttsProvider: TtsProvider;
-  onAnnotate: (phraseId: string, annotation: PhraseAnnotation) => void;
-  onRemoveAnnotation: (phraseId: string, index: number) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(phrase.text);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const textRef = useRef<HTMLParagraphElement>(null);
-  // Store selection when context menu opens (before browser clears it)
-  const savedSelection = useRef<{ start: number; end: number } | null>(null);
-
-  useEffect(() => {
-    if (editing && textareaRef.current) {
-      textareaRef.current.focus();
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
-    }
-  }, [editing]);
-
-  const save = () => {
-    const trimmed = draft.trim();
-    if (trimmed && trimmed !== phrase.text) {
-      onSave(phrase.phrase_id, trimmed);
-    }
-    setEditing(false);
-  };
-
-  // Get text selection offsets relative to the phrase text
-  const getSelectionOffsets = useCallback((): { start: number; end: number } | null => {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !textRef.current) return null;
-
-    const range = sel.getRangeAt(0);
-    // Check selection is inside our text element
-    if (!textRef.current.contains(range.startContainer) || !textRef.current.contains(range.endContainer)) return null;
-
-    // Calculate offsets relative to the original phrase text
-    // We need to ignore annotation markup (emojis, prefixes) and only count actual text chars
-    const textContent = phrase.text;
-    const selText = sel.toString();
-    
-    // Try to find the selected text in the phrase
-    const selStart = textContent.indexOf(selText);
-    if (selStart >= 0) {
-      return { start: selStart, end: selStart + selText.length };
-    }
-
-    // Fallback: walk text nodes but skip nodes with select-none class
-    const walker = document.createTreeWalker(textRef.current, NodeFilter.SHOW_TEXT);
-    let offset = 0;
-    let start = -1;
-    let end = -1;
-    let node: Node | null;
-
-    while ((node = walker.nextNode())) {
-      // Skip text inside annotation markers (select-none spans)
-      const parent = node.parentElement;
-      if (parent?.classList.contains("select-none")) continue;
-      
-      const len = (node.textContent || "").length;
-      if (node === range.startContainer) start = offset + range.startOffset;
-      if (node === range.endContainer) end = offset + range.endOffset;
-      offset += len;
-    }
-
-    if (start >= 0 && end > start) return { start, end };
-    return null;
-  }, [phrase.text]);
-
-  // Capture selection on right-click before context menu steals focus
-  const handleContextMenu = useCallback(() => {
-    savedSelection.current = getSelectionOffsets();
-  }, [getSelectionOffsets]);
-
-  const handleAnnotate = useCallback((type: AnnotationType, durationMs?: number) => {
-    // Use saved selection (captured before context menu opened)
-    const sel = savedSelection.current;
-    if (isInsertionAnnotation(type)) {
-      const offset = sel ? sel.end : phrase.text.length;
-      onAnnotate(phrase.phrase_id, { type, offset, durationMs: durationMs ?? 500 });
-    } else {
-      if (!sel) return;
-      // Smart emphasis: single letter → stress (word accent), multi-char → emphasis
-      const actualType = type === "emphasis" && (sel.end - sel.start) === 1 ? "stress" as AnnotationType : type;
-      onAnnotate(phrase.phrase_id, { type: actualType, start: sel.start, end: sel.end });
-    }
-    savedSelection.current = null;
-  }, [phrase.phrase_id, phrase.text.length, onAnnotate]);
-
-  const hasAnnotations = phrase.annotations && phrase.annotations.length > 0;
-
-  const EMOTION_TYPES = new Set(["joy", "sadness", "anger"]);
-  const SOUND_TYPES = new Set(["sigh", "cough", "laugh", "hmm"]);
-
-  const availableAnnotations = getAvailableAnnotations(ttsProvider, true);
-  const availableInsertions = getAvailableAnnotations(ttsProvider, false).filter(a => !a.needsRange);
-
-  const prosodyItems = availableAnnotations.filter(a => !EMOTION_TYPES.has(a.type) && !SOUND_TYPES.has(a.type));
-  const emotionItems = availableAnnotations.filter(a => EMOTION_TYPES.has(a.type));
-  const soundInsertions = availableInsertions.filter(a => SOUND_TYPES.has(a.type));
-  const otherInsertions = availableInsertions.filter(a => !SOUND_TYPES.has(a.type) && !availableAnnotations.find(x => x.type === a.type));
-
-  if (editing) {
-    return (
-      <div className="flex gap-2 px-3 py-1.5 group">
-        <span className="text-[10px] text-muted-foreground font-mono pt-1.5 shrink-0 w-5 text-right">
-          {phrase.phrase_number}
-        </span>
-        <textarea
-          ref={textareaRef}
-          value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            e.target.style.height = "auto";
-            e.target.style.height = e.target.scrollHeight + "px";
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              const pos = textareaRef.current?.selectionStart ?? draft.length;
-              const before = draft.slice(0, pos).trim();
-              const after = draft.slice(pos).trim();
-              if (before && after) {
-                onSplit(phrase.phrase_id, before, after);
-                setEditing(false);
-              } else {
-                save();
-              }
-            }
-            if (e.key === "Escape") { setDraft(phrase.text); setEditing(false); }
-          }}
-          className="flex-1 text-sm font-body text-foreground leading-relaxed bg-background border border-primary/30 rounded px-2 py-1 resize-none focus:outline-none focus:ring-1 focus:ring-primary"
-        />
-        <button onClick={save} className="shrink-0 text-primary hover:text-primary/80 pt-1">
-          <Check className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div onContextMenu={handleContextMenu} className="flex gap-2 px-3 py-1.5 hover:bg-accent/20 transition-colors group">
-          <span className="text-[10px] text-muted-foreground font-mono pt-0.5 shrink-0 w-5 text-right">
-            {phrase.phrase_number}
-          </span>
-          <p ref={textRef} className="text-sm font-body text-foreground leading-relaxed flex-1 select-text">
-            {renderAnnotatedText(phrase.text, phrase.annotations)}
-          </p>
-          <button
-            onClick={() => setEditing(true)}
-            className="shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground cursor-pointer"
-            title={isRu ? "Редактировать" : "Edit"}
-          >
-            <Pencil className="h-3 w-3" />
-          </button>
-        </div>
-      </ContextMenuTrigger>
-      <ContextMenuContent className="w-52">
-        <ContextMenuLabel className="text-xs">
-          {isRu ? "Аннотации речи" : "Speech Annotations"}
-          <span className="ml-1 text-[10px] text-muted-foreground font-normal">({ttsProvider})</span>
-        </ContextMenuLabel>
-        <ContextMenuSeparator />
-        {availableAnnotations.length === 0 && availableInsertions.length === 0 ? (
-          <ContextMenuItem disabled className="text-xs text-muted-foreground">
-            {isRu ? "Нет доступных аннотаций для этого TTS" : "No annotations available for this TTS"}
-          </ContextMenuItem>
-        ) : (
-          <>
-            {/* Prosody annotations (pause, emphasis, whisper, slow, fast) */}
-            {prosodyItems.map((a) =>
-              a.type === "pause" ? (
-                <ContextMenuSub key={a.type}>
-                  <ContextMenuSubTrigger className="text-xs gap-2">
-                    <span>{a.emoji}</span>
-                    {isRu ? "Пауза" : "Pause"}
-                  </ContextMenuSubTrigger>
-                  <ContextMenuSubContent className="min-w-[7rem]">
-                    {[250, 500, 1000, 2000].map((ms) => (
-                      <ContextMenuItem
-                        key={ms}
-                        onClick={() => handleAnnotate("pause", ms)}
-                        className="text-xs gap-2"
-                      >
-                        ⏸ {ms >= 1000 ? `${ms / 1000}с` : `${ms}мс`}
-                      </ContextMenuItem>
-                    ))}
-                  </ContextMenuSubContent>
-                </ContextMenuSub>
-              ) : (
-                <ContextMenuItem
-                  key={a.type}
-                  onClick={() => handleAnnotate(a.type)}
-                  className="text-xs gap-2"
-                >
-                  <span>{a.emoji}</span>
-                  {isRu ? a.label_ru.replace(/^. /, "") : a.label_en.replace(/^. /, "")}
-                </ContextMenuItem>
-              )
-            )}
-
-            {/* Emotions submenu */}
-            {emotionItems.length > 0 && (
-              <ContextMenuSub>
-                <ContextMenuSubTrigger className="text-xs gap-2">
-                  <span>🎭</span>
-                  {isRu ? "Эмоции" : "Emotions"}
-                </ContextMenuSubTrigger>
-                <ContextMenuSubContent className="min-w-[8rem]">
-                  {emotionItems.map((a) => (
-                    <ContextMenuItem
-                      key={a.type}
-                      onClick={() => handleAnnotate(a.type)}
-                      className="text-xs gap-2"
-                    >
-                      <span>{a.emoji}</span>
-                      {isRu ? a.label_ru.replace(/^. /, "") : a.label_en.replace(/^. /, "")}
-                    </ContextMenuItem>
-                  ))}
-                </ContextMenuSubContent>
-              </ContextMenuSub>
-            )}
-
-            {/* Sound insertions submenu */}
-            {soundInsertions.length > 0 && (
-              <ContextMenuSub>
-                <ContextMenuSubTrigger className="text-xs gap-2">
-                  <span>🔊</span>
-                  {isRu ? "Звуки" : "Sounds"}
-                </ContextMenuSubTrigger>
-                <ContextMenuSubContent className="min-w-[8rem]">
-                  {soundInsertions.map((a) => (
-                    <ContextMenuItem
-                      key={a.type}
-                      onClick={() => handleAnnotate(a.type)}
-                      className="text-xs gap-2"
-                    >
-                      <span>{a.emoji}</span>
-                      {isRu ? a.label_ru.replace(/^. /, "") : a.label_en.replace(/^. /, "")}
-                    </ContextMenuItem>
-                  ))}
-                </ContextMenuSubContent>
-              </ContextMenuSub>
-            )}
-
-            {/* Other insertions (non-pause, non-sound) */}
-            {otherInsertions.map((a) => (
-              <ContextMenuItem
-                key={`ins-${a.type}`}
-                onClick={() => handleAnnotate(a.type)}
-                className="text-xs gap-2"
-              >
-                <span>{a.emoji}</span>
-                {isRu ? a.label_ru.replace(/^. /, "") : a.label_en.replace(/^. /, "")}
-              </ContextMenuItem>
-            ))}
-          </>
-        )}
-        {hasAnnotations && (
-          <>
-            <ContextMenuSeparator />
-            <ContextMenuLabel className="text-[10px]">
-              {isRu ? "Удалить аннотацию" : "Remove annotation"}
-            </ContextMenuLabel>
-            {phrase.annotations!.map((a, idx) => (
-              <ContextMenuItem
-                key={`rm-${idx}`}
-                onClick={() => onRemoveAnnotation(phrase.phrase_id, idx)}
-                className="text-xs gap-2 text-destructive"
-              >
-                ✕ {ANNOTATION_STYLES[a.type]?.prefix || ""} {a.type}
-                {a.start !== undefined && a.end !== undefined && (
-                  <span className="text-muted-foreground ml-1">
-                    [{a.start}:{a.end}]
-                  </span>
-                )}
-              </ContextMenuItem>
-            ))}
-          </>
-        )}
-      </ContextMenuContent>
-    </ContextMenu>
-  );
-}
-
-// ─── Segment type selector ──────────────────────────────────
-
-function SegmentTypeBadge({ segmentType, isRu, onChange }: {
-  segmentType: string;
-  isRu: boolean;
-  onChange: (newType: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const config = SEGMENT_CONFIG[segmentType] || SEGMENT_CONFIG.narrator;
-  const Icon = config.icon;
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button className="inline-flex items-center cursor-pointer hover:ring-1 hover:ring-primary/40 rounded-full transition-all">
-          <Badge variant="outline" className={cn("text-[10px] gap-1 py-0", config.color)}>
-            <Icon className="h-3 w-3" />
-            {isRu ? config.label_ru : config.label_en}
-            <ChevronDown className="h-2.5 w-2.5 opacity-50" />
-          </Badge>
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-44 p-1" align="start">
-        <div className="space-y-0.5">
-          {SEGMENT_TYPES.map((type) => {
-            const c = SEGMENT_CONFIG[type];
-            const TypeIcon = c.icon;
-            const isActive = type === segmentType;
-            return (
-              <button
-                key={type}
-                onClick={() => { onChange(type); setOpen(false); }}
-                className={cn(
-                  "w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs font-body transition-colors text-left",
-                  isActive ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
-                )}
-              >
-                <TypeIcon className="h-3 w-3 shrink-0" />
-                {isRu ? c.label_ru : c.label_en}
-              </button>
-            );
-          })}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-// ─── Speaker search list ────────────────────────────────────
-
-function SpeakerSearchList({ speaker, characters, isRu, onChange }: {
-  speaker: string | null;
-  characters: CharacterOption[];
-  isRu: boolean;
-  onChange: (newSpeaker: string | null) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const filtered = useMemo(() => {
-    if (!query.trim()) return characters;
-    const q = query.toLowerCase();
-    return characters.filter(c => c.name.toLowerCase().includes(q));
-  }, [characters, query]);
-
-  return (
-    <div className="space-y-1">
-      {characters.length > 5 && (
-        <div className="flex items-center gap-1.5 px-1 pb-1 border-b border-border">
-          <Search className="h-3 w-3 shrink-0 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={isRu ? "Поиск…" : "Search…"}
-            className="h-6 border-0 bg-transparent px-0 text-xs focus-visible:ring-0 focus-visible:ring-offset-0"
-            autoFocus
-          />
-        </div>
-      )}
-      <div className="space-y-0.5 max-h-52 overflow-y-auto">
-        {!query && (
-          <button
-            onClick={() => onChange(null)}
-            className={cn(
-              "w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs font-body transition-colors text-left",
-              !speaker ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
-            )}
-          >
-            <HelpCircle className="h-3 w-3 shrink-0 text-orange-400" />
-            {isRu ? "Не назначен" : "Unassigned"}
-          </button>
-        )}
-        {filtered.map((ch) => {
-          const isActive = ch.name === speaker;
-          return (
-            <button
-              key={ch.id}
-              onClick={() => onChange(ch.name)}
-              className={cn(
-                "w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs font-body transition-colors text-left",
-                isActive ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
-              )}
-            >
-              {ch.color && (
-                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: ch.color }} />
-              )}
-              {!ch.color && <User className="h-3 w-3 shrink-0" />}
-              {ch.name}
-            </button>
-          );
-        })}
-        {filtered.length === 0 && (
-          <p className="text-xs text-muted-foreground text-center py-2">
-            {isRu ? "Не найдено" : "Not found"}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Speaker selector ───────────────────────────────────────
-
-function SpeakerBadge({ speaker, characters, isRu, onChange }: {
-  speaker: string | null;
-  characters: CharacterOption[];
-  isRu: boolean;
-  onChange: (newSpeaker: string | null) => void;
-}) {
-  const [open, setOpen] = useState(false);
-
-  const charColor = speaker
-    ? characters.find(c => c.name === speaker)?.color
-    : null;
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button className="inline-flex items-center cursor-pointer hover:ring-1 hover:ring-primary/40 rounded-full transition-all">
-          <Badge
-            variant="outline"
-            className={cn(
-              "text-[10px] gap-1 py-0",
-              speaker
-                ? "border-foreground/20 text-foreground/80"
-                : "border-orange-500/40 text-orange-400"
-            )}
-            style={charColor ? { borderColor: charColor + "60", color: charColor } : undefined}
-          >
-            {speaker ? (
-              <>
-                <User className="h-3 w-3" />
-                {speaker}
-              </>
-            ) : (
-              <>
-                <HelpCircle className="h-3 w-3" />
-                {isRu ? "персонаж ?" : "character ?"}
-              </>
-            )}
-            <ChevronDown className="h-2.5 w-2.5 opacity-50" />
-          </Badge>
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-52 p-1" align="start">
-        <SpeakerSearchList
-          speaker={speaker}
-          characters={characters}
-          isRu={isRu}
-          onChange={(v) => { onChange(v); setOpen(false); }}
-        />
-      </PopoverContent>
-    </Popover>
-  );
-}
+import type { Phrase, Segment, CharacterOption } from "./storyboard/types";
+import { SEGMENT_CONFIG } from "./storyboard/constants";
+import { EditablePhrase } from "./storyboard/EditablePhrase";
+import { SegmentTypeBadge } from "./storyboard/SegmentTypeBadge";
+import { SpeakerBadge } from "./storyboard/SpeakerBadge";
 
 // ─── Main component ─────────────────────────────────────────
 
@@ -703,10 +66,9 @@ export function StoryboardPanel({
   const [audioStatus, setAudioStatus] = useState<Map<string, { status: string; durationMs: number }>>(new Map());
   const [inlineNarrationSegIds, setInlineNarrationSegIds] = useState<Set<string>>(new Set());
   const [currentlySynthesizingIds, setCurrentlySynthesizingIds] = useState<Set<string>>(new Set());
-  /** Current speaker assigned to inline narrations (from scene_type_mappings with segment_type="inline_narration") */
   const [inlineNarrationSpeaker, setInlineNarrationSpeaker] = useState<string | null>(null);
   const [recalcRunning, setRecalcRunning] = useState(false);
-   const [mergeChecked, setMergeChecked] = useState<Set<string>>(new Set());
+  const [mergeChecked, setMergeChecked] = useState<Set<string>>(new Set());
   const [merging, setMerging] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [staleAudioSegIds, setStaleAudioSegIds] = useState<Set<string>>(new Set());
@@ -744,9 +106,20 @@ export function StoryboardPanel({
 
   const canMerge = mergeGroups.length > 0;
 
-  
+  // Build speaker → TTS provider map
+  const speakerProviderMap = useMemo(() => {
+    const map = new Map<string, TtsProvider>();
+    for (const c of characters) {
+      if (c.voiceConfig) {
+        const provider = resolveProvider(c.voiceConfig);
+        map.set(c.name.toLowerCase(), provider);
+      }
+    }
+    return map;
+  }, [characters]);
 
-  // Recalculate durations from actual MP3 files for current scene
+  // ─── Data Loading ─────────────────────────────────────────
+
   const handleRecalcDurations = useCallback(async () => {
     if (!sceneId) return;
     setRecalcRunning(true);
@@ -782,14 +155,13 @@ export function StoryboardPanel({
     setRecalcRunning(false);
   }, [sceneId, isRu, onRecalcDone]);
 
-
   useEffect(() => {
     if (!selectedSegmentId) return;
     const el = document.getElementById(`storyboard-seg-${selectedSegmentId}`);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [selectedSegmentId]);
 
-  // Load characters for the book (including voice_config for provider detection)
+  // Load characters for the book
   useEffect(() => {
     if (!bookId) { setCharacters([]); return; }
     (async () => {
@@ -806,19 +178,6 @@ export function StoryboardPanel({
       })));
     })();
   }, [bookId]);
-
-  // Build speaker → TTS provider map
-  const speakerProviderMap = useMemo(() => {
-    const map = new Map<string, TtsProvider>();
-    for (const c of characters) {
-      if (c.voiceConfig) {
-        const provider = resolveProvider(c.voiceConfig);
-        map.set(c.name.toLowerCase(), provider);
-        // Also map aliases if available
-      }
-    }
-    return map;
-  }, [characters]);
 
   // Load audio status for segments
   const loadAudioStatus = useCallback(async (segIds: string[]) => {
@@ -837,7 +196,6 @@ export function StoryboardPanel({
           map.set(a.segment_id, { status: a.status, durationMs: a.duration_ms });
           continue;
         }
-        // If any ready record exists for a segment, prefer it for UI fill/status.
         if (prev.status !== "ready" && a.status === "ready") {
           map.set(a.segment_id, { status: a.status, durationMs: a.duration_ms });
         }
@@ -846,7 +204,7 @@ export function StoryboardPanel({
     setAudioStatus(map);
   }, []);
 
-  // Load existing segments from DB, then apply saved type→character mappings
+  // Load existing segments from DB
   const loadSegments = useCallback(async (sid: string) => {
     setLoading(true);
     try {
@@ -879,10 +237,7 @@ export function StoryboardPanel({
 
       if (phErr) throw phErr;
 
-      // Build character id→name map for mapping application
       const charNameMap = new Map(characters.map(c => [c.id, c.name]));
-
-      // Build mapping: segment_type → character name
       const typeSpeakerMap = new Map<string, string>();
       let loadedInlineSpeaker: string | null = null;
       if (mappings) {
@@ -905,7 +260,6 @@ export function StoryboardPanel({
         phraseMap.set(p.segment_id, list);
       }
 
-      // Apply saved mappings to segments missing a speaker
       const needUpdate: string[] = [];
       const builtSegments = segs.map((s) => {
         let speaker = s.speaker;
@@ -914,7 +268,7 @@ export function StoryboardPanel({
           needUpdate.push(s.id);
         }
         const meta = (s.metadata ?? {}) as Record<string, unknown>;
-        const inlineNarr = Array.isArray(meta.inline_narrations) ? meta.inline_narrations as InlineNarration[] : undefined;
+        const inlineNarr = Array.isArray(meta.inline_narrations) ? meta.inline_narrations as any[] : undefined;
         const splitSilence = typeof meta.split_silence_ms === "number" ? meta.split_silence_ms : undefined;
         return {
           segment_id: s.id,
@@ -935,7 +289,6 @@ export function StoryboardPanel({
             .map(s => s.segment_id);
           if (ids.length > 0) {
             await supabase.from("scene_segments").update({ speaker: name }).in("id", ids);
-            // Ensure character_appearances record exists so the character shows in scene list & timeline
             const charRecord = characters.find(c => c.name === name);
             if (charRecord && sid) {
               const { data: existing } = await supabase
@@ -959,10 +312,8 @@ export function StoryboardPanel({
       }
 
       setSegments(builtSegments);
-      // Track which segments have inline narrations
       const inlineIds = new Set(builtSegments.filter(s => s.inline_narrations && s.inline_narrations.length > 0).map(s => s.segment_id));
       setInlineNarrationSegIds(inlineIds);
-      // Track segments with stale inline_narrations_audio metadata
       const staleIds = new Set<string>();
       for (const s of segs) {
         const meta = (s.metadata ?? {}) as Record<string, unknown>;
@@ -972,7 +323,6 @@ export function StoryboardPanel({
       }
       setStaleAudioSegIds(staleIds);
       setLoaded(true);
-      // Load audio status
       loadAudioStatus(builtSegments.map(s => s.segment_id));
     } catch (err) {
       console.error("Failed to load segments:", err);
@@ -980,6 +330,8 @@ export function StoryboardPanel({
     }
     setLoading(false);
   }, [isRu, characters, loadAudioStatus]);
+
+  // ─── Segment Operations ───────────────────────────────────
 
   const handleMergeSegments = useCallback(async () => {
     if (!sceneId || mergeGroups.length === 0) return;
@@ -989,23 +341,18 @@ export function StoryboardPanel({
         const [keeper, ...toMerge] = group;
         const mergeIds = toMerge.map(s => s.segment_id);
 
-        // Collect all phrases in order: keeper's phrases + each merged segment's phrases
-        // If a merged segment's first phrase doesn't start a new sentence,
-        // concatenate it with the previous phrase's text
         let allPhrases = [...keeper.phrases];
         for (const seg of toMerge) {
           for (let pi = 0; pi < seg.phrases.length; pi++) {
             const ph = seg.phrases[pi];
             const startsNewSentence = /^[A-ZА-ЯЁ«"—–\-\[]/.test(ph.text.trimStart());
             if (pi === 0 && !startsNewSentence && allPhrases.length > 0) {
-              // Merge text into previous phrase
               const prev = allPhrases[allPhrases.length - 1];
               const separator = prev.text.endsWith(" ") ? "" : " ";
               allPhrases[allPhrases.length - 1] = {
                 ...prev,
                 text: prev.text + separator + ph.text,
               };
-              // Delete this phrase from DB since it's been merged into previous
               await supabase.from("segment_phrases").delete().eq("id", ph.phrase_id);
             } else {
               allPhrases.push(ph);
@@ -1013,17 +360,14 @@ export function StoryboardPanel({
           }
         }
 
-        // Now reassign all phrases to keeper with correct numbering
         for (let i = 0; i < allPhrases.length; i++) {
           const ph = allPhrases[i];
           const isFromKeeper = keeper.phrases.some(kp => kp.phrase_id === ph.phrase_id);
           if (isFromKeeper) {
-            // Update text (may have been concatenated) and phrase_number
             await supabase.from("segment_phrases")
               .update({ phrase_number: i + 1, text: ph.text })
               .eq("id", ph.phrase_id);
           } else {
-            // Move from merged segment to keeper
             await supabase.from("segment_phrases")
               .update({ segment_id: keeper.segment_id, phrase_number: i + 1 })
               .eq("id", ph.phrase_id);
@@ -1033,7 +377,6 @@ export function StoryboardPanel({
         await supabase.from("segment_audio").delete().in("segment_id", mergeIds);
         await supabase.from("scene_segments").delete().in("id", mergeIds);
       }
-      // Renumber remaining segments sequentially
       const { data: remaining } = await supabase
         .from("scene_segments")
         .select("id, segment_number")
@@ -1046,7 +389,6 @@ export function StoryboardPanel({
           }
         }
       }
-      // Delete scene_playlists to force recalculation
       await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
       setMergeChecked(new Set());
       toast.success(isRu ? "Блоки объединены" : "Segments merged");
@@ -1059,7 +401,6 @@ export function StoryboardPanel({
     setMerging(false);
   }, [sceneId, mergeGroups, isRu, loadSegments, onSegmented]);
 
-  // Delete selected segments
   const handleDeleteSegments = useCallback(async () => {
     if (!sceneId || mergeChecked.size === 0) return;
     const toDelete = segments.filter(s => mergeChecked.has(s.segment_id));
@@ -1071,11 +412,9 @@ export function StoryboardPanel({
     setDeleting(true);
     try {
       const deleteIds = toDelete.map(s => s.segment_id);
-      // Delete phrases, audio, then segments
       await supabase.from("segment_phrases").delete().in("segment_id", deleteIds);
       await supabase.from("segment_audio").delete().in("segment_id", deleteIds);
       await supabase.from("scene_segments").delete().in("id", deleteIds);
-      // Renumber remaining segments sequentially
       const { data: remaining } = await supabase
         .from("scene_segments")
         .select("id, segment_number")
@@ -1088,7 +427,6 @@ export function StoryboardPanel({
           }
         }
       }
-      // Invalidate playlist to force timeline recalculation
       await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
       setMergeChecked(new Set());
       toast.success(isRu ? `Удалено ${toDelete.length} блок(ов)` : `Deleted ${toDelete.length} segment(s)`);
@@ -1101,25 +439,17 @@ export function StoryboardPanel({
     setDeleting(false);
   }, [sceneId, mergeChecked, segments, isRu, loadSegments, onSegmented]);
 
-  // Split a segment into two at a given phrase, splitting the phrase text
   const handleSplitAtPhrase = useCallback(async (phraseId: string, textBefore: string, textAfter: string) => {
     if (!sceneId) return;
-    // Find segment containing this phrase
     const seg = segments.find(s => s.phrases.some(p => p.phrase_id === phraseId));
     if (!seg) return;
     const phraseIdx = seg.phrases.findIndex(p => p.phrase_id === phraseId);
     if (phraseIdx < 0) return;
 
     try {
-      // Phrases staying in original segment: [0..phraseIdx] (split phrase gets textBefore)
-      // Phrases moving to new segment: split phrase gets textAfter + [phraseIdx+1..]
-      const keepPhrases = seg.phrases.slice(0, phraseIdx + 1);
       const movePhrases = seg.phrases.slice(phraseIdx + 1);
-
-      // Update the split phrase to textBefore
       await supabase.from("segment_phrases").update({ text: textBefore }).eq("id", phraseId);
 
-      // Shift all subsequent segments' numbers up by 1
       const { data: allSegs } = await supabase
         .from("scene_segments")
         .select("id, segment_number")
@@ -1132,7 +462,6 @@ export function StoryboardPanel({
         }
       }
 
-      // Create the new segment
       const { data: newSeg } = await supabase
         .from("scene_segments")
         .insert({
@@ -1147,24 +476,19 @@ export function StoryboardPanel({
 
       if (!newSeg) throw new Error("Failed to create new segment");
 
-      // Create new phrase for the textAfter part
       await supabase.from("segment_phrases").insert({
         segment_id: newSeg.id,
         phrase_number: 1,
         text: textAfter,
       });
 
-      // Move remaining phrases to the new segment
       for (let i = 0; i < movePhrases.length; i++) {
         await supabase.from("segment_phrases")
           .update({ segment_id: newSeg.id, phrase_number: i + 2 })
           .eq("id", movePhrases[i].phrase_id);
       }
 
-      // Delete audio for the original segment (text changed)
       await supabase.from("segment_audio").delete().eq("segment_id", seg.segment_id);
-
-      // Invalidate playlist
       await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
 
       toast.success(isRu ? "Блок разделён" : "Segment split");
@@ -1176,13 +500,10 @@ export function StoryboardPanel({
     }
   }, [sceneId, segments, isRu, loadSegments, onSegmented]);
 
-  // Update split silence duration in segment metadata
   const handleSplitSilenceChange = useCallback(async (segmentId: string, ms: number) => {
-    // Update local state immediately
     setSegments(prev => prev.map(s =>
       s.segment_id === segmentId ? { ...s, split_silence_ms: ms } : s
     ));
-    // Persist to DB: merge into existing metadata
     const { data: row } = await supabase
       .from("scene_segments")
       .select("metadata")
@@ -1192,13 +513,11 @@ export function StoryboardPanel({
     await supabase.from("scene_segments")
       .update({ metadata: { ...existing, split_silence_ms: ms } })
       .eq("id", segmentId);
-    // Invalidate playlist to recalculate timeline
     if (sceneId) {
       await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
       onSegmented?.(sceneId);
     }
   }, [sceneId, onSegmented]);
-
 
   useEffect(() => {
     setSegments([]);
@@ -1206,7 +525,7 @@ export function StoryboardPanel({
     if (sceneId) loadSegments(sceneId);
   }, [sceneId, loadSegments]);
 
-  // Realtime subscription: listen for segment_audio changes to update synthesizing state per-clip
+  // Realtime subscription for segment_audio changes
   const synthIdsRef = useRef<Set<string>>(new Set());
   synthIdsRef.current = currentlySynthesizingIds;
 
@@ -1218,24 +537,18 @@ export function StoryboardPanel({
       .channel(`segment_audio_${sceneId}`)
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "segment_audio",
-        },
+        { event: "*", schema: "public", table: "segment_audio" },
         (payload) => {
           const row = payload.new as { segment_id: string; status: string; duration_ms: number } | undefined;
           if (!row || !segmentIdSet.has(row.segment_id)) return;
           if (!synthIdsRef.current.has(row.segment_id)) return;
 
-          // Remove from synthesizing set
           setCurrentlySynthesizingIds(prev => {
             const next = new Set(prev);
             next.delete(row.segment_id);
             onSynthesizingChange?.(next);
             return next;
           });
-          // Update audio status for this segment
           setAudioStatus(prev => {
             const next = new Map(prev);
             next.set(row.segment_id, { status: row.status, durationMs: row.duration_ms });
@@ -1245,12 +558,11 @@ export function StoryboardPanel({
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [segments.map(s => s.segment_id).join(","), sceneId, onSynthesizingChange]);
 
-  // Run AI segmentation
+  // ─── AI Actions ───────────────────────────────────────────
+
   const runAnalysis = useCallback(async () => {
     if (!sceneId || !sceneContent) return;
     setAnalyzing(true);
@@ -1277,7 +589,8 @@ export function StoryboardPanel({
     }
   }, [loaded, segments.length, sceneContent, sceneId]);
 
-  // Save edited phrase to DB and update local state
+  // ─── Phrase CRUD ──────────────────────────────────────────
+
   const savePhrase = useCallback(async (phraseId: string, newText: string) => {
     const { error } = await supabase
       .from("segment_phrases")
@@ -1295,10 +608,8 @@ export function StoryboardPanel({
     })));
   }, [isRu]);
 
-  // Auto-add word to stress dictionary when user creates a stress annotation
   const addToStressDictionary = useCallback(async (phraseId: string, annotation: PhraseAnnotation) => {
     if (annotation.type !== "stress" || annotation.start === undefined) return;
-    // Find the phrase text
     let phraseText = "";
     for (const seg of segments) {
       const ph = seg.phrases.find(p => p.phrase_id === phraseId);
@@ -1306,7 +617,6 @@ export function StoryboardPanel({
     }
     if (!phraseText) return;
 
-    // Extract the word containing the stressed letter
     const stressPos = annotation.start;
     const wordRegex = /[а-яёА-ЯЁ]+/g;
     let m: RegExpExecArray | null;
@@ -1314,7 +624,6 @@ export function StoryboardPanel({
       if (stressPos >= m.index && stressPos < m.index + m[0].length) {
         const word = m[0].toLowerCase();
         const stressedIndex = stressPos - m.index;
-        // Upsert to dictionary (ignore if already exists)
         await supabase.from("stress_dictionary").upsert(
           { user_id: (await supabase.auth.getUser()).data.user?.id, word, stressed_index: stressedIndex },
           { onConflict: "user_id,word,stressed_index" }
@@ -1324,9 +633,7 @@ export function StoryboardPanel({
     }
   }, [segments]);
 
-  // Save annotation to phrase metadata
   const saveAnnotation = useCallback(async (phraseId: string, annotation: PhraseAnnotation) => {
-    // Find current phrase
     let currentAnnotations: PhraseAnnotation[] = [];
     for (const seg of segments) {
       const ph = seg.phrases.find(p => p.phrase_id === phraseId);
@@ -1337,7 +644,6 @@ export function StoryboardPanel({
     }
     currentAnnotations.push(annotation);
 
-    // Load current metadata first to preserve other fields
     const { data: existing } = await supabase
       .from("segment_phrases")
       .select("metadata")
@@ -1357,7 +663,6 @@ export function StoryboardPanel({
       return;
     }
 
-    // Auto-add stress annotations to dictionary
     if (annotation.type === "stress") {
       addToStressDictionary(phraseId, annotation);
     }
@@ -1371,7 +676,6 @@ export function StoryboardPanel({
     toast.success(isRu ? "Аннотация добавлена" : "Annotation added");
   }, [segments, isRu, addToStressDictionary]);
 
-  // Remove annotation by index
   const removeAnnotation = useCallback(async (phraseId: string, index: number) => {
     let currentAnnotations: PhraseAnnotation[] = [];
     for (const seg of segments) {
@@ -1412,16 +716,12 @@ export function StoryboardPanel({
     toast.success(isRu ? "Аннотация удалена" : "Annotation removed");
   }, [segments, isRu]);
 
-  // ── Full sync of character_appearances for scene ──
-  // Scans all segments + type mappings to determine which characters are actually used,
-  // removes stale appearances (empty tracks), and ensures used characters are present.
+  // ─── Character Sync ───────────────────────────────────────
+
   const syncSceneCharacters = useCallback(async (updatedSegments: Segment[]) => {
     if (!sceneId) return;
-
-    // 1. Collect all character IDs actually used
     const usedCharIds = new Set<string>();
 
-    // From segment speakers
     for (const seg of updatedSegments) {
       if (seg.speaker) {
         const charRecord = characters.find(c => c.name === seg.speaker);
@@ -1429,18 +729,14 @@ export function StoryboardPanel({
       }
     }
 
-    // From scene_type_mappings (includes first_person, inline_narration, footnote, etc.)
     const { data: mappings } = await supabase
       .from("scene_type_mappings")
       .select("character_id")
       .eq("scene_id", sceneId);
     if (mappings) {
-      for (const m of mappings) {
-        usedCharIds.add(m.character_id);
-      }
+      for (const m of mappings) usedCharIds.add(m.character_id);
     }
 
-    // Also include system characters that have auto-routed segments
     const SYSTEM_TYPES: Record<string, string> = {
       narrator: "рассказчик", epigraph: "рассказчик", lyric: "рассказчик",
       footnote: "комментатор",
@@ -1453,7 +749,6 @@ export function StoryboardPanel({
       }
     }
 
-    // 2. Get current appearances
     const { data: currentAppearances } = await supabase
       .from("character_appearances")
       .select("id, character_id")
@@ -1461,7 +756,6 @@ export function StoryboardPanel({
 
     if (!currentAppearances) return;
 
-    // 3. Delete stale appearances
     const staleIds = currentAppearances
       .filter(a => !usedCharIds.has(a.character_id))
       .map(a => a.id);
@@ -1469,7 +763,6 @@ export function StoryboardPanel({
       await supabase.from("character_appearances").delete().in("id", staleIds);
     }
 
-    // 4. Ensure all used characters have an appearance
     const existingCharIds = new Set(currentAppearances.map(a => a.character_id));
     for (const charId of usedCharIds) {
       if (!existingCharIds.has(charId)) {
@@ -1480,26 +773,22 @@ export function StoryboardPanel({
       }
     }
 
-    onSegmented?.(sceneId); // refresh timeline
+    onSegmented?.(sceneId);
   }, [sceneId, characters, onSegmented]);
 
   const PROPAGATE_TYPES = new Set(["narrator", "first_person", "inner_thought", "epigraph", "lyric", "footnote"]);
 
-  // Narrator↔first_person propagation pairs
   const TYPE_PROPAGATION_PAIRS: Record<string, string> = {
     narrator: "first_person",
     first_person: "narrator",
   };
 
-  // Update segment type in DB — propagates narrator↔first_person across all segments of old type
   const updateSegmentType = useCallback(async (segmentId: string, newType: string) => {
     const targetSeg = segments.find(s => s.segment_id === segmentId);
     if (!targetSeg) return;
     const oldType = targetSeg.segment_type;
 
-    // Determine if we should propagate: narrator→first_person or first_person→narrator
     const shouldPropagate = TYPE_PROPAGATION_PAIRS[oldType] === newType;
-
     const affectedIds = shouldPropagate
       ? segments.filter(s => s.segment_type === oldType).map(s => s.segment_id)
       : [segmentId];
@@ -1519,9 +808,7 @@ export function StoryboardPanel({
     }
 
     if (affectedIds.length > 1) {
-      const newLabel = isRu
-        ? SEGMENT_CONFIG[newType]?.label_ru
-        : SEGMENT_CONFIG[newType]?.label_en;
+      const newLabel = isRu ? SEGMENT_CONFIG[newType]?.label_ru : SEGMENT_CONFIG[newType]?.label_en;
       toast.success(
         isRu
           ? `Тип изменён: ${newLabel} (${affectedIds.length} фрагм.)`
@@ -1531,7 +818,6 @@ export function StoryboardPanel({
 
     if (!sceneId) return;
 
-    // If old type was propagatable and no segments of that type remain, clean up mapping
     if (PROPAGATE_TYPES.has(oldType) && oldType !== newType) {
       const remainingOfOldType = updatedSegments.filter(s => s.segment_type === oldType);
       if (remainingOfOldType.length === 0) {
@@ -1543,7 +829,6 @@ export function StoryboardPanel({
       }
     }
 
-    // Full sync: clean up stale appearances, add missing ones
     await syncSceneCharacters(updatedSegments);
   }, [isRu, segments, sceneId, characters, syncSceneCharacters]);
 
@@ -1552,24 +837,20 @@ export function StoryboardPanel({
     if (!targetSeg) return;
 
     const shouldPropagate = PROPAGATE_TYPES.has(targetSeg.segment_type);
-
     const affectedIds = shouldPropagate
       ? segments.filter(s => s.segment_type === targetSeg.segment_type).map(s => s.segment_id)
       : [segmentId];
 
-    // Update locally
     const updatedSegments = segments.map(seg =>
       affectedIds.includes(seg.segment_id) ? { ...seg, speaker: newSpeaker } : seg
     );
     setSegments(updatedSegments);
 
-    // Persist to DB
     const { error } = await supabase
       .from("scene_segments")
       .update({ speaker: newSpeaker })
       .in("id", affectedIds);
 
-    // Upsert or delete scene-level type→character mapping (only for propagatable types)
     if (sceneId && shouldPropagate) {
       const charRecord = newSpeaker ? characters.find(c => c.name === newSpeaker) : null;
       if (charRecord) {
@@ -1588,7 +869,6 @@ export function StoryboardPanel({
       }
     }
 
-    // Full sync: clean up stale appearances, add missing ones
     await syncSceneCharacters(updatedSegments);
 
     if (error) {
@@ -1605,14 +885,15 @@ export function StoryboardPanel({
     }
   }, [isRu, segments, sceneId, characters, syncSceneCharacters]);
 
-  // ── Synthesize scene ──
+  // ─── Synthesis ────────────────────────────────────────────
+
   const runSynthesis = useCallback(async () => {
     if (!sceneId || segments.length === 0) return;
     const allIds = new Set(segments.map(s => s.segment_id));
     setSynthesizing(true);
     setCurrentlySynthesizingIds(allIds);
     onSynthesizingChange?.(allIds);
-    onErrorSegmentsChange?.(new Set()); // Clear previous errors
+    onErrorSegmentsChange?.(new Set());
     setSynthProgress(isRu ? "Запуск синтеза…" : "Starting synthesis…");
     try {
       const { data, error } = await supabase.functions.invoke("synthesize-scene", {
@@ -1622,7 +903,6 @@ export function StoryboardPanel({
       const synth = data as { synthesized: number; errors: number; total_duration_ms: number; results?: Array<{ segment_id: string; status: string; error?: string }> };
       const durSec = (synth.total_duration_ms / 1000).toFixed(1);
 
-      // Collect error segment IDs
       const errorIds = new Set<string>();
       if (synth.results) {
         for (const r of synth.results) {
@@ -1644,9 +924,7 @@ export function StoryboardPanel({
             : `Synthesis done: ${synth.synthesized} seg., ${durSec}s`
         );
       }
-      // Trigger timeline refresh by notifying parent
       onSegmented?.(sceneId);
-      // Reload audio status indicators
       loadAudioStatus(segments.map(s => s.segment_id));
     } catch (err: any) {
       console.error("Synthesis failed:", err);
@@ -1658,14 +936,12 @@ export function StoryboardPanel({
     setSynthProgress("");
   }, [sceneId, segments, isRu, onSegmented, loadAudioStatus, onSynthesizingChange, onErrorSegmentsChange]);
 
-  // ── Re-synthesize single segment (force) ──
   const resynthSegment = useCallback(async (segmentId: string) => {
     if (!sceneId) return;
     setResynthSegId(segmentId);
     setCurrentlySynthesizingIds(new Set([segmentId]));
     onSynthesizingChange?.(new Set([segmentId]));
     try {
-      // Keep existing audio until new synthesis is confirmed ready.
       const { data, error } = await supabase.functions.invoke("synthesize-scene", {
         body: { scene_id: sceneId, language: isRu ? "ru" : "en", force: true, segment_ids: [segmentId] },
       });
@@ -1684,10 +960,8 @@ export function StoryboardPanel({
       }
 
       toast.success(isRu ? "Блок пересинтезирован" : "Segment re-synthesized");
-      // Clear this segment from error set on success
       onErrorSegmentsChange?.(new Set());
       onSegmented?.(sceneId);
-      // Small delay to ensure DB write is committed before reloading status
       await new Promise(r => setTimeout(r, 500));
       await loadAudioStatus(segments.map(s => s.segment_id));
     } catch (err: any) {
@@ -1696,13 +970,14 @@ export function StoryboardPanel({
         description: err?.message,
       });
       onErrorSegmentsChange?.(new Set([segmentId]));
-      // Reload status even on error to reflect current state
       await loadAudioStatus(segments.map(s => s.segment_id));
     }
     setResynthSegId(null);
     setCurrentlySynthesizingIds(new Set());
     onSynthesizingChange?.(new Set());
   }, [sceneId, isRu, onSegmented, loadAudioStatus, segments, onSynthesizingChange, onErrorSegmentsChange]);
+
+  // ─── Detection & Stress ───────────────────────────────────
 
   const dialogueCount = segments.filter(s => s.segment_type === "dialogue").length;
   const runDetectNarrations = useCallback(async () => {
@@ -1731,7 +1006,6 @@ export function StoryboardPanel({
     setDetecting(false);
   }, [sceneId, dialogueCount, isRu, loadSegments]);
 
-  // ── Stress correction ──────────────────────────────────────────
   const runStressCorrection = useCallback(async (mode: "correct" | "suggest") => {
     if (!sceneId) return;
     setCorrectingStress(true);
@@ -1747,7 +1021,6 @@ export function StoryboardPanel({
           toast.info(isRu ? "Неоднозначных ударений не найдено" : "No ambiguous stress found");
           return;
         }
-        // Auto-add suggestions to dictionary
         const userId = (await supabase.auth.getUser()).data.user?.id;
         if (userId) {
           for (const s of suggestions) {
@@ -1763,7 +1036,6 @@ export function StoryboardPanel({
           );
         }
       } else {
-        // correct mode
         if (data.applied > 0) {
           toast.success(
             isRu
@@ -1782,13 +1054,13 @@ export function StoryboardPanel({
     setCorrectingStress(false);
   }, [sceneId, isRu, loadSegments]);
 
-  // ── Clean stale inline_narrations_audio metadata ──
+  // ─── Cleanup ──────────────────────────────────────────────
+
   const cleanStaleInlineAudio = useCallback(async () => {
     if (!sceneId || staleAudioSegIds.size === 0) return;
     setCleaningMetadata(true);
     try {
       const ids = [...staleAudioSegIds];
-      // Load current metadata for each segment, remove inline_narrations_audio
       const { data: segs } = await supabase
         .from("scene_segments")
         .select("id, metadata")
@@ -1800,7 +1072,6 @@ export function StoryboardPanel({
           await supabase.from("scene_segments").update({ metadata: meta as any }).eq("id", seg.id);
         }
       }
-      // Also clear scene_playlists to force timeline refresh
       await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
       setStaleAudioSegIds(new Set());
       if (onSegmented) onSegmented(sceneId);
@@ -1836,11 +1107,11 @@ export function StoryboardPanel({
         .eq("segment_type", "inline_narration");
       toast.success(isRu ? "Голос вставок сброшен" : "Narration voice reset");
     }
-    // Full sync: clean up stale appearances, add missing ones
     await syncSceneCharacters(segments);
   }, [sceneId, characters, isRu, segments, syncSceneCharacters]);
 
-  // ── No scene selected ──
+  // ─── Render ───────────────────────────────────────────────
+
   if (!sceneId) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -1851,7 +1122,6 @@ export function StoryboardPanel({
     );
   }
 
-  // ── Loading / analyzing state ──
   if (loading || analyzing) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3">
@@ -1865,7 +1135,6 @@ export function StoryboardPanel({
     );
   }
 
-  // ── No segments and no content to analyze ──
   if (loaded && segments.length === 0 && !sceneContent) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 p-6">
@@ -1879,7 +1148,6 @@ export function StoryboardPanel({
     );
   }
 
-  // ── Segments view ──
   const totalPhrases = segments.reduce((a, s) => a + s.phrases.length, 0);
 
   return (
@@ -2029,7 +1297,6 @@ export function StoryboardPanel({
           )}
         </div>
         <div className="flex items-center gap-1.5">
-          {/* Silence duration selector */}
           <div className="flex items-center gap-1 border-r border-border pr-2 mr-0.5">
             <Timer className="h-3 w-3 text-muted-foreground" />
             {[1, 2, 3].map((sec) => (
@@ -2099,7 +1366,6 @@ export function StoryboardPanel({
                     isRu={isRu}
                     onChange={(newType) => updateSegmentType(seg.segment_id, newType)}
                   />
-                  {/* Hide speaker badge for narrator/footnote — they use book-level system characters */}
                   {seg.segment_type !== "narrator" && seg.segment_type !== "footnote" && (
                     <SpeakerBadge
                       speaker={seg.speaker}
@@ -2108,7 +1374,6 @@ export function StoryboardPanel({
                       onChange={(newSpeaker) => updateSpeaker(seg.segment_id, newSpeaker)}
                     />
                   )}
-                  {/* Lyric voice recommendation */}
                   {seg.segment_type === "lyric" && (
                     <span
                       className="text-[10px] text-pink-400 italic"
@@ -2119,7 +1384,6 @@ export function StoryboardPanel({
                       🎭 {isRu ? "стих" : "verse"}
                     </span>
                   )}
-                  {/* Audio status indicator */}
                   {(() => {
                     const audio = audioStatus.get(seg.segment_id);
                     if (!audio) return null;
@@ -2136,7 +1400,6 @@ export function StoryboardPanel({
                       </span>
                     );
                   })()}
-                  {/* Inline narration indicator */}
                   {seg.inline_narrations && seg.inline_narrations.length > 0 && (
                     <span
                       className="inline-flex items-center gap-0.5 text-[10px] text-accent-foreground font-mono"
@@ -2148,7 +1411,6 @@ export function StoryboardPanel({
                       {seg.inline_narrations.length}
                     </span>
                   )}
-                  {/* Synth / Re-synth button — always visible */}
                   <button
                     onClick={(e) => { e.stopPropagation(); resynthSegment(seg.segment_id); }}
                     disabled={resynthSegId === seg.segment_id || synthesizing}
@@ -2164,7 +1426,6 @@ export function StoryboardPanel({
                         : <AudioLines className="h-3 w-3" />}
                   </button>
                   <div className="ml-auto flex items-center gap-1.5">
-                    {/* Split silence selector — only for segments with split_silence_ms */}
                     {seg.split_silence_ms !== undefined && (
                       <div className="flex items-center gap-0.5 border-r border-border pr-1.5 mr-0.5" onClick={(e) => e.stopPropagation()}>
                         <Timer className="h-3 w-3 text-muted-foreground" />
@@ -2212,7 +1473,6 @@ export function StoryboardPanel({
                     />
                   ))}
                 </div>
-                {/* Inline narrations detail */}
                 {seg.inline_narrations && seg.inline_narrations.length > 0 && (
                   <div className="px-3 py-1 bg-accent/10 border-t border-border/30">
                     <div className="flex items-center gap-2 mb-1">
