@@ -549,6 +549,19 @@ export default function Parser() {
     }
   }, [tocEntries, navRestoredFromStorage]);
 
+  // Handle scene content updates from cleanup actions
+  const handleScenesUpdate = useCallback((updatedScenes: Scene[]) => {
+    if (selectedIdx === null) return;
+    setChapterResults(prev => {
+      const next = new Map(prev);
+      const existing = next.get(selectedIdx);
+      if (existing) {
+        next.set(selectedIdx, { ...existing, scenes: updatedScenes });
+      }
+      return next;
+    });
+  }, [selectedIdx, setChapterResults]);
+
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col h-full">
