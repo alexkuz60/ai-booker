@@ -768,8 +768,10 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       <div className="w-56 shrink-0 border-r border-border flex flex-col">
         <div className="p-3 border-b border-border flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold font-display text-foreground">
+            <span className="text-sm font-semibold font-display text-foreground flex items-center gap-1.5">
               {isRu ? "Персонажи" : "Characters"}
+              <RoleBadge roleId="profiler" model={getModelForRole("profiler")} isRu={isRu} size={13} />
+              <RoleBadge roleId="director" model={getModelForRole("director")} isRu={isRu} size={13} />
             </span>
             <div className="flex items-center gap-1">
               {/* Filter toggle */}
