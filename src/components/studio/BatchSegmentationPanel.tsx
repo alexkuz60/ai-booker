@@ -219,7 +219,7 @@ export function BatchSegmentationPanel({
               key={job.scene.id}
               className={cn(
                 "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-body transition-colors",
-                job.status === "analyzing" || job.status === "loading"
+                job.status === "analyzing"
                   ? "bg-primary/5 border border-primary/20"
                   : job.status === "done"
                     ? "bg-emerald-500/5"
