@@ -72,7 +72,12 @@ export function useChapterAnalysis({
   // ─── Two-stage Chapter Analysis (with resume) ─────────────
   const analyzeChapter = async (idx: number, mode: "full" | "enrich" | "auto" = "auto") => {
     if (!userId) return;
-    if (!pdfRef) {
+    // Try to load PDF on demand if not in memory
+    let activePdf = pdfRef;
+    if (!activePdf && ensurePdfLoaded) {
+      activePdf = await ensurePdfLoaded();
+    }
+    if (!activePdf) {
       toast.error(isRu ? "PDF не загружен. Перезагрузите книгу для анализа." : "PDF not loaded. Reload the book to analyze.");
       return;
     }
