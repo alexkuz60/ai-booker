@@ -157,7 +157,7 @@ export function useChapterAnalysis({
       // ─── STAGE 1: Boundary detection ───
       if (!hasExistingScenes) {
         addLog(`${t("logExtracting", isRu)} «${entry.title}»...`);
-        const text = await extractTextByPageRange(pdfRef, entry.startPage, entry.endPage);
+        const text = await extractTextByPageRange(activePdf, entry.startPage, entry.endPage);
         const charCount = text.trim().length;
 
         if (charCount < 50) {
