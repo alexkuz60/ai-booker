@@ -506,6 +506,8 @@ export default function Parser() {
                        isRu={isRu} selectedIdx={selectedIdx}
                        selectedEntry={selectedEntry} selectedResult={selectedResult}
                        analysisLog={analysisLog} onAnalyze={analyzeChapter}
+                       onStopAnalysis={stopAnalysis}
+                       isAnalyzing={isAnalyzing}
                        childCount={selectedChildCount}
                        roleModels={{
                          screenwriter: getModelForRole("screenwriter"),
