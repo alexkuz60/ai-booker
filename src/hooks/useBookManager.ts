@@ -420,6 +420,26 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
       chapters.forEach((_, i) => initMap.set(i, { scenes: [], status: "pending" }));
       setChapterResults(initMap);
 
+      // ── Dual-write: sync to local project ──
+      if (projectStorage?.isReady && book?.id) {
+        const partsArr = uniqueParts.map((title, i) => ({
+          id: newPartIdMap.get(title) || "",
+          title,
+          partNumber: i + 1,
+        }));
+        syncStructureToLocal(projectStorage, {
+          bookId: book.id,
+          title: f.name.replace('.pdf', ''),
+          fileName: f.name,
+          toc: chapters,
+          parts: partsArr,
+          chapterIdMap: newChapterIdMap,
+          chapterResults: initMap,
+        });
+        // Also save the source PDF locally
+        projectStorage.writeBlob("source/book.pdf", f).catch(() => {});
+      }
+
       setStep("workspace");
     } catch (err: any) {
       console.error("Parser error:", err);
