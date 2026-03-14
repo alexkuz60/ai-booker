@@ -6,11 +6,13 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { useAuth } from "@/hooks/useAuth";
 import { useMontageData } from "@/hooks/useMontageData";
+import { supabase } from "@/integrations/supabase/client";
 import { MasterMeterPanel } from "@/components/studio/MasterMeterPanel";
 import { MasterEffectsTabs } from "@/components/studio/MasterEffectsTabs";
 import { MontageTimeline } from "@/components/montage/MontageTimeline";
 import { RenderDialog } from "@/components/montage/RenderDialog";
 import { Button } from "@/components/ui/button";
+import { AiRolesButton } from "@/components/AiRolesButton";
 
 const SIDEBAR_WIDTH = 280;
 
@@ -24,6 +26,15 @@ const Montage = () => {
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
   const { user } = useAuth();
+  const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('profiles').select('api_keys').eq('id', user.id).single()
+      .then(({ data }) => {
+        if (data?.api_keys) setUserApiKeys(data.api_keys as Record<string, string>);
+      });
+  }, [user]);
 
   const {
     bookTitle, chapterId, chapterTitle,
@@ -45,18 +56,23 @@ const Montage = () => {
     ? `${bookTitle} → ${chapterTitle}`
     : (isRu ? "Финальный монтаж и мастеринг глав" : "Final chapter montage & mastering");
 
-  const renderButton = hasContent ? (
-    <Button
-      variant="hero"
-      size="sm"
-      className="gap-1.5 h-7 text-xs"
-      onClick={() => setRenderDialogOpen(true)}
-      disabled={clips.length === 0}
-    >
-      <FileAudio className="h-3.5 w-3.5" />
-      {isRu ? "Рендер" : "Render"}
-    </Button>
-  ) : undefined;
+  const renderButton = (
+    <div className="flex items-center gap-2">
+      {hasContent && (
+        <Button
+          variant="hero"
+          size="sm"
+          className="gap-1.5 h-7 text-xs"
+          onClick={() => setRenderDialogOpen(true)}
+          disabled={clips.length === 0}
+        >
+          <FileAudio className="h-3.5 w-3.5" />
+          {isRu ? "Рендер" : "Render"}
+        </Button>
+      )}
+      <AiRolesButton isRu={isRu} apiKeys={userApiKeys} bookTitle={bookTitle || undefined} />
+    </div>
+  );
 
   useEffect(() => {
     setPageHeader({ title, subtitle, headerRight: renderButton });
