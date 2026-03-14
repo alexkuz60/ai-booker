@@ -77,17 +77,22 @@ export function useChapterAnalysis({
 
     const addLog = (msg: string) => setAnalysisLog(prev => [...prev, msg]);
 
-    let userKey: string | null = null;
-    const modelEntry = getModelRegistryEntry(selectedModel);
-    if (modelEntry?.apiKeyField) {
-      userKey = userApiKeys[modelEntry.apiKeyField] || null;
-    }
-    const baseBody = {
-      user_api_key: userKey,
-      user_model: selectedModel,
-      provider: modelEntry?.provider || 'lovable',
-      openrouter_api_key: userApiKeys['openrouter'] || null,
-      lang: isRu ? 'ru' : 'en',
+    // Use Screenwriter role for structure parsing, Director for enrichment
+    const buildBaseBody = (roleId: AiRoleId) => {
+      const model = getModelForRole(roleId);
+      const modelEntry = getModelRegistryEntry(model);
+      let userKey: string | null = null;
+      if (modelEntry?.apiKeyField) {
+        userKey = userApiKeys[modelEntry.apiKeyField] || null;
+      }
+      return {
+        user_api_key: userKey,
+        user_model: model,
+        provider: modelEntry?.provider || 'lovable',
+        openrouter_api_key: userApiKeys['openrouter'] || null,
+        lang: isRu ? 'ru' : 'en',
+        _modelName: model, // for logging
+      };
     };
 
     const existingChId = chapterIdMap.get(idx);
