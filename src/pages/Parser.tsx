@@ -85,12 +85,10 @@ export default function Parser() {
   } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName, bookId: bookId ?? undefined });
 
   // ── Warn when analysis-relevant models change ──
-  const analysisRoles = new Set<AiRoleId>(["screenwriter", "director"]);
   const handleRoleModelChanged = useCallback((roleId: AiRoleId) => {
-    if (!analysisRoles.has(roleId)) return;
-    const analyzedCount = Object.values(chapterResults).filter(
-      (r) => r && (r as { status: ChapterStatus }).status === "done"
-    ).length;
+    if (roleId !== "screenwriter" && roleId !== "director") return;
+    let analyzedCount = 0;
+    chapterResults.forEach((r) => { if (r.status === "done") analyzedCount++; });
     if (analyzedCount > 0) {
       toast({
         title: isRu ? "Модель изменена" : "Model changed",
