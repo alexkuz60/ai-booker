@@ -87,9 +87,15 @@ export function renderAnnotatedText(text: string, annotations?: PhraseAnnotation
         </span>
       );
     } else {
-      const parts = chunk.split(/(\[[^\]]+\])/g);
+      const parts = chunk.split(/(\[сн\.→\s*\d+\]|\[[^\]]+\])/g);
       for (const [pi, part] of parts.entries()) {
-        if (/^\[.+\]$/.test(part)) {
+        if (/^\[сн\.→\s*\d+\]$/.test(part)) {
+          fragments.push(
+            <span key={`s-${i}-${pi}`} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 text-[10px] font-mono mx-0.5 cursor-help" title="Ссылка на сноску">
+              {part}
+            </span>
+          );
+        } else if (/^\[.+\]$/.test(part)) {
           fragments.push(
             <span key={`s-${i}-${pi}`} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-accent text-accent-foreground text-xs font-medium mx-0.5">
               <Volume2 className="h-3 w-3" />
