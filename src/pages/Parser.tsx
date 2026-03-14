@@ -425,7 +425,7 @@ export default function Parser() {
             </SheetTitle>
           </SheetHeader>
           <div className="mt-4">
-            <AiRolesTab apiKeys={userApiKeys} isRu={isRu} />
+            <AiRolesTab apiKeys={userApiKeys} isRu={isRu} onModelChanged={handleRoleModelChanged} />
           </div>
         </SheetContent>
       </Sheet>
