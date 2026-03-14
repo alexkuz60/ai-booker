@@ -73,7 +73,13 @@ export function useChapterAnalysis({
     const entry = tocEntries[idx];
     if (!entry) return;
 
+    // Cancel any previous analysis
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+
     userStartedAnalysis.current = true;
+    setIsAnalyzing(true);
     setAnalysisLog([]);
     if (analysisTimerRef.current) clearInterval(analysisTimerRef.current);
 
