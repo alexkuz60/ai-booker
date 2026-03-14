@@ -79,12 +79,12 @@ export default function Parser() {
     step, setStep, books, loadingLibrary, fileName, errorMsg, bookId,
     chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
     partIdMap, chapterResults, setChapterResults, fileInputRef,
-    openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset, reloadBook,
+    openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset, reloadBook, ensurePdfLoaded,
   } = useBookManager({ userId: user?.id, isRu, projectStorage });
 
   const { analysisLog, analyzeChapter, resetAnalysis, stopAnalysis, isAnalyzing } = useChapterAnalysis({
     isRu, pdfRef, userId: user?.id, userApiKeys, getModelForRole,
-    tocEntries, chapterIdMap, chapterResults, setChapterResults,
+    tocEntries, chapterIdMap, chapterResults, setChapterResults, ensurePdfLoaded,
   });
 
   const { pushSnapshot, undo, redo, canUndo, canRedo, resetStacks } = useStructureUndo(bookId);
