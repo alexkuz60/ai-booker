@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
+import { RoleBadge, RoleBadges } from "@/components/ui/RoleBadge";
 import { t, tSceneType, tMood, tSceneTitle } from "@/pages/parser/i18n";
 import type { TocChapter, Scene, ChapterStatus } from "@/pages/parser/types";
 import { SCENE_TYPE_COLORS } from "@/pages/parser/types";
@@ -66,9 +67,11 @@ interface ChapterDetailPanelProps {
   analysisLog: string[];
   onAnalyze: (idx: number, mode?: "full" | "enrich") => void;
   childCount?: number;
+  /** Current model names for role badges */
+  roleModels?: { screenwriter?: string; director?: string };
 }
 
-function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
+function SceneCards({ scenes, isRu, roleModels }: { scenes: Scene[]; isRu: boolean; roleModels?: { screenwriter?: string; director?: string } }) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const totalDuration = useMemo(() => {
@@ -103,7 +106,8 @@ function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
           >
             <CardContent className="py-3 px-4 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-base font-medium">
+                <span className="text-base font-medium flex items-center gap-1.5">
+                  <RoleBadge roleId="screenwriter" model={roleModels?.screenwriter} isRu={isRu} size={13} />
                   {t("scenePrefix", isRu)} {sc.scene_number}: {tSceneTitle(sc.title, isRu)}
                 </span>
                 <div className="flex items-center gap-1.5">
@@ -114,6 +118,7 @@ function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
                   <Badge variant="outline" className="text-xs font-mono">
                     {sc.bpm} BPM
                   </Badge>
+                  <RoleBadge roleId="director" model={roleModels?.director} isRu={isRu} size={12} />
                   <span className="text-[10px] text-muted-foreground font-mono ml-1">
                     {sceneDur}
                   </span>
@@ -140,7 +145,7 @@ function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
 }
 
 export default function ChapterDetailPanel({
-  isRu, selectedIdx, selectedEntry, selectedResult, analysisLog, onAnalyze, childCount = 0,
+  isRu, selectedIdx, selectedEntry, selectedResult, analysisLog, onAnalyze, childCount = 0, roleModels,
 }: ChapterDetailPanelProps) {
   const [reanalyzeOpen, setReanalyzeOpen] = useState(false);
 
@@ -210,7 +215,17 @@ export default function ChapterDetailPanel({
                   <Zap className="h-5 w-5 text-primary-foreground" />
                 </div>
                 <div>
-                  <p className="font-display font-semibold text-sm">The Architect</p>
+                  <p className="font-display font-semibold text-sm flex items-center gap-1.5">
+                    The Architect
+                    <RoleBadges
+                      roles={[
+                        { roleId: "screenwriter", model: roleModels?.screenwriter },
+                        { roleId: "director", model: roleModels?.director },
+                      ]}
+                      isRu={isRu}
+                      size={12}
+                    />
+                  </p>
                   <p className="text-xs text-muted-foreground">{t("decomposing", isRu)}</p>
                 </div>
                 <Loader2 className="h-4 w-4 animate-spin text-primary ml-auto shrink-0" />
@@ -267,7 +282,7 @@ export default function ChapterDetailPanel({
 
         {/* Scene cards */}
         {selectedResult?.status === "done" && selectedResult.scenes.length > 0 && (
-          <SceneCards scenes={selectedResult.scenes} isRu={isRu} />
+          <SceneCards scenes={selectedResult.scenes} isRu={isRu} roleModels={roleModels} />
         )}
 
         {/* Done but empty */}
