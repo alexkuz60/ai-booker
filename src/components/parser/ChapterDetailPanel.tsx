@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, Fragment } from "react";
 import { motion } from "framer-motion";
 import {
   FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock, RefreshCw, Palette, StopCircle,
-  Trash2, Hash, Scissors, SpellCheck
+  Trash2, Hash, Scissors, SpellCheck, Footprints
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
