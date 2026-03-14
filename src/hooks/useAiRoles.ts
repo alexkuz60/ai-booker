@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useCloudSettings } from "./useCloudSettings";
 import { useUserRole } from "./useUserRole";
 import {
@@ -14,11 +14,22 @@ import { getModelRegistryEntry, getAvailableModels } from "@/config/modelRegistr
  * Hook to manage AI role → model mappings.
  * Admin gets Lovable AI defaults, users get external provider defaults.
  * Overrides are stored in cloud settings.
+ *
+ * "Pre-edit snapshot": before the first change in a session,
+ * the current overrides are saved. Reset restores to that snapshot
+ * (the last "working" set) instead of clearing everything.
  */
 export function useAiRoles(userApiKeys: Record<string, string> = {}) {
   const { isAdmin } = useUserRole();
   const { value: overrides, update: setOverrides, loaded } =
     useCloudSettings<AiRoleModelMap>("ai_role_models", {});
+  const {
+    value: preEditSnapshot,
+    update: setPreEditSnapshot,
+  } = useCloudSettings<AiRoleModelMap | null>("ai_role_models_pre_edit", null);
+
+  /** Track whether we've already taken a snapshot this session */
+  const snapshotTakenRef = useRef(false);
 
   /** Defaults based on user role */
   const defaults = useMemo(
@@ -31,13 +42,11 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
     (roleId: AiRoleId): string => {
       const override = overrides[roleId];
       if (override) {
-        // Verify the model is still available to the user
         const entry = getModelRegistryEntry(override);
         if (entry) {
           if (entry.provider === "lovable" && isAdmin) return override;
           if (entry.apiKeyField && userApiKeys[entry.apiKeyField]) return override;
         }
-        // Override invalid → fall back to default
       }
       return defaults[roleId];
     },
@@ -49,9 +58,14 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
     return AI_ROLES[roleId].systemPrompt;
   }, []);
 
-  /** Set model override for a specific role */
+  /** Set model override for a specific role — snapshots pre-edit state on first change */
   const setModelForRole = useCallback(
     (roleId: AiRoleId, modelId: string | null) => {
+      // Snapshot current overrides before first edit
+      if (!snapshotTakenRef.current && preEditSnapshot === null) {
+        setPreEditSnapshot({ ...overrides });
+        snapshotTakenRef.current = true;
+      }
       setOverrides((prev) => {
         const next = { ...prev };
         if (modelId === null || modelId === defaults[roleId]) {
@@ -62,13 +76,19 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
         return next;
       });
     },
-    [setOverrides, defaults]
+    [setOverrides, defaults, preEditSnapshot, setPreEditSnapshot, overrides]
   );
 
-  /** Reset all overrides to defaults */
+  /** Reset to pre-edit snapshot (last working set) or defaults */
   const resetAll = useCallback(() => {
-    setOverrides({});
-  }, [setOverrides]);
+    if (preEditSnapshot !== null) {
+      setOverrides(preEditSnapshot);
+      setPreEditSnapshot(null);
+    } else {
+      setOverrides({});
+    }
+    snapshotTakenRef.current = false;
+  }, [setOverrides, preEditSnapshot, setPreEditSnapshot]);
 
   /** Full resolved map */
   const resolvedModels = useMemo(() => {
@@ -85,6 +105,9 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
     [userApiKeys]
   );
 
+  /** Whether there's a pre-edit snapshot to restore to */
+  const hasPreEditSnapshot = preEditSnapshot !== null;
+
   return {
     resolvedModels,
     overrides,
@@ -95,5 +118,6 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
     availableModels,
     isAdmin,
     loaded,
+    hasPreEditSnapshot,
   };
 }
