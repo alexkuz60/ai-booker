@@ -26,8 +26,8 @@ export default function Parser() {
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
 
-  const { value: selectedModel, update: setSelectedModel } = useCloudSettings('parser-model', DEFAULT_MODEL_ID);
   const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
+  const { getModelForRole } = useAiRoles(userApiKeys);
   const [navRestoredFromStorage] = useState<boolean>(() => {
     try {
       const saved = sessionStorage.getItem(NAV_STATE_KEY);
