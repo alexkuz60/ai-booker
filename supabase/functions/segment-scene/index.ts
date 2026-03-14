@@ -247,6 +247,10 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
       if (seg.inline_narrations && seg.inline_narrations.length > 0) {
         metadata.inline_narrations = seg.inline_narrations;
       }
+      // Mark lyric segments for special TTS handling
+      if (segType === "lyric") {
+        metadata.is_verse = true;
+      }
 
       const { data: inserted, error: segErr } = await supabase
         .from("scene_segments")
