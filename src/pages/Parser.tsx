@@ -29,6 +29,7 @@ export default function Parser() {
   const { setPageHeader } = usePageHeader();
 
   const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
+  const [aiRolesOpen, setAiRolesOpen] = useState(false);
   const { getModelForRole } = useAiRoles(userApiKeys);
   const [navRestoredFromStorage] = useState<boolean>(() => {
     try {
