@@ -368,6 +368,7 @@ export default function Parser() {
   };
 
   const renameEntry = (idx: number, newTitle: string) => {
+    pushSnapshot(getCurrentSnapshot());
     setTocEntries(prev => prev.map((e, i) => i === idx ? { ...e, title: newTitle } : e));
     const chapterId = chapterIdMap.get(idx);
     if (chapterId) {
