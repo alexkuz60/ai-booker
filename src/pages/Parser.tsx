@@ -21,6 +21,7 @@ import UploadView from "@/components/parser/UploadView";
 import { ExtractingTocView, ErrorView } from "@/components/parser/StatusViews";
 import NavSidebar from "@/components/parser/NavSidebar";
 import ChapterDetailPanel from "@/components/parser/ChapterDetailPanel";
+import { AiRolesTab } from "@/components/profile/tabs/AiRolesTab";
 
 export default function Parser() {
   const { user } = useAuth();
