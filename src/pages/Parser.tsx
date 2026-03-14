@@ -6,6 +6,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { syncStructureToLocal } from "@/lib/localSync";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -404,13 +405,6 @@ export default function Parser() {
   };
 
   const deleteEntry = (indices: number[]) => {
-    const count = indices.length;
-    const confirmMsg = count === 1
-      ? t("deleteEntryConfirm", isRu).replace("{title}", tocEntries[indices[0]]?.title || "")
-      : t("deleteMultiConfirm", isRu).replace("{count}", String(count));
-    if (!window.confirm(confirmMsg)) return;
-    pushSnapshot(getCurrentSnapshot());
-
     // Collect all indices to delete (each entry + deeper children)
     const toDelete = new Set<number>();
     for (const idx of indices) {
@@ -422,6 +416,16 @@ export default function Parser() {
         toDelete.add(i);
       }
     }
+    // Show confirmation dialog with details
+    setPendingDelete({ indices, toDelete });
+  };
+
+  const [pendingDelete, setPendingDelete] = useState<{ indices: number[]; toDelete: Set<number> } | null>(null);
+
+  const confirmDelete = () => {
+    if (!pendingDelete) return;
+    const { toDelete } = pendingDelete;
+    pushSnapshot(getCurrentSnapshot());
 
     // Delete from DB
     for (const di of toDelete) {
@@ -465,6 +469,7 @@ export default function Parser() {
       newIdx++;
     }
     setChapterResults(newResults);
+    setPendingDelete(null);
   };
 
   const mergeEntries = (indices: number[]) => {
@@ -740,6 +745,49 @@ export default function Parser() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Delete Confirmation Dialog ── */}
+      <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isRu ? "Удалить из структуры?" : "Remove from structure?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              {pendingDelete && pendingDelete.indices.length === 1 ? (
+                <span>{t("deleteEntryConfirm", isRu).replace("{title}", tocEntries[pendingDelete.indices[0]]?.title || "")}</span>
+              ) : pendingDelete ? (
+                <span>{t("deleteMultiConfirm", isRu).replace("{count}", String(pendingDelete.indices.length))}</span>
+              ) : null}
+              {pendingDelete && pendingDelete.toDelete.size > pendingDelete.indices.length && (
+                <span className="block text-xs text-muted-foreground">
+                  {isRu
+                    ? `Включая ${pendingDelete.toDelete.size - pendingDelete.indices.length} вложенных элементов`
+                    : `Including ${pendingDelete.toDelete.size - pendingDelete.indices.length} nested items`}
+                </span>
+              )}
+              {pendingDelete && (() => {
+                let sceneCount = 0;
+                for (const di of pendingDelete.toDelete) {
+                  const r = chapterResults.get(di);
+                  if (r?.scenes) sceneCount += r.scenes.length;
+                }
+                return sceneCount > 0 ? (
+                  <span className="block text-xs text-destructive">
+                    {isRu ? `${sceneCount} проанализированных сцен будут потеряны` : `${sceneCount} analyzed scenes will be lost`}
+                  </span>
+                ) : null;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {isRu ? "Удалить" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 }
