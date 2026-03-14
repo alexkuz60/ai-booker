@@ -7,6 +7,8 @@ import { CharactersPanel, type CharactersPanelHandle } from "./CharactersPanel";
 import { AtmospherePanel } from "./AtmospherePanel";
 import { FinishedChaptersPanel } from "./FinishedChaptersPanel";
 import { BatchSegmentationPanel } from "./BatchSegmentationPanel";
+import { RoleBadge } from "@/components/ui/RoleBadge";
+import { useAiRoles } from "@/hooks/useAiRoles";
 
 interface StudioWorkspaceProps {
   isRu: boolean;
@@ -37,6 +39,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
   const [activeTab, setActiveTabLocal] = useState(() => externalTab || sessionStorage.getItem("studio_active_tab") || "storyboard");
   const charactersPanelRef = useRef<CharactersPanelHandle | null>(null);
   const [castingExternal, setCastingExternal] = useState(false);
+  const { getModelForRole } = useAiRoles();
 
   // Sync external tab prop
   useEffect(() => {
@@ -71,14 +74,18 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
             <TabsTrigger value="storyboard" className="gap-1.5">
               <Film className="h-3.5 w-3.5" />
               <span className="font-body text-sm">{isRu ? "Раскадровка" : "Storyboard"}</span>
+              <RoleBadge roleId="screenwriter" model={getModelForRole("screenwriter")} isRu={isRu} size={12} />
             </TabsTrigger>
             <TabsTrigger value="narrators" className="gap-1.5">
               <Users className="h-3.5 w-3.5" />
               <span className="font-body text-sm">{isRu ? "Персонажи" : "Characters"}</span>
+              <RoleBadge roleId="profiler" model={getModelForRole("profiler")} isRu={isRu} size={12} />
+              <RoleBadge roleId="director" model={getModelForRole("director")} isRu={isRu} size={12} />
             </TabsTrigger>
             <TabsTrigger value="atmosphere" className="gap-1.5">
               <Wind className="h-3.5 w-3.5" />
               <span className="font-body text-sm">{isRu ? "Атмосфера" : "Atmosphere"}</span>
+              <RoleBadge roleId="sound_engineer" model={getModelForRole("sound_engineer")} isRu={isRu} size={12} />
             </TabsTrigger>
             <TabsTrigger value="finished" className="gap-1.5">
               <Headphones className="h-3.5 w-3.5" />
