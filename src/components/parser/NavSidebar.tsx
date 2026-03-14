@@ -33,7 +33,6 @@ interface NavSidebarProps {
   onChangeStartPage: (idx: number, newPage: number) => void;
   onOpenPdf?: (page?: number) => void;
   onRenamePart?: (oldTitle: string, newTitle: string) => void;
-  apiKeys?: Record<string, string>;
 }
 
 export default function NavSidebar({
