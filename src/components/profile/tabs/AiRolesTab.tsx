@@ -166,9 +166,10 @@ export function AiRolesTab({ apiKeys, isRu, onModelChanged }: AiRolesTabProps) {
 
                 <Select
                   value={currentModel}
-                  onValueChange={(v) =>
-                    setModelForRole(role.id as AiRoleId, v)
-                  }
+                  onValueChange={(v) => {
+                    setModelForRole(role.id as AiRoleId, v);
+                    onModelChanged?.(role.id as AiRoleId);
+                  }}
                 >
                   <SelectTrigger className="w-full sm:w-[240px] h-8 text-xs shrink-0">
                     <SelectValue />
