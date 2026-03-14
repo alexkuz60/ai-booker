@@ -52,7 +52,7 @@ function saveCollapsed(set: Set<string>) {
   } catch {}
 }
 
-export function AiRolesTab({ apiKeys, isRu }: AiRolesTabProps) {
+export function AiRolesTab({ apiKeys, isRu, onModelChanged }: AiRolesTabProps) {
   const {
     resolvedModels,
     overrides,
