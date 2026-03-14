@@ -135,7 +135,6 @@ export function BatchSegmentationPanel({
   const statusIcon = (status: SceneStatus) => {
     switch (status) {
       case "analyzing":
-      case "loading":
         return <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />;
       case "done":
         return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />;
