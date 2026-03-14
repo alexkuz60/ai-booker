@@ -56,18 +56,23 @@ const Montage = () => {
     ? `${bookTitle} → ${chapterTitle}`
     : (isRu ? "Финальный монтаж и мастеринг глав" : "Final chapter montage & mastering");
 
-  const renderButton = hasContent ? (
-    <Button
-      variant="hero"
-      size="sm"
-      className="gap-1.5 h-7 text-xs"
-      onClick={() => setRenderDialogOpen(true)}
-      disabled={clips.length === 0}
-    >
-      <FileAudio className="h-3.5 w-3.5" />
-      {isRu ? "Рендер" : "Render"}
-    </Button>
-  ) : undefined;
+  const renderButton = (
+    <div className="flex items-center gap-2">
+      {hasContent && (
+        <Button
+          variant="hero"
+          size="sm"
+          className="gap-1.5 h-7 text-xs"
+          onClick={() => setRenderDialogOpen(true)}
+          disabled={clips.length === 0}
+        >
+          <FileAudio className="h-3.5 w-3.5" />
+          {isRu ? "Рендер" : "Render"}
+        </Button>
+      )}
+      <AiRolesButton isRu={isRu} apiKeys={userApiKeys} bookTitle={bookTitle || undefined} />
+    </div>
+  );
 
   useEffect(() => {
     setPageHeader({ title, subtitle, headerRight: renderButton });

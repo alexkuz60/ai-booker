@@ -300,42 +300,47 @@ const Studio = () => {
   const actualSceneDurationMs = selectedScene?.id ? playlistDurations.get(selectedScene.id) : undefined;
   const actualSceneSec = actualSceneDurationMs && actualSceneDurationMs > 0 ? actualSceneDurationMs / 1000 : null;
 
-  const headerRight = chapterEstimate && chapterEstimate.chars > 0 ? (
+  const headerRight = (
     <div className="flex items-center gap-3 text-sm font-body">
-      <div className="flex items-center gap-1.5 text-muted-foreground">
-        <Clock className="h-4 w-4" />
-        {actualChapterDurationSec ? (
-          <span className="font-medium text-foreground">
-            {formatDuration(Math.round(actualChapterDurationSec))}
-          </span>
-        ) : (
-          <span className="font-medium text-muted-foreground italic flex items-center gap-0.5">
-            <span className="text-xs">~</span>
-            {chapterEstimate.formatted}
-          </span>
-        )}
-        <span className="text-xs">
-          ({chapterEstimate.chars.toLocaleString()} {isRu ? "сим." : "chars"})
-        </span>
-      </div>
-      {sceneEstimate && sceneEstimate.chars > 0 && (
-        <div className="text-xs text-muted-foreground border-l border-border pl-3">
-          {isRu ? "Сцена" : "Scene"}:{" "}
-          {actualSceneSec ? (
-            <span className="font-medium text-foreground">
-              {formatDuration(Math.round(actualSceneSec))}
+      {chapterEstimate && chapterEstimate.chars > 0 && (
+        <>
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <Clock className="h-4 w-4" />
+            {actualChapterDurationSec ? (
+              <span className="font-medium text-foreground">
+                {formatDuration(Math.round(actualChapterDurationSec))}
+              </span>
+            ) : (
+              <span className="font-medium text-muted-foreground italic flex items-center gap-0.5">
+                <span className="text-xs">~</span>
+                {chapterEstimate.formatted}
+              </span>
+            )}
+            <span className="text-xs">
+              ({chapterEstimate.chars.toLocaleString()} {isRu ? "сим." : "chars"})
             </span>
-          ) : (
-            <span className="font-medium text-muted-foreground italic flex items-center gap-0.5">
-              <span className="text-xs">~</span>
-              {sceneEstimate.formatted}
-            </span>
+          </div>
+          {sceneEstimate && sceneEstimate.chars > 0 && (
+            <div className="text-xs text-muted-foreground border-l border-border pl-3">
+              {isRu ? "Сцена" : "Scene"}:{" "}
+              {actualSceneSec ? (
+                <span className="font-medium text-foreground">
+                  {formatDuration(Math.round(actualSceneSec))}
+                </span>
+              ) : (
+                <span className="font-medium text-muted-foreground italic flex items-center gap-0.5">
+                  <span className="text-xs">~</span>
+                  {sceneEstimate.formatted}
+                </span>
+              )}
+              <span className="ml-1">({sceneEstimate.chars.toLocaleString()} {isRu ? "сим." : "ch."})</span>
+            </div>
           )}
-          <span className="ml-1">({sceneEstimate.chars.toLocaleString()} {isRu ? "сим." : "ch."})</span>
-        </div>
+        </>
       )}
+      <AiRolesButton isRu={isRu} apiKeys={userApiKeys} bookTitle={chapter?.bookTitle} />
     </div>
-  ) : undefined;
+  );
 
   useEffect(() => {
     setPageHeader({ title: studioTitle, subtitle: studioSubtitle, headerRight });
