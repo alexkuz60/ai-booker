@@ -28,6 +28,8 @@ export function useChapterAnalysis({
   const analysisTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prefetchingRef = useRef(false);
   const userStartedAnalysis = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // ─── Helper: call edge function ─────────────────────────────
   const callParseFunction = async (body: Record<string, unknown>): Promise<any> => {
