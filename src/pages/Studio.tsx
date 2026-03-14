@@ -397,6 +397,10 @@ const Studio = () => {
                 onSilenceSecChange={handleSilenceSecChange}
                 onRecalcDone={() => setClipsRefreshToken(t => t + 1)}
                 onVoiceSaved={() => setClipsRefreshToken(t => t + 1)}
+                batchSceneIds={batchSceneIds}
+                batchScenes={batchScenes}
+                onBatchComplete={handleBatchComplete}
+                onBatchClose={handleBatchClose}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
