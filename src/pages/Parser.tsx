@@ -112,7 +112,7 @@ export default function Parser() {
       );
     }
     return undefined;
-  }, [step, selectedModel, setSelectedModel, isRu, userApiKeys, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep]);
+  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep]);
 
   useEffect(() => {
     const title = t("parserTitle", isRu);
