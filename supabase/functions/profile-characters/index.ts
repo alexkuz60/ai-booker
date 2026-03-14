@@ -262,9 +262,39 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
 
       // Log raw response for debugging
       const reasoningLen = String((msg as Record<string, unknown>)?.reasoning || "").length;
+      const contentPreview = String(msg?.content || "").slice(0, 300);
       console.log(`Attempt ${attempt} unparseable (tools=${useToolsMode}). Keys: ${JSON.stringify(Object.keys(msg || {}))}. Tool calls: ${toolCall?.function?.name}. Content len: ${(msg?.content || "").length}. Reasoning len: ${reasoningLen}`);
+      console.log(`Content preview: ${contentPreview}`);
       lastError = "AI returned unparseable response";
-      // If tools mode failed (reasoning model?), switch to plain JSON mode for next attempt
+
+      // Try one more aggressive extraction: find anything between { and } that contains "name"
+      if (!profiles) {
+        const fullText = [String(msg?.content || ""), String((msg as Record<string, unknown>)?.reasoning || "")].join("\n");
+        // Try to find any JSON-like structure with "name" key
+        const jsonMatch = fullText.match(/\{[\s\S]*?"name"\s*:\s*"[\s\S]*?\}/);
+        if (jsonMatch) {
+          // Find the outermost balanced JSON from first {
+          const firstBrace = fullText.indexOf("{");
+          if (firstBrace >= 0) {
+            const extracted = extractBalancedJson(fullText, firstBrace);
+            if (extracted) {
+              try {
+                const p = JSON.parse(extracted);
+                profiles = p.characters || (Array.isArray(p) ? p : undefined);
+                if (profiles?.length) {
+                  console.log(`Aggressive extraction succeeded: ${profiles.length} profiles`);
+                  if (userId) {
+                    logAiUsage({ userId, modelId: usedModel, requestType: "profile-characters", status: "success", latencyMs: Date.now() - aiStart, tokensInput: usage?.prompt_tokens, tokensOutput: usage?.completion_tokens });
+                  }
+                  break;
+                }
+              } catch {}
+            }
+          }
+        }
+      }
+
+      // If tools mode failed, switch to plain JSON mode for next attempt
       if (useToolsMode) {
         useToolsMode = false;
         console.log("Switching to plain JSON mode for next attempt");
