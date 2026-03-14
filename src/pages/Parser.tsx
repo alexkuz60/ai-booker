@@ -468,6 +468,7 @@ export default function Parser() {
       newIdx++;
     }
     setChapterResults(newResults);
+    setPendingDelete(null);
   };
 
   const mergeEntries = (indices: number[]) => {
