@@ -50,7 +50,7 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
   };
 
   const handleAnnotate = useCallback((type: AnnotationType, durationMs?: number) => {
-    const sel = savedSelection.current;
+    const sel = peek();
     if (isInsertionAnnotation(type)) {
       const offset = sel ? sel.end : phrase.text.length;
       onAnnotate(phrase.phrase_id, { type, offset, durationMs: durationMs ?? 500 });
@@ -59,8 +59,7 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
       const actualType = type === "emphasis" && (sel.end - sel.start) === 1 ? "stress" as AnnotationType : type;
       onAnnotate(phrase.phrase_id, { type: actualType, start: sel.start, end: sel.end });
     }
-    savedSelection.current = null;
-  }, [phrase.phrase_id, phrase.text.length, onAnnotate]);
+  }, [phrase.phrase_id, phrase.text.length, onAnnotate, peek]);
 
   const hasAnnotations = phrase.annotations && phrase.annotations.length > 0;
 
