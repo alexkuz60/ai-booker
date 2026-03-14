@@ -80,7 +80,8 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
   if (!LOVABLE_API_KEY) throw new Error("AI key not configured");
 
   const usedModel = modelOverride || "google/gemini-3-flash-preview";
-  const isReasoningModel = usedModel.includes("gpt-5") || usedModel.includes("o3") || usedModel.includes("o4");
+  // Reasoning models return data in reasoning/reasoning_details, not tool_calls
+  const isReasoningModel = usedModel.includes("gpt-5") || usedModel.includes("o3") || usedModel.includes("o4") || usedModel.includes("gemini-2.5-pro");
   const aiStart = Date.now();
 
   // Build two variants: with tools (preferred) and without (fallback for reasoning models)
