@@ -183,6 +183,12 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       ? Math.max(...clips.map((c) => c.startSec + c.durationSec))
       : 0;
 
+  // Keep engine end boundary in sync with full timeline duration
+  // (including silent/unrendered clips) to avoid premature auto-stop.
+  useEffect(() => {
+    engine.setTimelineDuration(computedTotalDuration);
+  }, [engine, computedTotalDuration]);
+
   const play = useCallback(async () => {
     try {
       const currentEngine = getAudioEngine();
