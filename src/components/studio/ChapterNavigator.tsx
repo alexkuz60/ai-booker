@@ -170,6 +170,9 @@ export function ChapterNavigator({
   clipsRefreshToken,
   bookId,
   onPlaylistDurationsLoaded,
+  selectedSceneIndices,
+  onSelectedSceneIndicesChange,
+  onBatchAnalyze,
 }: {
   chapter: StudioChapter;
   selectedSceneIdx: number | null;
@@ -183,6 +186,9 @@ export function ChapterNavigator({
   clipsRefreshToken?: number;
   bookId?: string | null;
   onPlaylistDurationsLoaded?: (m: Map<string, number>) => void;
+  selectedSceneIndices?: Set<number>;
+  onSelectedSceneIndicesChange?: (indices: Set<number>) => void;
+  onBatchAnalyze?: (sceneIds: string[]) => void;
 }) {
   const navigate = useNavigate();
   const [chapterOpen, setChapterOpen] = useState(true);
