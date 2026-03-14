@@ -853,7 +853,10 @@ class AudioEngine {
   private _peakHoldTimeR = 0;
 
   private tracks = new Map<string, EngineTrack>();
+  /** Duration derived from loaded audio tracks only */
   private _totalDuration = 0;
+  /** Timeline duration hint (includes silent/unrendered blocks) */
+  private _timelineDurationHint = 0;
   private _volume = 80;
   private _state: EngineState = "stopped";
   private listeners = new Set<StateListener>();
@@ -951,6 +954,19 @@ class AudioEngine {
       case "sfx": return this.sfxBus;
       default: return this.voiceBus;
     }
+  }
+
+  private getEffectiveTotalDuration(): number {
+    return Math.max(this._totalDuration, this._timelineDurationHint);
+  }
+
+  /**
+   * External timeline can hint full duration including silent/unrendered clips.
+   * Prevents premature auto-stop when transport enters an empty block.
+   */
+  setTimelineDuration(totalSec: number): void {
+    this._timelineDurationHint = Math.max(0, Number.isFinite(totalSec) ? totalSec : 0);
+    this.notify();
   }
 
   // ─── Track management ──────────────────────────────────
@@ -1212,7 +1228,7 @@ class AudioEngine {
   }
 
   seek(toSec: number): void {
-    const clamped = Math.max(0, Math.min(toSec, this._totalDuration));
+    const clamped = Math.max(0, Math.min(toSec, this.getEffectiveTotalDuration()));
     const wasPlaying = this._state === "playing";
 
     this.transport.stop();
@@ -1801,7 +1817,7 @@ class AudioEngine {
 
   get state(): EngineState { return this._state; }
   get volume(): number { return this._volume; }
-  get totalDuration(): number { return this._totalDuration; }
+  get totalDuration(): number { return this.getEffectiveTotalDuration(); }
   get trackCount(): number { return this.tracks.size; }
 
   get positionSec(): number {
@@ -1813,7 +1829,7 @@ class AudioEngine {
     return {
       state: this._state,
       positionSec: this.positionSec,
-      totalDuration: this._totalDuration,
+      totalDuration: this.getEffectiveTotalDuration(),
       volume: this._volume,
     };
   }
@@ -1841,7 +1857,8 @@ class AudioEngine {
       if (this._state !== "playing") return;
       tickCount++;
       // Only check end condition after a few frames (avoid false stop at t=0)
-      if (tickCount > 5 && this._totalDuration > 0 && this.transport.seconds >= this._totalDuration) {
+      const endAt = this.getEffectiveTotalDuration();
+      if (tickCount > 5 && endAt > 0 && this.transport.seconds >= endAt) {
         this.stop();
         return;
       }
