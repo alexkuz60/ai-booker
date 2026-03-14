@@ -251,6 +251,10 @@ export async function extractTocFromText(
     /^(глава)\s+(\d+|[IVXLCDM]+|[а-яё]+(?:\s+[а-яё]+)?)\s*[.:]?\s*(.*)/i,
     // English: Chapter N
     /^(chapter)\s+(\d+|[IVXLCDM]+|[a-z]+(?:\s+[a-z]+)?)\s*[.:]?\s*(.*)/i,
+    // Russian: Акт N / Акт 1. Title
+    /^(акт)\s+(\d+|[IVXLCDM]+)\s*[.:]?\s*(.*)/i,
+    // English: Act N
+    /^(act)\s+(\d+|[IVXLCDM]+)\s*[.:]?\s*(.*)/i,
   ];
 
   const PART_PATTERNS = [
@@ -258,6 +262,9 @@ export async function extractTocFromText(
     /^(part)\s+(\d+|[IVXLCDM]+|[a-z]+)\s*[.:]?\s*(.*)/i,
     /^(книга)\s+(\d+|[IVXLCDM]+|[а-яё]+)\s*[.:]?\s*(.*)/i,
     /^(book)\s+(\d+|[IVXLCDM]+)\s*[.:]?\s*(.*)/i,
+    // Том N (volume)
+    /^(том)\s+(\d+|[IVXLCDM]+)\s*[.:]?\s*(.*)/i,
+    /^(volume)\s+(\d+|[IVXLCDM]+)\s*[.:]?\s*(.*)/i,
   ];
 
   // Standalone Roman numeral heading (I, II, III, IV, etc.)
