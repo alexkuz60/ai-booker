@@ -1,7 +1,8 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, useCallback, Fragment } from "react";
 import { motion } from "framer-motion";
 import {
-  FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock, RefreshCw, Palette, StopCircle
+  FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock, RefreshCw, Palette, StopCircle,
+  Trash2, Hash, Scissors, SpellCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,8 +11,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator, ContextMenuLabel,
+} from "@/components/ui/context-menu";
 import { RoleBadge, RoleBadges } from "@/components/ui/RoleBadge";
 import { t, tSceneType, tMood, tSceneTitle } from "@/pages/parser/i18n";
+import { useContentCleanup, type CleanupAction } from "@/hooks/useContentCleanup";
+import { toast } from "sonner";
 import type { TocChapter, Scene, ChapterStatus } from "@/pages/parser/types";
 import { SCENE_TYPE_COLORS } from "@/pages/parser/types";
 import { estimateDurationSec, formatDuration } from "@/lib/durationEstimate";
