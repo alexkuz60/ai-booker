@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Bot, Library, PlusCircle, Network, FileText, Users } from "lucide-react";
+import { ArrowLeft, Bot, Library, PlusCircle, Network, FileText, Users, RefreshCw } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { syncStructureToLocal } from "@/lib/localSync";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -76,7 +76,7 @@ export default function Parser() {
     step, setStep, books, loadingLibrary, fileName, errorMsg, bookId,
     chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
     partIdMap, chapterResults, setChapterResults, fileInputRef,
-    openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset,
+    openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset, reloadBook,
   } = useBookManager({ userId: user?.id, isRu, projectStorage });
 
   const { analysisLog, analyzeChapter, resetAnalysis } = useChapterAnalysis({
@@ -161,6 +161,17 @@ export default function Parser() {
           <PlusCircle className="h-3.5 w-3.5" />
           {isRu ? "Новая книга" : "New Book"}
         </Button>
+        {step === "workspace" && (
+          <Button
+            variant="ghost" size="sm"
+            onClick={reloadBook}
+            className="gap-1.5 text-xs"
+            title={isRu ? "Перезагрузить книгу (загрузить другую версию PDF)" : "Reload book (upload different PDF version)"}
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            {isRu ? "Перезагрузить" : "Reload"}
+          </Button>
+        )}
 
         {step === "workspace" && (
           <>
@@ -210,7 +221,7 @@ export default function Parser() {
     }
 
     return navButtons;
-  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab]);
+  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook]);
 
   useEffect(() => {
     const title = t("parserTitle", isRu);
