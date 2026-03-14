@@ -135,8 +135,9 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
     temperature: 0.3,
     max_tokens: 4096,
   };
-  // For non-reasoning models, request structured JSON output
-  if (!isReasoningModel) {
+  // For OpenAI non-reasoning models, request structured JSON output
+  // (Gemini models don't reliably support response_format through the gateway)
+  if (!isReasoningModel && usedModel.includes("openai/")) {
     (plainPayload as Record<string, unknown>).response_format = { type: "json_object" };
   }
 
