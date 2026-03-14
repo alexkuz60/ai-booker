@@ -400,12 +400,18 @@ export default function Parser() {
                 <ResizableHandle withHandle />
                 <ResizablePanel defaultSize={78} className="min-h-0 overflow-hidden">
                   <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
-                    <ChapterDetailPanel
-                      isRu={isRu} selectedIdx={selectedIdx}
-                      selectedEntry={selectedEntry} selectedResult={selectedResult}
-                      analysisLog={analysisLog} onAnalyze={analyzeChapter}
-                      childCount={selectedChildCount}
-                    />
+                   <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
+                     <ChapterDetailPanel
+                       isRu={isRu} selectedIdx={selectedIdx}
+                       selectedEntry={selectedEntry} selectedResult={selectedResult}
+                       analysisLog={analysisLog} onAnalyze={analyzeChapter}
+                       childCount={selectedChildCount}
+                       roleModels={{
+                         screenwriter: getModelForRole("screenwriter"),
+                         director: getModelForRole("director"),
+                       }}
+                     />
+                   </div>
                   </div>
                 </ResizablePanel>
               </ResizablePanelGroup>
