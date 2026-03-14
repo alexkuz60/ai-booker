@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Bot } from "lucide-react";
+import { ArrowLeft, Bot, Library, PlusCircle, Network, FileText, Users } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { syncStructureToLocal } from "@/lib/localSync";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
