@@ -1857,7 +1857,8 @@ class AudioEngine {
       if (this._state !== "playing") return;
       tickCount++;
       // Only check end condition after a few frames (avoid false stop at t=0)
-      if (tickCount > 5 && this._totalDuration > 0 && this.transport.seconds >= this._totalDuration) {
+      const endAt = this.getEffectiveTotalDuration();
+      if (tickCount > 5 && endAt > 0 && this.transport.seconds >= endAt) {
         this.stop();
         return;
       }
