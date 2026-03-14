@@ -376,7 +376,6 @@ export default function Parser() {
                     onChangeStartPage={changeStartPage}
                     onOpenPdf={handleOpenPdf}
                     onRenamePart={renamePart}
-                    apiKeys={userApiKeys}
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle />
@@ -395,6 +394,20 @@ export default function Parser() {
           )}
         </AnimatePresence>
       </div>
+
+      <Sheet open={aiRolesOpen} onOpenChange={setAiRolesOpen}>
+        <SheetContent side="right" className="w-[400px] sm:w-[440px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Bot className="h-4 w-4" />
+              {isRu ? "AI Роли" : "AI Roles"}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            <AiRolesTab apiKeys={userApiKeys} isRu={isRu} />
+          </div>
+        </SheetContent>
+      </Sheet>
     </motion.div>
   );
 }
