@@ -17,6 +17,7 @@ import {
 import { RoleBadge, RoleBadges } from "@/components/ui/RoleBadge";
 import { t, tSceneType, tMood, tSceneTitle } from "@/pages/parser/i18n";
 import { useContentCleanup, type CleanupAction } from "@/hooks/useContentCleanup";
+import { useSelectionCapture } from "@/hooks/useSelectionCapture";
 import { toast } from "sonner";
 import type { TocChapter, Scene, ChapterStatus } from "@/pages/parser/types";
 import { SCENE_TYPE_COLORS } from "@/pages/parser/types";
