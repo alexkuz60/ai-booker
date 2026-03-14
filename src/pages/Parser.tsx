@@ -396,7 +396,7 @@ export default function Parser() {
       </div>
 
       <Sheet open={aiRolesOpen} onOpenChange={setAiRolesOpen}>
-        <SheetContent side="right" className="w-[540px] sm:w-[600px] overflow-y-auto">
+        <SheetContent side="right" className="w-[540px] sm:w-[600px] sm:max-w-[600px] overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               <Bot className="h-4 w-4" />
