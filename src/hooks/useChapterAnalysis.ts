@@ -18,11 +18,13 @@ interface UseChapterAnalysisParams {
   chapterIdMap: Map<number, string>;
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
   setChapterResults: React.Dispatch<React.SetStateAction<Map<number, { scenes: Scene[]; status: ChapterStatus }>>>;
+  /** Lazy PDF loader — downloads from storage if not in memory */
+  ensurePdfLoaded?: () => Promise<any>;
 }
 
 export function useChapterAnalysis({
   isRu, pdfRef, userId, userApiKeys, getModelForRole,
-  tocEntries, chapterIdMap, chapterResults, setChapterResults,
+  tocEntries, chapterIdMap, chapterResults, setChapterResults, ensurePdfLoaded,
 }: UseChapterAnalysisParams) {
   const [analysisLog, setAnalysisLog] = useState<string[]>([]);
   const analysisTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -70,7 +72,12 @@ export function useChapterAnalysis({
   // ─── Two-stage Chapter Analysis (with resume) ─────────────
   const analyzeChapter = async (idx: number, mode: "full" | "enrich" | "auto" = "auto") => {
     if (!userId) return;
-    if (!pdfRef) {
+    // Try to load PDF on demand if not in memory
+    let activePdf = pdfRef;
+    if (!activePdf && ensurePdfLoaded) {
+      activePdf = await ensurePdfLoaded();
+    }
+    if (!activePdf) {
       toast.error(isRu ? "PDF не загружен. Перезагрузите книгу для анализа." : "PDF not loaded. Reload the book to analyze.");
       return;
     }
@@ -150,7 +157,7 @@ export function useChapterAnalysis({
       // ─── STAGE 1: Boundary detection ───
       if (!hasExistingScenes) {
         addLog(`${t("logExtracting", isRu)} «${entry.title}»...`);
-        const text = await extractTextByPageRange(pdfRef, entry.startPage, entry.endPage);
+        const text = await extractTextByPageRange(activePdf, entry.startPage, entry.endPage);
         const charCount = text.trim().length;
 
         if (charCount < 50) {
