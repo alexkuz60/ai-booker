@@ -15,7 +15,7 @@ interface SceneInfo {
   content?: string | null;
 }
 
-type SceneStatus = "pending" | "loading" | "analyzing" | "done" | "error" | "skipped";
+type SceneStatus = "pending" | "analyzing" | "done" | "error" | "skipped";
 
 interface SceneJob {
   scene: SceneInfo;
@@ -67,31 +67,12 @@ export function BatchSegmentationPanel({
     if (abortRef.current) return;
     const { scene } = job;
 
-    // Load content if missing
-    let content = scene.content;
-    if (!content) {
-      updateJob(scene.id, { status: "loading" });
-      const { data } = await supabase
-        .from("book_scenes")
-        .select("content")
-        .eq("id", scene.id)
-        .maybeSingle();
-      content = data?.content ?? null;
-    }
-
-    if (!content) {
-      updateJob(scene.id, { status: "skipped", error: isRu ? "Нет контента" : "No content" });
-      return;
-    }
-
-    if (abortRef.current) return;
     updateJob(scene.id, { status: "analyzing" });
 
     try {
       const { data, error } = await supabase.functions.invoke("segment-scene", {
         body: {
           scene_id: scene.id,
-          content,
           language: isRu ? "ru" : "en",
           model: getModelForRole("screenwriter"),
         },
@@ -154,7 +135,6 @@ export function BatchSegmentationPanel({
   const statusIcon = (status: SceneStatus) => {
     switch (status) {
       case "analyzing":
-      case "loading":
         return <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />;
       case "done":
         return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />;
@@ -170,7 +150,6 @@ export function BatchSegmentationPanel({
   const statusLabel = (status: SceneStatus) => {
     const labels: Record<SceneStatus, [string, string]> = {
       pending: ["Ожидание", "Pending"],
-      loading: ["Загрузка…", "Loading…"],
       analyzing: ["Анализ…", "Analyzing…"],
       done: ["Готово", "Done"],
       error: ["Ошибка", "Error"],
@@ -240,7 +219,7 @@ export function BatchSegmentationPanel({
               key={job.scene.id}
               className={cn(
                 "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-body transition-colors",
-                job.status === "analyzing" || job.status === "loading"
+                job.status === "analyzing"
                   ? "bg-primary/5 border border-primary/20"
                   : job.status === "done"
                     ? "bg-emerald-500/5"

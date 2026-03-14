@@ -49,10 +49,31 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { scene_id, content, language, model: clientModel } = await req.json();
-    if (!scene_id || !content) {
+    const { scene_id, content: bodyContent, language, model: clientModel } = await req.json();
+    if (!scene_id) {
       return new Response(
-        JSON.stringify({ error: "scene_id and content are required" }),
+        JSON.stringify({ error: "scene_id is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Read content from DB if not provided in body
+    let content = bodyContent;
+    if (!content) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const svcKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const svc = createClient(supabaseUrl, svcKey);
+      const { data: sceneRow } = await svc
+        .from("book_scenes")
+        .select("content")
+        .eq("id", scene_id)
+        .maybeSingle();
+      content = sceneRow?.content;
+    }
+
+    if (!content) {
+      return new Response(
+        JSON.stringify({ error: "No content found for this scene" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
