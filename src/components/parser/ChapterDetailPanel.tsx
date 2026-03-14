@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, Fragment } from "react";
+import { useState, useMemo, useCallback, Fragment } from "react";
 import { motion } from "framer-motion";
 import {
   FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock, RefreshCw, Palette, StopCircle,
