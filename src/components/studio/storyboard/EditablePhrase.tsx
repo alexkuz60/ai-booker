@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useSelectionCapture } from "@/hooks/useSelectionCapture";
 import { Pencil, Check } from "lucide-react";
 import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem,
@@ -30,7 +31,7 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
   const [draft, setDraft] = useState(phrase.text);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const textRef = useRef<HTMLParagraphElement>(null);
-  const savedSelection = useRef<{ start: number; end: number } | null>(null);
+  const { capture: handleContextMenu, peek } = useSelectionCapture(textRef);
 
   useEffect(() => {
     if (editing && textareaRef.current) {
@@ -48,45 +49,8 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
     setEditing(false);
   };
 
-  const getSelectionOffsets = useCallback((): { start: number; end: number } | null => {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !textRef.current) return null;
-
-    const range = sel.getRangeAt(0);
-    if (!textRef.current.contains(range.startContainer) || !textRef.current.contains(range.endContainer)) return null;
-
-    const textContent = phrase.text;
-    const selText = sel.toString();
-    const selStart = textContent.indexOf(selText);
-    if (selStart >= 0) {
-      return { start: selStart, end: selStart + selText.length };
-    }
-
-    const walker = document.createTreeWalker(textRef.current, NodeFilter.SHOW_TEXT);
-    let offset = 0;
-    let start = -1;
-    let end = -1;
-    let node: Node | null;
-
-    while ((node = walker.nextNode())) {
-      const parent = node.parentElement;
-      if (parent?.classList.contains("select-none")) continue;
-      const len = (node.textContent || "").length;
-      if (node === range.startContainer) start = offset + range.startOffset;
-      if (node === range.endContainer) end = offset + range.endOffset;
-      offset += len;
-    }
-
-    if (start >= 0 && end > start) return { start, end };
-    return null;
-  }, [phrase.text]);
-
-  const handleContextMenu = useCallback(() => {
-    savedSelection.current = getSelectionOffsets();
-  }, [getSelectionOffsets]);
-
   const handleAnnotate = useCallback((type: AnnotationType, durationMs?: number) => {
-    const sel = savedSelection.current;
+    const sel = peek();
     if (isInsertionAnnotation(type)) {
       const offset = sel ? sel.end : phrase.text.length;
       onAnnotate(phrase.phrase_id, { type, offset, durationMs: durationMs ?? 500 });
@@ -95,8 +59,7 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
       const actualType = type === "emphasis" && (sel.end - sel.start) === 1 ? "stress" as AnnotationType : type;
       onAnnotate(phrase.phrase_id, { type: actualType, start: sel.start, end: sel.end });
     }
-    savedSelection.current = null;
-  }, [phrase.phrase_id, phrase.text.length, onAnnotate]);
+  }, [phrase.phrase_id, phrase.text.length, onAnnotate, peek]);
 
   const hasAnnotations = phrase.annotations && phrase.annotations.length > 0;
 
