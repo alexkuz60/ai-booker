@@ -125,7 +125,7 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
   };
 
   const jsonPromptSuffix = `\n\nCRITICAL INSTRUCTION: You MUST respond with ONLY a valid JSON object. No explanations, no markdown fences, no text before or after. The response must start with { and end with }.\nRequired format:\n{"characters": [{"name": "...", "aliases": ["..."], "gender": "male|female|unknown", "age_group": "child|teen|young|adult|elder|unknown", "temperament": "...", "speech_style": "...", "description": "..."}]}`;
-  const plainPayload = {
+  const plainPayload: Record<string, unknown> = {
     model: usedModel,
     messages: [
       { role: "system", content: systemPrompt + jsonPromptSuffix },
@@ -134,6 +134,10 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
     temperature: 0.3,
     max_tokens: 4096,
   };
+  // For non-reasoning models, request structured JSON output
+  if (!isReasoningModel) {
+    (plainPayload as Record<string, unknown>).response_format = { type: "json_object" };
+  }
 
   // For reasoning models, skip tools entirely (they don't support tool_choice)
   let useToolsMode = !isReasoningModel;
