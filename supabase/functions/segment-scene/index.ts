@@ -85,9 +85,10 @@ Rules:
 - "inner_thought" = character's internal thoughts, reflections
 - "dialogue" = spoken lines in a conversation (when multiple characters speak in sequence); set "speaker" to the character name
 - "monologue" = a single standalone spoken line (direct speech) NOT part of a back-and-forth exchange; set "speaker" to the character name. Use this when a character speaks once and the scene continues with narration, not another character's reply
-- "lyric" = songs, poems, verses
+- "lyric" = songs, poems, verses, rhymed text, recitations. IMPORTANT: detect poetry even when embedded in prose — if a passage has verse structure (line breaks with rhythm/rhyme, stanza grouping, or meter), classify it as "lyric". Songs sung by characters are also "lyric" with "speaker" set to the singer. Preserve original line breaks in the "text" field for poetry.
 - "epigraph" = epigraphs, quotes at the start
 - "footnote" = footnotes, author comments
+- "telephone" = phone conversations
 - Inline sound markers like [gunshot] should remain in the text as-is
 
 IMPORTANT — Inline narrator detection:
