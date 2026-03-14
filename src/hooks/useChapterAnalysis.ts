@@ -157,8 +157,88 @@ export function useChapterAnalysis({
       // ─── STAGE 1: Boundary detection ───
       if (!hasExistingScenes) {
         addLog(`${t("logExtracting", isRu)} «${entry.title}»...`);
-        const text = await extractTextByPageRange(activePdf, entry.startPage, entry.endPage);
-        const charCount = text.trim().length;
+
+        const resolvePageRange = (chapterIndex: number) => {
+          const current = tocEntries[chapterIndex];
+          const currentLevel = current?.level ?? 0;
+          let startPage = Math.max(1, Number(current?.startPage) || 1);
+          let endPage = Math.max(startPage, Number(current?.endPage) || startPage);
+
+          let subtreeStart: number | null = null;
+          let subtreeEnd: number | null = null;
+          for (let i = chapterIndex + 1; i < tocEntries.length; i++) {
+            const n = tocEntries[i];
+            const nLevel = n.level ?? 0;
+            if (nLevel <= currentLevel) break;
+            const ns = Number(n.startPage) || 0;
+            const ne = Number(n.endPage) || 0;
+            if (ns > 0) subtreeStart = subtreeStart == null ? ns : Math.min(subtreeStart, ns);
+            if (ne > 0) subtreeEnd = subtreeEnd == null ? ne : Math.max(subtreeEnd, ne);
+          }
+
+          let nextSiblingStart: number | null = null;
+          for (let i = chapterIndex + 1; i < tocEntries.length; i++) {
+            const n = tocEntries[i];
+            const ns = Number(n.startPage) || 0;
+            if (ns <= 0) continue;
+            if ((n.level ?? 0) <= currentLevel) {
+              nextSiblingStart = ns;
+              break;
+            }
+          }
+
+          if ((Number(current?.startPage) || 0) <= 0 && subtreeStart) startPage = subtreeStart;
+          if ((Number(current?.endPage) || 0) <= 0 && subtreeEnd) endPage = Math.max(startPage, subtreeEnd);
+
+          if ((endPage - startPage + 1) <= 1 && subtreeEnd && subtreeEnd > endPage) {
+            endPage = subtreeEnd;
+          }
+
+          if ((endPage - startPage + 1) <= 1 && nextSiblingStart && nextSiblingStart > startPage + 1) {
+            endPage = Math.max(endPage, nextSiblingStart - 1);
+          }
+
+          return { startPage, endPage, subtreeStart, subtreeEnd, nextSiblingStart };
+        };
+
+        const baseRange = resolvePageRange(idx);
+        let effectiveStartPage = baseRange.startPage;
+        let effectiveEndPage = baseRange.endPage;
+
+        if (effectiveStartPage !== entry.startPage || effectiveEndPage !== entry.endPage) {
+          addLog(isRu
+            ? `↔️ Уточнен диапазон страниц: ${entry.startPage}–${entry.endPage} → ${effectiveStartPage}–${effectiveEndPage}`
+            : `↔️ Adjusted page range: ${entry.startPage}–${entry.endPage} → ${effectiveStartPage}–${effectiveEndPage}`);
+        }
+
+        let text = await extractTextByPageRange(activePdf, effectiveStartPage, effectiveEndPage);
+        let charCount = text.trim().length;
+
+        if (charCount < 50 && baseRange.subtreeStart && baseRange.subtreeEnd) {
+          const subtreeSpan = baseRange.subtreeEnd - baseRange.subtreeStart + 1;
+          const currentSpan = effectiveEndPage - effectiveStartPage + 1;
+          if (subtreeSpan > currentSpan) {
+            addLog(isRu
+              ? `↪️ Текста мало, пробую диапазон подглав: ${baseRange.subtreeStart}–${baseRange.subtreeEnd}`
+              : `↪️ Too little text, retrying with child range: ${baseRange.subtreeStart}–${baseRange.subtreeEnd}`);
+            effectiveStartPage = baseRange.subtreeStart;
+            effectiveEndPage = baseRange.subtreeEnd;
+            text = await extractTextByPageRange(activePdf, effectiveStartPage, effectiveEndPage);
+            charCount = text.trim().length;
+          }
+        }
+
+        if (charCount < 50 && baseRange.nextSiblingStart && baseRange.nextSiblingStart > effectiveStartPage + 1) {
+          const expandedEnd = baseRange.nextSiblingStart - 1;
+          if (expandedEnd > effectiveEndPage) {
+            addLog(isRu
+              ? `↪️ Текста мало, расширяю до следующей главы: ${effectiveStartPage}–${expandedEnd}`
+              : `↪️ Too little text, widening to next chapter: ${effectiveStartPage}–${expandedEnd}`);
+            effectiveEndPage = expandedEnd;
+            text = await extractTextByPageRange(activePdf, effectiveStartPage, effectiveEndPage);
+            charCount = text.trim().length;
+          }
+        }
 
         if (charCount < 50) {
           setChapterResults(prev => {
@@ -170,7 +250,7 @@ export function useChapterAnalysis({
           return;
         }
 
-        addLog(`${t("logExtracted", isRu)}: ${charCount.toLocaleString()} ${t("logChars", isRu)} (${entry.startPage}–${entry.endPage} ${t("logPagesAbbr", isRu)})`);
+        addLog(`${t("logExtracted", isRu)}: ${charCount.toLocaleString()} ${t("logChars", isRu)} (${effectiveStartPage}–${effectiveEndPage} ${t("logPagesAbbr", isRu)})`);
         addLog(t("logStage1", isRu));
         const screenwriterBody = buildBaseBody("screenwriter");
         addLog(`${t("logCallingAI", isRu)} ${screenwriterBody._modelName.split('/').pop()}...`);
