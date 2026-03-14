@@ -198,10 +198,13 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
       const savedToc: TocChapter[] = chapters.map((ch, i) => {
         const pdfInfo = tocFromPdf[i];
         const dbLevel = ch.level;
+        // Prefer DB-stored pages, fallback to PDF outline
+        const dbStartPage = (ch as any).start_page || 0;
+        const dbEndPage = (ch as any).end_page || 0;
         return {
           title: ch.title,
-          startPage: pdfInfo?.startPage || 0,
-          endPage: pdfInfo?.endPage || 0,
+          startPage: dbStartPage || pdfInfo?.startPage || 0,
+          endPage: dbEndPage || pdfInfo?.endPage || 0,
           level: dbLevel != null ? dbLevel : (pdfInfo?.level ?? (hasParts && ch.part_id ? 1 : 0)),
           partTitle: ch.part_id ? partById.get(ch.part_id) : undefined,
           sectionType: classifySection(ch.title),
