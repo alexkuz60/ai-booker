@@ -18,6 +18,8 @@ interface UseChapterAnalysisParams {
   chapterIdMap: Map<number, string>;
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
   setChapterResults: React.Dispatch<React.SetStateAction<Map<number, { scenes: Scene[]; status: ChapterStatus }>>>;
+  /** Lazy PDF loader — downloads from storage if not in memory */
+  ensurePdfLoaded?: () => Promise<any>;
 }
 
 export function useChapterAnalysis({

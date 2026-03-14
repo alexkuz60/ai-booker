@@ -518,6 +518,31 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
     }
   }, [bookId, isRu]);
 
+  // ─── Ensure PDF is loaded (on-demand download) ─────────────
+  const ensurePdfLoaded = useCallback(async (): Promise<any> => {
+    if (pdfRef) return pdfRef;
+    if (!bookId) return null;
+
+    // Find file_path from books list or DB
+    const book = books.find(b => b.id === bookId);
+    const filePath = book?.file_path;
+    if (!filePath) return null;
+
+    try {
+      const { data: blob } = await supabase.storage.from('book-uploads').download(filePath);
+      if (!blob) return null;
+      const arrayBuffer = await blob.arrayBuffer();
+      const { getDocument } = await import('pdfjs-dist');
+      const pdf = await getDocument({ data: arrayBuffer }).promise;
+      setPdfRef(pdf);
+      setTotalPages(pdf.numPages);
+      return pdf;
+    } catch (err) {
+      console.warn("Failed to download PDF on demand:", err);
+      return null;
+    }
+  }, [pdfRef, bookId, books]);
+
   // ─── Reset ─────────────────────────────────────────────────
   const handleReset = useCallback(() => {
     setStep("library");
@@ -534,6 +559,6 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
     partIdMap, chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
     chapterResults, setChapterResults, fileInputRef,
     // Actions
-    openSavedBook, deleteBook, handleFileSelect, handleReset, reloadBook,
+    openSavedBook, deleteBook, handleFileSelect, handleReset, reloadBook, ensurePdfLoaded,
   };
 }
