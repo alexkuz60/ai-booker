@@ -183,7 +183,7 @@ export default function ChapterDetailPanel({
                 </Button>
               )}
               {selectedResult?.status === "done" && (
-                <Button variant="ghost" size="sm" onClick={() => onAnalyze(selectedIdx)} className="gap-2 text-muted-foreground">
+                <Button variant="ghost" size="sm" onClick={() => setReanalyzeOpen(true)} className="gap-2 text-muted-foreground">
                   <Zap className="h-4 w-4" />
                   {t("reanalyze", isRu)}
                 </Button>
