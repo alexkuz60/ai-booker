@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, Fragment } from "react";
 import { motion } from "framer-motion";
 import {
   FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock, RefreshCw, Palette, StopCircle,
-  Trash2, Hash, Scissors, SpellCheck
+  Trash2, Hash, Scissors, SpellCheck, Footprints
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +29,7 @@ import { estimateDurationSec, formatDuration } from "@/lib/durationEstimate";
  * - [сн. N]…[/сн.] → amber footnote badge + dimmed content
  */
 function renderMarkedText(text: string) {
-  const regex = /(\[стр\.\s*\d+\]|\[сн\.\s*\d+\]|\[\/сн\.\])/g;
+  const regex = /(\[стр\.\s*\d+\]|\[сн\.→\s*\d+\]|\[сн\.\s*\d+\]|\[\/сн\.\])/g;
   const parts = text.split(regex);
   if (parts.length === 1) return text;
 
@@ -39,6 +39,13 @@ function renderMarkedText(text: string) {
     if (/^\[стр\.\s*\d+\]$/.test(part)) {
       return (
         <span key={i} className="inline-flex items-center mx-1 px-1.5 py-0 rounded text-[10px] font-mono bg-muted text-muted-foreground/60 align-baseline">
+          {part}
+        </span>
+      );
+    }
+    if (/^\[сн\.→\s*\d+\]$/.test(part)) {
+      return (
+        <span key={i} className="inline-flex items-center mx-0.5 px-1.5 py-0 rounded text-[10px] font-mono bg-sky-500/20 text-sky-400 align-baseline cursor-help" title="Ссылка на сноску">
           {part}
         </span>
       );
@@ -206,6 +213,10 @@ function SceneCards({
               <ContextMenuItem onClick={() => handleCleanup("page_number", i)} className="gap-2">
                 <Hash className="h-4 w-4 text-muted-foreground" />
                 {t("cleanupPageNum", isRu)}
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => handleCleanup("footnote_link", i)} className="gap-2">
+                <Footprints className="h-4 w-4 text-muted-foreground" />
+                {t("cleanupFootnoteLink", isRu)}
               </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem onClick={() => handleCleanup("chapter_split", i)} className="gap-2">

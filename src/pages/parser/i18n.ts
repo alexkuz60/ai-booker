@@ -180,6 +180,7 @@ const texts: Record<string, { ru: string; en: string }> = {
   cleanupPageNum: { ru: "Номер страницы — удалить похожие", en: "Page number — remove similar" },
   cleanupChapterSplit: { ru: "Раздел главы — разделить сцену", en: "Chapter section — split scene" },
   cleanupFixSpaces: { ru: "Исправить пробелы у знаков препинания", en: "Fix punctuation spacing" },
+  cleanupFootnoteLink: { ru: "Номер сноски — связать с текстом", en: "Footnote number — link to text" },
   cleanupNoSelection: { ru: "Выделите текст для действия", en: "Select text for action" },
   cleanupLabel: { ru: "Очистка текста", en: "Text cleanup" },
 };

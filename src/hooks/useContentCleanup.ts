@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import type { Scene } from "@/pages/parser/types";
 
 // ─── Types ───────────────────────────────────────────────────
-export type CleanupAction = "header" | "page_number" | "chapter_split" | "fix_punctuation_spaces";
+export type CleanupAction = "header" | "page_number" | "chapter_split" | "fix_punctuation_spaces" | "footnote_link";
 
 export interface CleanupResult {
   /** Updated scenes array (may grow if split happened) */
@@ -176,6 +176,63 @@ function fixPunctuationSpaces(scenes: Scene[]): CleanupResult {
   };
 }
 
+// ─── 5. Link footnote number ─────────────────────────────────
+// Wraps a bare footnote number in the body text with a reference
+// marker [сн.→ N] and verifies the corresponding footnote body
+// [сн. N]...[/сн.] exists somewhere in the scenes.
+function linkFootnoteNumber(
+  scenes: Scene[],
+  selectedText: string,
+  sceneIndex: number
+): CleanupResult {
+  const trimmed = selectedText.trim();
+  const numMatch = trimmed.match(/^\d+$/);
+  if (!numMatch) {
+    return { scenes, changeCount: 0, summary: "Выделите только номер сноски (число)" };
+  }
+
+  const fnNum = numMatch[0];
+  const scene = scenes[sceneIndex];
+  if (!scene) return { scenes, changeCount: 0, summary: "Сцена не найдена" };
+
+  const content = scene.content || "";
+
+  // Check if this number is already wrapped as a reference
+  const refMarker = `[сн.→ ${fnNum}]`;
+  if (content.includes(refMarker)) {
+    return { scenes, changeCount: 0, summary: `Сноска ${fnNum} уже размечена` };
+  }
+
+  // Find the bare number in the content and replace with reference marker
+  // We need to be careful to replace only the specific occurrence the user selected
+  const selIdx = content.indexOf(trimmed);
+  if (selIdx === -1) {
+    return { scenes, changeCount: 0, summary: "Выделенный текст не найден в сцене" };
+  }
+
+  // Replace the bare number with [сн.→ N]
+  const newContent =
+    content.slice(0, selIdx) + refMarker + content.slice(selIdx + trimmed.length);
+
+  // Check if the footnote body [сн. N]...[/сн.] exists anywhere
+  const fnBodyPattern = new RegExp(`\\[сн\\.\\s*${escapeRegex(fnNum)}\\]`);
+  const bodyFound = scenes.some(sc => fnBodyPattern.test(sc.content || ""));
+
+  const updatedScenes = scenes.map((sc, i) =>
+    i === sceneIndex ? { ...sc, content: newContent } : sc
+  );
+
+  const status = bodyFound
+    ? `Сноска ${fnNum} размечена и связана с текстом`
+    : `Сноска ${fnNum} размечена ⚠️ текст сноски [сн. ${fnNum}] не найден`;
+
+  return {
+    scenes: updatedScenes,
+    changeCount: 1,
+    summary: status,
+  };
+}
+
 // ─── Hook ────────────────────────────────────────────────────
 
 export function useContentCleanup() {
@@ -194,6 +251,8 @@ export function useContentCleanup() {
         return splitAtChapterMarker(scenes, selectedText, sceneIndex);
       case "fix_punctuation_spaces":
         return fixPunctuationSpaces(scenes);
+      case "footnote_link":
+        return linkFootnoteNumber(scenes, selectedText, sceneIndex);
       default:
         return { scenes, changeCount: 0, summary: "Неизвестное действие" };
     }
