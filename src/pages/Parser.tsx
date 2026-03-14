@@ -129,6 +129,18 @@ export default function Parser() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [step, handleUndo, handleRedo]);
 
+  // Handle scene content updates from cleanup actions
+  const handleScenesUpdate = useCallback((updatedScenes: Scene[]) => {
+    if (selectedIdx === null) return;
+    setChapterResults(prev => {
+      const next = new Map(prev);
+      const existing = next.get(selectedIdx);
+      if (existing) {
+        next.set(selectedIdx, { ...existing, scenes: updatedScenes });
+      }
+      return next;
+    });
+  }, [selectedIdx, setChapterResults]);
 
   // ── Auto-sync scene results to local project when chapters get analyzed ──
   const lastSyncedRef = useRef("");
