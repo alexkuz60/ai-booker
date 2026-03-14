@@ -858,6 +858,19 @@ export type Database = {
     }
     Functions: {
       get_my_api_keys: { Args: never; Returns: Json }
+      get_user_books_with_counts: {
+        Args: never
+        Returns: {
+          chapter_count: number
+          created_at: string
+          file_name: string
+          file_path: string
+          id: string
+          scene_count: number
+          status: string
+          title: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
