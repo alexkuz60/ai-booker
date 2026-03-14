@@ -395,6 +395,12 @@ export default function Parser() {
                     onChangeStartPage={changeStartPage}
                     onOpenPdf={handleOpenPdf}
                     onRenamePart={renamePart}
+                    roleModels={{
+                      screenwriter: getModelForRole("screenwriter"),
+                      director: getModelForRole("director"),
+                      translator: getModelForRole("translator"),
+                      proofreader: getModelForRole("proofreader"),
+                    }}
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle />

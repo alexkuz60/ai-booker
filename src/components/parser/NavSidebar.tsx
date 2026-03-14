@@ -9,6 +9,8 @@ import { t, tSection } from "@/pages/parser/i18n";
 import type { TocChapter, SectionType, ChapterStatus, Scene } from "@/pages/parser/types";
 import { SECTION_ICONS } from "@/pages/parser/types";
 import { estimateDurationSec, formatDuration } from "@/lib/durationEstimate";
+import { RoleBadges } from "@/components/ui/RoleBadge";
+import type { AiRoleId } from "@/config/aiRoles";
 
 interface NavSidebarProps {
   isRu: boolean;
@@ -33,6 +35,7 @@ interface NavSidebarProps {
   onChangeStartPage: (idx: number, newPage: number) => void;
   onOpenPdf?: (page?: number) => void;
   onRenamePart?: (oldTitle: string, newTitle: string) => void;
+  roleModels?: Partial<Record<AiRoleId, string>>;
 }
 
 export default function NavSidebar({
@@ -41,7 +44,7 @@ export default function NavSidebar({
   partGroups, partlessIndices,
   onSelectChapter, onAnalyzeChapter, onToggleNode, onSendToStudio, isChapterFullyDone,
   onChangeLevel, onDeleteEntry, onRenameEntry, onChangeStartPage,
-  onOpenPdf, onRenamePart,
+  onOpenPdf, onRenamePart, roleModels,
 }: NavSidebarProps) {
   const [editingPartTitle, setEditingPartTitle] = useState<string | null>(null);
   const [editPartValue, setEditPartValue] = useState("");
@@ -300,6 +303,13 @@ export default function NavSidebar({
     <div className="flex flex-col h-full min-h-0 overflow-hidden bg-card/50">
       <div className="px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
+          {roleModels && Object.keys(roleModels).length > 0 && (
+            <RoleBadges
+              roles={Object.entries(roleModels).map(([roleId, model]) => ({ roleId: roleId as AiRoleId, model }))}
+              isRu={isRu}
+              size={15}
+            />
+          )}
           <BookOpen className="h-5 w-5 text-primary" />
           <span className="font-display font-semibold text-base text-foreground truncate flex-1">
             {fileName.replace('.pdf', '')}
