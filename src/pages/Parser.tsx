@@ -64,7 +64,7 @@ export default function Parser() {
   } = useBookManager({ userId: user?.id, isRu });
 
   const { analysisLog, analyzeChapter, resetAnalysis } = useChapterAnalysis({
-    isRu, pdfRef, userId: user?.id, selectedModel, userApiKeys,
+    isRu, pdfRef, userId: user?.id, userApiKeys, getModelForRole,
     tocEntries, chapterIdMap, chapterResults, setChapterResults,
   });
 
