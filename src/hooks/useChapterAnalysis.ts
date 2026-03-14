@@ -69,7 +69,11 @@ export function useChapterAnalysis({
 
   // ─── Two-stage Chapter Analysis (with resume) ─────────────
   const analyzeChapter = async (idx: number, mode: "full" | "enrich" | "auto" = "auto") => {
-    if (!pdfRef || !userId) return;
+    if (!userId) return;
+    if (!pdfRef) {
+      toast.error(isRu ? "PDF не загружен. Перезагрузите книгу для анализа." : "PDF not loaded. Reload the book to analyze.");
+      return;
+    }
     const entry = tocEntries[idx];
     if (!entry) return;
 
