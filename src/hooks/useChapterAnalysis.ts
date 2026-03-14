@@ -153,9 +153,10 @@ export function useChapterAnalysis({
 
         addLog(`${t("logExtracted", isRu)}: ${charCount.toLocaleString()} ${t("logChars", isRu)} (${entry.startPage}–${entry.endPage} ${t("logPagesAbbr", isRu)})`);
         addLog(t("logStage1", isRu));
-        addLog(`${t("logCallingAI", isRu)} ${selectedModel.split('/').pop()}...`);
+        const screenwriterBody = buildBaseBody("screenwriter");
+        addLog(`${t("logCallingAI", isRu)} ${screenwriterBody._modelName.split('/').pop()}...`);
 
-        const fnData = await callParseFunction({ ...baseBody, text, mode: "boundaries", chapter_title: entry.title });
+        const fnData = await callParseFunction({ ...screenwriterBody, text, mode: "boundaries", chapter_title: entry.title });
         if (fnData?.error) throw new Error(fnData.error);
 
         const rawScenes = fnData.structure?.scenes || [];
