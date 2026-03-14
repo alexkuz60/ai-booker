@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useChapterAnalysis } from "@/hooks/useChapterAnalysis";
 import { useBookManager } from "@/hooks/useBookManager";
 import { useParserHelpers } from "@/hooks/useParserHelpers";
+import { useProjectStorage } from "@/hooks/useProjectStorage";
 
 import LibraryView from "@/components/parser/LibraryView";
 import UploadView from "@/components/parser/UploadView";
