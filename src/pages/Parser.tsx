@@ -23,6 +23,8 @@ import { useChapterAnalysis } from "@/hooks/useChapterAnalysis";
 import { useBookManager } from "@/hooks/useBookManager";
 import { useParserHelpers } from "@/hooks/useParserHelpers";
 import { useProjectStorage } from "@/hooks/useProjectStorage";
+import { useStructureUndo } from "@/hooks/useStructureUndo";
+import type { StructureSnapshot } from "@/hooks/useStructureUndo";
 
 import LibraryView from "@/components/parser/LibraryView";
 import UploadView from "@/components/parser/UploadView";
@@ -84,6 +86,48 @@ export default function Parser() {
     tocEntries, chapterIdMap, chapterResults, setChapterResults,
   });
 
+  const { pushSnapshot, undo, redo, canUndo, canRedo, resetStacks } = useStructureUndo(bookId);
+
+  const getCurrentSnapshot = useCallback((): StructureSnapshot => ({
+    tocEntries: tocEntries.map(e => ({ ...e })),
+    chapterIdMap: new Map(chapterIdMap),
+    chapterResults: new Map(
+      Array.from(chapterResults.entries()).map(([k, v]) => [k, { scenes: [...v.scenes], status: v.status }])
+    ),
+    selectedIndices: new Set(selectedIndices),
+  }), [tocEntries, chapterIdMap, chapterResults, selectedIndices]);
+
+  const restoreSnapshot = useCallback((s: StructureSnapshot) => {
+    setTocEntries(s.tocEntries);
+    setChapterIdMap(s.chapterIdMap);
+    setChapterResults(s.chapterResults);
+    setSelectedIndices(s.selectedIndices);
+  }, [setTocEntries, setChapterIdMap, setChapterResults]);
+
+  const handleUndo = useCallback(() => {
+    undo(getCurrentSnapshot(), restoreSnapshot);
+  }, [undo, getCurrentSnapshot, restoreSnapshot]);
+
+  const handleRedo = useCallback(() => {
+    redo(getCurrentSnapshot(), restoreSnapshot);
+  }, [redo, getCurrentSnapshot, restoreSnapshot]);
+
+  // Ctrl+Z / Ctrl+Shift+Z keyboard shortcuts
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (step !== "workspace") return;
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "z" && e.shiftKey) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [step, handleUndo, handleRedo]);
+
 
   // ── Auto-sync scene results to local project when chapters get analyzed ──
   const lastSyncedRef = useRef("");
@@ -138,6 +182,7 @@ export default function Parser() {
     setLastClickedIdx(null);
     setExpandedNodes(new Set());
     resetAnalysis();
+    resetStacks();
     sessionStorage.removeItem(NAV_STATE_KEY);
   };
 
@@ -287,6 +332,7 @@ export default function Parser() {
   };
 
   const changeLevel = (indices: number[], delta: number) => {
+    pushSnapshot(getCurrentSnapshot());
     setTocEntries(prev => {
       const next = prev.map(e => ({ ...e }));
       const allAffected = new Set<number>();
@@ -323,6 +369,7 @@ export default function Parser() {
   };
 
   const renameEntry = (idx: number, newTitle: string) => {
+    pushSnapshot(getCurrentSnapshot());
     setTocEntries(prev => prev.map((e, i) => i === idx ? { ...e, title: newTitle } : e));
     const chapterId = chapterIdMap.get(idx);
     if (chapterId) {
@@ -331,6 +378,7 @@ export default function Parser() {
   };
 
   const changeStartPage = (idx: number, newPage: number) => {
+    pushSnapshot(getCurrentSnapshot());
     setTocEntries(prev => {
       const next = prev.map((e, i) => i === idx ? { ...e, startPage: newPage } : e);
       if (idx > 0 && next[idx - 1].endPage === prev[idx].startPage) {
@@ -347,6 +395,7 @@ export default function Parser() {
   };
 
   const renamePart = (oldTitle: string, newTitle: string) => {
+    pushSnapshot(getCurrentSnapshot());
     setTocEntries(prev => prev.map(e => e.partTitle === oldTitle ? { ...e, partTitle: newTitle } : e));
     const partId = partIdMap.get(oldTitle);
     if (partId) {
@@ -360,6 +409,7 @@ export default function Parser() {
       ? t("deleteEntryConfirm", isRu).replace("{title}", tocEntries[indices[0]]?.title || "")
       : t("deleteMultiConfirm", isRu).replace("{count}", String(count));
     if (!window.confirm(confirmMsg)) return;
+    pushSnapshot(getCurrentSnapshot());
 
     // Collect all indices to delete (each entry + deeper children)
     const toDelete = new Set<number>();
@@ -419,6 +469,7 @@ export default function Parser() {
 
   const mergeEntries = (indices: number[]) => {
     if (indices.length < 2) return;
+    pushSnapshot(getCurrentSnapshot());
     const sorted = [...indices].sort((a, b) => a - b);
     const firstIdx = sorted[0];
     const lastIdx = sorted[sorted.length - 1];
@@ -555,6 +606,10 @@ export default function Parser() {
                     onOpenPdf={handleOpenPdf}
                     onRenamePart={renamePart}
                     onMergeEntries={mergeEntries}
+                    onUndo={handleUndo}
+                    onRedo={handleRedo}
+                    canUndo={canUndo}
+                    canRedo={canRedo}
                     roleModels={{
                       screenwriter: getModelForRole("screenwriter"),
                       director: getModelForRole("director"),

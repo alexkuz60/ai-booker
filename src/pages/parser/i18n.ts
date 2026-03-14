@@ -119,6 +119,8 @@ const texts: Record<string, { ru: string; en: string }> = {
   selectedCount: { ru: "выбрано", en: "selected" },
   partPagePrefix: { ru: "стр.", en: "p." },
   partChaptersSuffix: { ru: "глав", en: "ch." },
+  undo: { ru: "Отменить", en: "Undo" },
+  redo: { ru: "Повторить", en: "Redo" },
 
   // LibraryView
   deleteBookTitle: { ru: "Удалить книгу?", en: "Delete book?" },
