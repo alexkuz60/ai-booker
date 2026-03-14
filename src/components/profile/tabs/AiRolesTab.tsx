@@ -22,6 +22,8 @@ const STORAGE_KEY = "ai-roles-collapsed-providers";
 interface AiRolesTabProps {
   apiKeys: Record<string, string>;
   isRu: boolean;
+  /** Called when a role's model is changed — receives roleId */
+  onModelChanged?: (roleId: AiRoleId) => void;
 }
 
 const TIER_ICONS = {
