@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { Bot, RotateCcw, Sparkles, Zap, Cpu } from "lucide-react";
+import { useMemo, useState, useCallback } from "react";
+import { Bot, RotateCcw, Sparkles, Zap, Cpu, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +16,8 @@ import { Separator } from "@/components/ui/separator";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { AI_ROLE_LIST, TIER_LABELS, type AiRoleId } from "@/config/aiRoles";
 import type { ModelRegistryEntry } from "@/config/modelRegistry";
+
+const STORAGE_KEY = "ai-roles-collapsed-providers";
 
 interface AiRolesTabProps {
   apiKeys: Record<string, string>;
@@ -34,6 +36,20 @@ const TIER_COLORS = {
   heavy: "text-amber-500",
 } as const;
 
+function loadCollapsed(): Set<string> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return new Set(JSON.parse(raw));
+  } catch {}
+  return new Set();
+}
+
+function saveCollapsed(set: Set<string>) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(set)));
+  } catch {}
+}
+
 export function AiRolesTab({ apiKeys, isRu }: AiRolesTabProps) {
   const {
     resolvedModels,
@@ -43,6 +59,17 @@ export function AiRolesTab({ apiKeys, isRu }: AiRolesTabProps) {
     availableModels,
     isAdmin,
   } = useAiRoles(apiKeys);
+
+  const [collapsedProviders, setCollapsedProviders] = useState<Set<string>>(loadCollapsed);
+
+  const toggleProvider = useCallback((provider: string) => {
+    setCollapsedProviders(prev => {
+      const next = new Set(prev);
+      next.has(provider) ? next.delete(provider) : next.add(provider);
+      saveCollapsed(next);
+      return next;
+    });
+  }, []);
 
   const grouped = useMemo(() => {
     const map = new Map<string, ModelRegistryEntry[]>();
@@ -139,30 +166,46 @@ export function AiRolesTab({ apiKeys, isRu }: AiRolesTabProps) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {grouped.map(({ provider, models }) => (
-                      <SelectGroup key={provider}>
-                        <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                          {providerLabel(provider)}
-                          {provider === "lovable" && !isAdmin && (
-                            <span className="ml-1 text-destructive">
-                              (admin only)
-                            </span>
-                          )}
-                        </SelectLabel>
-                        {models.map((m) => (
-                          <SelectItem
-                            key={m.id}
-                            value={m.id}
-                            disabled={
-                              m.provider === "lovable" && !isAdmin
-                            }
-                            className="text-xs"
+                    {grouped.map(({ provider, models }) => {
+                      const isCollapsed = collapsedProviders.has(provider);
+                      const Chevron = isCollapsed ? ChevronRight : ChevronDown;
+                      return (
+                        <SelectGroup key={provider}>
+                          <SelectLabel
+                            className="text-[10px] uppercase tracking-wider text-muted-foreground cursor-pointer select-none flex items-center gap-1 hover:text-foreground transition-colors"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleProvider(provider);
+                            }}
                           >
-                            {m.displayName}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    ))}
+                            <Chevron className="h-3 w-3 shrink-0" />
+                            {providerLabel(provider)}
+                            <span className="text-muted-foreground/50 ml-0.5">
+                              ({models.length})
+                            </span>
+                            {provider === "lovable" && !isAdmin && (
+                              <span className="ml-1 text-destructive">
+                                (admin only)
+                              </span>
+                            )}
+                          </SelectLabel>
+                          {!isCollapsed &&
+                            models.map((m) => (
+                              <SelectItem
+                                key={m.id}
+                                value={m.id}
+                                disabled={
+                                  m.provider === "lovable" && !isAdmin
+                                }
+                                className="text-xs"
+                              >
+                                {m.displayName}
+                              </SelectItem>
+                            ))}
+                        </SelectGroup>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </CardContent>
