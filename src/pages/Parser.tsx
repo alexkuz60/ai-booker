@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Bot } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";

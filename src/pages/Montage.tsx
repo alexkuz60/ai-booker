@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { motion } from "framer-motion";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Loader2, AlertCircle, FileAudio } from "lucide-react";
