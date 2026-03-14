@@ -486,6 +486,32 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [userId, isRu]);
 
+  // ─── Reload book (delete structure, re-upload new PDF) ─────
+  const reloadBook = useCallback(async () => {
+    if (!bookId) return;
+    try {
+      // Delete scenes, chapters, parts for this book
+      const { data: chapters } = await supabase
+        .from('book_chapters').select('id').eq('book_id', bookId);
+      if (chapters?.length) {
+        const chapterIds = chapters.map(c => c.id);
+        await supabase.from('book_scenes').delete().in('chapter_id', chapterIds);
+      }
+      await supabase.from('book_chapters').delete().eq('book_id', bookId);
+      await supabase.from('book_parts').delete().eq('book_id', bookId);
+
+      // Reset state but keep bookId for re-association
+      setPartIdMap(new Map()); setChapterIdMap(new Map());
+      setTocEntries([]); setPdfRef(null); setFile(null);
+      setChapterResults(new Map());
+      setStep("upload");
+      toast.info(isRu ? "Выберите новый PDF для перезагрузки книги" : "Select a new PDF to reload the book");
+    } catch (err) {
+      console.error("Failed to reload book:", err);
+      toast.error(isRu ? "Не удалось очистить данные книги" : "Failed to clear book data");
+    }
+  }, [bookId, isRu]);
+
   // ─── Reset ─────────────────────────────────────────────────
   const handleReset = useCallback(() => {
     setStep("library");
@@ -502,6 +528,6 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
     partIdMap, chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
     chapterResults, setChapterResults, fileInputRef,
     // Actions
-    openSavedBook, deleteBook, handleFileSelect, handleReset,
+    openSavedBook, deleteBook, handleFileSelect, handleReset, reloadBook,
   };
 }
