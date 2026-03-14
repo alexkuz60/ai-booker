@@ -1228,7 +1228,7 @@ class AudioEngine {
   }
 
   seek(toSec: number): void {
-    const clamped = Math.max(0, Math.min(toSec, this._totalDuration));
+    const clamped = Math.max(0, Math.min(toSec, this.getEffectiveTotalDuration()));
     const wasPlaying = this._state === "playing";
 
     this.transport.stop();
