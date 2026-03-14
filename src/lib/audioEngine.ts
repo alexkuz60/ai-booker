@@ -956,6 +956,19 @@ class AudioEngine {
     }
   }
 
+  private getEffectiveTotalDuration(): number {
+    return Math.max(this._totalDuration, this._timelineDurationHint);
+  }
+
+  /**
+   * External timeline can hint full duration including silent/unrendered clips.
+   * Prevents premature auto-stop when transport enters an empty block.
+   */
+  setTimelineDuration(totalSec: number): void {
+    this._timelineDurationHint = Math.max(0, Number.isFinite(totalSec) ? totalSec : 0);
+    this.notify();
+  }
+
   // ─── Track management ──────────────────────────────────
 
   async loadTracks(configs: TrackConfig[], onProgress?: (p: LoadProgress) => void): Promise<LoadTracksResult> {
