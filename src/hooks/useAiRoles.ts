@@ -135,6 +135,7 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
     getPromptForRole,
     setModelForRole,
     resetAll,
+    loadPreset,
     availableModels,
     isAdmin,
     loaded,
