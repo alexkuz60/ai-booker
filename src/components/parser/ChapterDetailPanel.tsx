@@ -282,7 +282,7 @@ export default function ChapterDetailPanel({
 
         {/* Scene cards */}
         {selectedResult?.status === "done" && selectedResult.scenes.length > 0 && (
-          <SceneCards scenes={selectedResult.scenes} isRu={isRu} />
+          <SceneCards scenes={selectedResult.scenes} isRu={isRu} roleModels={roleModels} />
         )}
 
         {/* Done but empty */}
