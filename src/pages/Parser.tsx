@@ -16,7 +16,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { t } from "@/pages/parser/i18n";
 import { NAV_WIDTH_KEY, NAV_STATE_KEY } from "@/pages/parser/types";
-import type { Scene, ChapterStatus } from "@/pages/parser/types";
+import type { Scene, ChapterStatus, TocChapter } from "@/pages/parser/types";
 import type { AiRoleId } from "@/config/aiRoles";
 import { useToast } from "@/hooks/use-toast";
 import { useChapterAnalysis } from "@/hooks/useChapterAnalysis";
@@ -79,7 +79,7 @@ export default function Parser() {
     openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset, reloadBook,
   } = useBookManager({ userId: user?.id, isRu, projectStorage });
 
-  const { analysisLog, analyzeChapter, resetAnalysis } = useChapterAnalysis({
+  const { analysisLog, analyzeChapter, resetAnalysis, stopAnalysis, isAnalyzing } = useChapterAnalysis({
     isRu, pdfRef, userId: user?.id, userApiKeys, getModelForRole,
     tocEntries, chapterIdMap, chapterResults, setChapterResults,
   });
@@ -412,6 +412,65 @@ export default function Parser() {
     setChapterResults(newResults);
   };
 
+  const mergeEntries = (indices: number[]) => {
+    if (indices.length < 2) return;
+    const sorted = [...indices].sort((a, b) => a - b);
+    const firstIdx = sorted[0];
+    const lastIdx = sorted[sorted.length - 1];
+    const first = tocEntries[firstIdx];
+    const last = tocEntries[lastIdx];
+
+    // Merge into first entry: extend endPage, combine scenes
+    const mergedEntry: TocChapter = {
+      ...first,
+      endPage: Math.max(first.endPage, last.endPage),
+    };
+
+    // Merge scenes from all selected
+    const mergedScenes: Scene[] = [];
+    for (const idx of sorted) {
+      const result = chapterResults.get(idx);
+      if (result?.scenes) mergedScenes.push(...result.scenes);
+    }
+    // Renumber scenes
+    mergedScenes.forEach((sc, i) => { sc.scene_number = i + 1; });
+
+    const toRemove = new Set(sorted.slice(1));
+
+    // Delete merged chapters from DB
+    for (const di of toRemove) {
+      const chapterId = chapterIdMap.get(di);
+      if (chapterId) {
+        supabase.from('book_scenes').delete().eq('chapter_id', chapterId).then();
+        supabase.from('book_chapters').delete().eq('id', chapterId).then();
+      }
+    }
+
+    // Update entries
+    const newEntries = tocEntries.map((e, i) => i === firstIdx ? mergedEntry : e).filter((_, i) => !toRemove.has(i));
+    setTocEntries(newEntries);
+
+    // Rebuild maps
+    const newChapterMap = new Map<number, string>();
+    const newResults = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
+    let newIdx = 0;
+    for (let i = 0; i < tocEntries.length; i++) {
+      if (toRemove.has(i)) continue;
+      const oldId = chapterIdMap.get(i);
+      if (oldId) newChapterMap.set(newIdx, oldId);
+      if (i === firstIdx) {
+        newResults.set(newIdx, { scenes: mergedScenes, status: mergedScenes.length > 0 ? "done" : "pending" });
+      } else {
+        const oldResult = chapterResults.get(i);
+        if (oldResult) newResults.set(newIdx, oldResult);
+      }
+      newIdx++;
+    }
+    setChapterIdMap(newChapterMap);
+    setChapterResults(newResults);
+    setSelectedIndices(new Set([firstIdx]));
+  };
+
   useEffect(() => {
     // Skip auto-expand if nav state was restored from sessionStorage
     if (navRestoredFromStorage) return;
@@ -490,6 +549,7 @@ export default function Parser() {
                     onChangeStartPage={changeStartPage}
                     onOpenPdf={handleOpenPdf}
                     onRenamePart={renamePart}
+                    onMergeEntries={mergeEntries}
                     roleModels={{
                       screenwriter: getModelForRole("screenwriter"),
                       director: getModelForRole("director"),
@@ -506,6 +566,8 @@ export default function Parser() {
                        isRu={isRu} selectedIdx={selectedIdx}
                        selectedEntry={selectedEntry} selectedResult={selectedResult}
                        analysisLog={analysisLog} onAnalyze={analyzeChapter}
+                       onStopAnalysis={stopAnalysis}
+                       isAnalyzing={isAnalyzing}
                        childCount={selectedChildCount}
                        roleModels={{
                          screenwriter: getModelForRole("screenwriter"),

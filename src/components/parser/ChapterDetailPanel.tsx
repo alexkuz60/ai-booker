@@ -1,7 +1,7 @@
 import { useState, useMemo, Fragment } from "react";
 import { motion } from "framer-motion";
 import {
-  FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock, RefreshCw, Palette
+  FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock, RefreshCw, Palette, StopCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,6 +66,8 @@ interface ChapterDetailPanelProps {
   selectedResult: { scenes: Scene[]; status: ChapterStatus } | null | undefined;
   analysisLog: string[];
   onAnalyze: (idx: number, mode?: "full" | "enrich") => void;
+  onStopAnalysis?: () => void;
+  isAnalyzing?: boolean;
   childCount?: number;
   /** Current model names for role badges */
   roleModels?: { screenwriter?: string; director?: string };
@@ -145,7 +147,7 @@ function SceneCards({ scenes, isRu, roleModels }: { scenes: Scene[]; isRu: boole
 }
 
 export default function ChapterDetailPanel({
-  isRu, selectedIdx, selectedEntry, selectedResult, analysisLog, onAnalyze, childCount = 0, roleModels,
+  isRu, selectedIdx, selectedEntry, selectedResult, analysisLog, onAnalyze, onStopAnalysis, isAnalyzing, childCount = 0, roleModels,
 }: ChapterDetailPanelProps) {
   const [reanalyzeOpen, setReanalyzeOpen] = useState(false);
 
@@ -228,7 +230,19 @@ export default function ChapterDetailPanel({
                   </p>
                   <p className="text-xs text-muted-foreground">{t("decomposing", isRu)}</p>
                 </div>
-                <Loader2 className="h-4 w-4 animate-spin text-primary ml-auto shrink-0" />
+                <div className="flex items-center gap-2 ml-auto shrink-0">
+                  {onStopAnalysis && (
+                    <Button
+                      variant="ghost" size="sm"
+                      onClick={onStopAnalysis}
+                      className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <StopCircle className="h-4 w-4" />
+                      {isRu ? "Стоп" : "Stop"}
+                    </Button>
+                  )}
+                  <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+                </div>
               </div>
               <ScrollArea className="max-h-[300px]">
                 <div className="space-y-1 font-mono text-xs">

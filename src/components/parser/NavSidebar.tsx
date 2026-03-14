@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2, AlertCircle,
-  BookOpen, FolderOpen, Clapperboard, ChevronLeft, ChevronRightIcon, Trash2, ExternalLink, Clock
+  BookOpen, FolderOpen, Clapperboard, ChevronLeft, ChevronRightIcon, Trash2, ExternalLink, Clock, Merge
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,7 @@ interface NavSidebarProps {
   onChangeStartPage: (idx: number, newPage: number) => void;
   onOpenPdf?: (page?: number) => void;
   onRenamePart?: (oldTitle: string, newTitle: string) => void;
+  onMergeEntries?: (indices: number[]) => void;
   roleModels?: Partial<Record<AiRoleId, string>>;
 }
 
@@ -44,7 +45,7 @@ export default function NavSidebar({
   partGroups, partlessIndices,
   onSelectChapter, onAnalyzeChapter, onToggleNode, onSendToStudio, isChapterFullyDone,
   onChangeLevel, onDeleteEntry, onRenameEntry, onChangeStartPage,
-  onOpenPdf, onRenamePart, roleModels,
+  onOpenPdf, onRenamePart, onMergeEntries, roleModels,
 }: NavSidebarProps) {
   const [editingPartTitle, setEditingPartTitle] = useState<string | null>(null);
   const [editPartValue, setEditPartValue] = useState("");
@@ -369,6 +370,16 @@ export default function NavSidebar({
             >
               <ChevronRightIcon className="h-3.5 w-3.5" />
             </Button>
+            {onMergeEntries && selectedIndices.size >= 2 && (
+              <Button
+                variant="ghost" size="icon"
+                className="h-6 w-6 text-primary hover:text-primary"
+                title={isRu ? "Объединить выбранные" : "Merge selected"}
+                onClick={() => onMergeEntries(selectedArray)}
+              >
+                <Merge className="h-3.5 w-3.5" />
+              </Button>
+            )}
             <Button
               variant="ghost" size="icon"
               className="h-6 w-6 text-destructive hover:text-destructive"
