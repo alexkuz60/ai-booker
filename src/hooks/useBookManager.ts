@@ -332,11 +332,38 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
         }
         toast.success(`${t("tocFound", isRu)}: ${chapters.length} ${t("items", isRu)}`);
       } else {
-        toast.info(t("tocNotFound", isRu));
-        chapters = [{
-          title: f.name.replace('.pdf', ''),
-          startPage: 1, endPage: pdf.numPages, level: 0, sectionType: "content",
-        }];
+        // No embedded outline — try text-based heading detection
+        const textToc = await extractTocFromText(pdf);
+        if (textToc.length > 0) {
+          const flat = flattenTocWithRanges(textToc, pdf.numPages);
+          let currentPart = "";
+          for (const entry of flat) {
+            if (entry.level === 0 && entry.children.length > 0) {
+              currentPart = entry.title;
+            } else {
+              chapters.push({
+                title: entry.title, startPage: entry.startPage, endPage: entry.endPage,
+                level: entry.level, partTitle: currentPart || undefined,
+                sectionType: classifySection(entry.title),
+              });
+            }
+          }
+          if (chapters.length === 0) {
+            for (const entry of flat) {
+              chapters.push({
+                title: entry.title, startPage: entry.startPage, endPage: entry.endPage,
+                level: entry.level, sectionType: classifySection(entry.title),
+              });
+            }
+          }
+          toast.success(`${isRu ? "Найдены заголовки глав в тексте" : "Chapter headings found in text"}: ${chapters.length} ${t("items", isRu)}`);
+        } else {
+          toast.info(t("tocNotFound", isRu));
+          chapters = [{
+            title: f.name.replace('.pdf', ''),
+            startPage: 1, endPage: pdf.numPages, level: 0, sectionType: "content",
+          }];
+        }
       }
 
       setTocEntries(normalizeLevels(chapters));
