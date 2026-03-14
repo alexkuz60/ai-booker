@@ -404,11 +404,26 @@ export default function Parser() {
   };
 
   const deleteEntry = (indices: number[]) => {
-    const count = indices.length;
-    const confirmMsg = count === 1
-      ? t("deleteEntryConfirm", isRu).replace("{title}", tocEntries[indices[0]]?.title || "")
-      : t("deleteMultiConfirm", isRu).replace("{count}", String(count));
-    if (!window.confirm(confirmMsg)) return;
+    // Collect all indices to delete (each entry + deeper children)
+    const toDelete = new Set<number>();
+    for (const idx of indices) {
+      toDelete.add(idx);
+      const entry = tocEntries[idx];
+      for (let i = idx + 1; i < tocEntries.length; i++) {
+        if (tocEntries[i].level <= entry.level) break;
+        if (tocEntries[i].sectionType !== entry.sectionType) break;
+        toDelete.add(i);
+      }
+    }
+    // Show confirmation dialog with details
+    setPendingDelete({ indices, toDelete });
+  };
+
+  const [pendingDelete, setPendingDelete] = useState<{ indices: number[]; toDelete: Set<number> } | null>(null);
+
+  const confirmDelete = () => {
+    if (!pendingDelete) return;
+    const { toDelete } = pendingDelete;
     pushSnapshot(getCurrentSnapshot());
 
     // Collect all indices to delete (each entry + deeper children)
