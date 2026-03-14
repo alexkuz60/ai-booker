@@ -23,6 +23,8 @@ import { useChapterAnalysis } from "@/hooks/useChapterAnalysis";
 import { useBookManager } from "@/hooks/useBookManager";
 import { useParserHelpers } from "@/hooks/useParserHelpers";
 import { useProjectStorage } from "@/hooks/useProjectStorage";
+import { useStructureUndo } from "@/hooks/useStructureUndo";
+import type { StructureSnapshot } from "@/hooks/useStructureUndo";
 
 import LibraryView from "@/components/parser/LibraryView";
 import UploadView from "@/components/parser/UploadView";
