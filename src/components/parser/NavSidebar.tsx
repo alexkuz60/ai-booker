@@ -35,6 +35,7 @@ interface NavSidebarProps {
   onChangeStartPage: (idx: number, newPage: number) => void;
   onOpenPdf?: (page?: number) => void;
   onRenamePart?: (oldTitle: string, newTitle: string) => void;
+  roleModels?: Partial<Record<AiRoleId, string>>;
 }
 
 export default function NavSidebar({
