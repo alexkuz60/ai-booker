@@ -1051,7 +1051,7 @@ Deno.serve(async (req) => {
             result = await callTts(yandexTtsUrl, authHeader, {
               ssml,
               voice: voiceConfig.voice,
-              speed: voiceConfig.speed,
+              speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
               lang: langCode,
             });
           } else if (isV3Voice && (hasAnnot || isLyric)) {
