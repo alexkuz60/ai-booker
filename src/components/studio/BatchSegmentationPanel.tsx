@@ -67,31 +67,12 @@ export function BatchSegmentationPanel({
     if (abortRef.current) return;
     const { scene } = job;
 
-    // Load content if missing
-    let content = scene.content;
-    if (!content) {
-      updateJob(scene.id, { status: "loading" });
-      const { data } = await supabase
-        .from("book_scenes")
-        .select("content")
-        .eq("id", scene.id)
-        .maybeSingle();
-      content = data?.content ?? null;
-    }
-
-    if (!content) {
-      updateJob(scene.id, { status: "skipped", error: isRu ? "Нет контента" : "No content" });
-      return;
-    }
-
-    if (abortRef.current) return;
     updateJob(scene.id, { status: "analyzing" });
 
     try {
       const { data, error } = await supabase.functions.invoke("segment-scene", {
         body: {
           scene_id: scene.id,
-          content,
           language: isRu ? "ru" : "en",
           model: getModelForRole("screenwriter"),
         },
