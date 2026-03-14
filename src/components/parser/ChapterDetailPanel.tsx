@@ -106,7 +106,8 @@ function SceneCards({ scenes, isRu, roleModels }: { scenes: Scene[]; isRu: boole
           >
             <CardContent className="py-3 px-4 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-base font-medium">
+                <span className="text-base font-medium flex items-center gap-1.5">
+                  <RoleBadge roleId="screenwriter" model={roleModels?.screenwriter} isRu={isRu} size={13} />
                   {t("scenePrefix", isRu)} {sc.scene_number}: {tSceneTitle(sc.title, isRu)}
                 </span>
                 <div className="flex items-center gap-1.5">
@@ -117,6 +118,7 @@ function SceneCards({ scenes, isRu, roleModels }: { scenes: Scene[]; isRu: boole
                   <Badge variant="outline" className="text-xs font-mono">
                     {sc.bpm} BPM
                   </Badge>
+                  <RoleBadge roleId="director" model={roleModels?.director} isRu={isRu} size={12} />
                   <span className="text-[10px] text-muted-foreground font-mono ml-1">
                     {sceneDur}
                   </span>
