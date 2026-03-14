@@ -1,0 +1,185 @@
+import { useState, useCallback, useEffect } from "react";
+import {
+  type ProjectStorage,
+  type ProjectMeta,
+  type StorageBackend,
+  PROJECT_META_VERSION,
+  detectStorageBackend,
+  LocalFSStorage,
+  OPFSStorage,
+} from "@/lib/projectStorage";
+
+const LAST_PROJECT_KEY = "booker_last_project";
+
+interface UseProjectStorageReturn {
+  /** Current storage instance (null = no project open) */
+  storage: ProjectStorage | null;
+  /** Project metadata */
+  meta: ProjectMeta | null;
+  /** Which backend is available */
+  backend: StorageBackend;
+  /** Whether a project is currently open */
+  isOpen: boolean;
+  /** Loading state */
+  loading: boolean;
+
+  /** Create new project (opens folder picker on Chromium) */
+  createProject: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<ProjectStorage>;
+  /** Open existing project folder */
+  openProject: () => Promise<ProjectStorage>;
+  /** Close current project */
+  closeProject: () => void;
+
+  /** Save PDF source file into project */
+  saveSourcePDF: (file: File) => Promise<void>;
+  /** Read source PDF from project */
+  readSourcePDF: () => Promise<File | null>;
+}
+
+export function useProjectStorage(): UseProjectStorageReturn {
+  const [storage, setStorage] = useState<ProjectStorage | null>(null);
+  const [meta, setMeta] = useState<ProjectMeta | null>(null);
+  const [loading, setLoading] = useState(false);
+  const backend = detectStorageBackend();
+
+  // ── Create new project ──────────────────────────────────
+
+  const createProject = useCallback(async (
+    title: string,
+    bookId: string,
+    userId: string,
+    language: "ru" | "en",
+  ): Promise<ProjectStorage> => {
+    setLoading(true);
+    try {
+      // Sanitize folder name
+      const folderName = title.replace(/[<>:"/\\|?*]/g, "_").trim() || "BookProject";
+
+      let store: ProjectStorage;
+      if (backend === "fs-access") {
+        store = await LocalFSStorage.createProject(folderName);
+      } else {
+        store = await OPFSStorage.openOrCreate(folderName);
+      }
+
+      const projectMeta: ProjectMeta = {
+        version: PROJECT_META_VERSION,
+        bookId,
+        title,
+        userId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        language,
+      };
+
+      await store.writeJSON("project.json", projectMeta);
+      setStorage(store);
+      setMeta(projectMeta);
+
+      // Remember last project
+      try {
+        localStorage.setItem(LAST_PROJECT_KEY, JSON.stringify({
+          name: store.projectName,
+          backend,
+          bookId,
+        }));
+      } catch {}
+
+      return store;
+    } finally {
+      setLoading(false);
+    }
+  }, [backend]);
+
+  // ── Open existing project ───────────────────────────────
+
+  const openProject = useCallback(async (): Promise<ProjectStorage> => {
+    setLoading(true);
+    try {
+      let store: ProjectStorage;
+      if (backend === "fs-access") {
+        store = await LocalFSStorage.openProject();
+      } else {
+        // For OPFS, list projects and pick first (or show picker in UI)
+        const projects = await OPFSStorage.listProjects();
+        if (projects.length === 0) throw new Error("No projects found");
+        store = await OPFSStorage.openOrCreate(projects[0]);
+      }
+
+      const projectMeta = await store.readJSON<ProjectMeta>("project.json");
+      if (!projectMeta) {
+        throw new Error("Not a valid Booker project (project.json not found)");
+      }
+
+      setStorage(store);
+      setMeta(projectMeta);
+
+      try {
+        localStorage.setItem(LAST_PROJECT_KEY, JSON.stringify({
+          name: store.projectName,
+          backend,
+          bookId: projectMeta.bookId,
+        }));
+      } catch {}
+
+      return store;
+    } finally {
+      setLoading(false);
+    }
+  }, [backend]);
+
+  // ── Close project ───────────────────────────────────────
+
+  const closeProject = useCallback(() => {
+    setStorage(null);
+    setMeta(null);
+    try { localStorage.removeItem(LAST_PROJECT_KEY); } catch {}
+  }, []);
+
+  // ── PDF helpers ─────────────────────────────────────────
+
+  const saveSourcePDF = useCallback(async (file: File) => {
+    if (!storage) throw new Error("No project open");
+    await storage.writeBlob("source/book.pdf", file);
+  }, [storage]);
+
+  const readSourcePDF = useCallback(async (): Promise<File | null> => {
+    if (!storage) return null;
+    const blob = await storage.readBlob("source/book.pdf");
+    if (!blob) return null;
+    return new File([blob], "book.pdf", { type: "application/pdf" });
+  }, [storage]);
+
+  // ── Auto-restore OPFS project on mount ──────────────────
+
+  useEffect(() => {
+    if (backend !== "opfs") return;
+    try {
+      const saved = localStorage.getItem(LAST_PROJECT_KEY);
+      if (!saved) return;
+      const { name, backend: savedBackend } = JSON.parse(saved);
+      if (savedBackend !== "opfs" || !name) return;
+
+      OPFSStorage.openOrCreate(name).then(async (store) => {
+        const projectMeta = await store.readJSON<ProjectMeta>("project.json");
+        if (projectMeta) {
+          setStorage(store);
+          setMeta(projectMeta);
+        }
+      }).catch(() => {});
+    } catch {}
+  }, [backend]);
+
+  return {
+    storage,
+    meta,
+    backend,
+    isOpen: !!storage,
+    loading,
+    createProject,
+    openProject,
+    closeProject,
+    saveSourcePDF,
+    readSourcePDF,
+  };
+}

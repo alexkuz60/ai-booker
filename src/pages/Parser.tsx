@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useChapterAnalysis } from "@/hooks/useChapterAnalysis";
 import { useBookManager } from "@/hooks/useBookManager";
 import { useParserHelpers } from "@/hooks/useParserHelpers";
+import { useProjectStorage } from "@/hooks/useProjectStorage";
 
 import LibraryView from "@/components/parser/LibraryView";
 import UploadView from "@/components/parser/UploadView";
@@ -33,6 +34,7 @@ export default function Parser() {
 
   const userApiKeys = useUserApiKeys();
   const [aiRolesOpen, setAiRolesOpen] = useState(false);
+  const { backend: storageBackend, createProject, openProject, storage: projectStorage, meta: projectMeta, saveSourcePDF } = useProjectStorage();
   const { getModelForRole } = useAiRoles(userApiKeys);
   const { toast } = useToast();
   const [navRestoredFromStorage] = useState<boolean>(() => {
@@ -361,7 +363,33 @@ export default function Parser() {
             />
           )}
           {step === "upload" && (
-            <UploadView isRu={isRu} fileInputRef={fileInputRef} onFileSelect={handleFileSelect} />
+            <UploadView
+              isRu={isRu}
+              fileInputRef={fileInputRef}
+              onFileSelect={handleFileSelect}
+              storageBackend={storageBackend}
+              onCreateLocalProject={async () => {
+                try {
+                  const title = isRu ? "Новая книга" : "New Book";
+                  await createProject(title, "", user?.id || "", isRu ? "ru" : "en");
+                  toast({ title: isRu ? "Проект создан" : "Project created" });
+                } catch (err: any) {
+                  if (err?.name !== "AbortError") {
+                    toast({ title: isRu ? "Ошибка" : "Error", description: String(err?.message || err), variant: "destructive" });
+                  }
+                }
+              }}
+              onOpenLocalProject={async () => {
+                try {
+                  const store = await openProject();
+                  toast({ title: isRu ? "Проект открыт" : "Project opened", description: store.projectName });
+                } catch (err: any) {
+                  if (err?.name !== "AbortError") {
+                    toast({ title: isRu ? "Ошибка" : "Error", description: String(err?.message || err), variant: "destructive" });
+                  }
+                }
+              }}
+            />
           )}
           {step === "extracting_toc" && (
             <ExtractingTocView fileName={fileName} isRu={isRu} />
