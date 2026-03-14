@@ -38,6 +38,7 @@ export default function Parser() {
 
   const userApiKeys = useUserApiKeys();
   const [aiRolesOpen, setAiRolesOpen] = useState(false);
+  const [parserTab, setParserTab] = useState<"structure" | "content" | "characters">("structure");
   const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const { backend: storageBackend, createProject, openProject, storage: projectStorage, meta: projectMeta, saveSourcePDF } = useProjectStorage();
