@@ -278,6 +278,37 @@ export default function ChapterDetailPanel({
             </CardContent>
           </Card>
         )}
+        {/* Re-analysis mode dialog */}
+        <Dialog open={reanalyzeOpen} onOpenChange={setReanalyzeOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{t("reanalyzeDialogTitle", isRu)}</DialogTitle>
+              <DialogDescription>{t("reanalyzeDialogDesc", isRu)}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 pt-2">
+              <button
+                className="w-full text-left rounded-lg border border-border p-4 hover:bg-accent/50 transition-colors space-y-1"
+                onClick={() => { setReanalyzeOpen(false); onAnalyze(selectedIdx!, "full"); }}
+              >
+                <div className="flex items-center gap-2 font-medium text-sm">
+                  <RefreshCw className="h-4 w-4 text-primary" />
+                  {t("reanalyzeFull", isRu)}
+                </div>
+                <p className="text-xs text-muted-foreground">{t("reanalyzeFullDesc", isRu)}</p>
+              </button>
+              <button
+                className="w-full text-left rounded-lg border border-border p-4 hover:bg-accent/50 transition-colors space-y-1"
+                onClick={() => { setReanalyzeOpen(false); onAnalyze(selectedIdx!, "enrich"); }}
+              >
+                <div className="flex items-center gap-2 font-medium text-sm">
+                  <Palette className="h-4 w-4 text-primary" />
+                  {t("reanalyzeEnrich", isRu)}
+                </div>
+                <p className="text-xs text-muted-foreground">{t("reanalyzeEnrichDesc", isRu)}</p>
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </ScrollArea>
   );
