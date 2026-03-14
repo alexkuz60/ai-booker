@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import type { Scene } from "@/pages/parser/types";
 
 // ─── Types ───────────────────────────────────────────────────
-export type CleanupAction = "header" | "page_number" | "chapter_split" | "fix_punctuation_spaces" | "footnote_link";
+export type CleanupAction = "header" | "page_number" | "chapter_split" | "fix_punctuation_spaces" | "footnote_link" | "footnote_auto";
 
 export interface CleanupResult {
   /** Updated scenes array (may grow if split happened) */
@@ -233,6 +233,99 @@ function linkFootnoteNumber(
   };
 }
 
+// ─── 6. Auto-link all footnote numbers ───────────────────────
+// Scans all scenes for existing footnote bodies [сн. N]...[/сн.],
+// collects their numbers, then finds bare occurrences of those
+// numbers in the body text and wraps them with [сн.→ N].
+function autoLinkFootnotes(scenes: Scene[]): CleanupResult {
+  // 1. Collect all footnote numbers from [сн. N] markers
+  const fnNumbers = new Set<string>();
+  const fnBodyRe = /\[сн\.\s*(\d+)\]/g;
+  for (const sc of scenes) {
+    let m: RegExpExecArray | null;
+    while ((m = fnBodyRe.exec(sc.content || "")) !== null) {
+      fnNumbers.add(m[1]);
+    }
+  }
+
+  if (fnNumbers.size === 0) {
+    return { scenes, changeCount: 0, summary: "Маркеры сносок [сн. N] не найдены в тексте" };
+  }
+
+  let changeCount = 0;
+  const updatedScenes = scenes.map(sc => {
+    let content = sc.content || "";
+
+    for (const num of fnNumbers) {
+      const refMarker = `[сн.→ ${num}]`;
+      // Skip if already has this reference
+      if (content.includes(refMarker)) continue;
+
+      // Find bare number that is:
+      // - NOT inside an existing marker [сн. N] or [сн.→ N] or [стр. N]
+      // - Surrounded by non-digit context (word boundary or punctuation)
+      // Strategy: temporarily mask all existing markers, find bare numbers, then restore
+      const markerPlaceholders: string[] = [];
+      const masked = content.replace(/\[(?:сн\.|сн\.→|стр\.|\/сн\.)[^\]]*\]/g, (match) => {
+        const idx = markerPlaceholders.length;
+        markerPlaceholders.push(match);
+        return `\x00MARKER${idx}\x00`;
+      });
+
+      // Match bare number N at word boundary (not part of a larger number)
+      const barePattern = new RegExp(`(?<=\\D|^)${escapeRegex(num)}(?=\\D|$)`);
+      const bareMatch = barePattern.exec(masked);
+
+      if (bareMatch) {
+        // Map position back to original content
+        // Count how many placeholder chars precede this position
+        let origPos = 0;
+        let maskedPos = 0;
+        const placeholderRe = /\x00MARKER(\d+)\x00/g;
+        let lastEnd = 0;
+        let pm: RegExpExecArray | null;
+        const segments: { masked: number; orig: number; len: number }[] = [];
+
+        // Rebuild position mapping
+        placeholderRe.lastIndex = 0;
+        while ((pm = placeholderRe.exec(masked)) !== null) {
+          segments.push({
+            masked: pm.index,
+            orig: pm.index + (origPos - maskedPos),
+            len: markerPlaceholders[parseInt(pm[1])].length,
+          });
+          const placeholderLen = pm[0].length;
+          const origLen = markerPlaceholders[parseInt(pm[1])].length;
+          origPos += origLen - placeholderLen;
+        }
+
+        // Calculate real position
+        let realPos = bareMatch.index;
+        let offset = 0;
+        for (const seg of segments) {
+          if (bareMatch.index > seg.masked) {
+            offset += markerPlaceholders[segments.indexOf(seg)].length - `\x00MARKER${segments.indexOf(seg)}\x00`.length;
+          }
+        }
+        realPos = bareMatch.index + offset;
+
+        content = content.slice(0, realPos) + refMarker + content.slice(realPos + num.length);
+        changeCount++;
+      }
+    }
+
+    return changeCount > 0 ? { ...sc, content } : sc;
+  });
+
+  const linked = changeCount;
+  const notLinked = fnNumbers.size - linked;
+  const summary = linked > 0
+    ? `Размечено ${linked} сносок` + (notLinked > 0 ? `, ${notLinked} не найдены в тексте` : "")
+    : "Голые номера сносок не найдены в тексте";
+
+  return { scenes: updatedScenes, changeCount, summary };
+}
+
 // ─── Hook ────────────────────────────────────────────────────
 
 export function useContentCleanup() {
@@ -253,6 +346,8 @@ export function useContentCleanup() {
         return fixPunctuationSpaces(scenes);
       case "footnote_link":
         return linkFootnoteNumber(scenes, selectedText, sceneIndex);
+      case "footnote_auto":
+        return autoLinkFootnotes(scenes);
       default:
         return { scenes, changeCount: 0, summary: "Неизвестное действие" };
     }

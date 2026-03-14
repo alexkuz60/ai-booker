@@ -181,6 +181,7 @@ const texts: Record<string, { ru: string; en: string }> = {
   cleanupChapterSplit: { ru: "Раздел главы — разделить сцену", en: "Chapter section — split scene" },
   cleanupFixSpaces: { ru: "Исправить пробелы у знаков препинания", en: "Fix punctuation spacing" },
   cleanupFootnoteLink: { ru: "Номер сноски — связать с текстом", en: "Footnote number — link to text" },
+  cleanupFootnoteAuto: { ru: "Авто-сноски", en: "Auto-footnotes" },
   cleanupNoSelection: { ru: "Выделите текст для действия", en: "Select text for action" },
   cleanupLabel: { ru: "Очистка текста", en: "Text cleanup" },
 };
