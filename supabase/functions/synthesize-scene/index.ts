@@ -1007,12 +1007,13 @@ Deno.serve(async (req) => {
           // ── STANDARD SINGLE-PASS SYNTHESIS ────────────────
           let result: { audio: Uint8Array; durationMs: number } | { error: string };
           const hasAnnot = segmentHasAnnotations[i];
+          const isLyric = seg.segment_type === "lyric";
 
           if (isSaluteSpeechVoice) {
-            // SaluteSpeech: use SSML for annotations, plain text otherwise
-            if (hasAnnot) {
-              const ssml = buildSegmentSsml(seg.id);
-              console.log(`SaluteSpeech SSML for segment ${seg.id}: ${ssml.length} chars`);
+            // SaluteSpeech: use SSML for lyrics or annotations, plain text otherwise
+            if (isLyric || hasAnnot) {
+              const ssml = isLyric && !hasAnnot ? buildLyricSsml(text) : buildSegmentSsml(seg.id);
+              console.log(`SaluteSpeech ${isLyric ? 'lyric ' : ''}SSML for segment ${seg.id}: ${ssml.length} chars`);
               result = await callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, {
                 ssml,
                 voice: voiceConfig.voice,
@@ -1026,15 +1027,19 @@ Deno.serve(async (req) => {
               });
             }
           } else if (isProxyApiVoice && proxyApiKey) {
-            // ProxyAPI: apply text markers + extra instructions from annotations
-            const annotated = hasAnnot ? buildSegmentAnnotatedText(seg.id) : { text, extraInstructions: [] };
+            // ProxyAPI: apply text markers + extra instructions from annotations / lyrics
+            const annotated = hasAnnot
+              ? buildSegmentAnnotatedText(seg.id)
+              : isLyric
+                ? formatLyricText(text)
+                : { text, extraInstructions: [] };
             const baseInstructions = (voiceConfig as any).instructions || "";
             const fullInstructions = [baseInstructions, ...annotated.extraInstructions].filter(Boolean).join(". ");
             result = await callProxyApiTts(proxyApiKey, {
               text: annotated.text,
               voice: voiceConfig.voice,
               model: (voiceConfig as any).model,
-              speed: voiceConfig.speed,
+              speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
               instructions: fullInstructions || undefined,
             });
           } else if (!isV3Voice && hasAnnot) {
