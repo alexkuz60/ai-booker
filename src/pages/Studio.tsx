@@ -366,6 +366,9 @@ const Studio = () => {
                   clipsRefreshToken={clipsRefreshToken}
                   bookId={bookId}
                   onPlaylistDurationsLoaded={handlePlaylistDurationsLoaded}
+                  selectedSceneIndices={selectedSceneIndices}
+                  onSelectedSceneIndicesChange={setSelectedSceneIndices}
+                  onBatchAnalyze={handleBatchAnalyze}
                 />
               ) : (
                 <EmptyNavigator isRu={isRu} />
