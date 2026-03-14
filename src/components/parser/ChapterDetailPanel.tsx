@@ -65,7 +65,7 @@ function renderMarkedText(text: string) {
   });
 }
 
-interface ChapterDetailPanelProps {
+export interface ChapterDetailPanelProps {
   isRu: boolean;
   selectedIdx: number | null;
   selectedEntry: TocChapter | null;
@@ -77,6 +77,8 @@ interface ChapterDetailPanelProps {
   childCount?: number;
   /** Current model names for role badges */
   roleModels?: { screenwriter?: string; director?: string };
+  /** Callback when scenes are modified by cleanup actions */
+  onScenesUpdate?: (scenes: Scene[]) => void;
 }
 
 function SceneCards({ scenes, isRu, roleModels }: { scenes: Scene[]; isRu: boolean; roleModels?: { screenwriter?: string; director?: string } }) {
