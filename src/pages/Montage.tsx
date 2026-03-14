@@ -7,7 +7,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { useAuth } from "@/hooks/useAuth";
 import { useMontageData } from "@/hooks/useMontageData";
-import { supabase } from "@/integrations/supabase/client";
+
 import { MasterMeterPanel } from "@/components/studio/MasterMeterPanel";
 import { MasterEffectsTabs } from "@/components/studio/MasterEffectsTabs";
 import { MontageTimeline } from "@/components/montage/MontageTimeline";
