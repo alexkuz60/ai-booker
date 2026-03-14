@@ -825,12 +825,22 @@ export function StoryboardPanel({
     if (segIds.length === 0) { setAudioStatus(new Map()); return; }
     const { data } = await supabase
       .from("segment_audio")
-      .select("segment_id, status, duration_ms")
-      .in("segment_id", segIds);
+      .select("segment_id, status, duration_ms, created_at")
+      .in("segment_id", segIds)
+      .order("created_at", { ascending: false });
+
     const map = new Map<string, { status: string; durationMs: number }>();
     if (data) {
       for (const a of data) {
-        map.set(a.segment_id, { status: a.status, durationMs: a.duration_ms });
+        const prev = map.get(a.segment_id);
+        if (!prev) {
+          map.set(a.segment_id, { status: a.status, durationMs: a.duration_ms });
+          continue;
+        }
+        // If any ready record exists for a segment, prefer it for UI fill/status.
+        if (prev.status !== "ready" && a.status === "ready") {
+          map.set(a.segment_id, { status: a.status, durationMs: a.duration_ms });
+        }
       }
     }
     setAudioStatus(map);
