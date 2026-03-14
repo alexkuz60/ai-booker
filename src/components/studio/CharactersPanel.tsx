@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
 import { Users, UsersRound, Volume2, Loader2, Sparkles, User, Filter, Merge, CheckSquare, X, Check, SearchCheck } from "lucide-react";
+import { RoleBadge } from "@/components/ui/RoleBadge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
