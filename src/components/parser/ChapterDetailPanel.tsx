@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
+import { RoleBadge, RoleBadges } from "@/components/ui/RoleBadge";
 import { t, tSceneType, tMood, tSceneTitle } from "@/pages/parser/i18n";
 import type { TocChapter, Scene, ChapterStatus } from "@/pages/parser/types";
 import { SCENE_TYPE_COLORS } from "@/pages/parser/types";
