@@ -363,7 +363,33 @@ export default function Parser() {
             />
           )}
           {step === "upload" && (
-            <UploadView isRu={isRu} fileInputRef={fileInputRef} onFileSelect={handleFileSelect} />
+            <UploadView
+              isRu={isRu}
+              fileInputRef={fileInputRef}
+              onFileSelect={handleFileSelect}
+              storageBackend={storageBackend}
+              onCreateLocalProject={async () => {
+                try {
+                  const title = isRu ? "Новая книга" : "New Book";
+                  await createProject(title, "", user?.id || "", isRu ? "ru" : "en");
+                  toast({ title: isRu ? "Проект создан" : "Project created" });
+                } catch (err: any) {
+                  if (err?.name !== "AbortError") {
+                    toast({ title: isRu ? "Ошибка" : "Error", description: String(err?.message || err), variant: "destructive" });
+                  }
+                }
+              }}
+              onOpenLocalProject={async () => {
+                try {
+                  const store = await openProject();
+                  toast({ title: isRu ? "Проект открыт" : "Project opened", description: store.projectName });
+                } catch (err: any) {
+                  if (err?.name !== "AbortError") {
+                    toast({ title: isRu ? "Ошибка" : "Error", description: String(err?.message || err), variant: "destructive" });
+                  }
+                }
+              }}
+            />
           )}
           {step === "extracting_toc" && (
             <ExtractingTocView fileName={fileName} isRu={isRu} />
