@@ -142,6 +142,8 @@ function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
 export default function ChapterDetailPanel({
   isRu, selectedIdx, selectedEntry, selectedResult, analysisLog, onAnalyze, childCount = 0,
 }: ChapterDetailPanelProps) {
+  const [reanalyzeOpen, setReanalyzeOpen] = useState(false);
+
   if (selectedIdx === null || !selectedEntry) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground">
