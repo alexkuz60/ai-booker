@@ -78,6 +78,27 @@ export default function Parser() {
     tocEntries, chapterIdMap, chapterResults, setChapterResults,
   });
 
+
+  // ── Auto-sync scene results to local project when chapters get analyzed ──
+  const lastSyncedRef = useRef("");
+  useEffect(() => {
+    if (!projectStorage?.isReady || !bookId || chapterResults.size === 0) return;
+    // Build a simple key to detect meaningful changes (done count)
+    const doneCount = Array.from(chapterResults.values()).filter(r => r.status === "done").length;
+    const syncKey = `${bookId}_${doneCount}`;
+    if (syncKey === lastSyncedRef.current) return;
+    lastSyncedRef.current = syncKey;
+    syncStructureToLocal(projectStorage, {
+      bookId,
+      title: fileName.replace('.pdf', ''),
+      fileName,
+      toc: tocEntries,
+      parts: [],
+      chapterIdMap,
+      chapterResults,
+    });
+  }, [projectStorage, bookId, chapterResults, tocEntries, fileName, chapterIdMap]);
+
   const selectedIdx = selectedIndices.size === 1 ? Array.from(selectedIndices)[0] : null;
 
   const {
