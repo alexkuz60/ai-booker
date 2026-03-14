@@ -82,6 +82,9 @@ function dehyphenate(lines: string[]): string {
       result += ' ' + next;
     }
   }
+  // Also fix intra-line soft hyphens: "попыт- ка" → "попытка"
+  // Safe: real hyphens like "кто-то" / "диван-кровать" have no space after hyphen
+  result = result.replace(/([а-яёa-z])-\s+([а-яёa-z])/g, '$1$2');
   return result;
 }
 
