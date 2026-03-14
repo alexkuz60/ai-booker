@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Bot } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -12,6 +12,8 @@ import { usePageHeader } from "@/hooks/usePageHeader";
 import { t } from "@/pages/parser/i18n";
 import { NAV_WIDTH_KEY, NAV_STATE_KEY } from "@/pages/parser/types";
 import type { Scene, ChapterStatus } from "@/pages/parser/types";
+import type { AiRoleId } from "@/config/aiRoles";
+import { useToast } from "@/hooks/use-toast";
 import { useChapterAnalysis } from "@/hooks/useChapterAnalysis";
 import { useBookManager } from "@/hooks/useBookManager";
 import { useParserHelpers } from "@/hooks/useParserHelpers";
@@ -31,6 +33,7 @@ export default function Parser() {
   const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
   const [aiRolesOpen, setAiRolesOpen] = useState(false);
   const { getModelForRole } = useAiRoles(userApiKeys);
+  const { toast } = useToast();
   const [navRestoredFromStorage] = useState<boolean>(() => {
     try {
       const saved = sessionStorage.getItem(NAV_STATE_KEY);
@@ -80,6 +83,24 @@ export default function Parser() {
     isChapterFullyDone, sendToStudio,
     partGroups, partlessIndices,
   } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName, bookId: bookId ?? undefined });
+
+  // ── Warn when analysis-relevant models change ──
+  const analysisRoles = new Set<AiRoleId>(["screenwriter", "director"]);
+  const handleRoleModelChanged = useCallback((roleId: AiRoleId) => {
+    if (!analysisRoles.has(roleId)) return;
+    const analyzedCount = Object.values(chapterResults).filter(
+      (r) => r && (r as { status: ChapterStatus }).status === "done"
+    ).length;
+    if (analyzedCount > 0) {
+      toast({
+        title: isRu ? "Модель изменена" : "Model changed",
+        description: isRu
+          ? `${analyzedCount} гл. проанализированы прежней моделью. Используйте «Повторить» для обновления.`
+          : `${analyzedCount} ch. analyzed with previous model. Use "Reanalyze" to update.`,
+        duration: 6000,
+      });
+    }
+  }, [chapterResults, isRu, toast]);
 
   // ── Reset handler (must be above headerRight useMemo) ──
   const handleReset = () => {
@@ -404,7 +425,7 @@ export default function Parser() {
             </SheetTitle>
           </SheetHeader>
           <div className="mt-4">
-            <AiRolesTab apiKeys={userApiKeys} isRu={isRu} />
+            <AiRolesTab apiKeys={userApiKeys} isRu={isRu} onModelChanged={handleRoleModelChanged} />
           </div>
         </SheetContent>
       </Sheet>

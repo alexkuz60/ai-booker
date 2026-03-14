@@ -22,6 +22,8 @@ const STORAGE_KEY = "ai-roles-collapsed-providers";
 interface AiRolesTabProps {
   apiKeys: Record<string, string>;
   isRu: boolean;
+  /** Called when a role's model is changed — receives roleId */
+  onModelChanged?: (roleId: AiRoleId) => void;
 }
 
 const TIER_ICONS = {
@@ -50,7 +52,7 @@ function saveCollapsed(set: Set<string>) {
   } catch {}
 }
 
-export function AiRolesTab({ apiKeys, isRu }: AiRolesTabProps) {
+export function AiRolesTab({ apiKeys, isRu, onModelChanged }: AiRolesTabProps) {
   const {
     resolvedModels,
     overrides,
@@ -164,9 +166,10 @@ export function AiRolesTab({ apiKeys, isRu }: AiRolesTabProps) {
 
                 <Select
                   value={currentModel}
-                  onValueChange={(v) =>
-                    setModelForRole(role.id as AiRoleId, v)
-                  }
+                  onValueChange={(v) => {
+                    setModelForRole(role.id as AiRoleId, v);
+                    onModelChanged?.(role.id as AiRoleId);
+                  }}
                 >
                   <SelectTrigger className="w-full sm:w-[240px] h-8 text-xs shrink-0">
                     <SelectValue />
