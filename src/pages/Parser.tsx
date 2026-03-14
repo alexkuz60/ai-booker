@@ -99,6 +99,10 @@ export default function Parser() {
           <div className="text-xs text-muted-foreground font-body">
             {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} · {totalScenes} {t("scenes", isRu)}
           </div>
+          <Button variant="ghost" size="sm" onClick={() => setAiRolesOpen(true)} className="gap-1.5">
+            <Bot className="h-3.5 w-3.5" />
+            {isRu ? "AI Роли" : "AI Roles"}
+          </Button>
           <Button variant="outline" size="sm" onClick={handleReset} className="gap-1.5">
             <ArrowLeft className="h-3 w-3" />
             {t("libraryBack", isRu)}
