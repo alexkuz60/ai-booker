@@ -214,6 +214,10 @@ function SceneCards({
                 <Hash className="h-4 w-4 text-muted-foreground" />
                 {t("cleanupPageNum", isRu)}
               </ContextMenuItem>
+              <ContextMenuItem onClick={() => handleCleanup("footnote_link", i)} className="gap-2">
+                <Footprints className="h-4 w-4 text-muted-foreground" />
+                {t("cleanupFootnoteLink", isRu)}
+              </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem onClick={() => handleCleanup("chapter_split", i)} className="gap-2">
                 <Scissors className="h-4 w-4 text-muted-foreground" />
