@@ -230,7 +230,19 @@ export default function ChapterDetailPanel({
                   </p>
                   <p className="text-xs text-muted-foreground">{t("decomposing", isRu)}</p>
                 </div>
-                <Loader2 className="h-4 w-4 animate-spin text-primary ml-auto shrink-0" />
+                <div className="flex items-center gap-2 ml-auto shrink-0">
+                  {onStopAnalysis && (
+                    <Button
+                      variant="ghost" size="sm"
+                      onClick={onStopAnalysis}
+                      className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <StopCircle className="h-4 w-4" />
+                      {isRu ? "Стоп" : "Stop"}
+                    </Button>
+                  )}
+                  <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+                </div>
               </div>
               <ScrollArea className="max-h-[300px]">
                 <div className="space-y-1 font-mono text-xs">
