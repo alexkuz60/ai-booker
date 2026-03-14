@@ -105,6 +105,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
               {castingExternal
                 ? (isRu ? "Подбор и профайлинг..." : "Casting & profiling...")
                 : (isRu ? "Подбор Актёров" : "Auto-Cast")}
+              <RoleBadge roleId="director" model={getModelForRole("director")} isRu={isRu} size={12} />
             </Button>
           )}
         </div>
