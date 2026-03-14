@@ -174,12 +174,14 @@ export async function extractTextByPageRange(
     footnoteState = newState;
 
     // Merge consecutive non-empty lines into paragraphs, keep empty lines as \n\n
+    // Also dehyphenate: if a line ends with a hyphen followed by a lowercase letter
+    // on the next line, join the word without the hyphen.
     const paragraphs: string[] = [];
     let buf: string[] = [];
     for (const line of lines) {
       if (line === '') {
         if (buf.length > 0) {
-          paragraphs.push(buf.join(' '));
+          paragraphs.push(dehyphenate(buf));
           buf = [];
         }
         paragraphs.push('');
@@ -187,7 +189,7 @@ export async function extractTextByPageRange(
         buf.push(line);
       }
     }
-    if (buf.length > 0) paragraphs.push(buf.join(' '));
+    if (buf.length > 0) paragraphs.push(dehyphenate(buf));
 
     // Append footnote block if present
     if (markedFootnotes) {
