@@ -943,8 +943,9 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
           <ScrollArea className="h-full">
             <div className="p-4 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider">
+                <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   {isRu ? "Профайл" : "Profile"}
+                  <RoleBadge roleId="profiler" model={getModelForRole("profiler")} isRu={isRu} size={12} />
                 </h3>
                 {selectedChar && (
                   <Button
