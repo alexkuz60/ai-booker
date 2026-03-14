@@ -25,6 +25,8 @@ interface AiRolesTabProps {
   isRu: boolean;
   /** Called when a role's model is changed — receives roleId */
   onModelChanged?: (roleId: AiRoleId) => void;
+  /** Current book title for preset naming */
+  bookTitle?: string;
 }
 
 const TIER_ICONS = {
