@@ -26,15 +26,7 @@ const Montage = () => {
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
   const { user } = useAuth();
-  const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (!user) return;
-    supabase.from('profiles').select('api_keys').eq('id', user.id).single()
-      .then(({ data }) => {
-        if (data?.api_keys) setUserApiKeys(data.api_keys as Record<string, string>);
-      });
-  }, [user]);
+  const userApiKeys = useUserApiKeys();
 
   const {
     bookTitle, chapterId, chapterTitle,

@@ -348,13 +348,6 @@ export default function Parser() {
     }
   }, [tocEntries, navRestoredFromStorage]);
 
-  useEffect(() => {
-    if (!user) return;
-    supabase.from('profiles').select('api_keys').eq('id', user.id).single()
-      .then(({ data }) => {
-        if (data?.api_keys) setUserApiKeys(data.api_keys as Record<string, string>);
-      });
-  }, [user]);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col h-full">
