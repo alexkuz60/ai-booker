@@ -89,7 +89,15 @@ function SceneCards({
   roleModels?: { screenwriter?: string; director?: string };
   onScenesUpdate?: (scenes: Scene[]) => void;
 }) {
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const toggleExpand = useCallback((idx: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      return next;
+    });
+  }, []);
   const { applyCleanup } = useContentCleanup();
 
   const totalDuration = useMemo(() => {
