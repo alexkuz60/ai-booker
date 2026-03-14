@@ -272,7 +272,7 @@ export function useChapterAnalysis({
           }
 
           try {
-            const enrichData = await callParseFunction({ ...baseBody, text: sceneText, mode: "enrich" });
+            const enrichData = await callParseFunction({ ...buildBaseBody("director"), text: sceneText, mode: "enrich" });
             if (enrichData?.structure) {
               sc.scene_type = enrichData.structure.scene_type || 'mixed';
               sc.mood = enrichData.structure.mood || 'neutral';
