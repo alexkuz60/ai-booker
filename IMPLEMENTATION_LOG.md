@@ -354,3 +354,82 @@ Source → EQ (3-band) → Compressor → Limiter → Panner3D → Convolver (IR
 - **Director** (Режиссёр) → обогащение метаданных сцен (тип, настроение, BPM).
 - Единый набор моделей для всего пайплайна гарантирует консистентность результатов.
 - **Будущее:** поддержка вариантов (версий) аудиокниги для сравнения результатов разных моделей.
+
+---
+
+## Local-First Architecture (ProjectStorage)
+
+**Статус:** 🚧 В процессе реализации
+
+### Стратегия
+Переход от server-centric модели к Local-First: пользователь работает с локальной папкой проекта, облачная синхронизация — опциональна. Цели: снижение трафика/хранилища, максимальная скорость работы, автономность, безболезненные откаты.
+
+### Этап 0: Оптимизация трафика Edge Functions ✅
+| Функция | До | После |
+|---------|-----|-------|
+| `segment-scene` | Клиент передаёт `content` в body | Читает `book_scenes.content` по `scene_id` серверно |
+| `detect-inline-narrations` | Уже читал из БД | Без изменений (уже оптимально) |
+| `profile-characters` | Уже читал из БД | Без изменений (уже оптимально) |
+
+### Этап 1: ProjectStorage интерфейс ✅
+
+**Файлы:**
+- `src/lib/projectStorage.ts` — интерфейс + две реализации
+- `src/hooks/useProjectStorage.ts` — React-хук
+
+**Интерфейс `ProjectStorage`:**
+- `readJSON<T>(path)` / `writeJSON(path, data)` — структурированные данные
+- `readBlob(path)` / `writeBlob(path, blob)` — бинарные файлы (аудио, PDF)
+- `exists(path)` / `delete(path)` / `listDir(path)` — управление файлами
+- `exportZip()` / `importZip(zip)` — bulk-синхронизация (TODO)
+
+**Реализации:**
+- `LocalFSStorage` — File System Access API (Chromium: Chrome, Edge, Opera)
+- `OPFSStorage` — Origin Private File System (Firefox, Safari — fallback)
+- `detectStorageBackend()` — автодетект доступного API
+
+**Структура папок проекта:**
+```
+📁 BookTitle/
+├── project.json           — ProjectMeta (version, bookId, title, userId, language)
+├── 📁 source/
+│   └── book.pdf
+├── 📁 structure/
+│   ├── toc.json           — TocChapter[]
+│   ├── parts.json
+│   ├── chapters.json
+│   └── characters.json
+├── 📁 scenes/
+│   └── scene_{id}.json    — сцена + сегменты + фразы
+├── 📁 audio/
+│   ├── 📁 tts/            — {segmentId}.mp3
+│   ├── 📁 atmosphere/
+│   └── 📁 renders/        — финальные стемы
+└── 📁 montage/
+```
+
+**Хук `useProjectStorage`:**
+- `createProject(title, bookId, userId, lang)` — создание папки + project.json
+- `openProject()` — открытие существующей папки, валидация project.json
+- `closeProject()` — закрытие проекта
+- `saveSourcePDF(file)` / `readSourcePDF()` — PDF в source/
+- Авто-восстановление OPFS-проекта через localStorage
+
+### Этап 2: Интеграция в Parser UI ✅
+
+**Изменения:**
+- `UploadView.tsx` — добавлены карточки «Новый проект» / «Открыть проект» под основным upload
+- `Parser.tsx` — подключён `useProjectStorage`, передаются колбэки в UploadView
+- Индикация бэкенда (FS Access API / OPFS)
+
+### Следующие этапы (план):
+- **Этап 3:** Сохранение структуры книги (TOC, главы, сцены) в локальную папку параллельно с облаком
+- **Этап 4:** Скачивание TTS-аудио в `audio/tts/` вместо серверного хранилища
+- **Этап 5:** Кнопка «Сохранить в облако» — сериализация локальных данных → Supabase
+- **Этап 6:** Кнопка «Загрузить из облака» — восстановление проекта из Supabase в локалку
+
+### Ключевые архитектурные решения:
+1. **Dual-write пока не реализован** — сначала только локальное создание/открытие, без дублирования записи в БД
+2. **project.json** — единственный обязательный файл для валидации проекта
+3. **OPFS** не даёт пользователю видеть файлы в проводнике (в отличие от FS Access) — это ограничение, не баг
+4. **Права FS Access API** — сбрасываются при перезапуске браузера, потребуется re-pick папки
