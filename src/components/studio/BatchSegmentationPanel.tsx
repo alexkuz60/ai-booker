@@ -150,7 +150,6 @@ export function BatchSegmentationPanel({
   const statusLabel = (status: SceneStatus) => {
     const labels: Record<SceneStatus, [string, string]> = {
       pending: ["Ожидание", "Pending"],
-      loading: ["Загрузка…", "Loading…"],
       analyzing: ["Анализ…", "Analyzing…"],
       done: ["Готово", "Done"],
       error: ["Ошибка", "Error"],
