@@ -108,9 +108,10 @@ Rules:
 - "monologue" = a single standalone spoken line (direct speech) NOT part of a back-and-forth exchange; set "speaker" to the character name. Use this when a character speaks once and the scene continues with narration, not another character's reply
 - "lyric" = songs, poems, verses, rhymed text, recitations. IMPORTANT: detect poetry even when embedded in prose — if a passage has verse structure (line breaks with rhythm/rhyme, stanza grouping, or meter), classify it as "lyric". Songs sung by characters are also "lyric" with "speaker" set to the singer. Preserve original line breaks in the "text" field for poetry.
 - "epigraph" = epigraphs, quotes at the start
-- "footnote" = footnotes, author comments
+- "footnote" = footnotes, author comments. Text marked with [сн. N]...[/сн.] is footnote content.
 - "telephone" = phone conversations
 - Inline sound markers like [gunshot] should remain in the text as-is
+- Footnote reference markers [сн.→ N] MUST be preserved exactly as-is in the text. They mark where a footnote is referenced in the body text. Do NOT remove, alter, or split them.
 
 IMPORTANT — Inline narrator detection:
 When dialogue contains embedded narrator commentary (author words between dashes/commas), extract them as inline_narrations.
