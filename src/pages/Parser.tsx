@@ -745,6 +745,49 @@ export default function Parser() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Delete Confirmation Dialog ── */}
+      <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isRu ? "Удалить из структуры?" : "Remove from structure?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              {pendingDelete && pendingDelete.indices.length === 1 ? (
+                <span>{t("deleteEntryConfirm", isRu).replace("{title}", tocEntries[pendingDelete.indices[0]]?.title || "")}</span>
+              ) : pendingDelete ? (
+                <span>{t("deleteMultiConfirm", isRu).replace("{count}", String(pendingDelete.indices.length))}</span>
+              ) : null}
+              {pendingDelete && pendingDelete.toDelete.size > pendingDelete.indices.length && (
+                <span className="block text-xs text-muted-foreground">
+                  {isRu
+                    ? `Включая ${pendingDelete.toDelete.size - pendingDelete.indices.length} вложенных элементов`
+                    : `Including ${pendingDelete.toDelete.size - pendingDelete.indices.length} nested items`}
+                </span>
+              )}
+              {pendingDelete && (() => {
+                let sceneCount = 0;
+                for (const di of pendingDelete.toDelete) {
+                  const r = chapterResults.get(di);
+                  if (r?.scenes) sceneCount += r.scenes.length;
+                }
+                return sceneCount > 0 ? (
+                  <span className="block text-xs text-destructive">
+                    {isRu ? `${sceneCount} проанализированных сцен будут потеряны` : `${sceneCount} analyzed scenes will be lost`}
+                  </span>
+                ) : null;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {isRu ? "Удалить" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 }
