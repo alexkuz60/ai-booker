@@ -84,6 +84,24 @@ export default function Parser() {
     partGroups, partlessIndices,
   } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName, bookId: bookId ?? undefined });
 
+  // ── Warn when analysis-relevant models change ──
+  const analysisRoles = new Set<AiRoleId>(["screenwriter", "director"]);
+  const handleRoleModelChanged = useCallback((roleId: AiRoleId) => {
+    if (!analysisRoles.has(roleId)) return;
+    const analyzedCount = Object.values(chapterResults).filter(
+      (r) => r && (r as { status: ChapterStatus }).status === "done"
+    ).length;
+    if (analyzedCount > 0) {
+      toast({
+        title: isRu ? "Модель изменена" : "Model changed",
+        description: isRu
+          ? `${analyzedCount} гл. проанализированы прежней моделью. Используйте «Повторить» для обновления.`
+          : `${analyzedCount} ch. analyzed with previous model. Use "Reanalyze" to update.`,
+        duration: 6000,
+      });
+    }
+  }, [chapterResults, isRu, toast]);
+
   // ── Reset handler (must be above headerRight useMemo) ──
   const handleReset = () => {
     bookReset();
