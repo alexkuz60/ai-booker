@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Bot } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -30,7 +31,7 @@ export default function Parser() {
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
 
-  const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
+  const userApiKeys = useUserApiKeys();
   const [aiRolesOpen, setAiRolesOpen] = useState(false);
   const { getModelForRole } = useAiRoles(userApiKeys);
   const { toast } = useToast();
@@ -348,13 +349,6 @@ export default function Parser() {
     }
   }, [tocEntries, navRestoredFromStorage]);
 
-  useEffect(() => {
-    if (!user) return;
-    supabase.from('profiles').select('api_keys').eq('id', user.id).single()
-      .then(({ data }) => {
-        if (data?.api_keys) setUserApiKeys(data.api_keys as Record<string, string>);
-      });
-  }, [user]);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col h-full">

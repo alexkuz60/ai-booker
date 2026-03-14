@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { motion } from "framer-motion";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Loader2, AlertCircle, FileAudio } from "lucide-react";
@@ -6,7 +7,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { useAuth } from "@/hooks/useAuth";
 import { useMontageData } from "@/hooks/useMontageData";
-import { supabase } from "@/integrations/supabase/client";
+
 import { MasterMeterPanel } from "@/components/studio/MasterMeterPanel";
 import { MasterEffectsTabs } from "@/components/studio/MasterEffectsTabs";
 import { MontageTimeline } from "@/components/montage/MontageTimeline";
@@ -26,15 +27,7 @@ const Montage = () => {
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
   const { user } = useAuth();
-  const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (!user) return;
-    supabase.from('profiles').select('api_keys').eq('id', user.id).single()
-      .then(({ data }) => {
-        if (data?.api_keys) setUserApiKeys(data.api_keys as Record<string, string>);
-      });
-  }, [user]);
+  const userApiKeys = useUserApiKeys();
 
   const {
     bookTitle, chapterId, chapterTitle,

@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Clock, Loader2 } from "lucide-react";
+import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -21,15 +22,7 @@ import { AiRolesButton } from "@/components/AiRolesButton";
 const Studio = () => {
   const { isRu } = useLanguage();
   const { user } = useAuth();
-  const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (!user) return;
-    supabase.from('profiles').select('api_keys').eq('id', user.id).single()
-      .then(({ data }) => {
-        if (data?.api_keys) setUserApiKeys(data.api_keys as Record<string, string>);
-      });
-  }, [user]);
+  const userApiKeys = useUserApiKeys();
   const {
     chapter, setChapter,
     selectedSceneIdx, setSelectedSceneIdx,
