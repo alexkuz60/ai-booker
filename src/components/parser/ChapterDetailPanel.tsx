@@ -66,6 +66,8 @@ interface ChapterDetailPanelProps {
   selectedResult: { scenes: Scene[]; status: ChapterStatus } | null | undefined;
   analysisLog: string[];
   onAnalyze: (idx: number, mode?: "full" | "enrich") => void;
+  onStopAnalysis?: () => void;
+  isAnalyzing?: boolean;
   childCount?: number;
   /** Current model names for role badges */
   roleModels?: { screenwriter?: string; director?: string };
