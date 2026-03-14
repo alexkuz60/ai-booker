@@ -118,7 +118,7 @@ export function AiRolesTab({ apiKeys, isRu }: AiRolesTabProps) {
         {AI_ROLE_LIST.map((role) => {
           const TierIcon = TIER_ICONS[role.tier];
           const tierColor = TIER_COLORS[role.tier];
-          const currentModel = resolvedModels[role.id];
+          const currentModel = overrides[role.id] || resolvedModels[role.id];
           const isOverridden = !!overrides[role.id];
 
           return (
