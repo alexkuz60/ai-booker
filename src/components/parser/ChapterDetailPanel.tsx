@@ -43,6 +43,13 @@ function renderMarkedText(text: string) {
         </span>
       );
     }
+    if (/^\[сн\.→\s*\d+\]$/.test(part)) {
+      return (
+        <span key={i} className="inline-flex items-center mx-0.5 px-1.5 py-0 rounded text-[10px] font-mono bg-sky-500/20 text-sky-400 align-baseline cursor-help" title="Ссылка на сноску">
+          {part}
+        </span>
+      );
+    }
     if (/^\[сн\.\s*\d+\]$/.test(part)) {
       insideFootnote = true;
       return (
