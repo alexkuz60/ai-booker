@@ -297,15 +297,17 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
         const flat = flattenTocWithRanges(outline, pdf.numPages);
         let currentPart = "";
         for (const entry of flat) {
-          if (entry.level === 0 && entry.children.length > 0) {
-            currentPart = entry.title;
-          } else {
-            chapters.push({
-              title: entry.title, startPage: entry.startPage, endPage: entry.endPage,
-              level: entry.level, partTitle: currentPart || undefined,
-              sectionType: classifySection(entry.title),
-            });
+          const isContainer = entry.children.length > 0;
+          if (isContainer) {
+            if (entry.level === 0) currentPart = entry.title;
+            continue;
           }
+
+          chapters.push({
+            title: entry.title, startPage: entry.startPage, endPage: entry.endPage,
+            level: entry.level, partTitle: currentPart || undefined,
+            sectionType: classifySection(entry.title),
+          });
         }
         if (chapters.length === 0) {
           for (const entry of flat) {
