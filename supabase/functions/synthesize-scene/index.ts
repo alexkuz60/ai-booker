@@ -499,6 +499,44 @@ function escapeXml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// ── Lyric (verse/poetry) SSML builder ────────────────────────────────
+// Wraps verse text in <prosody rate="90%">, adds line-end pauses (400ms)
+// and stanza pauses (1000ms) between blank-line-separated strophes.
+
+function buildLyricSsml(text: string): string {
+  const lines = text.split(/\n/);
+  let ssml = '<speak><prosody rate="90%">';
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line === "") {
+      // Stanza break
+      ssml += ' <break time="1000ms"/> ';
+    } else {
+      ssml += escapeXml(line);
+      // Line-end pause (unless last line)
+      if (i < lines.length - 1 && lines[i + 1]?.trim() !== "") {
+        ssml += ' <break time="400ms"/> ';
+      }
+    }
+  }
+  ssml += '</prosody></speak>';
+  return ssml;
+}
+
+// Format lyric text for non-SSML providers (ProxyAPI, v3)
+function formatLyricText(text: string): { text: string; extraInstructions: string[] } {
+  // Replace line breaks with "..." for pauses, double breaks with "......"
+  let modified = text
+    .replace(/\n\s*\n/g, "\n......\n") // stanza breaks → long pause
+    .replace(/\n/g, "... ");          // line breaks → short pause
+  const instructions = [
+    "Read this as poetry/verse with expressive intonation",
+    "Slow down slightly, respect the rhythm and meter",
+    "Make meaningful pauses at line endings and longer pauses between stanzas",
+  ];
+  return { text: modified, extraInstructions: instructions };
+}
+
 // ── Narrator voice for inline narrations ─────────────────────────────
 // If scene has first_person segments with a speaker, use that character's voice
 // (the scene is narrated from their perspective). Otherwise fall back to Narrator/Рассказчик.
