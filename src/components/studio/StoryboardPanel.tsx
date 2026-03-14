@@ -1870,10 +1870,30 @@ export function StoryboardPanel({
               </span>
             )}
           </span>
-          <Button variant="ghost" size="sm" onClick={runAnalysis} disabled={analyzing || !sceneContent} className="gap-1.5 h-7 text-xs">
-            {analyzing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-            {isRu ? "Переанализ" : "Re-analyze"}
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="sm" disabled={analyzing || !sceneContent} className="gap-1.5 h-7 text-xs">
+                {analyzing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                {isRu ? "Переанализ" : "Re-analyze"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{isRu ? "Переанализировать сцену?" : "Re-analyze scene?"}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {isRu
+                    ? "Текущая раскадровка будет заменена. Существующие фразы, аудио и настройки голосов для этой сцены будут удалены."
+                    : "Current segmentation will be replaced. Existing phrases, audio and voice settings for this scene will be deleted."}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
+                <AlertDialogAction onClick={runAnalysis}>
+                  {isRu ? "Переанализ" : "Re-analyze"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button
             variant="outline"
             size="sm"
