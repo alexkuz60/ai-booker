@@ -215,7 +215,17 @@ export default function ChapterDetailPanel({
                   <Zap className="h-5 w-5 text-primary-foreground" />
                 </div>
                 <div>
-                  <p className="font-display font-semibold text-sm">The Architect</p>
+                  <p className="font-display font-semibold text-sm flex items-center gap-1.5">
+                    The Architect
+                    <RoleBadges
+                      roles={[
+                        { roleId: "screenwriter", model: roleModels?.screenwriter },
+                        { roleId: "director", model: roleModels?.director },
+                      ]}
+                      isRu={isRu}
+                      size={12}
+                    />
+                  </p>
                   <p className="text-xs text-muted-foreground">{t("decomposing", isRu)}</p>
                 </div>
                 <Loader2 className="h-4 w-4 animate-spin text-primary ml-auto shrink-0" />
