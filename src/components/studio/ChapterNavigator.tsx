@@ -541,6 +541,30 @@ export function ChapterNavigator({
             <Scissors className="h-3 w-3" />
           </Button>
         </div>
+        {multiCount > 0 && (
+          <div className="flex items-center gap-2 mt-1.5 px-0.5">
+            <Badge variant="secondary" className="text-[10px]">
+              {multiCount} {isRu ? "выбр." : "sel."}
+            </Badge>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-[11px] gap-1"
+              onClick={handleBatchAnalyzeClick}
+            >
+              <Sparkles className="h-3 w-3" />
+              {isRu ? "Анализ выбранных" : "Analyze Selected"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-1.5 text-[11px]"
+              onClick={() => onSelectedSceneIndicesChange?.(new Set())}
+            >
+              ✕
+            </Button>
+          </div>
+        )}
         <div className="flex items-center gap-2 mt-0.5">
           <p className="text-xs text-muted-foreground truncate flex-1">
             {chapter.bookTitle}
