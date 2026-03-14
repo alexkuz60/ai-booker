@@ -86,8 +86,6 @@ function dehyphenate(lines: string[]): string {
 }
 
 /**
- * Extract text from specific page ranges of a PDF.
-/**
  * Extract text from specific page ranges of a PDF,
  * preserving paragraph breaks using Y-coordinate gaps between text items.
  */
