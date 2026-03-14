@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Bot } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,6 +21,7 @@ import UploadView from "@/components/parser/UploadView";
 import { ExtractingTocView, ErrorView } from "@/components/parser/StatusViews";
 import NavSidebar from "@/components/parser/NavSidebar";
 import ChapterDetailPanel from "@/components/parser/ChapterDetailPanel";
+import { AiRolesTab } from "@/components/profile/tabs/AiRolesTab";
 
 export default function Parser() {
   const { user } = useAuth();
@@ -27,6 +29,7 @@ export default function Parser() {
   const { setPageHeader } = usePageHeader();
 
   const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
+  const [aiRolesOpen, setAiRolesOpen] = useState(false);
   const { getModelForRole } = useAiRoles(userApiKeys);
   const [navRestoredFromStorage] = useState<boolean>(() => {
     try {
@@ -96,6 +99,10 @@ export default function Parser() {
           <div className="text-xs text-muted-foreground font-body">
             {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} · {totalScenes} {t("scenes", isRu)}
           </div>
+          <Button variant="ghost" size="sm" onClick={() => setAiRolesOpen(true)} className="gap-1.5">
+            <Bot className="h-3.5 w-3.5" />
+            {isRu ? "AI Роли" : "AI Roles"}
+          </Button>
           <Button variant="outline" size="sm" onClick={handleReset} className="gap-1.5">
             <ArrowLeft className="h-3 w-3" />
             {t("libraryBack", isRu)}
@@ -369,7 +376,6 @@ export default function Parser() {
                     onChangeStartPage={changeStartPage}
                     onOpenPdf={handleOpenPdf}
                     onRenamePart={renamePart}
-                    apiKeys={userApiKeys}
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle />
@@ -388,6 +394,20 @@ export default function Parser() {
           )}
         </AnimatePresence>
       </div>
+
+      <Sheet open={aiRolesOpen} onOpenChange={setAiRolesOpen}>
+        <SheetContent side="right" className="w-[400px] sm:w-[440px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Bot className="h-4 w-4" />
+              {isRu ? "AI Роли" : "AI Roles"}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            <AiRolesTab apiKeys={userApiKeys} isRu={isRu} />
+          </div>
+        </SheetContent>
+      </Sheet>
     </motion.div>
   );
 }
