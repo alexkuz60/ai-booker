@@ -9,10 +9,14 @@ import type {
   Scene, TocChapter, Step, ChapterStatus, BookRecord,
 } from "@/pages/parser/types";
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
+import type { ProjectStorage } from "@/lib/projectStorage";
+import { syncStructureToLocal } from "@/lib/localSync";
 
 interface UseBookManagerParams {
   userId: string | undefined;
   isRu: boolean;
+  /** Optional local project storage for dual-write */
+  projectStorage?: ProjectStorage | null;
 }
 
 export function useBookManager({ userId, isRu }: UseBookManagerParams) {
