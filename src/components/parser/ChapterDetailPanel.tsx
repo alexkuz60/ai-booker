@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, Fragment } from "react";
+import { useState, useMemo, useCallback, useRef, Fragment } from "react";
 import { motion } from "framer-motion";
 import {
   FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock, RefreshCw, Palette, StopCircle,
@@ -105,7 +105,19 @@ function SceneCards({
     return { sec: estimateDurationSec(totalChars), formatted: formatDuration(estimateDurationSec(totalChars)) };
   }, [scenes]);
 
+  // Save selection text before context menu steals it
+  const savedSelection = useRef<string>("");
+
+  const handleContextMenu = useCallback(() => {
+    const sel = window.getSelection();
+    const text = sel?.toString().trim() || "";
+    if (text) savedSelection.current = text;
+  }, []);
+
   const getSelectedText = useCallback(() => {
+    // Prefer saved selection (survives context menu focus steal)
+    const saved = savedSelection.current;
+    if (saved) return saved;
     const sel = window.getSelection();
     return sel?.toString().trim() || "";
   }, []);
@@ -121,6 +133,7 @@ function SceneCards({
       onScenesUpdate(result.scenes);
     }
     toast(result.summary, { duration: 3000 });
+    savedSelection.current = "";
   }, [scenes, isRu, applyCleanup, getSelectedText, onScenesUpdate]);
 
   return (
@@ -155,7 +168,7 @@ function SceneCards({
         return (
           <ContextMenu key={`${sc.scene_number}-${i}`}>
             <ContextMenuTrigger asChild>
-              <Card>
+              <Card onContextMenu={handleContextMenu}>
                 <CardContent className="py-3 px-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-base font-medium flex items-center gap-1.5">
