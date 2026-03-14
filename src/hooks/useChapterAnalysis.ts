@@ -343,14 +343,16 @@ export function useChapterAnalysis({
 
         addLog(`${t("logFoundScenes", isRu)} ${scenes.length} ${t("logScenesWord", isRu)}:`);
         const totalChars = text.length;
-        const pageSpan = entry.endPage - entry.startPage + 1;
+        const extractRangeStart = Math.max(1, Number(entry.startPage) || 1);
+        const extractRangeEnd = Math.max(extractRangeStart, Number(entry.endPage) || extractRangeStart);
+        const pageSpan = extractRangeEnd - extractRangeStart + 1;
         let charOffset = 0;
         scenes.forEach((sc, i) => {
           const scLen = sc.content?.length || 0;
           const startFrac = totalChars > 0 ? charOffset / totalChars : 0;
           const endFrac = totalChars > 0 ? (charOffset + scLen) / totalChars : 0;
-          const pageStart = Math.floor(entry.startPage + startFrac * pageSpan);
-          const pageEnd = Math.max(pageStart, Math.ceil(entry.startPage + endFrac * pageSpan) - 1);
+          const pageStart = Math.floor(extractRangeStart + startFrac * pageSpan);
+          const pageEnd = Math.max(pageStart, Math.ceil(extractRangeStart + endFrac * pageSpan) - 1);
           charOffset += scLen;
           addLog(`  ${t("logSceneItem", isRu)} ${i + 1}: «${sc.title}» — ${t("logPagesAbbr", isRu)} ${pageStart}–${pageEnd}, ${scLen.toLocaleString()} ${t("logCharsAbbr", isRu)}`);
         });
