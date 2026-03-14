@@ -30,7 +30,7 @@ export default function Parser() {
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
 
-  const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
+  const userApiKeys = useUserApiKeys();
   const [aiRolesOpen, setAiRolesOpen] = useState(false);
   const { getModelForRole } = useAiRoles(userApiKeys);
   const { toast } = useToast();
