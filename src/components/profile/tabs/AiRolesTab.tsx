@@ -102,28 +102,37 @@ export function AiRolesTab({ apiKeys, isRu, onModelChanged, bookTitle }: AiRoles
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground font-body">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <p className="text-sm text-muted-foreground font-body flex-1 min-w-0">
           {isRu
             ? "Выберите модель для каждой AI-роли. Лёгкие задачи — быстрые модели, сложные — мощные."
             : "Choose a model for each AI role. Light tasks → fast models, complex → powerful."}
         </p>
-        {hasOverrides && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={resetAll}
-            className="gap-1.5 text-xs shrink-0"
-            title={isRu
-              ? (hasPreEditSnapshot ? "Вернуть набор моделей, с которым работали" : "Сбросить к настройкам по умолчанию")
-              : (hasPreEditSnapshot ? "Restore last working model set" : "Reset to defaults")}
-          >
-            <RotateCcw className="h-3 w-3" />
-            {isRu
-              ? (hasPreEditSnapshot ? "Вернуть" : "Сбросить")
-              : (hasPreEditSnapshot ? "Restore" : "Reset")}
-          </Button>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <AiRolePresets
+            currentOverrides={overrides}
+            resolvedModels={resolvedModels}
+            onLoadPreset={loadPreset}
+            bookTitle={bookTitle}
+            isRu={isRu}
+          />
+          {hasOverrides && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={resetAll}
+              className="gap-1.5 text-xs shrink-0"
+              title={isRu
+                ? (hasPreEditSnapshot ? "Вернуть набор моделей, с которым работали" : "Сбросить к настройкам по умолчанию")
+                : (hasPreEditSnapshot ? "Restore last working model set" : "Reset to defaults")}
+            >
+              <RotateCcw className="h-3 w-3" />
+              {isRu
+                ? (hasPreEditSnapshot ? "Вернуть" : "Сбросить")
+                : (hasPreEditSnapshot ? "Restore" : "Reset")}
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-3">
