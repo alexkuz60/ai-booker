@@ -29,7 +29,7 @@ import { estimateDurationSec, formatDuration } from "@/lib/durationEstimate";
  * - [сн. N]…[/сн.] → amber footnote badge + dimmed content
  */
 function renderMarkedText(text: string) {
-  const regex = /(\[стр\.\s*\d+\]|\[сн\.\s*\d+\]|\[\/сн\.\])/g;
+  const regex = /(\[стр\.\s*\d+\]|\[сн\.→\s*\d+\]|\[сн\.\s*\d+\]|\[\/сн\.\])/g;
   const parts = text.split(regex);
   if (parts.length === 1) return text;
 
