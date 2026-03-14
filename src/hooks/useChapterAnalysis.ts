@@ -5,13 +5,15 @@ import { getModelRegistryEntry } from "@/config/modelRegistry";
 import { extractTextByPageRange } from "@/lib/pdf-extract";
 import { t } from "@/pages/parser/i18n";
 import type { Scene, TocChapter, ChapterStatus } from "@/pages/parser/types";
+import type { AiRoleId } from "@/config/aiRoles";
 
 interface UseChapterAnalysisParams {
   isRu: boolean;
   pdfRef: any;
   userId: string | undefined;
-  selectedModel: string;
   userApiKeys: Record<string, string>;
+  /** Role-based model resolver from useAiRoles */
+  getModelForRole: (roleId: AiRoleId) => string;
   tocEntries: TocChapter[];
   chapterIdMap: Map<number, string>;
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
@@ -19,7 +21,7 @@ interface UseChapterAnalysisParams {
 }
 
 export function useChapterAnalysis({
-  isRu, pdfRef, userId, selectedModel, userApiKeys,
+  isRu, pdfRef, userId, userApiKeys, getModelForRole,
   tocEntries, chapterIdMap, chapterResults, setChapterResults,
 }: UseChapterAnalysisParams) {
   const [analysisLog, setAnalysisLog] = useState<string[]>([]);
