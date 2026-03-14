@@ -67,6 +67,8 @@ interface ChapterDetailPanelProps {
   analysisLog: string[];
   onAnalyze: (idx: number, mode?: "full" | "enrich") => void;
   childCount?: number;
+  /** Current model names for role badges */
+  roleModels?: { screenwriter?: string; director?: string };
 }
 
 function SceneCards({ scenes, isRu }: { scenes: Scene[]; isRu: boolean }) {
