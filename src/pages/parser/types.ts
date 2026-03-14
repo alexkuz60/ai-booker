@@ -81,7 +81,7 @@ const SECTION_PATTERNS: { type: SectionType; patterns: RegExp[] }[] = [
   },
   {
     type: "appendix",
-    patterns: [/приложен/i, /дополнен/i, /appendix/i, /supplement/i],
+    patterns: [/приложен/i, /дополнен/i, /аппендикс/i, /appendix/i, /supplement/i],
   },
 ];
 
