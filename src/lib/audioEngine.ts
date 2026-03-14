@@ -1829,7 +1829,7 @@ class AudioEngine {
     return {
       state: this._state,
       positionSec: this.positionSec,
-      totalDuration: this._totalDuration,
+      totalDuration: this.getEffectiveTotalDuration(),
       volume: this._volume,
     };
   }
