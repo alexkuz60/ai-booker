@@ -64,7 +64,7 @@ interface ChapterDetailPanelProps {
   selectedEntry: TocChapter | null;
   selectedResult: { scenes: Scene[]; status: ChapterStatus } | null | undefined;
   analysisLog: string[];
-  onAnalyze: (idx: number) => void;
+  onAnalyze: (idx: number, mode?: "full" | "enrich") => void;
   childCount?: number;
 }
 
