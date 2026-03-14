@@ -318,12 +318,34 @@ export default function NavSidebar({
               <ExternalLink className="h-3.5 w-3.5" />
             </Button>
           )}
+          <Button
+            variant="ghost" size="icon"
+            className="h-6 w-6 flex-shrink-0 text-muted-foreground hover:text-primary"
+            title={isRu ? "AI Роли" : "AI Roles"}
+            onClick={() => setAiRolesOpen(true)}
+          >
+            <Bot className="h-3.5 w-3.5" />
+          </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-1">
           {totalPages} {t("pages", isRu)} • {contentEntries.length} {t("chapters", isRu)}
           {supplementaryEntries.length > 0 && ` • ${supplementaryEntries.length} ${t("suppl", isRu)}`}
         </p>
       </div>
+
+      <Sheet open={aiRolesOpen} onOpenChange={setAiRolesOpen}>
+        <SheetContent side="left" className="w-[400px] sm:w-[440px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Bot className="h-4 w-4" />
+              {isRu ? "AI Роли" : "AI Roles"}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            <AiRolesTab apiKeys={apiKeys} isRu={isRu} />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Bulk actions toolbar */}
       {selectedIndices.size > 0 && (
