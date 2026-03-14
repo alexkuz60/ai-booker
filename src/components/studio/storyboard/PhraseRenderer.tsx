@@ -8,8 +8,16 @@ import {
 } from "../phraseAnnotations";
 
 export function renderPhraseText(text: string) {
-  const parts = text.split(/(\[[^\]]+\])/g);
+  const parts = text.split(/(\[сн\.→\s*\d+\]|\[[^\]]+\])/g);
   return parts.map((part, i) => {
+    // Footnote reference marker [сн.→ N]
+    if (/^\[сн\.→\s*\d+\]$/.test(part)) {
+      return (
+        <span key={i} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 text-[10px] font-mono mx-0.5 cursor-help" title="Ссылка на сноску">
+          {part}
+        </span>
+      );
+    }
     if (/^\[.+\]$/.test(part)) {
       return (
         <span key={i} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-accent text-accent-foreground text-xs font-medium mx-0.5">
