@@ -303,17 +303,17 @@ export default function NavSidebar({
     <div className="flex flex-col h-full min-h-0 overflow-hidden bg-card/50">
       <div className="px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
-          {roleModels && Object.keys(roleModels).length > 0 && (
-            <RoleBadges
-              roles={Object.entries(roleModels).map(([roleId, model]) => ({ roleId: roleId as AiRoleId, model }))}
-              isRu={isRu}
-              size={15}
-            />
-          )}
           <BookOpen className="h-5 w-5 text-primary" />
           <span className="font-display font-semibold text-base text-foreground truncate flex-1">
             {fileName.replace('.pdf', '')}
           </span>
+          {roleModels && Object.keys(roleModels).length > 0 && (
+            <RoleBadges
+              roles={Object.entries(roleModels).map(([roleId, model]) => ({ roleId: roleId as AiRoleId, model }))}
+              isRu={isRu}
+              size={14}
+            />
+          )}
           {onOpenPdf && (
             <Button
               variant="ghost" size="icon"
