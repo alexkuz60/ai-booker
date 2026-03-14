@@ -80,7 +80,8 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
   if (!LOVABLE_API_KEY) throw new Error("AI key not configured");
 
   const usedModel = modelOverride || "google/gemini-3-flash-preview";
-  const isReasoningModel = usedModel.includes("gpt-5") || usedModel.includes("o3") || usedModel.includes("o4");
+  // Reasoning models return data in reasoning/reasoning_details, not tool_calls
+  const isReasoningModel = usedModel.includes("gpt-5") || usedModel.includes("o3") || usedModel.includes("o4") || usedModel.includes("gemini-2.5-pro");
   const aiStart = Date.now();
 
   // Build two variants: with tools (preferred) and without (fallback for reasoning models)
@@ -132,10 +133,11 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       { role: "user", content: userPrompt + "\n\nRespond with ONLY the JSON object, nothing else." },
     ],
     temperature: 0.3,
-    max_tokens: 4096,
+    max_tokens: 8192,
   };
-  // For non-reasoning models, request structured JSON output
-  if (!isReasoningModel) {
+  // For OpenAI non-reasoning models, request structured JSON output
+  // (Gemini models don't reliably support response_format through the gateway)
+  if (!isReasoningModel && usedModel.includes("openai/")) {
     (plainPayload as Record<string, unknown>).response_format = { type: "json_object" };
   }
 
@@ -198,8 +200,10 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
         let reasoningText = reasoning;
         if (Array.isArray(reasoningDetails)) {
           for (const rd of reasoningDetails) {
-            if (rd && typeof rd === "object" && "content" in (rd as Record<string, unknown>)) {
-              reasoningText += "\n" + String((rd as Record<string, unknown>).content || "");
+            if (rd && typeof rd === "object") {
+              const rdObj = rd as Record<string, unknown>;
+              const rdText = String(rdObj.content || rdObj.text || "");
+              if (rdText) reasoningText += "\n" + rdText;
             }
           }
         }
