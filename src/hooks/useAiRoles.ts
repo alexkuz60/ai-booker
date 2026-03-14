@@ -105,6 +105,9 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
     [userApiKeys]
   );
 
+  /** Whether there's a pre-edit snapshot to restore to */
+  const hasPreEditSnapshot = preEditSnapshot !== null;
+
   return {
     resolvedModels,
     overrides,
@@ -115,5 +118,6 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
     availableModels,
     isAdmin,
     loaded,
+    hasPreEditSnapshot,
   };
 }
