@@ -221,7 +221,7 @@ export default function Parser() {
     }
 
     return navButtons;
-  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab]);
+  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook]);
 
   useEffect(() => {
     const title = t("parserTitle", isRu);
