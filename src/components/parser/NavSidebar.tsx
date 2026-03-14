@@ -343,6 +343,18 @@ export default function NavSidebar({
           <span className="text-xs text-primary font-medium">
             {selectedIndices.size} {t("selectedCount", isRu)}
           </span>
+          <div className="flex items-center gap-1">
+            {onUndo && (
+              <Button variant="ghost" size="icon" className="h-6 w-6" title={`${t("undo", isRu)} (Ctrl+Z)`} onClick={onUndo} disabled={!canUndo}>
+                <Undo2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {onRedo && (
+              <Button variant="ghost" size="icon" className="h-6 w-6" title={`${t("redo", isRu)} (Ctrl+Shift+Z)`} onClick={onRedo} disabled={!canRedo}>
+                <Redo2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
           <div className="flex items-center gap-1 ml-auto">
             {selectedIndices.size === 1 && (() => {
               const singleIdx = selectedArray[0];
