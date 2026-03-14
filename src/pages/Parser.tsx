@@ -3,11 +3,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
-import ModelSelector from "@/components/ModelSelector";
-import { DEFAULT_MODEL_ID } from "@/config/modelRegistry";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useCloudSettings } from "@/hooks/useCloudSettings";
+import { useAiRoles } from "@/hooks/useAiRoles";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { t } from "@/pages/parser/i18n";
@@ -28,8 +26,8 @@ export default function Parser() {
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
 
-  const { value: selectedModel, update: setSelectedModel } = useCloudSettings('parser-model', DEFAULT_MODEL_ID);
   const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
+  const { getModelForRole } = useAiRoles(userApiKeys);
   const [navRestoredFromStorage] = useState<boolean>(() => {
     try {
       const saved = sessionStorage.getItem(NAV_STATE_KEY);
@@ -66,7 +64,7 @@ export default function Parser() {
   } = useBookManager({ userId: user?.id, isRu });
 
   const { analysisLog, analyzeChapter, resetAnalysis } = useChapterAnalysis({
-    isRu, pdfRef, userId: user?.id, selectedModel, userApiKeys,
+    isRu, pdfRef, userId: user?.id, userApiKeys, getModelForRole,
     tocEntries, chapterIdMap, chapterResults, setChapterResults,
   });
 
@@ -95,7 +93,6 @@ export default function Parser() {
     if (step === "workspace") {
       return (
         <div className="flex items-center gap-3">
-          <ModelSelector value={selectedModel} onChange={setSelectedModel} isRu={isRu} userApiKeys={userApiKeys} />
           <div className="text-xs text-muted-foreground font-body">
             {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} · {totalScenes} {t("scenes", isRu)}
           </div>
@@ -115,7 +112,7 @@ export default function Parser() {
       );
     }
     return undefined;
-  }, [step, selectedModel, setSelectedModel, isRu, userApiKeys, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep]);
+  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep]);
 
   useEffect(() => {
     const title = t("parserTitle", isRu);

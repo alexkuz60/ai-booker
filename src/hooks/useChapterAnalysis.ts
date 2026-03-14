@@ -5,13 +5,15 @@ import { getModelRegistryEntry } from "@/config/modelRegistry";
 import { extractTextByPageRange } from "@/lib/pdf-extract";
 import { t } from "@/pages/parser/i18n";
 import type { Scene, TocChapter, ChapterStatus } from "@/pages/parser/types";
+import type { AiRoleId } from "@/config/aiRoles";
 
 interface UseChapterAnalysisParams {
   isRu: boolean;
   pdfRef: any;
   userId: string | undefined;
-  selectedModel: string;
   userApiKeys: Record<string, string>;
+  /** Role-based model resolver from useAiRoles */
+  getModelForRole: (roleId: AiRoleId) => string;
   tocEntries: TocChapter[];
   chapterIdMap: Map<number, string>;
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
@@ -19,7 +21,7 @@ interface UseChapterAnalysisParams {
 }
 
 export function useChapterAnalysis({
-  isRu, pdfRef, userId, selectedModel, userApiKeys,
+  isRu, pdfRef, userId, userApiKeys, getModelForRole,
   tocEntries, chapterIdMap, chapterResults, setChapterResults,
 }: UseChapterAnalysisParams) {
   const [analysisLog, setAnalysisLog] = useState<string[]>([]);
@@ -75,17 +77,22 @@ export function useChapterAnalysis({
 
     const addLog = (msg: string) => setAnalysisLog(prev => [...prev, msg]);
 
-    let userKey: string | null = null;
-    const modelEntry = getModelRegistryEntry(selectedModel);
-    if (modelEntry?.apiKeyField) {
-      userKey = userApiKeys[modelEntry.apiKeyField] || null;
-    }
-    const baseBody = {
-      user_api_key: userKey,
-      user_model: selectedModel,
-      provider: modelEntry?.provider || 'lovable',
-      openrouter_api_key: userApiKeys['openrouter'] || null,
-      lang: isRu ? 'ru' : 'en',
+    // Use Screenwriter role for structure parsing, Director for enrichment
+    const buildBaseBody = (roleId: AiRoleId) => {
+      const model = getModelForRole(roleId);
+      const modelEntry = getModelRegistryEntry(model);
+      let userKey: string | null = null;
+      if (modelEntry?.apiKeyField) {
+        userKey = userApiKeys[modelEntry.apiKeyField] || null;
+      }
+      return {
+        user_api_key: userKey,
+        user_model: model,
+        provider: modelEntry?.provider || 'lovable',
+        openrouter_api_key: userApiKeys['openrouter'] || null,
+        lang: isRu ? 'ru' : 'en',
+        _modelName: model, // for logging
+      };
     };
 
     const existingChId = chapterIdMap.get(idx);
@@ -146,9 +153,10 @@ export function useChapterAnalysis({
 
         addLog(`${t("logExtracted", isRu)}: ${charCount.toLocaleString()} ${t("logChars", isRu)} (${entry.startPage}–${entry.endPage} ${t("logPagesAbbr", isRu)})`);
         addLog(t("logStage1", isRu));
-        addLog(`${t("logCallingAI", isRu)} ${selectedModel.split('/').pop()}...`);
+        const screenwriterBody = buildBaseBody("screenwriter");
+        addLog(`${t("logCallingAI", isRu)} ${screenwriterBody._modelName.split('/').pop()}...`);
 
-        const fnData = await callParseFunction({ ...baseBody, text, mode: "boundaries", chapter_title: entry.title });
+        const fnData = await callParseFunction({ ...screenwriterBody, text, mode: "boundaries", chapter_title: entry.title });
         if (fnData?.error) throw new Error(fnData.error);
 
         const rawScenes = fnData.structure?.scenes || [];
@@ -264,7 +272,7 @@ export function useChapterAnalysis({
           }
 
           try {
-            const enrichData = await callParseFunction({ ...baseBody, text: sceneText, mode: "enrich" });
+            const enrichData = await callParseFunction({ ...buildBaseBody("director"), text: sceneText, mode: "enrich" });
             if (enrichData?.structure) {
               sc.scene_type = enrichData.structure.scene_type || 'mixed';
               sc.mood = enrichData.structure.mood || 'neutral';
