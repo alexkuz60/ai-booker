@@ -33,6 +33,7 @@ export default function Parser() {
   const [userApiKeys, setUserApiKeys] = useState<Record<string, string>>({});
   const [aiRolesOpen, setAiRolesOpen] = useState(false);
   const { getModelForRole } = useAiRoles(userApiKeys);
+  const { toast } = useToast();
   const [navRestoredFromStorage] = useState<boolean>(() => {
     try {
       const saved = sessionStorage.getItem(NAV_STATE_KEY);
