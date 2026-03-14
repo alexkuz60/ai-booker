@@ -46,37 +46,19 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
     if (!userId) return;
     setLoadingLibrary(true);
     try {
-      const { data: booksData } = await supabase
-        .from('books')
-        .select('id, title, file_name, file_path, status, created_at')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (booksData && booksData.length > 0) {
-        const enriched: BookRecord[] = [];
-        for (const b of booksData) {
-          const { count: chCount } = await supabase
-            .from('book_chapters')
-            .select('id', { count: 'exact', head: true })
-            .eq('book_id', b.id);
-          const { data: chapterIds } = await supabase
-            .from('book_chapters')
-            .select('id')
-            .eq('book_id', b.id);
-          let scCount = 0;
-          if (chapterIds && chapterIds.length > 0) {
-            const { count } = await supabase
-              .from('book_scenes')
-              .select('id', { count: 'exact', head: true })
-              .in('chapter_id', chapterIds.map(c => c.id));
-            scCount = count || 0;
-          }
-          enriched.push({ ...b, chapter_count: chCount || 0, scene_count: scCount });
-        }
-        setBooks(enriched);
-      } else {
-        setBooks([]);
-      }
+      const { data, error } = await supabase.rpc('get_user_books_with_counts');
+      if (error) throw error;
+      const enriched: BookRecord[] = (data || []).map((b: any) => ({
+        id: b.id,
+        title: b.title,
+        file_name: b.file_name,
+        file_path: b.file_path,
+        status: b.status,
+        created_at: b.created_at,
+        chapter_count: Number(b.chapter_count) || 0,
+        scene_count: Number(b.scene_count) || 0,
+      }));
+      setBooks(enriched);
     } catch (err) {
       console.error("Failed to load library:", err);
     } finally {
