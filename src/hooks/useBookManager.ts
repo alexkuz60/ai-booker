@@ -9,13 +9,17 @@ import type {
   Scene, TocChapter, Step, ChapterStatus, BookRecord,
 } from "@/pages/parser/types";
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
+import type { ProjectStorage } from "@/lib/projectStorage";
+import { syncStructureToLocal } from "@/lib/localSync";
 
 interface UseBookManagerParams {
   userId: string | undefined;
   isRu: boolean;
+  /** Optional local project storage for dual-write */
+  projectStorage?: ProjectStorage | null;
 }
 
-export function useBookManager({ userId, isRu }: UseBookManagerParams) {
+export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerParams) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>(() =>
@@ -236,6 +240,20 @@ export function useBookManager({ userId, isRu }: UseBookManagerParams) {
 
       setChapterResults(initMap);
       setStep("workspace");
+
+      // ── Dual-write: sync to local project ──
+      if (projectStorage?.isReady) {
+        syncStructureToLocal(projectStorage, {
+          bookId: book.id,
+          title: book.title || book.file_name.replace('.pdf', ''),
+          fileName: book.file_name,
+          toc: normalizeLevels(savedToc),
+          parts: parts.map(p => ({ id: p.id, title: p.title, partNumber: p.part_number })),
+          chapterIdMap: newChapterIdMap,
+          chapterResults: initMap,
+        });
+      }
+
       const pdfStatus = restoredPdf
         ? ` (${t("pdfRestored", isRu)})`
         : ` (${t("pdfNotFound", isRu)})`;
@@ -401,6 +419,26 @@ export function useBookManager({ userId, isRu }: UseBookManagerParams) {
       const initMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
       chapters.forEach((_, i) => initMap.set(i, { scenes: [], status: "pending" }));
       setChapterResults(initMap);
+
+      // ── Dual-write: sync to local project ──
+      if (projectStorage?.isReady && book?.id) {
+        const partsArr = uniqueParts.map((title, i) => ({
+          id: newPartIdMap.get(title) || "",
+          title,
+          partNumber: i + 1,
+        }));
+        syncStructureToLocal(projectStorage, {
+          bookId: book.id,
+          title: f.name.replace('.pdf', ''),
+          fileName: f.name,
+          toc: chapters,
+          parts: partsArr,
+          chapterIdMap: newChapterIdMap,
+          chapterResults: initMap,
+        });
+        // Also save the source PDF locally
+        projectStorage.writeBlob("source/book.pdf", f).catch(() => {});
+      }
 
       setStep("workspace");
     } catch (err: any) {

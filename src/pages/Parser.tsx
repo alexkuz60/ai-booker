@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Bot } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { syncStructureToLocal } from "@/lib/localSync";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -70,12 +71,33 @@ export default function Parser() {
     chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
     partIdMap, chapterResults, setChapterResults, fileInputRef,
     openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset,
-  } = useBookManager({ userId: user?.id, isRu });
+  } = useBookManager({ userId: user?.id, isRu, projectStorage });
 
   const { analysisLog, analyzeChapter, resetAnalysis } = useChapterAnalysis({
     isRu, pdfRef, userId: user?.id, userApiKeys, getModelForRole,
     tocEntries, chapterIdMap, chapterResults, setChapterResults,
   });
+
+
+  // ── Auto-sync scene results to local project when chapters get analyzed ──
+  const lastSyncedRef = useRef("");
+  useEffect(() => {
+    if (!projectStorage?.isReady || !bookId || chapterResults.size === 0) return;
+    // Build a simple key to detect meaningful changes (done count)
+    const doneCount = Array.from(chapterResults.values()).filter(r => r.status === "done").length;
+    const syncKey = `${bookId}_${doneCount}`;
+    if (syncKey === lastSyncedRef.current) return;
+    lastSyncedRef.current = syncKey;
+    syncStructureToLocal(projectStorage, {
+      bookId,
+      title: fileName.replace('.pdf', ''),
+      fileName,
+      toc: tocEntries,
+      parts: [],
+      chapterIdMap,
+      chapterResults,
+    });
+  }, [projectStorage, bookId, chapterResults, tocEntries, fileName, chapterIdMap]);
 
   const selectedIdx = selectedIndices.size === 1 ? Array.from(selectedIndices)[0] : null;
 

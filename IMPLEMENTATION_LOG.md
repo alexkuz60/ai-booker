@@ -422,11 +422,34 @@ Source → EQ (3-band) → Compressor → Limiter → Panner3D → Convolver (IR
 - `Parser.tsx` — подключён `useProjectStorage`, передаются колбэки в UploadView
 - Индикация бэкенда (FS Access API / OPFS)
 
+### Этап 3: Dual-write структуры книги ✅
+
+**Файлы:**
+- `src/lib/localSync.ts` — хелперы `syncStructureToLocal()` / `readStructureFromLocal()`
+- `src/hooks/useBookManager.ts` — принимает `projectStorage?`, dual-write при upload и open
+- `src/pages/Parser.tsx` — авто-синк при изменении `chapterResults` (после анализа глав)
+
+**Что записывается локально:**
+- `structure/toc.json` — полная структура (bookId, title, fileName, parts[], toc[])
+- `structure/chapters.json` — маппинг index → chapterId
+- `scenes/chapter_{id}.json` — сцены + статус для каждой главы
+- `source/book.pdf` — исходный PDF (при upload)
+
+**Точки синхронизации:**
+1. `handleFileSelect` — после создания book/parts/chapters в БД → пишет structure + PDF в локалку
+2. `openSavedBook` — после загрузки из БД → зеркалит в локалку
+3. `useEffect` в Parser.tsx — при изменении кол-ва проанализированных глав → обновляет scenes/
+
+**Архитектурные решения:**
+- Dual-write: облако остаётся primary, локалка — зеркало (пока)
+- `syncStructureToLocal` никогда не бросает ошибку наружу (catch → console.warn)
+- Синхронизация сцен debounced через `syncKey` = `${bookId}_${doneCount}`
+
 ### Следующие этапы (план):
-- **Этап 3:** Сохранение структуры книги (TOC, главы, сцены) в локальную папку параллельно с облаком
 - **Этап 4:** Скачивание TTS-аудио в `audio/tts/` вместо серверного хранилища
 - **Этап 5:** Кнопка «Сохранить в облако» — сериализация локальных данных → Supabase
 - **Этап 6:** Кнопка «Загрузить из облака» — восстановление проекта из Supabase в локалку
+- **Этап 7:** Чтение структуры из локалки при отсутствии сети (offline-first)
 
 ### Ключевые архитектурные решения:
 1. **Dual-write пока не реализован** — сначала только локальное создание/открытие, без дублирования записи в БД
