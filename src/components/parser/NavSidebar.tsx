@@ -1,14 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2, AlertCircle,
-  BookOpen, FolderOpen, Clapperboard, ChevronLeft, ChevronRightIcon, Trash2, ExternalLink, Clock
+  BookOpen, FolderOpen, Clapperboard, ChevronLeft, ChevronRightIcon, Trash2, ExternalLink, Clock, Bot
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { t, tSection } from "@/pages/parser/i18n";
 import type { TocChapter, SectionType, ChapterStatus, Scene } from "@/pages/parser/types";
 import { SECTION_ICONS } from "@/pages/parser/types";
 import { estimateDurationSec, formatDuration } from "@/lib/durationEstimate";
+import { AiRolesTab } from "@/components/profile/tabs/AiRolesTab";
 
 interface NavSidebarProps {
   isRu: boolean;
@@ -33,6 +35,7 @@ interface NavSidebarProps {
   onChangeStartPage: (idx: number, newPage: number) => void;
   onOpenPdf?: (page?: number) => void;
   onRenamePart?: (oldTitle: string, newTitle: string) => void;
+  apiKeys?: Record<string, string>;
 }
 
 export default function NavSidebar({
@@ -41,8 +44,9 @@ export default function NavSidebar({
   partGroups, partlessIndices,
   onSelectChapter, onAnalyzeChapter, onToggleNode, onSendToStudio, isChapterFullyDone,
   onChangeLevel, onDeleteEntry, onRenameEntry, onChangeStartPage,
-  onOpenPdf, onRenamePart,
+  onOpenPdf, onRenamePart, apiKeys = {},
 }: NavSidebarProps) {
+  const [aiRolesOpen, setAiRolesOpen] = useState(false);
   const [editingPartTitle, setEditingPartTitle] = useState<string | null>(null);
   const [editPartValue, setEditPartValue] = useState("");
   const editPartRef = useRef<HTMLInputElement>(null);
@@ -314,12 +318,34 @@ export default function NavSidebar({
               <ExternalLink className="h-3.5 w-3.5" />
             </Button>
           )}
+          <Button
+            variant="ghost" size="icon"
+            className="h-6 w-6 flex-shrink-0 text-muted-foreground hover:text-primary"
+            title={isRu ? "AI Роли" : "AI Roles"}
+            onClick={() => setAiRolesOpen(true)}
+          >
+            <Bot className="h-3.5 w-3.5" />
+          </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-1">
           {totalPages} {t("pages", isRu)} • {contentEntries.length} {t("chapters", isRu)}
           {supplementaryEntries.length > 0 && ` • ${supplementaryEntries.length} ${t("suppl", isRu)}`}
         </p>
       </div>
+
+      <Sheet open={aiRolesOpen} onOpenChange={setAiRolesOpen}>
+        <SheetContent side="left" className="w-[400px] sm:w-[440px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Bot className="h-4 w-4" />
+              {isRu ? "AI Роли" : "AI Roles"}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            <AiRolesTab apiKeys={apiKeys} isRu={isRu} />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Bulk actions toolbar */}
       {selectedIndices.size > 0 && (
