@@ -305,7 +305,7 @@ export function useChapterAnalysis({
           addLog(`  ${t("logAnalyzingScene", isRu)} ${scIdx + 1}/${scenes.length}: «${sc.title}»...`);
 
           const sceneText = sc.content || sc.content_preview || '';
-          if (sceneText.length < 20) {
+          if (sceneText.length < 10) {
             sc.scene_type = 'mixed'; sc.mood = 'neutral'; sc.bpm = 100;
             addLog(`  ${t("logSkipped", isRu)}`);
             continue;
