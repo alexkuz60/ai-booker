@@ -106,25 +106,11 @@ function SceneCards({
     return { sec: estimateDurationSec(totalChars), formatted: formatDuration(estimateDurationSec(totalChars)) };
   }, [scenes]);
 
-  // Save selection text before context menu steals it
-  const savedSelection = useRef<string>("");
-
-  const handleContextMenu = useCallback(() => {
-    const sel = window.getSelection();
-    const text = sel?.toString().trim() || "";
-    if (text) savedSelection.current = text;
-  }, []);
-
-  const getSelectedText = useCallback(() => {
-    // Prefer saved selection (survives context menu focus steal)
-    const saved = savedSelection.current;
-    if (saved) return saved;
-    const sel = window.getSelection();
-    return sel?.toString().trim() || "";
-  }, []);
+  const { capture: handleContextMenu, consume, getSelectedText } = useSelectionCapture();
 
   const handleCleanup = useCallback((action: CleanupAction, sceneIndex: number) => {
     const selectedText = getSelectedText();
+    consume(); // clear after reading
     if (action !== "fix_punctuation_spaces" && !selectedText) {
       toast.info(t("cleanupNoSelection", isRu));
       return;
@@ -134,8 +120,7 @@ function SceneCards({
       onScenesUpdate(result.scenes);
     }
     toast(result.summary, { duration: 3000 });
-    savedSelection.current = "";
-  }, [scenes, isRu, applyCleanup, getSelectedText, onScenesUpdate]);
+  }, [scenes, isRu, applyCleanup, getSelectedText, consume, onScenesUpdate]);
 
   return (
     <div className="space-y-2">
