@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useSelectionCapture } from "@/hooks/useSelectionCapture";
 import { Pencil, Check } from "lucide-react";
 import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem,
