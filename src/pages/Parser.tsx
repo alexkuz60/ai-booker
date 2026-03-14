@@ -161,6 +161,17 @@ export default function Parser() {
           <PlusCircle className="h-3.5 w-3.5" />
           {isRu ? "Новая книга" : "New Book"}
         </Button>
+        {step === "workspace" && (
+          <Button
+            variant="ghost" size="sm"
+            onClick={reloadBook}
+            className="gap-1.5 text-xs"
+            title={isRu ? "Перезагрузить книгу (загрузить другую версию PDF)" : "Reload book (upload different PDF version)"}
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            {isRu ? "Перезагрузить" : "Reload"}
+          </Button>
+        )}
 
         {step === "workspace" && (
           <>
