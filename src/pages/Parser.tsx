@@ -34,6 +34,7 @@ export default function Parser() {
 
   const userApiKeys = useUserApiKeys();
   const [aiRolesOpen, setAiRolesOpen] = useState(false);
+  const { backend: storageBackend, createProject, openProject, storage: projectStorage, meta: projectMeta, saveSourcePDF } = useProjectStorage();
   const { getModelForRole } = useAiRoles(userApiKeys);
   const { toast } = useToast();
   const [navRestoredFromStorage] = useState<boolean>(() => {
