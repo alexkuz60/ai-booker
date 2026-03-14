@@ -6,11 +6,13 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { useAuth } from "@/hooks/useAuth";
 import { useMontageData } from "@/hooks/useMontageData";
+import { supabase } from "@/integrations/supabase/client";
 import { MasterMeterPanel } from "@/components/studio/MasterMeterPanel";
 import { MasterEffectsTabs } from "@/components/studio/MasterEffectsTabs";
 import { MontageTimeline } from "@/components/montage/MontageTimeline";
 import { RenderDialog } from "@/components/montage/RenderDialog";
 import { Button } from "@/components/ui/button";
+import { AiRolesButton } from "@/components/AiRolesButton";
 
 const SIDEBAR_WIDTH = 280;
 
