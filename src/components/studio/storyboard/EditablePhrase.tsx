@@ -31,7 +31,7 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
   const [draft, setDraft] = useState(phrase.text);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const textRef = useRef<HTMLParagraphElement>(null);
-  const savedSelection = useRef<{ start: number; end: number } | null>(null);
+  const { capture: handleContextMenu, peek } = useSelectionCapture(textRef);
 
   useEffect(() => {
     if (editing && textareaRef.current) {
@@ -48,43 +48,6 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
     }
     setEditing(false);
   };
-
-  const getSelectionOffsets = useCallback((): { start: number; end: number } | null => {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !textRef.current) return null;
-
-    const range = sel.getRangeAt(0);
-    if (!textRef.current.contains(range.startContainer) || !textRef.current.contains(range.endContainer)) return null;
-
-    const textContent = phrase.text;
-    const selText = sel.toString();
-    const selStart = textContent.indexOf(selText);
-    if (selStart >= 0) {
-      return { start: selStart, end: selStart + selText.length };
-    }
-
-    const walker = document.createTreeWalker(textRef.current, NodeFilter.SHOW_TEXT);
-    let offset = 0;
-    let start = -1;
-    let end = -1;
-    let node: Node | null;
-
-    while ((node = walker.nextNode())) {
-      const parent = node.parentElement;
-      if (parent?.classList.contains("select-none")) continue;
-      const len = (node.textContent || "").length;
-      if (node === range.startContainer) start = offset + range.startOffset;
-      if (node === range.endContainer) end = offset + range.endOffset;
-      offset += len;
-    }
-
-    if (start >= 0 && end > start) return { start, end };
-    return null;
-  }, [phrase.text]);
-
-  const handleContextMenu = useCallback(() => {
-    savedSelection.current = getSelectionOffsets();
-  }, [getSelectionOffsets]);
 
   const handleAnnotate = useCallback((type: AnnotationType, durationMs?: number) => {
     const sel = savedSelection.current;
