@@ -1804,7 +1804,7 @@ class AudioEngine {
 
   get state(): EngineState { return this._state; }
   get volume(): number { return this._volume; }
-  get totalDuration(): number { return this._totalDuration; }
+  get totalDuration(): number { return this.getEffectiveTotalDuration(); }
   get trackCount(): number { return this.tracks.size; }
 
   get positionSec(): number {
