@@ -55,12 +55,13 @@ function saveCollapsed(set: Set<string>) {
   } catch {}
 }
 
-export function AiRolesTab({ apiKeys, isRu, onModelChanged }: AiRolesTabProps) {
+export function AiRolesTab({ apiKeys, isRu, onModelChanged, bookTitle }: AiRolesTabProps) {
   const {
     resolvedModels,
     overrides,
     setModelForRole,
     resetAll,
+    loadPreset,
     availableModels,
     isAdmin,
     hasPreEditSnapshot,
