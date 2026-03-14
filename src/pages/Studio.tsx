@@ -52,6 +52,37 @@ const Studio = () => {
   const [silenceSec, setSilenceSec] = useState<number>(2);
   const chapterSceneIds = chapter?.scenes.map(s => s.id).filter(Boolean) as string[] | undefined;
 
+  // Multi-select state
+  const [selectedSceneIndices, setSelectedSceneIndices] = useState<Set<number>>(new Set());
+  const [batchSceneIds, setBatchSceneIds] = useState<string[] | null>(null);
+
+  // Build batch scenes info from chapter
+  const batchScenes = useMemo(() => {
+    if (!chapter || !batchSceneIds) return [];
+    return batchSceneIds
+      .map(id => {
+        const scene = chapter.scenes.find(s => s.id === id);
+        if (!scene) return null;
+        return { id, title: scene.title, sceneNumber: scene.scene_number, content: scene.content };
+      })
+      .filter(Boolean) as { id: string; title: string; sceneNumber: number; content?: string | null }[];
+  }, [chapter, batchSceneIds]);
+
+  const handleBatchAnalyze = useCallback((sceneIds: string[]) => {
+    setBatchSceneIds(sceneIds);
+    setActiveTab("storyboard");
+  }, [setActiveTab]);
+
+  const handleBatchComplete = useCallback(() => {
+    setClipsRefreshToken(t => t + 1);
+    setSelectedSceneIndices(new Set());
+  }, []);
+
+  const handleBatchClose = useCallback(() => {
+    setBatchSceneIds(null);
+    setSelectedSceneIndices(new Set());
+  }, []);
+
   const selectedScene = chapter && selectedSceneIdx !== null ? chapter.scenes[selectedSceneIdx] : null;
 
   const chapterEstimate = useMemo(() => chapter ? estimateChapterDuration(chapter) : null, [chapter]);
@@ -335,6 +366,9 @@ const Studio = () => {
                   clipsRefreshToken={clipsRefreshToken}
                   bookId={bookId}
                   onPlaylistDurationsLoaded={handlePlaylistDurationsLoaded}
+                  selectedSceneIndices={selectedSceneIndices}
+                  onSelectedSceneIndicesChange={setSelectedSceneIndices}
+                  onBatchAnalyze={handleBatchAnalyze}
                 />
               ) : (
                 <EmptyNavigator isRu={isRu} />
@@ -363,6 +397,10 @@ const Studio = () => {
                 onSilenceSecChange={handleSilenceSecChange}
                 onRecalcDone={() => setClipsRefreshToken(t => t + 1)}
                 onVoiceSaved={() => setClipsRefreshToken(t => t + 1)}
+                batchSceneIds={batchSceneIds}
+                batchScenes={batchScenes}
+                onBatchComplete={handleBatchComplete}
+                onBatchClose={handleBatchClose}
               />
             </ResizablePanel>
           </ResizablePanelGroup>

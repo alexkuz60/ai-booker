@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2, Clock, Timer, BookOpen, Scissors, Disc } from "lucide-react";
+import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2, Clock, Timer, BookOpen, Scissors, Disc, Sparkles } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
@@ -170,6 +170,9 @@ export function ChapterNavigator({
   clipsRefreshToken,
   bookId,
   onPlaylistDurationsLoaded,
+  selectedSceneIndices,
+  onSelectedSceneIndicesChange,
+  onBatchAnalyze,
 }: {
   chapter: StudioChapter;
   selectedSceneIdx: number | null;
@@ -183,6 +186,9 @@ export function ChapterNavigator({
   clipsRefreshToken?: number;
   bookId?: string | null;
   onPlaylistDurationsLoaded?: (m: Map<string, number>) => void;
+  selectedSceneIndices?: Set<number>;
+  onSelectedSceneIndicesChange?: (indices: Set<number>) => void;
+  onBatchAnalyze?: (sceneIds: string[]) => void;
 }) {
   const navigate = useNavigate();
   const [chapterOpen, setChapterOpen] = useState(true);
@@ -234,6 +240,41 @@ export function ChapterNavigator({
   }, [chapter.scenes.map(s => s.id).join(","), clipsRefreshToken]);
 
   const staleCount = staleAudioSceneIds?.size ?? 0;
+  const lastClickedIdxRef = useRef<number | null>(null);
+
+  const handleSceneClick = useCallback((idx: number, e: React.MouseEvent) => {
+    // Multi-select with Ctrl/Cmd or Shift
+    if ((e.ctrlKey || e.metaKey) && onSelectedSceneIndicesChange) {
+      const next = new Set(selectedSceneIndices ?? []);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      onSelectedSceneIndicesChange(next);
+      lastClickedIdxRef.current = idx;
+      return;
+    }
+    if (e.shiftKey && onSelectedSceneIndicesChange && lastClickedIdxRef.current !== null) {
+      const from = Math.min(lastClickedIdxRef.current, idx);
+      const to = Math.max(lastClickedIdxRef.current, idx);
+      const next = new Set(selectedSceneIndices ?? []);
+      for (let i = from; i <= to; i++) next.add(i);
+      onSelectedSceneIndicesChange(next);
+      return;
+    }
+    // Normal click: clear multi-select, select single
+    if (onSelectedSceneIndicesChange) onSelectedSceneIndicesChange(new Set());
+    lastClickedIdxRef.current = idx;
+    onSelectScene(idx);
+  }, [onSelectScene, onSelectedSceneIndicesChange, selectedSceneIndices]);
+
+  const multiCount = selectedSceneIndices?.size ?? 0;
+  const handleBatchAnalyzeClick = useCallback(() => {
+    if (!onBatchAnalyze || !selectedSceneIndices || multiCount === 0) return;
+    const ids = [...selectedSceneIndices]
+      .sort((a, b) => a - b)
+      .map(i => chapter.scenes[i]?.id)
+      .filter(Boolean) as string[];
+    if (ids.length > 0) onBatchAnalyze(ids);
+  }, [onBatchAnalyze, selectedSceneIndices, multiCount, chapter.scenes]);
+
 
   const handleBatchResynth = async () => {
     if (!staleAudioSceneIds || staleCount === 0) return;
@@ -500,6 +541,30 @@ export function ChapterNavigator({
             <Scissors className="h-3 w-3" />
           </Button>
         </div>
+        {multiCount > 0 && (
+          <div className="flex items-center gap-2 mt-1.5 px-0.5">
+            <Badge variant="secondary" className="text-[10px]">
+              {multiCount} {isRu ? "выбр." : "sel."}
+            </Badge>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-[11px] gap-1"
+              onClick={handleBatchAnalyzeClick}
+            >
+              <Sparkles className="h-3 w-3" />
+              {isRu ? "Анализ выбранных" : "Analyze Selected"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-1.5 text-[11px]"
+              onClick={() => onSelectedSceneIndicesChange?.(new Set())}
+            >
+              ✕
+            </Button>
+          </div>
+        )}
         <div className="flex items-center gap-2 mt-0.5">
           <p className="text-xs text-muted-foreground truncate flex-1">
             {chapter.bookTitle}
@@ -541,7 +606,7 @@ export function ChapterNavigator({
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-0.5">
-                {chapter.scenes.map((scene, idx) => {
+              {chapter.scenes.map((scene, idx) => {
                   const colorClass = SCENE_TYPE_COLORS[scene.scene_type] || SCENE_TYPE_COLORS.mixed;
                   const est = estimateSceneDuration(scene);
                   const actualMs = scene.id ? playlistDurations.get(scene.id) : undefined;
@@ -550,6 +615,7 @@ export function ChapterNavigator({
                    const isStale = staleAudioSceneIds?.has(scene.id || "");
                    const isActual = !!actualSec;
                    const sceneRender = scene.id ? renderStatus.get(scene.id) : undefined;
+                   const isMultiSelected = selectedSceneIndices?.has(idx);
 
                   const durationColor = isStale
                     ? "text-yellow-500"
@@ -560,11 +626,12 @@ export function ChapterNavigator({
                   return (
                     <button
                       key={idx}
-                      onClick={() => onSelectScene(idx)}
+                      onClick={(e) => handleSceneClick(idx, e)}
                       className={cn(
                         "w-full flex items-center gap-2 pl-9 pr-3 py-2 text-sm font-body rounded-md transition-colors text-left",
                         "hover:bg-accent/50",
-                        selectedSceneIdx === idx && "bg-primary/10 text-primary border-r-2 border-primary"
+                        isMultiSelected && "bg-primary/15 border-l-2 border-primary",
+                        !isMultiSelected && selectedSceneIdx === idx && "bg-primary/10 text-primary border-r-2 border-primary"
                       )}
                     >
                       <span className={cn("px-1.5 py-0.5 rounded text-[10px] border shrink-0", colorClass)}>
