@@ -647,9 +647,10 @@ export default function Parser() {
                        childCount={selectedChildCount}
                        roleModels={{
                          screenwriter: getModelForRole("screenwriter"),
-                         director: getModelForRole("director"),
-                       }}
-                     />
+                          director: getModelForRole("director"),
+                        }}
+                        onScenesUpdate={handleScenesUpdate}
+                      />
                    </div>
                   </div>
                 </ResizablePanel>
