@@ -36,21 +36,36 @@ const Studio = () => {
   const [errorSegmentIds, setErrorSegmentIds] = useState<Set<string>>(new Set());
   const [clipsRefreshToken, setClipsRefreshToken] = useState(0);
 
-  // Bump refresh token when synthesis finishes (set goes from non-empty to empty)
-  const prevSynthRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    if (prevSynthRef.current.size > 0 && synthesizingSegmentIds.size === 0) {
-      setClipsRefreshToken(t => t + 1);
-    }
-    prevSynthRef.current = synthesizingSegmentIds;
-  }, [synthesizingSegmentIds]);
-  const [renderedSceneIds, setRenderedSceneIds] = useState<Set<string>>(new Set());
-  const [fullyRenderedSceneIds, setFullyRenderedSceneIds] = useState<Set<string>>(new Set());
-  const [staleAudioSceneIds, setStaleAudioSceneIds] = useState<Set<string>>(new Set());
-  const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
-  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
-  const [silenceSec, setSilenceSec] = useState<number>(2);
-  const chapterSceneIds = chapter?.scenes.map(s => s.id).filter(Boolean) as string[] | undefined;
+  // Multi-select state
+  const [selectedSceneIndices, setSelectedSceneIndices] = useState<Set<number>>(new Set());
+  const [batchSceneIds, setBatchSceneIds] = useState<string[] | null>(null);
+
+  // Build batch scenes info from chapter
+  const batchScenes = useMemo(() => {
+    if (!chapter || !batchSceneIds) return [];
+    return batchSceneIds
+      .map(id => {
+        const scene = chapter.scenes.find(s => s.id === id);
+        if (!scene) return null;
+        return { id, title: scene.title, sceneNumber: scene.scene_number, content: scene.content };
+      })
+      .filter(Boolean) as { id: string; title: string; sceneNumber: number; content?: string | null }[];
+  }, [chapter, batchSceneIds]);
+
+  const handleBatchAnalyze = useCallback((sceneIds: string[]) => {
+    setBatchSceneIds(sceneIds);
+    setActiveTab("storyboard");
+  }, [setActiveTab]);
+
+  const handleBatchComplete = useCallback(() => {
+    setClipsRefreshToken(t => t + 1);
+    setSelectedSceneIndices(new Set());
+  }, []);
+
+  const handleBatchClose = useCallback(() => {
+    setBatchSceneIds(null);
+    setSelectedSceneIndices(new Set());
+  }, []);
 
   const selectedScene = chapter && selectedSceneIdx !== null ? chapter.scenes[selectedSceneIdx] : null;
 
