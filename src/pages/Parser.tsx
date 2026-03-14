@@ -606,6 +606,10 @@ export default function Parser() {
                     onOpenPdf={handleOpenPdf}
                     onRenamePart={renamePart}
                     onMergeEntries={mergeEntries}
+                    onUndo={handleUndo}
+                    onRedo={handleRedo}
+                    canUndo={canUndo}
+                    canRedo={canRedo}
                     roleModels={{
                       screenwriter: getModelForRole("screenwriter"),
                       director: getModelForRole("director"),
