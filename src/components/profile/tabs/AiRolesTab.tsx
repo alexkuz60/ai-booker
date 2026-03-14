@@ -58,6 +58,7 @@ export function AiRolesTab({ apiKeys, isRu }: AiRolesTabProps) {
     resetAll,
     availableModels,
     isAdmin,
+    hasPreEditSnapshot,
   } = useAiRoles(apiKeys);
 
   const [collapsedProviders, setCollapsedProviders] = useState<Set<string>>(loadCollapsed);
