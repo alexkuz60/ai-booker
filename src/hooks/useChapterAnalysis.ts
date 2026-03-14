@@ -182,6 +182,28 @@ export function useChapterAnalysis({
 
         // Split text by markers
         const normalizeWS = (s: string) => s.replace(/\s+/g, ' ').trim();
+
+        /** Try to find normMarker in normText with progressive truncation */
+        const fuzzyFind = (normText: string, marker: string): number => {
+          const normMarker = normalizeWS(marker);
+          if (!normMarker) return -1;
+          // exact match
+          let pos = normText.indexOf(normMarker);
+          if (pos !== -1) return pos;
+          // try progressively shorter prefixes (down to 30 chars)
+          for (let len = Math.min(normMarker.length - 1, 60); len >= 30; len -= 5) {
+            pos = normText.indexOf(normMarker.slice(0, len));
+            if (pos !== -1) return pos;
+          }
+          // try first sentence / first line
+          const firstLine = normMarker.split(/[.!?\n]/)[0]?.trim();
+          if (firstLine && firstLine.length >= 15) {
+            pos = normText.indexOf(firstLine);
+            if (pos !== -1) return pos;
+          }
+          return -1;
+        };
+
         const splitTextByMarkers = (fullText: string, markers: { start_marker: string; title: string; scene_number: number }[]) => {
           const normText = normalizeWS(fullText);
           // Build a map from normalized-char-index to original-char-index
@@ -190,17 +212,12 @@ export function useChapterAnalysis({
           const normChars = normText.length;
           let oi = 0;
           const origLen = fullText.length;
-          // Walk both strings in parallel
           while (ni < normChars && oi < origLen) {
-            // skip extra whitespace in original
             if (/\s/.test(fullText[oi]) && (oi === 0 || /\s/.test(fullText[oi - 1]))) {
-              // In normalized, consecutive ws collapsed to single space
-              // If current norm char is space and we already mapped it, skip orig
               if (normToOrig.length > 0 && normToOrig.length === ni) { oi++; continue; }
             }
             normToOrig.push(oi);
             ni++; oi++;
-            // After matching a space in norm, skip remaining ws in orig
             if (ni > 0 && normText[ni - 1] === ' ') {
               while (oi < origLen && /\s/.test(fullText[oi])) oi++;
             }
@@ -209,9 +226,7 @@ export function useChapterAnalysis({
           const positions: { idx: number; scene: typeof markers[0] }[] = [];
           for (const m of markers) {
             if (!m.start_marker) continue;
-            const normMarker = normalizeWS(m.start_marker);
-            let normPos = normText.indexOf(normMarker);
-            if (normPos === -1 && normMarker.length > 40) normPos = normText.indexOf(normMarker.slice(0, 40));
+            const normPos = fuzzyFind(normText, m.start_marker);
             if (normPos !== -1) {
               const origPos = normToOrig[normPos] ?? 0;
               positions.push({ idx: origPos, scene: m });
@@ -232,12 +247,18 @@ export function useChapterAnalysis({
           scene_type: 'pending', mood: '', bpm: 0,
         }));
 
+        // Fallback: markers not matched → distribute full text evenly across scenes
         if (scenes.length === 0 && rawScenes.length > 0) {
-          scenes = rawScenes.map((s: any, i: number) => ({
-            scene_number: s.scene_number || i + 1, title: s.title,
-            content: '', content_preview: '', scene_type: 'pending', mood: '', bpm: 0,
-          }));
           addLog(t("logMarkersNotFound", isRu));
+          const chunkSize = Math.ceil(text.length / rawScenes.length);
+          scenes = rawScenes.map((s: any, i: number) => {
+            const chunk = text.slice(i * chunkSize, (i + 1) * chunkSize).trim();
+            return {
+              scene_number: s.scene_number || i + 1, title: s.title,
+              content: chunk, content_preview: chunk.slice(0, 200),
+              scene_type: 'pending', mood: '', bpm: 0,
+            };
+          });
         }
 
         addLog(`${t("logFoundScenes", isRu)} ${scenes.length} ${t("logScenesWord", isRu)}:`);
