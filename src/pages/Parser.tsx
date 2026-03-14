@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Bot } from "lucide-react";
+import { ArrowLeft, Bot, Library, PlusCircle, Network, FileText, Users } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { syncStructureToLocal } from "@/lib/localSync";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -38,6 +38,7 @@ export default function Parser() {
 
   const userApiKeys = useUserApiKeys();
   const [aiRolesOpen, setAiRolesOpen] = useState(false);
+  const [parserTab, setParserTab] = useState<"structure" | "content" | "characters">("structure");
   const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const { backend: storageBackend, createProject, openProject, storage: projectStorage, meta: projectMeta, saveSourcePDF } = useProjectStorage();
@@ -142,33 +143,74 @@ export default function Parser() {
 
   // ── Page header (unified with AppLayout) ──
   const headerRight = useMemo(() => {
+    const navButtons = (
+      <div className="flex items-center gap-1">
+        <Button
+          variant={step === "library" ? "secondary" : "ghost"} size="sm"
+          onClick={() => { if (step === "workspace") handleReset(); else setStep("library"); }}
+          className="gap-1.5 text-xs"
+        >
+          <Library className="h-3.5 w-3.5" />
+          {isRu ? "Библиотека" : "Library"}
+        </Button>
+        <Button
+          variant={step === "upload" ? "secondary" : "ghost"} size="sm"
+          onClick={() => setStep("upload")}
+          className="gap-1.5 text-xs"
+        >
+          <PlusCircle className="h-3.5 w-3.5" />
+          {isRu ? "Новая книга" : "New Book"}
+        </Button>
+
+        {step === "workspace" && (
+          <>
+            <span className="w-px h-4 bg-border mx-1" />
+            <Button
+              variant={parserTab === "structure" ? "secondary" : "ghost"} size="sm"
+              onClick={() => setParserTab("structure")}
+              className="gap-1.5 text-xs"
+            >
+              <Network className="h-3.5 w-3.5" />
+              {isRu ? "Структура" : "Structure"}
+            </Button>
+            <Button
+              variant={parserTab === "content" ? "secondary" : "ghost"} size="sm"
+              onClick={() => setParserTab("content")}
+              className="gap-1.5 text-xs"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              {isRu ? "Контент" : "Content"}
+            </Button>
+            <Button
+              variant={parserTab === "characters" ? "secondary" : "ghost"} size="sm"
+              onClick={() => setParserTab("characters")}
+              className="gap-1.5 text-xs"
+            >
+              <Users className="h-3.5 w-3.5" />
+              {isRu ? "Персонажи" : "Characters"}
+            </Button>
+          </>
+        )}
+      </div>
+    );
+
     if (step === "workspace") {
       return (
         <div className="flex items-center gap-3">
           <div className="text-xs text-muted-foreground font-body">
             {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} · {totalScenes} {t("scenes", isRu)}
           </div>
+          {navButtons}
           <Button variant="ghost" size="sm" onClick={() => setAiRolesOpen(true)} className="gap-1.5">
             <Bot className="h-3.5 w-3.5" />
             {isRu ? "AI Роли" : "AI Roles"}
           </Button>
-          <Button variant="outline" size="sm" onClick={handleReset} className="gap-1.5">
-            <ArrowLeft className="h-3 w-3" />
-            {t("libraryBack", isRu)}
-          </Button>
         </div>
       );
     }
-    if (step === "upload") {
-      return (
-        <Button variant="ghost" size="sm" onClick={() => setStep("library")} className="gap-1.5">
-          <ArrowLeft className="h-3 w-3" />
-          {t("libraryBack", isRu)}
-        </Button>
-      );
-    }
-    return undefined;
-  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep]);
+
+    return navButtons;
+  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab]);
 
   useEffect(() => {
     const title = t("parserTitle", isRu);
@@ -417,8 +459,8 @@ export default function Parser() {
           {step === "error" && (
             <ErrorView errorMsg={errorMsg} isRu={isRu} onReset={handleReset} />
           )}
-          {step === "workspace" && (
-            <motion.div key="workspace" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          {step === "workspace" && parserTab === "structure" && (
+            <motion.div key="workspace-structure" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="flex h-full min-h-0 overflow-hidden">
               <ResizablePanelGroup direction="horizontal" autoSaveId={NAV_WIDTH_KEY} className="h-full min-h-0">
                 <ResizablePanel defaultSize={22} minSize={14} maxSize={45} className="min-h-0 overflow-hidden">
@@ -463,6 +505,38 @@ export default function Parser() {
                   </div>
                 </ResizablePanel>
               </ResizablePanelGroup>
+            </motion.div>
+          )}
+          {step === "workspace" && parserTab === "content" && (
+            <motion.div key="workspace-content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="flex items-center justify-center h-full">
+              <div className="text-center space-y-3">
+                <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto" />
+                <h2 className="text-lg font-display text-muted-foreground">
+                  {isRu ? "Анализ контента" : "Content Analysis"}
+                </h2>
+                <p className="text-sm text-muted-foreground/60 max-w-md">
+                  {isRu
+                    ? "Детальный анализ текста каждой сцены: стиль, ритм, ключевые события. Скоро."
+                    : "Detailed analysis of each scene's text: style, rhythm, key events. Coming soon."}
+                </p>
+              </div>
+            </motion.div>
+          )}
+          {step === "workspace" && parserTab === "characters" && (
+            <motion.div key="workspace-characters" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="flex items-center justify-center h-full">
+              <div className="text-center space-y-3">
+                <Users className="h-12 w-12 text-muted-foreground/40 mx-auto" />
+                <h2 className="text-lg font-display text-muted-foreground">
+                  {isRu ? "Список персонажей" : "Characters"}
+                </h2>
+                <p className="text-sm text-muted-foreground/60 max-w-md">
+                  {isRu
+                    ? "Автоматическое определение и профилирование персонажей книги. Скоро."
+                    : "Automatic detection and profiling of book characters. Coming soon."}
+                </p>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
