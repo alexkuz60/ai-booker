@@ -15,7 +15,7 @@ interface SceneInfo {
   content?: string | null;
 }
 
-type SceneStatus = "pending" | "loading" | "analyzing" | "done" | "error" | "skipped";
+type SceneStatus = "pending" | "analyzing" | "done" | "error" | "skipped";
 
 interface SceneJob {
   scene: SceneInfo;
