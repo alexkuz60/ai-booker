@@ -41,9 +41,8 @@ export default function NavSidebar({
   partGroups, partlessIndices,
   onSelectChapter, onAnalyzeChapter, onToggleNode, onSendToStudio, isChapterFullyDone,
   onChangeLevel, onDeleteEntry, onRenameEntry, onChangeStartPage,
-  onOpenPdf, onRenamePart, apiKeys = {},
+  onOpenPdf, onRenamePart,
 }: NavSidebarProps) {
-  const [aiRolesOpen, setAiRolesOpen] = useState(false);
   const [editingPartTitle, setEditingPartTitle] = useState<string | null>(null);
   const [editPartValue, setEditPartValue] = useState("");
   const editPartRef = useRef<HTMLInputElement>(null);
