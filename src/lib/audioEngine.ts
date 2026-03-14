@@ -853,7 +853,10 @@ class AudioEngine {
   private _peakHoldTimeR = 0;
 
   private tracks = new Map<string, EngineTrack>();
+  /** Duration derived from loaded audio tracks only */
   private _totalDuration = 0;
+  /** Timeline duration hint (includes silent/unrendered blocks) */
+  private _timelineDurationHint = 0;
   private _volume = 80;
   private _state: EngineState = "stopped";
   private listeners = new Set<StateListener>();
