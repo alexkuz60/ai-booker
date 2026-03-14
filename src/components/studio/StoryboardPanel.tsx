@@ -1252,8 +1252,9 @@ export function StoryboardPanel({
       onSegmented?.(sceneId);
       toast.success(isRu ? "Раскадровка готова" : "Storyboard ready");
     } catch (err: any) {
-      console.error("Segmentation failed:", err);
-      toast.error(isRu ? "Ошибка анализа" : "Analysis failed");
+      const msg = err?.message || err?.context?.body || String(err);
+      console.error("Segmentation failed:", msg, err);
+      toast.error(`${isRu ? "Ошибка анализа" : "Analysis failed"}: ${msg}`);
     }
     setAnalyzing(false);
   }, [sceneId, sceneContent, isRu, onSegmented]);
