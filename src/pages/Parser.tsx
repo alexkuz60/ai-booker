@@ -26,6 +26,7 @@ import { useParserHelpers } from "@/hooks/useParserHelpers";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { useStructureUndo } from "@/hooks/useStructureUndo";
 import type { StructureSnapshot } from "@/hooks/useStructureUndo";
+import UndoRedoDropdown from "@/components/parser/UndoRedoDropdown";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { useImperativeSave } from "@/hooks/useImperativeSave";
 
