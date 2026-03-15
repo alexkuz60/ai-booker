@@ -19,32 +19,15 @@ interface UseBookManagerParams {
   isRu: boolean;
   /** Optional local project storage for dual-write */
   projectStorage?: ProjectStorage | null;
+  /** Whether project storage bootstrap finished (important for OPFS startup flow) */
+  projectStorageInitialized?: boolean;
   /** Storage backend type — needed to know if we should wait for storage init */
   storageBackend?: "fs-access" | "opfs" | "none";
   /** Create a new local project (for auto-creating OPFS from server data) */
   createProject?: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<import("@/lib/projectStorage").ProjectStorage>;
 }
-
-const BROWSER_ID_KEY = "booker_browser_id";
-const SERVER_SYNC_PREFIX = "booker_server_sync_checked";
-
-function getOrCreateBrowserId(): string {
-  try {
-    const existing = localStorage.getItem(BROWSER_ID_KEY);
-    if (existing) return existing;
-    const nextId = crypto?.randomUUID?.() || `browser_${Date.now()}`;
-    localStorage.setItem(BROWSER_ID_KEY, nextId);
-    return nextId;
-  } catch {
-    return "browser_fallback";
-  }
-}
-
-function getSyncCheckKey(bookId: string): string {
-  return `${SERVER_SYNC_PREFIX}:${bookId}`;
-}
-
-export function useBookManager({ userId, isRu, projectStorage, storageBackend = "none", createProject }: UseBookManagerParams) {
+...
+export function useBookManager({ userId, isRu, projectStorage, projectStorageInitialized = false, storageBackend = "none", createProject }: UseBookManagerParams) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>(() =>
