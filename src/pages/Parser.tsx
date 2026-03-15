@@ -426,6 +426,7 @@ export default function Parser() {
       }
       return next;
     });
+    scheduleSave();
   };
 
   const renameEntry = (idx: number, newTitle: string) => {
