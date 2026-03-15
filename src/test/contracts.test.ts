@@ -7,7 +7,7 @@
  * К4: selectedResult aggregation — агрегация сцен из дочерних узлов
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { TocChapter, Scene, ChapterStatus, SectionType } from "@/pages/parser/types";
 import { normalizeLevels } from "@/pages/parser/types";
 
