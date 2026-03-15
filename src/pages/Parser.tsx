@@ -107,7 +107,8 @@ export default function Parser() {
     setChapterIdMap(s.chapterIdMap);
     setChapterResults(s.chapterResults);
     setSelectedIndices(s.selectedIndices);
-  }, [setTocEntries, setChapterIdMap, setChapterResults]);
+    scheduleSave();
+  }, [setTocEntries, setChapterIdMap, setChapterResults, scheduleSave]);
 
   const handleUndo = useCallback(() => {
     undo(getCurrentSnapshot(), restoreSnapshot);
