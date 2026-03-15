@@ -177,6 +177,7 @@ export default function Parser() {
     return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
   }, [projectStorage, bookId, tocEntries, chapterResults, chapterIdMap, fileName, localPartsForSave]);
 
+  const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
     isRu,
     currentBookId: bookId,
     localSnapshot: step === "workspace"
