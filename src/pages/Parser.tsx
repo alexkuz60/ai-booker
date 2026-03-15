@@ -24,12 +24,7 @@ import { useChapterAnalysis } from "@/hooks/useChapterAnalysis";
 import { useBookManager } from "@/hooks/useBookManager";
 import { useParserHelpers } from "@/hooks/useParserHelpers";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
-import { useStructureUndo } from "@/hooks/useStructureUndo";
-import type { StructureSnapshot } from "@/hooks/useStructureUndo";
-import UndoRedoDropdown from "@/components/parser/UndoRedoDropdown";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
-import { useImperativeSave } from "@/hooks/useImperativeSave";
-import { assertMapIndicesInBounds, warnStaleResults, assertValidMerge, warnPartialTreeDelete } from "@/lib/parserContracts";
 
 import LibraryView from "@/components/parser/LibraryView";
 import UploadView from "@/components/parser/UploadView";
