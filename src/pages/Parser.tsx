@@ -620,6 +620,16 @@ export default function Parser() {
   // Only updates in-memory state; auto-save effect persists to local storage
   // IMPORTANT: when a parent node is selected, selectedResult aggregates scenes
   // from multiple children — we must distribute edits back to correct chapter indices.
+  /**
+   * CONTRACT K3: Scene edits on parent nodes MUST be distributed back to child chapters.
+   * CONTRACT K4: selectedResult is an AGGREGATE — never write it wholesale to a single index.
+   * 
+   * When selectedIdx is a parent with children, updatedScenes is the aggregated list
+   * from [selectedIdx, ...childIndices]. We split it back by original scene counts.
+   * 
+   * RUNTIME GUARD: assertNotOverwritingParent prevents silent data corruption.
+   * See: IMPLEMENTATION_LOG.md → К3, src/test/contracts.test.ts
+   */
   const handleScenesUpdate = useCallback((updatedScenes: Scene[], label?: string) => {
     if (selectedIdx === null) return;
     pushSnapshot(getCurrentSnapshot(), label || (isRu ? "Редактирование сцен" : "Edit scenes"));
@@ -648,9 +658,10 @@ export default function Parser() {
       return;
     }
 
+    // CONTRACT K3 GUARD: parent node must NOT receive aggregated scenes directly
+    assertNotOverwritingParent(selectedIdx, tocEntries, updatedScenes, label || "handleScenesUpdate");
+
     // Parent with children: distribute scenes back to their original chapters.
-    // The aggregated list was built by concatenating scenes from [selectedIdx, ...childIndices]
-    // in order, so we split updatedScenes back using the original scene counts.
     const indices = [selectedIdx, ...childIndices];
     setChapterResults(prev => {
       const next = new Map(prev);
@@ -660,7 +671,6 @@ export default function Parser() {
         if (!existing) continue;
         const count = existing.scenes.length;
         const slice = updatedScenes.slice(offset, offset + count);
-        // Restore original scene_number values for each chapter's scenes
         const restored = slice.map((sc, i) => ({
           ...sc,
           scene_number: existing.scenes[i]?.scene_number ?? i + 1,
