@@ -7,7 +7,7 @@ import { t } from "@/pages/parser/i18n";
 
 import type { Scene, TocChapter, ChapterStatus } from "@/pages/parser/types";
 import type { AiRoleId } from "@/config/aiRoles";
-import { isFolderNode } from "@/lib/tocStructure";
+import { isFolderNode, resolveEntryPageRange } from "@/lib/tocStructure";
 
 interface UseChapterAnalysisParams {
   isRu: boolean;
