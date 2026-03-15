@@ -125,7 +125,12 @@ function SceneCards({
     }
     const result = applyCleanup(action, scenes, selectedText, sceneIndex);
     if (result.changeCount > 0 && onScenesUpdate) {
-      onScenesUpdate(result.scenes, result.summary);
+      // Update char_count for all scenes after cleanup
+      const updatedScenes = result.scenes.map(sc => ({
+        ...sc,
+        char_count: (sc.content || '').length,
+      }));
+      onScenesUpdate(updatedScenes, result.summary);
       // Mark scene(s) as edited
       setEditedIndices(prev => {
         const next = new Set(prev);
