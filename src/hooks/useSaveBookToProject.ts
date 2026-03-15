@@ -120,8 +120,25 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
         if (error) console.warn("[SaveToServer] chapters upsert:", error);
       }
 
-      // ── 2. Upsert scenes to DB ──
-      const sceneUpserts: Array<{
+      // ── 2. Delete old scenes & insert current ones ──
+      // Collect all chapter IDs that have results
+      const chapterIdsWithScenes = new Set<string>();
+      chapterResults.forEach((_result, idx) => {
+        const chId = chapterIdMap.get(idx);
+        if (chId) chapterIdsWithScenes.add(chId);
+      });
+
+      // Delete ALL existing scenes for these chapters (removes stale/duplicate scenes)
+      if (chapterIdsWithScenes.size > 0) {
+        const { error: delErr } = await supabase
+          .from("book_scenes")
+          .delete()
+          .in("chapter_id", Array.from(chapterIdsWithScenes));
+        if (delErr) console.warn("[SaveToServer] scenes delete:", delErr);
+      }
+
+      // Insert fresh scenes
+      const sceneInserts: Array<{
         id: string;
         chapter_id: string;
         scene_number: number;
@@ -137,7 +154,7 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
         if (!chId) return;
         for (const sc of result.scenes) {
           if (!sc.id) continue;
-          sceneUpserts.push({
+          sceneInserts.push({
             id: sc.id,
             chapter_id: chId,
             scene_number: sc.scene_number,
@@ -150,9 +167,9 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
         }
       });
 
-      if (sceneUpserts.length > 0) {
-        const { error } = await supabase.from("book_scenes").upsert(sceneUpserts);
-        if (error) console.warn("[SaveToServer] scenes upsert:", error);
+      if (sceneInserts.length > 0) {
+        const { error } = await supabase.from("book_scenes").insert(sceneInserts);
+        if (error) console.warn("[SaveToServer] scenes insert:", error);
       }
 
       // ── 3. Upsert parts to DB ──
