@@ -68,7 +68,7 @@ export async function importProjectZip(storage: ProjectStorage, zipBlob: Blob): 
     if (path.endsWith("/") || data.length === 0) continue;
     count++;
 
-    const blob = new Blob([data]);
+    const blob = new Blob([data.buffer as ArrayBuffer]);
 
     // JSON files: validate and write as JSON for consistency
     if (path.endsWith(".json")) {
