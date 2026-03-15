@@ -265,6 +265,14 @@ export function useParserCharacters({
     });
   }, [persist]);
 
+  const updateGender = useCallback(async (id: string, gender: "male" | "female" | "unknown") => {
+    setCharacters(prev => {
+      const next = prev.map(c => c.id === id ? { ...c, gender } : c);
+      persist(next);
+      return next;
+    });
+  }, [persist]);
+
   const updateAliases = useCallback(async (id: string, aliases: string[]) => {
     setCharacters(prev => {
       const next = prev.map(c => c.id === id ? { ...c, aliases } : c);
