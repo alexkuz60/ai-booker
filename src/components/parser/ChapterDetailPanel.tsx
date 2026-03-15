@@ -98,6 +98,7 @@ function SceneCards({
   onScenesUpdate?: (scenes: Scene[]) => void;
 }) {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [editedIndices, setEditedIndices] = useState<Set<number>>(new Set());
   const toggleExpand = useCallback((idx: number, e: React.MouseEvent) => {
     e.stopPropagation();
     setExpandedIds(prev => {
@@ -125,6 +126,16 @@ function SceneCards({
     const result = applyCleanup(action, scenes, selectedText, sceneIndex);
     if (result.changeCount > 0 && onScenesUpdate) {
       onScenesUpdate(result.scenes);
+      // Mark scene(s) as edited
+      setEditedIndices(prev => {
+        const next = new Set(prev);
+        next.add(sceneIndex);
+        // If split happened, mark new scene too
+        if (result.scenes.length > scenes.length && action === "chapter_split") {
+          next.add(sceneIndex + 1);
+        }
+        return next;
+      });
     }
     toast(result.summary, { duration: 3000 });
   }, [scenes, isRu, applyCleanup, getSelectedText, consume, onScenesUpdate]);
