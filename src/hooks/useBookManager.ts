@@ -356,10 +356,13 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
       return;
     }
 
-    // Важно: не блокируемся в extracting_toc, если активный ключ книги остался,
-    // а локальное хранилище не прикреплено в этой сессии.
-    // Для fs-access/opfs всё равно сначала пробуем local restore, а при неуспехе
-    // корректно уходим в library/server-check без вечного ожидания.
+    // Для OPFS: projectStorage инициализируется асинхронно в useProjectStorage.
+    // Нужно ПОДОЖДАТЬ, пока он станет доступным, а не пропускать восстановление.
+    if (storageBackend === "opfs" && !projectStorage?.isReady) {
+      // Не ставим restoredOnce — эффект перезапустится когда projectStorage появится
+      return;
+    }
+
     setRestoredOnce(true);
 
     restoreFromLocal(savedBookId).then(async (restored) => {
