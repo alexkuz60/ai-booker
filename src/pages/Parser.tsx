@@ -137,7 +137,6 @@ export default function Parser() {
     bookId,
     fileName,
     getSnapshot: getLocalSnapshot,
-    debounceMs: 1500,
   });
 
 
