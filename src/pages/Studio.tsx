@@ -91,7 +91,7 @@ const Studio = () => {
   }, []);
 
   const selectedScene = chapter && selectedSceneIdx !== null ? chapter.scenes[selectedSceneIdx] : null;
-  const { saveBook, saving: savingBook } = useSaveBookToProject({
+  const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
     isRu,
     currentBookId: bookId,
   });
