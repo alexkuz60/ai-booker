@@ -180,6 +180,11 @@ export function useChapterAnalysis({
       if (!hasExistingScenes) {
         addLog(`${t("logExtracting", isRu)} «${entry.title}»...`);
 
+        // Always clear server scenes before stage-1 insert to prevent duplicate drift
+        if (existingChId) {
+          await supabase.from('book_scenes').delete().eq('chapter_id', existingChId);
+        }
+
         // CONTRACT K1: shared resolver (same logic as navigator/server normalization)
         const baseRange = resolveEntryPageRange(tocEntries, idx, activePdf?.numPages);
         let effectiveStartPage = baseRange.startPage;
