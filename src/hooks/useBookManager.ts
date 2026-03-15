@@ -99,6 +99,17 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
       sessionStorage.setItem(ACTIVE_BOOK_KEY, savedBookId);
       setStep("workspace");
 
+      // Normalize legacy local data immediately (remove folder scene files)
+      void syncStructureToLocal(projectStorage, {
+        bookId: savedBookId,
+        title: structure.title,
+        fileName: structure.fileName,
+        toc: normalizedToc,
+        parts: structure.parts,
+        chapterIdMap: localChIdMap,
+        chapterResults: sanitizedLocalResults,
+      });
+
       // ── Restore PDF from local project (async, non-blocking) ──
       projectStorage.readBlob("source/book.pdf").then(async (pdfBlob) => {
         if (!pdfBlob) {
