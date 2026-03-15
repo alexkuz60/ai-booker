@@ -135,3 +135,28 @@ export async function readStructureFromLocal(
     return null;
   }
 }
+
+// ─── Characters local persistence ────────────────────────────
+
+export async function saveCharactersToLocal(
+  storage: ProjectStorage,
+  characters: LocalCharacter[],
+): Promise<void> {
+  try {
+    await storage.writeJSON("structure/characters.json", characters);
+    console.debug(`[LocalSync] Characters saved: ${characters.length}`);
+  } catch (err) {
+    console.warn("[LocalSync] Failed to save characters:", err);
+  }
+}
+
+export async function readCharactersFromLocal(
+  storage: ProjectStorage,
+): Promise<LocalCharacter[]> {
+  try {
+    const data = await storage.readJSON<LocalCharacter[]>("structure/characters.json");
+    return data || [];
+  } catch {
+    return [];
+  }
+}
