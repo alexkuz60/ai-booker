@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Bot, Library, PlusCircle, Network, FileText, Users, RefreshCw, CloudUpload, Undo2, Redo2 } from "lucide-react";
@@ -26,7 +26,8 @@ import { useParserHelpers } from "@/hooks/useParserHelpers";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { useStructureUndo } from "@/hooks/useStructureUndo";
 import type { StructureSnapshot } from "@/hooks/useStructureUndo";
-import { useSaveBookToProject, autoSaveToLocal } from "@/hooks/useSaveBookToProject";
+import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
+import { useImperativeSave } from "@/hooks/useImperativeSave";
 
 import LibraryView from "@/components/parser/LibraryView";
 import UploadView from "@/components/parser/UploadView";
@@ -35,33 +36,6 @@ import NavSidebar from "@/components/parser/NavSidebar";
 import ChapterDetailPanel from "@/components/parser/ChapterDetailPanel";
 import { AiRolesTab } from "@/components/profile/tabs/AiRolesTab";
 import { SaveBookButton } from "@/components/SaveBookButton";
-
-const buildAutoSaveFingerprint = (
-  tocEntries: TocChapter[],
-  chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>,
-  chapterIdMap: Map<number, string>,
-): string => {
-  const tocFingerprint = tocEntries
-    .map((entry, idx) => `${idx}:${entry.title}:${entry.level}:${entry.startPage}:${entry.endPage}:${entry.partTitle ?? ""}`)
-    .join("||");
-
-  const chapterMapFingerprint = Array.from(chapterIdMap.entries())
-    .map(([idx, id]) => `${idx}:${id}`)
-    .join("||");
-
-  const scenesFingerprint = Array.from(chapterResults.entries())
-    .map(([idx, result]) => {
-      const scenes = result.scenes
-        .map((scene, sceneIdx) =>
-          `${sceneIdx}:${scene.id ?? ""}:${scene.scene_number}:${scene.title}:${scene.content ?? ""}:${scene.scene_type}:${scene.mood}:${scene.bpm}`,
-        )
-        .join("~~");
-      return `${idx}:${result.status}:${scenes}`;
-    })
-    .join("||");
-
-  return `${tocEntries.length}#${chapterResults.size}#${chapterIdMap.size}#${tocFingerprint}#${chapterMapFingerprint}#${scenesFingerprint}`;
-};
 
 export default function Parser() {
   const { user } = useAuth();
@@ -119,48 +93,6 @@ export default function Parser() {
 
   const { pushSnapshot, undo, redo, canUndo, canRedo, resetStacks } = useStructureUndo(bookId);
 
-  const getCurrentSnapshot = useCallback((): StructureSnapshot => ({
-    tocEntries: tocEntries.map(e => ({ ...e })),
-    chapterIdMap: new Map(chapterIdMap),
-    chapterResults: new Map(
-      Array.from(chapterResults.entries()).map(([k, v]) => [k, { scenes: [...v.scenes], status: v.status }])
-    ),
-    selectedIndices: new Set(selectedIndices),
-  }), [tocEntries, chapterIdMap, chapterResults, selectedIndices]);
-
-  const restoreSnapshot = useCallback((s: StructureSnapshot) => {
-    setTocEntries(s.tocEntries);
-    setChapterIdMap(s.chapterIdMap);
-    setChapterResults(s.chapterResults);
-    setSelectedIndices(s.selectedIndices);
-  }, [setTocEntries, setChapterIdMap, setChapterResults]);
-
-  const handleUndo = useCallback(() => {
-    undo(getCurrentSnapshot(), restoreSnapshot);
-  }, [undo, getCurrentSnapshot, restoreSnapshot]);
-
-  const handleRedo = useCallback(() => {
-    redo(getCurrentSnapshot(), restoreSnapshot);
-  }, [redo, getCurrentSnapshot, restoreSnapshot]);
-
-  // Ctrl+Z / Ctrl+Shift+Z keyboard shortcuts
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (step !== "workspace") return;
-      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        handleUndo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === "z" && e.shiftKey) {
-        e.preventDefault();
-        handleRedo();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [step, handleUndo, handleRedo]);
-
-
-
   const selectedIdx = selectedIndices.size === 1 ? Array.from(selectedIndices)[0] : null;
 
   const {
@@ -188,28 +120,61 @@ export default function Parser() {
     return parts;
   }, [tocEntries, partIdMap]);
 
-  // ── Auto-save structural changes to local project (only on real changes) ──
-  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSavedHash = useRef<string>("");
+  // ── Imperative auto-save: called explicitly after each mutation ──
+  const getLocalSnapshot = useCallback(() => ({
+    toc: tocEntries,
+    parts: localPartsForSave,
+    chapterIdMap,
+    chapterResults,
+  }), [tocEntries, localPartsForSave, chapterIdMap, chapterResults]);
+
+  const { scheduleSave, flushSave } = useImperativeSave({
+    storage: projectStorage,
+    bookId,
+    fileName,
+    getSnapshot: getLocalSnapshot,
+  });
+
+  const getCurrentSnapshot = useCallback((): StructureSnapshot => ({
+    tocEntries: tocEntries.map(e => ({ ...e })),
+    chapterIdMap: new Map(chapterIdMap),
+    chapterResults: new Map(
+      Array.from(chapterResults.entries()).map(([k, v]) => [k, { scenes: [...v.scenes], status: v.status }])
+    ),
+    selectedIndices: new Set(selectedIndices),
+  }), [tocEntries, chapterIdMap, chapterResults, selectedIndices]);
+
+  const restoreSnapshot = useCallback((s: StructureSnapshot) => {
+    setTocEntries(s.tocEntries);
+    setChapterIdMap(s.chapterIdMap);
+    setChapterResults(s.chapterResults);
+    setSelectedIndices(s.selectedIndices);
+    scheduleSave();
+  }, [setTocEntries, setChapterIdMap, setChapterResults, scheduleSave]);
+
+  const handleUndo = useCallback(() => {
+    undo(getCurrentSnapshot(), restoreSnapshot);
+  }, [undo, getCurrentSnapshot, restoreSnapshot]);
+
+  const handleRedo = useCallback(() => {
+    redo(getCurrentSnapshot(), restoreSnapshot);
+  }, [redo, getCurrentSnapshot, restoreSnapshot]);
+
+  // Ctrl+Z / Ctrl+Shift+Z keyboard shortcuts
   useEffect(() => {
-    if (!projectStorage?.isReady || !bookId || tocEntries.length === 0) return;
-
-    // Fingerprint includes actual scene content to avoid missed saves on same-length edits.
-    const hash = buildAutoSaveFingerprint(tocEntries, chapterResults, chapterIdMap);
-    if (hash === lastSavedHash.current) return;
-
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = setTimeout(() => {
-      lastSavedHash.current = hash;
-      autoSaveToLocal(projectStorage, bookId, fileName, {
-        toc: tocEntries,
-        parts: localPartsForSave,
-        chapterIdMap,
-        chapterResults,
-      }).catch((err) => console.warn("[AutoSave] local write failed:", err));
-    }, 800);
-    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
-  }, [projectStorage, bookId, tocEntries, chapterResults, chapterIdMap, fileName, localPartsForSave]);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (step !== "workspace") return;
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "z" && e.shiftKey) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [step, handleUndo, handleRedo]);
 
   const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
     isRu,
@@ -461,6 +426,7 @@ export default function Parser() {
       }
       return next;
     });
+    scheduleSave();
   };
 
   const renameEntry = (idx: number, newTitle: string) => {
@@ -470,6 +436,7 @@ export default function Parser() {
     if (chapterId) {
       supabase.from('book_chapters').update({ title: newTitle }).eq('id', chapterId).then();
     }
+    scheduleSave();
   };
 
   const changeStartPage = (idx: number, newPage: number) => {
@@ -487,6 +454,7 @@ export default function Parser() {
     // Persist to DB
     const chId = chapterIdMap.get(idx);
     if (chId) supabase.from('book_chapters').update({ start_page: newPage }).eq('id', chId).then();
+    scheduleSave();
   };
 
   const renamePart = (oldTitle: string, newTitle: string) => {
@@ -496,6 +464,7 @@ export default function Parser() {
     if (partId) {
       supabase.from('book_parts').update({ title: newTitle }).eq('id', partId).then();
     }
+    scheduleSave();
   };
 
   const deleteEntry = (indices: number[]) => {
@@ -564,6 +533,7 @@ export default function Parser() {
     }
     setChapterResults(newResults);
     setPendingDelete(null);
+    scheduleSave();
   };
 
   const mergeEntries = (indices: number[]) => {
@@ -624,6 +594,7 @@ export default function Parser() {
     setChapterIdMap(newChapterMap);
     setChapterResults(newResults);
     setSelectedIndices(new Set([firstIdx]));
+    scheduleSave();
   };
 
   useEffect(() => {
@@ -673,6 +644,7 @@ export default function Parser() {
         }
         return next;
       });
+      scheduleSave();
       return;
     }
 
@@ -698,7 +670,8 @@ export default function Parser() {
       }
       return next;
     });
-  }, [selectedIdx, tocEntries, setChapterResults, pushSnapshot, getCurrentSnapshot]);
+    scheduleSave();
+  }, [selectedIdx, tocEntries, setChapterResults, pushSnapshot, getCurrentSnapshot, scheduleSave]);
 
 
   return (
