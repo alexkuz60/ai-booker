@@ -56,6 +56,34 @@ export default function Parser() {
   } = useProjectStorageContext();
   const { getModelForRole } = useAiRoles(userApiKeys);
   const { toast } = useToast();
+  const [navRestoredFromStorage] = useState<boolean>(() => {
+    try {
+      const saved = sessionStorage.getItem(NAV_STATE_KEY);
+      return !!saved;
+    } catch { return false; }
+  });
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(() => {
+    try {
+      const saved = sessionStorage.getItem(NAV_STATE_KEY);
+      if (saved) { const p = JSON.parse(saved); return new Set(p.selected || []); }
+    } catch {}
+    return new Set();
+  });
+  const [lastClickedIdx, setLastClickedIdx] = useState<number | null>(() => {
+    try {
+      const saved = sessionStorage.getItem(NAV_STATE_KEY);
+      if (saved) { const p = JSON.parse(saved); return p.lastClicked ?? null; }
+    } catch {}
+    return null;
+  });
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => {
+    try {
+      const saved = sessionStorage.getItem(NAV_STATE_KEY);
+      if (saved) { const p = JSON.parse(saved); return new Set(p.expanded || []); }
+    } catch {}
+    return new Set();
+  });
+
   const {
     step, setStep, books, loadingLibrary, fileName, errorMsg, bookId,
     chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
@@ -63,14 +91,7 @@ export default function Parser() {
     openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset, reloadBook, ensurePdfLoaded,
     reloadLibrary,
     serverNewerBookId, dismissServerNewer, acceptServerVersion,
-  } = useBookManager({
-    userId: user?.id,
-    isRu,
-    projectStorage,
-    projectStorageInitialized,
-    storageBackend,
-    createProject,
-  });
+  } = useBookManager({ userId: user?.id, isRu, projectStorage, projectStorageInitialized, storageBackend, createProject });
 
   const {
     characters, extracting, extractProgress, extractCharacters,
