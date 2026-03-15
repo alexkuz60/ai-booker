@@ -217,7 +217,7 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
     } finally {
       setSaving(false);
     }
-  }, [currentBookId, backend, storage, openProject, isRu, toast, meta?.userId, meta?.createdAt, meta?.language, user?.id]);
+  }, [currentBookId, localSnapshot, backend, storage, openProject, isRu, toast, meta?.userId, meta?.createdAt, meta?.language, user?.id]);
 
   return {
     saveBook,
