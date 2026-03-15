@@ -63,9 +63,16 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
   const [file, setFile] = useState<File | null>(null);
 
   const [chapterResults, setChapterResults] = useState<Map<number, { scenes: Scene[]; status: ChapterStatus }>>(new Map());
+  const [localProjectNamesByBookId, setLocalProjectNamesByBookId] = useState<Map<string, string[]>>(new Map());
 
-  // ─── Library: Local-first list (no automatic server listing) ─────────────
-  const mapLocalStructureToBook = useCallback(async (storage: ProjectStorage): Promise<BookRecord | null> => {
+  type LocalLibraryCandidate = {
+    record: BookRecord;
+    projectName: string;
+    dedupeKey: string;
+  };
+
+  // ─── Library: Local-first list with deterministic dedupe ──────────────────
+  const mapLocalStructureToBook = useCallback(async (storage: ProjectStorage): Promise<LocalLibraryCandidate | null> => {
     const structure = await storage.readJSON<LocalBookStructure>("structure/toc.json");
     const meta = await storage.readJSON<{ bookId?: string; title?: string; createdAt?: string; updatedAt?: string }>("project.json");
 
@@ -78,37 +85,74 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
     const resolvedTitle = structure?.title || meta?.title || storage.projectName;
     const resolvedFileName = structure?.fileName || `${resolvedTitle}.pdf`;
     const resolvedCreatedAt = structure?.updatedAt || meta?.updatedAt || meta?.createdAt || new Date(0).toISOString();
+    const normalizedTitle = resolvedTitle.trim().toLowerCase();
+    const dedupeKey = structure?.bookId || meta?.bookId
+      ? `book:${resolvedId}`
+      : `title:${normalizedTitle}`;
 
     return {
-      id: resolvedId,
-      title: resolvedTitle,
-      file_name: resolvedFileName,
-      file_path: null,
-      status: "local",
-      created_at: resolvedCreatedAt,
-      chapter_count: chapterCount,
-      scene_count: 0,
+      record: {
+        id: resolvedId,
+        title: resolvedTitle,
+        file_name: resolvedFileName,
+        file_path: null,
+        status: "local",
+        created_at: resolvedCreatedAt,
+        chapter_count: chapterCount,
+        scene_count: 0,
+      },
+      projectName: storage.projectName,
+      dedupeKey,
     };
   }, []);
 
   const loadLocalLibrary = useCallback(async (): Promise<BookRecord[]> => {
+    const getTs = (value: string) => {
+      const ts = new Date(value).getTime();
+      return Number.isFinite(ts) ? ts : 0;
+    };
+
     if (storageBackend === "opfs") {
       const projectNames = await OPFSStorage.listProjects();
-      const records = await Promise.all(projectNames.map(async (projectName) => {
+      const candidatesRaw = await Promise.all(projectNames.map(async (projectName) => {
         const store = await OPFSStorage.openOrCreate(projectName);
         return mapLocalStructureToBook(store);
       }));
+      const candidates = candidatesRaw.filter((v): v is LocalLibraryCandidate => !!v);
 
-      return records
-        .filter((b): b is BookRecord => !!b)
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      const byDedupeKey = new Map<string, LocalLibraryCandidate>();
+      const projectsByDedupeKey = new Map<string, string[]>();
+
+      for (const candidate of candidates) {
+        const existingProjects = projectsByDedupeKey.get(candidate.dedupeKey) || [];
+        existingProjects.push(candidate.projectName);
+        projectsByDedupeKey.set(candidate.dedupeKey, existingProjects);
+
+        const existing = byDedupeKey.get(candidate.dedupeKey);
+        if (!existing || getTs(candidate.record.created_at) > getTs(existing.record.created_at)) {
+          byDedupeKey.set(candidate.dedupeKey, candidate);
+        }
+      }
+
+      const localIndex = new Map<string, string[]>();
+      const dedupedBooks = Array.from(byDedupeKey.values()).map((candidate) => {
+        localIndex.set(candidate.record.id, projectsByDedupeKey.get(candidate.dedupeKey) || [candidate.projectName]);
+        return candidate.record;
+      });
+
+      setLocalProjectNamesByBookId(localIndex);
+      return dedupedBooks.sort((a, b) => getTs(b.created_at) - getTs(a.created_at));
     }
 
     if (projectStorage?.isReady) {
       const current = await mapLocalStructureToBook(projectStorage);
-      return current ? [current] : [];
+      if (current) {
+        setLocalProjectNamesByBookId(new Map([[current.record.id, [current.projectName]]]));
+        return [current.record];
+      }
     }
 
+    setLocalProjectNamesByBookId(new Map());
     return [];
   }, [storageBackend, projectStorage, mapLocalStructureToBook]);
 
