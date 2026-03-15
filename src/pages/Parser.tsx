@@ -161,7 +161,22 @@ export default function Parser() {
     return parts;
   }, [tocEntries, partIdMap]);
 
-  const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
+  // ── Auto-save ALL structural changes to local project (debounced) ──
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!projectStorage?.isReady || !bookId || tocEntries.length === 0) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      autoSaveToLocal(projectStorage, bookId, fileName, {
+        toc: tocEntries,
+        parts: localPartsForSave,
+        chapterIdMap,
+        chapterResults,
+      }).catch((err) => console.warn("[AutoSave] local write failed:", err));
+    }, 800);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  }, [projectStorage, bookId, tocEntries, chapterResults, chapterIdMap, fileName, localPartsForSave]);
+
     isRu,
     currentBookId: bookId,
     localSnapshot: step === "workspace"
