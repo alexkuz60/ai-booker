@@ -604,17 +604,57 @@ export default function Parser() {
 
   // Handle scene content updates from cleanup actions
   // Only updates in-memory state; auto-save effect persists to local storage
+  // IMPORTANT: when a parent node is selected, selectedResult aggregates scenes
+  // from multiple children — we must distribute edits back to correct chapter indices.
   const handleScenesUpdate = useCallback((updatedScenes: Scene[]) => {
     if (selectedIdx === null) return;
+
+    const entry = tocEntries[selectedIdx];
+
+    // Collect child indices (same logic as useParserHelpers)
+    const childIndices: number[] = [];
+    for (let i = selectedIdx + 1; i < tocEntries.length; i++) {
+      if (tocEntries[i].level <= entry.level) break;
+      if (tocEntries[i].sectionType !== entry.sectionType) break;
+      childIndices.push(i);
+    }
+
+    // No children — simple case, update selectedIdx directly
+    if (childIndices.length === 0) {
+      setChapterResults(prev => {
+        const next = new Map(prev);
+        const existing = next.get(selectedIdx);
+        if (existing) {
+          next.set(selectedIdx, { ...existing, scenes: updatedScenes });
+        }
+        return next;
+      });
+      return;
+    }
+
+    // Parent with children: distribute scenes back to their original chapters.
+    // The aggregated list was built by concatenating scenes from [selectedIdx, ...childIndices]
+    // in order, so we split updatedScenes back using the original scene counts.
+    const indices = [selectedIdx, ...childIndices];
     setChapterResults(prev => {
       const next = new Map(prev);
-      const existing = next.get(selectedIdx);
-      if (existing) {
-        next.set(selectedIdx, { ...existing, scenes: updatedScenes });
+      let offset = 0;
+      for (const idx of indices) {
+        const existing = prev.get(idx);
+        if (!existing) continue;
+        const count = existing.scenes.length;
+        const slice = updatedScenes.slice(offset, offset + count);
+        // Restore original scene_number values for each chapter's scenes
+        const restored = slice.map((sc, i) => ({
+          ...sc,
+          scene_number: existing.scenes[i]?.scene_number ?? i + 1,
+        }));
+        next.set(idx, { ...existing, scenes: restored });
+        offset += count;
       }
       return next;
     });
-  }, [selectedIdx, setChapterResults]);
+  }, [selectedIdx, tocEntries, setChapterResults]);
 
 
   return (
