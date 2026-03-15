@@ -316,7 +316,7 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
     } catch (error) {
       toast({
         title: isRu ? "Ошибка импорта" : "Import failed",
-        description: error instanceof Error ? error.message : String(error),
+        description: getErrorMessage(error, isRu),
         variant: "destructive",
       });
     } finally {
