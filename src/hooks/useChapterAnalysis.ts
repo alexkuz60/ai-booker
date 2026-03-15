@@ -353,6 +353,7 @@ export function useChapterAnalysis({
           scene_number: s.scene_number || i + 1, title: s.title,
           content: s.content || '', content_preview: (s.content || '').slice(0, 200),
           scene_type: 'pending', mood: '', bpm: 0,
+          char_count: (s.content || '').length,
         }));
 
         // Fallback: markers not matched → distribute full text evenly across scenes
