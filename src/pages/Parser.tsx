@@ -83,6 +83,7 @@ export default function Parser() {
     chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
     partIdMap, chapterResults, setChapterResults, fileInputRef,
     openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset, reloadBook, ensurePdfLoaded,
+    reloadLibrary,
     serverNewerBookId, dismissServerNewer, acceptServerVersion,
   } = useBookManager({ userId: user?.id, isRu, projectStorage, storageBackend });
 
@@ -214,7 +215,11 @@ export default function Parser() {
       <div className="flex items-center gap-1">
         <Button
           variant={step === "library" ? "secondary" : "ghost"} size="sm"
-          onClick={() => { if (step === "workspace") handleReset(); else setStep("library"); }}
+          onClick={() => {
+            if (step === "workspace") handleReset();
+            else setStep("library");
+            void reloadLibrary();
+          }}
           className="gap-1.5 text-xs"
         >
           <Library className="h-3.5 w-3.5" />
@@ -298,7 +303,7 @@ export default function Parser() {
     }
 
     return navButtons;
-  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook, saveBook, savingBook, bookId]);
+  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook, reloadLibrary, saveBook, savingBook, bookId]);
 
   useEffect(() => {
     const title = t("parserTitle", isRu);

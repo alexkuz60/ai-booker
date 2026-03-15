@@ -47,30 +47,83 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
 
   // ─── Library: Load user's books ────────────────────────────
   const loadLibrary = useCallback(async () => {
-    if (!userId) return;
-    setLoadingLibrary(true);
-    try {
-      const { data, error } = await supabase.rpc('get_user_books_with_counts');
+    if (!userId) {
+      setBooks([]);
+      setLoadingLibrary(false);
+      return;
+    }
+
+    const mapBooks = (rows: any[]): BookRecord[] => (rows || []).map((b: any) => ({
+      id: b.id,
+      title: b.title,
+      file_name: b.file_name,
+      file_path: b.file_path,
+      status: b.status,
+      created_at: b.created_at,
+      chapter_count: Number(b.chapter_count) || 0,
+      scene_count: Number(b.scene_count) || 0,
+    }));
+
+    const fallbackLoadLibrary = async (): Promise<BookRecord[]> => {
+      const { data, error } = await supabase
+        .from("books")
+        .select("id, title, file_name, file_path, status, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
       if (error) throw error;
-      const enriched: BookRecord[] = (data || []).map((b: any) => ({
+      return (data || []).map((b: any) => ({
         id: b.id,
         title: b.title,
         file_name: b.file_name,
         file_path: b.file_path,
         status: b.status,
         created_at: b.created_at,
-        chapter_count: Number(b.chapter_count) || 0,
-        scene_count: Number(b.scene_count) || 0,
+        chapter_count: 0,
+        scene_count: 0,
       }));
-      setBooks(enriched);
+    };
+
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    setLoadingLibrary(true);
+
+    try {
+      const rpcPromise = supabase.rpc("get_user_books_with_counts");
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error("Library RPC timeout")), 12000);
+      });
+
+      const { data, error } = await Promise.race([rpcPromise, timeoutPromise]) as {
+        data: any[] | null;
+        error: unknown;
+      };
+
+      if (error) throw error;
+      setBooks(mapBooks(data || []));
     } catch (err) {
-      console.error("Failed to load library:", err);
+      console.warn("[Library] RPC failed, fallback to direct query:", err);
+      try {
+        setBooks(await fallbackLoadLibrary());
+      } catch (fallbackErr) {
+        console.error("Failed to load library:", fallbackErr);
+        setBooks([]);
+      }
     } finally {
+      if (timeoutId) clearTimeout(timeoutId);
       setLoadingLibrary(false);
     }
   }, [userId]);
 
-  useEffect(() => { if (userId) loadLibrary(); }, [userId, loadLibrary]);
+  useEffect(() => {
+    if (!userId) {
+      setBooks([]);
+      setLoadingLibrary(false);
+      return;
+    }
+
+    if (step !== "library" && books.length > 0) return;
+    void loadLibrary();
+  }, [userId, step, books.length, loadLibrary]);
 
   // ─── Auto-restore active book on mount ─────────────────────
   // ─── Restore from local ProjectStorage ─────────────────────
@@ -739,6 +792,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
     chapterResults, setChapterResults, fileInputRef,
     // Actions
     openSavedBook, deleteBook, handleFileSelect, handleReset, reloadBook, ensurePdfLoaded,
+    reloadLibrary: loadLibrary,
     // Sync-check
     serverNewerBookId, dismissServerNewer, acceptServerVersion,
   };
