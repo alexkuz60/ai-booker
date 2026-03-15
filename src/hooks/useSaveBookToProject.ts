@@ -176,11 +176,7 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
         title: book.title,
         fileName: book.file_name,
         toc,
-        parts: parts.map((part) => ({
-          id: part.id,
-          title: part.title,
-          partNumber: part.part_number,
-        })),
+        parts: partsForSync,
         chapterIdMap,
         chapterResults,
       });
