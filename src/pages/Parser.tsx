@@ -86,9 +86,17 @@ export default function Parser() {
     serverNewerBookId, dismissServerNewer, acceptServerVersion,
   } = useBookManager({ userId: user?.id, isRu, projectStorage, storageBackend });
 
+  const {
+    characters, extracting, extractCharacters,
+    renameCharacter, updateAliases, deleteCharacter, mergeCharacters, addCharacter,
+  } = useParserCharacters({
+    storage: projectStorage,
+    tocEntries,
+    chapterResults,
+    bookId,
+  });
 
 
-  
 
   const selectedIdx = selectedIndices.size === 1 ? Array.from(selectedIndices)[0] : null;
 
