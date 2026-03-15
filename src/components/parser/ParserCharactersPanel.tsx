@@ -291,12 +291,12 @@ export default function ParserCharactersPanel({
                     {/* Gender */}
                     <TableCell className="text-center">
                       {char.gender === "male" && (
-                        <span className="text-xs text-blue-400" title={isRu ? "Мужской" : "Male"}>
+                        <span className="text-xs text-sky-500 dark:text-sky-400" title={isRu ? "Мужской" : "Male"}>
                           М
                         </span>
                       )}
                       {char.gender === "female" && (
-                        <span className="text-xs text-pink-400" title={isRu ? "Женский" : "Female"}>
+                        <span className="text-xs text-rose-500 dark:text-rose-400" title={isRu ? "Женский" : "Female"}>
                           Ж
                         </span>
                       )}
