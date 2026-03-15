@@ -212,6 +212,9 @@ export function useChapterAnalysis({
         let effectiveStartPage = baseRange.startPage;
         let effectiveEndPage = baseRange.endPage;
 
+        // CONTRACT K1 GUARD: warn if range is suspiciously small for a parent node
+        warnSuspiciousPageRange(idx, tocEntries, effectiveStartPage, effectiveEndPage);
+
         if (effectiveStartPage !== entry.startPage || effectiveEndPage !== entry.endPage) {
           addLog(isRu
             ? `↔️ Уточнен диапазон страниц: ${entry.startPage}–${entry.endPage} → ${effectiveStartPage}–${effectiveEndPage}`
