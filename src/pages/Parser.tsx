@@ -412,15 +412,25 @@ export default function Parser() {
   const changeStartPage = (idx: number, newPage: number) => {
     setTocEntries(prev => {
       const next = prev.map((e, i) => i === idx ? { ...e, startPage: newPage } : e);
-      if (idx > 0 && next[idx - 1].endPage === prev[idx].startPage) {
-        next[idx - 1] = { ...next[idx - 1], endPage: newPage };
-        // Persist previous entry's endPage
+
+      // Keep previous chapter boundary contiguous (previous end = current start - 1)
+      if (idx > 0) {
+        const prevEnd = Math.max(next[idx - 1].startPage, newPage - 1);
+        next[idx - 1] = { ...next[idx - 1], endPage: prevEnd };
         const prevChId = chapterIdMap.get(idx - 1);
-        if (prevChId) supabase.from('book_chapters').update({ end_page: newPage }).eq('id', prevChId).then();
+        if (prevChId) supabase.from('book_chapters').update({ end_page: prevEnd }).eq('id', prevChId).then();
       }
+
+      // Guard against invalid range on current chapter
+      if (next[idx].endPage < newPage) {
+        next[idx] = { ...next[idx], endPage: newPage };
+        const chId = chapterIdMap.get(idx);
+        if (chId) supabase.from('book_chapters').update({ end_page: newPage }).eq('id', chId).then();
+      }
+
       return next;
     });
-    // Persist to DB
+
     const chId = chapterIdMap.get(idx);
     if (chId) supabase.from('book_chapters').update({ start_page: newPage }).eq('id', chId).then();
     scheduleSave();
