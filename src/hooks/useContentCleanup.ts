@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import type { Scene } from "@/pages/parser/types";
 
 // ─── Types ───────────────────────────────────────────────────
-export type CleanupAction = "header" | "page_number" | "chapter_split" | "fix_punctuation_spaces" | "footnote_link" | "footnote_auto";
+export type CleanupAction = "header" | "page_number" | "chapter_split" | "fix_punctuation_spaces" | "footnote_link" | "footnote_auto" | "delete_selected";
 
 export interface CleanupResult {
   /** Updated scenes array (may grow if split happened) */
