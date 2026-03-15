@@ -620,9 +620,9 @@ export default function Parser() {
   // Only updates in-memory state; auto-save effect persists to local storage
   // IMPORTANT: when a parent node is selected, selectedResult aggregates scenes
   // from multiple children — we must distribute edits back to correct chapter indices.
-  const handleScenesUpdate = useCallback((updatedScenes: Scene[]) => {
+  const handleScenesUpdate = useCallback((updatedScenes: Scene[], label?: string) => {
     if (selectedIdx === null) return;
-    pushSnapshot(getCurrentSnapshot(), isRu ? "Редактирование сцен" : "Edit scenes");
+    pushSnapshot(getCurrentSnapshot(), label || (isRu ? "Редактирование сцен" : "Edit scenes"));
 
     const entry = tocEntries[selectedIdx];
 
