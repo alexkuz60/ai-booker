@@ -11,7 +11,7 @@ import type {
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
-import { isFolderNode, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
+import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 
 
 interface UseBookManagerParams {
