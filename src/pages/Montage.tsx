@@ -32,7 +32,7 @@ const Montage = () => {
   const userApiKeys = useUserApiKeys();
 
   const {
-    bookTitle, chapterId, chapterTitle,
+    bookId, bookTitle, chapterId, chapterTitle,
     scenes, sceneIds, loading,
     renderedSceneIds, unrenderedSceneIds,
     clips, sceneBoundaries, totalDurationSec,
