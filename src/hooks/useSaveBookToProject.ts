@@ -37,6 +37,25 @@ async function ensureStorage(
   return openProject();
 }
 
+function getErrorMessage(error: unknown, isRu: boolean): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (typeof error === "string" && error.trim()) return error;
+
+  if (error && typeof error === "object") {
+    const maybeMessage = "message" in error ? (error as { message?: unknown }).message : undefined;
+    if (typeof maybeMessage === "string" && maybeMessage.trim()) return maybeMessage;
+
+    try {
+      const json = JSON.stringify(error);
+      if (json && json !== "{}") return json;
+    } catch {
+      // ignore
+    }
+  }
+
+  return isRu ? "Неизвестная ошибка" : "Unknown error";
+}
+
 export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: UseSaveBookToProjectParams) {
   const { toast } = useToast();
   const { user } = useAuth();
