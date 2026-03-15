@@ -651,6 +651,7 @@ export default function Parser() {
    * from [selectedIdx, ...childIndices]. We split it back by original scene counts.
    * 
    * Parent updates are redistributed only to children (never written as one block to parent).
+   */
   const handleScenesUpdate = useCallback((updatedScenes: Scene[], label?: string) => {
     if (selectedIdx === null) return;
     pushSnapshot(getCurrentSnapshot(), label || (isRu ? "Редактирование сцен" : "Edit scenes"));
