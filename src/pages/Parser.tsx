@@ -201,6 +201,15 @@ export default function Parser() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [step, handleUndo, handleRedo]);
 
+  // ── Flush pending auto-save on page unload ──
+  const flushSaveRef = useRef(flushSave);
+  flushSaveRef.current = flushSave;
+  useEffect(() => {
+    const handler = () => flushSaveRef.current();
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, []);
+
   const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
     isRu,
     currentBookId: bookId,
