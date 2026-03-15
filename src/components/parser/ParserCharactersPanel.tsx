@@ -219,6 +219,7 @@ export default function ParserCharactersPanel({
               <TableRow>
                 <TableHead className="w-8"></TableHead>
                 <TableHead className="text-xs">{isRu ? "Имя" : "Name"}</TableHead>
+                <TableHead className="text-xs text-center w-12">{isRu ? "Пол" : "Gender"}</TableHead>
                 <TableHead className="text-xs text-center w-16">{isRu ? "Сцен" : "Scenes"}</TableHead>
                 <TableHead className="text-xs text-center w-16">{isRu ? "Глав" : "Ch."}</TableHead>
                 <TableHead className="w-8"></TableHead>
@@ -285,6 +286,25 @@ export default function ParserCharactersPanel({
                           </div>
                         )}
                       </div>
+                    </TableCell>
+
+                    {/* Gender */}
+                    <TableCell className="text-center">
+                      {char.gender === "male" && (
+                        <span className="text-xs text-sky-500 dark:text-sky-400" title={isRu ? "Мужской" : "Male"}>
+                          М
+                        </span>
+                      )}
+                      {char.gender === "female" && (
+                        <span className="text-xs text-rose-500 dark:text-rose-400" title={isRu ? "Женский" : "Female"}>
+                          Ж
+                        </span>
+                      )}
+                      {(!char.gender || char.gender === "unknown") && (
+                        <span className="text-xs text-muted-foreground/40" title={isRu ? "Неизвестно" : "Unknown"}>
+                          ?
+                        </span>
+                      )}
                     </TableCell>
 
                     {/* Scene count */}
