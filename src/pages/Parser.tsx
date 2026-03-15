@@ -26,7 +26,7 @@ import { useParserHelpers } from "@/hooks/useParserHelpers";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { useStructureUndo } from "@/hooks/useStructureUndo";
 import type { StructureSnapshot } from "@/hooks/useStructureUndo";
-import { useSaveBookToProject, autoSaveToLocal } from "@/hooks/useSaveBookToProject";
+import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { useImperativeSave } from "@/hooks/useImperativeSave";
 
 import LibraryView from "@/components/parser/LibraryView";
