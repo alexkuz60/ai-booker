@@ -131,25 +131,22 @@ export default function Parser() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [step, handleUndo, handleRedo]);
-  // ── Auto-sync scene results to local project when chapters get analyzed ──
-  const lastSyncedRef = useRef("");
+  // ── Auto-save ALL structural changes to local project ──
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (!projectStorage?.isReady || !bookId || chapterResults.size === 0) return;
-    // Build a simple key to detect meaningful changes (done count)
-    const doneCount = Array.from(chapterResults.values()).filter(r => r.status === "done").length;
-    const syncKey = `${bookId}_${doneCount}`;
-    if (syncKey === lastSyncedRef.current) return;
-    lastSyncedRef.current = syncKey;
-    syncStructureToLocal(projectStorage, {
-      bookId,
-      title: fileName.replace('.pdf', ''),
-      fileName,
-      toc: tocEntries,
-      parts: [],
-      chapterIdMap,
-      chapterResults,
-    });
-  }, [projectStorage, bookId, chapterResults, tocEntries, fileName, chapterIdMap]);
+    if (!projectStorage?.isReady || !bookId || tocEntries.length === 0) return;
+    // Debounce: write at most once per 800ms to avoid thrashing on rapid edits
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      autoSaveToLocal(projectStorage, bookId, fileName, {
+        toc: tocEntries,
+        parts: localPartsForSave,
+        chapterIdMap,
+        chapterResults,
+      }).catch((err) => console.warn("[AutoSave] local write failed:", err));
+    }, 800);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  }, [projectStorage, bookId, tocEntries, chapterResults, chapterIdMap, fileName, localPartsForSave]);
 
   const selectedIdx = selectedIndices.size === 1 ? Array.from(selectedIndices)[0] : null;
 
