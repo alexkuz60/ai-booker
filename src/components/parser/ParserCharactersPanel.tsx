@@ -47,6 +47,7 @@ export default function ParserCharactersPanel({
   extractProgress,
   onExtract,
   onRename,
+  onUpdateGender,
   onUpdateAliases,
   onDelete,
   onMerge,
@@ -63,6 +64,7 @@ export default function ParserCharactersPanel({
   const [addingNew, setAddingNew] = useState(false);
   const [newName, setNewName] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [genderPopoverOpen, setGenderPopoverOpen] = useState<string | null>(null);
   const editRef = useRef<HTMLInputElement>(null);
   const aliasRef = useRef<HTMLInputElement>(null);
   const newRef = useRef<HTMLInputElement>(null);
