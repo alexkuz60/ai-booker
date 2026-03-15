@@ -44,7 +44,7 @@ function getSyncCheckKey(bookId: string): string {
   return `${SERVER_SYNC_PREFIX}:${bookId}`;
 }
 
-export function useBookManager({ userId, isRu, projectStorage, storageBackend = "none" }: UseBookManagerParams) {
+export function useBookManager({ userId, isRu, projectStorage, storageBackend = "none", createProject }: UseBookManagerParams) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>(() =>
