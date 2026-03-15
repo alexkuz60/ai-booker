@@ -89,12 +89,6 @@ export default function Parser() {
   } = useBookManager({ userId: user?.id, isRu, projectStorage });
 
 
-  const { analysisLog, analyzeChapter, resetAnalysis, stopAnalysis, isAnalyzing } = useChapterAnalysis({
-    isRu, pdfRef, userId: user?.id, bookId, userApiKeys, getModelForRole,
-    tocEntries, chapterIdMap, chapterResults, setChapterResults,
-    onChapterResultsMutated: scheduleSave,
-    ensurePdfLoaded,
-  });
 
   const { pushSnapshot, undo, redo, undoTo, redoTo, undoStack, redoStack, canUndo, canRedo, resetStacks } = useStructureUndo(bookId);
 
