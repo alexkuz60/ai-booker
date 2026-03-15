@@ -30,6 +30,7 @@ interface ParserCharactersPanelProps {
   extractProgress?: string | null;
   onExtract: () => void;
   onRename: (id: string, newName: string) => void;
+  onUpdateGender: (id: string, gender: "male" | "female" | "unknown") => void;
   onUpdateAliases: (id: string, aliases: string[]) => void;
   onDelete: (id: string) => void;
   onMerge: (sourceId: string, targetId: string) => void;
