@@ -85,7 +85,7 @@ export default function Parser() {
 
 
 
-  const { pushSnapshot, undo, redo, undoTo, redoTo, undoStack, redoStack, canUndo, canRedo, resetStacks } = useStructureUndo(bookId);
+  
 
   const selectedIdx = selectedIndices.size === 1 ? Array.from(selectedIndices)[0] : null;
 
