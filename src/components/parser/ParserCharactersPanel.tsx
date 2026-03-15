@@ -24,6 +24,7 @@ interface ParserCharactersPanelProps {
   isRu: boolean;
   characters: LocalCharacter[];
   extracting: boolean;
+  extractProgress?: string | null;
   onExtract: () => void;
   onRename: (id: string, newName: string) => void;
   onUpdateAliases: (id: string, aliases: string[]) => void;
@@ -37,6 +38,7 @@ export default function ParserCharactersPanel({
   isRu,
   characters,
   extracting,
+  extractProgress,
   onExtract,
   onRename,
   onUpdateAliases,
@@ -139,8 +141,8 @@ export default function ParserCharactersPanel({
         >
           <Scan className="h-3.5 w-3.5" />
           {extracting
-            ? (isRu ? "Извлечение..." : "Extracting...")
-            : (isRu ? "Извлечь из сцен" : "Extract from scenes")}
+            ? (extractProgress || (isRu ? "Извлечение..." : "Extracting..."))
+            : (isRu ? "Извлечь (AI)" : "Extract (AI)")}
         </Button>
         <Button
           variant="ghost" size="sm"

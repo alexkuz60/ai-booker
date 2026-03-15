@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.salutespeech-tts]
 verify_jwt = false
+
+[functions.extract-characters]
+verify_jwt = false
