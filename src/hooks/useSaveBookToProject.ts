@@ -14,6 +14,10 @@ import {
   type ProjectMeta,
   type ProjectStorage,
 } from "@/lib/projectStorage";
+import {
+  getLeafIndices,
+  sanitizeChapterResultsForStructure,
+} from "@/lib/tocStructure";
 
 export interface LocalBookSnapshot {
   toc: TocChapter[];
