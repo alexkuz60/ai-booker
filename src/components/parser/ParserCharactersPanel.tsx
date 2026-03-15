@@ -130,6 +130,7 @@ export default function ParserCharactersPanel({
         <h2 className="font-display font-semibold text-base text-foreground flex-1">
           {isRu ? "Персонажи" : "Characters"}
         </h2>
+        <RoleBadge roleId="profiler" model={profilerModel} isRu={isRu} size={16} />
         <Badge variant="secondary" className="text-xs">
           {characters.length}
         </Badge>
