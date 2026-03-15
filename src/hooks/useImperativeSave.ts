@@ -1,14 +1,9 @@
 /**
- * useImperativeSave — debounced imperative local save.
+ * useImperativeSave — immediate local save on every mutation.
  *
- * Instead of comparing fingerprints reactively, the caller explicitly
- * triggers `scheduleSave()` after every mutation.  Multiple rapid calls
- * within the debounce window (default 400 ms) are coalesced into one write.
- *
- * Usage:
- *   const { scheduleSave } = useImperativeSave({ storage, bookId, ... });
- *   // after any mutation:
- *   scheduleSave();
+ * The caller explicitly triggers `save()` after every mutation.
+ * Writes happen immediately (no debounce) — local FS writes are fast.
+ * Also flushes on beforeunload as a safety net.
  */
 
 import { useCallback, useEffect, useRef } from "react";
@@ -27,7 +22,6 @@ export interface ImperativeSaveParams {
     chapterIdMap: Map<number, string>;
     chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
   };
-  debounceMs?: number;
 }
 
 export function useImperativeSave({
@@ -35,46 +29,50 @@ export function useImperativeSave({
   bookId,
   fileName,
   getSnapshot,
-  debounceMs = 400,
 }: ImperativeSaveParams) {
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const getSnapshotRef = useRef(getSnapshot);
+  const savingRef = useRef(false);
+  const pendingRef = useRef(false);
 
   useEffect(() => {
     getSnapshotRef.current = getSnapshot;
   }, [getSnapshot]);
 
+  const doSave = useCallback(async () => {
+    if (!bookId || !storage?.isReady) return;
+    if (savingRef.current) {
+      // Another save is in flight — mark pending so we re-save after it finishes
+      pendingRef.current = true;
+      return;
+    }
+    savingRef.current = true;
+    try {
+      const snapshot = getSnapshotRef.current();
+      if (snapshot.toc.length === 0) return;
+      await autoSaveToLocal(storage, bookId, fileName, snapshot);
+    } catch (err) {
+      console.warn("[AutoSave] local write failed:", err);
+    } finally {
+      savingRef.current = false;
+      // If another mutation happened while we were saving, save again
+      if (pendingRef.current) {
+        pendingRef.current = false;
+        doSave();
+      }
+    }
+  }, [storage, bookId, fileName]);
+
   const scheduleSave = useCallback(() => {
     if (!bookId) return;
     if (!storage?.isReady) {
-      console.warn("[AutoSave] Storage not ready — edits will NOT persist to local project. Backend may need re-initialization.");
+      console.warn("[AutoSave] Storage not ready — edits will NOT persist.");
       return;
     }
+    doSave();
+  }, [storage, bookId, doSave]);
 
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      const snapshot = getSnapshotRef.current();
-      if (snapshot.toc.length === 0) return;
-      autoSaveToLocal(storage, bookId, fileName, snapshot)
-        .catch((err) =>
-          console.warn("[AutoSave] local write failed:", err),
-        );
-    }, debounceMs);
-  }, [storage, bookId, fileName, debounceMs]);
-
-  /** Flush pending save immediately (e.g. before page unload). */
-  const flushSave = useCallback(() => {
-    if (timer.current) {
-      clearTimeout(timer.current);
-      timer.current = null;
-    }
-    if (!storage?.isReady || !bookId) return;
-    const snapshot = getSnapshotRef.current();
-    if (snapshot.toc.length === 0) return;
-    autoSaveToLocal(storage, bookId, fileName, snapshot).catch((err) =>
-      console.warn("[AutoSave] flush failed:", err),
-    );
-  }, [storage, bookId, fileName]);
+  /** Flush — same as scheduleSave since writes are now immediate. */
+  const flushSave = scheduleSave;
 
   return { scheduleSave, flushSave };
 }
