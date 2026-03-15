@@ -84,7 +84,7 @@ export async function syncStructureToLocal(
     });
     await Promise.all(sceneWrites);
 
-    console.log(`[LocalSync] Structure saved: ${data.toc.length} chapters, ${data.chapterResults.size} results`);
+    console.debug(`[LocalSync] Structure saved: ${data.toc.length} chapters, ${data.chapterResults.size} results`);
   } catch (err) {
     console.warn("[LocalSync] Failed to sync structure:", err);
   }
