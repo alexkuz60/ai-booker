@@ -445,10 +445,6 @@ export default function Parser() {
   const confirmDelete = () => {
     if (!pendingDelete) return;
     const { toDelete } = pendingDelete;
-    pushSnapshot(getCurrentSnapshot(), isRu ? "Удаление элементов" : "Delete items");
-
-    // CONTRACT GUARD: warn if deleting parent without children
-    warnPartialTreeDelete(toDelete, tocEntries);
 
     // Delete from DB
     for (const di of toDelete) {
