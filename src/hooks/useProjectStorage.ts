@@ -253,6 +253,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
     storage,
     meta,
     backend,
+    initialized,
     isOpen: !!storage,
     loading,
     createProject,
