@@ -57,7 +57,7 @@ const Montage = () => {
 
   const headerRight = useMemo(() => (
     <div className="flex items-center gap-2">
-      <SaveBookButton isRu={isRu} onClick={saveBook} loading={savingBook} disabled={!bookId} />
+      <SaveBookButton isRu={isRu} onClick={saveBook} loading={savingBook} disabled={!bookId} showDownloadZip={isProjectOpen} onDownloadZip={downloadZip} showImportZip={!isProjectOpen} onImportZip={importZip} />
       {hasContent && (
         <Button
           variant="hero"

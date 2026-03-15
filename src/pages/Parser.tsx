@@ -289,7 +289,16 @@ export default function Parser() {
             {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} · {totalScenes} {t("scenes", isRu)}
           </div>
           {navButtons}
-          <SaveBookButton isRu={isRu} onClick={saveBook} loading={savingBook} disabled={!bookId} />
+          <SaveBookButton
+            isRu={isRu}
+            onClick={saveBook}
+            loading={savingBook}
+            disabled={!bookId}
+            showDownloadZip={isProjectOpen}
+            onDownloadZip={downloadZip}
+            showImportZip={!isProjectOpen}
+            onImportZip={importZip}
+          />
           <Button variant="ghost" size="sm" onClick={() => setAiRolesOpen(true)} className="gap-1.5">
             <Bot className="h-3.5 w-3.5" />
             {isRu ? "AI Роли" : "AI Roles"}
