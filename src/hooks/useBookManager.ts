@@ -356,19 +356,10 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
       return;
     }
 
-    // CRITICAL: If backend is OPFS, we must wait for projectStorage to initialize.
-    // Don't set restoredOnce until storage is ready or confirmed unavailable.
-    const storageNeeded = storageBackend === "opfs";
-    const storageReady = projectStorage?.isReady === true;
-
-    if (storageNeeded && !storageReady) {
-      // Storage is still initializing — DON'T set restoredOnce, wait for next render
-      console.log("[AutoRestore] Waiting for OPFS storage to initialize...");
-      return;
-    }
-
-    // For fs-access: storage requires user interaction, can't auto-restore folder.
-    // We still try local restore (in case storage was opened this session).
+    // Важно: не блокируемся в extracting_toc, если активный ключ книги остался,
+    // а локальное хранилище не прикреплено в этой сессии.
+    // Для fs-access/opfs всё равно сначала пробуем local restore, а при неуспехе
+    // корректно уходим в library/server-check без вечного ожидания.
     setRestoredOnce(true);
 
     restoreFromLocal(savedBookId).then(async (restored) => {
