@@ -81,7 +81,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
       if (!local?.structure || local.structure.bookId !== savedBookId) return false;
 
       const { structure, chapterIdMap: localChIdMap, chapterResults: localResults } = local;
-      const normalizedToc = normalizeLevels(structure.toc);
+      const normalizedToc = normalizeTocRanges(normalizeLevels(structure.toc));
       const sanitizedLocalResults = sanitizeChapterResultsForStructure(normalizedToc, localResults);
 
       setBookId(savedBookId);
