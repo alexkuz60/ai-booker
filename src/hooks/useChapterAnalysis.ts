@@ -158,6 +158,12 @@ export function useChapterAnalysis({
       if (!hasExistingScenes) {
         addLog(`${t("logExtracting", isRu)} «${entry.title}»...`);
 
+        /**
+         * CONTRACT K1: resolvePageRange — ALWAYS use instead of entry.startPage/endPage.
+         * PDF outline contains container nodes with 1-page ranges that need expansion.
+         * Three fallback levels: subtree → nextSibling → retry.
+         * See: IMPLEMENTATION_LOG.md → К1, src/test/contracts.test.ts
+         */
         const resolvePageRange = (chapterIndex: number) => {
           const current = tocEntries[chapterIndex];
           const currentLevel = current?.level ?? 0;

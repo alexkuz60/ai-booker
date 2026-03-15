@@ -31,7 +31,12 @@ export function useParserHelpers({
     return count;
   }, [selectedIdx, tocEntries]);
 
-  // Aggregate scenes from selected entry + all its children
+  /**
+   * CONTRACT K4: Aggregate scenes from selected entry + all its children.
+   * This result is READ-ONLY for display. To write edits back, use
+   * redistributeScenes (CONTRACT K3) — never write this aggregate to a single index.
+   * See: IMPLEMENTATION_LOG.md → К3/К4, src/test/contracts.test.ts
+   */
   const selectedResult = useMemo(() => {
     if (selectedIdx === null) return null;
     const entry = tocEntries[selectedIdx];
