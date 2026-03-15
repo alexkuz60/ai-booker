@@ -71,78 +71,105 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
         throw new Error(isRu ? "Книга не найдена" : "Book not found");
       }
 
-      const [partsRes, chaptersRes] = await Promise.all([
-        supabase
-          .from("book_parts")
-          .select("id, part_number, title")
-          .eq("book_id", book.id)
-          .order("part_number"),
-        supabase
-          .from("book_chapters")
-          .select("id, chapter_number, title, level, start_page, end_page, part_id")
-          .eq("book_id", book.id)
-          .order("chapter_number"),
-      ]);
+      let toc: TocChapter[] = [];
+      let partsForSync: Array<{ id: string; title: string; partNumber: number }> = [];
+      let chapterIdMap = new Map<number, string>();
+      let chapterResults = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
 
-      if (partsRes.error) throw partsRes.error;
-      if (chaptersRes.error) throw chaptersRes.error;
+      if (localSnapshot) {
+        toc = localSnapshot.toc.map((entry) => ({ ...entry }));
+        partsForSync = localSnapshot.parts.map((part) => ({ ...part }));
+        chapterIdMap = new Map(localSnapshot.chapterIdMap);
+        chapterResults = new Map(
+          Array.from(localSnapshot.chapterResults.entries()).map(([index, result]) => [
+            index,
+            {
+              scenes: result.scenes.map((scene) => ({ ...scene })),
+              status: result.status,
+            },
+          ]),
+        );
+      } else {
+        const [partsRes, chaptersRes] = await Promise.all([
+          supabase
+            .from("book_parts")
+            .select("id, part_number, title")
+            .eq("book_id", book.id)
+            .order("part_number"),
+          supabase
+            .from("book_chapters")
+            .select("id, chapter_number, title, level, start_page, end_page, part_id")
+            .eq("book_id", book.id)
+            .order("chapter_number"),
+        ]);
 
-      const parts = partsRes.data ?? [];
-      const chapters = chaptersRes.data ?? [];
+        if (partsRes.error) throw partsRes.error;
+        if (chaptersRes.error) throw chaptersRes.error;
 
-      if (chapters.length === 0) {
-        throw new Error(isRu ? "У книги нет глав для сохранения" : "Book has no chapters to save");
+        const parts = partsRes.data ?? [];
+        const chapters = chaptersRes.data ?? [];
+
+        if (chapters.length === 0) {
+          throw new Error(isRu ? "У книги нет глав для сохранения" : "Book has no chapters to save");
+        }
+
+        const chapterIds = chapters.map((chapter) => chapter.id);
+        const scenesRes = chapterIds.length
+          ? await supabase
+              .from("book_scenes")
+              .select("id, chapter_id, scene_number, title, content, scene_type, mood, bpm")
+              .in("chapter_id", chapterIds)
+              .order("scene_number")
+          : { data: [], error: null };
+
+        if (scenesRes.error) throw scenesRes.error;
+
+        const partById = new Map(parts.map((part) => [part.id, part.title]));
+
+        toc = chapters.map((chapter) => ({
+          title: chapter.title,
+          startPage: chapter.start_page ?? 0,
+          endPage: chapter.end_page ?? 0,
+          level: chapter.level ?? 0,
+          partTitle: chapter.part_id ? partById.get(chapter.part_id) : undefined,
+          sectionType: classifySection(chapter.title),
+        }));
+
+        const scenesByChapterId = new Map<string, Scene[]>();
+        for (const row of scenesRes.data ?? []) {
+          const chapterScenes = scenesByChapterId.get(row.chapter_id) ?? [];
+          chapterScenes.push({
+            id: row.id,
+            scene_number: row.scene_number,
+            title: row.title,
+            content: row.content ?? undefined,
+            content_preview: row.content?.slice(0, 200) ?? undefined,
+            scene_type: row.scene_type ?? "mixed",
+            mood: row.mood ?? "neutral",
+            bpm: row.bpm ?? 120,
+          });
+          scenesByChapterId.set(row.chapter_id, chapterScenes);
+        }
+
+        chapters.forEach((chapter, index) => {
+          chapterIdMap.set(index, chapter.id);
+          const chapterScenes = scenesByChapterId.get(chapter.id) ?? [];
+          chapterResults.set(index, {
+            scenes: chapterScenes,
+            status: chapterScenes.length > 0 ? "done" : "pending",
+          });
+        });
+
+        partsForSync = parts.map((part) => ({
+          id: part.id,
+          title: part.title,
+          partNumber: part.part_number,
+        }));
       }
 
-      const chapterIds = chapters.map((chapter) => chapter.id);
-      const scenesRes = chapterIds.length
-        ? await supabase
-            .from("book_scenes")
-            .select("id, chapter_id, scene_number, title, content, scene_type, mood, bpm")
-            .in("chapter_id", chapterIds)
-            .order("scene_number")
-        : { data: [], error: null };
-
-      if (scenesRes.error) throw scenesRes.error;
-
-      const partById = new Map(parts.map((part) => [part.id, part.title]));
-
-      const toc: TocChapter[] = chapters.map((chapter) => ({
-        title: chapter.title,
-        startPage: chapter.start_page ?? 0,
-        endPage: chapter.end_page ?? 0,
-        level: chapter.level ?? 0,
-        partTitle: chapter.part_id ? partById.get(chapter.part_id) : undefined,
-        sectionType: classifySection(chapter.title),
-      }));
-
-      const chapterIdMap = new Map<number, string>();
-      const chapterResults = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
-
-      const scenesByChapterId = new Map<string, Scene[]>();
-      for (const row of scenesRes.data ?? []) {
-        const chapterScenes = scenesByChapterId.get(row.chapter_id) ?? [];
-        chapterScenes.push({
-          id: row.id,
-          scene_number: row.scene_number,
-          title: row.title,
-          content: row.content ?? undefined,
-          content_preview: row.content?.slice(0, 200) ?? undefined,
-          scene_type: row.scene_type ?? "mixed",
-          mood: row.mood ?? "neutral",
-          bpm: row.bpm ?? 120,
-        });
-        scenesByChapterId.set(row.chapter_id, chapterScenes);
+      if (toc.length === 0) {
+        throw new Error(isRu ? "У книги нет данных для сохранения" : "No book data to save");
       }
-
-      chapters.forEach((chapter, index) => {
-        chapterIdMap.set(index, chapter.id);
-        const chapterScenes = scenesByChapterId.get(chapter.id) ?? [];
-        chapterResults.set(index, {
-          scenes: chapterScenes,
-          status: chapterScenes.length > 0 ? "done" : "pending",
-        });
-      });
 
       await syncStructureToLocal(activeStorage, {
         bookId: book.id,
