@@ -371,7 +371,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
         scenesByChapter.set(s.chapter_id, list);
       }
 
-      const normalizedToc = normalizedSavedToc;
+      const normalizedToc = normalizedRangedToc;
 
       const initRawMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
       chapters.forEach((ch, i) => {
