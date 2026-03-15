@@ -351,6 +351,27 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
       chapters.forEach((ch, i) => newChapterIdMap.set(i, ch.id));
       setChapterIdMap(newChapterIdMap);
 
+      const rangeFixes = chapters
+        .map((ch, i) => {
+          const next = normalizedToc[i];
+          if (!next) return null;
+          const currentStart = Number((ch as any).start_page || 0);
+          const currentEnd = Number((ch as any).end_page || 0);
+          if (currentStart === next.startPage && currentEnd === next.endPage) return null;
+          return {
+            id: ch.id,
+            start_page: next.startPage,
+            end_page: next.endPage,
+          };
+        })
+        .filter((v): v is { id: string; start_page: number; end_page: number } => !!v);
+
+      if (rangeFixes.length > 0) {
+        supabase.from('book_chapters').upsert(rangeFixes).then(({ error }) => {
+          if (error) console.warn('[OpenBook] range normalization failed:', error);
+        });
+      }
+
       const allChapterIds = chapters.map(c => c.id);
       const { data: allScenes } = await supabase
         .from('book_scenes')
