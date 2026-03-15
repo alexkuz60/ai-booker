@@ -353,7 +353,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
 
       const rangeFixes = chapters
         .map((ch, i) => {
-          const next = normalizedToc[i];
+          const next = normalizedRangedToc[i];
           if (!next) return null;
           const currentStart = Number((ch as any).start_page || 0);
           const currentEnd = Number((ch as any).end_page || 0);
