@@ -56,7 +56,13 @@ export default function Parser() {
   } = useProjectStorageContext();
   const { getModelForRole } = useAiRoles(userApiKeys);
   const { toast } = useToast();
-...
+  const {
+    step, setStep, books, loadingLibrary, fileName, errorMsg, bookId,
+    chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
+    partIdMap, chapterResults, setChapterResults, fileInputRef,
+    openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset, reloadBook, ensurePdfLoaded,
+    reloadLibrary,
+    serverNewerBookId, dismissServerNewer, acceptServerVersion,
   } = useBookManager({
     userId: user?.id,
     isRu,
