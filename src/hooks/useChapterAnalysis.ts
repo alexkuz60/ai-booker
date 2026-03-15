@@ -87,14 +87,7 @@ export function useChapterAnalysis({
   };
 
   // ─── Two-stage Chapter Analysis (with resume) ─────────────
-  // Check if an entry is a folder (has direct children by level)
-  const isFolder = (idx: number): boolean => {
-    const entry = tocEntries[idx];
-    if (!entry) return false;
-    return idx + 1 < tocEntries.length &&
-      tocEntries[idx + 1].level > entry.level &&
-      tocEntries[idx + 1].sectionType === entry.sectionType;
-  };
+  const isFolder = (idx: number): boolean => isFolderNode(tocEntries, idx);
 
   const analyzeChapter = async (idx: number, mode: "full" | "enrich" | "auto" = "auto") => {
     if (!userId) return;
