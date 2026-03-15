@@ -131,23 +131,28 @@ export async function readStructureFromLocal(
       });
     }
 
-    // Per-chapter results
+    // Per-chapter results (ignore folder-scene files from legacy saves)
     const chapterResults = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
     const sceneFiles = await storage.listDir("scenes");
     const reads = sceneFiles
-      .filter(f => f.startsWith("chapter_") && f.endsWith(".json"))
+      .filter((f) => f.startsWith("chapter_") && f.endsWith(".json"))
       .map(async (f) => {
         const data = await storage.readJSON<LocalChapterData>(`scenes/${f}`);
-        if (data) {
-          chapterResults.set(data.chapterIndex, {
-            scenes: data.scenes,
-            status: data.status,
-          });
+        if (!data) return;
+
+        if (Number.isNaN(data.chapterIndex) || isFolderNode(structure.toc, data.chapterIndex)) {
+          return;
         }
+
+        chapterResults.set(data.chapterIndex, {
+          scenes: data.scenes,
+          status: data.status,
+        });
       });
     await Promise.all(reads);
 
-    return { structure, chapterIdMap, chapterResults };
+    const sanitizedResults = sanitizeChapterResultsForStructure(structure.toc, chapterResults);
+    return { structure, chapterIdMap, chapterResults: sanitizedResults };
   } catch (err) {
     console.warn("[LocalSync] Failed to read structure:", err);
     return null;
