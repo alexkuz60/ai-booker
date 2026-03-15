@@ -180,54 +180,8 @@ export function useChapterAnalysis({
       if (!hasExistingScenes) {
         addLog(`${t("logExtracting", isRu)} «${entry.title}»...`);
 
-        /**
-         * CONTRACT K1: resolvePageRange — ALWAYS use instead of entry.startPage/endPage.
-         * PDF outline contains container nodes with 1-page ranges that need expansion.
-         * Three fallback levels: subtree → nextSibling → retry.
-         * See: IMPLEMENTATION_LOG.md → К1, src/test/contracts.test.ts
-         */
-        const resolvePageRange = (chapterIndex: number) => {
-          const current = tocEntries[chapterIndex];
-          const currentLevel = current?.level ?? 0;
-          let startPage = Math.max(1, Number(current?.startPage) || 1);
-          let endPage = Math.max(startPage, Number(current?.endPage) || startPage);
-
-          let subtreeStart: number | null = null;
-          let subtreeEnd: number | null = null;
-          for (let i = chapterIndex + 1; i < tocEntries.length; i++) {
-            const n = tocEntries[i];
-            const nLevel = n.level ?? 0;
-            if (nLevel <= currentLevel) break;
-            const ns = Number(n.startPage) || 0;
-            const ne = Number(n.endPage) || 0;
-            if (ns > 0) subtreeStart = subtreeStart == null ? ns : Math.min(subtreeStart, ns);
-            if (ne > 0) subtreeEnd = subtreeEnd == null ? ne : Math.max(subtreeEnd, ne);
-          }
-
-          let nextSiblingStart: number | null = null;
-          for (let i = chapterIndex + 1; i < tocEntries.length; i++) {
-            const n = tocEntries[i];
-            const ns = Number(n.startPage) || 0;
-            if (ns <= 0) continue;
-            if ((n.level ?? 0) <= currentLevel) {
-              nextSiblingStart = ns;
-              break;
-            }
-          }
-
-          if ((Number(current?.startPage) || 0) <= 0 && subtreeStart) startPage = subtreeStart;
-          if ((Number(current?.endPage) || 0) <= 0 && subtreeEnd) endPage = Math.max(startPage, subtreeEnd);
-
-          if ((endPage - startPage + 1) <= 1 && subtreeEnd && subtreeEnd > endPage) {
-            endPage = subtreeEnd;
-          }
-
-          if ((endPage - startPage + 1) <= 1 && nextSiblingStart && nextSiblingStart > startPage + 1) {
-            endPage = Math.max(endPage, nextSiblingStart - 1);
-          }
-
-          return { startPage, endPage, subtreeStart, subtreeEnd, nextSiblingStart };
-        };
+        // CONTRACT K1: shared resolver (same logic as navigator/server normalization)
+        const baseRange = resolveEntryPageRange(tocEntries, idx, activePdf?.numPages);
 
         const baseRange = resolvePageRange(idx);
         let effectiveStartPage = baseRange.startPage;
