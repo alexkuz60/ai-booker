@@ -591,7 +591,7 @@ export default function Parser() {
    */
   const handleScenesUpdate = useCallback((updatedScenes: Scene[], label?: string) => {
     if (selectedIdx === null) return;
-    pushSnapshot(getCurrentSnapshot(), label || (isRu ? "Редактирование сцен" : "Edit scenes"));
+    
 
     const entry = tocEntries[selectedIdx];
 
