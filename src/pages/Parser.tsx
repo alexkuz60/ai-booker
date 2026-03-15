@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Bot, Library, PlusCircle, Network, FileText, Users, RefreshCw, CloudUpload } from "lucide-react";
@@ -119,13 +119,22 @@ export default function Parser() {
     return parts;
   }, [tocEntries, partIdMap]);
 
-  // ── Imperative auto-save: called explicitly after each mutation ──
+  // ── Imperative auto-save: use refs so snapshot is never stale ──
+  const tocEntriesRef = useRef(tocEntries);
+  const localPartsRef = useRef(localPartsForSave);
+  const chapterIdMapRef = useRef(chapterIdMap);
+  const chapterResultsRef = useRef(chapterResults);
+  tocEntriesRef.current = tocEntries;
+  localPartsRef.current = localPartsForSave;
+  chapterIdMapRef.current = chapterIdMap;
+  chapterResultsRef.current = chapterResults;
+
   const getLocalSnapshot = useCallback(() => ({
-    toc: tocEntries,
-    parts: localPartsForSave,
-    chapterIdMap,
-    chapterResults,
-  }), [tocEntries, localPartsForSave, chapterIdMap, chapterResults]);
+    toc: tocEntriesRef.current,
+    parts: localPartsRef.current,
+    chapterIdMap: chapterIdMapRef.current,
+    chapterResults: chapterResultsRef.current,
+  }), []);
 
   const { scheduleSave, flushSave } = useImperativeSave({
     storage: projectStorage,
