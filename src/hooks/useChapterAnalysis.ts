@@ -402,6 +402,7 @@ export function useChapterAnalysis({
           next.set(idx, { scenes: [...scenes], status: "analyzing" });
           return next;
         });
+        markResultsDirty();
       } else {
         addLog(`${t("logResuming", isRu).replace("...", "")} ${scenes.length} ...`);
       }
