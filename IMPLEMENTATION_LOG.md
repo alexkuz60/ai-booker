@@ -386,7 +386,7 @@ Source → EQ (3-band) → Compressor → Limiter → Panner3D → Convolver (IR
 - `readJSON<T>(path)` / `writeJSON(path, data)` — структурированные данные
 - `readBlob(path)` / `writeBlob(path, blob)` — бинарные файлы (аудио, PDF)
 - `exists(path)` / `delete(path)` / `listDir(path)` — управление файлами
-- `exportZip()` / `importZip(zip)` — bulk-синхронизация (TODO)
+- `exportZip()` / `importZip(zip)` — bulk-синхронизация ✅ (fflate, `src/lib/projectZip.ts`)
 
 **Реализации:**
 - `LocalFSStorage` — File System Access API (Chromium: Chrome, Edge, Opera)
