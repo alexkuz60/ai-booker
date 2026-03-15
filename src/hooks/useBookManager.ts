@@ -578,8 +578,9 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
       }
       setChapterIdMap(newChapterIdMap);
 
-      const initMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
-      chapters.forEach((_, i) => initMap.set(i, { scenes: [], status: "pending" }));
+      const initRawMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
+      chapters.forEach((_, i) => initRawMap.set(i, { scenes: [], status: "pending" }));
+      const initMap = sanitizeChapterResultsForStructure(chapters, initRawMap);
       setChapterResults(initMap);
 
       // ── Dual-write: sync to local project ──
