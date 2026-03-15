@@ -84,10 +84,6 @@ export default function Parser() {
     openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset, reloadBook, ensurePdfLoaded,
   } = useBookManager({ userId: user?.id, isRu, projectStorage });
 
-  const { saveBook, saving: savingBook } = useSaveBookToProject({
-    isRu,
-    currentBookId: bookId,
-  });
 
   const { analysisLog, analyzeChapter, resetAnalysis, stopAnalysis, isAnalyzing } = useChapterAnalysis({
     isRu, pdfRef, userId: user?.id, userApiKeys, getModelForRole,
