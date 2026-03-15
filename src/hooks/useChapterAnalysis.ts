@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
 import { extractTextByPageRange } from "@/lib/pdf-extract";
 import { t } from "@/pages/parser/i18n";
+import { warnSuspiciousPageRange, assertExtractedTextNotTitlePage } from "@/lib/parserContracts";
 import type { Scene, TocChapter, ChapterStatus } from "@/pages/parser/types";
 import type { AiRoleId } from "@/config/aiRoles";
 

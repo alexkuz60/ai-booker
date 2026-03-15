@@ -606,6 +606,11 @@ export default function Parser() {
     }
     setChapterIdMap(newChapterMap);
     setChapterResults(newResults);
+
+    // CONTRACT K5 GUARD: verify rebuilt maps are consistent after merge
+    assertMapIndicesInBounds("chapterIdMap (after merge)", newChapterMap, newEntries.length);
+    assertMapIndicesInBounds("chapterResults (after merge)", newResults, newEntries.length);
+
     setSelectedIndices(new Set([firstIdx]));
     scheduleSave();
   };
