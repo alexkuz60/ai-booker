@@ -242,12 +242,19 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
       }
 
       if (book.file_path) {
-        const { data: pdfBlob, error: pdfError } = await supabase.storage
-          .from("book-uploads")
-          .download(book.file_path);
-        if (pdfError) throw pdfError;
-        if (pdfBlob) {
-          await activeStorage.writeBlob("source/book.pdf", pdfBlob);
+        const pdfAlreadySaved = await activeStorage.exists("source/book.pdf");
+
+        if (!pdfAlreadySaved) {
+          const { data: pdfBlob, error: pdfError } = await supabase.storage
+            .from("book-uploads")
+            .download(book.file_path);
+
+          if (pdfError) {
+            // Не валим сохранение структуры, если исходный PDF недоступен
+            console.warn("[SaveBook] PDF download skipped:", pdfError);
+          } else if (pdfBlob) {
+            await activeStorage.writeBlob("source/book.pdf", pdfBlob);
+          }
         }
       }
 
