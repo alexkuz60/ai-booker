@@ -333,6 +333,23 @@ export function useChapterAnalysis({
           });
         }
 
+        // Drop exact duplicate scene bodies (can happen when boundary markers are repeated by AI)
+        const seenBodies = new Set<string>();
+        const beforeDedup = scenes.length;
+        scenes = scenes.filter((sc) => {
+          const norm = (sc.content || "").replace(/\s+/g, " ").trim();
+          if (norm.length < 120) return true;
+          if (seenBodies.has(norm)) return false;
+          seenBodies.add(norm);
+          return true;
+        }).map((sc, i) => ({ ...sc, scene_number: i + 1, char_count: (sc.content || '').length }));
+
+        if (beforeDedup !== scenes.length) {
+          addLog(isRu
+            ? `⚠️ Удалены дубли сцен: ${beforeDedup - scenes.length}`
+            : `⚠️ Removed duplicated scenes: ${beforeDedup - scenes.length}`);
+        }
+
         addLog(`${t("logFoundScenes", isRu)} ${scenes.length} ${t("logScenesWord", isRu)}:`);
         const totalChars = text.length;
         const pageSpan = effectiveEndPage - effectiveStartPage + 1;
