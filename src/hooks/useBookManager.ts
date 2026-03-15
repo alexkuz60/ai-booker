@@ -341,7 +341,11 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
         };
       });
       const normalizedSavedToc = normalizeLevels(savedToc);
-      setTocEntries(normalizedSavedToc);
+      const normalizedRangedToc = normalizeTocRanges(
+        normalizedSavedToc,
+        restoredTotalPages > 0 ? restoredTotalPages : undefined,
+      );
+      setTocEntries(normalizedRangedToc);
 
       const newChapterIdMap = new Map<number, string>();
       chapters.forEach((ch, i) => newChapterIdMap.set(i, ch.id));
