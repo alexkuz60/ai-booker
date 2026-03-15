@@ -459,6 +459,7 @@ export function useChapterAnalysis({
         next.set(idx, { scenes: [...scenes], status: "done" });
         return next;
       });
+      markResultsDirty();
       toast.success(`"${entry.title}" — ${t("chapterAnalyzed", isRu)}`);
     } catch (err: any) {
       console.error(`Chapter ${idx} analysis failed:`, err);
@@ -486,8 +487,14 @@ export function useChapterAnalysis({
         next.set(idx, { scenes: partialScenes, status: "error" });
         return next;
       });
+      markResultsDirty();
       toast.error(userError, { duration: 8000 });
     } finally {
+      try {
+        await touchBookUpdatedAt();
+      } catch (touchErr) {
+        console.warn("[ChapterAnalysis] Failed to touch books.updated_at:", touchErr);
+      }
       setIsAnalyzing(false);
     }
   };
