@@ -22,7 +22,7 @@ interface UseBookManagerParams {
   storageBackend?: "fs-access" | "opfs" | "none";
 }
 
-export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerParams) {
+export function useBookManager({ userId, isRu, projectStorage, storageBackend = "none" }: UseBookManagerParams) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>(() =>
