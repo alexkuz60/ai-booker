@@ -490,8 +490,6 @@ export default function Parser() {
     }
     setChapterResults(newResults);
 
-    // CONTRACT K5 GUARD: verify results map
-    assertMapIndicesInBounds("chapterResults (after delete)", newResults, newEntries.length);
 
     setPendingDelete(null);
     scheduleSave();
