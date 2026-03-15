@@ -18,6 +18,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { useStudioSession } from "@/hooks/useStudioSession";
 import { AiRolesButton } from "@/components/AiRolesButton";
+import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
+import { SaveBookButton } from "@/components/SaveBookButton";
 
 const Studio = () => {
   const { isRu } = useLanguage();
@@ -89,6 +91,10 @@ const Studio = () => {
   }, []);
 
   const selectedScene = chapter && selectedSceneIdx !== null ? chapter.scenes[selectedSceneIdx] : null;
+  const { saveBook, saving: savingBook } = useSaveBookToProject({
+    isRu,
+    currentBookId: bookId,
+  });
 
   const chapterEstimate = useMemo(() => chapter ? estimateChapterDuration(chapter) : null, [chapter]);
   const sceneEstimate = useMemo(() => {
@@ -331,6 +337,7 @@ const Studio = () => {
           )}
         </>
       )}
+      <SaveBookButton isRu={isRu} onClick={saveBook} loading={savingBook} disabled={!bookId} />
       <AiRolesButton isRu={isRu} apiKeys={userApiKeys} bookTitle={chapter?.bookTitle} />
     </div>
   );
@@ -338,7 +345,7 @@ const Studio = () => {
   useEffect(() => {
     setPageHeader({ title: studioTitle, subtitle: studioSubtitle, headerRight });
     return () => setPageHeader({});
-  }, [studioTitle, studioSubtitle, chapterEstimate?.formatted, sceneEstimate?.formatted, actualChapterDurationSec, actualSceneSec, clipsRefreshToken]);
+  }, [studioTitle, studioSubtitle, chapterEstimate?.formatted, sceneEstimate?.formatted, actualChapterDurationSec, actualSceneSec, clipsRefreshToken, saveBook, savingBook, bookId]);
 
   // Show loading while restoring session
   if (!restored) {

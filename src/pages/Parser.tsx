@@ -23,9 +23,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useChapterAnalysis } from "@/hooks/useChapterAnalysis";
 import { useBookManager } from "@/hooks/useBookManager";
 import { useParserHelpers } from "@/hooks/useParserHelpers";
-import { useProjectStorage } from "@/hooks/useProjectStorage";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { useStructureUndo } from "@/hooks/useStructureUndo";
 import type { StructureSnapshot } from "@/hooks/useStructureUndo";
+import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 
 import LibraryView from "@/components/parser/LibraryView";
 import UploadView from "@/components/parser/UploadView";
@@ -33,6 +34,7 @@ import { ExtractingTocView, ErrorView } from "@/components/parser/StatusViews";
 import NavSidebar from "@/components/parser/NavSidebar";
 import ChapterDetailPanel from "@/components/parser/ChapterDetailPanel";
 import { AiRolesTab } from "@/components/profile/tabs/AiRolesTab";
+import { SaveBookButton } from "@/components/SaveBookButton";
 
 export default function Parser() {
   const { user } = useAuth();
@@ -44,7 +46,7 @@ export default function Parser() {
   const [parserTab, setParserTab] = useState<"structure" | "content" | "characters">("structure");
   const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
-  const { backend: storageBackend, createProject, openProject, storage: projectStorage, meta: projectMeta, saveSourcePDF } = useProjectStorage();
+  const { backend: storageBackend, createProject, openProject, storage: projectStorage } = useProjectStorageContext();
   const { getModelForRole } = useAiRoles(userApiKeys);
   const { toast } = useToast();
   const [navRestoredFromStorage] = useState<boolean>(() => {
@@ -81,6 +83,7 @@ export default function Parser() {
     partIdMap, chapterResults, setChapterResults, fileInputRef,
     openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset, reloadBook, ensurePdfLoaded,
   } = useBookManager({ userId: user?.id, isRu, projectStorage });
+
 
   const { analysisLog, analyzeChapter, resetAnalysis, stopAnalysis, isAnalyzing } = useChapterAnalysis({
     isRu, pdfRef, userId: user?.id, userApiKeys, getModelForRole,
@@ -157,6 +160,36 @@ export default function Parser() {
     isChapterFullyDone, sendToStudio,
     partGroups, partlessIndices,
   } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName, bookId: bookId ?? undefined });
+
+  const localPartsForSave = useMemo(() => {
+    const seen = new Set<string>();
+    const parts: Array<{ id: string; title: string; partNumber: number }> = [];
+
+    for (const entry of tocEntries) {
+      if (!entry.partTitle || seen.has(entry.partTitle)) continue;
+      seen.add(entry.partTitle);
+      parts.push({
+        id: partIdMap.get(entry.partTitle) || "",
+        title: entry.partTitle,
+        partNumber: parts.length + 1,
+      });
+    }
+
+    return parts;
+  }, [tocEntries, partIdMap]);
+
+  const { saveBook, saving: savingBook } = useSaveBookToProject({
+    isRu,
+    currentBookId: bookId,
+    localSnapshot: step === "workspace"
+      ? {
+          toc: tocEntries,
+          parts: localPartsForSave,
+          chapterIdMap,
+          chapterResults,
+        }
+      : undefined,
+  });
 
   // ── Warn when analysis-relevant models change ──
   const handleRoleModelChanged = useCallback((roleId: AiRoleId) => {
@@ -256,6 +289,7 @@ export default function Parser() {
             {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} · {totalScenes} {t("scenes", isRu)}
           </div>
           {navButtons}
+          <SaveBookButton isRu={isRu} onClick={saveBook} loading={savingBook} disabled={!bookId} />
           <Button variant="ghost" size="sm" onClick={() => setAiRolesOpen(true)} className="gap-1.5">
             <Bot className="h-3.5 w-3.5" />
             {isRu ? "AI Роли" : "AI Roles"}
@@ -265,7 +299,7 @@ export default function Parser() {
     }
 
     return navButtons;
-  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook]);
+  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook, saveBook, savingBook, bookId]);
 
   useEffect(() => {
     const title = t("parserTitle", isRu);

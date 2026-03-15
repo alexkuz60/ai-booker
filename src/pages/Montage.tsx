@@ -14,6 +14,8 @@ import { MontageTimeline } from "@/components/montage/MontageTimeline";
 import { RenderDialog } from "@/components/montage/RenderDialog";
 import { Button } from "@/components/ui/button";
 import { AiRolesButton } from "@/components/AiRolesButton";
+import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
+import { SaveBookButton } from "@/components/SaveBookButton";
 
 const SIDEBAR_WIDTH = 280;
 
@@ -30,7 +32,7 @@ const Montage = () => {
   const userApiKeys = useUserApiKeys();
 
   const {
-    bookTitle, chapterId, chapterTitle,
+    bookId, bookTitle, chapterId, chapterTitle,
     scenes, sceneIds, loading,
     renderedSceneIds, unrenderedSceneIds,
     clips, sceneBoundaries, totalDurationSec,
@@ -39,6 +41,10 @@ const Montage = () => {
   } = useMontageData();
 
   const [renderDialogOpen, setRenderDialogOpen] = useState(false);
+  const { saveBook, saving: savingBook } = useSaveBookToProject({
+    isRu,
+    currentBookId: bookId,
+  });
   const activePartNumber = parts.length > 0 ? parts[activePartIdx]?.part_number ?? null : null;
 
   const hasContent = !!chapterId && sceneIds.length > 0;
@@ -49,8 +55,9 @@ const Montage = () => {
     ? `${bookTitle} → ${chapterTitle}`
     : (isRu ? "Финальный монтаж и мастеринг глав" : "Final chapter montage & mastering");
 
-  const renderButton = (
+  const headerRight = useMemo(() => (
     <div className="flex items-center gap-2">
+      <SaveBookButton isRu={isRu} onClick={saveBook} loading={savingBook} disabled={!bookId} />
       {hasContent && (
         <Button
           variant="hero"
@@ -65,12 +72,12 @@ const Montage = () => {
       )}
       <AiRolesButton isRu={isRu} apiKeys={userApiKeys} bookTitle={bookTitle || undefined} />
     </div>
-  );
+  ), [isRu, saveBook, savingBook, bookId, hasContent, clips.length, userApiKeys, bookTitle]);
 
   useEffect(() => {
-    setPageHeader({ title, subtitle, headerRight: renderButton });
+    setPageHeader({ title, subtitle, headerRight });
     return () => setPageHeader({});
-  }, [title, subtitle, hasContent, clips.length]);
+  }, [title, subtitle, headerRight, setPageHeader]);
 
   if (loading) {
     return (
