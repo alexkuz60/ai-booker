@@ -41,7 +41,7 @@ const Montage = () => {
   } = useMontageData();
 
   const [renderDialogOpen, setRenderDialogOpen] = useState(false);
-  const { saveBook, saving: savingBook } = useSaveBookToProject({
+  const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
     isRu,
     currentBookId: bookId,
   });
