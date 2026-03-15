@@ -64,48 +64,58 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
 
   const [chapterResults, setChapterResults] = useState<Map<number, { scenes: Scene[]; status: ChapterStatus }>>(new Map());
 
-  // ─── Library: Load user's books ────────────────────────────
-  const loadLibrary = useCallback(async () => {
-    if (!userId) {
-      setBooks([]);
-      setLoadingLibrary(false);
-      return;
+  // ─── Library: Local-first list (no automatic server listing) ─────────────
+  const mapLocalStructureToBook = useCallback(async (storage: ProjectStorage): Promise<BookRecord | null> => {
+    const structure = await storage.readJSON<LocalBookStructure>("structure/toc.json");
+    const meta = await storage.readJSON<{ bookId?: string; title?: string; createdAt?: string; updatedAt?: string }>("project.json");
+
+    if (!structure && !meta) return null;
+
+    const toc = structure?.toc || [];
+    const chapterCount = toc.reduce((acc, _entry, idx) => acc + (isFolderNode(toc, idx) ? 0 : 1), 0);
+
+    const resolvedId = structure?.bookId || meta?.bookId || `local:${storage.projectName}`;
+    const resolvedTitle = structure?.title || meta?.title || storage.projectName;
+    const resolvedFileName = structure?.fileName || `${resolvedTitle}.pdf`;
+    const resolvedCreatedAt = structure?.updatedAt || meta?.updatedAt || meta?.createdAt || new Date(0).toISOString();
+
+    return {
+      id: resolvedId,
+      title: resolvedTitle,
+      file_name: resolvedFileName,
+      file_path: null,
+      status: "local",
+      created_at: resolvedCreatedAt,
+      chapter_count: chapterCount,
+      scene_count: 0,
+    };
+  }, []);
+
+  const loadLocalLibrary = useCallback(async (): Promise<BookRecord[]> => {
+    if (storageBackend === "opfs") {
+      const projectNames = await OPFSStorage.listProjects();
+      const records = await Promise.all(projectNames.map(async (projectName) => {
+        const store = await OPFSStorage.openOrCreate(projectName);
+        return mapLocalStructureToBook(store);
+      }));
+
+      return records
+        .filter((b): b is BookRecord => !!b)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
 
-    const mapBooks = (rows: any[]): BookRecord[] => (rows || []).map((b: any) => ({
-      id: b.id,
-      title: b.title,
-      file_name: b.file_name,
-      file_path: b.file_path,
-      status: b.status,
-      created_at: b.created_at,
-      chapter_count: Number(b.chapter_count) || 0,
-      scene_count: Number(b.scene_count) || 0,
-    }));
+    if (projectStorage?.isReady) {
+      const current = await mapLocalStructureToBook(projectStorage);
+      return current ? [current] : [];
+    }
 
-    const fallbackLoadLibrary = async (): Promise<BookRecord[]> => {
-      const { data, error } = await supabase
-        .from("books")
-        .select("id, title, file_name, file_path, status, created_at")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
+    return [];
+  }, [storageBackend, projectStorage, mapLocalStructureToBook]);
 
-      if (error) throw error;
-      return (data || []).map((b: any) => ({
-        id: b.id,
-        title: b.title,
-        file_name: b.file_name,
-        file_path: b.file_path,
-        status: b.status,
-        created_at: b.created_at,
-        chapter_count: 0,
-        scene_count: 0,
-      }));
-    };
+  const loadLibraryFromServer = useCallback(async (): Promise<BookRecord[]> => {
+    if (!userId) return [];
 
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    setLoadingLibrary(true);
-
     try {
       const rpcPromise = supabase.rpc("get_user_books_with_counts");
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -118,20 +128,65 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
       };
 
       if (error) throw error;
-      setBooks(mapBooks(data || []));
-    } catch (err) {
-      console.warn("[Library] RPC failed, fallback to direct query:", err);
-      try {
-        setBooks(await fallbackLoadLibrary());
-      } catch (fallbackErr) {
-        console.error("Failed to load library:", fallbackErr);
-        setBooks([]);
-      }
+      return (data || []).map((b: any) => ({
+        id: b.id,
+        title: b.title,
+        file_name: b.file_name,
+        file_path: b.file_path,
+        status: b.status,
+        created_at: b.created_at,
+        chapter_count: Number(b.chapter_count) || 0,
+        scene_count: Number(b.scene_count) || 0,
+      }));
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
-      setLoadingLibrary(false);
     }
   }, [userId]);
+
+  const loadBookFromServerById = useCallback(async (targetBookId: string): Promise<BookRecord | null> => {
+    const fromRpc = await loadLibraryFromServer();
+    const found = fromRpc.find((b) => b.id === targetBookId);
+    if (found) return found;
+
+    const { data, error } = await supabase
+      .from("books")
+      .select("id, title, file_name, file_path, status, created_at")
+      .eq("id", targetBookId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    return {
+      id: data.id,
+      title: data.title,
+      file_name: data.file_name,
+      file_path: data.file_path,
+      status: data.status,
+      created_at: data.created_at,
+      chapter_count: 0,
+      scene_count: 0,
+    };
+  }, [loadLibraryFromServer, userId]);
+
+  const loadLibrary = useCallback(async () => {
+    if (!userId) {
+      setBooks([]);
+      setLoadingLibrary(false);
+      return;
+    }
+
+    setLoadingLibrary(true);
+    try {
+      const localBooks = await loadLocalLibrary();
+      setBooks(localBooks);
+    } catch (err) {
+      console.error("Failed to load local library:", err);
+      setBooks([]);
+    } finally {
+      setLoadingLibrary(false);
+    }
+  }, [userId, loadLocalLibrary]);
 
   useEffect(() => {
     if (!userId) {
