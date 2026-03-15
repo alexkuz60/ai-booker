@@ -515,6 +515,10 @@ export function useChapterAnalysis({
       }
       return next;
     });
+    markResultsDirty();
+    void touchBookUpdatedAt().catch((touchErr) => {
+      console.warn("[ChapterAnalysis] Failed to touch books.updated_at after stop:", touchErr);
+    });
   };
 
   // ─── Background Prefetch ───
