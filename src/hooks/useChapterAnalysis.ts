@@ -459,11 +459,6 @@ export function useChapterAnalysis({
       markResultsDirty();
       toast.error(userError, { duration: 8000 });
     } finally {
-      try {
-        await touchBookUpdatedAt();
-      } catch (touchErr) {
-        console.warn("[ChapterAnalysis] Failed to touch books.updated_at:", touchErr);
-      }
       setIsAnalyzing(false);
     }
   };
