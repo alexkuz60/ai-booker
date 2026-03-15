@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Bot, Library, PlusCircle, Network, FileText, Users, RefreshCw, CloudUpload } from "lucide-react";
+import { ArrowLeft, Bot, Library, PlusCircle, Network, FileText, Users, RefreshCw, CloudUpload, Undo2, Redo2 } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -295,6 +295,26 @@ export default function Parser() {
     if (step === "workspace") {
       return (
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-0.5">
+            <Button
+              variant="ghost" size="icon"
+              onClick={handleUndo}
+              disabled={!canUndo}
+              className="h-7 w-7"
+              title={`${isRu ? "Отменить" : "Undo"} (Ctrl+Z)`}
+            >
+              <Undo2 className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost" size="icon"
+              onClick={handleRedo}
+              disabled={!canRedo}
+              className="h-7 w-7"
+              title={`${isRu ? "Повторить" : "Redo"} (Ctrl+Shift+Z)`}
+            >
+              <Redo2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
           <div className="text-xs text-muted-foreground font-body">
             {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} · {totalScenes} {t("scenes", isRu)}
           </div>
@@ -318,7 +338,7 @@ export default function Parser() {
     }
 
     return navButtons;
-  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook, saveBook, savingBook, bookId]);
+  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook, saveBook, savingBook, bookId, canUndo, canRedo, handleUndo, handleRedo]);
 
   useEffect(() => {
     const title = t("parserTitle", isRu);
