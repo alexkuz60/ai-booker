@@ -205,7 +205,7 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
 
       toast({
         title: isRu ? "Книга сохранена" : "Book saved",
-        description: `${activeStorage.projectName} · ${chapters.length} ${isRu ? "глав" : "chapters"}`,
+        description: `${activeStorage.projectName} · ${toc.length} ${isRu ? "глав" : "chapters"}`,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
