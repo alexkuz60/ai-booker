@@ -675,7 +675,7 @@ export default function Parser() {
       }
       return next;
     });
-  }, [selectedIdx, tocEntries, setChapterResults]);
+  }, [selectedIdx, tocEntries, setChapterResults, pushSnapshot, getCurrentSnapshot]);
 
 
   return (
