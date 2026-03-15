@@ -37,6 +37,18 @@ export function useChapterAnalysis({
   const abortRef = useRef<AbortController | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  const markResultsDirty = () => {
+    onChapterResultsMutated?.();
+  };
+
+  const touchBookUpdatedAt = async () => {
+    if (!bookId) return;
+    await supabase
+      .from("books")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", bookId);
+  };
+
   // ─── Helper: call edge function ─────────────────────────────
   const callParseFunction = async (body: Record<string, unknown>): Promise<any> => {
     const abortCtrl = new AbortController();
