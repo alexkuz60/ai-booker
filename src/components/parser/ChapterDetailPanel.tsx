@@ -290,6 +290,28 @@ export default function ChapterDetailPanel({
     );
   }
 
+  // Folders are structural-only — never show content/analysis panel
+  if (childCount > 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-muted-foreground">
+        <div className="text-center space-y-3">
+          <Layers className="h-12 w-12 mx-auto opacity-30" />
+          <h3 className="text-base font-display font-semibold text-foreground">{selectedEntry.title}</h3>
+          <p className="text-sm">
+            {isRu
+              ? `Папка · ${childCount} вложенных элементов`
+              : `Folder · ${childCount} nested items`}
+          </p>
+          <p className="text-xs text-muted-foreground/60 max-w-sm">
+            {isRu
+              ? "Папки служат для группировки структуры. Выберите дочернюю главу для просмотра и анализа."
+              : "Folders group the structure. Select a child chapter to view and analyze."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ScrollArea className="flex-1">
       <div className="p-6 space-y-4">

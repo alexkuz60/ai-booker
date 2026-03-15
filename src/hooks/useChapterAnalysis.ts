@@ -543,7 +543,7 @@ export function useChapterAnalysis({
     const nextPending: number[] = [];
     for (let i = maxDone + 1; i < tocEntries.length && nextPending.length < 3; i++) {
       const r = chapterResults.get(i);
-      if (r && r.status === "pending" && tocEntries[i].sectionType === "content") nextPending.push(i);
+      if (r && r.status === "pending" && tocEntries[i].sectionType === "content" && !isFolder(i)) nextPending.push(i);
     }
     if (nextPending.length === 0) return;
 
