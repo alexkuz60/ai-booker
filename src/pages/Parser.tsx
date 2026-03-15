@@ -440,7 +440,7 @@ export default function Parser() {
   };
 
   const changeStartPage = (idx: number, newPage: number) => {
-    pushSnapshot(getCurrentSnapshot());
+    pushSnapshot(getCurrentSnapshot(), isRu ? "Изменение начальной страницы" : "Change start page");
     setTocEntries(prev => {
       const next = prev.map((e, i) => i === idx ? { ...e, startPage: newPage } : e);
       if (idx > 0 && next[idx - 1].endPage === prev[idx].startPage) {
