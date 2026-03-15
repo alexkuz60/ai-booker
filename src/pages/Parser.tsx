@@ -215,7 +215,11 @@ export default function Parser() {
       <div className="flex items-center gap-1">
         <Button
           variant={step === "library" ? "secondary" : "ghost"} size="sm"
-          onClick={() => { if (step === "workspace") handleReset(); else setStep("library"); }}
+          onClick={() => {
+            if (step === "workspace") handleReset();
+            else setStep("library");
+            void reloadLibrary();
+          }}
           className="gap-1.5 text-xs"
         >
           <Library className="h-3.5 w-3.5" />
