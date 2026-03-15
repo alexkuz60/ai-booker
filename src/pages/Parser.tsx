@@ -326,7 +326,7 @@ export default function Parser() {
     }
 
     return navButtons;
-  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook, saveBook, savingBook, bookId, canUndo, canRedo, handleUndo, handleRedo]);
+  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook, saveBook, savingBook, bookId, canUndo, canRedo, undoStack, redoStack, handleUndo, handleRedo, handleUndoTo, handleRedoTo]);
 
   useEffect(() => {
     const title = t("parserTitle", isRu);
