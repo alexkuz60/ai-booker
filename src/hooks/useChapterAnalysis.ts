@@ -12,6 +12,7 @@ interface UseChapterAnalysisParams {
   isRu: boolean;
   pdfRef: any;
   userId: string | undefined;
+  bookId?: string | null;
   userApiKeys: Record<string, string>;
   /** Role-based model resolver from useAiRoles */
   getModelForRole: (roleId: AiRoleId) => string;
@@ -19,13 +20,15 @@ interface UseChapterAnalysisParams {
   chapterIdMap: Map<number, string>;
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
   setChapterResults: React.Dispatch<React.SetStateAction<Map<number, { scenes: Scene[]; status: ChapterStatus }>>>;
+  /** Called after analysis mutates chapter results to trigger imperative local save */
+  onChapterResultsMutated?: () => void;
   /** Lazy PDF loader — downloads from storage if not in memory */
   ensurePdfLoaded?: () => Promise<any>;
 }
 
 export function useChapterAnalysis({
-  isRu, pdfRef, userId, userApiKeys, getModelForRole,
-  tocEntries, chapterIdMap, chapterResults, setChapterResults, ensurePdfLoaded,
+  isRu, pdfRef, userId, bookId, userApiKeys, getModelForRole,
+  tocEntries, chapterIdMap, chapterResults, setChapterResults, onChapterResultsMutated, ensurePdfLoaded,
 }: UseChapterAnalysisParams) {
   const [analysisLog, setAnalysisLog] = useState<string[]>([]);
   const analysisTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -33,6 +36,18 @@ export function useChapterAnalysis({
   const userStartedAnalysis = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const markResultsDirty = () => {
+    onChapterResultsMutated?.();
+  };
+
+  const touchBookUpdatedAt = async () => {
+    if (!bookId) return;
+    await supabase
+      .from("books")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", bookId);
+  };
 
   // ─── Helper: call edge function ─────────────────────────────
   const callParseFunction = async (body: Record<string, unknown>): Promise<any> => {
@@ -153,6 +168,7 @@ export function useChapterAnalysis({
       next.set(idx, { scenes, status: "analyzing" });
       return next;
     });
+    markResultsDirty();
 
     try {
       // ─── STAGE 1: Boundary detection ───
@@ -259,6 +275,8 @@ export function useChapterAnalysis({
             next.set(idx, { scenes: [], status: "done" });
             return next;
           });
+          markResultsDirty();
+          await touchBookUpdatedAt();
           toast.info(`"${entry.title}" — ${t("logNotEnough", isRu)}`);
           return;
         }
@@ -384,6 +402,7 @@ export function useChapterAnalysis({
           next.set(idx, { scenes: [...scenes], status: "analyzing" });
           return next;
         });
+        markResultsDirty();
       } else {
         addLog(`${t("logResuming", isRu).replace("...", "")} ${scenes.length} ...`);
       }
@@ -430,6 +449,7 @@ export function useChapterAnalysis({
             next.set(idx, { scenes: [...scenes], status: "analyzing" });
             return next;
           });
+          markResultsDirty();
         }
       }
 
@@ -439,6 +459,7 @@ export function useChapterAnalysis({
         next.set(idx, { scenes: [...scenes], status: "done" });
         return next;
       });
+      markResultsDirty();
       toast.success(`"${entry.title}" — ${t("chapterAnalyzed", isRu)}`);
     } catch (err: any) {
       console.error(`Chapter ${idx} analysis failed:`, err);
@@ -466,8 +487,14 @@ export function useChapterAnalysis({
         next.set(idx, { scenes: partialScenes, status: "error" });
         return next;
       });
+      markResultsDirty();
       toast.error(userError, { duration: 8000 });
     } finally {
+      try {
+        await touchBookUpdatedAt();
+      } catch (touchErr) {
+        console.warn("[ChapterAnalysis] Failed to touch books.updated_at:", touchErr);
+      }
       setIsAnalyzing(false);
     }
   };
@@ -487,6 +514,10 @@ export function useChapterAnalysis({
         }
       }
       return next;
+    });
+    markResultsDirty();
+    void touchBookUpdatedAt().catch((touchErr) => {
+      console.warn("[ChapterAnalysis] Failed to touch books.updated_at after stop:", touchErr);
     });
   };
 

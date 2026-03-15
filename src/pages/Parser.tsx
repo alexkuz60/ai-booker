@@ -89,10 +89,6 @@ export default function Parser() {
   } = useBookManager({ userId: user?.id, isRu, projectStorage });
 
 
-  const { analysisLog, analyzeChapter, resetAnalysis, stopAnalysis, isAnalyzing } = useChapterAnalysis({
-    isRu, pdfRef, userId: user?.id, userApiKeys, getModelForRole,
-    tocEntries, chapterIdMap, chapterResults, setChapterResults, ensurePdfLoaded,
-  });
 
   const { pushSnapshot, undo, redo, undoTo, redoTo, undoStack, redoStack, canUndo, canRedo, resetStacks } = useStructureUndo(bookId);
 
@@ -136,6 +132,14 @@ export default function Parser() {
     bookId,
     fileName,
     getSnapshot: getLocalSnapshot,
+  });
+
+
+  const { analysisLog, analyzeChapter, resetAnalysis, stopAnalysis, isAnalyzing } = useChapterAnalysis({
+    isRu, pdfRef, userId: user?.id, bookId, userApiKeys, getModelForRole,
+    tocEntries, chapterIdMap, chapterResults, setChapterResults,
+    onChapterResultsMutated: scheduleSave,
+    ensurePdfLoaded,
   });
 
   const getCurrentSnapshot = useCallback((): StructureSnapshot => ({

@@ -11,7 +11,7 @@
  *   scheduleSave();
  */
 
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { TocChapter, Scene, ChapterStatus } from "@/pages/parser/types";
 import { autoSaveToLocal } from "@/hooks/useSaveBookToProject";
@@ -38,19 +38,24 @@ export function useImperativeSave({
   debounceMs = 400,
 }: ImperativeSaveParams) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const getSnapshotRef = useRef(getSnapshot);
+
+  useEffect(() => {
+    getSnapshotRef.current = getSnapshot;
+  }, [getSnapshot]);
 
   const scheduleSave = useCallback(() => {
     if (!storage?.isReady || !bookId) return;
 
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      const snapshot = getSnapshot();
+      const snapshot = getSnapshotRef.current();
       if (snapshot.toc.length === 0) return;
       autoSaveToLocal(storage, bookId, fileName, snapshot).catch((err) =>
         console.warn("[AutoSave] local write failed:", err),
       );
     }, debounceMs);
-  }, [storage, bookId, fileName, getSnapshot, debounceMs]);
+  }, [storage, bookId, fileName, debounceMs]);
 
   /** Flush pending save immediately (e.g. before page unload). */
   const flushSave = useCallback(() => {
@@ -59,12 +64,12 @@ export function useImperativeSave({
       timer.current = null;
     }
     if (!storage?.isReady || !bookId) return;
-    const snapshot = getSnapshot();
+    const snapshot = getSnapshotRef.current();
     if (snapshot.toc.length === 0) return;
     autoSaveToLocal(storage, bookId, fileName, snapshot).catch((err) =>
       console.warn("[AutoSave] flush failed:", err),
     );
-  }, [storage, bookId, fileName, getSnapshot]);
+  }, [storage, bookId, fileName]);
 
   return { scheduleSave, flushSave };
 }
