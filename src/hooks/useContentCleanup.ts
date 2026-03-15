@@ -370,6 +370,8 @@ export function useContentCleanup() {
         return removeHeaderFooter(scenes, selectedText);
       case "page_number":
         return removePageNumbers(scenes, selectedText);
+      case "delete_selected":
+        return deleteSelectedTextInScene(scenes, selectedText, sceneIndex);
       case "chapter_split":
         return splitAtChapterMarker(scenes, selectedText, sceneIndex);
       case "fix_punctuation_spaces":

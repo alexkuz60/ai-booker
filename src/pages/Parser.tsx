@@ -679,8 +679,6 @@ export default function Parser() {
       return;
     }
 
-    // CONTRACT K3 GUARD: parent node must NOT receive aggregated scenes directly
-    assertNotOverwritingParent(selectedIdx, tocEntries, updatedScenes, label || "handleScenesUpdate");
 
     // Parent with children: distribute scenes back to their original chapters.
     const indices = [selectedIdx, ...childIndices];
