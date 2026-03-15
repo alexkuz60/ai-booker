@@ -237,21 +237,8 @@ export function useChapterAnalysis({
         let text = await extractTextByPageRange(activePdf, effectiveStartPage, effectiveEndPage);
         let charCount = text.trim().length;
 
-        // Guard: if first page looks like a title page (short text, matches chapter title),
-        // skip it and start from the next page
-        if (effectiveStartPage <= 2 && charCount > 0 && charCount < 500) {
-          const lower = text.toLowerCase().trim();
-          const titleLower = entry.title.toLowerCase().trim();
-          const looksLikeTitlePage = titleLower.length > 3 && lower.includes(titleLower) && lower.length < 500;
-          if (looksLikeTitlePage && effectiveStartPage < effectiveEndPage) {
-            addLog(isRu
-              ? `⚠️ Страница ${effectiveStartPage} выглядит как титульный лист — пропускаю`
-              : `⚠️ Page ${effectiveStartPage} looks like a title page — skipping`);
-            effectiveStartPage += 1;
-            text = await extractTextByPageRange(activePdf, effectiveStartPage, effectiveEndPage);
-            charCount = text.trim().length;
-          }
-        }
+        // No title-page heuristic needed: page range is derived from TOC structure
+        // (current entry startPage → next entry startPage - 1), which inherently excludes title pages.
 
         if (charCount < 50 && baseRange.subtreeStart && baseRange.subtreeEnd) {
           const subtreeSpan = baseRange.subtreeEnd - baseRange.subtreeStart + 1;
