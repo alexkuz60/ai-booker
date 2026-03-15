@@ -275,6 +275,8 @@ export function useChapterAnalysis({
             next.set(idx, { scenes: [], status: "done" });
             return next;
           });
+          markResultsDirty();
+          await touchBookUpdatedAt();
           toast.info(`"${entry.title}" — ${t("logNotEnough", isRu)}`);
           return;
         }
