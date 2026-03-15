@@ -45,15 +45,21 @@ export function useImperativeSave({
   }, [getSnapshot]);
 
   const scheduleSave = useCallback(() => {
-    if (!storage?.isReady || !bookId) return;
+    if (!bookId) return;
+    if (!storage?.isReady) {
+      console.warn("[AutoSave] Storage not ready — edits will NOT persist to local project. Backend may need re-initialization.");
+      return;
+    }
 
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       const snapshot = getSnapshotRef.current();
       if (snapshot.toc.length === 0) return;
-      autoSaveToLocal(storage, bookId, fileName, snapshot).catch((err) =>
-        console.warn("[AutoSave] local write failed:", err),
-      );
+      autoSaveToLocal(storage, bookId, fileName, snapshot)
+        .then(() => console.log("[AutoSave] Local write OK:", snapshot.chapterResults.size, "chapters"))
+        .catch((err) =>
+          console.warn("[AutoSave] local write failed:", err),
+        );
     }, debounceMs);
   }, [storage, bookId, fileName, debounceMs]);
 
