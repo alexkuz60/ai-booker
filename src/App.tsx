@@ -36,18 +36,20 @@ function ProtectedRoutes() {
 
   return (
     <PageHeaderProvider>
-      <AppLayout>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/parser" element={<Parser />} />
-          <Route path="/studio" element={<Studio />} />
-          <Route path="/montage" element={<Montage />} />
-          <Route path="/narrators" element={<Narrators />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </AppLayout>
+      <ProjectStorageProvider>
+        <AppLayout>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/parser" element={<Parser />} />
+            <Route path="/studio" element={<Studio />} />
+            <Route path="/montage" element={<Montage />} />
+            <Route path="/narrators" element={<Narrators />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AppLayout>
+      </ProjectStorageProvider>
     </PageHeaderProvider>
   );
 }
