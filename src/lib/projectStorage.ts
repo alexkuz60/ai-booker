@@ -372,11 +372,13 @@ export class OPFSStorage implements ProjectStorage {
   }
 
   async exportZip(): Promise<Blob> {
-    throw new Error("exportZip not yet implemented");
+    const { exportProjectZip } = await import("./projectZip");
+    return exportProjectZip(this);
   }
 
-  async importZip(_zip: Blob): Promise<void> {
-    throw new Error("importZip not yet implemented");
+  async importZip(zip: Blob): Promise<void> {
+    const { importProjectZip } = await import("./projectZip");
+    await importProjectZip(this, zip);
   }
 
   /** Create or open project in OPFS */
