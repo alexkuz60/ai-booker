@@ -389,7 +389,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
           bookId: book.id,
           title: book.title || book.file_name.replace('.pdf', ''),
           fileName: book.file_name,
-          toc: normalizedSavedToc,
+          toc: normalizedToc,
           parts: parts.map(p => ({ id: p.id, title: p.title, partNumber: p.part_number })),
           chapterIdMap: newChapterIdMap,
           chapterResults: initMap,
