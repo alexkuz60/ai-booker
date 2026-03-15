@@ -420,9 +420,15 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
     step,
   ]);
 
-  // ─── Open saved book from DB ──────────────────────────────
+  // ─── Open saved book (local-first, server fallback) ───────────────────────
   const openSavedBook = useCallback(async (book: BookRecord) => {
     if (!userId) return;
+
+    if (projectStorage?.isReady) {
+      const restored = await restoreFromLocal(book.id);
+      if (restored) return;
+    }
+
     setStep("extracting_toc");
     setFileName(book.file_name);
     setBookId(book.id);
