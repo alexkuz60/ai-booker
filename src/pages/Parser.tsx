@@ -622,7 +622,7 @@ export default function Parser() {
   // from multiple children — we must distribute edits back to correct chapter indices.
   const handleScenesUpdate = useCallback((updatedScenes: Scene[]) => {
     if (selectedIdx === null) return;
-    pushSnapshot(getCurrentSnapshot());
+    pushSnapshot(getCurrentSnapshot(), isRu ? "Редактирование сцен" : "Edit scenes");
 
     const entry = tocEntries[selectedIdx];
 
