@@ -93,49 +93,6 @@ export default function Parser() {
 
   const { pushSnapshot, undo, redo, canUndo, canRedo, resetStacks } = useStructureUndo(bookId);
 
-  const getCurrentSnapshot = useCallback((): StructureSnapshot => ({
-    tocEntries: tocEntries.map(e => ({ ...e })),
-    chapterIdMap: new Map(chapterIdMap),
-    chapterResults: new Map(
-      Array.from(chapterResults.entries()).map(([k, v]) => [k, { scenes: [...v.scenes], status: v.status }])
-    ),
-    selectedIndices: new Set(selectedIndices),
-  }), [tocEntries, chapterIdMap, chapterResults, selectedIndices]);
-
-  const restoreSnapshot = useCallback((s: StructureSnapshot) => {
-    setTocEntries(s.tocEntries);
-    setChapterIdMap(s.chapterIdMap);
-    setChapterResults(s.chapterResults);
-    setSelectedIndices(s.selectedIndices);
-    scheduleSave();
-  }, [setTocEntries, setChapterIdMap, setChapterResults, scheduleSave]);
-
-  const handleUndo = useCallback(() => {
-    undo(getCurrentSnapshot(), restoreSnapshot);
-  }, [undo, getCurrentSnapshot, restoreSnapshot]);
-
-  const handleRedo = useCallback(() => {
-    redo(getCurrentSnapshot(), restoreSnapshot);
-  }, [redo, getCurrentSnapshot, restoreSnapshot]);
-
-  // Ctrl+Z / Ctrl+Shift+Z keyboard shortcuts
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (step !== "workspace") return;
-      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        handleUndo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === "z" && e.shiftKey) {
-        e.preventDefault();
-        handleRedo();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [step, handleUndo, handleRedo]);
-
-
-
   const selectedIdx = selectedIndices.size === 1 ? Array.from(selectedIndices)[0] : null;
 
   const {
@@ -177,6 +134,47 @@ export default function Parser() {
     fileName,
     getSnapshot: getLocalSnapshot,
   });
+
+  const getCurrentSnapshot = useCallback((): StructureSnapshot => ({
+    tocEntries: tocEntries.map(e => ({ ...e })),
+    chapterIdMap: new Map(chapterIdMap),
+    chapterResults: new Map(
+      Array.from(chapterResults.entries()).map(([k, v]) => [k, { scenes: [...v.scenes], status: v.status }])
+    ),
+    selectedIndices: new Set(selectedIndices),
+  }), [tocEntries, chapterIdMap, chapterResults, selectedIndices]);
+
+  const restoreSnapshot = useCallback((s: StructureSnapshot) => {
+    setTocEntries(s.tocEntries);
+    setChapterIdMap(s.chapterIdMap);
+    setChapterResults(s.chapterResults);
+    setSelectedIndices(s.selectedIndices);
+    scheduleSave();
+  }, [setTocEntries, setChapterIdMap, setChapterResults, scheduleSave]);
+
+  const handleUndo = useCallback(() => {
+    undo(getCurrentSnapshot(), restoreSnapshot);
+  }, [undo, getCurrentSnapshot, restoreSnapshot]);
+
+  const handleRedo = useCallback(() => {
+    redo(getCurrentSnapshot(), restoreSnapshot);
+  }, [redo, getCurrentSnapshot, restoreSnapshot]);
+
+  // Ctrl+Z / Ctrl+Shift+Z keyboard shortcuts
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (step !== "workspace") return;
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "z" && e.shiftKey) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [step, handleUndo, handleRedo]);
 
   const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
     isRu,
