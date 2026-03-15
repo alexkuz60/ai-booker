@@ -14,6 +14,8 @@ import { MontageTimeline } from "@/components/montage/MontageTimeline";
 import { RenderDialog } from "@/components/montage/RenderDialog";
 import { Button } from "@/components/ui/button";
 import { AiRolesButton } from "@/components/AiRolesButton";
+import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
+import { SaveBookButton } from "@/components/SaveBookButton";
 
 const SIDEBAR_WIDTH = 280;
 

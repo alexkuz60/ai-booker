@@ -18,6 +18,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { useStudioSession } from "@/hooks/useStudioSession";
 import { AiRolesButton } from "@/components/AiRolesButton";
+import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
+import { SaveBookButton } from "@/components/SaveBookButton";
 
 const Studio = () => {
   const { isRu } = useLanguage();

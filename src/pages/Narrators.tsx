@@ -18,6 +18,8 @@ import { ELEVENLABS_VOICES } from "@/config/elevenlabsVoices";
 import { SALUTESPEECH_VOICES } from "@/config/salutespeechVoices";
 import { PROXYAPI_TTS_VOICES, PROXYAPI_TTS_MODELS, getVoicesForModel } from "@/config/proxyapiVoices";
 import { ElevenLabsCreditsWidget } from "@/components/studio/ElevenLabsCreditsWidget";
+import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
+import { SaveBookButton } from "@/components/SaveBookButton";
 
 // ─── Types ──────────────────────────────────────────────
 
