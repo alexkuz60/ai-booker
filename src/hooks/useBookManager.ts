@@ -149,9 +149,9 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
 
       if (!data?.updated_at) return false;
 
-      const localTime = new Date(localMeta.updatedAt).getTime();
+      const localTime = new Date(localUpdatedAt).getTime();
       const serverTime = new Date(data.updated_at).getTime();
-      const TOLERANCE_MS = 2000; // 2 sec tolerance for clock drift
+      const TOLERANCE_MS = 2000;
 
       if (serverTime > localTime + TOLERANCE_MS) {
         console.log(`[SyncCheck] Server is newer: server=${data.updated_at} local=${localMeta.updatedAt}`);
