@@ -36,6 +36,33 @@ import ChapterDetailPanel from "@/components/parser/ChapterDetailPanel";
 import { AiRolesTab } from "@/components/profile/tabs/AiRolesTab";
 import { SaveBookButton } from "@/components/SaveBookButton";
 
+const buildAutoSaveFingerprint = (
+  tocEntries: TocChapter[],
+  chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>,
+  chapterIdMap: Map<number, string>,
+): string => {
+  const tocFingerprint = tocEntries
+    .map((entry, idx) => `${idx}:${entry.title}:${entry.level}:${entry.startPage}:${entry.endPage}:${entry.partTitle ?? ""}`)
+    .join("||");
+
+  const chapterMapFingerprint = Array.from(chapterIdMap.entries())
+    .map(([idx, id]) => `${idx}:${id}`)
+    .join("||");
+
+  const scenesFingerprint = Array.from(chapterResults.entries())
+    .map(([idx, result]) => {
+      const scenes = result.scenes
+        .map((scene, sceneIdx) =>
+          `${sceneIdx}:${scene.id ?? ""}:${scene.scene_number}:${scene.title}:${scene.content ?? ""}:${scene.scene_type}:${scene.mood}:${scene.bpm}`,
+        )
+        .join("~~");
+      return `${idx}:${result.status}:${scenes}`;
+    })
+    .join("||");
+
+  return `${tocEntries.length}#${chapterResults.size}#${chapterIdMap.size}#${tocFingerprint}#${chapterMapFingerprint}#${scenesFingerprint}`;
+};
+
 export default function Parser() {
   const { user } = useAuth();
   const { isRu } = useLanguage();
@@ -167,12 +194,8 @@ export default function Parser() {
   useEffect(() => {
     if (!projectStorage?.isReady || !bookId || tocEntries.length === 0) return;
 
-    // Cheap fingerprint: compare serialised lengths + key counts to avoid JSON.stringify on every render
-    const hash = `${tocEntries.length}:${chapterResults.size}:${chapterIdMap.size}:${
-      tocEntries.map(e => e.title + e.level + e.startPage).join("|")
-    }:${
-      Array.from(chapterResults.entries()).map(([k, v]) => `${k}:${v.status}:${v.scenes.length}:${v.scenes.reduce((s, sc) => s + (sc.content?.length ?? 0), 0)}`).join("|")
-    }`;
+    // Fingerprint includes actual scene content to avoid missed saves on same-length edits.
+    const hash = buildAutoSaveFingerprint(tocEntries, chapterResults, chapterIdMap);
     if (hash === lastSavedHash.current) return;
 
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
