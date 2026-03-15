@@ -56,7 +56,6 @@ export function useImperativeSave({
       const snapshot = getSnapshotRef.current();
       if (snapshot.toc.length === 0) return;
       autoSaveToLocal(storage, bookId, fileName, snapshot)
-        .then(() => console.log("[AutoSave] Local write OK:", snapshot.chapterResults.size, "chapters"))
         .catch((err) =>
           console.warn("[AutoSave] local write failed:", err),
         );
