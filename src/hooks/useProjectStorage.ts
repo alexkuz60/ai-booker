@@ -47,6 +47,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
   const [storage, setStorage] = useState<ProjectStorage | null>(null);
   const [meta, setMeta] = useState<ProjectMeta | null>(null);
   const [loading, setLoading] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   const backend = detectStorageBackend();
 
   // ── Create new project ──────────────────────────────────
