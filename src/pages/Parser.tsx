@@ -161,6 +161,14 @@ export default function Parser() {
     redo(getCurrentSnapshot(), restoreSnapshot);
   }, [redo, getCurrentSnapshot, restoreSnapshot]);
 
+  const handleUndoTo = useCallback((index: number) => {
+    undoTo(index, getCurrentSnapshot(), restoreSnapshot);
+  }, [undoTo, getCurrentSnapshot, restoreSnapshot]);
+
+  const handleRedoTo = useCallback((index: number) => {
+    redoTo(index, getCurrentSnapshot(), restoreSnapshot);
+  }, [redoTo, getCurrentSnapshot, restoreSnapshot]);
+
   // Ctrl+Z / Ctrl+Shift+Z keyboard shortcuts
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
