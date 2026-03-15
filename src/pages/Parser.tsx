@@ -35,6 +35,7 @@ import NavSidebar from "@/components/parser/NavSidebar";
 import ChapterDetailPanel from "@/components/parser/ChapterDetailPanel";
 import { AiRolesTab } from "@/components/profile/tabs/AiRolesTab";
 import { SaveBookButton } from "@/components/SaveBookButton";
+import ParserCharactersPanel from "@/components/parser/ParserCharactersPanel";
 
 export default function Parser() {
   const { user } = useAuth();
