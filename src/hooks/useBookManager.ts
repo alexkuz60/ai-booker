@@ -11,6 +11,7 @@ import type {
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
+import { isFolderNode, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 
 
 interface UseBookManagerParams {
@@ -80,12 +81,14 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
       if (!local?.structure || local.structure.bookId !== savedBookId) return false;
 
       const { structure, chapterIdMap: localChIdMap, chapterResults: localResults } = local;
+      const normalizedToc = normalizeLevels(structure.toc);
+      const sanitizedLocalResults = sanitizeChapterResultsForStructure(normalizedToc, localResults);
 
       setBookId(savedBookId);
       setFileName(structure.fileName);
-      setTocEntries(normalizeLevels(structure.toc));
+      setTocEntries(normalizedToc);
       setChapterIdMap(localChIdMap);
-      setChapterResults(localResults);
+      setChapterResults(sanitizedLocalResults);
 
       const newPartIdMap = new Map<string, string>();
       for (const p of structure.parts) {
@@ -95,6 +98,17 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
 
       sessionStorage.setItem(ACTIVE_BOOK_KEY, savedBookId);
       setStep("workspace");
+
+      // Normalize legacy local data immediately (remove folder scene files)
+      void syncStructureToLocal(projectStorage, {
+        bookId: savedBookId,
+        title: structure.title,
+        fileName: structure.fileName,
+        toc: normalizedToc,
+        parts: structure.parts,
+        chapterIdMap: localChIdMap,
+        chapterResults: sanitizedLocalResults,
+      });
 
       // ── Restore PDF from local project (async, non-blocking) ──
       projectStorage.readBlob("source/book.pdf").then(async (pdfBlob) => {
@@ -348,32 +362,19 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
           content: s.content || undefined,
           content_preview: (s.content || '').slice(0, 200) || undefined,
           scene_type: s.scene_type || "mixed", mood: s.mood || "neutral", bpm: s.bpm || 120,
+          char_count: (s.content || '').length,
         });
         scenesByChapter.set(s.chapter_id, list);
       }
 
       const normalizedToc = normalizedSavedToc;
 
-      // Identify folder indices (entries that have direct children by level)
-      const folderIndices = new Set<number>();
-      for (let i = 0; i < normalizedToc.length; i++) {
-        if (i + 1 < normalizedToc.length &&
-            normalizedToc[i + 1].level > normalizedToc[i].level &&
-            normalizedToc[i + 1].sectionType === normalizedToc[i].sectionType) {
-          folderIndices.add(i);
-        }
-      }
-
-      const initMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
+      const initRawMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
       chapters.forEach((ch, i) => {
-        // Folders are structural-only — never store scene content
-        if (folderIndices.has(i)) {
-          initMap.set(i, { scenes: [], status: "pending" });
-          return;
-        }
-        const scenes = scenesByChapter.get(ch.id) || [];
-        initMap.set(i, { scenes, status: scenes.length > 0 ? "done" : "pending" });
+        const scenes = isFolderNode(normalizedToc, i) ? [] : (scenesByChapter.get(ch.id) || []);
+        initRawMap.set(i, { scenes, status: scenes.length > 0 ? "done" : "pending" });
       });
+      const initMap = sanitizeChapterResultsForStructure(normalizedToc, initRawMap);
 
       setChapterResults(initMap);
       setStep("workspace");
@@ -400,7 +401,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
       setErrorMsg(err.message || "Unknown error");
       setStep("error");
     }
-  }, [userId, isRu]);
+  }, [userId, isRu, projectStorage]);
 
   // Keep ref in sync for auto-restore effect
   openSavedBookRef.current = openSavedBook;
@@ -445,67 +446,59 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
 
       let chapters: TocChapter[] = [];
 
-      if (outline.length > 0) {
-        const flat = flattenTocWithRanges(outline, pdf.numPages);
+      const mapFlatToChapters = (
+        flat: { title: string; level: number; startPage: number; endPage: number; children: TocEntry[] }[],
+      ): TocChapter[] => {
+        const mapped: TocChapter[] = [];
         let currentPart = "";
-        for (const entry of flat) {
-          const isContainer = entry.children.length > 0;
-          if (isContainer) {
-            if (entry.level === 0) currentPart = entry.title;
-            continue;
+
+        for (let i = 0; i < flat.length; i++) {
+          const entry = flat[i];
+          const sectionType = classifySection(entry.title);
+          const hasNested = entry.children.length > 0 || (i + 1 < flat.length && flat[i + 1].level > entry.level);
+
+          if (entry.level === 0 && sectionType === "content" && hasNested) {
+            currentPart = entry.title;
           }
 
-          chapters.push({
-            title: entry.title, startPage: entry.startPage, endPage: entry.endPage,
-            level: entry.level, partTitle: currentPart || undefined,
-            sectionType: classifySection(entry.title),
+          mapped.push({
+            title: entry.title,
+            startPage: entry.startPage,
+            endPage: entry.endPage,
+            level: entry.level,
+            partTitle: entry.level > 0 ? (currentPart || undefined) : undefined,
+            sectionType,
           });
         }
-        if (chapters.length === 0) {
-          for (const entry of flat) {
-            chapters.push({
-              title: entry.title, startPage: entry.startPage, endPage: entry.endPage,
-              level: entry.level, sectionType: classifySection(entry.title),
-            });
-          }
-        }
+
+        return mapped;
+      };
+
+      if (outline.length > 0) {
+        const flat = flattenTocWithRanges(outline, pdf.numPages);
+        chapters = mapFlatToChapters(flat);
         toast.success(`${t("tocFound", isRu)}: ${chapters.length} ${t("items", isRu)}`);
       } else {
         // No embedded outline — try text-based heading detection
         const textToc = await extractTocFromText(pdf);
         if (textToc.length > 0) {
           const flat = flattenTocWithRanges(textToc, pdf.numPages);
-          let currentPart = "";
-          for (const entry of flat) {
-            if (entry.level === 0 && entry.children.length > 0) {
-              currentPart = entry.title;
-            } else {
-              chapters.push({
-                title: entry.title, startPage: entry.startPage, endPage: entry.endPage,
-                level: entry.level, partTitle: currentPart || undefined,
-                sectionType: classifySection(entry.title),
-              });
-            }
-          }
-          if (chapters.length === 0) {
-            for (const entry of flat) {
-              chapters.push({
-                title: entry.title, startPage: entry.startPage, endPage: entry.endPage,
-                level: entry.level, sectionType: classifySection(entry.title),
-              });
-            }
-          }
+          chapters = mapFlatToChapters(flat);
           toast.success(`${isRu ? "Найдены заголовки глав в тексте" : "Chapter headings found in text"}: ${chapters.length} ${t("items", isRu)}`);
         } else {
           toast.info(t("tocNotFound", isRu));
           chapters = [{
             title: f.name.replace('.pdf', ''),
-            startPage: 1, endPage: pdf.numPages, level: 0, sectionType: "content",
+            startPage: 1,
+            endPage: pdf.numPages,
+            level: 0,
+            sectionType: "content",
           }];
         }
       }
 
-      setTocEntries(normalizeLevels(chapters));
+      chapters = normalizeLevels(chapters);
+      setTocEntries(chapters);
 
       // Clean up previous uploads of the same file name
       const { data: existingBooks } = await supabase
@@ -585,8 +578,9 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
       }
       setChapterIdMap(newChapterIdMap);
 
-      const initMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
-      chapters.forEach((_, i) => initMap.set(i, { scenes: [], status: "pending" }));
+      const initRawMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
+      chapters.forEach((_, i) => initRawMap.set(i, { scenes: [], status: "pending" }));
+      const initMap = sanitizeChapterResultsForStructure(chapters, initRawMap);
       setChapterResults(initMap);
 
       // ── Dual-write: sync to local project ──
@@ -626,7 +620,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
     }
 
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [userId, isRu]);
+  }, [userId, isRu, projectStorage]);
 
   // ─── Reload book (delete structure, re-upload new PDF) ─────
   const reloadBook = useCallback(async () => {

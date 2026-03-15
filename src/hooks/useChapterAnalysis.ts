@@ -7,6 +7,7 @@ import { t } from "@/pages/parser/i18n";
 
 import type { Scene, TocChapter, ChapterStatus } from "@/pages/parser/types";
 import type { AiRoleId } from "@/config/aiRoles";
+import { isFolderNode } from "@/lib/tocStructure";
 
 interface UseChapterAnalysisParams {
   isRu: boolean;
@@ -86,14 +87,7 @@ export function useChapterAnalysis({
   };
 
   // ─── Two-stage Chapter Analysis (with resume) ─────────────
-  // Check if an entry is a folder (has direct children by level)
-  const isFolder = (idx: number): boolean => {
-    const entry = tocEntries[idx];
-    if (!entry) return false;
-    return idx + 1 < tocEntries.length &&
-      tocEntries[idx + 1].level > entry.level &&
-      tocEntries[idx + 1].sectionType === entry.sectionType;
-  };
+  const isFolder = (idx: number): boolean => isFolderNode(tocEntries, idx);
 
   const analyzeChapter = async (idx: number, mode: "full" | "enrich" | "auto" = "auto") => {
     if (!userId) return;
