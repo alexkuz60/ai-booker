@@ -86,8 +86,19 @@ export function useChapterAnalysis({
   };
 
   // ─── Two-stage Chapter Analysis (with resume) ─────────────
+  // Check if an entry is a folder (has direct children by level)
+  const isFolder = (idx: number): boolean => {
+    const entry = tocEntries[idx];
+    if (!entry) return false;
+    return idx + 1 < tocEntries.length &&
+      tocEntries[idx + 1].level > entry.level &&
+      tocEntries[idx + 1].sectionType === entry.sectionType;
+  };
+
   const analyzeChapter = async (idx: number, mode: "full" | "enrich" | "auto" = "auto") => {
     if (!userId) return;
+    // Folders are structural-only — never analyze them
+    if (isFolder(idx)) return;
     // Try to load PDF on demand if not in memory
     let activePdf = pdfRef;
     if (!activePdf && ensurePdfLoaded) {
