@@ -366,6 +366,7 @@ export function useChapterAnalysis({
               scene_number: s.scene_number || i + 1, title: s.title,
               content: chunk, content_preview: chunk.slice(0, 200),
               scene_type: 'pending', mood: '', bpm: 0,
+              char_count: chunk.length,
             };
           });
         }
