@@ -129,10 +129,21 @@ function SceneCards({
       // Mark scene(s) as edited
       setEditedIndices(prev => {
         const next = new Set(prev);
-        next.add(sceneIndex);
-        // If split happened, mark new scene too
-        if (result.scenes.length > scenes.length && action === "chapter_split") {
-          next.add(sceneIndex + 1);
+        // For mass actions (footnote_auto, fix_punctuation_spaces), mark all affected scenes
+        if (action === "footnote_auto" || action === "fix_punctuation_spaces") {
+          result.scenes.forEach((sc, idx) => {
+            // Compare content to detect which scenes were modified
+            const originalContent = scenes[idx]?.content ?? scenes[idx]?.content_preview ?? "";
+            if (sc.content !== originalContent) {
+              next.add(idx);
+            }
+          });
+        } else {
+          next.add(sceneIndex);
+          // If split happened, mark new scene too
+          if (result.scenes.length > scenes.length && action === "chapter_split") {
+            next.add(sceneIndex + 1);
+          }
         }
         return next;
       });
