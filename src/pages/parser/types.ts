@@ -9,6 +9,8 @@ export interface Scene {
   scene_type: string;
   mood: string;
   bpm: number;
+  /** Character count of scene content, updated after every edit */
+  char_count?: number;
 }
 
 export interface Chapter {
