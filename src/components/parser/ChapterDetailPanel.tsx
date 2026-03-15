@@ -95,7 +95,7 @@ function SceneCards({
   scenes: Scene[];
   isRu: boolean;
   roleModels?: { screenwriter?: string; director?: string };
-  onScenesUpdate?: (scenes: Scene[]) => void;
+  onScenesUpdate?: (scenes: Scene[], label?: string) => void;
 }) {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [editedIndices, setEditedIndices] = useState<Set<number>>(new Set());
