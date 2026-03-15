@@ -362,6 +362,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
           content: s.content || undefined,
           content_preview: (s.content || '').slice(0, 200) || undefined,
           scene_type: s.scene_type || "mixed", mood: s.mood || "neutral", bpm: s.bpm || 120,
+          char_count: (s.content || '').length,
         });
         scenesByChapter.set(s.chapter_id, list);
       }
