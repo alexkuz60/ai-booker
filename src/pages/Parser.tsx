@@ -464,6 +464,7 @@ export default function Parser() {
     if (partId) {
       supabase.from('book_parts').update({ title: newTitle }).eq('id', partId).then();
     }
+    scheduleSave();
   };
 
   const deleteEntry = (indices: number[]) => {
