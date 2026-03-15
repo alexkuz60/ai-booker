@@ -125,6 +125,49 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
     }
   }, [projectStorage, isRu]);
 
+  // ─── Sync-check: server vs local timestamps ────────────────
+  const [serverNewerBookId, setServerNewerBookId] = useState<string | null>(null);
+
+  const checkServerNewer = useCallback(async (savedBookId: string): Promise<boolean> => {
+    if (!projectStorage?.isReady) return false;
+    try {
+      const localMeta = await projectStorage.readJSON<{ updatedAt?: string }>("project.json");
+      if (!localMeta?.updatedAt) return false; // no local timestamp — can't compare
+
+      const { data } = await supabase
+        .from("books")
+        .select("updated_at")
+        .eq("id", savedBookId)
+        .maybeSingle();
+
+      if (!data?.updated_at) return false;
+
+      const localTime = new Date(localMeta.updatedAt).getTime();
+      const serverTime = new Date(data.updated_at).getTime();
+      const TOLERANCE_MS = 2000; // 2 sec tolerance for clock drift
+
+      if (serverTime > localTime + TOLERANCE_MS) {
+        console.log(`[SyncCheck] Server is newer: server=${data.updated_at} local=${localMeta.updatedAt}`);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.warn("[SyncCheck] Failed:", err);
+      return false;
+    }
+  }, [projectStorage]);
+
+  const dismissServerNewer = useCallback(() => setServerNewerBookId(null), []);
+
+  const acceptServerVersion = useCallback(async () => {
+    if (!serverNewerBookId) return;
+    const book = books.find(b => b.id === serverNewerBookId);
+    setServerNewerBookId(null);
+    if (book) {
+      await openSavedBookRef.current?.(book);
+    }
+  }, [serverNewerBookId, books]);
+
   // ─── Auto-restore active book on mount (local-first) ───────
   const [restoredOnce, setRestoredOnce] = useState(false);
   const openSavedBookRef = useRef<(book: BookRecord) => Promise<void>>();
@@ -138,10 +181,17 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
       return;
     }
 
-    // Try local-first, then fall back to server
+    // Try local-first, then check if server has newer version
     setRestoredOnce(true);
-    restoreFromLocal(savedBookId).then((restored) => {
-      if (restored) return;
+    restoreFromLocal(savedBookId).then(async (restored) => {
+      if (restored) {
+        // Check if server has a newer version
+        const isNewer = await checkServerNewer(savedBookId);
+        if (isNewer) {
+          setServerNewerBookId(savedBookId);
+        }
+        return;
+      }
       // Fallback: load from server
       const book = books.find(b => b.id === savedBookId);
       if (book) {
@@ -151,7 +201,7 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
         setStep("library");
       }
     });
-  }, [userId, loadingLibrary, books, restoredOnce, restoreFromLocal]);
+  }, [userId, loadingLibrary, books, restoredOnce, restoreFromLocal, checkServerNewer]);
 
   // ─── Open saved book from DB ──────────────────────────────
   const openSavedBook = useCallback(async (book: BookRecord) => {
