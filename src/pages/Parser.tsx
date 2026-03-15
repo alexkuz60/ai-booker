@@ -161,6 +161,36 @@ export default function Parser() {
     partGroups, partlessIndices,
   } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName, bookId: bookId ?? undefined });
 
+  const localPartsForSave = useMemo(() => {
+    const seen = new Set<string>();
+    const parts: Array<{ id: string; title: string; partNumber: number }> = [];
+
+    for (const entry of tocEntries) {
+      if (!entry.partTitle || seen.has(entry.partTitle)) continue;
+      seen.add(entry.partTitle);
+      parts.push({
+        id: partIdMap.get(entry.partTitle) || "",
+        title: entry.partTitle,
+        partNumber: parts.length + 1,
+      });
+    }
+
+    return parts;
+  }, [tocEntries, partIdMap]);
+
+  const { saveBook, saving: savingBook } = useSaveBookToProject({
+    isRu,
+    currentBookId: bookId,
+    localSnapshot: step === "workspace"
+      ? {
+          toc: tocEntries,
+          parts: localPartsForSave,
+          chapterIdMap,
+          chapterResults,
+        }
+      : undefined,
+  });
+
   // ── Warn when analysis-relevant models change ──
   const handleRoleModelChanged = useCallback((roleId: AiRoleId) => {
     if (roleId !== "screenwriter" && roleId !== "director") return;
