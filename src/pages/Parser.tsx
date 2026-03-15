@@ -436,6 +436,7 @@ export default function Parser() {
     if (chapterId) {
       supabase.from('book_chapters').update({ title: newTitle }).eq('id', chapterId).then();
     }
+    scheduleSave();
   };
 
   const changeStartPage = (idx: number, newPage: number) => {
