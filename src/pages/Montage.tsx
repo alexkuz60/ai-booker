@@ -41,6 +41,10 @@ const Montage = () => {
   } = useMontageData();
 
   const [renderDialogOpen, setRenderDialogOpen] = useState(false);
+  const { saveBook, saving: savingBook } = useSaveBookToProject({
+    isRu,
+    currentBookId: bookId,
+  });
   const activePartNumber = parts.length > 0 ? parts[activePartIdx]?.part_number ?? null : null;
 
   const hasContent = !!chapterId && sceneIds.length > 0;
