@@ -275,7 +275,7 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
         description: `${activeStorage.projectName} · ${toc.length} ${isRu ? "глав" : "chapters"}`,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getErrorMessage(error, isRu);
       toast({
         title: isRu ? "Ошибка сохранения" : "Save failed",
         description: message,
