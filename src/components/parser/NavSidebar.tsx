@@ -34,12 +34,7 @@ interface NavSidebarProps {
   onRenameEntry: (idx: number, newTitle: string) => void;
   onChangeStartPage: (idx: number, newPage: number) => void;
   onOpenPdf?: (page?: number) => void;
-  onRenamePart?: (oldTitle: string, newTitle: string) => void;
   onMergeEntries?: (indices: number[]) => void;
-  onUndo?: () => void;
-  onRedo?: () => void;
-  canUndo?: boolean;
-  canRedo?: boolean;
   roleModels?: Partial<Record<AiRoleId, string>>;
 }
 
