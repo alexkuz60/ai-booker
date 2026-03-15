@@ -449,6 +449,7 @@ export function useChapterAnalysis({
             next.set(idx, { scenes: [...scenes], status: "analyzing" });
             return next;
           });
+          markResultsDirty();
         }
       }
 
