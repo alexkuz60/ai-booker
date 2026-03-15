@@ -446,67 +446,59 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
 
       let chapters: TocChapter[] = [];
 
-      if (outline.length > 0) {
-        const flat = flattenTocWithRanges(outline, pdf.numPages);
+      const mapFlatToChapters = (
+        flat: { title: string; level: number; startPage: number; endPage: number; children: TocEntry[] }[],
+      ): TocChapter[] => {
+        const mapped: TocChapter[] = [];
         let currentPart = "";
-        for (const entry of flat) {
-          const isContainer = entry.children.length > 0;
-          if (isContainer) {
-            if (entry.level === 0) currentPart = entry.title;
-            continue;
+
+        for (let i = 0; i < flat.length; i++) {
+          const entry = flat[i];
+          const sectionType = classifySection(entry.title);
+          const hasNested = entry.children.length > 0 || (i + 1 < flat.length && flat[i + 1].level > entry.level);
+
+          if (entry.level === 0 && sectionType === "content" && hasNested) {
+            currentPart = entry.title;
           }
 
-          chapters.push({
-            title: entry.title, startPage: entry.startPage, endPage: entry.endPage,
-            level: entry.level, partTitle: currentPart || undefined,
-            sectionType: classifySection(entry.title),
+          mapped.push({
+            title: entry.title,
+            startPage: entry.startPage,
+            endPage: entry.endPage,
+            level: entry.level,
+            partTitle: entry.level > 0 ? (currentPart || undefined) : undefined,
+            sectionType,
           });
         }
-        if (chapters.length === 0) {
-          for (const entry of flat) {
-            chapters.push({
-              title: entry.title, startPage: entry.startPage, endPage: entry.endPage,
-              level: entry.level, sectionType: classifySection(entry.title),
-            });
-          }
-        }
+
+        return mapped;
+      };
+
+      if (outline.length > 0) {
+        const flat = flattenTocWithRanges(outline, pdf.numPages);
+        chapters = mapFlatToChapters(flat);
         toast.success(`${t("tocFound", isRu)}: ${chapters.length} ${t("items", isRu)}`);
       } else {
         // No embedded outline — try text-based heading detection
         const textToc = await extractTocFromText(pdf);
         if (textToc.length > 0) {
           const flat = flattenTocWithRanges(textToc, pdf.numPages);
-          let currentPart = "";
-          for (const entry of flat) {
-            if (entry.level === 0 && entry.children.length > 0) {
-              currentPart = entry.title;
-            } else {
-              chapters.push({
-                title: entry.title, startPage: entry.startPage, endPage: entry.endPage,
-                level: entry.level, partTitle: currentPart || undefined,
-                sectionType: classifySection(entry.title),
-              });
-            }
-          }
-          if (chapters.length === 0) {
-            for (const entry of flat) {
-              chapters.push({
-                title: entry.title, startPage: entry.startPage, endPage: entry.endPage,
-                level: entry.level, sectionType: classifySection(entry.title),
-              });
-            }
-          }
+          chapters = mapFlatToChapters(flat);
           toast.success(`${isRu ? "Найдены заголовки глав в тексте" : "Chapter headings found in text"}: ${chapters.length} ${t("items", isRu)}`);
         } else {
           toast.info(t("tocNotFound", isRu));
           chapters = [{
             title: f.name.replace('.pdf', ''),
-            startPage: 1, endPage: pdf.numPages, level: 0, sectionType: "content",
+            startPage: 1,
+            endPage: pdf.numPages,
+            level: 0,
+            sectionType: "content",
           }];
         }
       }
 
-      setTocEntries(normalizeLevels(chapters));
+      chapters = normalizeLevels(chapters);
+      setTocEntries(chapters);
 
       // Clean up previous uploads of the same file name
       const { data: existingBooks } = await supabase
