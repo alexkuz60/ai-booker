@@ -1,4 +1,4 @@
-import { Loader2, Save, Download, FolderOpen } from "lucide-react";
+import { Loader2, CloudUpload, Download, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRef } from "react";
 
@@ -7,10 +7,8 @@ interface SaveBookButtonProps {
   loading?: boolean;
   disabled?: boolean;
   onClick: () => void | Promise<void>;
-  /** Show "Download ZIP" button (for OPFS backend) */
   showDownloadZip?: boolean;
   onDownloadZip?: () => void | Promise<void>;
-  /** Show "Open ZIP" button (for importing projects) */
   showImportZip?: boolean;
   onImportZip?: (file: File) => void | Promise<void>;
 }
@@ -29,9 +27,16 @@ export function SaveBookButton({
 
   return (
     <div className="flex items-center gap-1">
-      <Button variant="secondary" size="sm" onClick={onClick} disabled={disabled || loading} className="gap-1.5">
-        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-        {isRu ? "Сохранить" : "Save"}
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={onClick}
+        disabled={disabled || loading}
+        className="gap-1.5"
+        title={isRu ? "Синхронизировать на сервер (для доступа с других устройств)" : "Sync to server (for cross-device access)"}
+      >
+        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CloudUpload className="h-3.5 w-3.5" />}
+        {isRu ? "На сервер" : "Sync"}
       </Button>
 
       {showDownloadZip && onDownloadZip && (
