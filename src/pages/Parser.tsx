@@ -47,7 +47,13 @@ export default function Parser() {
   const [parserTab, setParserTab] = useState<"structure" | "content" | "characters">("structure");
   const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
-  const { backend: storageBackend, createProject, openProject, storage: projectStorage } = useProjectStorageContext();
+  const {
+    backend: storageBackend,
+    createProject,
+    openProject,
+    storage: projectStorage,
+    initialized: projectStorageInitialized,
+  } = useProjectStorageContext();
   const { getModelForRole } = useAiRoles(userApiKeys);
   const { toast } = useToast();
   const [navRestoredFromStorage] = useState<boolean>(() => {
@@ -85,7 +91,7 @@ export default function Parser() {
     openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset, reloadBook, ensurePdfLoaded,
     reloadLibrary,
     serverNewerBookId, dismissServerNewer, acceptServerVersion,
-  } = useBookManager({ userId: user?.id, isRu, projectStorage, storageBackend, createProject });
+  } = useBookManager({ userId: user?.id, isRu, projectStorage, projectStorageInitialized, storageBackend, createProject });
 
   const {
     characters, extracting, extractProgress, extractCharacters,
