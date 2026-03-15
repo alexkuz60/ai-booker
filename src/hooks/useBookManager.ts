@@ -369,26 +369,12 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
 
       const normalizedToc = normalizedSavedToc;
 
-      // Identify folder indices (entries that have direct children by level)
-      const folderIndices = new Set<number>();
-      for (let i = 0; i < normalizedToc.length; i++) {
-        if (i + 1 < normalizedToc.length &&
-            normalizedToc[i + 1].level > normalizedToc[i].level &&
-            normalizedToc[i + 1].sectionType === normalizedToc[i].sectionType) {
-          folderIndices.add(i);
-        }
-      }
-
-      const initMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
+      const initRawMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
       chapters.forEach((ch, i) => {
-        // Folders are structural-only — never store scene content
-        if (folderIndices.has(i)) {
-          initMap.set(i, { scenes: [], status: "pending" });
-          return;
-        }
-        const scenes = scenesByChapter.get(ch.id) || [];
-        initMap.set(i, { scenes, status: scenes.length > 0 ? "done" : "pending" });
+        const scenes = isFolderNode(normalizedToc, i) ? [] : (scenesByChapter.get(ch.id) || []);
+        initRawMap.set(i, { scenes, status: scenes.length > 0 ? "done" : "pending" });
       });
+      const initMap = sanitizeChapterResultsForStructure(normalizedToc, initRawMap);
 
       setChapterResults(initMap);
       setStep("workspace");
