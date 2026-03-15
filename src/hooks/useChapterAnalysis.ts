@@ -182,8 +182,6 @@ export function useChapterAnalysis({
 
         // CONTRACT K1: shared resolver (same logic as navigator/server normalization)
         const baseRange = resolveEntryPageRange(tocEntries, idx, activePdf?.numPages);
-
-        const baseRange = resolvePageRange(idx);
         let effectiveStartPage = baseRange.startPage;
         let effectiveEndPage = baseRange.endPage;
 
