@@ -141,8 +141,8 @@ export default function ParserCharactersPanel({
         >
           <Scan className="h-3.5 w-3.5" />
           {extracting
-            ? (isRu ? "Извлечение..." : "Extracting...")
-            : (isRu ? "Извлечь из сцен" : "Extract from scenes")}
+            ? (extractProgress || (isRu ? "Извлечение..." : "Extracting..."))
+            : (isRu ? "Извлечь (AI)" : "Extract (AI)")}
         </Button>
         <Button
           variant="ghost" size="sm"
