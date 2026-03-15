@@ -628,6 +628,7 @@ export default function Parser() {
   // from multiple children — we must distribute edits back to correct chapter indices.
   const handleScenesUpdate = useCallback((updatedScenes: Scene[]) => {
     if (selectedIdx === null) return;
+    pushSnapshot(getCurrentSnapshot());
 
     const entry = tocEntries[selectedIdx];
 
