@@ -69,6 +69,44 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
   useEffect(() => { if (userId) loadLibrary(); }, [userId, loadLibrary]);
 
   // ─── Auto-restore active book on mount ─────────────────────
+  // ─── Restore from local ProjectStorage ─────────────────────
+  const restoreFromLocal = useCallback(async (savedBookId: string): Promise<boolean> => {
+    if (!projectStorage?.isReady) return false;
+    try {
+      const local = await readStructureFromLocal(projectStorage);
+      if (!local?.structure || local.structure.bookId !== savedBookId) return false;
+
+      const { structure, chapterIdMap: localChIdMap, chapterResults: localResults } = local;
+
+      setBookId(savedBookId);
+      setFileName(structure.fileName);
+      setTocEntries(normalizeLevels(structure.toc));
+      setChapterIdMap(localChIdMap);
+      setChapterResults(localResults);
+
+      const newPartIdMap = new Map<string, string>();
+      for (const p of structure.parts) {
+        newPartIdMap.set(p.title, p.id);
+      }
+      setPartIdMap(newPartIdMap);
+
+      sessionStorage.setItem(ACTIVE_BOOK_KEY, savedBookId);
+      setStep("workspace");
+
+      console.log(`[LocalRestore] Restored from local: ${structure.toc.length} chapters, ${localResults.size} results`);
+      toast.success(
+        isRu
+          ? `Книга «${structure.title}» восстановлена из локального проекта`
+          : `Book "${structure.title}" restored from local project`
+      );
+      return true;
+    } catch (err) {
+      console.warn("[LocalRestore] Failed:", err);
+      return false;
+    }
+  }, [projectStorage, isRu]);
+
+  // ─── Auto-restore active book on mount (local-first) ───────
   const [restoredOnce, setRestoredOnce] = useState(false);
   const openSavedBookRef = useRef<(book: BookRecord) => Promise<void>>();
 
@@ -80,16 +118,21 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
       setRestoredOnce(true);
       return;
     }
-    const book = books.find(b => b.id === savedBookId);
-    if (book) {
-      setRestoredOnce(true);
-      openSavedBookRef.current?.(book);
-    } else if (books.length > 0) {
-      sessionStorage.removeItem(ACTIVE_BOOK_KEY);
-      setStep("library");
-      setRestoredOnce(true);
-    }
-  }, [userId, loadingLibrary, books, restoredOnce]);
+
+    // Try local-first, then fall back to server
+    setRestoredOnce(true);
+    restoreFromLocal(savedBookId).then((restored) => {
+      if (restored) return;
+      // Fallback: load from server
+      const book = books.find(b => b.id === savedBookId);
+      if (book) {
+        openSavedBookRef.current?.(book);
+      } else if (books.length > 0) {
+        sessionStorage.removeItem(ACTIVE_BOOK_KEY);
+        setStep("library");
+      }
+    });
+  }, [userId, loadingLibrary, books, restoredOnce, restoreFromLocal]);
 
   // ─── Open saved book from DB ──────────────────────────────
   const openSavedBook = useCallback(async (book: BookRecord) => {
