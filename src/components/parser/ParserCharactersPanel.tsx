@@ -288,6 +288,25 @@ export default function ParserCharactersPanel({
                       </div>
                     </TableCell>
 
+                    {/* Gender */}
+                    <TableCell className="text-center">
+                      {char.gender === "male" && (
+                        <span className="text-xs text-blue-400" title={isRu ? "Мужской" : "Male"}>
+                          М
+                        </span>
+                      )}
+                      {char.gender === "female" && (
+                        <span className="text-xs text-pink-400" title={isRu ? "Женский" : "Female"}>
+                          Ж
+                        </span>
+                      )}
+                      {(!char.gender || char.gender === "unknown") && (
+                        <span className="text-xs text-muted-foreground/40" title={isRu ? "Неизвестно" : "Unknown"}>
+                          ?
+                        </span>
+                      )}
+                    </TableCell>
+
                     {/* Scene count */}
                     <TableCell className="text-center text-xs text-muted-foreground font-mono">
                       {char.sceneCount}
