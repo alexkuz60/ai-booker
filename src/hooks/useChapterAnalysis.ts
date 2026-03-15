@@ -27,8 +27,8 @@ interface UseChapterAnalysisParams {
 }
 
 export function useChapterAnalysis({
-  isRu, pdfRef, userId, userApiKeys, getModelForRole,
-  tocEntries, chapterIdMap, chapterResults, setChapterResults, ensurePdfLoaded,
+  isRu, pdfRef, userId, bookId, userApiKeys, getModelForRole,
+  tocEntries, chapterIdMap, chapterResults, setChapterResults, onChapterResultsMutated, ensurePdfLoaded,
 }: UseChapterAnalysisParams) {
   const [analysisLog, setAnalysisLog] = useState<string[]>([]);
   const analysisTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
