@@ -38,6 +38,7 @@ export default function ParserCharactersPanel({
   isRu,
   characters,
   extracting,
+  extractProgress,
   onExtract,
   onRename,
   onUpdateAliases,
