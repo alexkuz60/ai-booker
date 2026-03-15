@@ -594,6 +594,7 @@ export default function Parser() {
     setChapterIdMap(newChapterMap);
     setChapterResults(newResults);
     setSelectedIndices(new Set([firstIdx]));
+    scheduleSave();
   };
 
   useEffect(() => {
