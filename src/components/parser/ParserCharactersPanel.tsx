@@ -219,6 +219,7 @@ export default function ParserCharactersPanel({
               <TableRow>
                 <TableHead className="w-8"></TableHead>
                 <TableHead className="text-xs">{isRu ? "Имя" : "Name"}</TableHead>
+                <TableHead className="text-xs text-center w-12">{isRu ? "Пол" : "Gender"}</TableHead>
                 <TableHead className="text-xs text-center w-16">{isRu ? "Сцен" : "Scenes"}</TableHead>
                 <TableHead className="text-xs text-center w-16">{isRu ? "Глав" : "Ch."}</TableHead>
                 <TableHead className="w-8"></TableHead>
