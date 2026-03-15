@@ -85,6 +85,7 @@ export default function Parser() {
     chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
     partIdMap, chapterResults, setChapterResults, fileInputRef,
     openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset, reloadBook, ensurePdfLoaded,
+    serverNewerBookId, dismissServerNewer, acceptServerVersion,
   } = useBookManager({ userId: user?.id, isRu, projectStorage });
 
 
@@ -935,6 +936,30 @@ export default function Parser() {
             <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {isRu ? "Удалить" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Server Newer Version Dialog ── */}
+      <AlertDialog open={!!serverNewerBookId} onOpenChange={(open) => { if (!open) dismissServerNewer(); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isRu ? "На сервере есть более свежая версия" : "Server has a newer version"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isRu
+                ? "Книга была обновлена на другом устройстве. Загрузить серверную версию? Локальные изменения будут заменены."
+                : "The book was updated on another device. Load the server version? Local changes will be replaced."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {isRu ? "Оставить локальную" : "Keep local"}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={acceptServerVersion}>
+              {isRu ? "Загрузить с сервера" : "Load from server"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

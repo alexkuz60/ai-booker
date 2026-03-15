@@ -219,6 +219,13 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
         await storage.writeJSON("project.json", nextMeta);
       }
 
+      // ── 6. Update books.updated_at so other devices can detect newer version ──
+      const serverNow = new Date().toISOString();
+      await supabase
+        .from("books")
+        .update({ updated_at: serverNow })
+        .eq("id", currentBookId);
+
       const sceneCount = sceneUpserts.length;
       toast({
         title: isRu ? "Синхронизировано с сервером" : "Synced to server",
