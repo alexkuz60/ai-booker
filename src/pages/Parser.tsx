@@ -773,6 +773,7 @@ export default function Parser() {
                 onMerge={mergeCharacters}
                 onAdd={addCharacter}
                 analyzedCount={analyzedCount}
+                profilerModel={getModelForRole("profiler")}
               />
             </motion.div>
           )}

@@ -18,6 +18,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { RoleBadge } from "@/components/ui/RoleBadge";
 import type { LocalCharacter } from "@/pages/parser/types";
 
 interface ParserCharactersPanelProps {
@@ -32,6 +33,8 @@ interface ParserCharactersPanelProps {
   onMerge: (sourceId: string, targetId: string) => void;
   onAdd: (name: string) => void;
   analyzedCount: number;
+  /** Model used for profiler role */
+  profilerModel?: string;
 }
 
 export default function ParserCharactersPanel({
@@ -46,6 +49,7 @@ export default function ParserCharactersPanel({
   onMerge,
   onAdd,
   analyzedCount,
+  profilerModel,
 }: ParserCharactersPanelProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -126,6 +130,7 @@ export default function ParserCharactersPanel({
         <h2 className="font-display font-semibold text-base text-foreground flex-1">
           {isRu ? "Персонажи" : "Characters"}
         </h2>
+        <RoleBadge roleId="profiler" model={profilerModel} isRu={isRu} size={16} />
         <Badge variant="secondary" className="text-xs">
           {characters.length}
         </Badge>
