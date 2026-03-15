@@ -86,7 +86,7 @@ export interface ChapterDetailPanelProps {
   /** Current model names for role badges */
   roleModels?: { screenwriter?: string; director?: string };
   /** Callback when scenes are modified by cleanup actions */
-  onScenesUpdate?: (scenes: Scene[]) => void;
+  onScenesUpdate?: (scenes: Scene[], label?: string) => void;
 }
 
 function SceneCards({
@@ -95,7 +95,7 @@ function SceneCards({
   scenes: Scene[];
   isRu: boolean;
   roleModels?: { screenwriter?: string; director?: string };
-  onScenesUpdate?: (scenes: Scene[]) => void;
+  onScenesUpdate?: (scenes: Scene[], label?: string) => void;
 }) {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [editedIndices, setEditedIndices] = useState<Set<number>>(new Set());
@@ -125,7 +125,7 @@ function SceneCards({
     }
     const result = applyCleanup(action, scenes, selectedText, sceneIndex);
     if (result.changeCount > 0 && onScenesUpdate) {
-      onScenesUpdate(result.scenes);
+      onScenesUpdate(result.scenes, result.summary);
       // Mark scene(s) as edited
       setEditedIndices(prev => {
         const next = new Set(prev);

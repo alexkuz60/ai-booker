@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Bot, Library, PlusCircle, Network, FileText, Users, RefreshCw, CloudUpload, Undo2, Redo2 } from "lucide-react";
+import { ArrowLeft, Bot, Library, PlusCircle, Network, FileText, Users, RefreshCw, CloudUpload } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -26,6 +26,7 @@ import { useParserHelpers } from "@/hooks/useParserHelpers";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { useStructureUndo } from "@/hooks/useStructureUndo";
 import type { StructureSnapshot } from "@/hooks/useStructureUndo";
+import UndoRedoDropdown from "@/components/parser/UndoRedoDropdown";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { useImperativeSave } from "@/hooks/useImperativeSave";
 
@@ -91,7 +92,7 @@ export default function Parser() {
     tocEntries, chapterIdMap, chapterResults, setChapterResults, ensurePdfLoaded,
   });
 
-  const { pushSnapshot, undo, redo, canUndo, canRedo, resetStacks } = useStructureUndo(bookId);
+  const { pushSnapshot, undo, redo, undoTo, redoTo, undoStack, redoStack, canUndo, canRedo, resetStacks } = useStructureUndo(bookId);
 
   const selectedIdx = selectedIndices.size === 1 ? Array.from(selectedIndices)[0] : null;
 
@@ -159,6 +160,14 @@ export default function Parser() {
   const handleRedo = useCallback(() => {
     redo(getCurrentSnapshot(), restoreSnapshot);
   }, [redo, getCurrentSnapshot, restoreSnapshot]);
+
+  const handleUndoTo = useCallback((index: number) => {
+    undoTo(index, getCurrentSnapshot(), restoreSnapshot);
+  }, [undoTo, getCurrentSnapshot, restoreSnapshot]);
+
+  const handleRedoTo = useCallback((index: number) => {
+    redoTo(index, getCurrentSnapshot(), restoreSnapshot);
+  }, [redoTo, getCurrentSnapshot, restoreSnapshot]);
 
   // Ctrl+Z / Ctrl+Shift+Z keyboard shortcuts
   useEffect(() => {
@@ -283,26 +292,17 @@ export default function Parser() {
     if (step === "workspace") {
       return (
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-0.5">
-            <Button
-              variant="ghost" size="icon"
-              onClick={handleUndo}
-              disabled={!canUndo}
-              className="h-7 w-7"
-              title={`${isRu ? "Отменить" : "Undo"} (Ctrl+Z)`}
-            >
-              <Undo2 className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost" size="icon"
-              onClick={handleRedo}
-              disabled={!canRedo}
-              className="h-7 w-7"
-              title={`${isRu ? "Повторить" : "Redo"} (Ctrl+Shift+Z)`}
-            >
-              <Redo2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+          <UndoRedoDropdown
+            isRu={isRu}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            undoStack={undoStack}
+            redoStack={redoStack}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            onUndoTo={handleUndoTo}
+            onRedoTo={handleRedoTo}
+          />
           <div className="text-xs text-muted-foreground font-body">
             {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} · {totalScenes} {t("scenes", isRu)}
           </div>
@@ -326,7 +326,7 @@ export default function Parser() {
     }
 
     return navButtons;
-  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook, saveBook, savingBook, bookId, canUndo, canRedo, handleUndo, handleRedo]);
+  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook, saveBook, savingBook, bookId, canUndo, canRedo, undoStack, redoStack, handleUndo, handleRedo, handleUndoTo, handleRedoTo]);
 
   useEffect(() => {
     const title = t("parserTitle", isRu);
@@ -392,7 +392,7 @@ export default function Parser() {
   };
 
   const changeLevel = (indices: number[], delta: number) => {
-    pushSnapshot(getCurrentSnapshot());
+    pushSnapshot(getCurrentSnapshot(), isRu ? "Изменение уровня" : "Change level");
     setTocEntries(prev => {
       const next = prev.map(e => ({ ...e }));
       const allAffected = new Set<number>();
@@ -430,7 +430,7 @@ export default function Parser() {
   };
 
   const renameEntry = (idx: number, newTitle: string) => {
-    pushSnapshot(getCurrentSnapshot());
+    pushSnapshot(getCurrentSnapshot(), isRu ? "Переименование главы" : "Rename chapter");
     setTocEntries(prev => prev.map((e, i) => i === idx ? { ...e, title: newTitle } : e));
     const chapterId = chapterIdMap.get(idx);
     if (chapterId) {
@@ -440,7 +440,7 @@ export default function Parser() {
   };
 
   const changeStartPage = (idx: number, newPage: number) => {
-    pushSnapshot(getCurrentSnapshot());
+    pushSnapshot(getCurrentSnapshot(), isRu ? "Изменение начальной страницы" : "Change start page");
     setTocEntries(prev => {
       const next = prev.map((e, i) => i === idx ? { ...e, startPage: newPage } : e);
       if (idx > 0 && next[idx - 1].endPage === prev[idx].startPage) {
@@ -458,7 +458,7 @@ export default function Parser() {
   };
 
   const renamePart = (oldTitle: string, newTitle: string) => {
-    pushSnapshot(getCurrentSnapshot());
+    pushSnapshot(getCurrentSnapshot(), isRu ? "Переименование части" : "Rename part");
     setTocEntries(prev => prev.map(e => e.partTitle === oldTitle ? { ...e, partTitle: newTitle } : e));
     const partId = partIdMap.get(oldTitle);
     if (partId) {
@@ -488,7 +488,7 @@ export default function Parser() {
   const confirmDelete = () => {
     if (!pendingDelete) return;
     const { toDelete } = pendingDelete;
-    pushSnapshot(getCurrentSnapshot());
+    pushSnapshot(getCurrentSnapshot(), isRu ? "Удаление элементов" : "Delete items");
 
     // Delete from DB
     for (const di of toDelete) {
@@ -538,7 +538,7 @@ export default function Parser() {
 
   const mergeEntries = (indices: number[]) => {
     if (indices.length < 2) return;
-    pushSnapshot(getCurrentSnapshot());
+    pushSnapshot(getCurrentSnapshot(), isRu ? "Объединение секций" : "Merge sections");
     const sorted = [...indices].sort((a, b) => a - b);
     const firstIdx = sorted[0];
     const lastIdx = sorted[sorted.length - 1];
@@ -620,9 +620,9 @@ export default function Parser() {
   // Only updates in-memory state; auto-save effect persists to local storage
   // IMPORTANT: when a parent node is selected, selectedResult aggregates scenes
   // from multiple children — we must distribute edits back to correct chapter indices.
-  const handleScenesUpdate = useCallback((updatedScenes: Scene[]) => {
+  const handleScenesUpdate = useCallback((updatedScenes: Scene[], label?: string) => {
     if (selectedIdx === null) return;
-    pushSnapshot(getCurrentSnapshot());
+    pushSnapshot(getCurrentSnapshot(), label || (isRu ? "Редактирование сцен" : "Edit scenes"));
 
     const entry = tocEntries[selectedIdx];
 

@@ -9,6 +9,12 @@ export interface StructureSnapshot {
   selectedIndices: Set<number>;
 }
 
+export interface LabeledSnapshot {
+  label: string;
+  snapshot: StructureSnapshot;
+  timestamp: number;
+}
+
 const MAX_DEPTH = 20;
 
 function cloneSnapshot(s: StructureSnapshot): StructureSnapshot {
@@ -26,8 +32,7 @@ function cloneSnapshot(s: StructureSnapshot): StructureSnapshot {
 }
 
 /**
- * Reconcile DB state after undo/redo by comparing old and restored snapshots.
- * Re-inserts deleted chapters+scenes, deletes extra ones, updates changed fields.
+ * Reconcile DB state after undo/redo.
  */
 async function reconcileDb(
   bookId: string,
@@ -37,7 +42,6 @@ async function reconcileDb(
   const oldIds = new Set(oldSnap.chapterIdMap.values());
   const newIds = new Set(newSnap.chapterIdMap.values());
 
-  // Chapters to delete (in old but not in new)
   for (const id of oldIds) {
     if (!newIds.has(id)) {
       await supabase.from("book_scenes").delete().eq("chapter_id", id);
@@ -45,7 +49,6 @@ async function reconcileDb(
     }
   }
 
-  // Chapters to re-insert (in new but not in old)
   for (const [idx, id] of newSnap.chapterIdMap.entries()) {
     if (!oldIds.has(id)) {
       const entry = newSnap.tocEntries[idx];
@@ -59,7 +62,6 @@ async function reconcileDb(
         end_page: entry.endPage,
         chapter_number: idx + 1,
       });
-      // Re-insert scenes
       const result = newSnap.chapterResults.get(idx);
       if (result?.scenes?.length) {
         const sceneRows = result.scenes.map((sc) => ({
@@ -77,7 +79,6 @@ async function reconcileDb(
     }
   }
 
-  // Update fields for chapters that exist in both
   for (const [idx, id] of newSnap.chapterIdMap.entries()) {
     if (oldIds.has(id)) {
       const entry = newSnap.tocEntries[idx];
@@ -94,36 +95,38 @@ async function reconcileDb(
 }
 
 export function useStructureUndo(bookId: string | null) {
-  const [undoStack, setUndoStack] = useState<StructureSnapshot[]>([]);
-  const [redoStack, setRedoStack] = useState<StructureSnapshot[]>([]);
+  const [undoStack, setUndoStack] = useState<LabeledSnapshot[]>([]);
+  const [redoStack, setRedoStack] = useState<LabeledSnapshot[]>([]);
   const reconciling = useRef(false);
 
-  // Reset stacks when book changes
   useEffect(() => {
     setUndoStack([]);
     setRedoStack([]);
   }, [bookId]);
 
-  const pushSnapshot = useCallback((snapshot: StructureSnapshot) => {
-    setUndoStack(prev => [...prev.slice(-(MAX_DEPTH - 1)), cloneSnapshot(snapshot)]);
+  const pushSnapshot = useCallback((snapshot: StructureSnapshot, label: string = "Изменение") => {
+    setUndoStack(prev => [
+      ...prev.slice(-(MAX_DEPTH - 1)),
+      { label, snapshot: cloneSnapshot(snapshot), timestamp: Date.now() },
+    ]);
     setRedoStack([]);
   }, []);
 
+  /** Undo a single step */
   const undo = useCallback(
     (
       current: StructureSnapshot,
       restore: (s: StructureSnapshot) => void
     ) => {
       if (undoStack.length === 0 || reconciling.current) return;
-      const prev = undoStack[undoStack.length - 1];
+      const entry = undoStack[undoStack.length - 1];
       setUndoStack(s => s.slice(0, -1));
-      setRedoStack(s => [...s, cloneSnapshot(current)]);
-      restore(cloneSnapshot(prev));
+      setRedoStack(s => [...s, { label: entry.label, snapshot: cloneSnapshot(current), timestamp: Date.now() }]);
+      restore(cloneSnapshot(entry.snapshot));
 
-      // Reconcile DB in background
       if (bookId) {
         reconciling.current = true;
-        reconcileDb(bookId, current, prev).finally(() => {
+        reconcileDb(bookId, current, entry.snapshot).finally(() => {
           reconciling.current = false;
         });
       }
@@ -131,20 +134,88 @@ export function useStructureUndo(bookId: string | null) {
     [undoStack, bookId]
   );
 
+  /** Redo a single step */
   const redo = useCallback(
     (
       current: StructureSnapshot,
       restore: (s: StructureSnapshot) => void
     ) => {
       if (redoStack.length === 0 || reconciling.current) return;
-      const next = redoStack[redoStack.length - 1];
+      const entry = redoStack[redoStack.length - 1];
       setRedoStack(s => s.slice(0, -1));
-      setUndoStack(s => [...s, cloneSnapshot(current)]);
-      restore(cloneSnapshot(next));
+      setUndoStack(s => [...s, { label: entry.label, snapshot: cloneSnapshot(current), timestamp: Date.now() }]);
+      restore(cloneSnapshot(entry.snapshot));
 
       if (bookId) {
         reconciling.current = true;
-        reconcileDb(bookId, current, next).finally(() => {
+        reconcileDb(bookId, current, entry.snapshot).finally(() => {
+          reconciling.current = false;
+        });
+      }
+    },
+    [redoStack, bookId]
+  );
+
+  /** Batch undo: jump back to undoStack[targetIndex] */
+  const undoTo = useCallback(
+    (
+      targetIndex: number,
+      current: StructureSnapshot,
+      restore: (s: StructureSnapshot) => void
+    ) => {
+      if (targetIndex < 0 || targetIndex >= undoStack.length || reconciling.current) return;
+      // Items from targetIndex+1..end go to redo (in reverse order)
+      const movingToRedo = undoStack.slice(targetIndex + 1).reverse();
+      const target = undoStack[targetIndex];
+      const remaining = undoStack.slice(0, targetIndex);
+
+      // Current state becomes top of redo
+      const currentEntry: LabeledSnapshot = {
+        label: movingToRedo.length > 0 ? movingToRedo[movingToRedo.length - 1].label : target.label,
+        snapshot: cloneSnapshot(current),
+        timestamp: Date.now(),
+      };
+
+      setUndoStack(remaining);
+      setRedoStack(s => [...s, ...movingToRedo.map(e => ({ ...e, snapshot: cloneSnapshot(e.snapshot) })), currentEntry]);
+      restore(cloneSnapshot(target.snapshot));
+
+      if (bookId) {
+        reconciling.current = true;
+        reconcileDb(bookId, current, target.snapshot).finally(() => {
+          reconciling.current = false;
+        });
+      }
+    },
+    [undoStack, bookId]
+  );
+
+  /** Batch redo: jump forward to redoStack[targetIndex] */
+  const redoTo = useCallback(
+    (
+      targetIndex: number,
+      current: StructureSnapshot,
+      restore: (s: StructureSnapshot) => void
+    ) => {
+      if (targetIndex < 0 || targetIndex >= redoStack.length || reconciling.current) return;
+      // Items from targetIndex+1..end go to undo (in reverse order)
+      const movingToUndo = redoStack.slice(targetIndex + 1).reverse();
+      const target = redoStack[targetIndex];
+      const remaining = redoStack.slice(0, targetIndex);
+
+      const currentEntry: LabeledSnapshot = {
+        label: movingToUndo.length > 0 ? movingToUndo[movingToUndo.length - 1].label : target.label,
+        snapshot: cloneSnapshot(current),
+        timestamp: Date.now(),
+      };
+
+      setRedoStack(remaining);
+      setUndoStack(s => [...s, currentEntry, ...movingToUndo.map(e => ({ ...e, snapshot: cloneSnapshot(e.snapshot) }))]);
+      restore(cloneSnapshot(target.snapshot));
+
+      if (bookId) {
+        reconciling.current = true;
+        reconcileDb(bookId, current, target.snapshot).finally(() => {
           reconciling.current = false;
         });
       }
@@ -156,6 +227,10 @@ export function useStructureUndo(bookId: string | null) {
     pushSnapshot,
     undo,
     redo,
+    undoTo,
+    redoTo,
+    undoStack,
+    redoStack,
     canUndo: undoStack.length > 0,
     canRedo: redoStack.length > 0,
     resetStacks: useCallback(() => { setUndoStack([]); setRedoStack([]); }, []),
