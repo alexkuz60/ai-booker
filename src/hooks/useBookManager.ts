@@ -9,8 +9,8 @@ import type {
   Scene, TocChapter, Step, ChapterStatus, BookRecord,
 } from "@/pages/parser/types";
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
-import type { ProjectStorage } from "@/lib/projectStorage";
-import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
+import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
+import { syncStructureToLocal, readStructureFromLocal, type LocalBookStructure } from "@/lib/localSync";
 import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 
 
@@ -21,6 +21,25 @@ interface UseBookManagerParams {
   projectStorage?: ProjectStorage | null;
   /** Storage backend type — needed to know if we should wait for storage init */
   storageBackend?: "fs-access" | "opfs" | "none";
+}
+
+const BROWSER_ID_KEY = "booker_browser_id";
+const SERVER_SYNC_PREFIX = "booker_server_sync_checked";
+
+function getOrCreateBrowserId(): string {
+  try {
+    const existing = localStorage.getItem(BROWSER_ID_KEY);
+    if (existing) return existing;
+    const nextId = crypto?.randomUUID?.() || `browser_${Date.now()}`;
+    localStorage.setItem(BROWSER_ID_KEY, nextId);
+    return nextId;
+  } catch {
+    return "browser_fallback";
+  }
+}
+
+function getSyncCheckKey(bookId: string): string {
+  return `${SERVER_SYNC_PREFIX}:${bookId}`;
 }
 
 export function useBookManager({ userId, isRu, projectStorage, storageBackend = "none" }: UseBookManagerParams) {
