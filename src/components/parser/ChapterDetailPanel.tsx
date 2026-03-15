@@ -177,10 +177,12 @@ function SceneCards({
         const hasMore = content.length > 100;
         const sceneDur = formatDuration(estimateDurationSec(content.length));
 
+        const isEdited = editedIndices.has(i);
+
         return (
           <ContextMenu key={`${sc.scene_number}-${i}`}>
             <ContextMenuTrigger asChild>
-              <Card onContextMenu={handleContextMenu}>
+              <Card onContextMenu={handleContextMenu} className={isEdited ? "border-primary/40" : undefined}>
                 <CardContent className="py-3 px-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-base font-medium flex items-center gap-1.5">
@@ -197,6 +199,12 @@ function SceneCards({
                       {t("scenePrefix", isRu)} {sc.scene_number}: {tSceneTitle(sc.title, isRu)}
                     </span>
                     <div className="flex items-center gap-1.5">
+                      {isEdited && (
+                        <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-400 border-amber-500/30 gap-1">
+                          <PencilLine className="h-3 w-3" />
+                          {isRu ? "редакт." : "edited"}
+                        </Badge>
+                      )}
                       <Badge variant="outline" className={`text-xs ${colorCls}`}>
                         {tSceneType(sc.scene_type, isRu)}
                       </Badge>
