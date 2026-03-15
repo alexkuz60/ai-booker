@@ -352,7 +352,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
         scenesByChapter.set(s.chapter_id, list);
       }
 
-      const normalizedToc = normalizeLevels(savedToc);
+      const normalizedToc = normalizedSavedToc;
 
       // Identify folder indices (entries that have direct children by level)
       const folderIndices = new Set<number>();
