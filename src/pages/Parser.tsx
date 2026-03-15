@@ -24,12 +24,8 @@ import { useChapterAnalysis } from "@/hooks/useChapterAnalysis";
 import { useBookManager } from "@/hooks/useBookManager";
 import { useParserHelpers } from "@/hooks/useParserHelpers";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
-import { useStructureUndo } from "@/hooks/useStructureUndo";
-import type { StructureSnapshot } from "@/hooks/useStructureUndo";
-import UndoRedoDropdown from "@/components/parser/UndoRedoDropdown";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { useImperativeSave } from "@/hooks/useImperativeSave";
-import { assertMapIndicesInBounds, warnStaleResults, assertValidMerge, warnPartialTreeDelete } from "@/lib/parserContracts";
 
 import LibraryView from "@/components/parser/LibraryView";
 import UploadView from "@/components/parser/UploadView";
@@ -90,7 +86,7 @@ export default function Parser() {
 
 
 
-  const { pushSnapshot, undo, redo, undoTo, redoTo, undoStack, redoStack, canUndo, canRedo, resetStacks } = useStructureUndo(bookId);
+  
 
   const selectedIdx = selectedIndices.size === 1 ? Array.from(selectedIndices)[0] : null;
 
@@ -152,54 +148,6 @@ export default function Parser() {
     ensurePdfLoaded,
   });
 
-  const getCurrentSnapshot = useCallback((): StructureSnapshot => ({
-    tocEntries: tocEntries.map(e => ({ ...e })),
-    chapterIdMap: new Map(chapterIdMap),
-    chapterResults: new Map(
-      Array.from(chapterResults.entries()).map(([k, v]) => [k, { scenes: [...v.scenes], status: v.status }])
-    ),
-    selectedIndices: new Set(selectedIndices),
-  }), [tocEntries, chapterIdMap, chapterResults, selectedIndices]);
-
-  const restoreSnapshot = useCallback((s: StructureSnapshot) => {
-    setTocEntries(s.tocEntries);
-    setChapterIdMap(s.chapterIdMap);
-    setChapterResults(s.chapterResults);
-    setSelectedIndices(s.selectedIndices);
-    scheduleSave();
-  }, [setTocEntries, setChapterIdMap, setChapterResults, scheduleSave]);
-
-  const handleUndo = useCallback(() => {
-    undo(getCurrentSnapshot(), restoreSnapshot);
-  }, [undo, getCurrentSnapshot, restoreSnapshot]);
-
-  const handleRedo = useCallback(() => {
-    redo(getCurrentSnapshot(), restoreSnapshot);
-  }, [redo, getCurrentSnapshot, restoreSnapshot]);
-
-  const handleUndoTo = useCallback((index: number) => {
-    undoTo(index, getCurrentSnapshot(), restoreSnapshot);
-  }, [undoTo, getCurrentSnapshot, restoreSnapshot]);
-
-  const handleRedoTo = useCallback((index: number) => {
-    redoTo(index, getCurrentSnapshot(), restoreSnapshot);
-  }, [redoTo, getCurrentSnapshot, restoreSnapshot]);
-
-  // Ctrl+Z / Ctrl+Shift+Z keyboard shortcuts
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (step !== "workspace") return;
-      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        handleUndo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === "z" && e.shiftKey) {
-        e.preventDefault();
-        handleRedo();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [step, handleUndo, handleRedo]);
 
   // ── Flush pending auto-save on page unload ──
   const flushSaveRef = useRef(flushSave);
@@ -246,7 +194,6 @@ export default function Parser() {
     setLastClickedIdx(null);
     setExpandedNodes(new Set());
     resetAnalysis();
-    resetStacks();
     sessionStorage.removeItem(NAV_STATE_KEY);
   };
 
@@ -317,17 +264,6 @@ export default function Parser() {
     if (step === "workspace") {
       return (
         <div className="flex items-center gap-3">
-          <UndoRedoDropdown
-            isRu={isRu}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            undoStack={undoStack}
-            redoStack={redoStack}
-            onUndo={handleUndo}
-            onRedo={handleRedo}
-            onUndoTo={handleUndoTo}
-            onRedoTo={handleRedoTo}
-          />
           <div className="text-xs text-muted-foreground font-body">
             {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} · {totalScenes} {t("scenes", isRu)}
           </div>
@@ -351,7 +287,7 @@ export default function Parser() {
     }
 
     return navButtons;
-  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook, saveBook, savingBook, bookId, canUndo, canRedo, undoStack, redoStack, handleUndo, handleRedo, handleUndoTo, handleRedoTo]);
+  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook, saveBook, savingBook, bookId]);
 
   useEffect(() => {
     const title = t("parserTitle", isRu);
@@ -417,7 +353,6 @@ export default function Parser() {
   };
 
   const changeLevel = (indices: number[], delta: number) => {
-    pushSnapshot(getCurrentSnapshot(), isRu ? "Изменение уровня" : "Change level");
     setTocEntries(prev => {
       const next = prev.map(e => ({ ...e }));
       const allAffected = new Set<number>();
@@ -455,7 +390,6 @@ export default function Parser() {
   };
 
   const renameEntry = (idx: number, newTitle: string) => {
-    pushSnapshot(getCurrentSnapshot(), isRu ? "Переименование главы" : "Rename chapter");
     setTocEntries(prev => prev.map((e, i) => i === idx ? { ...e, title: newTitle } : e));
     const chapterId = chapterIdMap.get(idx);
     if (chapterId) {
@@ -465,7 +399,6 @@ export default function Parser() {
   };
 
   const changeStartPage = (idx: number, newPage: number) => {
-    pushSnapshot(getCurrentSnapshot(), isRu ? "Изменение начальной страницы" : "Change start page");
     setTocEntries(prev => {
       const next = prev.map((e, i) => i === idx ? { ...e, startPage: newPage } : e);
       if (idx > 0 && next[idx - 1].endPage === prev[idx].startPage) {
@@ -483,7 +416,6 @@ export default function Parser() {
   };
 
   const renamePart = (oldTitle: string, newTitle: string) => {
-    pushSnapshot(getCurrentSnapshot(), isRu ? "Переименование части" : "Rename part");
     setTocEntries(prev => prev.map(e => e.partTitle === oldTitle ? { ...e, partTitle: newTitle } : e));
     const partId = partIdMap.get(oldTitle);
     if (partId) {
@@ -513,10 +445,6 @@ export default function Parser() {
   const confirmDelete = () => {
     if (!pendingDelete) return;
     const { toDelete } = pendingDelete;
-    pushSnapshot(getCurrentSnapshot(), isRu ? "Удаление элементов" : "Delete items");
-
-    // CONTRACT GUARD: warn if deleting parent without children
-    warnPartialTreeDelete(toDelete, tocEntries);
 
     // Delete from DB
     for (const di of toDelete) {
@@ -543,8 +471,6 @@ export default function Parser() {
     }
     setChapterIdMap(newMap);
 
-    // CONTRACT K5 GUARD: verify rebuilt maps are consistent
-    assertMapIndicesInBounds("chapterIdMap (after delete)", newMap, newEntries.length);
 
     // Clear selection
     setSelectedIndices(prev => {
@@ -564,8 +490,6 @@ export default function Parser() {
     }
     setChapterResults(newResults);
 
-    // CONTRACT K5 GUARD: verify results map
-    assertMapIndicesInBounds("chapterResults (after delete)", newResults, newEntries.length);
 
     setPendingDelete(null);
     scheduleSave();
@@ -573,9 +497,6 @@ export default function Parser() {
 
   const mergeEntries = (indices: number[]) => {
     if (indices.length < 2) return;
-    // CONTRACT GUARD: validate merge inputs
-    assertValidMerge(indices, tocEntries);
-    pushSnapshot(getCurrentSnapshot(), isRu ? "Объединение секций" : "Merge sections");
     const sorted = [...indices].sort((a, b) => a - b);
     const firstIdx = sorted[0];
     const lastIdx = sorted[sorted.length - 1];
@@ -631,9 +552,6 @@ export default function Parser() {
     setChapterIdMap(newChapterMap);
     setChapterResults(newResults);
 
-    // CONTRACT K5 GUARD: verify rebuilt maps are consistent after merge
-    assertMapIndicesInBounds("chapterIdMap (after merge)", newChapterMap, newEntries.length);
-    assertMapIndicesInBounds("chapterResults (after merge)", newResults, newEntries.length);
 
     setSelectedIndices(new Set([firstIdx]));
     scheduleSave();
@@ -673,7 +591,7 @@ export default function Parser() {
    */
   const handleScenesUpdate = useCallback((updatedScenes: Scene[], label?: string) => {
     if (selectedIdx === null) return;
-    pushSnapshot(getCurrentSnapshot(), label || (isRu ? "Редактирование сцен" : "Edit scenes"));
+    
 
     const entry = tocEntries[selectedIdx];
 
@@ -720,7 +638,7 @@ export default function Parser() {
       return next;
     });
     scheduleSave();
-  }, [selectedIdx, tocEntries, setChapterResults, pushSnapshot, getCurrentSnapshot, scheduleSave]);
+  }, [selectedIdx, tocEntries, setChapterResults, scheduleSave]);
 
 
   return (
@@ -782,10 +700,6 @@ export default function Parser() {
                     onOpenPdf={handleOpenPdf}
                     onRenamePart={renamePart}
                     onMergeEntries={mergeEntries}
-                    onUndo={handleUndo}
-                    onRedo={handleRedo}
-                    canUndo={canUndo}
-                    canRedo={canRedo}
                     roleModels={{
                       screenwriter: getModelForRole("screenwriter"),
                       director: getModelForRole("director"),

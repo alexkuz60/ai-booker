@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2, AlertCircle,
   BookOpen, FolderOpen, Clapperboard, ChevronLeft, ChevronRightIcon, Trash2, ExternalLink, Clock, Merge,
-  Undo2, Redo2
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -37,10 +36,6 @@ interface NavSidebarProps {
   onOpenPdf?: (page?: number) => void;
   onRenamePart?: (oldTitle: string, newTitle: string) => void;
   onMergeEntries?: (indices: number[]) => void;
-  onUndo?: () => void;
-  onRedo?: () => void;
-  canUndo?: boolean;
-  canRedo?: boolean;
   roleModels?: Partial<Record<AiRoleId, string>>;
 }
 
@@ -50,7 +45,7 @@ export default function NavSidebar({
   partGroups, partlessIndices,
   onSelectChapter, onAnalyzeChapter, onToggleNode, onSendToStudio, isChapterFullyDone,
   onChangeLevel, onDeleteEntry, onRenameEntry, onChangeStartPage,
-  onOpenPdf, onRenamePart, onMergeEntries, onUndo, onRedo, canUndo, canRedo, roleModels,
+  onOpenPdf, onRenamePart, onMergeEntries, roleModels,
 }: NavSidebarProps) {
   const [editingPartTitle, setEditingPartTitle] = useState<string | null>(null);
   const [editPartValue, setEditPartValue] = useState("");
@@ -343,18 +338,6 @@ export default function NavSidebar({
           <span className="text-xs text-primary font-medium">
             {selectedIndices.size} {t("selectedCount", isRu)}
           </span>
-          <div className="flex items-center gap-1">
-            {onUndo && (
-              <Button variant="ghost" size="icon" className="h-6 w-6" title={`${t("undo", isRu)} (Ctrl+Z)`} onClick={onUndo} disabled={!canUndo}>
-                <Undo2 className="h-3.5 w-3.5" />
-              </Button>
-            )}
-            {onRedo && (
-              <Button variant="ghost" size="icon" className="h-6 w-6" title={`${t("redo", isRu)} (Ctrl+Shift+Z)`} onClick={onRedo} disabled={!canRedo}>
-                <Redo2 className="h-3.5 w-3.5" />
-              </Button>
-            )}
-          </div>
           <div className="flex items-center gap-1 ml-auto">
             {selectedIndices.size === 1 && (() => {
               const singleIdx = selectedArray[0];
