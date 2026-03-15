@@ -650,9 +650,7 @@ export default function Parser() {
    * When selectedIdx is a parent with children, updatedScenes is the aggregated list
    * from [selectedIdx, ...childIndices]. We split it back by original scene counts.
    * 
-   * RUNTIME GUARD: assertNotOverwritingParent prevents silent data corruption.
-   * See: IMPLEMENTATION_LOG.md → К3, src/test/contracts.test.ts
-   */
+   * Parent updates are redistributed only to children (never written as one block to parent).
   const handleScenesUpdate = useCallback((updatedScenes: Scene[], label?: string) => {
     if (selectedIdx === null) return;
     pushSnapshot(getCurrentSnapshot(), label || (isRu ? "Редактирование сцен" : "Edit scenes"));

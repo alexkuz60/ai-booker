@@ -84,7 +84,37 @@ function removePageNumbers(scenes: Scene[], selectedText: string): CleanupResult
   };
 }
 
-// ─── 3. Split scene at chapter marker ────────────────────────
+// ─── 3. Delete selected text in current scene (exact, no global search) ─────
+function deleteSelectedTextInScene(
+  scenes: Scene[],
+  selectedText: string,
+  sceneIndex: number,
+): CleanupResult {
+  const trimmed = selectedText.trim();
+  if (!trimmed) return { scenes, changeCount: 0, summary: "Нет выделенного текста" };
+
+  const scene = scenes[sceneIndex];
+  if (!scene) return { scenes, changeCount: 0, summary: "Сцена не найдена" };
+
+  const content = scene.content || "";
+  const selIdx = content.indexOf(trimmed);
+  if (selIdx === -1) {
+    return { scenes, changeCount: 0, summary: "Выделенный текст не найден в сцене" };
+  }
+
+  const newContent = content.slice(0, selIdx) + content.slice(selIdx + trimmed.length);
+  const updatedScenes = scenes.map((sc, i) =>
+    i === sceneIndex ? { ...sc, content: newContent } : sc
+  );
+
+  return {
+    scenes: updatedScenes,
+    changeCount: 1,
+    summary: "Выделенный текст удалён",
+  };
+}
+
+// ─── 4. Split scene at chapter marker ────────────────────────
 // Checks if the character right after selection starts with an
 // uppercase letter. If so, splits the scene at that position
 // and creates a new scene.
