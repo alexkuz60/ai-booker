@@ -23,9 +23,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useChapterAnalysis } from "@/hooks/useChapterAnalysis";
 import { useBookManager } from "@/hooks/useBookManager";
 import { useParserHelpers } from "@/hooks/useParserHelpers";
-import { useProjectStorage } from "@/hooks/useProjectStorage";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { useStructureUndo } from "@/hooks/useStructureUndo";
 import type { StructureSnapshot } from "@/hooks/useStructureUndo";
+import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 
 import LibraryView from "@/components/parser/LibraryView";
 import UploadView from "@/components/parser/UploadView";
@@ -33,6 +34,7 @@ import { ExtractingTocView, ErrorView } from "@/components/parser/StatusViews";
 import NavSidebar from "@/components/parser/NavSidebar";
 import ChapterDetailPanel from "@/components/parser/ChapterDetailPanel";
 import { AiRolesTab } from "@/components/profile/tabs/AiRolesTab";
+import { SaveBookButton } from "@/components/SaveBookButton";
 
 export default function Parser() {
   const { user } = useAuth();
