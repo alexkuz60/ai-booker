@@ -295,6 +295,26 @@ export default function Parser() {
     if (step === "workspace") {
       return (
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-0.5">
+            <Button
+              variant="ghost" size="icon"
+              onClick={handleUndo}
+              disabled={!canUndo}
+              className="h-7 w-7"
+              title={`${isRu ? "Отменить" : "Undo"} (Ctrl+Z)`}
+            >
+              <Undo2 className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost" size="icon"
+              onClick={handleRedo}
+              disabled={!canRedo}
+              className="h-7 w-7"
+              title={`${isRu ? "Повторить" : "Redo"} (Ctrl+Shift+Z)`}
+            >
+              <Redo2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
           <div className="text-xs text-muted-foreground font-body">
             {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} · {totalScenes} {t("scenes", isRu)}
           </div>
