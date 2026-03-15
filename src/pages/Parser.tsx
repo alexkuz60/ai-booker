@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Bot, Library, PlusCircle, Network, FileText, Users, RefreshCw } from "lucide-react";
+import { ArrowLeft, Bot, Library, PlusCircle, Network, FileText, Users, RefreshCw, CloudUpload } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import { syncStructureToLocal } from "@/lib/localSync";
+
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
@@ -26,7 +26,7 @@ import { useParserHelpers } from "@/hooks/useParserHelpers";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { useStructureUndo } from "@/hooks/useStructureUndo";
 import type { StructureSnapshot } from "@/hooks/useStructureUndo";
-import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
+import { useSaveBookToProject, autoSaveToLocal } from "@/hooks/useSaveBookToProject";
 
 import LibraryView from "@/components/parser/LibraryView";
 import UploadView from "@/components/parser/UploadView";
@@ -131,25 +131,8 @@ export default function Parser() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [step, handleUndo, handleRedo]);
-  // ── Auto-sync scene results to local project when chapters get analyzed ──
-  const lastSyncedRef = useRef("");
-  useEffect(() => {
-    if (!projectStorage?.isReady || !bookId || chapterResults.size === 0) return;
-    // Build a simple key to detect meaningful changes (done count)
-    const doneCount = Array.from(chapterResults.values()).filter(r => r.status === "done").length;
-    const syncKey = `${bookId}_${doneCount}`;
-    if (syncKey === lastSyncedRef.current) return;
-    lastSyncedRef.current = syncKey;
-    syncStructureToLocal(projectStorage, {
-      bookId,
-      title: fileName.replace('.pdf', ''),
-      fileName,
-      toc: tocEntries,
-      parts: [],
-      chapterIdMap,
-      chapterResults,
-    });
-  }, [projectStorage, bookId, chapterResults, tocEntries, fileName, chapterIdMap]);
+
+
 
   const selectedIdx = selectedIndices.size === 1 ? Array.from(selectedIndices)[0] : null;
 
@@ -177,6 +160,22 @@ export default function Parser() {
 
     return parts;
   }, [tocEntries, partIdMap]);
+
+  // ── Auto-save ALL structural changes to local project (debounced) ──
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!projectStorage?.isReady || !bookId || tocEntries.length === 0) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      autoSaveToLocal(projectStorage, bookId, fileName, {
+        toc: tocEntries,
+        parts: localPartsForSave,
+        chapterIdMap,
+        chapterResults,
+      }).catch((err) => console.warn("[AutoSave] local write failed:", err));
+    }, 800);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  }, [projectStorage, bookId, tocEntries, chapterResults, chapterIdMap, fileName, localPartsForSave]);
 
   const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
     isRu,
