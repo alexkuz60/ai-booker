@@ -523,7 +523,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
         }
       }
 
-      chapters = normalizeLevels(chapters);
+      chapters = normalizeTocRanges(normalizeLevels(chapters), pdf.numPages);
       setTocEntries(chapters);
 
       // Clean up previous uploads of the same file name
