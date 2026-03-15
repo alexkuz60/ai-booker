@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, Fragment } from "react";
 import { motion } from "framer-motion";
 import {
   FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock, RefreshCw, Palette, StopCircle,
-  Trash2, Hash, Scissors, SpellCheck, Footprints
+  Trash2, Hash, Scissors, SpellCheck, Footprints, PencilLine
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -98,6 +98,7 @@ function SceneCards({
   onScenesUpdate?: (scenes: Scene[]) => void;
 }) {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [editedIndices, setEditedIndices] = useState<Set<number>>(new Set());
   const toggleExpand = useCallback((idx: number, e: React.MouseEvent) => {
     e.stopPropagation();
     setExpandedIds(prev => {
@@ -125,6 +126,27 @@ function SceneCards({
     const result = applyCleanup(action, scenes, selectedText, sceneIndex);
     if (result.changeCount > 0 && onScenesUpdate) {
       onScenesUpdate(result.scenes);
+      // Mark scene(s) as edited
+      setEditedIndices(prev => {
+        const next = new Set(prev);
+        // For mass actions (footnote_auto, fix_punctuation_spaces), mark all affected scenes
+        if (action === "footnote_auto" || action === "fix_punctuation_spaces") {
+          result.scenes.forEach((sc, idx) => {
+            // Compare content to detect which scenes were modified
+            const originalContent = scenes[idx]?.content ?? scenes[idx]?.content_preview ?? "";
+            if (sc.content !== originalContent) {
+              next.add(idx);
+            }
+          });
+        } else {
+          next.add(sceneIndex);
+          // If split happened, mark new scene too
+          if (result.scenes.length > scenes.length && action === "chapter_split") {
+            next.add(sceneIndex + 1);
+          }
+        }
+        return next;
+      });
     }
     toast(result.summary, { duration: 3000 });
   }, [scenes, isRu, applyCleanup, getSelectedText, consume, onScenesUpdate]);
@@ -166,10 +188,12 @@ function SceneCards({
         const hasMore = content.length > 100;
         const sceneDur = formatDuration(estimateDurationSec(content.length));
 
+        const isEdited = editedIndices.has(i);
+
         return (
           <ContextMenu key={`${sc.scene_number}-${i}`}>
             <ContextMenuTrigger asChild>
-              <Card onContextMenu={handleContextMenu}>
+              <Card onContextMenu={handleContextMenu} className={isEdited ? "border-primary/40" : undefined}>
                 <CardContent className="py-3 px-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-base font-medium flex items-center gap-1.5">
@@ -186,6 +210,12 @@ function SceneCards({
                       {t("scenePrefix", isRu)} {sc.scene_number}: {tSceneTitle(sc.title, isRu)}
                     </span>
                     <div className="flex items-center gap-1.5">
+                      {isEdited && (
+                        <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-400 border-amber-500/30 gap-1">
+                          <PencilLine className="h-3 w-3" />
+                          {isRu ? "редакт." : "edited"}
+                        </Badge>
+                      )}
                       <Badge variant="outline" className={`text-xs ${colorCls}`}>
                         {tSceneType(sc.scene_type, isRu)}
                       </Badge>
