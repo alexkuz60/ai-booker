@@ -81,12 +81,14 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
       if (!local?.structure || local.structure.bookId !== savedBookId) return false;
 
       const { structure, chapterIdMap: localChIdMap, chapterResults: localResults } = local;
+      const normalizedToc = normalizeLevels(structure.toc);
+      const sanitizedLocalResults = sanitizeChapterResultsForStructure(normalizedToc, localResults);
 
       setBookId(savedBookId);
       setFileName(structure.fileName);
-      setTocEntries(normalizeLevels(structure.toc));
+      setTocEntries(normalizedToc);
       setChapterIdMap(localChIdMap);
-      setChapterResults(localResults);
+      setChapterResults(sanitizedLocalResults);
 
       const newPartIdMap = new Map<string, string>();
       for (const p of structure.parts) {
