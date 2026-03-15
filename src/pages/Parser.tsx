@@ -178,7 +178,7 @@ export default function Parser() {
     return parts;
   }, [tocEntries, partIdMap]);
 
-  const { saveBook, saving: savingBook } = useSaveBookToProject({
+  const { saveBook, saving: savingBook, backend: storageBackend, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
     isRu,
     currentBookId: bookId,
     localSnapshot: step === "workspace"
