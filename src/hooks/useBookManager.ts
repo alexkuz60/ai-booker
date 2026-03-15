@@ -620,7 +620,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
     }
 
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [userId, isRu]);
+  }, [userId, isRu, projectStorage]);
 
   // ─── Reload book (delete structure, re-upload new PDF) ─────
   const reloadBook = useCallback(async () => {
