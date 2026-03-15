@@ -46,7 +46,7 @@ export default function Parser() {
   const [parserTab, setParserTab] = useState<"structure" | "content" | "characters">("structure");
   const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
-  const { backend: storageBackend, createProject, openProject, storage: projectStorage, meta: projectMeta, saveSourcePDF } = useProjectStorage();
+  const { backend: storageBackend, createProject, openProject, storage: projectStorage } = useProjectStorageContext();
   const { getModelForRole } = useAiRoles(userApiKeys);
   const { toast } = useToast();
   const [navRestoredFromStorage] = useState<boolean>(() => {
