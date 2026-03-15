@@ -397,6 +397,18 @@ export class OPFSStorage implements ProjectStorage {
     return new OPFSStorage(projectDir, projectName);
   }
 
+  /** Delete a project directory from OPFS by name */
+  static async deleteProject(projectName: string): Promise<void> {
+    const opfsRoot = await navigator.storage.getDirectory();
+    try {
+      await opfsRoot.removeEntry(projectName, { recursive: true });
+    } catch (err: any) {
+      if (err?.name !== "NotFoundError") {
+        throw err;
+      }
+    }
+  }
+
   /** List all projects in OPFS */
   static async listProjects(): Promise<string[]> {
     const opfsRoot = await navigator.storage.getDirectory();
