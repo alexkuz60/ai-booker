@@ -18,6 +18,8 @@ interface UseBookManagerParams {
   isRu: boolean;
   /** Optional local project storage for dual-write */
   projectStorage?: ProjectStorage | null;
+  /** Storage backend type — needed to know if we should wait for storage init */
+  storageBackend?: "fs-access" | "opfs" | "none";
 }
 
 export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerParams) {
