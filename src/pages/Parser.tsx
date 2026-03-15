@@ -613,6 +613,15 @@ export default function Parser() {
       }
       return next;
     });
+    // Persist content changes to DB for scenes that have IDs
+    const scenesWithIds = updatedScenes.filter(sc => sc.id);
+    if (scenesWithIds.length > 0) {
+      Promise.all(
+        scenesWithIds.map(sc =>
+          supabase.from("book_scenes").update({ content: sc.content ?? null }).eq("id", sc.id!)
+        )
+      ).catch(err => console.warn("[ScenesUpdate] DB write failed:", err));
+    }
   }, [selectedIdx, setChapterResults]);
 
 
