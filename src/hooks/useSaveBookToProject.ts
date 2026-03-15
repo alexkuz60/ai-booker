@@ -16,9 +16,17 @@ import {
   type ProjectStorage,
 } from "@/lib/projectStorage";
 
+interface LocalBookSnapshot {
+  toc: TocChapter[];
+  parts: Array<{ id: string; title: string; partNumber: number }>;
+  chapterIdMap: Map<number, string>;
+  chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
+}
+
 interface UseSaveBookToProjectParams {
   isRu: boolean;
   currentBookId?: string | null;
+  localSnapshot?: LocalBookSnapshot;
 }
 
 async function ensureStorage(
