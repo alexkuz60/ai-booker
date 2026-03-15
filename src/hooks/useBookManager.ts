@@ -154,7 +154,7 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
       const TOLERANCE_MS = 2000;
 
       if (serverTime > localTime + TOLERANCE_MS) {
-        console.log(`[SyncCheck] Server is newer: server=${data.updated_at} local=${localMeta.updatedAt}`);
+        console.log(`[SyncCheck] Server is newer: server=${data.updated_at} local=${localUpdatedAt}`);
         return true;
       }
       return false;
