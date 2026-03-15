@@ -161,12 +161,23 @@ export default function Parser() {
     return parts;
   }, [tocEntries, partIdMap]);
 
-  // ── Auto-save ALL structural changes to local project (debounced) ──
+  // ── Auto-save structural changes to local project (only on real changes) ──
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedHash = useRef<string>("");
   useEffect(() => {
     if (!projectStorage?.isReady || !bookId || tocEntries.length === 0) return;
+
+    // Cheap fingerprint: compare serialised lengths + key counts to avoid JSON.stringify on every render
+    const hash = `${tocEntries.length}:${chapterResults.size}:${chapterIdMap.size}:${
+      tocEntries.map(e => e.title + e.level + e.startPage).join("|")
+    }:${
+      Array.from(chapterResults.entries()).map(([k, v]) => `${k}:${v.status}:${v.scenes.length}`).join("|")
+    }`;
+    if (hash === lastSavedHash.current) return;
+
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(() => {
+      lastSavedHash.current = hash;
       autoSaveToLocal(projectStorage, bookId, fileName, {
         toc: tocEntries,
         parts: localPartsForSave,
