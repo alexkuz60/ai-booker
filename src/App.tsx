@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeaderProvider } from "@/hooks/usePageHeader";
+import { ProjectStorageProvider } from "@/hooks/useProjectStorageContext";
 import Home from "./pages/Home";
 import Parser from "./pages/Parser";
 import Studio from "./pages/Studio";
