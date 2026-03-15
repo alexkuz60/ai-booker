@@ -488,7 +488,7 @@ export default function Parser() {
   const confirmDelete = () => {
     if (!pendingDelete) return;
     const { toDelete } = pendingDelete;
-    pushSnapshot(getCurrentSnapshot());
+    pushSnapshot(getCurrentSnapshot(), isRu ? "Удаление элементов" : "Delete items");
 
     // Delete from DB
     for (const di of toDelete) {
