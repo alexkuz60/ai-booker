@@ -12,6 +12,7 @@ interface UseChapterAnalysisParams {
   isRu: boolean;
   pdfRef: any;
   userId: string | undefined;
+  bookId?: string | null;
   userApiKeys: Record<string, string>;
   /** Role-based model resolver from useAiRoles */
   getModelForRole: (roleId: AiRoleId) => string;
@@ -19,6 +20,8 @@ interface UseChapterAnalysisParams {
   chapterIdMap: Map<number, string>;
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
   setChapterResults: React.Dispatch<React.SetStateAction<Map<number, { scenes: Scene[]; status: ChapterStatus }>>>;
+  /** Called after analysis mutates chapter results to trigger imperative local save */
+  onChapterResultsMutated?: () => void;
   /** Lazy PDF loader — downloads from storage if not in memory */
   ensurePdfLoaded?: () => Promise<any>;
 }

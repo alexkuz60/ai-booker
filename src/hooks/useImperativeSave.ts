@@ -11,7 +11,7 @@
  *   scheduleSave();
  */
 
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { TocChapter, Scene, ChapterStatus } from "@/pages/parser/types";
 import { autoSaveToLocal } from "@/hooks/useSaveBookToProject";
