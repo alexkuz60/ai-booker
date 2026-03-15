@@ -243,7 +243,7 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
         .update({ updated_at: serverNow })
         .eq("id", currentBookId);
 
-      const sceneCount = sceneUpserts.length;
+      const sceneCount = sceneInserts.length;
       toast({
         title: isRu ? "Синхронизировано с сервером" : "Synced to server",
         description: `${chapterUpserts.length} ${isRu ? "глав" : "chapters"}, ${sceneCount} ${isRu ? "сцен" : "scenes"}`,
