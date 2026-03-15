@@ -162,28 +162,20 @@ export default function Parser() {
     return parts;
   }, [tocEntries, partIdMap]);
 
-  // ── Auto-save structural changes to local project (only on real changes) ──
-  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSavedHash = useRef<string>("");
-  useEffect(() => {
-    if (!projectStorage?.isReady || !bookId || tocEntries.length === 0) return;
+  // ── Imperative auto-save: called explicitly after each mutation ──
+  const getLocalSnapshot = useCallback(() => ({
+    toc: tocEntries,
+    parts: localPartsForSave,
+    chapterIdMap,
+    chapterResults,
+  }), [tocEntries, localPartsForSave, chapterIdMap, chapterResults]);
 
-    // Fingerprint includes actual scene content to avoid missed saves on same-length edits.
-    const hash = buildAutoSaveFingerprint(tocEntries, chapterResults, chapterIdMap);
-    if (hash === lastSavedHash.current) return;
-
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = setTimeout(() => {
-      lastSavedHash.current = hash;
-      autoSaveToLocal(projectStorage, bookId, fileName, {
-        toc: tocEntries,
-        parts: localPartsForSave,
-        chapterIdMap,
-        chapterResults,
-      }).catch((err) => console.warn("[AutoSave] local write failed:", err));
-    }, 800);
-    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
-  }, [projectStorage, bookId, tocEntries, chapterResults, chapterIdMap, fileName, localPartsForSave]);
+  const { scheduleSave, flushSave } = useImperativeSave({
+    storage: projectStorage,
+    bookId,
+    fileName,
+    getSnapshot: getLocalSnapshot,
+  });
 
   const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
     isRu,
