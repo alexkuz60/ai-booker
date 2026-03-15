@@ -171,7 +171,7 @@ export default function Parser() {
     const hash = `${tocEntries.length}:${chapterResults.size}:${chapterIdMap.size}:${
       tocEntries.map(e => e.title + e.level + e.startPage).join("|")
     }:${
-      Array.from(chapterResults.entries()).map(([k, v]) => `${k}:${v.status}:${v.scenes.length}`).join("|")
+      Array.from(chapterResults.entries()).map(([k, v]) => `${k}:${v.status}:${v.scenes.length}:${v.scenes.reduce((s, sc) => s + (sc.content?.length ?? 0), 0)}`).join("|")
     }`;
     if (hash === lastSavedHash.current) return;
 
