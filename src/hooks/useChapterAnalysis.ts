@@ -227,7 +227,6 @@ export function useChapterAnalysis({
             return next;
           });
           markResultsDirty();
-          await touchBookUpdatedAt();
           toast.info(`"${entry.title}" — ${t("logNotEnough", isRu)}`);
           return;
         }
