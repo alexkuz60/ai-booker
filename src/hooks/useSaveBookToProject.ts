@@ -37,7 +37,7 @@ async function ensureStorage(
   return openProject();
 }
 
-export function useSaveBookToProject({ isRu, currentBookId }: UseSaveBookToProjectParams) {
+export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: UseSaveBookToProjectParams) {
   const { toast } = useToast();
   const { user } = useAuth();
   const { storage, openProject, backend, meta } = useProjectStorageContext();
