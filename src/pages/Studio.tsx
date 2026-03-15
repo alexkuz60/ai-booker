@@ -337,6 +337,7 @@ const Studio = () => {
           )}
         </>
       )}
+      <SaveBookButton isRu={isRu} onClick={saveBook} loading={savingBook} disabled={!bookId} />
       <AiRolesButton isRu={isRu} apiKeys={userApiKeys} bookTitle={chapter?.bookTitle} />
     </div>
   );
