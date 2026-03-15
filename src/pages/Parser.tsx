@@ -644,8 +644,8 @@ export default function Parser() {
         }
         return next;
       });
+      scheduleSave();
       return;
-    }
 
     // Parent with children: distribute scenes back to their original chapters.
     // The aggregated list was built by concatenating scenes from [selectedIdx, ...childIndices]
