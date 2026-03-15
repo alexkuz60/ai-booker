@@ -88,7 +88,7 @@ export default function Parser() {
 
   const {
     characters, extracting, extractProgress, extractCharacters,
-    renameCharacter, updateAliases, deleteCharacter, mergeCharacters, addCharacter,
+    renameCharacter, updateGender, updateAliases, deleteCharacter, mergeCharacters, addCharacter,
   } = useParserCharacters({
     storage: projectStorage,
     tocEntries,
