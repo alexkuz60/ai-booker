@@ -644,4 +644,27 @@ Source → EQ (3-band) → Compressor → Limiter → Panner3D → Convolver (IR
 
 ---
 
-**Инструкция для AI:** При обнаружении регрессии или повторяющейся ошибки добавляй запись в этот раздел с датой, описанием и паттерном. Это поможет учиться на ошибках и предотвращать их в будущем.
+### К6. Runtime Guards: НЕ УДАЛЯТЬ при рефакторинге
+
+**Дата:** 2026-03-15  
+**Контракт:**
+- Файл `src/lib/parserContracts.ts` содержит runtime-guard'ы для контрактов K1–K5. **ЗАПРЕЩЕНО** удалять, комментировать или ослаблять эти функции при рефакторинге, оптимизации или «чистке кода».
+- Файл `src/test/contracts.test.ts` содержит 28 тестов, покрывающих все контракты. **ЗАПРЕЩЕНО** удалять тесты или файл.
+- Все вызовы guard-функций в `Parser.tsx`, `useChapterAnalysis.ts`, `useBookManager.ts` **ЗАПРЕЩЕНО** удалять при рефакторинге.
+
+**Защищённые точки вызова (НЕ ТРОГАТЬ):**
+| Guard | Файл | Функция |
+|---|---|---|
+| `assertNotOverwritingParent` | `Parser.tsx` | `handleScenesUpdate` |
+| `assertMapIndicesInBounds` | `Parser.tsx` | `confirmDelete`, `mergeEntries` |
+| `assertValidMerge` | `Parser.tsx` | `mergeEntries` |
+| `warnSuspiciousPageRange` | `useChapterAnalysis.ts` | `analyzeChapter` |
+| `assertExtractedTextNotTitlePage` | `useChapterAnalysis.ts` | `analyzeChapter` |
+| `warnContainerAsChapter` | `useBookManager.ts` | `handleFileSelect` |
+| `warnPartialTreeDelete` | `Parser.tsx` | `confirmDelete` |
+
+**Причина контракта:** AI регулярно удаляет «ненужный» код при оптимизации, включая защитные проверки. Guard'ы — единственный механизм, не зависящий от «внимательности» AI.
+
+---
+
+**Инструкция для AI:** При обнаружении регрессии или повторяющейся ошибки добавляй запись в этот раздел с датой, описанием и паттерном. Это поможет учиться на ошибках и предотвращать их в будущем. **НИКОГДА** не удаляй runtime guard'ы и тесты контрактов при рефакторинге.
