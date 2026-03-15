@@ -194,7 +194,6 @@ export default function Parser() {
     setLastClickedIdx(null);
     setExpandedNodes(new Set());
     resetAnalysis();
-    resetStacks();
     sessionStorage.removeItem(NAV_STATE_KEY);
   };
 
