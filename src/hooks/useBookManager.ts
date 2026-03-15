@@ -433,8 +433,6 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
         for (const entry of flat) {
           const isContainer = entry.children.length > 0;
           if (isContainer) {
-            // CONTRACT K2 GUARD: log skipped containers
-            warnContainerAsChapter(entry.title, entry.children.length, "TOC import — skipping");
             if (entry.level === 0) currentPart = entry.title;
             continue;
           }

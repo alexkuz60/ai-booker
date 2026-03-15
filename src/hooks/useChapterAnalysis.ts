@@ -237,9 +237,6 @@ export function useChapterAnalysis({
         let text = await extractTextByPageRange(activePdf, effectiveStartPage, effectiveEndPage);
         let charCount = text.trim().length;
 
-        // CONTRACT K1 GUARD: warn if this looks like title page content
-        assertExtractedTextNotTitlePage(text, entry.title, effectiveStartPage);
-
         if (charCount < 50 && baseRange.subtreeStart && baseRange.subtreeEnd) {
           const subtreeSpan = baseRange.subtreeEnd - baseRange.subtreeStart + 1;
           const currentSpan = effectiveEndPage - effectiveStartPage + 1;
