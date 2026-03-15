@@ -85,7 +85,7 @@ export default function Parser() {
     openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset, reloadBook, ensurePdfLoaded,
     reloadLibrary,
     serverNewerBookId, dismissServerNewer, acceptServerVersion,
-  } = useBookManager({ userId: user?.id, isRu, projectStorage, storageBackend });
+  } = useBookManager({ userId: user?.id, isRu, projectStorage, storageBackend, createProject });
 
   const {
     characters, extracting, extractProgress, extractCharacters,
