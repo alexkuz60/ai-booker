@@ -404,10 +404,9 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       return;
     }
 
-    // Для OPFS: projectStorage инициализируется асинхронно в useProjectStorage.
-    // Нужно ПОДОЖДАТЬ, пока он станет доступным, а не пропускать восстановление.
-    if (storageBackend === "opfs" && !projectStorage?.isReady) {
-      // Не ставим restoredOnce — эффект перезапустится когда projectStorage появится
+    // Для OPFS: ждем завершения bootstrap, но не блокируемся вечно при отсутствии проекта.
+    if (storageBackend === "opfs" && !projectStorageInitialized) {
+      // Не ставим restoredOnce — эффект перезапустится после завершения инициализации хранилища
       return;
     }
 
