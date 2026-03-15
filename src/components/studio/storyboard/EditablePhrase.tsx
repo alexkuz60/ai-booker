@@ -61,6 +61,16 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
     }
   }, [phrase.phrase_id, phrase.text.length, onAnnotate, peek]);
 
+  const handleDeleteSelected = useCallback(() => {
+    const sel = peek();
+    if (!sel) return;
+    const newText = (phrase.text.slice(0, sel.start) + phrase.text.slice(sel.end)).trim();
+    if (!newText) return; // don't allow deleting entire phrase
+    if (newText !== phrase.text) {
+      onSave(phrase.phrase_id, newText);
+    }
+  }, [phrase.phrase_id, phrase.text, onSave, peek]);
+
   const hasAnnotations = phrase.annotations && phrase.annotations.length > 0;
 
   const EMOTION_TYPES = new Set(["joy", "sadness", "anger"]);
