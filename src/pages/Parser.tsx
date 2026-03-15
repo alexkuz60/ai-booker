@@ -454,6 +454,7 @@ export default function Parser() {
     // Persist to DB
     const chId = chapterIdMap.get(idx);
     if (chId) supabase.from('book_chapters').update({ start_page: newPage }).eq('id', chId).then();
+    scheduleSave();
   };
 
   const renamePart = (oldTitle: string, newTitle: string) => {
