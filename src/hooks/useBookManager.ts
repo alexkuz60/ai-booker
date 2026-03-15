@@ -11,7 +11,7 @@ import type {
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
-import { isFolderNode, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
+import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 
 
 interface UseBookManagerParams {
@@ -81,7 +81,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
       if (!local?.structure || local.structure.bookId !== savedBookId) return false;
 
       const { structure, chapterIdMap: localChIdMap, chapterResults: localResults } = local;
-      const normalizedToc = normalizeLevels(structure.toc);
+      const normalizedToc = normalizeTocRanges(normalizeLevels(structure.toc));
       const sanitizedLocalResults = sanitizeChapterResultsForStructure(normalizedToc, localResults);
 
       setBookId(savedBookId);
@@ -341,11 +341,37 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
         };
       });
       const normalizedSavedToc = normalizeLevels(savedToc);
-      setTocEntries(normalizedSavedToc);
+      const normalizedRangedToc = normalizeTocRanges(
+        normalizedSavedToc,
+        restoredTotalPages > 0 ? restoredTotalPages : undefined,
+      );
+      setTocEntries(normalizedRangedToc);
 
       const newChapterIdMap = new Map<number, string>();
       chapters.forEach((ch, i) => newChapterIdMap.set(i, ch.id));
       setChapterIdMap(newChapterIdMap);
+
+      const rangeFixes = chapters
+        .map((ch, i) => {
+          const next = normalizedRangedToc[i];
+          if (!next) return null;
+          const currentStart = Number((ch as any).start_page || 0);
+          const currentEnd = Number((ch as any).end_page || 0);
+          if (currentStart === next.startPage && currentEnd === next.endPage) return null;
+          return {
+            id: ch.id,
+            book_id: book.id,
+            start_page: next.startPage,
+            end_page: next.endPage,
+          };
+        })
+        .filter((v): v is { id: string; book_id: string; start_page: number; end_page: number } => !!v);
+
+      if (rangeFixes.length > 0) {
+        supabase.from('book_chapters').upsert(rangeFixes).then(({ error }) => {
+          if (error) console.warn('[OpenBook] range normalization failed:', error);
+        });
+      }
 
       const allChapterIds = chapters.map(c => c.id);
       const { data: allScenes } = await supabase
@@ -367,7 +393,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
         scenesByChapter.set(s.chapter_id, list);
       }
 
-      const normalizedToc = normalizedSavedToc;
+      const normalizedToc = normalizedRangedToc;
 
       const initRawMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
       chapters.forEach((ch, i) => {
@@ -385,7 +411,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
           bookId: book.id,
           title: book.title || book.file_name.replace('.pdf', ''),
           fileName: book.file_name,
-          toc: normalizedSavedToc,
+          toc: normalizedToc,
           parts: parts.map(p => ({ id: p.id, title: p.title, partNumber: p.part_number })),
           chapterIdMap: newChapterIdMap,
           chapterResults: initMap,
@@ -497,7 +523,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
         }
       }
 
-      chapters = normalizeLevels(chapters);
+      chapters = normalizeTocRanges(normalizeLevels(chapters), pdf.numPages);
       setTocEntries(chapters);
 
       // Clean up previous uploads of the same file name

@@ -7,7 +7,7 @@ import { t } from "@/pages/parser/i18n";
 
 import type { Scene, TocChapter, ChapterStatus } from "@/pages/parser/types";
 import type { AiRoleId } from "@/config/aiRoles";
-import { isFolderNode } from "@/lib/tocStructure";
+import { isFolderNode, resolveEntryPageRange } from "@/lib/tocStructure";
 
 interface UseChapterAnalysisParams {
   isRu: boolean;
@@ -180,56 +180,13 @@ export function useChapterAnalysis({
       if (!hasExistingScenes) {
         addLog(`${t("logExtracting", isRu)} «${entry.title}»...`);
 
-        /**
-         * CONTRACT K1: resolvePageRange — ALWAYS use instead of entry.startPage/endPage.
-         * PDF outline contains container nodes with 1-page ranges that need expansion.
-         * Three fallback levels: subtree → nextSibling → retry.
-         * See: IMPLEMENTATION_LOG.md → К1, src/test/contracts.test.ts
-         */
-        const resolvePageRange = (chapterIndex: number) => {
-          const current = tocEntries[chapterIndex];
-          const currentLevel = current?.level ?? 0;
-          let startPage = Math.max(1, Number(current?.startPage) || 1);
-          let endPage = Math.max(startPage, Number(current?.endPage) || startPage);
+        // Always clear server scenes before stage-1 insert to prevent duplicate drift
+        if (existingChId) {
+          await supabase.from('book_scenes').delete().eq('chapter_id', existingChId);
+        }
 
-          let subtreeStart: number | null = null;
-          let subtreeEnd: number | null = null;
-          for (let i = chapterIndex + 1; i < tocEntries.length; i++) {
-            const n = tocEntries[i];
-            const nLevel = n.level ?? 0;
-            if (nLevel <= currentLevel) break;
-            const ns = Number(n.startPage) || 0;
-            const ne = Number(n.endPage) || 0;
-            if (ns > 0) subtreeStart = subtreeStart == null ? ns : Math.min(subtreeStart, ns);
-            if (ne > 0) subtreeEnd = subtreeEnd == null ? ne : Math.max(subtreeEnd, ne);
-          }
-
-          let nextSiblingStart: number | null = null;
-          for (let i = chapterIndex + 1; i < tocEntries.length; i++) {
-            const n = tocEntries[i];
-            const ns = Number(n.startPage) || 0;
-            if (ns <= 0) continue;
-            if ((n.level ?? 0) <= currentLevel) {
-              nextSiblingStart = ns;
-              break;
-            }
-          }
-
-          if ((Number(current?.startPage) || 0) <= 0 && subtreeStart) startPage = subtreeStart;
-          if ((Number(current?.endPage) || 0) <= 0 && subtreeEnd) endPage = Math.max(startPage, subtreeEnd);
-
-          if ((endPage - startPage + 1) <= 1 && subtreeEnd && subtreeEnd > endPage) {
-            endPage = subtreeEnd;
-          }
-
-          if ((endPage - startPage + 1) <= 1 && nextSiblingStart && nextSiblingStart > startPage + 1) {
-            endPage = Math.max(endPage, nextSiblingStart - 1);
-          }
-
-          return { startPage, endPage, subtreeStart, subtreeEnd, nextSiblingStart };
-        };
-
-        const baseRange = resolvePageRange(idx);
+        // CONTRACT K1: shared resolver (same logic as navigator/server normalization)
+        const baseRange = resolveEntryPageRange(tocEntries, idx, activePdf?.numPages);
         let effectiveStartPage = baseRange.startPage;
         let effectiveEndPage = baseRange.endPage;
 
@@ -374,6 +331,23 @@ export function useChapterAnalysis({
               char_count: chunk.length,
             };
           });
+        }
+
+        // Drop exact duplicate scene bodies (can happen when boundary markers are repeated by AI)
+        const seenBodies = new Set<string>();
+        const beforeDedup = scenes.length;
+        scenes = scenes.filter((sc) => {
+          const norm = (sc.content || "").replace(/\s+/g, " ").trim();
+          if (norm.length < 120) return true;
+          if (seenBodies.has(norm)) return false;
+          seenBodies.add(norm);
+          return true;
+        }).map((sc, i) => ({ ...sc, scene_number: i + 1, char_count: (sc.content || '').length }));
+
+        if (beforeDedup !== scenes.length) {
+          addLog(isRu
+            ? `⚠️ Удалены дубли сцен: ${beforeDedup - scenes.length}`
+            : `⚠️ Removed duplicated scenes: ${beforeDedup - scenes.length}`);
         }
 
         addLog(`${t("logFoundScenes", isRu)} ${scenes.length} ${t("logScenesWord", isRu)}:`);
