@@ -131,8 +131,15 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
   const checkServerNewer = useCallback(async (savedBookId: string): Promise<boolean> => {
     if (!projectStorage?.isReady) return false;
     try {
+      // Try project.json first, fall back to structure/toc.json
+      let localUpdatedAt: string | undefined;
       const localMeta = await projectStorage.readJSON<{ updatedAt?: string }>("project.json");
-      if (!localMeta?.updatedAt) return false; // no local timestamp — can't compare
+      localUpdatedAt = localMeta?.updatedAt;
+      if (!localUpdatedAt) {
+        const tocMeta = await projectStorage.readJSON<{ updatedAt?: string }>("structure/toc.json");
+        localUpdatedAt = tocMeta?.updatedAt;
+      }
+      if (!localUpdatedAt) return false; // no local timestamp — can't compare
 
       const { data } = await supabase
         .from("books")
