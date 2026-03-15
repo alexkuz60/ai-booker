@@ -659,17 +659,32 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
 
   // ─── Delete book ──────────────────────────────────────────
   const deleteBook = useCallback(async (delBookId: string) => {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(delBookId);
+
     try {
-      await supabase.from('book_chapters').delete().eq('book_id', delBookId);
-      await supabase.from('book_parts').delete().eq('book_id', delBookId);
-      await supabase.from('books').delete().eq('id', delBookId);
-      setBooks(prev => prev.filter(b => b.id !== delBookId));
+      const localProjects = localProjectNamesByBookId.get(delBookId) || [];
+      if (storageBackend === "opfs" && localProjects.length > 0) {
+        await Promise.all(localProjects.map((projectName) => OPFSStorage.deleteProject(projectName)));
+      }
+
+      if (isUuid) {
+        const { error } = await supabase.from("books").delete().eq("id", delBookId);
+        if (error) throw error;
+      }
+
+      if (bookId === delBookId) {
+        sessionStorage.removeItem(ACTIVE_BOOK_KEY);
+        setStep("library");
+        setBookId(null);
+      }
+
+      await loadLibrary();
       toast.success(t("bookDeleted", isRu));
     } catch (err) {
       console.error("Failed to delete book:", err);
       toast.error(t("bookDeleteFailed", isRu));
     }
-  }, [isRu]);
+  }, [isRu, storageBackend, localProjectNamesByBookId, bookId, loadLibrary]);
 
   // ─── File Upload & TOC Extraction ──────────────────────────
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
