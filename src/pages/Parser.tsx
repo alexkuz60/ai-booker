@@ -458,7 +458,7 @@ export default function Parser() {
   };
 
   const renamePart = (oldTitle: string, newTitle: string) => {
-    pushSnapshot(getCurrentSnapshot());
+    pushSnapshot(getCurrentSnapshot(), isRu ? "Переименование части" : "Rename part");
     setTocEntries(prev => prev.map(e => e.partTitle === oldTitle ? { ...e, partTitle: newTitle } : e));
     const partId = partIdMap.get(oldTitle);
     if (partId) {
