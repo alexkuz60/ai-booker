@@ -386,7 +386,7 @@ Source → EQ (3-band) → Compressor → Limiter → Panner3D → Convolver (IR
 - `readJSON<T>(path)` / `writeJSON(path, data)` — структурированные данные
 - `readBlob(path)` / `writeBlob(path, blob)` — бинарные файлы (аудио, PDF)
 - `exists(path)` / `delete(path)` / `listDir(path)` — управление файлами
-- `exportZip()` / `importZip(zip)` — bulk-синхронизация (TODO)
+- `exportZip()` / `importZip(zip)` — bulk-синхронизация ✅ (fflate, `src/lib/projectZip.ts`)
 
 **Реализации:**
 - `LocalFSStorage` — File System Access API (Chromium: Chrome, Edge, Opera)
@@ -449,6 +449,24 @@ Source → EQ (3-band) → Compressor → Limiter → Panner3D → Convolver (IR
 - Dual-write: облако остаётся primary, локалка — зеркало (пока)
 - `syncStructureToLocal` никогда не бросает ошибку наружу (catch → console.warn)
 - Синхронизация сцен debounced через `syncKey` = `${bookId}_${doneCount}`
+
+### Этап 3.5: ZIP экспорт/импорт ✅
+
+**Файлы:**
+- `src/lib/projectZip.ts` — `exportProjectZip()`, `importProjectZip()`, `downloadBlob()`
+- Библиотека: `fflate` (лёгкий, браузерный ZIP)
+
+**Что реализовано:**
+- Рекурсивный обход ProjectStorage → flat map путь→Uint8Array → ZIP
+- Распаковка ZIP → запись файлов в ProjectStorage (JSON парсится для консистентности)
+- Кнопка «Скачать проект» (⬇) — экспорт всего проекта как ZIP в папку загрузок
+- Кнопка «Открыть проект» (📂) — input[type=file] accept=.zip → импорт в OPFS/FS
+- Интегрировано во все модули: Парсер, Студия, Монтаж, Голоса
+
+**Кроссбраузерность:**
+- Chromium: `showDirectoryPicker()` → видимая папка + ZIP-экспорт как backup
+- Firefox/Safari: OPFS (внутреннее хранилище) + ZIP-скачивание для доступа к файлам
+- Пользователь не видит разницы — на диске лежит `.zip` с полной структурой проекта
 
 ### Следующие этапы (план):
 - **Этап 4:** Скачивание TTS-аудио в `audio/tts/` вместо серверного хранилища

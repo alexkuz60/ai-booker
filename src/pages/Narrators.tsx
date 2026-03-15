@@ -127,14 +127,25 @@ const Narrators = () => {
   const selectedVoice = YANDEX_VOICES.find(v => v.id === voice);
   const availableRoles = selectedVoice?.roles ?? ["neutral"];
   const markDirty = () => setDirty(true);
-  const { saveBook, saving: savingBook } = useSaveBookToProject({
+  const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
     isRu,
     currentBookId: selectedBookId,
   });
 
   const headerRight = useMemo(
-    () => <SaveBookButton isRu={isRu} onClick={saveBook} loading={savingBook} disabled={!selectedBookId} />,
-    [isRu, saveBook, savingBook, selectedBookId],
+    () => (
+      <SaveBookButton
+        isRu={isRu}
+        onClick={saveBook}
+        loading={savingBook}
+        disabled={!selectedBookId}
+        showDownloadZip={isProjectOpen}
+        onDownloadZip={downloadZip}
+        showImportZip={!isProjectOpen}
+        onImportZip={importZip}
+      />
+    ),
+    [isRu, saveBook, savingBook, selectedBookId, isProjectOpen, downloadZip, importZip],
   );
 
   // Page header

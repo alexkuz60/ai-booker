@@ -40,7 +40,7 @@ async function ensureStorage(
 export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: UseSaveBookToProjectParams) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { storage, openProject, backend, meta } = useProjectStorageContext();
+  const { storage, openProject, backend, meta, downloadProjectAsZip, importProjectFromZip } = useProjectStorageContext();
   const [saving, setSaving] = useState(false);
 
   const saveBook = useCallback(async () => {
@@ -260,8 +260,50 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
     }
   }, [currentBookId, localSnapshot, backend, storage, openProject, isRu, toast, meta?.userId, meta?.createdAt, meta?.language, user?.id]);
 
+  const downloadZip = useCallback(async () => {
+    try {
+      setSaving(true);
+      await downloadProjectAsZip();
+      toast({
+        title: isRu ? "Проект скачан" : "Project downloaded",
+        description: isRu ? "ZIP-файл сохранён в папку загрузок" : "ZIP file saved to downloads",
+      });
+    } catch (error) {
+      toast({
+        title: isRu ? "Ошибка скачивания" : "Download failed",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }, [downloadProjectAsZip, isRu, toast]);
+
+  const importZip = useCallback(async (file: File) => {
+    try {
+      setSaving(true);
+      await importProjectFromZip(file);
+      toast({
+        title: isRu ? "Проект загружен" : "Project imported",
+        description: file.name,
+      });
+    } catch (error) {
+      toast({
+        title: isRu ? "Ошибка импорта" : "Import failed",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }, [importProjectFromZip, isRu, toast]);
+
   return {
     saveBook,
     saving,
+    backend,
+    isProjectOpen: !!storage,
+    downloadZip,
+    importZip,
   };
 }

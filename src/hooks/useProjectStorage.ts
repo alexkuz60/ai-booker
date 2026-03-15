@@ -8,6 +8,7 @@ import {
   LocalFSStorage,
   OPFSStorage,
 } from "@/lib/projectStorage";
+import { downloadBlob } from "@/lib/projectZip";
 
 const LAST_PROJECT_KEY = "booker_last_project";
 
@@ -27,6 +28,10 @@ interface UseProjectStorageReturn {
   createProject: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<ProjectStorage>;
   /** Open existing project folder */
   openProject: () => Promise<ProjectStorage>;
+  /** Open project from a ZIP file (cross-browser) */
+  importProjectFromZip: (file: File) => Promise<ProjectStorage>;
+  /** Download current project as ZIP */
+  downloadProjectAsZip: () => Promise<void>;
   /** Close current project */
   closeProject: () => void;
 
@@ -52,7 +57,6 @@ export function useProjectStorage(): UseProjectStorageReturn {
   ): Promise<ProjectStorage> => {
     setLoading(true);
     try {
-      // Sanitize folder name
       const folderName = title.replace(/[<>:"/\\|?*]/g, "_").trim() || "BookProject";
 
       let store: ProjectStorage;
@@ -76,7 +80,6 @@ export function useProjectStorage(): UseProjectStorageReturn {
       setStorage(store);
       setMeta(projectMeta);
 
-      // Remember last project
       try {
         localStorage.setItem(LAST_PROJECT_KEY, JSON.stringify({
           name: store.projectName,
@@ -100,7 +103,6 @@ export function useProjectStorage(): UseProjectStorageReturn {
       if (backend === "fs-access") {
         store = await LocalFSStorage.openProject();
       } else {
-        // For OPFS, list projects and pick first (or show picker in UI)
         const projects = await OPFSStorage.listProjects();
         if (projects.length === 0) throw new Error("No projects found");
         store = await OPFSStorage.openOrCreate(projects[0]);
@@ -127,6 +129,59 @@ export function useProjectStorage(): UseProjectStorageReturn {
       setLoading(false);
     }
   }, [backend]);
+
+  // ── Import project from ZIP ─────────────────────────────
+
+  const importProjectFromZip = useCallback(async (file: File): Promise<ProjectStorage> => {
+    setLoading(true);
+    try {
+      // Derive project name from ZIP filename
+      const projectName = file.name.replace(/\.zip$/i, "").trim() || "ImportedProject";
+
+      let store: ProjectStorage;
+      if (backend === "fs-access") {
+        store = await LocalFSStorage.createProject(projectName);
+      } else {
+        store = await OPFSStorage.openOrCreate(projectName);
+      }
+
+      await store.importZip(file);
+
+      const projectMeta = await store.readJSON<ProjectMeta>("project.json");
+      if (!projectMeta) {
+        throw new Error("ZIP does not contain a valid Booker project (project.json not found)");
+      }
+
+      setStorage(store);
+      setMeta(projectMeta);
+
+      try {
+        localStorage.setItem(LAST_PROJECT_KEY, JSON.stringify({
+          name: store.projectName,
+          backend,
+          bookId: projectMeta.bookId,
+        }));
+      } catch {}
+
+      return store;
+    } finally {
+      setLoading(false);
+    }
+  }, [backend]);
+
+  // ── Download project as ZIP ─────────────────────────────
+
+  const downloadProjectAsZip = useCallback(async () => {
+    if (!storage) throw new Error("No project open");
+    setLoading(true);
+    try {
+      const zipBlob = await storage.exportZip();
+      const fileName = `${storage.projectName || "project"}.zip`;
+      downloadBlob(zipBlob, fileName);
+    } finally {
+      setLoading(false);
+    }
+  }, [storage]);
 
   // ── Close project ───────────────────────────────────────
 
@@ -178,6 +233,8 @@ export function useProjectStorage(): UseProjectStorageReturn {
     loading,
     createProject,
     openProject,
+    importProjectFromZip,
+    downloadProjectAsZip,
     closeProject,
     saveSourcePDF,
     readSourcePDF,
