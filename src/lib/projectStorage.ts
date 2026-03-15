@@ -402,8 +402,10 @@ export class OPFSStorage implements ProjectStorage {
     const opfsRoot = await navigator.storage.getDirectory();
     try {
       await opfsRoot.removeEntry(projectName, { recursive: true });
-    } catch {
-      // Ignore if folder is already gone or inaccessible
+    } catch (err: any) {
+      if (err?.name !== "NotFoundError") {
+        throw err;
+      }
     }
   }
 
