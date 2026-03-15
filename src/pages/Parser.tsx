@@ -765,6 +765,7 @@ export default function Parser() {
                 isRu={isRu}
                 characters={characters}
                 extracting={extracting}
+                extractProgress={extractProgress}
                 onExtract={extractCharacters}
                 onRename={renameCharacter}
                 onUpdateAliases={updateAliases}
