@@ -24,6 +24,7 @@ interface ParserCharactersPanelProps {
   isRu: boolean;
   characters: LocalCharacter[];
   extracting: boolean;
+  extractProgress?: string | null;
   onExtract: () => void;
   onRename: (id: string, newName: string) => void;
   onUpdateAliases: (id: string, aliases: string[]) => void;
