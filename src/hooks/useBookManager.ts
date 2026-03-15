@@ -681,5 +681,7 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
     chapterResults, setChapterResults, fileInputRef,
     // Actions
     openSavedBook, deleteBook, handleFileSelect, handleReset, reloadBook, ensurePdfLoaded,
+    // Sync-check
+    serverNewerBookId, dismissServerNewer, acceptServerVersion,
   };
 }
