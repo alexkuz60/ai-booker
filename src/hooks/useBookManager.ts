@@ -93,6 +93,24 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
       sessionStorage.setItem(ACTIVE_BOOK_KEY, savedBookId);
       setStep("workspace");
 
+      // ── Restore PDF from local project (async, non-blocking) ──
+      projectStorage.readBlob("source/book.pdf").then(async (pdfBlob) => {
+        if (!pdfBlob) {
+          console.log("[LocalRestore] No local PDF found, will download on demand");
+          return;
+        }
+        try {
+          const arrayBuffer = await pdfBlob.arrayBuffer();
+          const { getDocument } = await import("pdfjs-dist");
+          const pdf = await getDocument({ data: arrayBuffer }).promise;
+          setPdfRef(pdf);
+          setTotalPages(pdf.numPages);
+          console.log(`[LocalRestore] PDF restored locally: ${pdf.numPages} pages`);
+        } catch (pdfErr) {
+          console.warn("[LocalRestore] Failed to parse local PDF:", pdfErr);
+        }
+      });
+
       console.log(`[LocalRestore] Restored from local: ${structure.toc.length} chapters, ${localResults.size} results`);
       toast.success(
         isRu
