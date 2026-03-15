@@ -37,33 +37,6 @@ import ChapterDetailPanel from "@/components/parser/ChapterDetailPanel";
 import { AiRolesTab } from "@/components/profile/tabs/AiRolesTab";
 import { SaveBookButton } from "@/components/SaveBookButton";
 
-const buildAutoSaveFingerprint = (
-  tocEntries: TocChapter[],
-  chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>,
-  chapterIdMap: Map<number, string>,
-): string => {
-  const tocFingerprint = tocEntries
-    .map((entry, idx) => `${idx}:${entry.title}:${entry.level}:${entry.startPage}:${entry.endPage}:${entry.partTitle ?? ""}`)
-    .join("||");
-
-  const chapterMapFingerprint = Array.from(chapterIdMap.entries())
-    .map(([idx, id]) => `${idx}:${id}`)
-    .join("||");
-
-  const scenesFingerprint = Array.from(chapterResults.entries())
-    .map(([idx, result]) => {
-      const scenes = result.scenes
-        .map((scene, sceneIdx) =>
-          `${sceneIdx}:${scene.id ?? ""}:${scene.scene_number}:${scene.title}:${scene.content ?? ""}:${scene.scene_type}:${scene.mood}:${scene.bpm}`,
-        )
-        .join("~~");
-      return `${idx}:${result.status}:${scenes}`;
-    })
-    .join("||");
-
-  return `${tocEntries.length}#${chapterResults.size}#${chapterIdMap.size}#${tocFingerprint}#${chapterMapFingerprint}#${scenesFingerprint}`;
-};
-
 export default function Parser() {
   const { user } = useAuth();
   const { isRu } = useLanguage();
