@@ -238,12 +238,13 @@ export class LocalFSStorage implements ProjectStorage {
   // ── Bulk export/import (ZIP) ─────────────────────────
 
   async exportZip(): Promise<Blob> {
-    // TODO: implement with a lightweight ZIP library when needed
-    throw new Error("exportZip not yet implemented");
+    const { exportProjectZip } = await import("./projectZip");
+    return exportProjectZip(this);
   }
 
-  async importZip(_zip: Blob): Promise<void> {
-    throw new Error("importZip not yet implemented");
+  async importZip(zip: Blob): Promise<void> {
+    const { importProjectZip } = await import("./projectZip");
+    await importProjectZip(this, zip);
   }
 
   // ── Static factories ─────────────────────────────────
