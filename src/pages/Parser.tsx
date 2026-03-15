@@ -92,7 +92,7 @@ export default function Parser() {
     tocEntries, chapterIdMap, chapterResults, setChapterResults, ensurePdfLoaded,
   });
 
-  const { pushSnapshot, undo, redo, canUndo, canRedo, resetStacks } = useStructureUndo(bookId);
+  const { pushSnapshot, undo, redo, undoTo, redoTo, undoStack, redoStack, canUndo, canRedo, resetStacks } = useStructureUndo(bookId);
 
   const selectedIdx = selectedIndices.size === 1 ? Array.from(selectedIndices)[0] : null;
 
