@@ -271,18 +271,41 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
   // ─── Sync-check: server vs local timestamps ────────────────
   const [serverNewerBookId, setServerNewerBookId] = useState<string | null>(null);
 
-  const checkServerNewer = useCallback(async (savedBookId: string): Promise<boolean> => {
-    if (!projectStorage?.isReady) return false;
+  const shouldRunServerSyncCheck = useCallback((targetBookId: string): boolean => {
+    try {
+      const browserId = getOrCreateBrowserId();
+      const lastCheckedBrowserId = localStorage.getItem(getSyncCheckKey(targetBookId));
+      return lastCheckedBrowserId !== browserId;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const markServerSyncChecked = useCallback((targetBookId: string) => {
+    try {
+      localStorage.setItem(getSyncCheckKey(targetBookId), getOrCreateBrowserId());
+    } catch {
+      // non-critical
+    }
+  }, []);
+
+  const checkServerNewer = useCallback(async (
+    savedBookId: string,
+    options?: { allowMissingLocalTimestamp?: boolean },
+  ): Promise<boolean> => {
+    const allowMissingLocalTimestamp = options?.allowMissingLocalTimestamp || false;
+
     try {
       // Try project.json first, fall back to structure/toc.json
       let localUpdatedAt: string | undefined;
-      const localMeta = await projectStorage.readJSON<{ updatedAt?: string }>("project.json");
-      localUpdatedAt = localMeta?.updatedAt;
-      if (!localUpdatedAt) {
-        const tocMeta = await projectStorage.readJSON<{ updatedAt?: string }>("structure/toc.json");
-        localUpdatedAt = tocMeta?.updatedAt;
+      if (projectStorage?.isReady) {
+        const localMeta = await projectStorage.readJSON<{ updatedAt?: string }>("project.json");
+        localUpdatedAt = localMeta?.updatedAt;
+        if (!localUpdatedAt) {
+          const tocMeta = await projectStorage.readJSON<{ updatedAt?: string }>("structure/toc.json");
+          localUpdatedAt = tocMeta?.updatedAt;
+        }
       }
-      if (!localUpdatedAt) return false; // no local timestamp — can't compare
 
       const { data } = await supabase
         .from("books")
@@ -291,6 +314,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
         .maybeSingle();
 
       if (!data?.updated_at) return false;
+      if (!localUpdatedAt) return allowMissingLocalTimestamp;
 
       const localTime = new Date(localUpdatedAt).getTime();
       const serverTime = new Date(data.updated_at).getTime();
@@ -311,12 +335,13 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
 
   const acceptServerVersion = useCallback(async () => {
     if (!serverNewerBookId) return;
-    const book = books.find(b => b.id === serverNewerBookId);
     setServerNewerBookId(null);
+
+    const book = await loadBookFromServerById(serverNewerBookId);
     if (book) {
       await openSavedBookRef.current?.(book);
     }
-  }, [serverNewerBookId, books]);
+  }, [serverNewerBookId, loadBookFromServerById]);
 
   // ─── Auto-restore active book on mount (local-first) ───────
   const [restoredOnce, setRestoredOnce] = useState(false);
@@ -347,24 +372,53 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
     setRestoredOnce(true);
 
     restoreFromLocal(savedBookId).then(async (restored) => {
+      const shouldSyncWithServer = shouldRunServerSyncCheck(savedBookId);
+
       if (restored) {
-        // Check if server has a newer version
-        const isNewer = await checkServerNewer(savedBookId);
-        if (isNewer) {
-          setServerNewerBookId(savedBookId);
+        if (shouldSyncWithServer) {
+          const isNewer = await checkServerNewer(savedBookId);
+          markServerSyncChecked(savedBookId);
+          if (isNewer) {
+            setServerNewerBookId(savedBookId);
+          }
         }
         return;
       }
-      // Fallback: load from server
-      const book = books.find(b => b.id === savedBookId);
+
+      // Strict local-first: do not load from server unless this browser hasn't performed sync-check yet.
+      if (!shouldSyncWithServer) {
+        setStep("library");
+        return;
+      }
+
+      const isServerNewerForThisBrowser = await checkServerNewer(savedBookId, { allowMissingLocalTimestamp: true });
+      markServerSyncChecked(savedBookId);
+      if (!isServerNewerForThisBrowser) {
+        setStep("library");
+        return;
+      }
+
+      const book = await loadBookFromServerById(savedBookId);
       if (book) {
-        openSavedBookRef.current?.(book);
-      } else if (books.length > 0) {
+        await openSavedBookRef.current?.(book);
+      } else {
         sessionStorage.removeItem(ACTIVE_BOOK_KEY);
         setStep("library");
       }
     });
-  }, [userId, loadingLibrary, books, restoredOnce, restoreFromLocal, checkServerNewer, storageBackend, projectStorage]);
+  }, [
+    userId,
+    loadingLibrary,
+    restoredOnce,
+    restoreFromLocal,
+    checkServerNewer,
+    storageBackend,
+    projectStorage,
+    shouldRunServerSyncCheck,
+    markServerSyncChecked,
+    loadBookFromServerById,
+    step,
+  ]);
 
   // ─── Open saved book from DB ──────────────────────────────
   const openSavedBook = useCallback(async (book: BookRecord) => {
