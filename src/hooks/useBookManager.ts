@@ -454,7 +454,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     restoreFromLocal,
     checkServerNewer,
     storageBackend,
-    projectStorage,
+    projectStorageInitialized,
     shouldRunServerSyncCheck,
     markServerSyncChecked,
     loadBookFromServerById,
