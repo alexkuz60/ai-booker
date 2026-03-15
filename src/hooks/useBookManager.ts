@@ -326,7 +326,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
           sectionType: classifySection(ch.title),
         };
       });
-      setTocEntries(normalizeLevels(savedToc));
+      setTocEntries(normalizedToc);
 
       const newChapterIdMap = new Map<number, string>();
       chapters.forEach((ch, i) => newChapterIdMap.set(i, ch.id));
