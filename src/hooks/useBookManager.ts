@@ -26,7 +26,7 @@ interface UseBookManagerParams {
   /** Create a new local project (for auto-creating OPFS from server data) */
   createProject?: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<import("@/lib/projectStorage").ProjectStorage>;
 }
-...
+
 export function useBookManager({ userId, isRu, projectStorage, projectStorageInitialized = false, storageBackend = "none", createProject }: UseBookManagerParams) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
