@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSelectionCapture } from "@/hooks/useSelectionCapture";
-import { Pencil, Check } from "lucide-react";
+import { Pencil, Check, Trash2 } from "lucide-react";
 import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem,
   ContextMenuSeparator, ContextMenuLabel, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent,
@@ -60,6 +60,16 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
       onAnnotate(phrase.phrase_id, { type: actualType, start: sel.start, end: sel.end });
     }
   }, [phrase.phrase_id, phrase.text.length, onAnnotate, peek]);
+
+  const handleDeleteSelected = useCallback(() => {
+    const sel = peek();
+    if (!sel) return;
+    const newText = (phrase.text.slice(0, sel.start) + phrase.text.slice(sel.end)).trim();
+    if (!newText) return; // don't allow deleting entire phrase
+    if (newText !== phrase.text) {
+      onSave(phrase.phrase_id, newText);
+    }
+  }, [phrase.phrase_id, phrase.text, onSave, peek]);
 
   const hasAnnotations = phrase.annotations && phrase.annotations.length > 0;
 
@@ -250,6 +260,14 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
             ))}
           </>
         )}
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          onClick={handleDeleteSelected}
+          className="text-xs gap-2 text-destructive"
+        >
+          <Trash2 className="h-3 w-3" />
+          {isRu ? "Удалить выделенное" : "Delete selected"}
+        </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   );
