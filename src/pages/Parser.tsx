@@ -940,6 +940,30 @@ export default function Parser() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── Server Newer Version Dialog ── */}
+      <AlertDialog open={!!serverNewerBookId} onOpenChange={(open) => { if (!open) dismissServerNewer(); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isRu ? "На сервере есть более свежая версия" : "Server has a newer version"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isRu
+                ? "Книга была обновлена на другом устройстве. Загрузить серверную версию? Локальные изменения будут заменены."
+                : "The book was updated on another device. Load the server version? Local changes will be replaced."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {isRu ? "Оставить локальную" : "Keep local"}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={acceptServerVersion}>
+              {isRu ? "Загрузить с сервера" : "Load from server"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 }
