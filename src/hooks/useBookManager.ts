@@ -10,7 +10,7 @@ import type {
 } from "@/pages/parser/types";
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import type { ProjectStorage } from "@/lib/projectStorage";
-import { syncStructureToLocal } from "@/lib/localSync";
+import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
 
 interface UseBookManagerParams {
   userId: string | undefined;
