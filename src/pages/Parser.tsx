@@ -194,12 +194,8 @@ export default function Parser() {
   useEffect(() => {
     if (!projectStorage?.isReady || !bookId || tocEntries.length === 0) return;
 
-    // Cheap fingerprint: compare serialised lengths + key counts to avoid JSON.stringify on every render
-    const hash = `${tocEntries.length}:${chapterResults.size}:${chapterIdMap.size}:${
-      tocEntries.map(e => e.title + e.level + e.startPage).join("|")
-    }:${
-      Array.from(chapterResults.entries()).map(([k, v]) => `${k}:${v.status}:${v.scenes.length}:${v.scenes.reduce((s, sc) => s + (sc.content?.length ?? 0), 0)}`).join("|")
-    }`;
+    // Fingerprint includes actual scene content to avoid missed saves on same-length edits.
+    const hash = buildAutoSaveFingerprint(tocEntries, chapterResults, chapterIdMap);
     if (hash === lastSavedHash.current) return;
 
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
