@@ -168,6 +168,7 @@ export function useChapterAnalysis({
       next.set(idx, { scenes, status: "analyzing" });
       return next;
     });
+    markResultsDirty();
 
     try {
       // ─── STAGE 1: Boundary detection ───
