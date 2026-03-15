@@ -37,6 +37,25 @@ async function ensureStorage(
   return openProject();
 }
 
+function getErrorMessage(error: unknown, isRu: boolean): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (typeof error === "string" && error.trim()) return error;
+
+  if (error && typeof error === "object") {
+    const maybeMessage = "message" in error ? (error as { message?: unknown }).message : undefined;
+    if (typeof maybeMessage === "string" && maybeMessage.trim()) return maybeMessage;
+
+    try {
+      const json = JSON.stringify(error);
+      if (json && json !== "{}") return json;
+    } catch {
+      // ignore
+    }
+  }
+
+  return isRu ? "Неизвестная ошибка" : "Unknown error";
+}
+
 export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: UseSaveBookToProjectParams) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -223,12 +242,19 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
       }
 
       if (book.file_path) {
-        const { data: pdfBlob, error: pdfError } = await supabase.storage
-          .from("book-uploads")
-          .download(book.file_path);
-        if (pdfError) throw pdfError;
-        if (pdfBlob) {
-          await activeStorage.writeBlob("source/book.pdf", pdfBlob);
+        const pdfAlreadySaved = await activeStorage.exists("source/book.pdf");
+
+        if (!pdfAlreadySaved) {
+          const { data: pdfBlob, error: pdfError } = await supabase.storage
+            .from("book-uploads")
+            .download(book.file_path);
+
+          if (pdfError) {
+            // Не валим сохранение структуры, если исходный PDF недоступен
+            console.warn("[SaveBook] PDF download skipped:", pdfError);
+          } else if (pdfBlob) {
+            await activeStorage.writeBlob("source/book.pdf", pdfBlob);
+          }
         }
       }
 
@@ -249,7 +275,7 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
         description: `${activeStorage.projectName} · ${toc.length} ${isRu ? "глав" : "chapters"}`,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getErrorMessage(error, isRu);
       toast({
         title: isRu ? "Ошибка сохранения" : "Save failed",
         description: message,
@@ -271,7 +297,7 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
     } catch (error) {
       toast({
         title: isRu ? "Ошибка скачивания" : "Download failed",
-        description: error instanceof Error ? error.message : String(error),
+        description: getErrorMessage(error, isRu),
         variant: "destructive",
       });
     } finally {
@@ -290,7 +316,7 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
     } catch (error) {
       toast({
         title: isRu ? "Ошибка импорта" : "Import failed",
-        description: error instanceof Error ? error.message : String(error),
+        description: getErrorMessage(error, isRu),
         variant: "destructive",
       });
     } finally {
