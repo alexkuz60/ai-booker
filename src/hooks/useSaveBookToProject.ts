@@ -124,26 +124,23 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
         if (error) console.warn("[SaveToServer] chapters upsert:", error);
       }
 
-      // ── 2. Delete old scenes & insert current ones ──
-      // Collect all chapter IDs that have results
-      const chapterIdsWithScenes = new Set<string>();
-      chapterResults.forEach((_result, idx) => {
-        const chId = chapterIdMap.get(idx);
-        if (chId) chapterIdsWithScenes.add(chId);
-      });
+      // ── 2. Delete old scenes & insert current ones (leaf-only) ──
+      const normalizedResults = sanitizeChapterResultsForStructure(toc, chapterResults);
+      const leafIndices = getLeafIndices(toc);
+      const allChapterIds = chapterUpserts.map((ch) => ch.id);
 
-      // Delete ALL existing scenes for these chapters (removes stale/duplicate scenes)
-      if (chapterIdsWithScenes.size > 0) {
+      // Delete ALL existing scenes for all chapter rows (removes stale/duplicate/folder scenes)
+      if (allChapterIds.length > 0) {
         const { error: delErr } = await supabase
           .from("book_scenes")
           .delete()
-          .in("chapter_id", Array.from(chapterIdsWithScenes));
+          .in("chapter_id", allChapterIds);
         if (delErr) console.warn("[SaveToServer] scenes delete:", delErr);
       }
 
-      // Insert fresh scenes
+      // Insert fresh scenes only for leaf chapters
       const sceneInserts: Array<{
-        id: string;
+        id?: string;
         chapter_id: string;
         scene_number: number;
         title: string;
@@ -153,13 +150,14 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
         bpm: number;
       }> = [];
 
-      chapterResults.forEach((result, idx) => {
+      for (const idx of leafIndices) {
         const chId = chapterIdMap.get(idx);
-        if (!chId) return;
+        const result = normalizedResults.get(idx);
+        if (!chId || !result) continue;
+
         for (const sc of result.scenes) {
-          if (!sc.id) continue;
           sceneInserts.push({
-            id: sc.id,
+            ...(sc.id ? { id: sc.id } : {}),
             chapter_id: chId,
             scene_number: sc.scene_number,
             title: sc.title,
@@ -169,7 +167,7 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
             bpm: sc.bpm || 120,
           });
         }
-      });
+      }
 
       if (sceneInserts.length > 0) {
         const { error } = await supabase.from("book_scenes").insert(sceneInserts);
