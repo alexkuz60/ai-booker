@@ -40,7 +40,7 @@ async function ensureStorage(
 export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: UseSaveBookToProjectParams) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { storage, openProject, backend, meta } = useProjectStorageContext();
+  const { storage, openProject, backend, meta, downloadProjectAsZip, importProjectFromZip } = useProjectStorageContext();
   const [saving, setSaving] = useState(false);
 
   const saveBook = useCallback(async () => {
