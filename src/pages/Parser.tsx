@@ -491,6 +491,9 @@ export default function Parser() {
     const { toDelete } = pendingDelete;
     pushSnapshot(getCurrentSnapshot(), isRu ? "Удаление элементов" : "Delete items");
 
+    // CONTRACT GUARD: warn if deleting parent without children
+    warnPartialTreeDelete(toDelete, tocEntries);
+
     // Delete from DB
     for (const di of toDelete) {
       const chapterId = chapterIdMap.get(di);
@@ -516,6 +519,9 @@ export default function Parser() {
     }
     setChapterIdMap(newMap);
 
+    // CONTRACT K5 GUARD: verify rebuilt maps are consistent
+    assertMapIndicesInBounds("chapterIdMap (after delete)", newMap, newEntries.length);
+
     // Clear selection
     setSelectedIndices(prev => {
       const next = new Set(prev);
@@ -533,6 +539,10 @@ export default function Parser() {
       newIdx++;
     }
     setChapterResults(newResults);
+
+    // CONTRACT K5 GUARD: verify results map
+    assertMapIndicesInBounds("chapterResults (after delete)", newResults, newEntries.length);
+
     setPendingDelete(null);
     scheduleSave();
   };
