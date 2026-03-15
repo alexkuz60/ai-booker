@@ -171,7 +171,7 @@ export default function Parser() {
     const hash = `${tocEntries.length}:${chapterResults.size}:${chapterIdMap.size}:${
       tocEntries.map(e => e.title + e.level + e.startPage).join("|")
     }:${
-      Array.from(chapterResults.entries()).map(([k, v]) => `${k}:${v.status}:${v.scenes.length}`).join("|")
+      Array.from(chapterResults.entries()).map(([k, v]) => `${k}:${v.status}:${v.scenes.length}:${v.scenes.reduce((s, sc) => s + (sc.content?.length ?? 0), 0)}`).join("|")
     }`;
     if (hash === lastSavedHash.current) return;
 
@@ -613,6 +613,15 @@ export default function Parser() {
       }
       return next;
     });
+    // Persist content changes to DB for scenes that have IDs
+    const scenesWithIds = updatedScenes.filter(sc => sc.id);
+    if (scenesWithIds.length > 0) {
+      Promise.all(
+        scenesWithIds.map(sc =>
+          supabase.from("book_scenes").update({ content: sc.content ?? null }).eq("id", sc.id!)
+        )
+      ).catch(err => console.warn("[ScenesUpdate] DB write failed:", err));
+    }
   }, [selectedIdx, setChapterResults]);
 
 
