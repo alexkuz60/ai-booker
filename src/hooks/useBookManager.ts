@@ -190,8 +190,21 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
       return;
     }
 
-    // Try local-first, then check if server has newer version
+    // CRITICAL: If backend is OPFS, we must wait for projectStorage to initialize.
+    // Don't set restoredOnce until storage is ready or confirmed unavailable.
+    const storageNeeded = storageBackend === "opfs";
+    const storageReady = projectStorage?.isReady === true;
+
+    if (storageNeeded && !storageReady) {
+      // Storage is still initializing — DON'T set restoredOnce, wait for next render
+      console.log("[AutoRestore] Waiting for OPFS storage to initialize...");
+      return;
+    }
+
+    // For fs-access: storage requires user interaction, can't auto-restore folder.
+    // We still try local restore (in case storage was opened this session).
     setRestoredOnce(true);
+
     restoreFromLocal(savedBookId).then(async (restored) => {
       if (restored) {
         // Check if server has a newer version
@@ -210,7 +223,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
         setStep("library");
       }
     });
-  }, [userId, loadingLibrary, books, restoredOnce, restoreFromLocal, checkServerNewer]);
+  }, [userId, loadingLibrary, books, restoredOnce, restoreFromLocal, checkServerNewer, storageBackend, projectStorage]);
 
   // ─── Open saved book from DB ──────────────────────────────
   const openSavedBook = useCallback(async (book: BookRecord) => {
