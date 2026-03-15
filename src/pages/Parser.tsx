@@ -353,7 +353,6 @@ export default function Parser() {
   };
 
   const changeLevel = (indices: number[], delta: number) => {
-    pushSnapshot(getCurrentSnapshot(), isRu ? "Изменение уровня" : "Change level");
     setTocEntries(prev => {
       const next = prev.map(e => ({ ...e }));
       const allAffected = new Set<number>();
