@@ -295,21 +295,65 @@ export default function ParserCharactersPanel({
 
                     {/* Gender */}
                     <TableCell className="text-center">
-                      {char.gender === "male" && (
-                        <span className="text-xs text-sky-500 dark:text-sky-400" title={isRu ? "Мужской" : "Male"}>
-                          М
-                        </span>
-                      )}
-                      {char.gender === "female" && (
-                        <span className="text-xs text-rose-500 dark:text-rose-400" title={isRu ? "Женский" : "Female"}>
-                          Ж
-                        </span>
-                      )}
-                      {(!char.gender || char.gender === "unknown") && (
-                        <span className="text-xs text-muted-foreground/40" title={isRu ? "Неизвестно" : "Unknown"}>
-                          ?
-                        </span>
-                      )}
+                      <Popover
+                        open={genderPopoverOpen === char.id}
+                        onOpenChange={(open) => setGenderPopoverOpen(open ? char.id : null)}
+                      >
+                        <PopoverTrigger asChild>
+                          <button className="inline-flex items-center gap-0.5 hover:opacity-60 transition-opacity">
+                            {char.gender === "male" && (
+                              <span className="text-xs text-sky-500 dark:text-sky-400" title={isRu ? "Мужской" : "Male"}>
+                                М
+                              </span>
+                            )}
+                            {char.gender === "female" && (
+                              <span className="text-xs text-rose-500 dark:text-rose-400" title={isRu ? "Женский" : "Female"}>
+                                Ж
+                              </span>
+                            )}
+                            {(!char.gender || char.gender === "unknown") && (
+                              <span className="text-xs text-muted-foreground/40" title={isRu ? "Неизвестно" : "Unknown"}>
+                                ?
+                              </span>
+                            )}
+                            <ChevronDown className="h-2.5 w-2.5 text-muted-foreground/40" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-32 p-1" align="center">
+                          <div className="flex flex-col gap-0.5">
+                            <button
+                              className="text-left px-2 py-1 text-xs rounded hover:bg-accent flex items-center gap-2"
+                              onClick={() => {
+                                onUpdateGender(char.id, "male");
+                                setGenderPopoverOpen(null);
+                              }}
+                            >
+                              <span className="text-sky-500 dark:text-sky-400 font-semibold">М</span>
+                              <span>{isRu ? "Мужской" : "Male"}</span>
+                            </button>
+                            <button
+                              className="text-left px-2 py-1 text-xs rounded hover:bg-accent flex items-center gap-2"
+                              onClick={() => {
+                                onUpdateGender(char.id, "female");
+                                setGenderPopoverOpen(null);
+                              }}
+                            >
+                              <span className="text-rose-500 dark:text-rose-400 font-semibold">Ж</span>
+                              <span>{isRu ? "Женский" : "Female"}</span>
+                            </button>
+                            <button
+                              className="text-left px-2 py-1 text-xs rounded hover:bg-accent flex items-center gap-2"
+                              onClick={() => {
+                                onUpdateGender(char.id, "unknown");
+                                setGenderPopoverOpen(null);
+                              }}
+                            >
+                              <span className="text-muted-foreground/40 font-semibold">?</span>
+                              <span>{isRu ? "Неизвестно" : "Unknown"}</span>
+                            </button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </TableCell>
 
                     {/* Scene count */}

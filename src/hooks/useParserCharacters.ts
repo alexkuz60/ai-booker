@@ -346,6 +346,7 @@ export function useParserCharacters({
     extractProgress,
     extractCharacters,
     renameCharacter,
+    updateGender,
     updateAliases,
     deleteCharacter,
     mergeCharacters,

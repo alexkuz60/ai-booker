@@ -768,6 +768,7 @@ export default function Parser() {
                 extractProgress={extractProgress}
                 onExtract={extractCharacters}
                 onRename={renameCharacter}
+                onUpdateGender={updateGender}
                 onUpdateAliases={updateAliases}
                 onDelete={deleteCharacter}
                 onMerge={mergeCharacters}
