@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import type { Scene } from "@/pages/parser/types";
 
 // ─── Types ───────────────────────────────────────────────────
-export type CleanupAction = "header" | "page_number" | "chapter_split" | "fix_punctuation_spaces" | "footnote_link" | "footnote_auto";
+export type CleanupAction = "header" | "page_number" | "chapter_split" | "fix_punctuation_spaces" | "footnote_link" | "footnote_auto" | "delete_selected";
 
 export interface CleanupResult {
   /** Updated scenes array (may grow if split happened) */
@@ -84,7 +84,37 @@ function removePageNumbers(scenes: Scene[], selectedText: string): CleanupResult
   };
 }
 
-// ─── 3. Split scene at chapter marker ────────────────────────
+// ─── 3. Delete selected text in current scene (exact, no global search) ─────
+function deleteSelectedTextInScene(
+  scenes: Scene[],
+  selectedText: string,
+  sceneIndex: number,
+): CleanupResult {
+  const trimmed = selectedText.trim();
+  if (!trimmed) return { scenes, changeCount: 0, summary: "Нет выделенного текста" };
+
+  const scene = scenes[sceneIndex];
+  if (!scene) return { scenes, changeCount: 0, summary: "Сцена не найдена" };
+
+  const content = scene.content || "";
+  const selIdx = content.indexOf(trimmed);
+  if (selIdx === -1) {
+    return { scenes, changeCount: 0, summary: "Выделенный текст не найден в сцене" };
+  }
+
+  const newContent = content.slice(0, selIdx) + content.slice(selIdx + trimmed.length);
+  const updatedScenes = scenes.map((sc, i) =>
+    i === sceneIndex ? { ...sc, content: newContent } : sc
+  );
+
+  return {
+    scenes: updatedScenes,
+    changeCount: 1,
+    summary: "Выделенный текст удалён",
+  };
+}
+
+// ─── 4. Split scene at chapter marker ────────────────────────
 // Checks if the character right after selection starts with an
 // uppercase letter. If so, splits the scene at that position
 // and creates a new scene.
@@ -340,6 +370,8 @@ export function useContentCleanup() {
         return removeHeaderFooter(scenes, selectedText);
       case "page_number":
         return removePageNumbers(scenes, selectedText);
+      case "delete_selected":
+        return deleteSelectedTextInScene(scenes, selectedText, sceneIndex);
       case "chapter_split":
         return splitAtChapterMarker(scenes, selectedText, sceneIndex);
       case "fix_punctuation_spaces":

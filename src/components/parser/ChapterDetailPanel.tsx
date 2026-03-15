@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, Fragment } from "react";
 import { motion } from "framer-motion";
 import {
   FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock, RefreshCw, Palette, StopCircle,
-  Trash2, Hash, Scissors, SpellCheck, Footprints, PencilLine
+  Trash2, Hash, SpellCheck, Footprints, PencilLine
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -257,9 +257,9 @@ function SceneCards({
                 {t("cleanupFootnoteLink", isRu)}
               </ContextMenuItem>
               <ContextMenuSeparator />
-              <ContextMenuItem onClick={() => handleCleanup("chapter_split", i)} className="gap-2">
-                <Scissors className="h-4 w-4 text-muted-foreground" />
-                {t("cleanupChapterSplit", isRu)}
+              <ContextMenuItem onClick={() => handleCleanup("delete_selected", i)} className="gap-2 text-destructive">
+                <Trash2 className="h-4 w-4" />
+                {isRu ? "Удалить выделенное" : "Delete selected"}
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>

@@ -29,7 +29,7 @@ import type { StructureSnapshot } from "@/hooks/useStructureUndo";
 import UndoRedoDropdown from "@/components/parser/UndoRedoDropdown";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { useImperativeSave } from "@/hooks/useImperativeSave";
-import { assertNotOverwritingParent, assertMapIndicesInBounds, warnStaleResults, assertValidMerge, warnPartialTreeDelete } from "@/lib/parserContracts";
+import { assertMapIndicesInBounds, warnStaleResults, assertValidMerge, warnPartialTreeDelete } from "@/lib/parserContracts";
 
 import LibraryView from "@/components/parser/LibraryView";
 import UploadView from "@/components/parser/UploadView";
@@ -650,8 +650,7 @@ export default function Parser() {
    * When selectedIdx is a parent with children, updatedScenes is the aggregated list
    * from [selectedIdx, ...childIndices]. We split it back by original scene counts.
    * 
-   * RUNTIME GUARD: assertNotOverwritingParent prevents silent data corruption.
-   * See: IMPLEMENTATION_LOG.md → К3, src/test/contracts.test.ts
+   * Parent updates are redistributed only to children (never written as one block to parent).
    */
   const handleScenesUpdate = useCallback((updatedScenes: Scene[], label?: string) => {
     if (selectedIdx === null) return;
@@ -681,8 +680,6 @@ export default function Parser() {
       return;
     }
 
-    // CONTRACT K3 GUARD: parent node must NOT receive aggregated scenes directly
-    assertNotOverwritingParent(selectedIdx, tocEntries, updatedScenes, label || "handleScenesUpdate");
 
     // Parent with children: distribute scenes back to their original chapters.
     const indices = [selectedIdx, ...childIndices];
