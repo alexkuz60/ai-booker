@@ -50,7 +50,7 @@ export async function exportProjectZip(storage: ProjectStorage): Promise<Blob> {
   }
 
   const zipped = zipSync(files, { level: 6 });
-  return new Blob([zipped], { type: "application/zip" });
+  return new Blob([zipped.buffer as ArrayBuffer], { type: "application/zip" });
 }
 
 /**
