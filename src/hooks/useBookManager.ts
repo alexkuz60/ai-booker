@@ -632,9 +632,22 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
       setChapterResults(initMap);
       setStep("workspace");
 
-      // ── Dual-write: sync to local project ──
-      if (projectStorage?.isReady) {
-        syncStructureToLocal(projectStorage, {
+      // ── Dual-write: sync to local project (auto-create OPFS if needed) ──
+      let targetStorage = projectStorage?.isReady ? projectStorage : null;
+
+      if (!targetStorage && storageBackend === "opfs" && createProject && userId) {
+        try {
+          const projectTitle = book.title || book.file_name.replace('.pdf', '');
+          const lang = isRu ? "ru" as const : "en" as const;
+          targetStorage = await createProject(projectTitle, book.id, userId, lang);
+          console.log("[OpenBook] Auto-created OPFS project for server book:", projectTitle);
+        } catch (err) {
+          console.warn("[OpenBook] Failed to auto-create OPFS project:", err);
+        }
+      }
+
+      if (targetStorage) {
+        syncStructureToLocal(targetStorage, {
           bookId: book.id,
           title: book.title || book.file_name.replace('.pdf', ''),
           fileName: book.file_name,
@@ -643,6 +656,13 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
           chapterIdMap: newChapterIdMap,
           chapterResults: initMap,
         });
+
+        // Save PDF to local project if downloaded from server
+        if (pdfBlob && targetStorage) {
+          targetStorage.writeBlob("source/book.pdf", pdfBlob).catch(err =>
+            console.warn("[OpenBook] Failed to save PDF to local project:", err)
+          );
+        }
       }
 
       const pdfStatus = restoredPdf
