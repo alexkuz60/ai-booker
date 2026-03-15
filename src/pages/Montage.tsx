@@ -55,8 +55,9 @@ const Montage = () => {
     ? `${bookTitle} → ${chapterTitle}`
     : (isRu ? "Финальный монтаж и мастеринг глав" : "Final chapter montage & mastering");
 
-  const renderButton = (
+  const headerRight = useMemo(() => (
     <div className="flex items-center gap-2">
+      <SaveBookButton isRu={isRu} onClick={saveBook} loading={savingBook} disabled={!bookId} />
       {hasContent && (
         <Button
           variant="hero"
@@ -71,12 +72,12 @@ const Montage = () => {
       )}
       <AiRolesButton isRu={isRu} apiKeys={userApiKeys} bookTitle={bookTitle || undefined} />
     </div>
-  );
+  ), [isRu, saveBook, savingBook, bookId, hasContent, clips.length, userApiKeys, bookTitle]);
 
   useEffect(() => {
-    setPageHeader({ title, subtitle, headerRight: renderButton });
+    setPageHeader({ title, subtitle, headerRight });
     return () => setPageHeader({});
-  }, [title, subtitle, hasContent, clips.length]);
+  }, [title, subtitle, headerRight, setPageHeader]);
 
   if (loading) {
     return (

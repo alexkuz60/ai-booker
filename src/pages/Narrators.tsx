@@ -127,15 +127,25 @@ const Narrators = () => {
   const selectedVoice = YANDEX_VOICES.find(v => v.id === voice);
   const availableRoles = selectedVoice?.roles ?? ["neutral"];
   const markDirty = () => setDirty(true);
+  const { saveBook, saving: savingBook } = useSaveBookToProject({
+    isRu,
+    currentBookId: selectedBookId,
+  });
+
+  const headerRight = useMemo(
+    () => <SaveBookButton isRu={isRu} onClick={saveBook} loading={savingBook} disabled={!selectedBookId} />,
+    [isRu, saveBook, savingBook, selectedBookId],
+  );
 
   // Page header
   useEffect(() => {
     setPageHeader({
       title: isRu ? "Дикторы" : "Narrators",
       subtitle: isRu ? "Библиотека голосов и настройка TTS-провайдеров" : "Voice library and TTS provider settings",
+      headerRight,
     });
     return () => setPageHeader({});
-  }, [isRu]);
+  }, [isRu, headerRight, setPageHeader]);
 
   // Load books
   useEffect(() => {

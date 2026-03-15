@@ -345,7 +345,7 @@ const Studio = () => {
   useEffect(() => {
     setPageHeader({ title: studioTitle, subtitle: studioSubtitle, headerRight });
     return () => setPageHeader({});
-  }, [studioTitle, studioSubtitle, chapterEstimate?.formatted, sceneEstimate?.formatted, actualChapterDurationSec, actualSceneSec, clipsRefreshToken]);
+  }, [studioTitle, studioSubtitle, chapterEstimate?.formatted, sceneEstimate?.formatted, actualChapterDurationSec, actualSceneSec, clipsRefreshToken, saveBook, savingBook, bookId]);
 
   // Show loading while restoring session
   if (!restored) {
