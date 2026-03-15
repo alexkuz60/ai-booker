@@ -134,6 +134,14 @@ export default function Parser() {
     getSnapshot: getLocalSnapshot,
   });
 
+
+  const { analysisLog, analyzeChapter, resetAnalysis, stopAnalysis, isAnalyzing } = useChapterAnalysis({
+    isRu, pdfRef, userId: user?.id, bookId, userApiKeys, getModelForRole,
+    tocEntries, chapterIdMap, chapterResults, setChapterResults,
+    onChapterResultsMutated: scheduleSave,
+    ensurePdfLoaded,
+  });
+
   const getCurrentSnapshot = useCallback((): StructureSnapshot => ({
     tocEntries: tocEntries.map(e => ({ ...e })),
     chapterIdMap: new Map(chapterIdMap),
