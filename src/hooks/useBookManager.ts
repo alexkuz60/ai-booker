@@ -21,6 +21,8 @@ interface UseBookManagerParams {
   projectStorage?: ProjectStorage | null;
   /** Storage backend type — needed to know if we should wait for storage init */
   storageBackend?: "fs-access" | "opfs" | "none";
+  /** Create a new local project (for auto-creating OPFS from server data) */
+  createProject?: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<import("@/lib/projectStorage").ProjectStorage>;
 }
 
 const BROWSER_ID_KEY = "booker_browser_id";
