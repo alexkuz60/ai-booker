@@ -260,6 +260,14 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
             ))}
           </>
         )}
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          onClick={handleDeleteSelected}
+          className="text-xs gap-2 text-destructive"
+        >
+          <Trash2 className="h-3 w-3" />
+          {isRu ? "Удалить выделенное" : "Delete selected"}
+        </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   );
