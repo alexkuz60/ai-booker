@@ -638,7 +638,7 @@ export default function Parser() {
       return next;
     });
     scheduleSave();
-  }, [selectedIdx, tocEntries, setChapterResults, pushSnapshot, getCurrentSnapshot, scheduleSave]);
+  }, [selectedIdx, tocEntries, setChapterResults, scheduleSave]);
 
 
   return (
