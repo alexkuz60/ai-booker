@@ -211,21 +211,42 @@ export function useProjectStorage(): UseProjectStorageReturn {
   // ── Auto-restore OPFS project on mount ──────────────────
 
   useEffect(() => {
-    if (backend !== "opfs") return;
-    try {
-      const saved = localStorage.getItem(LAST_PROJECT_KEY);
-      if (!saved) return;
-      const { name, backend: savedBackend } = JSON.parse(saved);
-      if (savedBackend !== "opfs" || !name) return;
+    let cancelled = false;
 
-      OPFSStorage.openOrCreate(name).then(async (store) => {
+    if (backend !== "opfs") {
+      setInitialized(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const bootstrap = async () => {
+      try {
+        const saved = localStorage.getItem(LAST_PROJECT_KEY);
+        if (!saved) return;
+
+        const { name, backend: savedBackend } = JSON.parse(saved);
+        if (savedBackend !== "opfs" || !name) return;
+
+        const store = await OPFSStorage.openOrCreate(name);
         const projectMeta = await store.readJSON<ProjectMeta>("project.json");
-        if (projectMeta) {
+
+        if (!cancelled && projectMeta) {
           setStorage(store);
           setMeta(projectMeta);
         }
-      }).catch(() => {});
-    } catch {}
+      } catch {
+        // ignore bootstrap errors, app can still work without restored project
+      } finally {
+        if (!cancelled) setInitialized(true);
+      }
+    };
+
+    void bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
   }, [backend]);
 
   return {
