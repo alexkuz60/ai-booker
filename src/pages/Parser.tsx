@@ -147,54 +147,6 @@ export default function Parser() {
     ensurePdfLoaded,
   });
 
-  const getCurrentSnapshot = useCallback((): StructureSnapshot => ({
-    tocEntries: tocEntries.map(e => ({ ...e })),
-    chapterIdMap: new Map(chapterIdMap),
-    chapterResults: new Map(
-      Array.from(chapterResults.entries()).map(([k, v]) => [k, { scenes: [...v.scenes], status: v.status }])
-    ),
-    selectedIndices: new Set(selectedIndices),
-  }), [tocEntries, chapterIdMap, chapterResults, selectedIndices]);
-
-  const restoreSnapshot = useCallback((s: StructureSnapshot) => {
-    setTocEntries(s.tocEntries);
-    setChapterIdMap(s.chapterIdMap);
-    setChapterResults(s.chapterResults);
-    setSelectedIndices(s.selectedIndices);
-    scheduleSave();
-  }, [setTocEntries, setChapterIdMap, setChapterResults, scheduleSave]);
-
-  const handleUndo = useCallback(() => {
-    undo(getCurrentSnapshot(), restoreSnapshot);
-  }, [undo, getCurrentSnapshot, restoreSnapshot]);
-
-  const handleRedo = useCallback(() => {
-    redo(getCurrentSnapshot(), restoreSnapshot);
-  }, [redo, getCurrentSnapshot, restoreSnapshot]);
-
-  const handleUndoTo = useCallback((index: number) => {
-    undoTo(index, getCurrentSnapshot(), restoreSnapshot);
-  }, [undoTo, getCurrentSnapshot, restoreSnapshot]);
-
-  const handleRedoTo = useCallback((index: number) => {
-    redoTo(index, getCurrentSnapshot(), restoreSnapshot);
-  }, [redoTo, getCurrentSnapshot, restoreSnapshot]);
-
-  // Ctrl+Z / Ctrl+Shift+Z keyboard shortcuts
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (step !== "workspace") return;
-      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        handleUndo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === "z" && e.shiftKey) {
-        e.preventDefault();
-        handleRedo();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [step, handleUndo, handleRedo]);
 
   // ── Flush pending auto-save on page unload ──
   const flushSaveRef = useRef(flushSave);
