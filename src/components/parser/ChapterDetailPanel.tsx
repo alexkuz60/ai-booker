@@ -276,19 +276,19 @@ export default function ChapterDetailPanel({
                 </div>
               </div>
 
-              {selectedResult?.status === "pending" && (
+              {selectedResult?.status === "pending" && childCount === 0 && (
                 <Button variant="outline" size="sm" onClick={() => onAnalyze(selectedIdx)} className="gap-2">
                   <PlayCircle className="h-4 w-4" />
                   {t("analyze", isRu)}
                 </Button>
               )}
-              {selectedResult?.status === "done" && (
+              {selectedResult?.status === "done" && childCount === 0 && (
                 <Button variant="ghost" size="sm" onClick={() => setReanalyzeOpen(true)} className="gap-2 text-muted-foreground">
                   <Zap className="h-4 w-4" />
                   {t("reanalyze", isRu)}
                 </Button>
               )}
-              {selectedResult?.status === "error" && (
+              {selectedResult?.status === "error" && childCount === 0 && (
                 <Button variant="outline" size="sm" onClick={() => onAnalyze(selectedIdx)} className="gap-2 border-destructive/30 text-destructive">
                   {(selectedResult?.scenes?.length || 0) > 0 ? (
                     <><PlayCircle className="h-4 w-4" />{t("resume", isRu)}</>
