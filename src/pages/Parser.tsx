@@ -29,7 +29,7 @@ import type { StructureSnapshot } from "@/hooks/useStructureUndo";
 import UndoRedoDropdown from "@/components/parser/UndoRedoDropdown";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { useImperativeSave } from "@/hooks/useImperativeSave";
-import { assertNotOverwritingParent } from "@/lib/parserContracts";
+import { assertNotOverwritingParent, assertMapIndicesInBounds, warnStaleResults, assertValidMerge, warnPartialTreeDelete } from "@/lib/parserContracts";
 
 import LibraryView from "@/components/parser/LibraryView";
 import UploadView from "@/components/parser/UploadView";
