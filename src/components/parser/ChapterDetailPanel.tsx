@@ -276,7 +276,7 @@ export default function ChapterDetailPanel({
                 </div>
               </div>
 
-              {selectedResult?.status === "pending" && (
+              {selectedResult?.status === "pending" && childCount === 0 && (
                 <Button variant="outline" size="sm" onClick={() => onAnalyze(selectedIdx)} className="gap-2">
                   <PlayCircle className="h-4 w-4" />
                   {t("analyze", isRu)}

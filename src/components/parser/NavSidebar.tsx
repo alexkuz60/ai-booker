@@ -156,7 +156,7 @@ export default function NavSidebar({
               onToggleNode(nodeKey);
             }
             onSelectChapter(idx, e);
-            if (status === "pending" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+            if (status === "pending" && !isParent && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
               onAnalyzeChapter(idx);
             }
           }}
