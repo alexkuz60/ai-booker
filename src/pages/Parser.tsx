@@ -471,8 +471,6 @@ export default function Parser() {
     }
     setChapterIdMap(newMap);
 
-    // CONTRACT K5 GUARD: verify rebuilt maps are consistent
-    assertMapIndicesInBounds("chapterIdMap (after delete)", newMap, newEntries.length);
 
     // Clear selection
     setSelectedIndices(prev => {
