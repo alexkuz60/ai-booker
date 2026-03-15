@@ -18,6 +18,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { RoleBadge } from "@/components/ui/RoleBadge";
 import type { LocalCharacter } from "@/pages/parser/types";
 
 interface ParserCharactersPanelProps {
