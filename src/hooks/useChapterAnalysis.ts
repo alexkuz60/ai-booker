@@ -42,14 +42,6 @@ export function useChapterAnalysis({
     onChapterResultsMutated?.();
   };
 
-  const touchBookUpdatedAt = async () => {
-    if (!bookId) return;
-    await supabase
-      .from("books")
-      .update({ updated_at: new Date().toISOString() })
-      .eq("id", bookId);
-  };
-
   // ─── Helper: call edge function ─────────────────────────────
   const callParseFunction = async (body: Record<string, unknown>): Promise<any> => {
     const abortCtrl = new AbortController();
@@ -235,7 +227,6 @@ export function useChapterAnalysis({
             return next;
           });
           markResultsDirty();
-          await touchBookUpdatedAt();
           toast.info(`"${entry.title}" — ${t("logNotEnough", isRu)}`);
           return;
         }
@@ -468,11 +459,6 @@ export function useChapterAnalysis({
       markResultsDirty();
       toast.error(userError, { duration: 8000 });
     } finally {
-      try {
-        await touchBookUpdatedAt();
-      } catch (touchErr) {
-        console.warn("[ChapterAnalysis] Failed to touch books.updated_at:", touchErr);
-      }
       setIsAnalyzing(false);
     }
   };
@@ -494,9 +480,6 @@ export function useChapterAnalysis({
       return next;
     });
     markResultsDirty();
-    void touchBookUpdatedAt().catch((touchErr) => {
-      console.warn("[ChapterAnalysis] Failed to touch books.updated_at after stop:", touchErr);
-    });
   };
 
   // ─── Background Prefetch ───

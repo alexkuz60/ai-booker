@@ -9,8 +9,8 @@ import type {
   Scene, TocChapter, Step, ChapterStatus, BookRecord,
 } from "@/pages/parser/types";
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
-import type { ProjectStorage } from "@/lib/projectStorage";
-import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
+import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
+import { syncStructureToLocal, readStructureFromLocal, type LocalBookStructure } from "@/lib/localSync";
 import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 
 
@@ -21,6 +21,25 @@ interface UseBookManagerParams {
   projectStorage?: ProjectStorage | null;
   /** Storage backend type — needed to know if we should wait for storage init */
   storageBackend?: "fs-access" | "opfs" | "none";
+}
+
+const BROWSER_ID_KEY = "booker_browser_id";
+const SERVER_SYNC_PREFIX = "booker_server_sync_checked";
+
+function getOrCreateBrowserId(): string {
+  try {
+    const existing = localStorage.getItem(BROWSER_ID_KEY);
+    if (existing) return existing;
+    const nextId = crypto?.randomUUID?.() || `browser_${Date.now()}`;
+    localStorage.setItem(BROWSER_ID_KEY, nextId);
+    return nextId;
+  } catch {
+    return "browser_fallback";
+  }
+}
+
+function getSyncCheckKey(bookId: string): string {
+  return `${SERVER_SYNC_PREFIX}:${bookId}`;
 }
 
 export function useBookManager({ userId, isRu, projectStorage, storageBackend = "none" }: UseBookManagerParams) {
@@ -45,48 +64,58 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
 
   const [chapterResults, setChapterResults] = useState<Map<number, { scenes: Scene[]; status: ChapterStatus }>>(new Map());
 
-  // ─── Library: Load user's books ────────────────────────────
-  const loadLibrary = useCallback(async () => {
-    if (!userId) {
-      setBooks([]);
-      setLoadingLibrary(false);
-      return;
+  // ─── Library: Local-first list (no automatic server listing) ─────────────
+  const mapLocalStructureToBook = useCallback(async (storage: ProjectStorage): Promise<BookRecord | null> => {
+    const structure = await storage.readJSON<LocalBookStructure>("structure/toc.json");
+    const meta = await storage.readJSON<{ bookId?: string; title?: string; createdAt?: string; updatedAt?: string }>("project.json");
+
+    if (!structure && !meta) return null;
+
+    const toc = structure?.toc || [];
+    const chapterCount = toc.reduce((acc, _entry, idx) => acc + (isFolderNode(toc, idx) ? 0 : 1), 0);
+
+    const resolvedId = structure?.bookId || meta?.bookId || `local:${storage.projectName}`;
+    const resolvedTitle = structure?.title || meta?.title || storage.projectName;
+    const resolvedFileName = structure?.fileName || `${resolvedTitle}.pdf`;
+    const resolvedCreatedAt = structure?.updatedAt || meta?.updatedAt || meta?.createdAt || new Date(0).toISOString();
+
+    return {
+      id: resolvedId,
+      title: resolvedTitle,
+      file_name: resolvedFileName,
+      file_path: null,
+      status: "local",
+      created_at: resolvedCreatedAt,
+      chapter_count: chapterCount,
+      scene_count: 0,
+    };
+  }, []);
+
+  const loadLocalLibrary = useCallback(async (): Promise<BookRecord[]> => {
+    if (storageBackend === "opfs") {
+      const projectNames = await OPFSStorage.listProjects();
+      const records = await Promise.all(projectNames.map(async (projectName) => {
+        const store = await OPFSStorage.openOrCreate(projectName);
+        return mapLocalStructureToBook(store);
+      }));
+
+      return records
+        .filter((b): b is BookRecord => !!b)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
 
-    const mapBooks = (rows: any[]): BookRecord[] => (rows || []).map((b: any) => ({
-      id: b.id,
-      title: b.title,
-      file_name: b.file_name,
-      file_path: b.file_path,
-      status: b.status,
-      created_at: b.created_at,
-      chapter_count: Number(b.chapter_count) || 0,
-      scene_count: Number(b.scene_count) || 0,
-    }));
+    if (projectStorage?.isReady) {
+      const current = await mapLocalStructureToBook(projectStorage);
+      return current ? [current] : [];
+    }
 
-    const fallbackLoadLibrary = async (): Promise<BookRecord[]> => {
-      const { data, error } = await supabase
-        .from("books")
-        .select("id, title, file_name, file_path, status, created_at")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
+    return [];
+  }, [storageBackend, projectStorage, mapLocalStructureToBook]);
 
-      if (error) throw error;
-      return (data || []).map((b: any) => ({
-        id: b.id,
-        title: b.title,
-        file_name: b.file_name,
-        file_path: b.file_path,
-        status: b.status,
-        created_at: b.created_at,
-        chapter_count: 0,
-        scene_count: 0,
-      }));
-    };
+  const loadLibraryFromServer = useCallback(async (): Promise<BookRecord[]> => {
+    if (!userId) return [];
 
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    setLoadingLibrary(true);
-
     try {
       const rpcPromise = supabase.rpc("get_user_books_with_counts");
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -99,20 +128,65 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
       };
 
       if (error) throw error;
-      setBooks(mapBooks(data || []));
-    } catch (err) {
-      console.warn("[Library] RPC failed, fallback to direct query:", err);
-      try {
-        setBooks(await fallbackLoadLibrary());
-      } catch (fallbackErr) {
-        console.error("Failed to load library:", fallbackErr);
-        setBooks([]);
-      }
+      return (data || []).map((b: any) => ({
+        id: b.id,
+        title: b.title,
+        file_name: b.file_name,
+        file_path: b.file_path,
+        status: b.status,
+        created_at: b.created_at,
+        chapter_count: Number(b.chapter_count) || 0,
+        scene_count: Number(b.scene_count) || 0,
+      }));
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
-      setLoadingLibrary(false);
     }
   }, [userId]);
+
+  const loadBookFromServerById = useCallback(async (targetBookId: string): Promise<BookRecord | null> => {
+    const fromRpc = await loadLibraryFromServer();
+    const found = fromRpc.find((b) => b.id === targetBookId);
+    if (found) return found;
+
+    const { data, error } = await supabase
+      .from("books")
+      .select("id, title, file_name, file_path, status, created_at")
+      .eq("id", targetBookId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    return {
+      id: data.id,
+      title: data.title,
+      file_name: data.file_name,
+      file_path: data.file_path,
+      status: data.status,
+      created_at: data.created_at,
+      chapter_count: 0,
+      scene_count: 0,
+    };
+  }, [loadLibraryFromServer, userId]);
+
+  const loadLibrary = useCallback(async () => {
+    if (!userId) {
+      setBooks([]);
+      setLoadingLibrary(false);
+      return;
+    }
+
+    setLoadingLibrary(true);
+    try {
+      const localBooks = await loadLocalLibrary();
+      setBooks(localBooks);
+    } catch (err) {
+      console.error("Failed to load local library:", err);
+      setBooks([]);
+    } finally {
+      setLoadingLibrary(false);
+    }
+  }, [userId, loadLocalLibrary]);
 
   useEffect(() => {
     if (!userId) {
@@ -197,18 +271,41 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
   // ─── Sync-check: server vs local timestamps ────────────────
   const [serverNewerBookId, setServerNewerBookId] = useState<string | null>(null);
 
-  const checkServerNewer = useCallback(async (savedBookId: string): Promise<boolean> => {
-    if (!projectStorage?.isReady) return false;
+  const shouldRunServerSyncCheck = useCallback((targetBookId: string): boolean => {
+    try {
+      const browserId = getOrCreateBrowserId();
+      const lastCheckedBrowserId = localStorage.getItem(getSyncCheckKey(targetBookId));
+      return lastCheckedBrowserId !== browserId;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const markServerSyncChecked = useCallback((targetBookId: string) => {
+    try {
+      localStorage.setItem(getSyncCheckKey(targetBookId), getOrCreateBrowserId());
+    } catch {
+      // non-critical
+    }
+  }, []);
+
+  const checkServerNewer = useCallback(async (
+    savedBookId: string,
+    options?: { allowMissingLocalTimestamp?: boolean },
+  ): Promise<boolean> => {
+    const allowMissingLocalTimestamp = options?.allowMissingLocalTimestamp || false;
+
     try {
       // Try project.json first, fall back to structure/toc.json
       let localUpdatedAt: string | undefined;
-      const localMeta = await projectStorage.readJSON<{ updatedAt?: string }>("project.json");
-      localUpdatedAt = localMeta?.updatedAt;
-      if (!localUpdatedAt) {
-        const tocMeta = await projectStorage.readJSON<{ updatedAt?: string }>("structure/toc.json");
-        localUpdatedAt = tocMeta?.updatedAt;
+      if (projectStorage?.isReady) {
+        const localMeta = await projectStorage.readJSON<{ updatedAt?: string }>("project.json");
+        localUpdatedAt = localMeta?.updatedAt;
+        if (!localUpdatedAt) {
+          const tocMeta = await projectStorage.readJSON<{ updatedAt?: string }>("structure/toc.json");
+          localUpdatedAt = tocMeta?.updatedAt;
+        }
       }
-      if (!localUpdatedAt) return false; // no local timestamp — can't compare
 
       const { data } = await supabase
         .from("books")
@@ -217,6 +314,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
         .maybeSingle();
 
       if (!data?.updated_at) return false;
+      if (!localUpdatedAt) return allowMissingLocalTimestamp;
 
       const localTime = new Date(localUpdatedAt).getTime();
       const serverTime = new Date(data.updated_at).getTime();
@@ -237,12 +335,13 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
 
   const acceptServerVersion = useCallback(async () => {
     if (!serverNewerBookId) return;
-    const book = books.find(b => b.id === serverNewerBookId);
     setServerNewerBookId(null);
+
+    const book = await loadBookFromServerById(serverNewerBookId);
     if (book) {
       await openSavedBookRef.current?.(book);
     }
-  }, [serverNewerBookId, books]);
+  }, [serverNewerBookId, loadBookFromServerById]);
 
   // ─── Auto-restore active book on mount (local-first) ───────
   const [restoredOnce, setRestoredOnce] = useState(false);
@@ -273,28 +372,63 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
     setRestoredOnce(true);
 
     restoreFromLocal(savedBookId).then(async (restored) => {
+      const shouldSyncWithServer = shouldRunServerSyncCheck(savedBookId);
+
       if (restored) {
-        // Check if server has a newer version
-        const isNewer = await checkServerNewer(savedBookId);
-        if (isNewer) {
-          setServerNewerBookId(savedBookId);
+        if (shouldSyncWithServer) {
+          const isNewer = await checkServerNewer(savedBookId);
+          markServerSyncChecked(savedBookId);
+          if (isNewer) {
+            setServerNewerBookId(savedBookId);
+          }
         }
         return;
       }
-      // Fallback: load from server
-      const book = books.find(b => b.id === savedBookId);
+
+      // Strict local-first: do not load from server unless this browser hasn't performed sync-check yet.
+      if (!shouldSyncWithServer) {
+        setStep("library");
+        return;
+      }
+
+      const isServerNewerForThisBrowser = await checkServerNewer(savedBookId, { allowMissingLocalTimestamp: true });
+      markServerSyncChecked(savedBookId);
+      if (!isServerNewerForThisBrowser) {
+        setStep("library");
+        return;
+      }
+
+      const book = await loadBookFromServerById(savedBookId);
       if (book) {
-        openSavedBookRef.current?.(book);
-      } else if (books.length > 0) {
+        await openSavedBookRef.current?.(book);
+      } else {
         sessionStorage.removeItem(ACTIVE_BOOK_KEY);
         setStep("library");
       }
     });
-  }, [userId, loadingLibrary, books, restoredOnce, restoreFromLocal, checkServerNewer, storageBackend, projectStorage]);
+  }, [
+    userId,
+    loadingLibrary,
+    restoredOnce,
+    restoreFromLocal,
+    checkServerNewer,
+    storageBackend,
+    projectStorage,
+    shouldRunServerSyncCheck,
+    markServerSyncChecked,
+    loadBookFromServerById,
+    step,
+  ]);
 
-  // ─── Open saved book from DB ──────────────────────────────
+  // ─── Open saved book (local-first, server fallback) ───────────────────────
   const openSavedBook = useCallback(async (book: BookRecord) => {
     if (!userId) return;
+
+    if (projectStorage?.isReady) {
+      const restored = await restoreFromLocal(book.id);
+      if (restored) return;
+    }
+
     setStep("extracting_toc");
     setFileName(book.file_name);
     setBookId(book.id);
@@ -480,7 +614,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
       setErrorMsg(err.message || "Unknown error");
       setStep("error");
     }
-  }, [userId, isRu, projectStorage]);
+  }, [userId, isRu, projectStorage, restoreFromLocal]);
 
   // Keep ref in sync for auto-restore effect
   openSavedBookRef.current = openSavedBook;
