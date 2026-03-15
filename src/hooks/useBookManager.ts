@@ -792,6 +792,7 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
     chapterResults, setChapterResults, fileInputRef,
     // Actions
     openSavedBook, deleteBook, handleFileSelect, handleReset, reloadBook, ensurePdfLoaded,
+    reloadLibrary: loadLibrary,
     // Sync-check
     serverNewerBookId, dismissServerNewer, acceptServerVersion,
   };
