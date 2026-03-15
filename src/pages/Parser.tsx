@@ -29,7 +29,7 @@ import type { StructureSnapshot } from "@/hooks/useStructureUndo";
 import UndoRedoDropdown from "@/components/parser/UndoRedoDropdown";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { useImperativeSave } from "@/hooks/useImperativeSave";
-import { assertNotOverwritingParent } from "@/lib/parserContracts";
+import { assertNotOverwritingParent, assertMapIndicesInBounds, warnStaleResults, assertValidMerge, warnPartialTreeDelete } from "@/lib/parserContracts";
 
 import LibraryView from "@/components/parser/LibraryView";
 import UploadView from "@/components/parser/UploadView";
@@ -491,6 +491,9 @@ export default function Parser() {
     const { toDelete } = pendingDelete;
     pushSnapshot(getCurrentSnapshot(), isRu ? "Удаление элементов" : "Delete items");
 
+    // CONTRACT GUARD: warn if deleting parent without children
+    warnPartialTreeDelete(toDelete, tocEntries);
+
     // Delete from DB
     for (const di of toDelete) {
       const chapterId = chapterIdMap.get(di);
@@ -516,6 +519,9 @@ export default function Parser() {
     }
     setChapterIdMap(newMap);
 
+    // CONTRACT K5 GUARD: verify rebuilt maps are consistent
+    assertMapIndicesInBounds("chapterIdMap (after delete)", newMap, newEntries.length);
+
     // Clear selection
     setSelectedIndices(prev => {
       const next = new Set(prev);
@@ -533,12 +539,18 @@ export default function Parser() {
       newIdx++;
     }
     setChapterResults(newResults);
+
+    // CONTRACT K5 GUARD: verify results map
+    assertMapIndicesInBounds("chapterResults (after delete)", newResults, newEntries.length);
+
     setPendingDelete(null);
     scheduleSave();
   };
 
   const mergeEntries = (indices: number[]) => {
     if (indices.length < 2) return;
+    // CONTRACT GUARD: validate merge inputs
+    assertValidMerge(indices, tocEntries);
     pushSnapshot(getCurrentSnapshot(), isRu ? "Объединение секций" : "Merge sections");
     const sorted = [...indices].sort((a, b) => a - b);
     const firstIdx = sorted[0];
@@ -594,6 +606,11 @@ export default function Parser() {
     }
     setChapterIdMap(newChapterMap);
     setChapterResults(newResults);
+
+    // CONTRACT K5 GUARD: verify rebuilt maps are consistent after merge
+    assertMapIndicesInBounds("chapterIdMap (after merge)", newChapterMap, newEntries.length);
+    assertMapIndicesInBounds("chapterResults (after merge)", newResults, newEntries.length);
+
     setSelectedIndices(new Set([firstIdx]));
     scheduleSave();
   };

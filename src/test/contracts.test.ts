@@ -7,7 +7,7 @@
  * К4: selectedResult aggregation — агрегация сцен из дочерних узлов
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { TocChapter, Scene, ChapterStatus, SectionType } from "@/pages/parser/types";
 import { normalizeLevels } from "@/pages/parser/types";
 
@@ -443,5 +443,133 @@ describe("K4: aggregateSelectedResult", () => {
     expect(updated.get(2)!.scenes[1].title).toBe("D");
     // Parent stays empty
     expect(updated.get(0)!.scenes).toHaveLength(0);
+  });
+});
+
+// ─── Runtime Guards Tests ────────────────────────────────────
+
+import {
+  assertNotOverwritingParent,
+  assertMapIndicesInBounds,
+  warnSuspiciousPageRange,
+  assertExtractedTextNotTitlePage,
+  assertValidMerge,
+  warnPartialTreeDelete,
+  warnStaleResults,
+} from "@/lib/parserContracts";
+
+describe("K3 Guard: assertNotOverwritingParent", () => {
+  it("throws when writing scenes to a parent with children", () => {
+    const toc = makeToc([
+      { title: "Parent", level: 0 },
+      { title: "Child", level: 1 },
+    ]);
+    expect(() =>
+      assertNotOverwritingParent(0, toc, [makeScene(1)], "test")
+    ).toThrowError(/CONTRACT K3 VIOLATION/);
+  });
+
+  it("does NOT throw for leaf nodes", () => {
+    const toc = makeToc([
+      { title: "Ch 1", level: 0 },
+      { title: "Ch 2", level: 0 },
+    ]);
+    expect(() =>
+      assertNotOverwritingParent(0, toc, [makeScene(1)], "test")
+    ).not.toThrow();
+  });
+
+  it("does NOT throw for empty scene arrays", () => {
+    const toc = makeToc([
+      { title: "Parent", level: 0 },
+      { title: "Child", level: 1 },
+    ]);
+    expect(() =>
+      assertNotOverwritingParent(0, toc, [], "test")
+    ).not.toThrow();
+  });
+});
+
+describe("K5 Guard: assertMapIndicesInBounds", () => {
+  it("throws when map contains out-of-bounds index", () => {
+    const map = new Map([[0, "a"], [5, "b"]]);
+    expect(() =>
+      assertMapIndicesInBounds("testMap", map, 3)
+    ).toThrowError(/CONTRACT K5 VIOLATION/);
+  });
+
+  it("passes when all indices are in bounds", () => {
+    const map = new Map([[0, "a"], [2, "b"]]);
+    expect(() =>
+      assertMapIndicesInBounds("testMap", map, 3)
+    ).not.toThrow();
+  });
+});
+
+describe("Merge Guard: assertValidMerge", () => {
+  it("throws for less than 2 indices", () => {
+    const toc = makeToc([{ title: "Ch 1" }]);
+    expect(() => assertValidMerge([0], toc)).toThrowError(/at least 2/);
+  });
+
+  it("throws for out-of-bounds index", () => {
+    const toc = makeToc([{ title: "Ch 1" }, { title: "Ch 2" }]);
+    expect(() => assertValidMerge([0, 5], toc)).toThrowError(/out of bounds/);
+  });
+
+  it("throws for mixed sectionTypes", () => {
+    const toc = makeToc([
+      { title: "Ch 1", sectionType: "content" as any },
+      { title: "Preface", sectionType: "preface" as any },
+    ]);
+    expect(() => assertValidMerge([0, 1], toc)).toThrowError(/sectionTypes/);
+  });
+
+  it("passes for valid merge", () => {
+    const toc = makeToc([
+      { title: "Ch 1" },
+      { title: "Ch 2" },
+    ]);
+    expect(() => assertValidMerge([0, 1], toc)).not.toThrow();
+  });
+});
+
+describe("K1 Guard: warnSuspiciousPageRange", () => {
+  it("warns for 1-page parent with children", () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const toc = makeToc([
+      { title: "Container", startPage: 3, endPage: 3, level: 0 },
+      { title: "Child", startPage: 4, endPage: 50, level: 1 },
+    ]);
+    warnSuspiciousPageRange(0, toc, 3, 3);
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("CONTRACT K1 WARNING"));
+    spy.mockRestore();
+  });
+
+  it("does NOT warn for multi-page ranges", () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const toc = makeToc([
+      { title: "Ch 1", startPage: 3, endPage: 50, level: 0 },
+      { title: "Ch 1.1", startPage: 4, endPage: 25, level: 1 },
+    ]);
+    warnSuspiciousPageRange(0, toc, 3, 50);
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+});
+
+describe("K1 Guard: assertExtractedTextNotTitlePage", () => {
+  it("warns for short text from page 1", () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    assertExtractedTextNotTitlePage("Book Title\nAuthor Name", "Chapter 1", 1);
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("title page"));
+    spy.mockRestore();
+  });
+
+  it("does NOT warn for text from later pages", () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    assertExtractedTextNotTitlePage("Short text", "Chapter 5", 50);
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 });

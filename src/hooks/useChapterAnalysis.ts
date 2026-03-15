@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
 import { extractTextByPageRange } from "@/lib/pdf-extract";
 import { t } from "@/pages/parser/i18n";
+import { warnSuspiciousPageRange, assertExtractedTextNotTitlePage } from "@/lib/parserContracts";
 import type { Scene, TocChapter, ChapterStatus } from "@/pages/parser/types";
 import type { AiRoleId } from "@/config/aiRoles";
 
@@ -211,6 +212,9 @@ export function useChapterAnalysis({
         let effectiveStartPage = baseRange.startPage;
         let effectiveEndPage = baseRange.endPage;
 
+        // CONTRACT K1 GUARD: warn if range is suspiciously small for a parent node
+        warnSuspiciousPageRange(idx, tocEntries, effectiveStartPage, effectiveEndPage);
+
         if (effectiveStartPage !== entry.startPage || effectiveEndPage !== entry.endPage) {
           addLog(isRu
             ? `↔️ Уточнен диапазон страниц: ${entry.startPage}–${entry.endPage} → ${effectiveStartPage}–${effectiveEndPage}`
@@ -219,6 +223,9 @@ export function useChapterAnalysis({
 
         let text = await extractTextByPageRange(activePdf, effectiveStartPage, effectiveEndPage);
         let charCount = text.trim().length;
+
+        // CONTRACT K1 GUARD: warn if this looks like title page content
+        assertExtractedTextNotTitlePage(text, entry.title, effectiveStartPage);
 
         if (charCount < 50 && baseRange.subtreeStart && baseRange.subtreeEnd) {
           const subtreeSpan = baseRange.subtreeEnd - baseRange.subtreeStart + 1;
