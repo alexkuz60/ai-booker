@@ -5,6 +5,11 @@
 
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { TocChapter, Scene, ChapterStatus, LocalCharacter } from "@/pages/parser/types";
+import {
+  getLeafChapterIds,
+  isFolderNode,
+  sanitizeChapterResultsForStructure,
+} from "@/lib/tocStructure";
 
 export interface LocalBookStructure {
   bookId: string;
