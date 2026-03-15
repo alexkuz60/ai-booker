@@ -360,11 +360,12 @@ export function useBookManager({ userId, isRu, projectStorage, storageBackend = 
           if (currentStart === next.startPage && currentEnd === next.endPage) return null;
           return {
             id: ch.id,
+            book_id: book.id,
             start_page: next.startPage,
             end_page: next.endPage,
           };
         })
-        .filter((v): v is { id: string; start_page: number; end_page: number } => !!v);
+        .filter((v): v is { id: string; book_id: string; start_page: number; end_page: number } => !!v);
 
       if (rangeFixes.length > 0) {
         supabase.from('book_chapters').upsert(rangeFixes).then(({ error }) => {
