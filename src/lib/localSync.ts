@@ -49,6 +49,17 @@ export async function syncStructureToLocal(
     };
     await storage.writeJSON("structure/toc.json", structure);
 
+    // 1b. Also update project.json updatedAt so sync-check works
+    try {
+      const projectMeta = await storage.readJSON<Record<string, unknown>>("project.json");
+      if (projectMeta) {
+        projectMeta.updatedAt = structure.updatedAt;
+        await storage.writeJSON("project.json", projectMeta);
+      }
+    } catch {
+      // non-critical — project.json may not exist yet
+    }
+
     // 2. Chapter ID map
     const chapterMap: Record<string, string> = {};
     data.chapterIdMap.forEach((id, idx) => {

@@ -131,8 +131,15 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
   const checkServerNewer = useCallback(async (savedBookId: string): Promise<boolean> => {
     if (!projectStorage?.isReady) return false;
     try {
+      // Try project.json first, fall back to structure/toc.json
+      let localUpdatedAt: string | undefined;
       const localMeta = await projectStorage.readJSON<{ updatedAt?: string }>("project.json");
-      if (!localMeta?.updatedAt) return false; // no local timestamp — can't compare
+      localUpdatedAt = localMeta?.updatedAt;
+      if (!localUpdatedAt) {
+        const tocMeta = await projectStorage.readJSON<{ updatedAt?: string }>("structure/toc.json");
+        localUpdatedAt = tocMeta?.updatedAt;
+      }
+      if (!localUpdatedAt) return false; // no local timestamp — can't compare
 
       const { data } = await supabase
         .from("books")
@@ -142,9 +149,9 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
 
       if (!data?.updated_at) return false;
 
-      const localTime = new Date(localMeta.updatedAt).getTime();
+      const localTime = new Date(localUpdatedAt).getTime();
       const serverTime = new Date(data.updated_at).getTime();
-      const TOLERANCE_MS = 2000; // 2 sec tolerance for clock drift
+      const TOLERANCE_MS = 2000;
 
       if (serverTime > localTime + TOLERANCE_MS) {
         console.log(`[SyncCheck] Server is newer: server=${data.updated_at} local=${localMeta.updatedAt}`);
