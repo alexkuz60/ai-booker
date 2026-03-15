@@ -11,7 +11,7 @@ import type {
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
-import { warnContainerAsChapter } from "@/lib/parserContracts";
+
 
 interface UseBookManagerParams {
   userId: string | undefined;
