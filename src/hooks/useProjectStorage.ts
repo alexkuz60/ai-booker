@@ -19,6 +19,8 @@ interface UseProjectStorageReturn {
   meta: ProjectMeta | null;
   /** Which backend is available */
   backend: StorageBackend;
+  /** Whether local storage init/restore phase is completed */
+  initialized: boolean;
   /** Whether a project is currently open */
   isOpen: boolean;
   /** Loading state */
