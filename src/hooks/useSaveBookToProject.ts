@@ -181,6 +181,47 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
         chapterResults,
       });
 
+      // ── Sync edited scene content back to DB ──
+      if (localSnapshot) {
+        const upsertBatch: Array<{
+          id: string;
+          chapter_id: string;
+          scene_number: number;
+          title: string;
+          content: string;
+          scene_type: string;
+          mood: string;
+          bpm: number;
+        }> = [];
+
+        chapterResults.forEach((result, idx) => {
+          const chId = chapterIdMap.get(idx);
+          if (!chId) return;
+          for (const sc of result.scenes) {
+            if (!sc.id) continue;
+            upsertBatch.push({
+              id: sc.id,
+              chapter_id: chId,
+              scene_number: sc.scene_number,
+              title: sc.title,
+              content: sc.content || "",
+              scene_type: sc.scene_type || "mixed",
+              mood: sc.mood || "neutral",
+              bpm: sc.bpm || 120,
+            });
+          }
+        });
+
+        if (upsertBatch.length > 0) {
+          const { error: upsertError } = await supabase
+            .from("book_scenes")
+            .upsert(upsertBatch);
+          if (upsertError) {
+            console.warn("[SaveBook] Failed to sync scenes to DB:", upsertError);
+          }
+        }
+      }
+
       if (book.file_path) {
         const { data: pdfBlob, error: pdfError } = await supabase.storage
           .from("book-uploads")
