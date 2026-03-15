@@ -93,6 +93,24 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
       sessionStorage.setItem(ACTIVE_BOOK_KEY, savedBookId);
       setStep("workspace");
 
+      // ── Restore PDF from local project (async, non-blocking) ──
+      projectStorage.readBlob("source/book.pdf").then(async (pdfBlob) => {
+        if (!pdfBlob) {
+          console.log("[LocalRestore] No local PDF found, will download on demand");
+          return;
+        }
+        try {
+          const arrayBuffer = await pdfBlob.arrayBuffer();
+          const { getDocument } = await import("pdfjs-dist");
+          const pdf = await getDocument({ data: arrayBuffer }).promise;
+          setPdfRef(pdf);
+          setTotalPages(pdf.numPages);
+          console.log(`[LocalRestore] PDF restored locally: ${pdf.numPages} pages`);
+        } catch (pdfErr) {
+          console.warn("[LocalRestore] Failed to parse local PDF:", pdfErr);
+        }
+      });
+
       console.log(`[LocalRestore] Restored from local: ${structure.toc.length} chapters, ${localResults.size} results`);
       toast.success(
         isRu
@@ -545,30 +563,53 @@ export function useBookManager({ userId, isRu, projectStorage }: UseBookManagerP
     }
   }, [bookId, isRu]);
 
-  // ─── Ensure PDF is loaded (on-demand download) ─────────────
+  // ─── Ensure PDF is loaded (local-first, then server) ────────
   const ensurePdfLoaded = useCallback(async (): Promise<any> => {
     if (pdfRef) return pdfRef;
     if (!bookId) return null;
 
-    // Find file_path from books list or DB
+    const loadPdf = async (arrayBuffer: ArrayBuffer) => {
+      const { getDocument } = await import("pdfjs-dist");
+      const pdf = await getDocument({ data: arrayBuffer }).promise;
+      setPdfRef(pdf);
+      setTotalPages(pdf.numPages);
+      return pdf;
+    };
+
+    // 1. Try local project first
+    if (projectStorage?.isReady) {
+      try {
+        const localBlob = await projectStorage.readBlob("source/book.pdf");
+        if (localBlob) {
+          console.log("[EnsurePDF] Loading from local project");
+          return await loadPdf(await localBlob.arrayBuffer());
+        }
+      } catch (err) {
+        console.warn("[EnsurePDF] Local read failed:", err);
+      }
+    }
+
+    // 2. Fallback: download from server
     const book = books.find(b => b.id === bookId);
     const filePath = book?.file_path;
     if (!filePath) return null;
 
     try {
+      console.log("[EnsurePDF] Downloading from server");
       const { data: blob } = await supabase.storage.from('book-uploads').download(filePath);
       if (!blob) return null;
-      const arrayBuffer = await blob.arrayBuffer();
-      const { getDocument } = await import('pdfjs-dist');
-      const pdf = await getDocument({ data: arrayBuffer }).promise;
-      setPdfRef(pdf);
-      setTotalPages(pdf.numPages);
+      const pdf = await loadPdf(await blob.arrayBuffer());
+
+      // Cache locally for next time
+      if (projectStorage?.isReady) {
+        projectStorage.writeBlob("source/book.pdf", blob).catch(() => {});
+      }
       return pdf;
     } catch (err) {
-      console.warn("Failed to download PDF on demand:", err);
+      console.warn("[EnsurePDF] Server download failed:", err);
       return null;
     }
-  }, [pdfRef, bookId, books]);
+  }, [pdfRef, bookId, books, projectStorage]);
 
   // ─── Reset ─────────────────────────────────────────────────
   const handleReset = useCallback(() => {
