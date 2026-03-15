@@ -549,6 +549,8 @@ export default function Parser() {
 
   const mergeEntries = (indices: number[]) => {
     if (indices.length < 2) return;
+    // CONTRACT GUARD: validate merge inputs
+    assertValidMerge(indices, tocEntries);
     pushSnapshot(getCurrentSnapshot(), isRu ? "Объединение секций" : "Merge sections");
     const sorted = [...indices].sort((a, b) => a - b);
     const firstIdx = sorted[0];
