@@ -72,9 +72,23 @@ export async function syncStructureToLocal(
     });
     await storage.writeJSON("structure/chapters.json", chapterMap);
 
-    // 3. Per-chapter scene data
+    // 3. Per-chapter scene data (leaf-only)
+    const sanitizedResults = sanitizeChapterResultsForStructure(data.toc, data.chapterResults);
+    const leafChapterIds = new Set(getLeafChapterIds(data.toc, data.chapterIdMap));
+
+    // Cleanup stale scene files from old structure (folders/removed chapters)
+    const existingSceneFiles = await storage.listDir("scenes").catch(() => []);
+    const staleSceneDeletes = existingSceneFiles
+      .filter((f) => {
+        const m = f.match(/^chapter_(.+)\.json$/);
+        if (!m) return false;
+        return !leafChapterIds.has(m[1]);
+      })
+      .map((f) => storage.delete(`scenes/${f}`).catch(() => undefined));
+
     const sceneWrites: Promise<void>[] = [];
-    data.chapterResults.forEach((result, idx) => {
+    sanitizedResults.forEach((result, idx) => {
+      if (isFolderNode(data.toc, idx)) return;
       const chapterId = data.chapterIdMap.get(idx);
       if (!chapterId) return;
       const chapterData: LocalChapterData = {
@@ -83,11 +97,10 @@ export async function syncStructureToLocal(
         scenes: result.scenes,
         status: result.status,
       };
-      sceneWrites.push(
-        storage.writeJSON(`scenes/chapter_${chapterId}.json`, chapterData)
-      );
+      sceneWrites.push(storage.writeJSON(`scenes/chapter_${chapterId}.json`, chapterData));
     });
-    await Promise.all(sceneWrites);
+
+    await Promise.all([...staleSceneDeletes, ...sceneWrites]);
 
     console.debug(`[LocalSync] Structure saved: ${data.toc.length} chapters, ${data.chapterResults.size} results`);
   } catch (err) {
