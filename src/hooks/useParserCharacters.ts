@@ -1,9 +1,11 @@
 /**
  * Hook for managing characters in the Parser module (local-first).
- * Extracts character names from analyzed scenes, manages CRUD, aliases, merge.
+ * Uses AI (Profiler role) to extract characters from analyzed scenes.
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { Scene, ChapterStatus, TocChapter, LocalCharacter, CharacterAppearance } from "@/pages/parser/types";
 import { saveCharactersToLocal, readCharactersFromLocal } from "@/lib/localSync";
@@ -13,27 +15,9 @@ interface UseParserCharactersParams {
   tocEntries: TocChapter[];
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
   bookId: string | null;
-}
-
-/** Simple quoted-speech speaker extraction (Russian / English dialogue patterns) */
-function extractSpeakersFromText(text: string): string[] {
-  const speakers = new Set<string>();
-
-  // Pattern: «...» — Имя / "..." said Name / Name said
-  // Capture capitalized names after em-dash or before/after speech verbs
-  const dashPattern = /[»"]\s*[—–-]\s*([А-ЯЁA-Z][а-яёa-z]{2,}(?:\s+[А-ЯЁA-Z][а-яёa-z]+)?)/g;
-  let m: RegExpExecArray | null;
-  while ((m = dashPattern.exec(text)) !== null) {
-    speakers.add(m[1].trim());
-  }
-
-  // Pattern: Name + speech verb (сказал, спросил, ответил, воскликнул, прошептал, etc.)
-  const verbPattern = /([А-ЯЁA-Z][а-яёa-z]{2,}(?:\s+[А-ЯЁA-Z][а-яёa-z]+)?)\s+(?:сказал|спросил|ответил|воскликнул|прошептал|пробормотал|проговорил|заметил|добавил|крикнул|шепнул|буркнул|произнёс|произнес|said|asked|replied|exclaimed|whispered|muttered|shouted)/g;
-  while ((m = verbPattern.exec(text)) !== null) {
-    speakers.add(m[1].trim());
-  }
-
-  return Array.from(speakers);
+  /** Resolved model for the profiler role */
+  profilerModel?: string;
+  isRu?: boolean;
 }
 
 function generateId(): string {
@@ -45,11 +29,15 @@ export function useParserCharacters({
   tocEntries,
   chapterResults,
   bookId,
+  profilerModel = "google/gemini-2.5-flash",
+  isRu = true,
 }: UseParserCharactersParams) {
   const [characters, setCharacters] = useState<LocalCharacter[]>([]);
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  const [extractProgress, setExtractProgress] = useState<string | null>(null);
   const loadedBookRef = useRef<string | null>(null);
+  const { toast } = useToast();
 
   // Load characters from local storage when book changes
   useEffect(() => {
@@ -69,44 +57,143 @@ export function useParserCharacters({
     await saveCharactersToLocal(storage, chars);
   }, [storage]);
 
-  // Extract characters from all analyzed scenes
+  // Extract characters using AI (per-chapter, then merge)
   const extractCharacters = useCallback(async () => {
     setExtracting(true);
+    setExtractProgress(isRu ? "Подготовка…" : "Preparing…");
 
-    const nameMap = new Map<string, { appearances: CharacterAppearance[]; sceneCount: number }>();
-
+    // Collect chapters that have analyzed scenes
+    const chaptersToProcess: { idx: number; entry: TocChapter; scenes: Scene[] }[] = [];
     chapterResults.forEach((result, idx) => {
       if (result.status !== "done" || !result.scenes?.length) return;
       const entry = tocEntries[idx];
       if (!entry) return;
-
-      for (const scene of result.scenes) {
-        const text = scene.content || "";
-        if (!text) continue;
-
-        const speakers = extractSpeakersFromText(text);
-        for (const name of speakers) {
-          const key = name.toLowerCase();
-          if (!nameMap.has(key)) {
-            nameMap.set(key, { appearances: [], sceneCount: 0 });
-          }
-          const data = nameMap.get(key)!;
-
-          // Check if this chapter already has an appearance entry
-          let chapterApp = data.appearances.find(a => a.chapterIdx === idx);
-          if (!chapterApp) {
-            chapterApp = { chapterIdx: idx, chapterTitle: entry.title, sceneNumbers: [] };
-            data.appearances.push(chapterApp);
-          }
-          if (!chapterApp.sceneNumbers.includes(scene.scene_number)) {
-            chapterApp.sceneNumbers.push(scene.scene_number);
-            data.sceneCount++;
-          }
-        }
-      }
+      chaptersToProcess.push({ idx, entry, scenes: result.scenes });
     });
 
-    // Merge with existing characters (keep IDs, add new ones)
+    if (chaptersToProcess.length === 0) {
+      setExtracting(false);
+      setExtractProgress(null);
+      toast({
+        title: isRu ? "Нет проанализированных глав" : "No analyzed chapters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Accumulate all characters across chapters
+    const allResults = new Map<string, {
+      name: string;
+      aliases: string[];
+      gender: "male" | "female" | "unknown";
+      appearances: CharacterAppearance[];
+      sceneCount: number;
+    }>();
+
+    for (let ci = 0; ci < chaptersToProcess.length; ci++) {
+      const { idx, entry, scenes } = chaptersToProcess[ci];
+      setExtractProgress(
+        isRu
+          ? `Глава ${ci + 1}/${chaptersToProcess.length}: ${entry.title.slice(0, 40)}`
+          : `Chapter ${ci + 1}/${chaptersToProcess.length}: ${entry.title.slice(0, 40)}`
+      );
+
+      // Build scenes payload for AI
+      const scenesPayload = scenes
+        .filter(s => s.content && s.content.length > 20)
+        .map(s => ({
+          scene_number: s.scene_number,
+          text: s.content!,
+        }));
+
+      if (scenesPayload.length === 0) continue;
+
+      try {
+        const { data, error } = await supabase.functions.invoke("extract-characters", {
+          body: {
+            scenes: scenesPayload,
+            lang: isRu ? "ru" : "en",
+            model: profilerModel,
+          },
+        });
+
+        if (error) {
+          console.error("extract-characters error for chapter", idx, error);
+          continue;
+        }
+
+        const extracted: Array<{
+          name: string;
+          aliases: string[];
+          gender: "male" | "female" | "unknown";
+          scene_numbers: number[];
+        }> = data?.characters || [];
+
+        for (const char of extracted) {
+          const key = char.name.toLowerCase();
+
+          // Check if this character (or an alias) already exists in results
+          let existingKey: string | null = null;
+          for (const [k, v] of allResults) {
+            if (k === key) { existingKey = k; break; }
+            if (v.aliases.some(a => a.toLowerCase() === key)) { existingKey = k; break; }
+            if (char.aliases.some(a => a.toLowerCase() === k)) { existingKey = k; break; }
+          }
+
+          if (existingKey) {
+            const existing = allResults.get(existingKey)!;
+            // Merge aliases
+            const allAliases = new Set([...existing.aliases, ...char.aliases]);
+            allAliases.delete(existing.name);
+            existing.aliases = Array.from(allAliases);
+            // Merge gender (prefer non-unknown)
+            if (existing.gender === "unknown" && char.gender !== "unknown") {
+              existing.gender = char.gender;
+            }
+            // Add appearance for this chapter
+            existing.appearances.push({
+              chapterIdx: idx,
+              chapterTitle: entry.title,
+              sceneNumbers: char.scene_numbers,
+            });
+            existing.sceneCount += char.scene_numbers.length;
+          } else {
+            allResults.set(key, {
+              name: char.name,
+              aliases: char.aliases,
+              gender: char.gender,
+              appearances: [{
+                chapterIdx: idx,
+                chapterTitle: entry.title,
+                sceneNumbers: char.scene_numbers,
+              }],
+              sceneCount: char.scene_numbers.length,
+            });
+          }
+        }
+      } catch (err) {
+        console.error("AI extraction failed for chapter", idx, err);
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("rate_limited") || msg.includes("429")) {
+          toast({
+            title: isRu ? "Превышен лимит запросов" : "Rate limit exceeded",
+            description: isRu ? "Подождите и попробуйте снова" : "Wait and try again",
+            variant: "destructive",
+          });
+          break;
+        }
+        if (msg.includes("payment_required") || msg.includes("402")) {
+          toast({
+            title: isRu ? "Недостаточно средств" : "Payment required",
+            description: isRu ? "Пополните баланс AI" : "Top up your AI credits",
+            variant: "destructive",
+          });
+          break;
+        }
+      }
+    }
+
+    // Merge with existing characters (keep manually edited data)
     const existingByName = new Map<string, LocalCharacter>();
     for (const ch of characters) {
       existingByName.set(ch.name.toLowerCase(), ch);
@@ -118,19 +205,30 @@ export function useParserCharacters({
     const updated: LocalCharacter[] = [...characters];
     const usedIds = new Set(characters.map(c => c.id));
 
-    for (const [key, data] of nameMap) {
-      const existing = existingByName.get(key);
+    for (const [key, data] of allResults) {
+      const existing = existingByName.get(key)
+        || data.aliases.reduce<LocalCharacter | undefined>(
+          (found, a) => found || existingByName.get(a.toLowerCase()),
+          undefined,
+        );
+
       if (existing) {
-        // Update appearances
+        // Update appearances & gender, keep manually set data
         existing.appearances = data.appearances;
         existing.sceneCount = data.sceneCount;
+        if ((!existing.gender || existing.gender === "unknown") && data.gender !== "unknown") {
+          existing.gender = data.gender;
+        }
+        // Merge new aliases
+        const allAliases = new Set([...existing.aliases, ...data.aliases]);
+        allAliases.delete(existing.name);
+        existing.aliases = Array.from(allAliases);
       } else {
-        // Capitalize name from key
-        const displayName = key.charAt(0).toUpperCase() + key.slice(1);
         const newChar: LocalCharacter = {
           id: generateId(),
-          name: displayName,
-          aliases: [],
+          name: data.name,
+          aliases: data.aliases,
+          gender: data.gender,
           appearances: data.appearances,
           sceneCount: data.sceneCount,
         };
@@ -146,8 +244,17 @@ export function useParserCharacters({
     setCharacters(updated);
     await persist(updated);
     setExtracting(false);
+    setExtractProgress(null);
+
+    toast({
+      title: isRu ? "Персонажи извлечены" : "Characters extracted",
+      description: isRu
+        ? `Найдено ${allResults.size} персонажей в ${chaptersToProcess.length} главах`
+        : `Found ${allResults.size} characters in ${chaptersToProcess.length} chapters`,
+    });
+
     return updated;
-  }, [chapterResults, tocEntries, characters, persist]);
+  }, [chapterResults, tocEntries, characters, persist, profilerModel, isRu, toast]);
 
   // CRUD operations
   const renameCharacter = useCallback(async (id: string, newName: string) => {
@@ -180,11 +287,9 @@ export function useParserCharacters({
       const target = prev.find(c => c.id === targetId);
       if (!source || !target) return prev;
 
-      // Merge aliases (source name + source aliases → target aliases)
       const allAliases = new Set([...target.aliases, source.name, ...source.aliases]);
-      allAliases.delete(target.name); // don't add target's own name as alias
+      allAliases.delete(target.name);
 
-      // Merge appearances
       const appMap = new Map<number, CharacterAppearance>();
       for (const app of [...target.appearances, ...source.appearances]) {
         const existing = appMap.get(app.chapterIdx);
@@ -199,6 +304,7 @@ export function useParserCharacters({
       const merged: LocalCharacter = {
         ...target,
         aliases: Array.from(allAliases),
+        gender: target.gender || source.gender,
         appearances: Array.from(appMap.values()),
         sceneCount: Array.from(appMap.values()).reduce((sum, a) => sum + a.sceneNumbers.length, 0),
       };
@@ -229,6 +335,7 @@ export function useParserCharacters({
     characters,
     loading,
     extracting,
+    extractProgress,
     extractCharacters,
     renameCharacter,
     updateAliases,
