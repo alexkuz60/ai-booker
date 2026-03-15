@@ -25,6 +25,7 @@ import { useBookManager } from "@/hooks/useBookManager";
 import { useParserHelpers } from "@/hooks/useParserHelpers";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
+import { useImperativeSave } from "@/hooks/useImperativeSave";
 
 import LibraryView from "@/components/parser/LibraryView";
 import UploadView from "@/components/parser/UploadView";
