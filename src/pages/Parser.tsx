@@ -758,18 +758,19 @@ export default function Parser() {
           )}
           {step === "workspace" && parserTab === "characters" && (
             <motion.div key="workspace-characters" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="flex items-center justify-center h-full">
-              <div className="text-center space-y-3">
-                <Users className="h-12 w-12 text-muted-foreground/40 mx-auto" />
-                <h2 className="text-lg font-display text-muted-foreground">
-                  {isRu ? "Список персонажей" : "Characters"}
-                </h2>
-                <p className="text-sm text-muted-foreground/60 max-w-md">
-                  {isRu
-                    ? "Автоматическое определение и профилирование персонажей книги. Скоро."
-                    : "Automatic detection and profiling of book characters. Coming soon."}
-                </p>
-              </div>
+              className="flex h-full min-h-0 overflow-hidden">
+              <ParserCharactersPanel
+                isRu={isRu}
+                characters={characters}
+                extracting={extracting}
+                onExtract={extractCharacters}
+                onRename={renameCharacter}
+                onUpdateAliases={updateAliases}
+                onDelete={deleteCharacter}
+                onMerge={mergeCharacters}
+                onAdd={addCharacter}
+                analyzedCount={analyzedCount}
+              />
             </motion.div>
           )}
         </AnimatePresence>
