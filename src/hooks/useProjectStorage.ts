@@ -266,7 +266,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
     importProjectFromZip,
     downloadProjectAsZip,
     closeProject,
-    saveSourcePDF,
-    readSourcePDF,
+    saveSourceFile,
+    readSourceFile,
   };
 }
