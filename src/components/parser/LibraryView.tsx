@@ -28,10 +28,38 @@ export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onO
       <div className="max-w-3xl mx-auto py-8 px-6 space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-xl font-semibold text-foreground">{t("libraryTitle", isRu)}</h2>
-          <Button variant="outline" size="sm" onClick={onUpload} className="gap-2">
-            <Upload className="h-4 w-4" />
-            {t("libraryUpload", isRu)}
-          </Button>
+          <div className="flex items-center gap-2">
+            {onClearAll && books.length > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-destructive hover:text-destructive">
+                    <Eraser className="h-3.5 w-3.5" />
+                    {isRu ? "Очистить всё" : "Clear all"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{isRu ? "Удалить все проекты?" : "Delete all projects?"}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {isRu
+                        ? "Все локальные проекты будут безвозвратно удалены из браузерного хранилища."
+                        : "All local projects will be permanently deleted from browser storage."}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{t("cancel", isRu)}</AlertDialogCancel>
+                    <AlertDialogAction onClick={onClearAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      {isRu ? "Удалить всё" : "Delete all"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            <Button variant="outline" size="sm" onClick={onUpload} className="gap-2">
+              <Upload className="h-4 w-4" />
+              {t("libraryUpload", isRu)}
+            </Button>
+          </div>
         </div>
 
         {loadingLibrary ? (
