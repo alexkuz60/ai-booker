@@ -912,27 +912,29 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       setBookId(resolvedBookId);
       sessionStorage.setItem(ACTIVE_BOOK_KEY, resolvedBookId);
 
-      // Add default characters: Narrator and Commentator
-      await supabase.from('book_characters').insert([
-        {
-          book_id: book.id,
-          name: isRu ? 'Рассказчик' : 'Narrator',
-          gender: 'male',
-          age_group: 'adult',
-          description: isRu ? 'Голос повествования от третьего лица' : 'Third-person narration voice',
-          sort_order: -2,
-          voice_config: { provider: 'yandex' },
-        },
-        {
-          book_id: book.id,
-          name: isRu ? 'Комментатор' : 'Commentator',
-          gender: 'male',
-          age_group: 'adult',
-          description: isRu ? 'Озвучивание сносок и комментариев' : 'Footnote and commentary voice',
-          sort_order: -1,
-          voice_config: { provider: 'yandex' },
-        },
-      ]);
+      // Add default characters: Narrator and Commentator (only for fresh uploads)
+      if (!isReload) {
+        await supabase.from('book_characters').insert([
+          {
+            book_id: resolvedBookId,
+            name: isRu ? 'Рассказчик' : 'Narrator',
+            gender: 'male',
+            age_group: 'adult',
+            description: isRu ? 'Голос повествования от третьего лица' : 'Third-person narration voice',
+            sort_order: -2,
+            voice_config: { provider: 'yandex' },
+          },
+          {
+            book_id: resolvedBookId,
+            name: isRu ? 'Комментатор' : 'Commentator',
+            gender: 'male',
+            age_group: 'adult',
+            description: isRu ? 'Озвучивание сносок и комментариев' : 'Footnote and commentary voice',
+            sort_order: -1,
+            voice_config: { provider: 'yandex' },
+          },
+        ]);
+      }
 
       const uniqueParts = [...new Set(chapters.map(c => c.partTitle).filter(Boolean))] as string[];
       const newPartIdMap = new Map<string, string>();
