@@ -418,20 +418,7 @@ export default function Parser() {
               fileInputRef={fileInputRef}
               onFileSelect={handleFileSelect}
               storageBackend={storageBackend}
-              onCreateLocalProject={() => {
-                setNewProjectName("");
-                setNewProjectDialogOpen(true);
-              }}
-              onOpenLocalProject={async () => {
-                try {
-                  const store = await openProject();
-                  toast({ title: isRu ? "Проект открыт" : "Project opened", description: store.projectName });
-                } catch (err: any) {
-                  if (err?.name !== "AbortError") {
-                    toast({ title: isRu ? "Ошибка" : "Error", description: String(err?.message || err), variant: "destructive" });
-                  }
-                }
-              }}
+              onCreateWithFile={(name) => setPendingProjectName(name)}
             />
           )}
           {step === "extracting_toc" && (
