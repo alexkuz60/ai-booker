@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   extractOutline, extractTocFromText, flattenTocWithRanges, type TocEntry
 } from "@/lib/pdf-extract";
+import { extractFromDocx } from "@/lib/docx-extract";
 import { t } from "@/pages/parser/i18n";
 import type {
   Scene, TocChapter, Step, ChapterStatus, BookRecord,
@@ -730,13 +731,43 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     }
   }, [isRu, storageBackend, localProjectNamesByBookId, bookId, loadLibrary]);
 
+  // ─── Helper: flat TOC → TocChapter[] ─────────────────────
+  const mapFlatToChapters = (
+    flat: { title: string; level: number; startPage: number; endPage: number; children: TocEntry[] }[],
+  ): TocChapter[] => {
+    const mapped: TocChapter[] = [];
+    let currentPart = "";
+    for (let i = 0; i < flat.length; i++) {
+      const entry = flat[i];
+      const sectionType = classifySection(entry.title);
+      const hasNested = entry.children.length > 0 || (i + 1 < flat.length && flat[i + 1].level > entry.level);
+      if (entry.level === 0 && sectionType === "content" && hasNested) {
+        currentPart = entry.title;
+      }
+      mapped.push({
+        title: entry.title,
+        startPage: entry.startPage,
+        endPage: entry.endPage,
+        level: entry.level,
+        partTitle: entry.level > 0 ? (currentPart || undefined) : undefined,
+        sectionType,
+      });
+    }
+    return mapped;
+  };
+
   // ─── File Upload & TOC Extraction ──────────────────────────
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (!f || !userId) return;
+    if (!userId) return;
+    if (!f) return;
 
-    if (!f.name.toLowerCase().endsWith('.pdf')) {
-      toast.error(t("onlyPdf", isRu));
+    const ext = f.name.toLowerCase().split('.').pop() || '';
+    const isDocx = ext === 'docx' || ext === 'doc';
+    const isPdf = ext === 'pdf';
+
+    if (!isPdf && !isDocx) {
+      toast.error(t("onlySupported", isRu));
       return;
     }
     if (f.size > 20 * 1024 * 1024) {
@@ -750,64 +781,70 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     setErrorMsg("");
 
     try {
-      const { outline, pdf } = await extractOutline(f);
-      setPdfRef(pdf);
-      setTotalPages(pdf.numPages);
-
       let chapters: TocChapter[] = [];
 
-      const mapFlatToChapters = (
-        flat: { title: string; level: number; startPage: number; endPage: number; children: TocEntry[] }[],
-      ): TocChapter[] => {
-        const mapped: TocChapter[] = [];
-        let currentPart = "";
+      let localTotalPages = 1;
 
-        for (let i = 0; i < flat.length; i++) {
-          const entry = flat[i];
-          const sectionType = classifySection(entry.title);
-          const hasNested = entry.children.length > 0 || (i + 1 < flat.length && flat[i + 1].level > entry.level);
+      if (isDocx) {
+        // ── DOCX path ──
+        const docxResult = await extractFromDocx(f);
+        setPdfRef(null); // no PDF proxy for DOCX
+        localTotalPages = docxResult.totalPages;
+        setTotalPages(localTotalPages);
 
-          if (entry.level === 0 && sectionType === "content" && hasNested) {
-            currentPart = entry.title;
-          }
-
-          mapped.push({
-            title: entry.title,
-            startPage: entry.startPage,
-            endPage: entry.endPage,
-            level: entry.level,
-            partTitle: entry.level > 0 ? (currentPart || undefined) : undefined,
-            sectionType,
-          });
-        }
-
-        return mapped;
-      };
-
-      if (outline.length > 0) {
-        const flat = flattenTocWithRanges(outline, pdf.numPages);
-        chapters = mapFlatToChapters(flat);
-        toast.success(`${t("tocFound", isRu)}: ${chapters.length} ${t("items", isRu)}`);
-      } else {
-        // No embedded outline — try text-based heading detection
-        const textToc = await extractTocFromText(pdf);
-        if (textToc.length > 0) {
-          const flat = flattenTocWithRanges(textToc, pdf.numPages);
+        if (docxResult.outline.length > 0) {
+          const flat = flattenTocWithRanges(docxResult.outline, localTotalPages);
           chapters = mapFlatToChapters(flat);
-          toast.success(`${isRu ? "Найдены заголовки глав в тексте" : "Chapter headings found in text"}: ${chapters.length} ${t("items", isRu)}`);
+          const headingBased = docxResult.html.includes('<h1') || docxResult.html.includes('<h2');
+          const msgKey = headingBased ? "docxTocFromHeadings" : "docxTocFromRegex";
+          toast.success(`${t(msgKey, isRu)}: ${chapters.length} ${t("items", isRu)}`);
         } else {
-          toast.info(t("tocNotFound", isRu));
+          toast.info(t("docxNoToc", isRu));
           chapters = [{
-            title: f.name.replace('.pdf', ''),
+            title: f.name.replace(/\.(docx?|pdf)$/i, ''),
             startPage: 1,
-            endPage: pdf.numPages,
+            endPage: localTotalPages,
             level: 0,
             sectionType: "content",
           }];
         }
+
+        // Store DOCX data for later chapter text extraction
+        sessionStorage.setItem("docx_chapter_texts", JSON.stringify(
+          Array.from(docxResult.chapterTexts.entries())
+        ));
+        sessionStorage.setItem("docx_html", docxResult.html);
+      } else {
+        // ── PDF path (existing) ──
+        const { outline, pdf } = await extractOutline(f);
+        setPdfRef(pdf);
+        localTotalPages = pdf.numPages;
+        setTotalPages(localTotalPages);
+
+        if (outline.length > 0) {
+          const flat = flattenTocWithRanges(outline, localTotalPages);
+          chapters = mapFlatToChapters(flat);
+          toast.success(`${t("tocFound", isRu)}: ${chapters.length} ${t("items", isRu)}`);
+        } else {
+          const textToc = await extractTocFromText(pdf);
+          if (textToc.length > 0) {
+            const flat = flattenTocWithRanges(textToc, localTotalPages);
+            chapters = mapFlatToChapters(flat);
+            toast.success(`${isRu ? "Найдены заголовки глав в тексте" : "Chapter headings found in text"}: ${chapters.length} ${t("items", isRu)}`);
+          } else {
+            toast.info(t("tocNotFound", isRu));
+            chapters = [{
+              title: f.name.replace('.pdf', ''),
+              startPage: 1,
+              endPage: localTotalPages,
+              level: 0,
+              sectionType: "content",
+            }];
+          }
+        }
       }
 
-      chapters = normalizeTocRanges(normalizeLevels(chapters), pdf.numPages);
+      chapters = normalizeTocRanges(normalizeLevels(chapters), localTotalPages);
       setTocEntries(chapters);
 
       // Clean up previous uploads of the same file name
@@ -827,11 +864,13 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         await supabase.from('books').delete().in('id', oldIds);
       }
 
-      const filePath = `${userId}/${Date.now()}_${f.name}`;
-      await supabase.storage.from('book-uploads').upload(filePath, f);
+      const filePath = isPdf ? `${userId}/${Date.now()}_${f.name}` : null;
+      if (isPdf && filePath) {
+        await supabase.storage.from('book-uploads').upload(filePath, f);
+      }
       const { data: book, error: bookErr } = await supabase
         .from('books')
-        .insert({ user_id: userId, title: f.name.replace('.pdf', ''), file_name: f.name, file_path: filePath, status: 'uploaded' })
+        .insert({ user_id: userId, title: f.name.replace(/\.(pdf|docx?)$/i, ''), file_name: f.name, file_path: isPdf ? filePath : null, status: 'uploaded' })
         .select('id').single();
       if (bookErr) throw bookErr;
       setBookId(book.id);
@@ -902,15 +941,16 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         }));
         syncStructureToLocal(projectStorage, {
           bookId: book.id,
-          title: f.name.replace('.pdf', ''),
+          title: f.name.replace(/\.(pdf|docx?)$/i, ''),
           fileName: f.name,
           toc: chapters,
           parts: partsArr,
           chapterIdMap: newChapterIdMap,
           chapterResults: initMap,
         });
-        // Also save the source PDF locally
-        projectStorage.writeBlob("source/book.pdf", f).catch(() => {});
+        // Save the source file locally
+        const localSourceName = isDocx ? "source/book.docx" : "source/book.pdf";
+        projectStorage.writeBlob(localSourceName, f).catch(() => {});
       }
 
       setStep("workspace");

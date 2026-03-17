@@ -23,11 +23,14 @@ const texts: Record<string, { ru: string; en: string }> = {
   libraryLoadingBook: { ru: "Загрузка книги...", en: "Loading book..." },
 
   // Upload
-  uploadTitle: { ru: "Загрузите PDF книги", en: "Upload a book PDF" },
-  uploadHint: { ru: "Максимум 20 МБ • PDF формат", en: "Max 20 MB • PDF format" },
+  uploadTitle: { ru: "Загрузите книгу", en: "Upload a book" },
+  uploadHint: { ru: "Максимум 20 МБ • PDF или DOCX", en: "Max 20 MB • PDF or DOCX" },
   selectFile: { ru: "Выбрать файл", en: "Select file" },
-  onlyPdf: { ru: "Поддерживается только PDF формат", en: "Only PDF format is supported" },
+  onlySupported: { ru: "Поддерживаются только PDF и DOCX форматы", en: "Only PDF and DOCX formats are supported" },
   maxSize: { ru: "Максимальный размер файла — 20 МБ", en: "Max file size is 20 MB" },
+  docxTocFromHeadings: { ru: "Найдены заголовки (Heading) в документе", en: "Headings found in document" },
+  docxTocFromRegex: { ru: "Найдены главы по паттернам в тексте", en: "Chapter patterns found in text" },
+  docxNoToc: { ru: "Структура не найдена. Документ загружен как один блок.", en: "No structure found. Document loaded as a single block." },
 
   // TOC extraction
   searchingToc: { ru: "Поиск оглавления в PDF...", en: "Searching for TOC in PDF..." },
