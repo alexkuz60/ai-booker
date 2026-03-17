@@ -14,6 +14,10 @@
 - [ ] **Сайдбар AI-ролей не сохраняет выбор модели** — при смене модели в Sheet (AiRolesButton → AiRolesTab) изменения не персистятся
 - [ ] **Просмотр промпта роли в сайдбаре** — в панели AI-ролей добавить возможность посмотреть системный промпт каждой роли (expand/collapse или tooltip)
 
+## Студия / Раскадровка
+
+- [ ] **Добавить недостающие категории сегментов** — в enum `segment_type`, константы `SEGMENT_TYPES` и UI: добавить `remark` (Реплика). Проверить полноту списка: epigraph, narrator, first_person, inner_thought, dialogue, monologue, lyric, footnote, telephone, remark
+
 ## Архитектура (из PROBLEMS.md)
 
 - [ ] **Б. Синхронизация персонажей Парсер ↔ Студия** — определить контракт мерджа LocalCharacter → book_characters
