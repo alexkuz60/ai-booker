@@ -257,7 +257,7 @@ export function useFileUpload({
         await targetStorage.writeJSON("project.json", {
           version: Number(existingMeta?.version) || 1,
           bookId: resolvedBookId,
-          title: f.name.replace(/\.(pdf|docx?)$/i, ''),
+          title: pendingProjectName || stripFileExtension(f.name),
           userId,
           createdAt: typeof existingMeta?.createdAt === "string" ? existingMeta.createdAt : new Date().toISOString(),
           updatedAt: new Date().toISOString(),
