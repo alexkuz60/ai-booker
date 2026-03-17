@@ -267,11 +267,9 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
   const restoreFromLocal = useCallback(async (savedBookId: string): Promise<boolean> => {
     if (!projectStorage?.isReady) return false;
     try {
-      const [local, localCharacters] = await Promise.all([
-        readStructureFromLocal(projectStorage),
-        readCharactersFromLocal(projectStorage),
-      ]);
+      const local = await readStructureFromLocal(projectStorage);
       if (!local?.structure || local.structure.bookId !== savedBookId) return false;
+      // Note: characters are loaded independently by useParserCharacters when bookId changes
 
       const { structure, chapterIdMap: localChIdMap, chapterResults: localResults } = local;
       const normalizedToc = normalizeTocRanges(normalizeLevels(structure.toc));
