@@ -230,53 +230,59 @@ export function useFileUpload({
       const initMap = sanitizeChapterResultsForStructure(chapters, initRawMap);
       setChapterResults(initMap);
 
-      // ── Save to OPFS only ──
+      // ── Save to OPFS only (non-fatal — upload succeeds even if storage fails) ──
       progress(3, "Сохранение в локальное хранилище...", "Saving to local storage...");
-      let targetStorage = projectStorage?.isReady ? projectStorage : null;
-      if (!targetStorage && storageBackend === "opfs" && createProject) {
-        try {
-          targetStorage = await createProject(
-            pendingProjectName || stripFileExtension(f.name),
-            resolvedBookId,
-            userId,
-            isRu ? "ru" : "en",
-          );
-        } catch (storageErr) {
-          console.warn("[Upload] Failed to auto-create local project:", storageErr);
+      try {
+        let targetStorage: ProjectStorage | null = projectStorage ?? null;
+
+        // Auto-create OPFS project if no storage is open yet
+        if (!targetStorage && createProject && (storageBackend === "opfs" || storageBackend === "fs-access")) {
+          try {
+            targetStorage = await createProject(
+              pendingProjectName || stripFileExtension(f.name),
+              resolvedBookId,
+              userId,
+              isRu ? "ru" : "en",
+            );
+          } catch (storageErr) {
+            console.warn("[Upload] Failed to auto-create local project:", storageErr);
+          }
         }
-      }
 
-      if (targetStorage && resolvedBookId) {
-        const partsArr = uniqueParts.map((title, i) => ({
-          id: newPartIdMap.get(title) || "",
-          title,
-          partNumber: i + 1,
-        }));
+        if (targetStorage && resolvedBookId) {
+          const partsArr = uniqueParts.map((title, i) => ({
+            id: newPartIdMap.get(title) || "",
+            title,
+            partNumber: i + 1,
+          }));
 
-        const existingMeta = await targetStorage.readJSON<Record<string, unknown>>("project.json").catch(() => null);
-        await targetStorage.writeJSON("project.json", {
-          version: Number(existingMeta?.version) || 1,
-          bookId: resolvedBookId,
-          title: pendingProjectName || stripFileExtension(f.name),
-          userId,
-          createdAt: typeof existingMeta?.createdAt === "string" ? existingMeta.createdAt : new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          language: (existingMeta?.language === "en" ? "en" : (isRu ? "ru" : "en")),
-          fileFormat: isDocx ? "docx" : "pdf",
-        });
+          const existingMeta = await targetStorage.readJSON<Record<string, unknown>>("project.json").catch(() => null);
+          await targetStorage.writeJSON("project.json", {
+            version: Number(existingMeta?.version) || 1,
+            bookId: resolvedBookId,
+            title: pendingProjectName || stripFileExtension(f.name),
+            userId,
+            createdAt: typeof existingMeta?.createdAt === "string" ? existingMeta.createdAt : new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            language: (existingMeta?.language === "en" ? "en" : (isRu ? "ru" : "en")),
+            fileFormat: isDocx ? "docx" : "pdf",
+          });
 
-        await syncStructureToLocal(targetStorage, {
-          bookId: resolvedBookId,
-          title: pendingProjectName || stripFileExtension(f.name),
-          fileName: f.name,
-          toc: chapters,
-          parts: partsArr,
-          chapterIdMap: newChapterIdMap,
-          chapterResults: initMap,
-        });
+          await syncStructureToLocal(targetStorage, {
+            bookId: resolvedBookId,
+            title: pendingProjectName || stripFileExtension(f.name),
+            fileName: f.name,
+            toc: chapters,
+            parts: partsArr,
+            chapterIdMap: newChapterIdMap,
+            chapterResults: initMap,
+          });
 
-        const localSourceName = isDocx ? "source/book.docx" : "source/book.pdf";
-        await targetStorage.writeBlob(localSourceName, f).catch(() => {});
+          const localSourceName = isDocx ? "source/book.docx" : "source/book.pdf";
+          await targetStorage.writeBlob(localSourceName, f).catch(() => {});
+        }
+      } catch (storageErr) {
+        console.warn("[Upload] Local storage save failed (non-fatal):", storageErr);
       }
 
       progress(4, "Готово!", "Done!");
