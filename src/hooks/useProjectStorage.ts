@@ -11,6 +11,13 @@ import {
 import { downloadBlob } from "@/lib/projectZip";
 
 const LAST_PROJECT_KEY = "booker_last_project";
+const LOCAL_RESET_KEYS = [
+  LAST_PROJECT_KEY,
+  "parser-active-book",
+  "parser-nav-state",
+  "docx_chapter_texts",
+  "docx_html",
+];
 
 interface UseProjectStorageReturn {
   /** Current storage instance (null = no project open) */
@@ -36,6 +43,8 @@ interface UseProjectStorageReturn {
   downloadProjectAsZip: () => Promise<void>;
   /** Close current project */
   closeProject: () => void;
+  /** Hard-reset all locally persisted parser data for this browser */
+  hardResetLocalData: () => Promise<void>;
 
   /** Save source file (PDF or DOCX) into project */
   saveSourceFile: (file: File) => Promise<void>;
@@ -194,6 +203,26 @@ export function useProjectStorage(): UseProjectStorageReturn {
     try { localStorage.removeItem(LAST_PROJECT_KEY); } catch {}
   }, []);
 
+  const hardResetLocalData = useCallback(async () => {
+    setLoading(true);
+    try {
+      setStorage(null);
+      setMeta(null);
+
+      if (backend === "opfs") {
+        const projectNames = await OPFSStorage.listProjects();
+        await Promise.all(projectNames.map((projectName) => OPFSStorage.deleteProject(projectName)));
+      }
+
+      for (const key of LOCAL_RESET_KEYS) {
+        try { localStorage.removeItem(key); } catch {}
+        try { sessionStorage.removeItem(key); } catch {}
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [backend]);
+
   // ── Source file helpers (PDF or DOCX) ────────────────────
 
   const saveSourceFile = useCallback(async (file: File) => {
@@ -266,6 +295,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
     importProjectFromZip,
     downloadProjectAsZip,
     closeProject,
+    hardResetLocalData,
     saveSourceFile,
     readSourceFile,
   };

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bot, Library, PlusCircle, Network, FileText, Users, RefreshCw } from "lucide-react";
@@ -38,6 +39,8 @@ export default function Parser() {
   const { user } = useAuth();
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const userApiKeys = useUserApiKeys();
   const [aiRolesOpen, setAiRolesOpen] = useState(false);
@@ -50,6 +53,7 @@ export default function Parser() {
     storage: projectStorage,
     initialized: projectStorageInitialized,
     meta: projectMeta,
+    hardResetLocalData,
   } = useProjectStorageContext();
   const { getModelForRole } = useAiRoles(userApiKeys);
   const { toast } = useToast();
@@ -213,14 +217,46 @@ export default function Parser() {
   }, [chapterResults, isRu, toast]);
 
   // ── Reset handler ──
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     bookReset();
     setSelectedIndices(new Set());
     setLastClickedIdx(null);
     setExpandedNodes(new Set());
+    setPendingProjectName(null);
     resetAnalysis();
     sessionStorage.removeItem(NAV_STATE_KEY);
-  };
+  }, [bookReset, resetAnalysis]);
+
+  const startNewProject = useCallback(() => {
+    handleReset();
+    setParserTab("structure");
+    setStep("upload");
+  }, [handleReset, setStep]);
+
+  useEffect(() => {
+    if (!new URLSearchParams(location.search).has("resetLocal")) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      await hardResetLocalData();
+      if (cancelled) return;
+      handleReset();
+      setParserTab("structure");
+      setStep("upload");
+      navigate("/parser", { replace: true });
+      toast({
+        title: isRu ? "Локальное хранилище очищено" : "Local storage cleared",
+        description: isRu
+          ? "Все локальные проекты и кэш Парсера удалены из этого браузера."
+          : "All local parser projects and caches were removed from this browser.",
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location.search, hardResetLocalData, handleReset, navigate, isRu, toast, setStep]);
 
   // ── Page header ──
   const headerRight = useMemo(() => {
@@ -240,7 +276,7 @@ export default function Parser() {
         </Button>
         <Button
           variant={step === "upload" ? "secondary" : "ghost"} size="sm"
-          onClick={() => setStep("upload")}
+          onClick={startNewProject}
           className="gap-1.5 text-xs"
         >
           <PlusCircle className="h-3.5 w-3.5" />
@@ -316,7 +352,7 @@ export default function Parser() {
     }
 
     return navButtons;
-  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook, reloadLibrary, saveBook, savingBook, bookId]);
+  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook, reloadLibrary, saveBook, savingBook, bookId, startNewProject]);
 
   useEffect(() => {
     const title = t("parserTitle", isRu);
@@ -406,7 +442,7 @@ export default function Parser() {
           {step === "library" && (
             <LibraryView
               isRu={isRu} books={books} loadingLibrary={loadingLibrary}
-              onUpload={() => setStep("upload")} onOpen={openSavedBook} onDelete={deleteBook}
+              onUpload={startNewProject} onOpen={openSavedBook} onDelete={deleteBook}
               onClearAll={clearAllProjects}
             />
           )}

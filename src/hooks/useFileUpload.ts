@@ -91,10 +91,18 @@ export function useFileUpload({
       return;
     }
 
-    // Clear stale session data from previous uploads to prevent cross-book contamination
+    // Clear stale session/runtime data from previous uploads to prevent cross-book contamination
     sessionStorage.removeItem("docx_chapter_texts");
     sessionStorage.removeItem("docx_html");
+    sessionStorage.removeItem(ACTIVE_BOOK_KEY);
 
+    setBookId(null);
+    setPdfRef(null);
+    setTotalPages(0);
+    setTocEntries([]);
+    setChapterIdMap(new Map());
+    setPartIdMap(new Map());
+    setChapterResults(new Map());
     setFileName(f.name);
     setFile(f);
     setStep("extracting_toc");
@@ -233,7 +241,7 @@ export function useFileUpload({
       // ── Save to OPFS only (non-fatal — upload succeeds even if storage fails) ──
       progress(3, "Сохранение в локальное хранилище...", "Saving to local storage...");
       try {
-        let targetStorage: ProjectStorage | null = projectStorage ?? null;
+        let targetStorage: ProjectStorage | null = isReload ? (projectStorage ?? null) : null;
 
         // Auto-create OPFS project if no storage is open yet
         if (!targetStorage && createProject && (storageBackend === "opfs" || storageBackend === "fs-access")) {
