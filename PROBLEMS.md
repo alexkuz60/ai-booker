@@ -122,11 +122,11 @@
 | **B6** | `handleFileSelect` не проверяет «существует ли уже bookId?» → безусловный INSERT (= B1, другой ракурс) | `useBookManager.ts:886-891` | 🔴 = B1 |
 | **B7** | `ensurePdfLoaded` ищет `file_path` в `books` state, но после `restoreFromLocal` этот state пуст; для DOCX `file_path = null` → всегда null | `useBookManager.ts:1077-1093` | 🟡 Связан с B4 |
 | **B8** | `openSavedBook` с сервера: если PDF удалён или книга DOCX → `pdfBlob = null`, код продолжает без ошибки, но анализ позже падает | `useBookManager.ts:504-510` | 🟡 Средне |
-| **B9** | Библиотека читает `toc.json` и запрашивает сервер без необходимости | `useBookManager.ts:81,231-240` | 🟡 Средне |
-| **B10** | `openSavedBook` не проверяет серверный таймстамп при ручном открытии — `restoreFromLocal` → успех → return, без `checkServerNewer` | `useBookManager.ts:490-496` | 🔴 Критично |
-| **B11** | `restoreFromLocal` не читает `structure/characters.json` → персонажи теряются при восстановлении из локалки | `useBookManager.ts:277-342` | 🟡 Средне |
-| **B12** | `acceptServerVersion` вызывает `openSavedBook`, который при наличии локалки снова возвращает `restoreFromLocal` → true → **локалка НЕ заменяется** серверной копией | `useBookManager.ts:409-417` | 🔴 Критично |
-| **B13** | `openSavedBook` делает `upsert(rangeFixes)` в `book_chapters` — побочный эффект записи в БД при операции чтения | `useBookManager.ts:607-627` | 🟡 Средне |
+| **B9** | ~~Библиотека читает `toc.json` и запрашивает сервер без необходимости~~ | `useBookManager.ts` | ✅ Исправлено |
+| **B10** | ~~`openSavedBook` не проверяет серверный таймстамп при ручном открытии~~ | `useBookManager.ts` | ✅ Исправлено |
+| **B11** | ~~`restoreFromLocal` не читает `structure/characters.json`~~ — загрузка персонажей обеспечивается `useParserCharacters` | `useBookManager.ts` | ✅ Исправлено |
+| **B12** | ~~`acceptServerVersion` не заменяет локалку серверной копией~~ | `useBookManager.ts` | ✅ Исправлено |
+| **B13** | ~~`openSavedBook` делает `upsert(rangeFixes)` — побочный эффект записи при чтении~~ | `useBookManager.ts` | ✅ Исправлено |
 
 ### Правильная логика операций (эталон)
 
