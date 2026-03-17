@@ -36,7 +36,7 @@ function isSentenceLike(line: string): boolean {
 function isLikelyHeadingLine(line: string, knownTitles: Set<string>): boolean {
   const normalized = normalizeTocTitle(line);
   if (!normalized) return false;
-  return knownTitles.has(normalized) || TOC_HEADING_PATTERNS.some((pattern) => pattern.test(line));
+  return knownTitles.has(normalized) || /^([\p{L}]+)\s+\d+(?:[.:]\d+)*[.:]?/u.test(line) || TOC_HEADING_PATTERNS.some((pattern) => pattern.test(line));
 }
 
 export function isLikelyTocOnlyHtml(html: string, knownTitles: Set<string>): boolean {
