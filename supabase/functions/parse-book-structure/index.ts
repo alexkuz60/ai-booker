@@ -307,6 +307,14 @@ async function handleAIRequest(
     toolName = "suggest_structure";
   }
 
+  // Some models (e.g. openai/gpt-5-mini via proxyapi) reject non-default temperature
+  const MODELS_NO_TEMPERATURE = new Set([
+    'openai/gpt-5-mini',
+    'openai/gpt-5',
+    'openai/gpt-5.2',
+  ]);
+  const useTemperature = !MODELS_NO_TEMPERATURE.has(model);
+
   const requestBody: Record<string, unknown> = {
     messages: [
       { role: "system", content: systemPrompt },
@@ -314,7 +322,7 @@ async function handleAIRequest(
     ],
     tools,
     tool_choice: { type: "function", function: { name: toolName } },
-    temperature: 0.3,
+    ...(useTemperature ? { temperature: 0.3 } : {}),
   };
 
   async function callAI(ep: string, mdl: string, key: string, prov: string): Promise<Response> {
@@ -379,7 +387,7 @@ async function handleAIRequest(
       }
     }
 
-    // Handle 400 context-length errors: try truncating text and retrying once
+    // Handle 400 errors: context-length OR temperature/param issues
     if (response.status === 400 && toolAttempt === 0) {
       const errBody = await response.text();
       if (errBody.includes('context length') || errBody.includes('too many tokens') || errBody.includes('maximum')) {
@@ -402,10 +410,16 @@ async function handleAIRequest(
         ];
         continue; // retry with shorter text
       }
-      // Not a context error — fall through to normal error handling
+      // Handle temperature/parameter rejection — retry without temperature
+      if (errBody.includes('temperature') || errBody.includes('Unsupported value')) {
+        console.warn(`[parse-book-structure] Parameter rejected by ${model}, retrying without temperature`);
+        delete requestBody.temperature;
+        continue;
+      }
+      // Not a recoverable error — return
       console.error("AI error:", 400, "model:", model, "provider:", provider, errBody);
-      if (userId) logAiUsage({ userId, modelId: model, requestType: `parse-structure${mode ? `-${mode}` : ''}`, status: "error", latencyMs: Math.round(performance.now() - t0), errorMessage: `HTTP 400` });
-      return new Response(JSON.stringify({ error: `AI analysis failed (400)` }),
+      if (userId) logAiUsage({ userId, modelId: model, requestType: `parse-structure${mode ? `-${mode}` : ''}`, status: "error", latencyMs: Math.round(performance.now() - t0), errorMessage: `HTTP 400: ${errBody.slice(0, 200)}` });
+      return new Response(JSON.stringify({ error: `AI analysis failed (400): ${errBody.slice(0, 200)}` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -494,13 +508,13 @@ async function handleAIRequest(
         ? `Return ONLY a JSON object with key "scenes" containing an array of objects with keys: scene_number, title, start_marker. No extra text.`
         : `Return ONLY a JSON object. No extra text.`;
 
-    const fallbackBody = {
+    const fallbackBody: Record<string, unknown> = {
       messages: [
         { role: "system", content: systemPrompt + "\n\n" + jsonPrompt },
         { role: "user", content: userContent },
       ],
-      temperature: 0.3,
       model,
+      ...(useTemperature ? { temperature: 0.3 } : {}),
     };
 
     const hdrs: Record<string, string> = {
