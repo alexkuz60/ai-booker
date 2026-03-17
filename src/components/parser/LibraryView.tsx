@@ -18,9 +18,10 @@ interface LibraryViewProps {
   onUpload: () => void;
   onOpen: (book: BookRecord) => void;
   onDelete: (bookId: string) => void;
+  onClearAll?: () => void;
 }
 
-export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onOpen, onDelete }: LibraryViewProps) {
+export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onOpen, onDelete, onClearAll }: LibraryViewProps) {
   return (
     <motion.div key="library" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
       className="flex-1 h-full overflow-auto">
