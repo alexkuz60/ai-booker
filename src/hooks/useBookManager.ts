@@ -256,8 +256,13 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       return;
     }
 
-    // Load library once on mount, or when returning to library tab
-    if (step === "library" && !libraryLoadedRef.current) {
+    if (step !== "library") {
+      // Reset so returning to library reloads
+      libraryLoadedRef.current = false;
+      return;
+    }
+
+    if (!libraryLoadedRef.current) {
       libraryLoadedRef.current = true;
       void loadLibrary();
     }
