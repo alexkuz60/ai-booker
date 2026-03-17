@@ -276,7 +276,7 @@ export default function Parser() {
         </Button>
         <Button
           variant={step === "upload" ? "secondary" : "ghost"} size="sm"
-          onClick={() => setStep("upload")}
+          onClick={startNewProject}
           className="gap-1.5 text-xs"
         >
           <PlusCircle className="h-3.5 w-3.5" />
