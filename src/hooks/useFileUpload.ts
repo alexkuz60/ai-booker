@@ -51,6 +51,8 @@ interface UseFileUploadParams {
   projectStorage?: ProjectStorage | null;
   createProject?: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<ProjectStorage>;
   bookId: string | null;
+  /** User-provided project name (from the UI input) */
+  pendingProjectName?: string | null;
   setStep: (s: Step) => void;
   setFileName: (s: string) => void;
   setBookId: (id: string | null) => void;
