@@ -239,14 +239,10 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         }),
       ]);
 
-      console.log("[Library] local:", localBooks.length, "server:", serverBooks.length);
-
       // Merge: local takes priority, append server-only books
       const localIds = new Set(localBooks.map(b => b.id));
       const serverOnly = serverBooks.filter(sb => !localIds.has(sb.id));
-      const merged = [...localBooks, ...serverOnly];
-      console.log("[Library] merged:", merged.length, "ids:", merged.map(b => b.id));
-      setBooks(merged);
+      setBooks([...localBooks, ...serverOnly]);
     } catch (err) {
       console.error("Failed to load library:", err);
       setBooks([]);
@@ -993,17 +989,33 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       await supabase.from('book_chapters').delete().eq('book_id', bookId);
       await supabase.from('book_parts').delete().eq('book_id', bookId);
 
+      // Clean up local OPFS project(s) for this book
+      if (storageBackend === "opfs") {
+        const projectNames = localProjectNamesByBookId.get(bookId);
+        if (projectNames?.length) {
+          for (const name of projectNames) {
+            try { await OPFSStorage.deleteProject(name); } catch {}
+          }
+        }
+      } else if (projectStorage?.isReady) {
+        // FS Access: clear structure files but keep project dir
+        try {
+          await projectStorage.writeJSON("structure/toc.json", []);
+          await projectStorage.writeJSON("structure/characters.json", []);
+        } catch {}
+      }
+
       // Reset state but keep bookId for re-association
       setPartIdMap(new Map()); setChapterIdMap(new Map());
       setTocEntries([]); setPdfRef(null); setFile(null);
       setChapterResults(new Map());
       setStep("upload");
-      toast.info(isRu ? "Выберите новый PDF для перезагрузки книги" : "Select a new PDF to reload the book");
+      toast.info(isRu ? "Выберите новый файл для перезагрузки книги" : "Select a new file to reload the book");
     } catch (err) {
       console.error("Failed to reload book:", err);
       toast.error(isRu ? "Не удалось очистить данные книги" : "Failed to clear book data");
     }
-  }, [bookId, isRu]);
+  }, [bookId, isRu, storageBackend, localProjectNamesByBookId, projectStorage]);
 
   // ─── Ensure PDF is loaded (local-first, then server) ────────
   const ensurePdfLoaded = useCallback(async (): Promise<any> => {
