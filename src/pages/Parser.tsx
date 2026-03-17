@@ -102,6 +102,7 @@ export default function Parser() {
     chapterResults,
     bookId,
     profilerModel: getModelForRole("profiler"),
+    userApiKeys,
     isRu,
   });
 

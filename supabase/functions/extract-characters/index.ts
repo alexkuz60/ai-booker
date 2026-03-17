@@ -1,3 +1,4 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
 
 const corsHeaders = {
@@ -11,6 +12,83 @@ interface ExtractedCharacter {
   aliases: string[];
   gender: "male" | "female" | "unknown";
   scene_numbers: number[];
+}
+
+// ── ProxyAPI model mapping ─────────────────────────────────
+const PROXYAPI_MODEL_MAP: Record<string, string> = {
+  'proxyapi/gpt-5': 'openai/gpt-5',
+  'proxyapi/gpt-5-mini': 'openai/gpt-5-mini',
+  'proxyapi/gpt-5.2': 'openai/gpt-5.2',
+  'proxyapi/gpt-4o': 'openai/gpt-4o',
+  'proxyapi/gpt-4o-mini': 'openai/gpt-4o-mini',
+  'proxyapi/claude-sonnet-4': 'anthropic/claude-sonnet-4-20250514',
+  'proxyapi/claude-opus-4': 'anthropic/claude-opus-4-6',
+  'proxyapi/claude-3-5-sonnet': 'anthropic/claude-3-5-sonnet-20241022',
+  'proxyapi/gemini-3-pro-preview': 'gemini/gemini-3-pro-preview',
+  'proxyapi/gemini-3-flash-preview': 'gemini/gemini-3-flash-preview',
+  'proxyapi/gemini-2.5-pro': 'gemini/gemini-2.5-pro',
+  'proxyapi/gemini-2.5-flash': 'gemini/gemini-2.5-flash',
+  'proxyapi/deepseek-chat': 'deepseek/deepseek-chat',
+  'proxyapi/deepseek-reasoner': 'deepseek/deepseek-reasoner',
+};
+
+// ── Provider routing ───────────────────────────────────────
+function getEndpointAndModel(
+  userModel: string,
+  userApiKey: string | null,
+): { endpoint: string; model: string; apiKey: string } {
+  // Detect provider from model prefix
+  if (userModel.startsWith("proxyapi/") && userApiKey) {
+    const realModel = PROXYAPI_MODEL_MAP[userModel] || userModel.replace("proxyapi/", "");
+    return {
+      endpoint: "https://openai.api.proxyapi.ru/v1/chat/completions",
+      model: realModel,
+      apiKey: userApiKey,
+    };
+  }
+
+  if (userModel.startsWith("openrouter/") && userApiKey) {
+    const realModel = userModel.replace("openrouter/", "");
+    return {
+      endpoint: "https://openrouter.ai/api/v1/chat/completions",
+      model: realModel,
+      apiKey: userApiKey,
+    };
+  }
+
+  if (userModel.startsWith("dotpoint/") && userApiKey) {
+    const realModel = userModel.replace("dotpoint/", "");
+    return {
+      endpoint: "https://llms.dotpoin.com/v1/chat/completions",
+      model: realModel,
+      apiKey: userApiKey,
+    };
+  }
+
+  // Lovable AI gateway (admin-only — gated by client)
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  return {
+    endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions",
+    model: userModel || "google/gemini-2.5-flash",
+    apiKey: LOVABLE_API_KEY || "",
+  };
+}
+
+/** Check if user has admin role */
+async function checkIsAdmin(authHeader: string): Promise<boolean> {
+  try {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+    const { data } = await supabase.rpc("has_role", { _user_id: user.id, _role: "admin" });
+    return !!data;
+  } catch {
+    return false;
+  }
 }
 
 // ── Prompt ──────────────────────────────────────────────────
@@ -64,14 +142,21 @@ async function callAI(
   userPrompt: string,
   model: string,
   userId: string,
+  userApiKey: string | null,
 ): Promise<ExtractedCharacter[]> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+  const { endpoint, model: resolvedModel, apiKey } = getEndpointAndModel(model, userApiKey);
+
+  if (!apiKey) throw new Error("No API key available for the selected model provider");
+
+  const provider = model.startsWith("openrouter/") ? "openrouter"
+    : model.startsWith("proxyapi/") ? "proxyapi"
+    : model.startsWith("dotpoint/") ? "dotpoint"
+    : "lovable";
 
   const t0 = Date.now();
 
   const body: Record<string, unknown> = {
-    model,
+    model: resolvedModel,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
@@ -118,12 +203,20 @@ async function callAI(
     tool_choice: { type: "function", function: { name: "report_characters" } },
   };
 
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey}`,
+    "Content-Type": "application/json",
+  };
+
+  // OpenRouter requires HTTP-Referer
+  if (provider === "openrouter") {
+    headers["HTTP-Referer"] = "https://booker-studio.lovable.app";
+    headers["X-Title"] = "AI Booker";
+  }
+
+  const resp = await fetch(endpoint, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify(body),
   });
 
@@ -131,10 +224,10 @@ async function callAI(
 
   if (!resp.ok) {
     const errText = await resp.text();
-    console.error("AI gateway error:", resp.status, errText);
+    console.error(`AI error (${provider}):`, resp.status, errText);
     await logAiUsage({
       userId,
-      modelId: model,
+      modelId: resolvedModel,
       requestType: "extract-characters",
       status: "error",
       latencyMs,
@@ -142,7 +235,7 @@ async function callAI(
     });
     if (resp.status === 429) throw new Error("rate_limited");
     if (resp.status === 402) throw new Error("payment_required");
-    throw new Error(`AI gateway ${resp.status}`);
+    throw new Error(`AI ${provider} ${resp.status}`);
   }
 
   const json = await resp.json();
@@ -150,7 +243,7 @@ async function callAI(
 
   await logAiUsage({
     userId,
-    modelId: model,
+    modelId: resolvedModel,
     requestType: "extract-characters",
     status: "success",
     latencyMs,
@@ -196,11 +289,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    let { scenes, lang = "ru", model = "google/gemini-2.5-flash" } = await req.json();
-    // Strip provider prefixes (e.g. "openrouter/google/gemini-2.5-pro" → "google/gemini-2.5-pro")
-    if (model && model.includes("/") && model.split("/").length > 2) {
-      model = model.split("/").slice(-2).join("/");
-    }
+    const { scenes, lang = "ru", model = "google/gemini-2.5-flash", apiKey = null } = await req.json();
 
     if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
       return new Response(
@@ -209,8 +298,21 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Gate Lovable AI to admins only
+    const isLovableRoute = !model.startsWith("openrouter/") && !model.startsWith("proxyapi/") && !model.startsWith("dotpoint/");
+    if (isLovableRoute && !apiKey) {
+      const admin = await checkIsAdmin(authHeader);
+      if (!admin) {
+        // Try fallback to OpenRouter if user has a key
+        return new Response(
+          JSON.stringify({ error: "Lovable AI доступен только администраторам. Выберите модель внешнего провайдера." }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
     const { systemPrompt, userPrompt } = buildPrompt(scenes, lang as "ru" | "en");
-    const characters = await callAI(systemPrompt, userPrompt, model, userId);
+    const characters = await callAI(systemPrompt, userPrompt, model, userId, apiKey);
 
     return new Response(
       JSON.stringify({ characters }),

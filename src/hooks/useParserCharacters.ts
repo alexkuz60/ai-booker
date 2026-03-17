@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { Scene, ChapterStatus, TocChapter, LocalCharacter, CharacterAppearance } from "@/pages/parser/types";
 import { saveCharactersToLocal, readCharactersFromLocal } from "@/lib/localSync";
+import { getModelRegistryEntry } from "@/config/modelRegistry";
 
 interface UseParserCharactersParams {
   storage: ProjectStorage | null;
@@ -17,6 +18,8 @@ interface UseParserCharactersParams {
   bookId: string | null;
   /** Resolved model for the profiler role */
   profilerModel?: string;
+  /** User API keys map (e.g. { openrouter: "sk-...", proxyapi: "..." }) */
+  userApiKeys?: Record<string, string>;
   isRu?: boolean;
 }
 
@@ -30,6 +33,7 @@ export function useParserCharacters({
   chapterResults,
   bookId,
   profilerModel = "google/gemini-2.5-flash",
+  userApiKeys = {},
   isRu = true,
 }: UseParserCharactersParams) {
   const [characters, setCharacters] = useState<LocalCharacter[]>([]);
@@ -109,11 +113,18 @@ export function useParserCharacters({
       if (scenesPayload.length === 0) continue;
 
       try {
+        // Resolve the API key for the model's provider
+        const registryEntry = getModelRegistryEntry(profilerModel);
+        const apiKeyForModel = registryEntry?.apiKeyField
+          ? userApiKeys[registryEntry.apiKeyField] || null
+          : null;
+
         const { data, error } = await supabase.functions.invoke("extract-characters", {
           body: {
             scenes: scenesPayload,
             lang: isRu ? "ru" : "en",
             model: profilerModel,
+            apiKey: apiKeyForModel,
           },
         });
 
