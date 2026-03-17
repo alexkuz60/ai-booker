@@ -450,7 +450,9 @@ async function handleAIRequest(
 
     if (toolCall) {
       const structure = JSON.parse(toolCall.function.arguments);
-      return new Response(JSON.stringify({ structure }), {
+      const resp: Record<string, unknown> = { structure };
+      if (wasTruncated) resp.truncated = { originalLength: originalTextLength, truncatedLength: truncatedText.length };
+      return new Response(JSON.stringify(resp), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
