@@ -17,8 +17,11 @@ export function normalizeTocTitle(raw: string): string {
 }
 
 function extractHtmlLines(html: string): string[] {
-  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
-  return Array.from(doc.body.children)
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const blockNodes = Array.from(doc.body.querySelectorAll("p, h1, h2, h3, h4, h5, h6, li"));
+  const source = blockNodes.length > 0 ? blockNodes : Array.from(doc.body.children);
+
+  return source
     .map((node) => stripTrailingPageNumber(node.textContent || ""))
     .map((line) => line.trim())
     .filter(Boolean);
