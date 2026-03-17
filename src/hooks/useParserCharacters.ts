@@ -113,11 +113,18 @@ export function useParserCharacters({
       if (scenesPayload.length === 0) continue;
 
       try {
+        // Resolve the API key for the model's provider
+        const registryEntry = getModelRegistryEntry(profilerModel);
+        const apiKeyForModel = registryEntry?.apiKeyField
+          ? userApiKeys[registryEntry.apiKeyField] || null
+          : null;
+
         const { data, error } = await supabase.functions.invoke("extract-characters", {
           body: {
             scenes: scenesPayload,
             lang: isRu ? "ru" : "en",
             model: profilerModel,
+            apiKey: apiKeyForModel,
           },
         });
 
