@@ -990,14 +990,14 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       setChapterResults(initMap);
 
       // ── Dual-write: sync to local project ──
-      if (projectStorage?.isReady && book?.id) {
+      if (projectStorage?.isReady && resolvedBookId) {
         const partsArr = uniqueParts.map((title, i) => ({
           id: newPartIdMap.get(title) || "",
           title,
           partNumber: i + 1,
         }));
         syncStructureToLocal(projectStorage, {
-          bookId: book.id,
+          bookId: resolvedBookId,
           title: f.name.replace(/\.(pdf|docx?)$/i, ''),
           fileName: f.name,
           toc: chapters,
