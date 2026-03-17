@@ -825,9 +825,21 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         setTotalPages(localTotalPages);
 
         if (outline.length > 0) {
-          const flat = flattenTocWithRanges(outline, localTotalPages);
+          // Always also scan text for headings to catch entries missing from outline
+          const textToc = await extractTocFromText(pdf);
+          const merged = mergeOutlineWithTextToc(outline, textToc);
+          const flat = flattenTocWithRanges(merged, localTotalPages);
           chapters = mapFlatToChapters(flat);
-          toast.success(`${t("tocFound", isRu)}: ${chapters.length} ${t("items", isRu)}`);
+          const extra = merged.length - outline.length;
+          if (extra > 0) {
+            toast.success(
+              isRu
+                ? `Оглавление: ${chapters.length} записей (${extra} найдено в тексте)`
+                : `TOC: ${chapters.length} entries (${extra} found in text)`
+            );
+          } else {
+            toast.success(`${t("tocFound", isRu)}: ${chapters.length} ${t("items", isRu)}`);
+          }
         } else {
           const textToc = await extractTocFromText(pdf);
           if (textToc.length > 0) {
