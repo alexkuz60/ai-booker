@@ -218,6 +218,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     };
   }, [loadLibraryFromServer, userId]);
 
+  // B9 fix: Library loads ONLY from local OPFS, no server requests
   const loadLibrary = useCallback(async () => {
     if (!userId) {
       setBooks([]);
@@ -227,29 +228,18 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
     setLoadingLibrary(true);
     try {
-      // Load local + server in parallel, merge once
-      const [localBooks, serverBooks] = await Promise.all([
-        loadLocalLibrary().catch((err) => {
-          console.warn("[Library] Local fetch failed:", err);
-          return [] as BookRecord[];
-        }),
-        loadLibraryFromServer().catch((err) => {
-          console.warn("[Library] Server fetch failed:", err);
-          return [] as BookRecord[];
-        }),
-      ]);
-
-      // Merge: local takes priority, append server-only books
-      const localIds = new Set(localBooks.map(b => b.id));
-      const serverOnly = serverBooks.filter(sb => !localIds.has(sb.id));
-      setBooks([...localBooks, ...serverOnly]);
+      const localBooks = await loadLocalLibrary().catch((err) => {
+        console.warn("[Library] Local fetch failed:", err);
+        return [] as BookRecord[];
+      });
+      setBooks(localBooks);
     } catch (err) {
       console.error("Failed to load library:", err);
       setBooks([]);
     } finally {
       setLoadingLibrary(false);
     }
-  }, [userId, loadLocalLibrary, loadLibraryFromServer]);
+  }, [userId, loadLocalLibrary]);
 
   const libraryLoadedRef = useRef(false);
   useEffect(() => {
