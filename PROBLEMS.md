@@ -123,6 +123,73 @@
 | **B7** | `ensurePdfLoaded` ищет `file_path` в `books` state, но после `restoreFromLocal` этот state пуст; для DOCX `file_path = null` → всегда null | `useBookManager.ts:1077-1093` | 🟡 Связан с B4 |
 | **B8** | `openSavedBook` с сервера: если PDF удалён или книга DOCX → `pdfBlob = null`, код продолжает без ошибки, но анализ позже падает | `useBookManager.ts:504-510` | 🟡 Средне |
 
+### Правильная логика операций (эталон)
+
+#### 1. Просмотр библиотеки
+1. Перечислить OPFS-директории (`OPFSStorage.listProjects()`)
+2. Из каждой прочитать **только** `project.json` — там есть `title`, `bookId`, `updatedAt`, `language`
+3. **НЕ читать** `structure/toc.json` — структура не нужна для списка
+4. **НЕ запрашивать** серверный список — пользователь мог ничего не сохранять на сервер
+5. Если `project.json` отсутствует или сломан — показать проект как «повреждённый» с кнопкой удаления, **НЕ ломать** весь список
+6. Серверная синхронизация — **только** при явном действии пользователя или при "New Workstation Flow" (пустой OPFS)
+7. Отображать: название, дату последнего изменения (`updatedAt`), язык
+
+#### 2. Загрузка новой книги
+1. Пользователь выбирает PDF/DOCX файл
+2. Извлечь TOC (PDF: outline + текстовый парсинг; DOCX: heading-парсинг)
+3. Создать запись в `books` (INSERT) + `book_parts` / `book_chapters` → получить `bookId`
+4. Создать OPFS-проект: `project.json` с `bookId`, `fileFormat: "pdf"|"docx"`, `updatedAt`
+5. Сохранить исходный файл в `source/book.pdf` (или `source/book.docx`)
+6. Сохранить структуру в `structure/toc.json`
+7. Upload PDF в Supabase Storage (для восстановления на другом устройстве)
+8. Folder-ноды пометить `done` (у них нет контента для анализа)
+
+#### 2-R. Перезагрузка книги (Reload)
+1. Сохранить текущий `bookId`
+2. Очистить `sessionStorage` (docx_chapter_texts, docx_html)
+3. Удалить старые chapters/parts/scenes из БД (каскадно)
+4. Удалить `structure/` и `scenes/` из OPFS
+5. Выполнить шаги 2.1–2.8 из п.2, используя **существующий bookId** (UPDATE books, не INSERT)
+
+#### 2.1. Анализ структуры (parse-book-structure)
+1. Определить формат книги из `project.json.fileFormat`
+2. PDF → извлечь текст страниц через `pdfRef`; DOCX → взять из `sessionStorage`
+3. Отправить текст + диапазон страниц на edge function
+4. Получить сцены → сохранить в `scenes/chapter_{idx}.json`
+5. Обновить статус главы → `done`
+6. Auto-save в OPFS (через `useImperativeSave`)
+
+#### 2.2. Разбивка на сцены (segment-scene)
+- Выполняется в Студии, не в Парсере (здесь только структурный анализ)
+
+#### 3. Открытие книги из библиотеки
+1. Прочитать `project.json` → восстановить `bookId`, `fileFormat`, `title`
+2. Прочитать `structure/toc.json` → восстановить TOC-дерево
+3. Прочитать `scenes/chapter_*.json` → восстановить результаты анализа
+4. Прочитать `structure/characters.json` → восстановить персонажей
+5. Прочитать исходный файл (`source/book.pdf` или `source/book.docx`)
+6. **Если** исходный файл отсутствует локально → показать предупреждение, анализ невозможен
+7. Серверная проверка `updatedAt` — **только** если пользователь ранее пушил на сервер
+
+#### 4. Удаление книги
+1. Удалить OPFS-директорию целиком (`OPFSStorage.deleteProject`)
+2. Удалить запись из `books` (каскад удалит chapters, scenes, etc.)
+3. Удалить PDF из Supabase Storage
+4. Убрать `localStorage` запись (`booker_last_project`)
+
+#### 5. Удаление секции в навигаторе
+1. Удалить узел из TOC-дерева (с потомками если folder)
+2. Удалить соответствующие `scenes/chapter_*.json` из OPFS
+3. Пересчитать `chapter_number` для оставшихся
+4. Auto-save
+
+#### 6. Сохранение изменений
+- **Автосохранение**: `useImperativeSave` пишет в OPFS при каждом значимом изменении
+- **Ручной push**: кнопка «На сервер» → upsert в Supabase (books, chapters, parts, scenes, characters)
+- **updatedAt**: обновляется в `project.json` при каждом автосохранении
+
+---
+
 ### План исправлений (порядок работы)
 
 #### Волна 1 — Критичные (блокируют пользователей)
@@ -145,7 +212,7 @@
 #### Волна 2 — Средние (UX-проблемы)
 
 **B2: Folder-ноды остаются pending**
-- Исправление: в `handleFileSelect` после `sanitizeChapterResultsForStructure` дополнительно пройти по всем folder-нодам и выставить `done`
+- Исправление: в `handleFileSelect` после загрузки TOC пометить все folder-ноды как `done`
 - Файл: `src/hooks/useBookManager.ts`
 
 **B3: sessionStorage не очищается при reload**
@@ -154,4 +221,9 @@
 
 **B8: Молчаливый null при отсутствии PDF на сервере**
 - Исправление: если `pdfBlob = null` и книга НЕ DOCX → показать toast-предупреждение
+- Файл: `src/hooks/useBookManager.ts`
+
+**B9 (новый): Библиотека читает toc.json и запрашивает сервер без необходимости**
+- Корень: `loadLocalLibrary` читает `structure/toc.json` для каждого проекта; `loadLibrary` параллельно запрашивает `get_user_books_with_counts`
+- Исправление: библиотека читает ТОЛЬКО `project.json`; серверный запрос убрать из дефолтного потока
 - Файл: `src/hooks/useBookManager.ts`
