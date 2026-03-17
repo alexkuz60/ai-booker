@@ -226,15 +226,25 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
     setLoadingLibrary(true);
     try {
+      // Always load local books first for instant display
       const localBooks = await loadLocalLibrary();
-      if (localBooks.length > 0) {
-        setBooks(localBooks);
-        return;
-      }
+      setBooks(localBooks);
 
-      // Local storage empty — fall back to server
-      const serverBooks = await loadLibraryFromServer();
-      setBooks(serverBooks);
+      // Then merge with server books (non-blocking for UX)
+      try {
+        const serverBooks = await loadLibraryFromServer();
+        if (serverBooks.length > 0) {
+          setBooks(prev => {
+            const localIds = new Set(prev.map(b => b.id));
+            const newFromServer = serverBooks.filter(sb => !localIds.has(sb.id));
+            if (newFromServer.length === 0) return prev;
+            return [...prev, ...newFromServer];
+          });
+        }
+      } catch (serverErr) {
+        // Server unreachable — local books are still shown
+        console.warn("[Library] Server fetch failed, showing local only:", serverErr);
+      }
     } catch (err) {
       console.error("Failed to load library:", err);
       setBooks([]);
