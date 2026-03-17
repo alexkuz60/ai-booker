@@ -267,7 +267,10 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
   const restoreFromLocal = useCallback(async (savedBookId: string): Promise<boolean> => {
     if (!projectStorage?.isReady) return false;
     try {
-      const local = await readStructureFromLocal(projectStorage);
+      const [local, localCharacters] = await Promise.all([
+        readStructureFromLocal(projectStorage),
+        readCharactersFromLocal(projectStorage),
+      ]);
       if (!local?.structure || local.structure.bookId !== savedBookId) return false;
 
       const { structure, chapterIdMap: localChIdMap, chapterResults: localResults } = local;
