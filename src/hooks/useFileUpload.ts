@@ -299,7 +299,7 @@ export function useFileUpload({
     }
 
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [userId, isRu, projectStorage, storageBackend, createProject, bookId,
+  }, [userId, isRu, projectStorage, storageBackend, createProject, bookId, pendingProjectName,
       setStep, setFileName, setBookId, setTocEntries, setChapterIdMap,
       setPartIdMap, setChapterResults, setPdfRef, setTotalPages, setFile, setErrorMsg]);
 
