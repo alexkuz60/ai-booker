@@ -37,10 +37,10 @@ interface UseProjectStorageReturn {
   /** Close current project */
   closeProject: () => void;
 
-  /** Save PDF source file into project */
-  saveSourcePDF: (file: File) => Promise<void>;
-  /** Read source PDF from project */
-  readSourcePDF: () => Promise<File | null>;
+  /** Save source file (PDF or DOCX) into project */
+  saveSourceFile: (file: File) => Promise<void>;
+  /** Read source file from project (tries PDF then DOCX) */
+  readSourceFile: () => Promise<File | null>;
 }
 
 export function useProjectStorage(): UseProjectStorageReturn {
