@@ -473,7 +473,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
       const book = await loadBookFromServerById(savedBookId);
       if (book) {
-        await openSavedBookRef.current?.(book);
+        await openSavedBookRef.current?.(book, { skipTimestampCheck: true });
       } else {
         sessionStorage.removeItem(ACTIVE_BOOK_KEY);
         setStep("library");
