@@ -91,12 +91,19 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       fileFormat?: string;
     }>("project.json");
 
-    if (!meta || !meta.bookId) return null;
+    // Recovery path for legacy/broken local projects where project.json was created
+    // before the real bookId was known. Read structure metadata only when needed.
+    const structure = (!meta?.bookId || !meta?.title)
+      ? await storage.readJSON<LocalBookStructure>("structure/toc.json").catch(() => null)
+      : null;
 
-    const resolvedId = meta.bookId;
-    const resolvedTitle = meta.title || storage.projectName;
-    const resolvedFileName = `${resolvedTitle}.${meta.fileFormat === "docx" ? "docx" : "pdf"}`;
-    const resolvedCreatedAt = meta.updatedAt || meta.createdAt || new Date(0).toISOString();
+    const resolvedId = meta?.bookId || structure?.bookId;
+    if (!resolvedId) return null;
+
+    const resolvedTitle = meta?.title || structure?.title || storage.projectName;
+    const resolvedFormat = meta?.fileFormat || detectFileFormat(structure?.fileName || resolvedTitle);
+    const resolvedFileName = structure?.fileName || `${resolvedTitle}.${resolvedFormat}`;
+    const resolvedCreatedAt = meta?.updatedAt || structure?.updatedAt || meta?.createdAt || new Date(0).toISOString();
     const dedupeKey = `book:${resolvedId}`;
 
     return {
@@ -107,7 +114,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         file_path: null,
         status: "local",
         created_at: resolvedCreatedAt,
-        chapter_count: 0, // not reading toc.json for library list
+        chapter_count: 0,
         scene_count: 0,
       },
       projectName: storage.projectName,
