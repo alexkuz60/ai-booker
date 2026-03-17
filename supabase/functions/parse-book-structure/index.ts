@@ -307,6 +307,14 @@ async function handleAIRequest(
     toolName = "suggest_structure";
   }
 
+  // Some models (e.g. openai/gpt-5-mini via proxyapi) reject non-default temperature
+  const MODELS_NO_TEMPERATURE = new Set([
+    'openai/gpt-5-mini',
+    'openai/gpt-5',
+    'openai/gpt-5.2',
+  ]);
+  const useTemperature = !MODELS_NO_TEMPERATURE.has(model);
+
   const requestBody: Record<string, unknown> = {
     messages: [
       { role: "system", content: systemPrompt },
@@ -314,7 +322,7 @@ async function handleAIRequest(
     ],
     tools,
     tool_choice: { type: "function", function: { name: toolName } },
-    temperature: 0.3,
+    ...(useTemperature ? { temperature: 0.3 } : {}),
   };
 
   async function callAI(ep: string, mdl: string, key: string, prov: string): Promise<Response> {
