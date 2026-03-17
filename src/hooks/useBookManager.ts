@@ -1003,9 +1003,14 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
   }, [userId, isRu, projectStorage]);
 
   // ─── Reload book (delete structure, re-upload new PDF) ─────
+  // B1/B6 fix: reloadBook preserves bookId, clears sessionStorage (B3)
   const reloadBook = useCallback(async () => {
     if (!bookId) return;
     try {
+      // B3: clear DOCX session data
+      sessionStorage.removeItem("docx_chapter_texts");
+      sessionStorage.removeItem("docx_html");
+
       // Delete scenes, chapters, parts for this book
       const { data: chapters } = await supabase
         .from('book_chapters').select('id').eq('book_id', bookId);
@@ -1016,23 +1021,28 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       await supabase.from('book_chapters').delete().eq('book_id', bookId);
       await supabase.from('book_parts').delete().eq('book_id', bookId);
 
-      // Clean up local OPFS project(s) for this book
+      // Clean up local OPFS project(s) — remove structure/ and scenes/ only, keep project.json and source/
       if (storageBackend === "opfs") {
         const projectNames = localProjectNamesByBookId.get(bookId);
         if (projectNames?.length) {
           for (const name of projectNames) {
-            try { await OPFSStorage.deleteProject(name); } catch {}
+            try {
+              const store = await OPFSStorage.openOrCreate(name);
+              const structFiles = await store.listDir("structure").catch(() => []);
+              for (const f of structFiles) await store.delete(`structure/${f}`).catch(() => {});
+              const sceneFiles = await store.listDir("scenes").catch(() => []);
+              for (const f of sceneFiles) await store.delete(`scenes/${f}`).catch(() => {});
+            } catch {}
           }
         }
       } else if (projectStorage?.isReady) {
-        // FS Access: clear structure files but keep project dir
         try {
           await projectStorage.writeJSON("structure/toc.json", []);
           await projectStorage.writeJSON("structure/characters.json", []);
         } catch {}
       }
 
-      // Reset state but keep bookId for re-association
+      // Reset state but keep bookId for re-association (B1/B6 fix)
       setPartIdMap(new Map()); setChapterIdMap(new Map());
       setTocEntries([]); setPdfRef(null); setFile(null);
       setChapterResults(new Map());
