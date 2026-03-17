@@ -217,8 +217,6 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
                 .from("books")
                 .update({ file_path: filePath })
                 .eq("id", currentBookId);
-            }
-            }
           }
         }
       }
