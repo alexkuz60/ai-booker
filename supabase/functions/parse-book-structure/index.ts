@@ -277,7 +277,9 @@ async function handleAIRequest(
   provider: string, mode: string | undefined, chapterTitle: string | undefined,
   openrouterApiKey: string | null, lang: string = 'en', userId: string | null = null
 ): Promise<Response> {
+  const originalTextLength = inputText.length;
   let truncatedText = inputText;
+  let wasTruncated = false;
   let systemPrompt: string;
   let userContent: string;
   let tools: unknown[];
