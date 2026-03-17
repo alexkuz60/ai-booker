@@ -58,7 +58,7 @@ export function useBookManager({
   const library = useLibrary({ userId, storageBackend, projectStorage, step });
 
   const upload = useFileUpload({
-    userId, isRu, storageBackend, projectStorage, createProject, bookId,
+    userId, isRu, storageBackend, projectStorage, createProject, bookId, pendingProjectName,
     setStep, setFileName, setBookId, setTocEntries, setChapterIdMap,
     setPartIdMap, setChapterResults, setPdfRef, setTotalPages, setFile, setErrorMsg,
   });
