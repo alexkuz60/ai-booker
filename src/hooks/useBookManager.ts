@@ -871,6 +871,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
       chapters = normalizeTocRanges(normalizeLevels(chapters), localTotalPages);
       setTocEntries(chapters);
+      progress(2, "Подготовка базы данных...", "Preparing database...");
 
       // B1/B6 fix: if bookId already exists (reload flow), UPDATE instead of INSERT
       const isReload = !!bookId;
