@@ -196,7 +196,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { scenes, lang = "ru", model = "google/gemini-2.5-flash" } = await req.json();
+    let { scenes, lang = "ru", model = "google/gemini-2.5-flash" } = await req.json();
+    // Strip provider prefixes (e.g. "openrouter/google/gemini-2.5-pro" → "google/gemini-2.5-pro")
+    if (model && model.includes("/") && model.split("/").length > 2) {
+      model = model.split("/").slice(-2).join("/");
+    }
 
     if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
       return new Response(
