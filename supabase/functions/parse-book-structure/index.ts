@@ -485,7 +485,59 @@ async function handleAIRequest(
     }
   }
 
-  console.error("AI response had no tool_calls after retries:", JSON.stringify(lastMsg).slice(0, 500));
+  // ─── Last-resort fallback: retry WITHOUT tool_choice, ask for raw JSON ───
+  console.warn("All tool_call retries failed, attempting raw JSON fallback...");
+  try {
+    const jsonPrompt = mode === "enrich"
+      ? `Return ONLY a JSON object with keys: scene_type, mood, bpm. No extra text.`
+      : mode === "boundaries"
+        ? `Return ONLY a JSON object with key "scenes" containing an array of objects with keys: scene_number, title, start_marker. No extra text.`
+        : `Return ONLY a JSON object. No extra text.`;
+
+    const fallbackBody = {
+      messages: [
+        { role: "system", content: systemPrompt + "\n\n" + jsonPrompt },
+        { role: "user", content: userContent },
+      ],
+      temperature: 0.3,
+      model,
+    };
+
+    const hdrs: Record<string, string> = {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    };
+    if (provider === 'openrouter') {
+      hdrs["HTTP-Referer"] = "https://booker-studio.lovable.app";
+      hdrs["X-Title"] = "BookerStudio Parser";
+    }
+
+    const fallbackResp = await fetch(endpoint, { method: "POST", headers: hdrs, body: JSON.stringify(fallbackBody) });
+    if (fallbackResp.ok) {
+      const fbData = await fallbackResp.json();
+      const fbContent = fbData.choices?.[0]?.message?.content || fbData.choices?.[0]?.message?.reasoning || "";
+      if (fbContent) {
+        const jsonMatch = fbContent.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (parsed.scene_type || parsed.scenes || parsed.chapters || parsed.book_title) {
+            console.log("Raw JSON fallback succeeded");
+            const resp: Record<string, unknown> = { structure: parsed };
+            if (wasTruncated) resp.truncated = { originalLength: originalTextLength, truncatedLength: truncatedText.length };
+            return new Response(JSON.stringify(resp), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        }
+      }
+    } else {
+      await fallbackResp.text();
+    }
+  } catch (fbErr) {
+    console.warn("Raw JSON fallback also failed:", fbErr);
+  }
+
+  console.error("AI response had no tool_calls after all retries:", JSON.stringify(lastMsg).slice(0, 500));
   return new Response(JSON.stringify({ error: "AI did not return structured output" }),
     { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
