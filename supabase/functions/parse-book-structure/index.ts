@@ -386,6 +386,7 @@ async function handleAIRequest(
         console.warn(`[parse-book-structure] Context length exceeded for ${model}, truncating to 50% and retrying`);
         const halfLen = Math.floor(truncatedText.length / 2);
         truncatedText = truncatedText.slice(0, halfLen);
+        wasTruncated = true;
         if (mode === 'boundaries') {
           userContent = `Split the following chapter "${chapterTitle || 'Untitled'}" into scenes. Return boundaries and complete text only:\n\n${truncatedText}`;
         } else if (mode === 'enrich') {
