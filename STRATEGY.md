@@ -246,7 +246,7 @@ Character {
 | Шаг | Описание | Где | Статус |
 |-----|----------|-----|--------|
 | **Шаг 1** | Создать таблицы `book_characters` и `character_appearances` с RLS | БД (миграция) | ⬜ |
-| **Шаг 2** | При сегментации сцен (`segment-scene`) извлекать speakers → upsert в `book_characters`, создавать записи в `character_appearances` | Edge Function | ⬜ |
+| **Шаг 2** | _(перенесено в PROBLEMS.md §Б — синхронизация персонажей Парсер ↔ Студия)_ | — | 🔴 |
 | **Шаг 3** | В `CharactersPanel` загружать реестр персонажей главы, привязывать голоса, сохранять `voice_config` | UI (Студия) | ⬜ |
 | **Шаг 4** | Глубокий профайлинг: отдельный AI-проход по всей книге для заполнения `description`, `temperament`, `speech_style`, кластеризации алиасов | Edge Function + UI | ⬜ |
 
