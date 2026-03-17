@@ -147,31 +147,43 @@ export function useParserHelpers({
     const nopart: number[] = [];
     const pMap = new Map<string, number[]>();
     const childOf = new Set<number>();
+    const realFolderTitles = new Set<string>();
 
     tocEntries.forEach((entry, idx) => {
       if (entry.sectionType !== "content") return;
+      let hasChildren = false;
       for (let i = idx + 1; i < tocEntries.length; i++) {
         if (tocEntries[i].level <= entry.level) break;
         if (tocEntries[i].sectionType !== entry.sectionType) break;
         childOf.add(i);
+        hasChildren = true;
+      }
+      if (hasChildren) {
+        realFolderTitles.add(entry.title.trim().toLowerCase());
       }
     });
 
     tocEntries.forEach((entry, idx) => {
       if (entry.sectionType !== "content") return;
       const key = entry.partTitle || "";
-      if (key) {
+      const hasRealFolder = key && realFolderTitles.has(key.trim().toLowerCase());
+
+      if (key && !hasRealFolder) {
         if (!pMap.has(key)) {
           pMap.set(key, []);
           groups.push({ title: key, indices: pMap.get(key)! });
         }
         if (!childOf.has(idx)) pMap.get(key)!.push(idx);
-      } else {
-        if (!childOf.has(idx)) nopart.push(idx);
+        return;
       }
+
+      if (!childOf.has(idx)) nopart.push(idx);
     });
 
-    return { partGroups: groups, partlessIndices: nopart };
+    return {
+      partGroups: groups.filter((group) => group.indices.length > 0),
+      partlessIndices: nopart,
+    };
   }, [tocEntries]);
 
   return {
