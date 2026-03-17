@@ -33,7 +33,7 @@ const texts: Record<string, { ru: string; en: string }> = {
   docxNoToc: { ru: "Структура не найдена. Документ загружен как один блок.", en: "No structure found. Document loaded as a single block." },
 
   // TOC extraction
-  searchingToc: { ru: "Поиск оглавления в PDF...", en: "Searching for TOC in PDF..." },
+  searchingToc: { ru: "Поиск оглавления...", en: "Searching for TOC..." },
   tocFound: { ru: "Найдено оглавление", en: "TOC found" },
   tocNotFound: { ru: "Оглавление не найдено. Книга загружена как один блок.", en: "No TOC found. Book loaded as a single block." },
   items: { ru: "элементов", en: "items" },

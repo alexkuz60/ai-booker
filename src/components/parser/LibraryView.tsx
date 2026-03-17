@@ -70,6 +70,9 @@ export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onO
                       {(book.scene_count || 0) > 0 && (
                         <span>{book.scene_count} {t("libraryScenes", isRu)}</span>
                       )}
+                      <Badge variant="outline" className="text-[10px] font-mono">
+                        {book.file_name?.match(/\.(docx?)$/i) ? "DOCX" : "PDF"}
+                      </Badge>
                       <Badge variant="outline" className="text-[10px]">
                         {(book.chapter_count || 0) > 0 ? t("libraryAnalyzed", isRu) : t("libraryUploaded", isRu)}
                       </Badge>
