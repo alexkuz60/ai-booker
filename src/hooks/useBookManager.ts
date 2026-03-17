@@ -680,7 +680,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       setErrorMsg(err.message || "Unknown error");
       setStep("error");
     }
-  }, [userId, isRu, projectStorage, storageBackend, createProject, restoreFromLocal]);
+  }, [userId, isRu, projectStorage, storageBackend, createProject, restoreFromLocal, checkServerNewer]);
 
   // Keep ref in sync for auto-restore effect
   openSavedBookRef.current = openSavedBook;
