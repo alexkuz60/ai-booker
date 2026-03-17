@@ -858,34 +858,59 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       chapters = normalizeTocRanges(normalizeLevels(chapters), localTotalPages);
       setTocEntries(chapters);
 
-      // Clean up previous uploads of the same file name
-      const { data: existingBooks } = await supabase
-        .from('books')
-        .select('id, file_path')
-        .eq('user_id', userId)
-        .eq('file_name', f.name);
-      if (existingBooks?.length) {
-        const oldPaths = existingBooks.map(b => b.file_path).filter(Boolean) as string[];
-        if (oldPaths.length) {
-          await supabase.storage.from('book-uploads').remove(oldPaths);
+      // B1/B6 fix: if bookId already exists (reload flow), UPDATE instead of INSERT
+      const isReload = !!bookId;
+      const filePath = isPdf ? `${userId}/${Date.now()}_${f.name}` : null;
+
+      if (!isReload) {
+        // Fresh upload — clean up previous uploads of the same file name
+        const { data: existingBooks } = await supabase
+          .from('books')
+          .select('id, file_path')
+          .eq('user_id', userId)
+          .eq('file_name', f.name);
+        if (existingBooks?.length) {
+          const oldPaths = existingBooks.map(b => b.file_path).filter(Boolean) as string[];
+          if (oldPaths.length) {
+            await supabase.storage.from('book-uploads').remove(oldPaths);
+          }
+          const oldIds = existingBooks.map(b => b.id);
+          await supabase.from('book_chapters').delete().in('book_id', oldIds);
+          await supabase.from('book_parts').delete().in('book_id', oldIds);
+          await supabase.from('books').delete().in('id', oldIds);
         }
-        const oldIds = existingBooks.map(b => b.id);
-        await supabase.from('book_chapters').delete().in('book_id', oldIds);
-        await supabase.from('book_parts').delete().in('book_id', oldIds);
-        await supabase.from('books').delete().in('id', oldIds);
       }
 
-      const filePath = isPdf ? `${userId}/${Date.now()}_${f.name}` : null;
       if (isPdf && filePath) {
         await supabase.storage.from('book-uploads').upload(filePath, f);
       }
-      const { data: book, error: bookErr } = await supabase
-        .from('books')
-        .insert({ user_id: userId, title: f.name.replace(/\.(pdf|docx?)$/i, ''), file_name: f.name, file_path: isPdf ? filePath : null, status: 'uploaded' })
-        .select('id').single();
-      if (bookErr) throw bookErr;
-      setBookId(book.id);
-      sessionStorage.setItem(ACTIVE_BOOK_KEY, book.id);
+
+      let resolvedBookId: string;
+      if (isReload) {
+        // UPDATE existing book record
+        const { error: updErr } = await supabase
+          .from('books')
+          .update({
+            title: f.name.replace(/\.(pdf|docx?)$/i, ''),
+            file_name: f.name,
+            file_path: isPdf ? filePath : null,
+            status: 'uploaded',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', bookId);
+        if (updErr) throw updErr;
+        resolvedBookId = bookId;
+      } else {
+        // INSERT new book
+        const { data: book, error: bookErr } = await supabase
+          .from('books')
+          .insert({ user_id: userId, title: f.name.replace(/\.(pdf|docx?)$/i, ''), file_name: f.name, file_path: isPdf ? filePath : null, status: 'uploaded' })
+          .select('id').single();
+        if (bookErr) throw bookErr;
+        resolvedBookId = book.id;
+      }
+      setBookId(resolvedBookId);
+      sessionStorage.setItem(ACTIVE_BOOK_KEY, resolvedBookId);
 
       // Add default characters: Narrator and Commentator
       await supabase.from('book_characters').insert([
