@@ -217,14 +217,46 @@ export default function Parser() {
   }, [chapterResults, isRu, toast]);
 
   // ── Reset handler ──
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     bookReset();
     setSelectedIndices(new Set());
     setLastClickedIdx(null);
     setExpandedNodes(new Set());
+    setPendingProjectName(null);
     resetAnalysis();
     sessionStorage.removeItem(NAV_STATE_KEY);
-  };
+  }, [bookReset, resetAnalysis]);
+
+  const startNewProject = useCallback(() => {
+    handleReset();
+    setParserTab("structure");
+    setStep("upload");
+  }, [handleReset, setStep]);
+
+  useEffect(() => {
+    if (!new URLSearchParams(location.search).has("resetLocal")) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      await hardResetLocalData();
+      if (cancelled) return;
+      handleReset();
+      setParserTab("structure");
+      setStep("upload");
+      navigate("/parser", { replace: true });
+      toast({
+        title: isRu ? "Локальное хранилище очищено" : "Local storage cleared",
+        description: isRu
+          ? "Все локальные проекты и кэш Парсера удалены из этого браузера."
+          : "All local parser projects and caches were removed from this browser.",
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location.search, hardResetLocalData, handleReset, navigate, isRu, toast, setStep]);
 
   // ── Page header ──
   const headerRight = useMemo(() => {
