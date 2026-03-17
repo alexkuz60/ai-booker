@@ -1046,13 +1046,40 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
       // ── Dual-write: sync to local project ──
       progress(5, "Сохранение в локальное хранилище...", "Saving to local storage...");
-      if (projectStorage?.isReady && resolvedBookId) {
+      let targetStorage = projectStorage?.isReady ? projectStorage : null;
+      if (!targetStorage && storageBackend === "opfs" && createProject) {
+        try {
+          targetStorage = await createProject(
+            stripFileExtension(f.name),
+            resolvedBookId,
+            userId,
+            isRu ? "ru" : "en",
+          );
+        } catch (storageErr) {
+          console.warn("[Upload] Failed to auto-create local project:", storageErr);
+        }
+      }
+
+      if (targetStorage && resolvedBookId) {
         const partsArr = uniqueParts.map((title, i) => ({
           id: newPartIdMap.get(title) || "",
           title,
           partNumber: i + 1,
         }));
-        syncStructureToLocal(projectStorage, {
+
+        const existingMeta = await targetStorage.readJSON<Record<string, unknown>>("project.json").catch(() => null);
+        await targetStorage.writeJSON("project.json", {
+          version: Number(existingMeta?.version) || 1,
+          bookId: resolvedBookId,
+          title: f.name.replace(/\.(pdf|docx?)$/i, ''),
+          userId,
+          createdAt: typeof existingMeta?.createdAt === "string" ? existingMeta.createdAt : new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          language: (existingMeta?.language === "en" ? "en" : (isRu ? "ru" : "en")),
+          fileFormat: isDocx ? "docx" : "pdf",
+        });
+
+        await syncStructureToLocal(targetStorage, {
           bookId: resolvedBookId,
           title: f.name.replace(/\.(pdf|docx?)$/i, ''),
           fileName: f.name,
@@ -1061,18 +1088,9 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
           chapterIdMap: newChapterIdMap,
           chapterResults: initMap,
         });
-        // Save the source file locally
-        const localSourceName = isDocx ? "source/book.docx" : "source/book.pdf";
-        projectStorage.writeBlob(localSourceName, f).catch(() => {});
 
-        // B4/B7 fix: persist fileFormat in project.json
-        try {
-          const projectMeta = await projectStorage.readJSON<Record<string, unknown>>("project.json");
-          if (projectMeta) {
-            projectMeta.fileFormat = isDocx ? "docx" : "pdf";
-            await projectStorage.writeJSON("project.json", projectMeta);
-          }
-        } catch {}
+        const localSourceName = isDocx ? "source/book.docx" : "source/book.pdf";
+        await targetStorage.writeBlob(localSourceName, f).catch(() => {});
       }
       progress(6, "Готово!", "Done!");
       setStep("workspace");
