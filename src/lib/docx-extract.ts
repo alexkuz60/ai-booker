@@ -86,6 +86,8 @@ export async function extractFromDocx(file: File): Promise<DocxExtractResult> {
 
     // Build TocEntry list and extract text between headings
     const allElements = Array.from(doc.body.children);
+    const rawEntries: { title: string; pageNumber: number; level: number; html: string }[] = [];
+
     for (let i = 0; i < headingInfos.length; i++) {
       const info = headingInfos[i];
       const startIdx = allElements.indexOf(info.element);
@@ -93,21 +95,30 @@ export async function extractFromDocx(file: File): Promise<DocxExtractResult> {
         ? allElements.indexOf(headingInfos[i + 1].element)
         : allElements.length;
 
-      // Collect HTML between this heading and the next
       let chapterHtml = "";
       for (let j = startIdx + 1; j < endIdx; j++) {
         chapterHtml += allElements[j]?.outerHTML || "";
       }
-      chapterTexts.set(i, chapterHtml);
 
-      // Estimate "page number" from character offset
       const offsetChars = getCharOffsetBefore(doc.body, info.element);
       const pageNumber = Math.max(1, Math.ceil(offsetChars / CHARS_PER_PAGE));
 
+      rawEntries.push({ title: info.title, pageNumber, level: info.level, html: chapterHtml });
+    }
+
+    // Filter out empty structural headings (book title, author, etc.)
+    const MIN_CONTENT_CHARS = 20;
+    const filtered = rawEntries.filter((e) => {
+      const textLen = e.html.replace(/<[^>]*>/g, "").trim().length;
+      return textLen >= MIN_CONTENT_CHARS;
+    });
+
+    for (let i = 0; i < filtered.length; i++) {
+      chapterTexts.set(i, filtered[i].html);
       outline.push({
-        title: info.title,
-        pageNumber,
-        level: info.level,
+        title: filtered[i].title,
+        pageNumber: filtered[i].pageNumber,
+        level: filtered[i].level,
         children: [],
       });
     }
