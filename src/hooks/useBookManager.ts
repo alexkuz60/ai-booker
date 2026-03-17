@@ -896,6 +896,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         }
       }
 
+      progress(3, isPdf ? "Загрузка PDF на сервер..." : "Сохранение книги...", isPdf ? "Uploading PDF to server..." : "Saving book...");
       if (isPdf && filePath) {
         await supabase.storage.from('book-uploads').upload(filePath, f);
       }
