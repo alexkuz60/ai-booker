@@ -5,6 +5,11 @@
  */
 import mammoth from "mammoth";
 import { type TocEntry } from "./pdf-extract";
+import {
+  normalizeTocTitle,
+  pruneDocxTocArtifacts,
+  stripTrailingPageNumber,
+} from "./docxTocCleanup";
 
 export interface DocxExtractResult {
   /** Hierarchical TOC entries (from headings or regex fallback) */
@@ -20,17 +25,6 @@ export interface DocxExtractResult {
 }
 
 const CHARS_PER_PAGE = 2000;
-
-/**
- * Strip trailing tab/spaces + page number that DOCX TOC headings often contain.
- * E.g. "Глава 01. ЛУЖА: РОЗЛИВ\t6" → "глава 01. лужа: розлив"
- */
-function normalizeTocTitle(raw: string): string {
-  return raw
-    .replace(/[\t\s]+\d+\s*$/, "")  // trailing tab/space + digits
-    .trim()
-    .toLowerCase();
-}
 
 // ── Regex patterns for fallback TOC detection ──
 
@@ -89,8 +83,7 @@ export async function extractFromDocx(file: File): Promise<DocxExtractResult> {
     headings.forEach((h) => {
       const tagLevel = parseInt(h.tagName.substring(1), 10) - 1; // h1→0, h2→1, h3→2
       const rawTitle = h.textContent?.trim() || "Untitled";
-      // Strip trailing TOC page numbers (e.g. "Глава 1\t6" → "Глава 1")
-      const title = rawTitle.replace(/[\t\s]+\d+\s*$/, "").trim() || rawTitle;
+      const title = stripTrailingPageNumber(rawTitle) || rawTitle;
       headingInfos.push({ title, level: tagLevel, element: h });
     });
 
@@ -165,12 +158,12 @@ export async function extractFromDocx(file: File): Promise<DocxExtractResult> {
       let matched = false;
 
       // Check part patterns (level 0)
-      for (const pat of PART_PATTERNS) {
-        const m = text.match(pat);
-        if (m) {
-          const suffix = m[3]?.trim();
-          const title = suffix ? `${m[1]} ${m[2]}. ${suffix}` : `${m[1]} ${m[2]}`;
-          outline.push({
+        for (const pat of PART_PATTERNS) {
+          const m = text.match(pat);
+          if (m) {
+            const suffix = stripTrailingPageNumber(m[3]?.trim() || "");
+            const title = suffix ? `${m[1]} ${m[2]}. ${suffix}` : `${m[1]} ${m[2]}`;
+            outline.push({
             title,
             pageNumber: Math.max(1, Math.ceil(charOffset / CHARS_PER_PAGE)),
             level: 0,
@@ -185,7 +178,7 @@ export async function extractFromDocx(file: File): Promise<DocxExtractResult> {
         for (const pat of CHAPTER_PATTERNS) {
           const m = text.match(pat);
           if (m) {
-            const suffix = m[3]?.trim();
+            const suffix = stripTrailingPageNumber(m[3]?.trim() || "");
             const title = suffix ? `${m[1]} ${m[2]}. ${suffix}` : `${m[1]} ${m[2]}`;
             outline.push({
               title,
@@ -247,7 +240,14 @@ export async function extractFromDocx(file: File): Promise<DocxExtractResult> {
     }
   }
 
-  return { outline, html, plainText, totalPages, chapterTexts };
+  const cleaned = pruneDocxTocArtifacts(outline, chapterTexts);
+  return {
+    outline: cleaned.outline,
+    html,
+    plainText,
+    totalPages,
+    chapterTexts: cleaned.chapterTexts,
+  };
 }
 
 /**
