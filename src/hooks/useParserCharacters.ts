@@ -18,6 +18,8 @@ interface UseParserCharactersParams {
   bookId: string | null;
   /** Resolved model for the profiler role */
   profilerModel?: string;
+  /** User API keys map (e.g. { openrouter: "sk-...", proxyapi: "..." }) */
+  userApiKeys?: Record<string, string>;
   isRu?: boolean;
 }
 
