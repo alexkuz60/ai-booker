@@ -240,7 +240,14 @@ export async function extractFromDocx(file: File): Promise<DocxExtractResult> {
     }
   }
 
-  return { outline, html, plainText, totalPages, chapterTexts };
+  const cleaned = pruneDocxTocArtifacts(outline, chapterTexts);
+  return {
+    outline: cleaned.outline,
+    html,
+    plainText,
+    totalPages,
+    chapterTexts: cleaned.chapterTexts,
+  };
 }
 
 /**
