@@ -144,3 +144,49 @@ PDF outline содержит контейнерные узлы (например
 - **OPFS** не даёт пользователю видеть файлы в проводнике — это ограничение API, не баг. ZIP-экспорт решает проблему.
 - **FS Access API** — права сбрасываются при перезапуске браузера, потребуется re-pick папки.
 - `project.json` — единственный обязательный файл для валидации проекта.
+
+---
+
+## 2. Роль «Сценарист» (screenwriter) — двухэтапная работа
+
+### 2.1 Парсер: определение границ сцен
+
+Сценарист определяет **границы сцен** для выбранного пункта в Навигаторе структуры книги.
+
+**Обязательный контроль границ:**
+- Нумерация страниц книги (PDF page range через `resolveEntryPageRange`)
+- Количество знаков контента (`char_count` в каждой сцене)
+
+**Ключевые файлы:**
+| Файл | Назначение |
+|------|------------|
+| `src/hooks/useChapterAnalysis.ts` | Оркестрирует AI-анализ: PDF → текст → edge function → сцены |
+| `supabase/functions/parse-book-structure/index.ts` | Edge function: LLM определяет границы сцен |
+| `src/pages/parser/types.ts` | `Scene`, `Chapter`, `Part`, `BookStructure` |
+
+### 2.2 Студия / Раскадровка: типизация блоков
+
+Сценарист разбивает сцены на **типизированные блоки** (сегменты) с атрибуцией спикеров.
+
+**Категории сегментов (segment_type enum):**
+
+| Тип | RU | EN | Описание |
+|-----|----|----|----------|
+| `narrator` | Повествование | Narrator | Авторский текст от третьего лица |
+| `first_person` | От первого лица | First Person | Повествование от первого лица |
+| `dialogue` | Диалог | Dialogue | Реплики в диалоге |
+| `monologue` | Монолог | Monologue | Развёрнутая речь одного персонажа |
+| `inner_thought` | Мысли | Thoughts | Внутренний монолог / мысли |
+| `lyric` | Стих | Verse | Стихотворный фрагмент |
+| `epigraph` | Эпиграф | Epigraph | Эпиграф главы/сцены |
+| `footnote` | Сноска | Footnote | Комментарий / примечание |
+| `telephone` | Телефон | Telephone | Телефонный разговор |
+| `remark` | Реплика | Remark | ⚠️ **НЕ РЕАЛИЗОВАНО** — одиночная реплика вне диалога |
+
+**Ключевые файлы:**
+| Файл | Назначение |
+|------|------------|
+| `supabase/functions/segment-scene/index.ts` | Edge function: LLM → сегменты + фразы |
+| `src/components/studio/StoryboardPanel.tsx` | UI раскадровки: сегменты, фразы, операции |
+| `src/components/studio/storyboard/constants.ts` | `SEGMENT_TYPES`, `SEGMENT_CONFIG` (иконки, цвета) |
+| `src/components/studio/storyboard/SegmentTypeBadge.tsx` | Бейдж типа с попover-выбором |
