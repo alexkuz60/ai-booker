@@ -13,6 +13,7 @@ import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parse
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
 import { syncStructureToLocal, readStructureFromLocal, readCharactersFromLocal, type LocalBookStructure } from "@/lib/localSync";
 import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
+import { detectFileFormat, getSourcePath, findSourceBlob, stripFileExtension, type FileFormat } from "@/lib/fileFormatUtils";
 
 
 interface UseBookManagerParams {
@@ -304,23 +305,34 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         chapterResults: sanitizedLocalResults,
       });
 
-      // ── Restore PDF from local project (async, non-blocking) ──
-      projectStorage.readBlob("source/book.pdf").then(async (pdfBlob) => {
-        if (!pdfBlob) {
-          console.log("[LocalRestore] No local PDF found, will download on demand");
-          return;
-        }
-        try {
-          const arrayBuffer = await pdfBlob.arrayBuffer();
-          const { getDocument } = await import("pdfjs-dist");
-          const pdf = await getDocument({ data: arrayBuffer }).promise;
-          setPdfRef(pdf);
-          setTotalPages(pdf.numPages);
-          console.log(`[LocalRestore] PDF restored locally: ${pdf.numPages} pages`);
-        } catch (pdfErr) {
-          console.warn("[LocalRestore] Failed to parse local PDF:", pdfErr);
-        }
-      });
+      // ── Restore source file from local project (async, non-blocking) ──
+      // Detect format from project.json or file name
+      const localMeta = await projectStorage.readJSON<Record<string, unknown>>("project.json");
+      const localFormat: FileFormat = (localMeta?.fileFormat as FileFormat) || detectFileFormat(structure.fileName);
+
+      if (localFormat === "pdf") {
+        // Only try to load PDF proxy for PDF books
+        const sourcePath = getSourcePath(localFormat);
+        projectStorage.readBlob(sourcePath).then(async (pdfBlob) => {
+          if (!pdfBlob) {
+            console.log("[LocalRestore] No local PDF found, will download on demand");
+            return;
+          }
+          try {
+            const arrayBuffer = await pdfBlob.arrayBuffer();
+            const { getDocument } = await import("pdfjs-dist");
+            const pdf = await getDocument({ data: arrayBuffer }).promise;
+            setPdfRef(pdf);
+            setTotalPages(pdf.numPages);
+            console.log(`[LocalRestore] PDF restored locally: ${pdf.numPages} pages`);
+          } catch (pdfErr) {
+            console.warn("[LocalRestore] Failed to parse local PDF:", pdfErr);
+          }
+        });
+      } else {
+        // DOCX: no PDF proxy needed, chapter texts are in sessionStorage
+        console.log("[LocalRestore] DOCX book — skipping PDF proxy restore");
+      }
 
       console.log(`[LocalRestore] Restored from local: ${structure.toc.length} chapters, ${localResults.size} results`);
       toast.success(
@@ -537,11 +549,15 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         return;
       }
 
+      // Detect file format from file_name
+      const bookFormat = detectFileFormat(book.file_name);
+      const isBookDocx = bookFormat === "docx";
+
       let restoredPdf: any = null;
       let restoredTotalPages = 0;
       let tocFromPdf: { startPage: number; endPage: number; level: number }[] = [];
 
-      if (pdfBlob) {
+      if (!isBookDocx && pdfBlob) {
         try {
           const arrayBuffer = await pdfBlob.arrayBuffer();
           const { getDocument } = await import('pdfjs-dist');
@@ -583,13 +599,16 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         } catch (pdfErr) {
           console.warn("Could not restore PDF for analysis:", pdfErr);
         }
-      } else if (book.file_path) {
+      } else if (!isBookDocx && book.file_path && !pdfBlob) {
         // B8 fix: PDF was expected (file_path exists) but blob download failed
         toast.warning(
           isRu
             ? "PDF-файл не найден на сервере. Анализ будет недоступен до повторной загрузки."
             : "PDF file not found on server. Analysis unavailable until re-upload."
         );
+      } else if (isBookDocx) {
+        // DOCX books don't use PDF proxy — chapter texts come from sessionStorage
+        console.log("[OpenBook] DOCX book — no PDF proxy needed");
       }
 
       setPdfRef(restoredPdf);
@@ -669,7 +688,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
       if (!targetStorage && storageBackend === "opfs" && createProject && userId) {
         try {
-          const projectTitle = book.title || book.file_name.replace('.pdf', '');
+          const projectTitle = book.title || stripFileExtension(book.file_name);
           const lang = isRu ? "ru" as const : "en" as const;
           targetStorage = await createProject(projectTitle, book.id, userId, lang);
           console.log("[OpenBook] Auto-created OPFS project for server book:", projectTitle);
@@ -681,7 +700,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       if (targetStorage) {
         syncStructureToLocal(targetStorage, {
           bookId: book.id,
-          title: book.title || book.file_name.replace('.pdf', ''),
+          title: book.title || stripFileExtension(book.file_name),
           fileName: book.file_name,
           toc: normalizedToc,
           parts: parts.map(p => ({ id: p.id, title: p.title, partNumber: p.part_number })),
@@ -689,11 +708,23 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
           chapterResults: initMap,
         });
 
-        // Save PDF to local project if downloaded from server
+        // Save source file to local project if downloaded from server
         if (pdfBlob && targetStorage) {
-          targetStorage.writeBlob("source/book.pdf", pdfBlob).catch(err =>
-            console.warn("[OpenBook] Failed to save PDF to local project:", err)
+          const sourcePath = getSourcePath(bookFormat);
+          targetStorage.writeBlob(sourcePath, pdfBlob).catch(err =>
+            console.warn("[OpenBook] Failed to save source file to local project:", err)
           );
+        }
+
+        // Persist fileFormat in project.json for DOCX awareness
+        if (targetStorage && isBookDocx) {
+          try {
+            const projMeta = await targetStorage.readJSON<Record<string, unknown>>("project.json");
+            if (projMeta) {
+              projMeta.fileFormat = "docx";
+              await targetStorage.writeJSON("project.json", projMeta);
+            }
+          } catch {}
         }
       }
 
@@ -859,7 +890,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
           } else {
             toast.info(t("tocNotFound", isRu));
             chapters = [{
-              title: f.name.replace('.pdf', ''),
+              title: stripFileExtension(f.name),
               startPage: 1,
               endPage: localTotalPages,
               level: 0,
@@ -1118,9 +1149,28 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
   }, [bookId, isRu, storageBackend, localProjectNamesByBookId, projectStorage]);
 
   // ─── Ensure PDF is loaded (local-first, then server) ────────
+  // For DOCX books this returns null — DOCX uses sessionStorage for chapter texts
   const ensurePdfLoaded = useCallback(async (): Promise<any> => {
     if (pdfRef) return pdfRef;
     if (!bookId) return null;
+
+    // Detect format: check project.json first, then fileName
+    let format: FileFormat = "pdf";
+    if (projectStorage?.isReady) {
+      try {
+        const meta = await projectStorage.readJSON<Record<string, unknown>>("project.json");
+        if (meta?.fileFormat === "docx") format = "docx";
+      } catch {}
+    }
+    if (format === "pdf" && fileName && detectFileFormat(fileName) === "docx") {
+      format = "docx";
+    }
+
+    // DOCX books don't use PDF proxy at all
+    if (format === "docx") {
+      console.log("[EnsureSource] DOCX book — PDF proxy not needed");
+      return null;
+    }
 
     const loadPdf = async (arrayBuffer: ArrayBuffer) => {
       const { getDocument } = await import("pdfjs-dist");
@@ -1133,7 +1183,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     // 1. Try local project first
     if (projectStorage?.isReady) {
       try {
-        const localBlob = await projectStorage.readBlob("source/book.pdf");
+        const localBlob = await projectStorage.readBlob(getSourcePath("pdf"));
         if (localBlob) {
           console.log("[EnsurePDF] Loading from local project");
           return await loadPdf(await localBlob.arrayBuffer());
@@ -1174,14 +1224,14 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
       // Cache locally for next time
       if (projectStorage?.isReady) {
-        projectStorage.writeBlob("source/book.pdf", blob).catch(() => {});
+        projectStorage.writeBlob(getSourcePath("pdf"), blob).catch(() => {});
       }
       return pdf;
     } catch (err) {
       console.warn("[EnsurePDF] Server download failed:", err);
       return null;
     }
-  }, [pdfRef, bookId, books, projectStorage]);
+  }, [pdfRef, bookId, books, projectStorage, fileName]);
 
   // ─── Reset ─────────────────────────────────────────────────
   const handleReset = useCallback(() => {

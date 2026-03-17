@@ -3,9 +3,9 @@
  *
  * Структура папок проекта:
  *   📁 BookTitle/
- *   ├── project.json          — метаданные проекта (bookId, title, userId, etc.)
+ *   ├── project.json          — метаданные проекта (bookId, title, userId, fileFormat, etc.)
  *   ├── 📁 source/
- *   │   └── book.pdf          — исходный PDF
+ *   │   └── book.pdf / book.docx — исходный файл книги
  *   ├── 📁 structure/
  *   │   ├── toc.json          — оглавление (TocChapter[])
  *   │   ├── parts.json        — части книги

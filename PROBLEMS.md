@@ -8,7 +8,7 @@
 
 **Финальная формулировка (записана в ARCHITECTURE.md §1):**
 
-- Исходный PDF **никогда** не покидает устройство пользователя. Хранится как `source/book.pdf` в ProjectStorage.
+- Исходный файл (PDF или DOCX) **никогда** не покидает устройство пользователя. Хранится как `source/book.pdf` или `source/book.docx` в ProjectStorage.
 - На сервер уходят **только**: извлечённые текстовые блоки (для ИИ-анализа и TTS) и структурные метаданные (при ручном пуше).
 - Жизненный цикл: **Инициализация** → **Local-auto-save** (мгновенно, без обращения к БД) → **Manual-push** (кнопка «На сервер»).
 - Термин «dual-write» удалён. Начальная запись при upload — это единоразовая инициализация, не постоянный паттерн.
@@ -127,6 +127,7 @@
 | **B11** | ~~`restoreFromLocal` не читает `structure/characters.json`~~ — загрузка персонажей обеспечивается `useParserCharacters` | `useBookManager.ts` | ✅ Исправлено |
 | **B12** | ~~`acceptServerVersion` не заменяет локалку серверной копией~~ | `useBookManager.ts` | ✅ Исправлено |
 | **B13** | ~~`openSavedBook` делает `upsert(rangeFixes)` — побочный эффект записи при чтении~~ | `useBookManager.ts` | ✅ Исправлено |
+| **B14** | ~~Хардкод `source/book.pdf` во всех хуках — DOCX-книги не находят свой исходный файл при восстановлении, загрузке на сервер и `ensurePdfLoaded`~~ | `useBookManager.ts`, `useSaveBookToProject.ts`, `useProjectStorage.ts` | ✅ Исправлено |
 
 ### Правильная логика операций (эталон)
 
