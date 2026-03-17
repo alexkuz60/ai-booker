@@ -29,7 +29,8 @@ function extractHtmlLines(html: string): string[] {
 
 function isSentenceLike(line: string): boolean {
   const words = line.split(/\s+/).filter(Boolean);
-  return words.length >= 8 && /[!?…]|\.(?=\s+[А-ЯA-ZЁ]|$)/.test(line);
+  if (words.length < 8) return false;
+  return /[!?…]/.test(line) || /[,;:]/.test(line) || /[а-яёa-z].*[.]$/.test(line);
 }
 
 function isLikelyHeadingLine(line: string, knownTitles: Set<string>): boolean {
