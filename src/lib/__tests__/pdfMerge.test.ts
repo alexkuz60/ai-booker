@@ -76,6 +76,23 @@ describe("mergeOutlineWithTextToc", () => {
     expect(result[1].title).toBe("Chapter 2");
   });
 
+  it("repairs broken outline entries with fallback page 1 instead of duplicating them", () => {
+    const outline: TocEntry[] = [
+      { title: "Part 1", pageNumber: 1, level: 0, children: [
+        { title: "Chapter 1", pageNumber: 1, level: 1, children: [] },
+      ]},
+    ];
+
+    const textToc: TocEntry[] = [
+      { title: "Chapter 1", pageNumber: 12, level: 1, children: [] },
+    ];
+
+    const result = mergeOutlineWithTextToc(outline, textToc);
+    expect(result[0].children).toHaveLength(1);
+    expect(result[0].children[0].title).toBe("Chapter 1");
+    expect(result[0].children[0].pageNumber).toBe(12);
+  });
+
   it("does not mutate original outline", () => {
     const outline: TocEntry[] = [
       { title: "Part 1", pageNumber: 1, level: 0, children: [] },
