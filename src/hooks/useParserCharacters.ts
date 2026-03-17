@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { Scene, ChapterStatus, TocChapter, LocalCharacter, CharacterAppearance } from "@/pages/parser/types";
 import { saveCharactersToLocal, readCharactersFromLocal } from "@/lib/localSync";
+import { getModelRegistryEntry } from "@/config/modelRegistry";
 
 interface UseParserCharactersParams {
   storage: ProjectStorage | null;
