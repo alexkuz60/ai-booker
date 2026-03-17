@@ -968,6 +968,13 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       const initRawMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
       chapters.forEach((_, i) => initRawMap.set(i, { scenes: [], status: "pending" }));
 
+      // B2 fix: mark folder-nodes as done immediately
+      chapters.forEach((_, i) => {
+        if (isFolderNode(chapters, i)) {
+          initRawMap.set(i, { scenes: [], status: "done" });
+        }
+      });
+
       // For DOCX: pre-mark chapters with no/minimal content as "done" (nothing to analyze)
       if (isDocx) {
         try {
