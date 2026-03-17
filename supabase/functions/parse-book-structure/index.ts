@@ -468,7 +468,9 @@ async function handleAIRequest(
           const parsed = JSON.parse(jsonMatch[0]);
           if (parsed.scene_type || parsed.scenes || parsed.chapters || parsed.book_title) {
             console.warn("AI returned text instead of tool_call, extracted JSON from fallback");
-            return new Response(JSON.stringify({ structure: parsed }), {
+            const resp: Record<string, unknown> = { structure: parsed };
+            if (wasTruncated) resp.truncated = { originalLength: originalTextLength, truncatedLength: truncatedText.length };
+            return new Response(JSON.stringify(resp), {
               headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
           }
