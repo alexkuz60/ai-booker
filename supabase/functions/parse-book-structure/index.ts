@@ -356,6 +356,7 @@ async function handleAIRequest(
   if (charLimit && truncatedText.length > charLimit && mode === 'boundaries') {
     console.warn(`[parse-book-structure] Pre-truncating text from ${truncatedText.length} to ${charLimit} chars for ${model}`);
     truncatedText = truncatedText.slice(0, charLimit);
+    wasTruncated = true;
     // Update userContent with truncated text
     userContent = `Split the following chapter "${chapterTitle || 'Untitled'}" into scenes. Return boundaries and complete text only:\n\n${truncatedText}`;
     requestBody.messages = [
