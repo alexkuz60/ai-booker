@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
 import { extractTextByPageRange } from "@/lib/pdf-extract";
+import { stripHtml } from "@/lib/docx-extract";
 import { t } from "@/pages/parser/i18n";
 
 import type { Scene, TocChapter, ChapterStatus } from "@/pages/parser/types";
