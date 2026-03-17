@@ -194,18 +194,23 @@ export function useProjectStorage(): UseProjectStorageReturn {
     try { localStorage.removeItem(LAST_PROJECT_KEY); } catch {}
   }, []);
 
-  // ── PDF helpers ─────────────────────────────────────────
+  // ── Source file helpers (PDF or DOCX) ────────────────────
 
-  const saveSourcePDF = useCallback(async (file: File) => {
+  const saveSourceFile = useCallback(async (file: File) => {
     if (!storage) throw new Error("No project open");
-    await storage.writeBlob("source/book.pdf", file);
+    const isDocx = /\.docx?$/i.test(file.name);
+    const path = isDocx ? "source/book.docx" : "source/book.pdf";
+    await storage.writeBlob(path, file);
   }, [storage]);
 
-  const readSourcePDF = useCallback(async (): Promise<File | null> => {
+  const readSourceFile = useCallback(async (): Promise<File | null> => {
     if (!storage) return null;
-    const blob = await storage.readBlob("source/book.pdf");
-    if (!blob) return null;
-    return new File([blob], "book.pdf", { type: "application/pdf" });
+    // Try PDF first, then DOCX
+    const pdfBlob = await storage.readBlob("source/book.pdf");
+    if (pdfBlob) return new File([pdfBlob], "book.pdf", { type: "application/pdf" });
+    const docxBlob = await storage.readBlob("source/book.docx");
+    if (docxBlob) return new File([docxBlob], "book.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+    return null;
   }, [storage]);
 
   // ── Auto-restore OPFS project on mount ──────────────────
