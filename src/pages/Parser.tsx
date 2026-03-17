@@ -10,7 +10,6 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -27,6 +26,7 @@ import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { useImperativeSave } from "@/hooks/useImperativeSave";
 import { useParserCharacters } from "@/hooks/useParserCharacters";
+import { useTocMutations } from "@/hooks/useTocMutations";
 
 import LibraryView from "@/components/parser/LibraryView";
 import UploadView from "@/components/parser/UploadView";
@@ -107,8 +107,6 @@ export default function Parser() {
     isRu,
   });
 
-
-
   const selectedIdx = selectedIndices.size === 1 ? Array.from(selectedIndices)[0] : null;
 
   const {
@@ -136,7 +134,7 @@ export default function Parser() {
     return parts;
   }, [tocEntries, partIdMap]);
 
-  // ── Imperative auto-save: use refs so snapshot is never stale ──
+  // ── Imperative auto-save ──
   const tocEntriesRef = useRef(tocEntries);
   const localPartsRef = useRef(localPartsForSave);
   const chapterIdMapRef = useRef(chapterIdMap);
@@ -160,6 +158,16 @@ export default function Parser() {
     getSnapshot: getLocalSnapshot,
   });
 
+  // ── TOC Mutations (extracted from Parser) ──
+  const mutations = useTocMutations({
+    tocEntries, setTocEntries,
+    chapterIdMap, setChapterIdMap,
+    chapterResults, setChapterResults,
+    partIdMap,
+    selectedIdx,
+    setSelectedIndices,
+    scheduleSave,
+  });
 
   const { analysisLog, analyzeChapter, resetAnalysis, stopAnalysis, isAnalyzing } = useChapterAnalysis({
     isRu, pdfRef, userId: user?.id, bookId, userApiKeys, getModelForRole,
@@ -168,7 +176,6 @@ export default function Parser() {
     ensurePdfLoaded,
     fileFormat: projectMeta?.fileFormat || null,
   });
-
 
   // ── Flush pending auto-save on page unload ──
   const flushSaveRef = useRef(flushSave);
@@ -182,6 +189,7 @@ export default function Parser() {
   const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
     isRu,
     currentBookId: bookId,
+    fileName,
     localSnapshot: step === "workspace"
       ? {
           toc: tocEntries,
@@ -195,20 +203,20 @@ export default function Parser() {
   // ── Warn when analysis-relevant models change ──
   const handleRoleModelChanged = useCallback((roleId: AiRoleId) => {
     if (roleId !== "screenwriter" && roleId !== "director") return;
-    let analyzedCount = 0;
-    chapterResults.forEach((r) => { if (r.status === "done") analyzedCount++; });
-    if (analyzedCount > 0) {
+    let count = 0;
+    chapterResults.forEach((r) => { if (r.status === "done") count++; });
+    if (count > 0) {
       toast({
         title: isRu ? "Модель изменена" : "Model changed",
         description: isRu
-          ? `${analyzedCount} гл. проанализированы прежней моделью. Используйте «Повторить» для обновления.`
-          : `${analyzedCount} ch. analyzed with previous model. Use "Reanalyze" to update.`,
+          ? `${count} гл. проанализированы прежней моделью. Используйте «Повторить» для обновления.`
+          : `${count} ch. analyzed with previous model. Use "Reanalyze" to update.`,
         duration: 6000,
       });
     }
   }, [chapterResults, isRu, toast]);
 
-  // ── Reset handler (must be above headerRight useMemo) ──
+  // ── Reset handler ──
   const handleReset = () => {
     bookReset();
     setSelectedIndices(new Set());
@@ -218,7 +226,7 @@ export default function Parser() {
     sessionStorage.removeItem(NAV_STATE_KEY);
   };
 
-  // ── Page header (unified with AppLayout) ──
+  // ── Page header ──
   const headerRight = useMemo(() => {
     const navButtons = (
       <div className="flex items-center gap-1">
@@ -377,223 +385,7 @@ export default function Parser() {
     });
   };
 
-  const changeLevel = (indices: number[], delta: number) => {
-    setTocEntries(prev => {
-      const next = prev.map(e => ({ ...e }));
-      const allAffected = new Set<number>();
-      
-      for (const idx of indices) {
-        const entry = next[idx];
-        const newLevel = entry.level + delta;
-        if (newLevel < 0) continue;
-        
-        const affected = [idx];
-        for (let i = idx + 1; i < next.length; i++) {
-          if (next[i].level <= entry.level) break;
-          if (next[i].sectionType !== entry.sectionType) break;
-          affected.push(i);
-        }
-        
-        next[idx].level = newLevel;
-        for (const ci of affected.slice(1)) {
-          next[ci].level += delta;
-          if (next[ci].level < 0) next[ci].level = 0;
-        }
-        affected.forEach(i => allAffected.add(i));
-      }
-      
-      // Auto-save levels to DB
-      for (const ci of allAffected) {
-        const chapterId = chapterIdMap.get(ci);
-        if (chapterId) {
-          supabase.from('book_chapters').update({ level: next[ci].level }).eq('id', chapterId).then();
-        }
-      }
-      return next;
-    });
-    scheduleSave();
-  };
-
-  const renameEntry = (idx: number, newTitle: string) => {
-    setTocEntries(prev => prev.map((e, i) => i === idx ? { ...e, title: newTitle } : e));
-    const chapterId = chapterIdMap.get(idx);
-    if (chapterId) {
-      supabase.from('book_chapters').update({ title: newTitle }).eq('id', chapterId).then();
-    }
-    scheduleSave();
-  };
-
-  const changeStartPage = (idx: number, newPage: number) => {
-    setTocEntries(prev => {
-      const next = prev.map((e, i) => i === idx ? { ...e, startPage: newPage } : e);
-
-      // Keep previous chapter boundary contiguous (previous end = current start - 1)
-      if (idx > 0) {
-        const prevEnd = Math.max(next[idx - 1].startPage, newPage - 1);
-        next[idx - 1] = { ...next[idx - 1], endPage: prevEnd };
-        const prevChId = chapterIdMap.get(idx - 1);
-        if (prevChId) supabase.from('book_chapters').update({ end_page: prevEnd }).eq('id', prevChId).then();
-      }
-
-      // Guard against invalid range on current chapter
-      if (next[idx].endPage < newPage) {
-        next[idx] = { ...next[idx], endPage: newPage };
-        const chId = chapterIdMap.get(idx);
-        if (chId) supabase.from('book_chapters').update({ end_page: newPage }).eq('id', chId).then();
-      }
-
-      return next;
-    });
-
-    const chId = chapterIdMap.get(idx);
-    if (chId) supabase.from('book_chapters').update({ start_page: newPage }).eq('id', chId).then();
-    scheduleSave();
-  };
-
-  const renamePart = (oldTitle: string, newTitle: string) => {
-    setTocEntries(prev => prev.map(e => e.partTitle === oldTitle ? { ...e, partTitle: newTitle } : e));
-    const partId = partIdMap.get(oldTitle);
-    if (partId) {
-      supabase.from('book_parts').update({ title: newTitle }).eq('id', partId).then();
-    }
-    scheduleSave();
-  };
-
-  const deleteEntry = (indices: number[]) => {
-    // Collect all indices to delete (each entry + deeper children)
-    const toDelete = new Set<number>();
-    for (const idx of indices) {
-      toDelete.add(idx);
-      const entry = tocEntries[idx];
-      for (let i = idx + 1; i < tocEntries.length; i++) {
-        if (tocEntries[i].level <= entry.level) break;
-        if (tocEntries[i].sectionType !== entry.sectionType) break;
-        toDelete.add(i);
-      }
-    }
-    // Show confirmation dialog with details
-    setPendingDelete({ indices, toDelete });
-  };
-
-  const [pendingDelete, setPendingDelete] = useState<{ indices: number[]; toDelete: Set<number> } | null>(null);
-
-  const confirmDelete = () => {
-    if (!pendingDelete) return;
-    const { toDelete } = pendingDelete;
-
-    // Delete from DB
-    for (const di of toDelete) {
-      const chapterId = chapterIdMap.get(di);
-      if (chapterId) {
-        supabase.from('book_scenes').delete().eq('chapter_id', chapterId).then();
-        supabase.from('book_chapters').delete().eq('id', chapterId).then();
-      }
-    }
-
-    // Remove from state
-    const newEntries = tocEntries.filter((_, i) => !toDelete.has(i));
-    setTocEntries(newEntries);
-
-    // Rebuild chapterIdMap
-    const oldMap = chapterIdMap;
-    const newMap = new Map<number, string>();
-    let newIdx = 0;
-    for (let i = 0; i < tocEntries.length; i++) {
-      if (toDelete.has(i)) continue;
-      const oldId = oldMap.get(i);
-      if (oldId) newMap.set(newIdx, oldId);
-      newIdx++;
-    }
-    setChapterIdMap(newMap);
-
-
-    // Clear selection
-    setSelectedIndices(prev => {
-      const next = new Set(prev);
-      for (const di of toDelete) next.delete(di);
-      return next.size > 0 ? next : new Set<number>();
-    });
-
-    // Rebuild chapterResults
-    const newResults = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
-    newIdx = 0;
-    for (let i = 0; i < tocEntries.length; i++) {
-      if (toDelete.has(i)) continue;
-      const oldResult = chapterResults.get(i);
-      if (oldResult) newResults.set(newIdx, oldResult);
-      newIdx++;
-    }
-    setChapterResults(newResults);
-
-
-    setPendingDelete(null);
-    scheduleSave();
-  };
-
-  const mergeEntries = (indices: number[]) => {
-    if (indices.length < 2) return;
-    const sorted = [...indices].sort((a, b) => a - b);
-    const firstIdx = sorted[0];
-    const lastIdx = sorted[sorted.length - 1];
-    const first = tocEntries[firstIdx];
-    const last = tocEntries[lastIdx];
-
-    // Merge into first entry: extend endPage, combine scenes
-    const mergedEntry: TocChapter = {
-      ...first,
-      endPage: Math.max(first.endPage, last.endPage),
-    };
-
-    // Merge scenes from all selected
-    const mergedScenes: Scene[] = [];
-    for (const idx of sorted) {
-      const result = chapterResults.get(idx);
-      if (result?.scenes) mergedScenes.push(...result.scenes);
-    }
-    // Renumber scenes
-    mergedScenes.forEach((sc, i) => { sc.scene_number = i + 1; });
-
-    const toRemove = new Set(sorted.slice(1));
-
-    // Delete merged chapters from DB
-    for (const di of toRemove) {
-      const chapterId = chapterIdMap.get(di);
-      if (chapterId) {
-        supabase.from('book_scenes').delete().eq('chapter_id', chapterId).then();
-        supabase.from('book_chapters').delete().eq('id', chapterId).then();
-      }
-    }
-
-    // Update entries
-    const newEntries = tocEntries.map((e, i) => i === firstIdx ? mergedEntry : e).filter((_, i) => !toRemove.has(i));
-    setTocEntries(newEntries);
-
-    // Rebuild maps
-    const newChapterMap = new Map<number, string>();
-    const newResults = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
-    let newIdx = 0;
-    for (let i = 0; i < tocEntries.length; i++) {
-      if (toRemove.has(i)) continue;
-      const oldId = chapterIdMap.get(i);
-      if (oldId) newChapterMap.set(newIdx, oldId);
-      if (i === firstIdx) {
-        newResults.set(newIdx, { scenes: mergedScenes, status: mergedScenes.length > 0 ? "done" : "pending" });
-      } else {
-        const oldResult = chapterResults.get(i);
-        if (oldResult) newResults.set(newIdx, oldResult);
-      }
-      newIdx++;
-    }
-    setChapterIdMap(newChapterMap);
-    setChapterResults(newResults);
-
-
-    setSelectedIndices(new Set([firstIdx]));
-    scheduleSave();
-  };
-
   useEffect(() => {
-    // Skip auto-expand if nav state was restored from sessionStorage
     if (navRestoredFromStorage) return;
     if (tocEntries.length > 0 && expandedNodes.size === 0) {
       const allKeys = new Set<string>();
@@ -610,71 +402,6 @@ export default function Parser() {
       setExpandedNodes(allKeys);
     }
   }, [tocEntries, navRestoredFromStorage]);
-
-  // Handle scene content updates from cleanup actions
-  // Only updates in-memory state; auto-save effect persists to local storage
-  // IMPORTANT: when a parent node is selected, selectedResult aggregates scenes
-  // from multiple children — we must distribute edits back to correct chapter indices.
-  /**
-   * CONTRACT K3: Scene edits on parent nodes MUST be distributed back to child chapters.
-   * CONTRACT K4: selectedResult is an AGGREGATE — never write it wholesale to a single index.
-   * 
-   * When selectedIdx is a parent with children, updatedScenes is the aggregated list
-   * from [selectedIdx, ...childIndices]. We split it back by original scene counts.
-   * 
-   * Parent updates are redistributed only to children (never written as one block to parent).
-   */
-  const handleScenesUpdate = useCallback((updatedScenes: Scene[], label?: string) => {
-    if (selectedIdx === null) return;
-    
-
-    const entry = tocEntries[selectedIdx];
-
-    // Collect child indices (same logic as useParserHelpers)
-    const childIndices: number[] = [];
-    for (let i = selectedIdx + 1; i < tocEntries.length; i++) {
-      if (tocEntries[i].level <= entry.level) break;
-      if (tocEntries[i].sectionType !== entry.sectionType) break;
-      childIndices.push(i);
-    }
-
-    // No children — simple case, update selectedIdx directly
-    if (childIndices.length === 0) {
-      setChapterResults(prev => {
-        const next = new Map(prev);
-        const existing = next.get(selectedIdx);
-        if (existing) {
-          next.set(selectedIdx, { ...existing, scenes: updatedScenes });
-        }
-        return next;
-      });
-      scheduleSave();
-      return;
-    }
-
-
-    // Parent with children: distribute scenes back to their original chapters.
-    const indices = [selectedIdx, ...childIndices];
-    setChapterResults(prev => {
-      const next = new Map(prev);
-      let offset = 0;
-      for (const idx of indices) {
-        const existing = prev.get(idx);
-        if (!existing) continue;
-        const count = existing.scenes.length;
-        const slice = updatedScenes.slice(offset, offset + count);
-        const restored = slice.map((sc, i) => ({
-          ...sc,
-          scene_number: existing.scenes[i]?.scene_number ?? i + 1,
-        }));
-        next.set(idx, { ...existing, scenes: restored });
-        offset += count;
-      }
-      return next;
-    });
-    scheduleSave();
-  }, [selectedIdx, tocEntries, setChapterResults, scheduleSave]);
-
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col h-full">
@@ -728,13 +455,13 @@ export default function Parser() {
                     onSelectChapter={handleSelectChapter} onAnalyzeChapter={analyzeChapter}
                     onToggleNode={toggleNode} onSendToStudio={sendToStudio}
                     isChapterFullyDone={isChapterFullyDone}
-                    onChangeLevel={changeLevel}
-                    onDeleteEntry={deleteEntry}
-                    onRenameEntry={renameEntry}
-                    onChangeStartPage={changeStartPage}
+                    onChangeLevel={mutations.changeLevel}
+                    onDeleteEntry={mutations.deleteEntry}
+                    onRenameEntry={mutations.renameEntry}
+                    onChangeStartPage={mutations.changeStartPage}
                     onOpenPdf={handleOpenPdf}
-                    onRenamePart={renamePart}
-                    onMergeEntries={mergeEntries}
+                    onRenamePart={mutations.renamePart}
+                    onMergeEntries={mutations.mergeEntries}
                     roleModels={{
                       screenwriter: getModelForRole("screenwriter"),
                       director: getModelForRole("director"),
@@ -758,7 +485,7 @@ export default function Parser() {
                          screenwriter: getModelForRole("screenwriter"),
                           director: getModelForRole("director"),
                         }}
-                        onScenesUpdate={handleScenesUpdate}
+                        onScenesUpdate={mutations.handleScenesUpdate}
                       />
                    </div>
                   </div>
@@ -872,28 +599,28 @@ export default function Parser() {
       </Dialog>
 
       {/* ── Delete Confirmation Dialog ── */}
-      <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
+      <AlertDialog open={!!mutations.pendingDelete} onOpenChange={(open) => { if (!open) mutations.setPendingDelete(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
               {isRu ? "Удалить из структуры?" : "Remove from structure?"}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
-              {pendingDelete && pendingDelete.indices.length === 1 ? (
-                <span>{t("deleteEntryConfirm", isRu).replace("{title}", tocEntries[pendingDelete.indices[0]]?.title || "")}</span>
-              ) : pendingDelete ? (
-                <span>{t("deleteMultiConfirm", isRu).replace("{count}", String(pendingDelete.indices.length))}</span>
+              {mutations.pendingDelete && mutations.pendingDelete.indices.length === 1 ? (
+                <span>{t("deleteEntryConfirm", isRu).replace("{title}", tocEntries[mutations.pendingDelete.indices[0]]?.title || "")}</span>
+              ) : mutations.pendingDelete ? (
+                <span>{t("deleteMultiConfirm", isRu).replace("{count}", String(mutations.pendingDelete.indices.length))}</span>
               ) : null}
-              {pendingDelete && pendingDelete.toDelete.size > pendingDelete.indices.length && (
+              {mutations.pendingDelete && mutations.pendingDelete.toDelete.size > mutations.pendingDelete.indices.length && (
                 <span className="block text-xs text-muted-foreground">
                   {isRu
-                    ? `Включая ${pendingDelete.toDelete.size - pendingDelete.indices.length} вложенных элементов`
-                    : `Including ${pendingDelete.toDelete.size - pendingDelete.indices.length} nested items`}
+                    ? `Включая ${mutations.pendingDelete.toDelete.size - mutations.pendingDelete.indices.length} вложенных элементов`
+                    : `Including ${mutations.pendingDelete.toDelete.size - mutations.pendingDelete.indices.length} nested items`}
                 </span>
               )}
-              {pendingDelete && (() => {
+              {mutations.pendingDelete && (() => {
                 let sceneCount = 0;
-                for (const di of pendingDelete.toDelete) {
+                for (const di of mutations.pendingDelete.toDelete) {
                   const r = chapterResults.get(di);
                   if (r?.scenes) sceneCount += r.scenes.length;
                 }
@@ -907,7 +634,7 @@ export default function Parser() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction onClick={mutations.confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {isRu ? "Удалить" : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>

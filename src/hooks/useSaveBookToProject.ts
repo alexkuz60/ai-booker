@@ -18,7 +18,7 @@ import {
   getLeafIndices,
   sanitizeChapterResultsForStructure,
 } from "@/lib/tocStructure";
-import { findSourceBlob, getMimeType } from "@/lib/fileFormatUtils";
+import { findSourceBlob } from "@/lib/fileFormatUtils";
 
 export interface LocalBookSnapshot {
   toc: TocChapter[];
@@ -30,6 +30,8 @@ export interface LocalBookSnapshot {
 interface UseSaveBookToProjectParams {
   isRu: boolean;
   currentBookId?: string | null;
+  /** File name for first-push book title */
+  fileName?: string;
   /** In-memory snapshot — primary source of truth */
   localSnapshot?: LocalBookSnapshot;
 }
@@ -66,7 +68,7 @@ export async function autoSaveToLocal(
   });
 }
 
-export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: UseSaveBookToProjectParams) {
+export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnapshot }: UseSaveBookToProjectParams) {
   const { toast } = useToast();
   const { user } = useAuth();
   const { storage, openProject, backend, meta, downloadProjectAsZip, importProjectFromZip } = useProjectStorageContext();
@@ -75,7 +77,7 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
   /**
    * SAVE = push local state → server (Supabase DB + Storage).
    * Used for cross-device sync / backup.
-   * Source of truth: localSnapshot (in-memory state).
+   * Handles first-push: creates books row if it doesn't exist yet.
    */
   const saveBook = useCallback(async () => {
     if (!currentBookId || !localSnapshot) {
@@ -95,7 +97,34 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
         throw new Error(isRu ? "Нет данных для синхронизации" : "No data to sync");
       }
 
-      // ── 1. Upsert chapters to DB ──
+      // ── 0. Ensure books row exists (first-push from OPFS-only workflow) ──
+      const { data: existingBook } = await supabase
+        .from("books")
+        .select("id")
+        .eq("id", currentBookId)
+        .maybeSingle();
+
+      if (!existingBook && user?.id) {
+        const bookTitle = fileName
+          ? fileName.replace(/\.(pdf|docx?)$/i, "")
+          : (toc[0]?.title || "Book");
+        const { error: bookErr } = await supabase
+          .from("books")
+          .insert({
+            id: currentBookId,
+            user_id: user.id,
+            title: bookTitle,
+            file_name: fileName || `${bookTitle}.pdf`,
+            status: "uploaded",
+          });
+        if (bookErr) throw bookErr;
+        console.log("[SaveToServer] Created books row for first push:", currentBookId);
+      }
+
+      // ── 1. Delete all existing chapters, then insert fresh ones ──
+      // This handles both updates and structural changes (renames, deletes, merges)
+      await supabase.from("book_chapters").delete().eq("book_id", currentBookId);
+
       const chapterUpserts: Array<{
         id: string;
         book_id: string;
@@ -121,25 +150,14 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
       });
 
       if (chapterUpserts.length > 0) {
-        const { error } = await supabase.from("book_chapters").upsert(chapterUpserts);
-        if (error) console.warn("[SaveToServer] chapters upsert:", error);
+        const { error } = await supabase.from("book_chapters").insert(chapterUpserts);
+        if (error) console.warn("[SaveToServer] chapters insert:", error);
       }
 
-      // ── 2. Delete old scenes & insert current ones (leaf-only) ──
+      // ── 2. Insert scenes for leaf chapters only ──
       const normalizedResults = sanitizeChapterResultsForStructure(toc, chapterResults);
       const leafIndices = getLeafIndices(toc);
-      const allChapterIds = chapterUpserts.map((ch) => ch.id);
 
-      // Delete ALL existing scenes for all chapter rows (removes stale/duplicate/folder scenes)
-      if (allChapterIds.length > 0) {
-        const { error: delErr } = await supabase
-          .from("book_scenes")
-          .delete()
-          .in("chapter_id", allChapterIds);
-        if (delErr) console.warn("[SaveToServer] scenes delete:", delErr);
-      }
-
-      // Insert fresh scenes only for leaf chapters
       const sceneInserts: Array<{
         id?: string;
         chapter_id: string;
@@ -175,9 +193,10 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
         if (error) console.warn("[SaveToServer] scenes insert:", error);
       }
 
-      // ── 3. Upsert parts to DB ──
+      // ── 3. Replace parts ──
+      await supabase.from("book_parts").delete().eq("book_id", currentBookId);
       if (parts.length > 0) {
-        const partUpserts = parts
+        const partInserts = parts
           .filter((p) => p.id)
           .map((p) => ({
             id: p.id,
@@ -186,9 +205,9 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
             title: p.title,
           }));
 
-        if (partUpserts.length > 0) {
-          const { error } = await supabase.from("book_parts").upsert(partUpserts);
-          if (error) console.warn("[SaveToServer] parts upsert:", error);
+        if (partInserts.length > 0) {
+          const { error } = await supabase.from("book_parts").insert(partInserts);
+          if (error) console.warn("[SaveToServer] parts insert:", error);
         }
       }
 
@@ -196,7 +215,6 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
       if (storage) {
         const sourceResult = await findSourceBlob(storage);
         if (sourceResult) {
-          // Check if server already has the file
           const { data: bookRow } = await supabase
             .from("books")
             .select("file_path")
@@ -222,7 +240,7 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
         }
       }
 
-      // ── 5. Also ensure local storage is up-to-date ──
+      // ── 5. Update local project.json ──
       if (storage) {
         const nowIso = new Date().toISOString();
         const nextMeta: ProjectMeta = {
@@ -259,7 +277,7 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
     } finally {
       setSaving(false);
     }
-  }, [currentBookId, localSnapshot, storage, isRu, toast, meta, user?.id]);
+  }, [currentBookId, localSnapshot, storage, isRu, toast, meta, user?.id, fileName]);
 
   const downloadZip = useCallback(async () => {
     try {
