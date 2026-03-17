@@ -477,13 +477,22 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     step,
   ]);
 
-  // ─── Open saved book (local-first, server fallback) ───────────────────────
-  const openSavedBook = useCallback(async (book: BookRecord) => {
+  // ─── Open saved book (local-first + server timestamp check) ────────────────
+  const openSavedBook = useCallback(async (book: BookRecord, options?: { skipTimestampCheck?: boolean }) => {
     if (!userId) return;
 
     if (projectStorage?.isReady) {
       const restored = await restoreFromLocal(book.id);
-      if (restored) return;
+      if (restored) {
+        // B10 fix: always check server timestamp after successful local restore
+        if (!options?.skipTimestampCheck) {
+          const isNewer = await checkServerNewer(book.id);
+          if (isNewer) {
+            setServerNewerBookId(book.id);
+          }
+        }
+        return;
+      }
     }
 
     setStep("extracting_toc");
