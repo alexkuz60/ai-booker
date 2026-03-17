@@ -549,11 +549,15 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         return;
       }
 
+      // Detect file format from file_name
+      const bookFormat = detectFileFormat(book.file_name);
+      const isBookDocx = bookFormat === "docx";
+
       let restoredPdf: any = null;
       let restoredTotalPages = 0;
       let tocFromPdf: { startPage: number; endPage: number; level: number }[] = [];
 
-      if (pdfBlob) {
+      if (!isBookDocx && pdfBlob) {
         try {
           const arrayBuffer = await pdfBlob.arrayBuffer();
           const { getDocument } = await import('pdfjs-dist');
@@ -595,13 +599,16 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         } catch (pdfErr) {
           console.warn("Could not restore PDF for analysis:", pdfErr);
         }
-      } else if (book.file_path) {
+      } else if (!isBookDocx && book.file_path && !pdfBlob) {
         // B8 fix: PDF was expected (file_path exists) but blob download failed
         toast.warning(
           isRu
             ? "PDF-файл не найден на сервере. Анализ будет недоступен до повторной загрузки."
             : "PDF file not found on server. Analysis unavailable until re-upload."
         );
+      } else if (isBookDocx) {
+        // DOCX books don't use PDF proxy — chapter texts come from sessionStorage
+        console.log("[OpenBook] DOCX book — no PDF proxy needed");
       }
 
       setPdfRef(restoredPdf);
