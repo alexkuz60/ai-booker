@@ -267,7 +267,7 @@ export function useFileUpload({
 
         await syncStructureToLocal(targetStorage, {
           bookId: resolvedBookId,
-          title: f.name.replace(/\.(pdf|docx?)$/i, ''),
+          title: pendingProjectName || stripFileExtension(f.name),
           fileName: f.name,
           toc: chapters,
           parts: partsArr,
