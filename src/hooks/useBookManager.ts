@@ -11,7 +11,7 @@ import type {
 } from "@/pages/parser/types";
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
-import { syncStructureToLocal, readStructureFromLocal, type LocalBookStructure } from "@/lib/localSync";
+import { syncStructureToLocal, readStructureFromLocal, readCharactersFromLocal, type LocalBookStructure } from "@/lib/localSync";
 import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 
 
