@@ -33,6 +33,7 @@ export function useParserCharacters({
   chapterResults,
   bookId,
   profilerModel = "google/gemini-2.5-flash",
+  userApiKeys = {},
   isRu = true,
 }: UseParserCharactersParams) {
   const [characters, setCharacters] = useState<LocalCharacter[]>([]);
