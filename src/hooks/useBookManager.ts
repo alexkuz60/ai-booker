@@ -688,7 +688,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
       if (!targetStorage && storageBackend === "opfs" && createProject && userId) {
         try {
-          const projectTitle = book.title || book.file_name.replace('.pdf', '');
+          const projectTitle = book.title || stripFileExtension(book.file_name);
           const lang = isRu ? "ru" as const : "en" as const;
           targetStorage = await createProject(projectTitle, book.id, userId, lang);
           console.log("[OpenBook] Auto-created OPFS project for server book:", projectTitle);
