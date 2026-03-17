@@ -731,6 +731,31 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     }
   }, [isRu, storageBackend, localProjectNamesByBookId, bookId, loadLibrary]);
 
+  // ─── Helper: flat TOC → TocChapter[] ─────────────────────
+  const mapFlatToChapters = (
+    flat: { title: string; level: number; startPage: number; endPage: number; children: TocEntry[] }[],
+  ): TocChapter[] => {
+    const mapped: TocChapter[] = [];
+    let currentPart = "";
+    for (let i = 0; i < flat.length; i++) {
+      const entry = flat[i];
+      const sectionType = classifySection(entry.title);
+      const hasNested = entry.children.length > 0 || (i + 1 < flat.length && flat[i + 1].level > entry.level);
+      if (entry.level === 0 && sectionType === "content" && hasNested) {
+        currentPart = entry.title;
+      }
+      mapped.push({
+        title: entry.title,
+        startPage: entry.startPage,
+        endPage: entry.endPage,
+        level: entry.level,
+        partTitle: entry.level > 0 ? (currentPart || undefined) : undefined,
+        sectionType,
+      });
+    }
+    return mapped;
+  };
+
   // ─── File Upload & TOC Extraction ──────────────────────────
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
