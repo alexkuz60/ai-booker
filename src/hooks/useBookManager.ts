@@ -952,6 +952,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         ]);
       }
 
+      progress(4, "Создание структуры глав...", "Creating chapter structure...");
       const uniqueParts = [...new Set(chapters.map(c => c.partTitle).filter(Boolean))] as string[];
       const newPartIdMap = new Map<string, string>();
       for (let i = 0; i < uniqueParts.length; i++) {
