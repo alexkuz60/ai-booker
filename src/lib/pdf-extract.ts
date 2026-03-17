@@ -447,22 +447,41 @@ export function mergeOutlineWithTextToc(
   const newEntries = textToc.filter(te => !outlinePages.has(te.pageNumber));
   if (newEntries.length === 0) return outline;
 
-  // Merge: flatten outline + new entries, sort by page
-  const allFlat: TocEntry[] = [];
-  function flatten(items: TocEntry[]) {
-    for (const item of items) {
-      allFlat.push({ ...item, children: [] });
-      if (item.children.length) flatten(item.children);
+  // B5 fix: insert new entries into existing hierarchy instead of flattening
+  // Strategy: for each new text entry, find the right position in the top-level
+  // or within a container's children based on page number
+  function insertIntoHierarchy(items: TocEntry[], entry: TocEntry): void {
+    // Find the container whose page range covers this entry
+    for (let i = items.length - 1; i >= 0; i--) {
+      const item = items[i];
+      const nextSibling = items[i + 1];
+      const containerEnd = nextSibling ? nextSibling.pageNumber - 1 : Infinity;
+
+      if (item.children.length > 0 && entry.pageNumber >= item.pageNumber && entry.pageNumber <= containerEnd) {
+        // Try to insert deeper into children
+        insertIntoHierarchy(item.children, entry);
+        return;
+      }
+    }
+    // Insert at this level, maintaining page order
+    const insertIdx = items.findIndex(it => it.pageNumber > entry.pageNumber);
+    if (insertIdx === -1) {
+      items.push(entry);
+    } else {
+      items.splice(insertIdx, 0, entry);
     }
   }
-  flatten(outline);
+
+  // Deep-clone outline to avoid mutating the original
+  const result: TocEntry[] = outline.map(function clone(item: TocEntry): TocEntry {
+    return { ...item, children: item.children.map(clone) };
+  });
 
   for (const ne of newEntries) {
-    allFlat.push({ ...ne, children: [] });
+    insertIntoHierarchy(result, { ...ne, children: [] });
   }
 
-  allFlat.sort((a, b) => a.pageNumber - b.pageNumber);
-  return allFlat;
+  return result;
 }
 
 /**
