@@ -192,10 +192,10 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
         }
       }
 
-      // ── 4. Upload PDF to server if not already there ──
+      // ── 4. Upload source file to server if not already there ──
       if (storage) {
-        const localPdfExists = await storage.exists("source/book.pdf");
-        if (localPdfExists) {
+        const sourceResult = await findSourceBlob(storage);
+        if (sourceResult) {
           // Check if server already has the file
           const { data: bookRow } = await supabase
             .from("books")
@@ -203,22 +203,21 @@ export function useSaveBookToProject({ isRu, currentBookId, localSnapshot }: Use
             .eq("id", currentBookId)
             .maybeSingle();
 
-          const serverHasPdf = !!bookRow?.file_path;
+          const serverHasFile = !!bookRow?.file_path;
 
-          if (!serverHasPdf && user?.id) {
-            const pdfBlob = await storage.readBlob("source/book.pdf");
-            if (pdfBlob) {
-              const filePath = `${user.id}/${Date.now()}_book.pdf`;
-              const { error: uploadError } = await supabase.storage
-                .from("book-uploads")
-                .upload(filePath, pdfBlob);
+          if (!serverHasFile && user?.id) {
+            const ext = sourceResult.format === "docx" ? "book.docx" : "book.pdf";
+            const filePath = `${user.id}/${Date.now()}_${ext}`;
+            const { error: uploadError } = await supabase.storage
+              .from("book-uploads")
+              .upload(filePath, sourceResult.blob);
 
-              if (!uploadError) {
-                await supabase
-                  .from("books")
-                  .update({ file_path: filePath })
-                  .eq("id", currentBookId);
-              }
+            if (!uploadError) {
+              await supabase
+                .from("books")
+                .update({ file_path: filePath })
+                .eq("id", currentBookId);
+            }
             }
           }
         }
