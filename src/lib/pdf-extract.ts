@@ -424,6 +424,10 @@ export async function extractTocFromText(
  * Adds text-based entries that don't overlap with existing outline entries
  * (by page proximity), preserving outline hierarchy.
  */
+function normalizeOutlineTitle(title: string): string {
+  return title.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
 export function mergeOutlineWithTextToc(
   outline: TocEntry[],
   textToc: TocEntry[],
@@ -431,39 +435,80 @@ export function mergeOutlineWithTextToc(
 ): TocEntry[] {
   if (textToc.length === 0) return outline;
 
-  // Flatten outline to get all page numbers
+  // Deep-clone outline to avoid mutating the original
+  const result: TocEntry[] = outline.map(function clone(item: TocEntry): TocEntry {
+    return { ...item, children: item.children.map(clone) };
+  });
+
   const outlinePages = new Set<number>();
+  const outlineByTitle = new Map<string, TocEntry[]>();
+
   function collectPages(items: TocEntry[]) {
     for (const item of items) {
+      const key = normalizeOutlineTitle(item.title);
+      if (key) {
+        const bucket = outlineByTitle.get(key) || [];
+        bucket.push(item);
+        outlineByTitle.set(key, bucket);
+      }
       for (let p = item.pageNumber - pageProximity; p <= item.pageNumber + pageProximity; p++) {
         outlinePages.add(p);
       }
       if (item.children.length) collectPages(item.children);
     }
   }
-  collectPages(outline);
+  collectPages(result);
 
-  // Find text entries not covered by outline
-  const newEntries = textToc.filter(te => !outlinePages.has(te.pageNumber));
-  if (newEntries.length === 0) return outline;
+  // Repair broken outline destinations (common case: unresolved dest => page 1)
+  const consumedTextEntries = new Set<number>();
+  textToc.forEach((entry, index) => {
+    const key = normalizeOutlineTitle(entry.title);
+    const matches = outlineByTitle.get(key) || [];
+    const repairable = matches.find((item) => item.pageNumber <= 1 && entry.pageNumber > 1);
+    if (!repairable) return;
+
+    repairable.pageNumber = entry.pageNumber;
+    if (repairable.children.length === 0) {
+      repairable.level = entry.level;
+    }
+    consumedTextEntries.add(index);
+  });
+
+  // Rebuild page coverage after repairs
+  outlinePages.clear();
+  (function recollect(items: TocEntry[]) {
+    for (const item of items) {
+      for (let p = item.pageNumber - pageProximity; p <= item.pageNumber + pageProximity; p++) {
+        outlinePages.add(p);
+      }
+      if (item.children.length) recollect(item.children);
+    }
+  })(result);
+
+  // Find text entries not covered by outline, also avoiding same-title duplicates
+  const newEntries = textToc.filter((entry, index) => {
+    if (consumedTextEntries.has(index)) return false;
+    const key = normalizeOutlineTitle(entry.title);
+    const matches = outlineByTitle.get(key) || [];
+    if (matches.some((item) => Math.abs(item.pageNumber - entry.pageNumber) <= pageProximity)) {
+      return false;
+    }
+    return !outlinePages.has(entry.pageNumber);
+  });
+  if (newEntries.length === 0) return result;
 
   // B5 fix: insert new entries into existing hierarchy instead of flattening
-  // Strategy: for each new text entry, find the right position in the top-level
-  // or within a container's children based on page number
   function insertIntoHierarchy(items: TocEntry[], entry: TocEntry): void {
-    // Find the container whose page range covers this entry
     for (let i = items.length - 1; i >= 0; i--) {
       const item = items[i];
       const nextSibling = items[i + 1];
       const containerEnd = nextSibling ? nextSibling.pageNumber - 1 : Infinity;
 
       if (item.children.length > 0 && entry.pageNumber >= item.pageNumber && entry.pageNumber <= containerEnd) {
-        // Try to insert deeper into children
         insertIntoHierarchy(item.children, entry);
         return;
       }
     }
-    // Insert at this level, maintaining page order
     const insertIdx = items.findIndex(it => it.pageNumber > entry.pageNumber);
     if (insertIdx === -1) {
       items.push(entry);
@@ -471,11 +516,6 @@ export function mergeOutlineWithTextToc(
       items.splice(insertIdx, 0, entry);
     }
   }
-
-  // Deep-clone outline to avoid mutating the original
-  const result: TocEntry[] = outline.map(function clone(item: TocEntry): TocEntry {
-    return { ...item, children: item.children.map(clone) };
-  });
 
   for (const ne of newEntries) {
     insertIntoHierarchy(result, { ...ne, children: [] });
