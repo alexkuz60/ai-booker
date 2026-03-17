@@ -397,15 +397,31 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
   const dismissServerNewer = useCallback(() => setServerNewerBookId(null), []);
 
+  // B12 fix: acceptServerVersion forces full local replacement with server data
   const acceptServerVersion = useCallback(async () => {
     if (!serverNewerBookId) return;
+    const targetBookId = serverNewerBookId;
     setServerNewerBookId(null);
 
-    const book = await loadBookFromServerById(serverNewerBookId);
-    if (book) {
-      await openSavedBookRef.current?.(book);
+    // Delete existing local project to force server download path in openSavedBook
+    if (storageBackend === "opfs") {
+      const projectNames = localProjectNamesByBookId.get(targetBookId) || [];
+      for (const pn of projectNames) {
+        try {
+          await OPFSStorage.deleteProject(pn);
+          console.log(`[AcceptServer] Deleted local OPFS project: ${pn}`);
+        } catch (err) {
+          console.warn(`[AcceptServer] Failed to delete OPFS project ${pn}:`, err);
+        }
+      }
     }
-  }, [serverNewerBookId, loadBookFromServerById]);
+
+    const book = await loadBookFromServerById(targetBookId);
+    if (book) {
+      // skipTimestampCheck: we already know server is newer
+      await openSavedBookRef.current?.(book, { skipTimestampCheck: true });
+    }
+  }, [serverNewerBookId, loadBookFromServerById, storageBackend, localProjectNamesByBookId]);
 
   // ─── Auto-restore active book on mount (local-first) ───────
   const [restoredOnce, setRestoredOnce] = useState(false);
