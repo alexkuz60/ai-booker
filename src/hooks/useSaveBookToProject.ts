@@ -18,6 +18,7 @@ import {
   getLeafIndices,
   sanitizeChapterResultsForStructure,
 } from "@/lib/tocStructure";
+import { findSourceBlob, getMimeType } from "@/lib/fileFormatUtils";
 
 export interface LocalBookSnapshot {
   toc: TocChapter[];
