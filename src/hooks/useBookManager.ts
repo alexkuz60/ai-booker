@@ -76,24 +76,24 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     dedupeKey: string;
   };
 
-  // ─── Library: Local-first list with deterministic dedupe ──────────────────
+  // ─── Library: Local-first list — reads ONLY project.json (B9 fix) ──────────
   const mapLocalStructureToBook = useCallback(async (storage: ProjectStorage): Promise<LocalLibraryCandidate | null> => {
-    const structure = await storage.readJSON<LocalBookStructure>("structure/toc.json");
-    const meta = await storage.readJSON<{ bookId?: string; title?: string; createdAt?: string; updatedAt?: string }>("project.json");
+    const meta = await storage.readJSON<{
+      bookId?: string;
+      title?: string;
+      createdAt?: string;
+      updatedAt?: string;
+      language?: string;
+      fileFormat?: string;
+    }>("project.json");
 
-    if (!structure && !meta) return null;
+    if (!meta || !meta.bookId) return null;
 
-    const toc = structure?.toc || [];
-    const chapterCount = toc.reduce((acc, _entry, idx) => acc + (isFolderNode(toc, idx) ? 0 : 1), 0);
-
-    const resolvedId = structure?.bookId || meta?.bookId || `local:${storage.projectName}`;
-    const resolvedTitle = structure?.title || meta?.title || storage.projectName;
-    const resolvedFileName = structure?.fileName || `${resolvedTitle}.pdf`;
-    const resolvedCreatedAt = structure?.updatedAt || meta?.updatedAt || meta?.createdAt || new Date(0).toISOString();
-    const normalizedTitle = resolvedTitle.trim().toLowerCase();
-    const dedupeKey = structure?.bookId || meta?.bookId
-      ? `book:${resolvedId}`
-      : `title:${normalizedTitle}`;
+    const resolvedId = meta.bookId;
+    const resolvedTitle = meta.title || storage.projectName;
+    const resolvedFileName = `${resolvedTitle}.${meta.fileFormat === "docx" ? "docx" : "pdf"}`;
+    const resolvedCreatedAt = meta.updatedAt || meta.createdAt || new Date(0).toISOString();
+    const dedupeKey = `book:${resolvedId}`;
 
     return {
       record: {
@@ -103,7 +103,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         file_path: null,
         status: "local",
         created_at: resolvedCreatedAt,
-        chapter_count: chapterCount,
+        chapter_count: 0, // not reading toc.json for library list
         scene_count: 0,
       },
       projectName: storage.projectName,
