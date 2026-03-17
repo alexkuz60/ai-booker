@@ -840,7 +840,10 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         }
       }
 
-      chapters = normalizeTocRanges(normalizeLevels(chapters), pdf.numPages);
+      const currentTotalPages = isDocx
+        ? Math.max(1, Math.ceil((sessionStorage.getItem("docx_html") || "").length / 2000))
+        : (pdfRef ? (pdfRef as any).numPages : 1);
+      chapters = normalizeTocRanges(normalizeLevels(chapters), currentTotalPages);
       setTocEntries(chapters);
 
       // Clean up previous uploads of the same file name
