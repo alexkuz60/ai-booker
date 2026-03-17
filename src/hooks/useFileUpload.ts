@@ -67,7 +67,7 @@ interface UseFileUploadParams {
 }
 
 export function useFileUpload({
-  userId, isRu, storageBackend, projectStorage, createProject, bookId,
+  userId, isRu, storageBackend, projectStorage, createProject, bookId, pendingProjectName,
   setStep, setFileName, setBookId, setTocEntries, setChapterIdMap,
   setPartIdMap, setChapterResults, setPdfRef, setTotalPages, setFile, setErrorMsg,
 }: UseFileUploadParams) {
