@@ -1043,8 +1043,9 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
           }
         } catch {}
       }
-
+      progress(6, "Готово!", "Done!");
       setStep("workspace");
+      setUploadProgress(null);
     } catch (err: any) {
       console.error("Parser error:", err);
       const msg = err.message || "Unknown error";
