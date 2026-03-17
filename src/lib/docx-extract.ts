@@ -158,12 +158,12 @@ export async function extractFromDocx(file: File): Promise<DocxExtractResult> {
       let matched = false;
 
       // Check part patterns (level 0)
-      for (const pat of PART_PATTERNS) {
-        const m = text.match(pat);
-        if (m) {
-          const suffix = m[3]?.trim();
-          const title = suffix ? `${m[1]} ${m[2]}. ${suffix}` : `${m[1]} ${m[2]}`;
-          outline.push({
+        for (const pat of PART_PATTERNS) {
+          const m = text.match(pat);
+          if (m) {
+            const suffix = stripTrailingPageNumber(m[3]?.trim() || "");
+            const title = suffix ? `${m[1]} ${m[2]}. ${suffix}` : `${m[1]} ${m[2]}`;
+            outline.push({
             title,
             pageNumber: Math.max(1, Math.ceil(charOffset / CHARS_PER_PAGE)),
             level: 0,
