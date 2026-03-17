@@ -1014,6 +1014,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       setChapterResults(initMap);
 
       // ── Dual-write: sync to local project ──
+      progress(5, "Сохранение в локальное хранилище...", "Saving to local storage...");
       if (projectStorage?.isReady && resolvedBookId) {
         const partsArr = uniqueParts.map((title, i) => ({
           id: newPartIdMap.get(title) || "",
