@@ -11,7 +11,7 @@ import type {
 } from "@/pages/parser/types";
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
-import { syncStructureToLocal, readStructureFromLocal, type LocalBookStructure } from "@/lib/localSync";
+import { syncStructureToLocal, readStructureFromLocal, readCharactersFromLocal, type LocalBookStructure } from "@/lib/localSync";
 import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 
 
@@ -76,24 +76,24 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     dedupeKey: string;
   };
 
-  // ─── Library: Local-first list with deterministic dedupe ──────────────────
+  // ─── Library: Local-first list — reads ONLY project.json (B9 fix) ──────────
   const mapLocalStructureToBook = useCallback(async (storage: ProjectStorage): Promise<LocalLibraryCandidate | null> => {
-    const structure = await storage.readJSON<LocalBookStructure>("structure/toc.json");
-    const meta = await storage.readJSON<{ bookId?: string; title?: string; createdAt?: string; updatedAt?: string }>("project.json");
+    const meta = await storage.readJSON<{
+      bookId?: string;
+      title?: string;
+      createdAt?: string;
+      updatedAt?: string;
+      language?: string;
+      fileFormat?: string;
+    }>("project.json");
 
-    if (!structure && !meta) return null;
+    if (!meta || !meta.bookId) return null;
 
-    const toc = structure?.toc || [];
-    const chapterCount = toc.reduce((acc, _entry, idx) => acc + (isFolderNode(toc, idx) ? 0 : 1), 0);
-
-    const resolvedId = structure?.bookId || meta?.bookId || `local:${storage.projectName}`;
-    const resolvedTitle = structure?.title || meta?.title || storage.projectName;
-    const resolvedFileName = structure?.fileName || `${resolvedTitle}.pdf`;
-    const resolvedCreatedAt = structure?.updatedAt || meta?.updatedAt || meta?.createdAt || new Date(0).toISOString();
-    const normalizedTitle = resolvedTitle.trim().toLowerCase();
-    const dedupeKey = structure?.bookId || meta?.bookId
-      ? `book:${resolvedId}`
-      : `title:${normalizedTitle}`;
+    const resolvedId = meta.bookId;
+    const resolvedTitle = meta.title || storage.projectName;
+    const resolvedFileName = `${resolvedTitle}.${meta.fileFormat === "docx" ? "docx" : "pdf"}`;
+    const resolvedCreatedAt = meta.updatedAt || meta.createdAt || new Date(0).toISOString();
+    const dedupeKey = `book:${resolvedId}`;
 
     return {
       record: {
@@ -103,7 +103,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         file_path: null,
         status: "local",
         created_at: resolvedCreatedAt,
-        chapter_count: chapterCount,
+        chapter_count: 0, // not reading toc.json for library list
         scene_count: 0,
       },
       projectName: storage.projectName,
@@ -218,6 +218,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     };
   }, [loadLibraryFromServer, userId]);
 
+  // B9 fix: Library loads ONLY from local OPFS, no server requests
   const loadLibrary = useCallback(async () => {
     if (!userId) {
       setBooks([]);
@@ -227,29 +228,18 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
     setLoadingLibrary(true);
     try {
-      // Load local + server in parallel, merge once
-      const [localBooks, serverBooks] = await Promise.all([
-        loadLocalLibrary().catch((err) => {
-          console.warn("[Library] Local fetch failed:", err);
-          return [] as BookRecord[];
-        }),
-        loadLibraryFromServer().catch((err) => {
-          console.warn("[Library] Server fetch failed:", err);
-          return [] as BookRecord[];
-        }),
-      ]);
-
-      // Merge: local takes priority, append server-only books
-      const localIds = new Set(localBooks.map(b => b.id));
-      const serverOnly = serverBooks.filter(sb => !localIds.has(sb.id));
-      setBooks([...localBooks, ...serverOnly]);
+      const localBooks = await loadLocalLibrary().catch((err) => {
+        console.warn("[Library] Local fetch failed:", err);
+        return [] as BookRecord[];
+      });
+      setBooks(localBooks);
     } catch (err) {
       console.error("Failed to load library:", err);
       setBooks([]);
     } finally {
       setLoadingLibrary(false);
     }
-  }, [userId, loadLocalLibrary, loadLibraryFromServer]);
+  }, [userId, loadLocalLibrary]);
 
   const libraryLoadedRef = useRef(false);
   useEffect(() => {
@@ -279,6 +269,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     try {
       const local = await readStructureFromLocal(projectStorage);
       if (!local?.structure || local.structure.bookId !== savedBookId) return false;
+      // Note: characters are loaded independently by useParserCharacters when bookId changes
 
       const { structure, chapterIdMap: localChIdMap, chapterResults: localResults } = local;
       const normalizedToc = normalizeTocRanges(normalizeLevels(structure.toc));
@@ -406,19 +397,35 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
   const dismissServerNewer = useCallback(() => setServerNewerBookId(null), []);
 
+  // B12 fix: acceptServerVersion forces full local replacement with server data
   const acceptServerVersion = useCallback(async () => {
     if (!serverNewerBookId) return;
+    const targetBookId = serverNewerBookId;
     setServerNewerBookId(null);
 
-    const book = await loadBookFromServerById(serverNewerBookId);
-    if (book) {
-      await openSavedBookRef.current?.(book);
+    // Delete existing local project to force server download path in openSavedBook
+    if (storageBackend === "opfs") {
+      const projectNames = localProjectNamesByBookId.get(targetBookId) || [];
+      for (const pn of projectNames) {
+        try {
+          await OPFSStorage.deleteProject(pn);
+          console.log(`[AcceptServer] Deleted local OPFS project: ${pn}`);
+        } catch (err) {
+          console.warn(`[AcceptServer] Failed to delete OPFS project ${pn}:`, err);
+        }
+      }
     }
-  }, [serverNewerBookId, loadBookFromServerById]);
+
+    const book = await loadBookFromServerById(targetBookId);
+    if (book) {
+      // skipTimestampCheck: we already know server is newer
+      await openSavedBookRef.current?.(book, { skipTimestampCheck: true });
+    }
+  }, [serverNewerBookId, loadBookFromServerById, storageBackend, localProjectNamesByBookId]);
 
   // ─── Auto-restore active book on mount (local-first) ───────
   const [restoredOnce, setRestoredOnce] = useState(false);
-  const openSavedBookRef = useRef<(book: BookRecord) => Promise<void>>();
+  const openSavedBookRef = useRef<(book: BookRecord, options?: { skipTimestampCheck?: boolean }) => Promise<void>>();
 
   useEffect(() => {
     if (restoredOnce || !userId || loadingLibrary) return;
@@ -466,7 +473,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
       const book = await loadBookFromServerById(savedBookId);
       if (book) {
-        await openSavedBookRef.current?.(book);
+        await openSavedBookRef.current?.(book, { skipTimestampCheck: true });
       } else {
         sessionStorage.removeItem(ACTIVE_BOOK_KEY);
         setStep("library");
@@ -486,13 +493,22 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     step,
   ]);
 
-  // ─── Open saved book (local-first, server fallback) ───────────────────────
-  const openSavedBook = useCallback(async (book: BookRecord) => {
+  // ─── Open saved book (local-first + server timestamp check) ────────────────
+  const openSavedBook = useCallback(async (book: BookRecord, options?: { skipTimestampCheck?: boolean }) => {
     if (!userId) return;
 
     if (projectStorage?.isReady) {
       const restored = await restoreFromLocal(book.id);
-      if (restored) return;
+      if (restored) {
+        // B10 fix: always check server timestamp after successful local restore
+        if (!options?.skipTimestampCheck) {
+          const isNewer = await checkServerNewer(book.id);
+          if (isNewer) {
+            setServerNewerBookId(book.id);
+          }
+        }
+        return;
+      }
     }
 
     setStep("extracting_toc");
@@ -604,27 +620,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       chapters.forEach((ch, i) => newChapterIdMap.set(i, ch.id));
       setChapterIdMap(newChapterIdMap);
 
-      const rangeFixes = chapters
-        .map((ch, i) => {
-          const next = normalizedRangedToc[i];
-          if (!next) return null;
-          const currentStart = Number((ch as any).start_page || 0);
-          const currentEnd = Number((ch as any).end_page || 0);
-          if (currentStart === next.startPage && currentEnd === next.endPage) return null;
-          return {
-            id: ch.id,
-            book_id: book.id,
-            start_page: next.startPage,
-            end_page: next.endPage,
-          };
-        })
-        .filter((v): v is { id: string; book_id: string; start_page: number; end_page: number } => !!v);
-
-      if (rangeFixes.length > 0) {
-        supabase.from('book_chapters').upsert(rangeFixes).then(({ error }) => {
-          if (error) console.warn('[OpenBook] range normalization failed:', error);
-        });
-      }
+      // B13 fix: removed upsert rangeFixes — no DB writes during read operation
 
       const allChapterIds = chapters.map(c => c.id);
       const { data: allScenes } = await supabase
@@ -700,7 +696,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       setErrorMsg(err.message || "Unknown error");
       setStep("error");
     }
-  }, [userId, isRu, projectStorage, storageBackend, createProject, restoreFromLocal]);
+  }, [userId, isRu, projectStorage, storageBackend, createProject, restoreFromLocal, checkServerNewer]);
 
   // Keep ref in sync for auto-restore effect
   openSavedBookRef.current = openSavedBook;
