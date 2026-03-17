@@ -442,7 +442,7 @@ export default function Parser() {
           {step === "library" && (
             <LibraryView
               isRu={isRu} books={books} loadingLibrary={loadingLibrary}
-              onUpload={() => setStep("upload")} onOpen={openSavedBook} onDelete={deleteBook}
+              onUpload={startNewProject} onOpen={openSavedBook} onDelete={deleteBook}
               onClearAll={clearAllProjects}
             />
           )}

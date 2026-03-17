@@ -295,6 +295,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
     importProjectFromZip,
     downloadProjectAsZip,
     closeProject,
+    hardResetLocalData,
     saveSourceFile,
     readSourceFile,
   };

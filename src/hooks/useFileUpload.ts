@@ -241,7 +241,7 @@ export function useFileUpload({
       // ── Save to OPFS only (non-fatal — upload succeeds even if storage fails) ──
       progress(3, "Сохранение в локальное хранилище...", "Saving to local storage...");
       try {
-        let targetStorage: ProjectStorage | null = projectStorage ?? null;
+        let targetStorage: ProjectStorage | null = isReload ? (projectStorage ?? null) : null;
 
         // Auto-create OPFS project if no storage is open yet
         if (!targetStorage && createProject && (storageBackend === "opfs" || storageBackend === "fs-access")) {
