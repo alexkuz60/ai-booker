@@ -604,27 +604,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       chapters.forEach((ch, i) => newChapterIdMap.set(i, ch.id));
       setChapterIdMap(newChapterIdMap);
 
-      const rangeFixes = chapters
-        .map((ch, i) => {
-          const next = normalizedRangedToc[i];
-          if (!next) return null;
-          const currentStart = Number((ch as any).start_page || 0);
-          const currentEnd = Number((ch as any).end_page || 0);
-          if (currentStart === next.startPage && currentEnd === next.endPage) return null;
-          return {
-            id: ch.id,
-            book_id: book.id,
-            start_page: next.startPage,
-            end_page: next.endPage,
-          };
-        })
-        .filter((v): v is { id: string; book_id: string; start_page: number; end_page: number } => !!v);
-
-      if (rangeFixes.length > 0) {
-        supabase.from('book_chapters').upsert(rangeFixes).then(({ error }) => {
-          if (error) console.warn('[OpenBook] range normalization failed:', error);
-        });
-      }
+      // B13 fix: removed upsert rangeFixes — no DB writes during read operation
 
       const allChapterIds = chapters.map(c => c.id);
       const { data: allScenes } = await supabase
