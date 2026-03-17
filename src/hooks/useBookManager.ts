@@ -1008,6 +1008,15 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         // Save the source file locally
         const localSourceName = isDocx ? "source/book.docx" : "source/book.pdf";
         projectStorage.writeBlob(localSourceName, f).catch(() => {});
+
+        // B4/B7 fix: persist fileFormat in project.json
+        try {
+          const projectMeta = await projectStorage.readJSON<Record<string, unknown>>("project.json");
+          if (projectMeta) {
+            projectMeta.fileFormat = isDocx ? "docx" : "pdf";
+            await projectStorage.writeJSON("project.json", projectMeta);
+          }
+        } catch {}
       }
 
       setStep("workspace");
