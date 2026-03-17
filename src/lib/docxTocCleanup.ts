@@ -1,11 +1,11 @@
 import type { TocEntry } from "./pdf-extract";
 
 const TOC_HEADING_PATTERNS = [
-  /^(глава|chapter)\b/i,
-  /^(часть|part)\b/i,
-  /^(книга|book)\b/i,
-  /^(том|volume)\b/i,
-  /^(акт|act)\b/i,
+  /^(глава|chapter)(?:\s|$)/i,
+  /^(часть|part)(?:\s|$)/i,
+  /^(книга|book)(?:\s|$)/i,
+  /^(том|volume)(?:\s|$)/i,
+  /^(акт|act)(?:\s|$)/i,
 ];
 
 export function stripTrailingPageNumber(raw: string): string {
