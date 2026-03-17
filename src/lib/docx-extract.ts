@@ -229,18 +229,16 @@ export function stripHtml(html: string): string {
   return doc.body.textContent || "";
 }
 
-/** Get all text content before a given element */
-function getTextBefore(root: Element, target: Element): string {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let text = "";
-  let node: Text | null;
-  while ((node = walker.nextNode() as Text | null)) {
-    if (target.contains(node)) break;
-    // Check if node is before target in DOM order
-    const pos = target.compareDocumentPosition(node);
-    if (pos & Node.DOCUMENT_POSITION_PRECEDING) {
-      text += node.textContent || "";
-    }
+/**
+ * Count characters in all sibling elements before `target`.
+ * Mammoth outputs all headings/paragraphs as direct children of <body>,
+ * so a simple child iteration is both reliable and fast.
+ */
+function getCharOffsetBefore(root: Element, target: Element): number {
+  let offset = 0;
+  for (const child of Array.from(root.children)) {
+    if (child === target) break;
+    offset += (child.textContent || "").length;
   }
-  return text;
+  return offset;
 }
