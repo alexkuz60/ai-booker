@@ -379,17 +379,24 @@ export function useChapterAnalysis({
 
         addLog(`${t("logFoundScenes", isRu)} ${scenes.length} ${t("logScenesWord", isRu)}:`);
         const totalChars = text.length;
-        const pageSpan = effectiveEndPage - effectiveStartPage + 1;
         let charOffset = 0;
-        scenes.forEach((sc, i) => {
-          const scLen = sc.content?.length || 0;
-          const startFrac = totalChars > 0 ? charOffset / totalChars : 0;
-          const endFrac = totalChars > 0 ? (charOffset + scLen) / totalChars : 0;
-          const pageStart = Math.floor(effectiveStartPage + startFrac * pageSpan);
-          const pageEnd = Math.max(pageStart, Math.ceil(effectiveStartPage + endFrac * pageSpan) - 1);
-          charOffset += scLen;
-          addLog(`  ${t("logSceneItem", isRu)} ${i + 1}: «${sc.title}» — ${t("logPagesAbbr", isRu)} ${pageStart}–${pageEnd}, ${scLen.toLocaleString()} ${t("logCharsAbbr", isRu)}`);
-        });
+        if (!docxMode) {
+          const pageSpan = (entry.endPage || entry.startPage) - entry.startPage + 1;
+          scenes.forEach((sc, i) => {
+            const scLen = sc.content?.length || 0;
+            const startFrac = totalChars > 0 ? charOffset / totalChars : 0;
+            const endFrac = totalChars > 0 ? (charOffset + scLen) / totalChars : 0;
+            const pageStart = Math.floor(entry.startPage + startFrac * pageSpan);
+            const pageEnd = Math.max(pageStart, Math.ceil(entry.startPage + endFrac * pageSpan) - 1);
+            charOffset += scLen;
+            addLog(`  ${t("logSceneItem", isRu)} ${i + 1}: «${sc.title}» — ${t("logPagesAbbr", isRu)} ${pageStart}–${pageEnd}, ${scLen.toLocaleString()} ${t("logCharsAbbr", isRu)}`);
+          });
+        } else {
+          scenes.forEach((sc, i) => {
+            const scLen = sc.content?.length || 0;
+            addLog(`  ${t("logSceneItem", isRu)} ${i + 1}: «${sc.title}» — ${scLen.toLocaleString()} ${t("logCharsAbbr", isRu)}`);
+          });
+        }
 
         addLog(t("logSaving", isRu));
         if (existingChId) {
