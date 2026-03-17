@@ -85,7 +85,7 @@ export default function Parser() {
     step, setStep, books, loadingLibrary, fileName, errorMsg, bookId, uploadProgress,
     chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
     partIdMap, chapterResults, setChapterResults, fileInputRef,
-    openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset, reloadBook, ensurePdfLoaded,
+    openSavedBook, deleteBook, clearAllProjects, handleFileSelect, handleReset: bookReset, reloadBook, ensurePdfLoaded,
     reloadLibrary,
     serverNewerBookId, dismissServerNewer, acceptServerVersion,
   } = useBookManager({ userId: user?.id, isRu, projectStorage, projectStorageInitialized, storageBackend, createProject, pendingProjectName });
