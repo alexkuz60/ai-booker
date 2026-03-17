@@ -226,25 +226,19 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
     setLoadingLibrary(true);
     try {
-      // Always load local books first for instant display
-      const localBooks = await loadLocalLibrary();
-      setBooks(localBooks);
+      // Load local + server in parallel, merge once
+      const [localBooks, serverBooks] = await Promise.all([
+        loadLocalLibrary().catch(() => [] as BookRecord[]),
+        loadLibraryFromServer().catch((err) => {
+          console.warn("[Library] Server fetch failed:", err);
+          return [] as BookRecord[];
+        }),
+      ]);
 
-      // Then merge with server books (non-blocking for UX)
-      try {
-        const serverBooks = await loadLibraryFromServer();
-        if (serverBooks.length > 0) {
-          setBooks(prev => {
-            const localIds = new Set(prev.map(b => b.id));
-            const newFromServer = serverBooks.filter(sb => !localIds.has(sb.id));
-            if (newFromServer.length === 0) return prev;
-            return [...prev, ...newFromServer];
-          });
-        }
-      } catch (serverErr) {
-        // Server unreachable — local books are still shown
-        console.warn("[Library] Server fetch failed, showing local only:", serverErr);
-      }
+      // Merge: local takes priority, append server-only books
+      const localIds = new Set(localBooks.map(b => b.id));
+      const serverOnly = serverBooks.filter(sb => !localIds.has(sb.id));
+      setBooks([...localBooks, ...serverOnly]);
     } catch (err) {
       console.error("Failed to load library:", err);
       setBooks([]);
@@ -253,16 +247,21 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     }
   }, [userId, loadLocalLibrary, loadLibraryFromServer]);
 
+  const libraryLoadedRef = useRef(false);
   useEffect(() => {
     if (!userId) {
       setBooks([]);
       setLoadingLibrary(false);
+      libraryLoadedRef.current = false;
       return;
     }
 
-    if (step !== "library" && books.length > 0) return;
-    void loadLibrary();
-  }, [userId, step, books.length, loadLibrary]);
+    // Load library once on mount, or when returning to library tab
+    if (step === "library" && !libraryLoadedRef.current) {
+      libraryLoadedRef.current = true;
+      void loadLibrary();
+    }
+  }, [userId, step, loadLibrary]);
 
   // ─── Auto-restore active book on mount ─────────────────────
   // ─── Restore from local ProjectStorage ─────────────────────
