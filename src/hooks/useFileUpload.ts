@@ -91,10 +91,18 @@ export function useFileUpload({
       return;
     }
 
-    // Clear stale session data from previous uploads to prevent cross-book contamination
+    // Clear stale session/runtime data from previous uploads to prevent cross-book contamination
     sessionStorage.removeItem("docx_chapter_texts");
     sessionStorage.removeItem("docx_html");
+    sessionStorage.removeItem(ACTIVE_BOOK_KEY);
 
+    setBookId(null);
+    setPdfRef(null);
+    setTotalPages(0);
+    setTocEntries([]);
+    setChapterIdMap(new Map());
+    setPartIdMap(new Map());
+    setChapterResults(new Map());
     setFileName(f.name);
     setFile(f);
     setStep("extracting_toc");

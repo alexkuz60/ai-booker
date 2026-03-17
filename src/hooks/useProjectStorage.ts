@@ -11,6 +11,13 @@ import {
 import { downloadBlob } from "@/lib/projectZip";
 
 const LAST_PROJECT_KEY = "booker_last_project";
+const LOCAL_RESET_KEYS = [
+  LAST_PROJECT_KEY,
+  "parser-active-book",
+  "parser-nav-state",
+  "docx_chapter_texts",
+  "docx_html",
+];
 
 interface UseProjectStorageReturn {
   /** Current storage instance (null = no project open) */
@@ -36,6 +43,8 @@ interface UseProjectStorageReturn {
   downloadProjectAsZip: () => Promise<void>;
   /** Close current project */
   closeProject: () => void;
+  /** Hard-reset all locally persisted parser data for this browser */
+  hardResetLocalData: () => Promise<void>;
 
   /** Save source file (PDF or DOCX) into project */
   saveSourceFile: (file: File) => Promise<void>;
