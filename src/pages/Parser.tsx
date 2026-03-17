@@ -53,6 +53,7 @@ export default function Parser() {
     openProject,
     storage: projectStorage,
     initialized: projectStorageInitialized,
+    meta: projectMeta,
   } = useProjectStorageContext();
   const { getModelForRole } = useAiRoles(userApiKeys);
   const { toast } = useToast();
