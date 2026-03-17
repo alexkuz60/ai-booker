@@ -5,6 +5,11 @@
  */
 import mammoth from "mammoth";
 import { type TocEntry } from "./pdf-extract";
+import {
+  normalizeTocTitle,
+  pruneDocxTocArtifacts,
+  stripTrailingPageNumber,
+} from "./docxTocCleanup";
 
 export interface DocxExtractResult {
   /** Hierarchical TOC entries (from headings or regex fallback) */
@@ -20,17 +25,6 @@ export interface DocxExtractResult {
 }
 
 const CHARS_PER_PAGE = 2000;
-
-/**
- * Strip trailing tab/spaces + page number that DOCX TOC headings often contain.
- * E.g. "Глава 01. ЛУЖА: РОЗЛИВ\t6" → "глава 01. лужа: розлив"
- */
-function normalizeTocTitle(raw: string): string {
-  return raw
-    .replace(/[\t\s]+\d+\s*$/, "")  // trailing tab/space + digits
-    .trim()
-    .toLowerCase();
-}
 
 // ── Regex patterns for fallback TOC detection ──
 
