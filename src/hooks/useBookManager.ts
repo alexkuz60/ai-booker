@@ -70,6 +70,9 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
   const [chapterResults, setChapterResults] = useState<Map<number, { scenes: Scene[]; status: ChapterStatus }>>(new Map());
   const [localProjectNamesByBookId, setLocalProjectNamesByBookId] = useState<Map<string, string[]>>(new Map());
 
+  // Upload progress tracking
+  const [uploadProgress, setUploadProgress] = useState<{ step: number; totalSteps: number; message: string } | null>(null);
+
   type LocalLibraryCandidate = {
     record: BookRecord;
     projectName: string;
