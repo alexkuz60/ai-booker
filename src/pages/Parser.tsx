@@ -709,7 +709,7 @@ export default function Parser() {
             />
           )}
           {step === "extracting_toc" && (
-            <ExtractingTocView fileName={fileName} isRu={isRu} />
+            <ExtractingTocView fileName={fileName} isRu={isRu} uploadProgress={uploadProgress} />
           )}
           {step === "error" && (
             <ErrorView errorMsg={errorMsg} isRu={isRu} onReset={handleReset} />
