@@ -708,11 +708,23 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
           chapterResults: initMap,
         });
 
-        // Save PDF to local project if downloaded from server
+        // Save source file to local project if downloaded from server
         if (pdfBlob && targetStorage) {
-          targetStorage.writeBlob("source/book.pdf", pdfBlob).catch(err =>
-            console.warn("[OpenBook] Failed to save PDF to local project:", err)
+          const sourcePath = getSourcePath(bookFormat);
+          targetStorage.writeBlob(sourcePath, pdfBlob).catch(err =>
+            console.warn("[OpenBook] Failed to save source file to local project:", err)
           );
+        }
+
+        // Persist fileFormat in project.json for DOCX awareness
+        if (targetStorage && isBookDocx) {
+          try {
+            const projMeta = await targetStorage.readJSON<Record<string, unknown>>("project.json");
+            if (projMeta) {
+              projMeta.fileFormat = "docx";
+              await targetStorage.writeJSON("project.json", projMeta);
+            }
+          } catch {}
         }
       }
 
