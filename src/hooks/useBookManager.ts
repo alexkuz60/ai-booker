@@ -1112,7 +1112,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     }
 
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [userId, isRu, projectStorage]);
+  }, [userId, isRu, projectStorage, storageBackend, createProject, bookId]);
 
   // ─── Reload book (delete structure, re-upload new PDF) ─────
   // B1/B6 fix: reloadBook preserves bookId, clears sessionStorage (B3)
