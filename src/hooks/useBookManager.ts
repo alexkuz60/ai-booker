@@ -1149,9 +1149,28 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
   }, [bookId, isRu, storageBackend, localProjectNamesByBookId, projectStorage]);
 
   // ─── Ensure PDF is loaded (local-first, then server) ────────
+  // For DOCX books this returns null — DOCX uses sessionStorage for chapter texts
   const ensurePdfLoaded = useCallback(async (): Promise<any> => {
     if (pdfRef) return pdfRef;
     if (!bookId) return null;
+
+    // Detect format: check project.json first, then fileName
+    let format: FileFormat = "pdf";
+    if (projectStorage?.isReady) {
+      try {
+        const meta = await projectStorage.readJSON<Record<string, unknown>>("project.json");
+        if (meta?.fileFormat === "docx") format = "docx";
+      } catch {}
+    }
+    if (format === "pdf" && fileName && detectFileFormat(fileName) === "docx") {
+      format = "docx";
+    }
+
+    // DOCX books don't use PDF proxy at all
+    if (format === "docx") {
+      console.log("[EnsureSource] DOCX book — PDF proxy not needed");
+      return null;
+    }
 
     const loadPdf = async (arrayBuffer: ArrayBuffer) => {
       const { getDocument } = await import("pdfjs-dist");
@@ -1164,7 +1183,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     // 1. Try local project first
     if (projectStorage?.isReady) {
       try {
-        const localBlob = await projectStorage.readBlob("source/book.pdf");
+        const localBlob = await projectStorage.readBlob(getSourcePath("pdf"));
         if (localBlob) {
           console.log("[EnsurePDF] Loading from local project");
           return await loadPdf(await localBlob.arrayBuffer());
@@ -1205,14 +1224,14 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
       // Cache locally for next time
       if (projectStorage?.isReady) {
-        projectStorage.writeBlob("source/book.pdf", blob).catch(() => {});
+        projectStorage.writeBlob(getSourcePath("pdf"), blob).catch(() => {});
       }
       return pdf;
     } catch (err) {
       console.warn("[EnsurePDF] Server download failed:", err);
       return null;
     }
-  }, [pdfRef, bookId, books, projectStorage]);
+  }, [pdfRef, bookId, books, projectStorage, fileName]);
 
   // ─── Reset ─────────────────────────────────────────────────
   const handleReset = useCallback(() => {
