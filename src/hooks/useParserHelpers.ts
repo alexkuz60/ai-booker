@@ -137,7 +137,7 @@ export function useParserHelpers({
       chapterTitle = `${parent.title} (Часть ${partNumber})`;
     }
 
-    saveStudioChapter({ chapterTitle, bookTitle: fileName.replace('.pdf', ''), bookId, scenes: allScenes });
+    saveStudioChapter({ chapterTitle, bookTitle: fileName.replace(/\.(pdf|docx?)$/i, ''), bookId, scenes: allScenes });
     navigate("/studio");
   }, [tocEntries, chapterResults, fileName, bookId, navigate]);
 

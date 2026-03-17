@@ -56,7 +56,7 @@ export async function autoSaveToLocal(
 ): Promise<void> {
   await syncStructureToLocal(storage, {
     bookId,
-    title: fileName.replace(".pdf", ""),
+    title: fileName.replace(/\.(pdf|docx?)$/i, ""),
     fileName,
     toc: snapshot.toc,
     parts: snapshot.parts,

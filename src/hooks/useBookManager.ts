@@ -13,6 +13,7 @@ import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parse
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
 import { syncStructureToLocal, readStructureFromLocal, readCharactersFromLocal, type LocalBookStructure } from "@/lib/localSync";
 import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
+import { detectFileFormat, getSourcePath, findSourceBlob, stripFileExtension, type FileFormat } from "@/lib/fileFormatUtils";
 
 
 interface UseBookManagerParams {
