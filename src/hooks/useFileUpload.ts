@@ -51,6 +51,8 @@ interface UseFileUploadParams {
   projectStorage?: ProjectStorage | null;
   createProject?: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<ProjectStorage>;
   bookId: string | null;
+  /** User-provided project name (from the UI input) */
+  pendingProjectName?: string | null;
   setStep: (s: Step) => void;
   setFileName: (s: string) => void;
   setBookId: (id: string | null) => void;
@@ -65,7 +67,7 @@ interface UseFileUploadParams {
 }
 
 export function useFileUpload({
-  userId, isRu, storageBackend, projectStorage, createProject, bookId,
+  userId, isRu, storageBackend, projectStorage, createProject, bookId, pendingProjectName,
   setStep, setFileName, setBookId, setTocEntries, setChapterIdMap,
   setPartIdMap, setChapterResults, setPdfRef, setTotalPages, setFile, setErrorMsg,
 }: UseFileUploadParams) {
@@ -88,6 +90,10 @@ export function useFileUpload({
       toast.error(t("maxSize", isRu));
       return;
     }
+
+    // Clear stale session data from previous uploads to prevent cross-book contamination
+    sessionStorage.removeItem("docx_chapter_texts");
+    sessionStorage.removeItem("docx_html");
 
     setFileName(f.name);
     setFile(f);
@@ -230,7 +236,7 @@ export function useFileUpload({
       if (!targetStorage && storageBackend === "opfs" && createProject) {
         try {
           targetStorage = await createProject(
-            stripFileExtension(f.name),
+            pendingProjectName || stripFileExtension(f.name),
             resolvedBookId,
             userId,
             isRu ? "ru" : "en",
@@ -251,7 +257,7 @@ export function useFileUpload({
         await targetStorage.writeJSON("project.json", {
           version: Number(existingMeta?.version) || 1,
           bookId: resolvedBookId,
-          title: f.name.replace(/\.(pdf|docx?)$/i, ''),
+          title: pendingProjectName || stripFileExtension(f.name),
           userId,
           createdAt: typeof existingMeta?.createdAt === "string" ? existingMeta.createdAt : new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -261,7 +267,7 @@ export function useFileUpload({
 
         await syncStructureToLocal(targetStorage, {
           bookId: resolvedBookId,
-          title: f.name.replace(/\.(pdf|docx?)$/i, ''),
+          title: pendingProjectName || stripFileExtension(f.name),
           fileName: f.name,
           toc: chapters,
           parts: partsArr,
@@ -293,7 +299,7 @@ export function useFileUpload({
     }
 
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [userId, isRu, projectStorage, storageBackend, createProject, bookId,
+  }, [userId, isRu, projectStorage, storageBackend, createProject, bookId, pendingProjectName,
       setStep, setFileName, setBookId, setTocEntries, setChapterIdMap,
       setPartIdMap, setChapterResults, setPdfRef, setTotalPages, setFile, setErrorMsg]);
 

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Upload, BookOpen, Library, Trash2, FolderOpen, Clock, Loader2 } from "lucide-react";
+import { Upload, BookOpen, Library, Trash2, FolderOpen, Clock, Loader2, Eraser } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,19 +18,48 @@ interface LibraryViewProps {
   onUpload: () => void;
   onOpen: (book: BookRecord) => void;
   onDelete: (bookId: string) => void;
+  onClearAll?: () => void;
 }
 
-export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onOpen, onDelete }: LibraryViewProps) {
+export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onOpen, onDelete, onClearAll }: LibraryViewProps) {
   return (
     <motion.div key="library" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
       className="flex-1 h-full overflow-auto">
       <div className="max-w-3xl mx-auto py-8 px-6 space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-xl font-semibold text-foreground">{t("libraryTitle", isRu)}</h2>
-          <Button variant="outline" size="sm" onClick={onUpload} className="gap-2">
-            <Upload className="h-4 w-4" />
-            {t("libraryUpload", isRu)}
-          </Button>
+          <div className="flex items-center gap-2">
+            {onClearAll && books.length > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-destructive hover:text-destructive">
+                    <Eraser className="h-3.5 w-3.5" />
+                    {isRu ? "Очистить всё" : "Clear all"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{isRu ? "Удалить все проекты?" : "Delete all projects?"}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {isRu
+                        ? "Все локальные проекты будут безвозвратно удалены из браузерного хранилища."
+                        : "All local projects will be permanently deleted from browser storage."}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{t("cancel", isRu)}</AlertDialogCancel>
+                    <AlertDialogAction onClick={onClearAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      {isRu ? "Удалить всё" : "Delete all"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            <Button variant="outline" size="sm" onClick={onUpload} className="gap-2">
+              <Upload className="h-4 w-4" />
+              {t("libraryUpload", isRu)}
+            </Button>
+          </div>
         </div>
 
         {loadingLibrary ? (

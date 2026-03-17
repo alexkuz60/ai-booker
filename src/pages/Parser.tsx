@@ -1,14 +1,11 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Bot, Library, PlusCircle, Network, FileText, Users, RefreshCw, CloudUpload } from "lucide-react";
+import { Bot, Library, PlusCircle, Network, FileText, Users, RefreshCw } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useAiRoles } from "@/hooks/useAiRoles";
@@ -45,8 +42,7 @@ export default function Parser() {
   const userApiKeys = useUserApiKeys();
   const [aiRolesOpen, setAiRolesOpen] = useState(false);
   const [parserTab, setParserTab] = useState<"structure" | "content" | "characters">("structure");
-  const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
-  const [newProjectName, setNewProjectName] = useState("");
+  const [pendingProjectName, setPendingProjectName] = useState<string | null>(null);
   const {
     backend: storageBackend,
     createProject,
@@ -89,10 +85,10 @@ export default function Parser() {
     step, setStep, books, loadingLibrary, fileName, errorMsg, bookId, uploadProgress,
     chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
     partIdMap, chapterResults, setChapterResults, fileInputRef,
-    openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset, reloadBook, ensurePdfLoaded,
+    openSavedBook, deleteBook, clearAllProjects, handleFileSelect, handleReset: bookReset, reloadBook, ensurePdfLoaded,
     reloadLibrary,
     serverNewerBookId, dismissServerNewer, acceptServerVersion,
-  } = useBookManager({ userId: user?.id, isRu, projectStorage, projectStorageInitialized, storageBackend, createProject });
+  } = useBookManager({ userId: user?.id, isRu, projectStorage, projectStorageInitialized, storageBackend, createProject, pendingProjectName });
 
   const {
     characters, extracting, extractProgress, extractCharacters,
@@ -411,6 +407,7 @@ export default function Parser() {
             <LibraryView
               isRu={isRu} books={books} loadingLibrary={loadingLibrary}
               onUpload={() => setStep("upload")} onOpen={openSavedBook} onDelete={deleteBook}
+              onClearAll={clearAllProjects}
             />
           )}
           {step === "upload" && (
@@ -419,20 +416,7 @@ export default function Parser() {
               fileInputRef={fileInputRef}
               onFileSelect={handleFileSelect}
               storageBackend={storageBackend}
-              onCreateLocalProject={() => {
-                setNewProjectName("");
-                setNewProjectDialogOpen(true);
-              }}
-              onOpenLocalProject={async () => {
-                try {
-                  const store = await openProject();
-                  toast({ title: isRu ? "Проект открыт" : "Project opened", description: store.projectName });
-                } catch (err: any) {
-                  if (err?.name !== "AbortError") {
-                    toast({ title: isRu ? "Ошибка" : "Error", description: String(err?.message || err), variant: "destructive" });
-                  }
-                }
-              }}
+              onCreateWithFile={(name) => setPendingProjectName(name)}
             />
           )}
           {step === "extracting_toc" && (
@@ -546,57 +530,8 @@ export default function Parser() {
         </SheetContent>
       </Sheet>
 
-      {/* ── New Project Name Dialog ── */}
-      <Dialog open={newProjectDialogOpen} onOpenChange={setNewProjectDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{isRu ? "Название проекта" : "Project Name"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label htmlFor="project-name">{isRu ? "Имя папки проекта" : "Project folder name"}</Label>
-            <Input
-              id="project-name"
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              placeholder={isRu ? "Моя книга" : "My Book"}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && newProjectName.trim()) {
-                  e.preventDefault();
-                  document.getElementById("create-project-btn")?.click();
-                }
-              }}
-            />
-            <p className="text-xs text-muted-foreground">
-              {storageBackend === "fs-access"
-                ? (isRu ? "Далее выберите родительскую папку на диске" : "Next you'll pick a parent folder on disk")
-                : (isRu ? "Проект будет сохранён в браузерном хранилище" : "Project will be saved in browser storage")}
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewProjectDialogOpen(false)}>
-              {isRu ? "Отмена" : "Cancel"}
-            </Button>
-            <Button
-              id="create-project-btn"
-              disabled={!newProjectName.trim()}
-              onClick={async () => {
-                setNewProjectDialogOpen(false);
-                try {
-                  await createProject(newProjectName.trim(), "", user?.id || "", isRu ? "ru" : "en");
-                  toast({ title: isRu ? "Проект создан" : "Project created", description: newProjectName.trim() });
-                } catch (err: any) {
-                  if (err?.name !== "AbortError") {
-                    toast({ title: isRu ? "Ошибка" : "Error", description: String(err?.message || err), variant: "destructive" });
-                  }
-                }
-              }}
-            >
-              {isRu ? "Создать" : "Create"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
+
 
       {/* ── Delete Confirmation Dialog ── */}
       <AlertDialog open={!!mutations.pendingDelete} onOpenChange={(open) => { if (!open) mutations.setPendingDelete(null); }}>

@@ -29,11 +29,12 @@ interface UseBookManagerParams {
   projectStorageInitialized?: boolean;
   storageBackend?: "fs-access" | "opfs" | "none";
   createProject?: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<ProjectStorage>;
+  pendingProjectName?: string | null;
 }
 
 export function useBookManager({
   userId, isRu, projectStorage, projectStorageInitialized = false,
-  storageBackend = "none", createProject,
+  storageBackend = "none", createProject, pendingProjectName,
 }: UseBookManagerParams) {
   // ── Shared state ──────────────────────────────────────────
   const [step, setStep] = useState<Step>(() =>
@@ -57,7 +58,7 @@ export function useBookManager({
   const library = useLibrary({ userId, storageBackend, projectStorage, step });
 
   const upload = useFileUpload({
-    userId, isRu, storageBackend, projectStorage, createProject, bookId,
+    userId, isRu, storageBackend, projectStorage, createProject, bookId, pendingProjectName,
     setStep, setFileName, setBookId, setTocEntries, setChapterIdMap,
     setPartIdMap, setChapterResults, setPdfRef, setTotalPages, setFile, setErrorMsg,
   });
@@ -178,6 +179,26 @@ export function useBookManager({
     }
   }, [isRu, storageBackend, library.localProjectNamesByBookId, bookId, library.loadLibrary]);
 
+  // ── Clear all local projects ──────────────────────────────
+  const clearAllProjects = useCallback(async () => {
+    try {
+      if (storageBackend === "opfs") {
+        const allProjects = await OPFSStorage.listProjects();
+        await Promise.all(allProjects.map((name) => OPFSStorage.deleteProject(name)));
+      }
+      sessionStorage.removeItem(ACTIVE_BOOK_KEY);
+      sessionStorage.removeItem("docx_chapter_texts");
+      sessionStorage.removeItem("docx_html");
+      setStep("library");
+      setBookId(null);
+      await library.loadLibrary();
+      toast.success(isRu ? "Все проекты удалены" : "All projects cleared");
+    } catch (err) {
+      console.error("Failed to clear projects:", err);
+      toast.error(isRu ? "Не удалось очистить" : "Failed to clear");
+    }
+  }, [storageBackend, isRu, library.loadLibrary]);
+
   // ── Reload book ───────────────────────────────────────────
   const reloadBook = useCallback(async () => {
     if (!bookId) return;
@@ -254,6 +275,7 @@ export function useBookManager({
     // Actions
     openSavedBook,
     deleteBook,
+    clearAllProjects,
     handleFileSelect: upload.handleFileSelect,
     handleReset,
     reloadBook,
