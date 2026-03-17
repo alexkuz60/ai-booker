@@ -890,7 +890,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
           } else {
             toast.info(t("tocNotFound", isRu));
             chapters = [{
-              title: f.name.replace('.pdf', ''),
+              title: stripFileExtension(f.name),
               startPage: 1,
               endPage: localTotalPages,
               level: 0,
