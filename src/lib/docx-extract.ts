@@ -21,6 +21,17 @@ export interface DocxExtractResult {
 
 const CHARS_PER_PAGE = 2000;
 
+/**
+ * Strip trailing tab/spaces + page number that DOCX TOC headings often contain.
+ * E.g. "Глава 01. ЛУЖА: РОЗЛИВ\t6" → "глава 01. лужа: розлив"
+ */
+function normalizeTocTitle(raw: string): string {
+  return raw
+    .replace(/[\t\s]+\d+\s*$/, "")  // trailing tab/space + digits
+    .trim()
+    .toLowerCase();
+}
+
 // ── Regex patterns for fallback TOC detection ──
 
 const CHAPTER_PATTERNS = [
@@ -77,11 +88,10 @@ export async function extractFromDocx(file: File): Promise<DocxExtractResult> {
     const headingInfos: { title: string; level: number; element: Element }[] = [];
     headings.forEach((h) => {
       const tagLevel = parseInt(h.tagName.substring(1), 10) - 1; // h1→0, h2→1, h3→2
-      headingInfos.push({
-        title: h.textContent?.trim() || "Untitled",
-        level: tagLevel,
-        element: h,
-      });
+      const rawTitle = h.textContent?.trim() || "Untitled";
+      // Strip trailing TOC page numbers (e.g. "Глава 1\t6" → "Глава 1")
+      const title = rawTitle.replace(/[\t\s]+\d+\s*$/, "").trim() || rawTitle;
+      headingInfos.push({ title, level: tagLevel, element: h });
     });
 
     // Build TocEntry list and extract text between headings
@@ -117,7 +127,7 @@ export async function extractFromDocx(file: File): Promise<DocxExtractResult> {
     const seen = new Map<string, number>(); // title → index in `filtered`
     const filtered: typeof nonEmpty = [];
     for (const entry of nonEmpty) {
-      const key = entry.title.trim().toLowerCase();
+      const key = normalizeTocTitle(entry.title);
       const prevIdx = seen.get(key);
       if (prevIdx !== undefined) {
         // Replace if new entry has more content
