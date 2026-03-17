@@ -580,6 +580,13 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         } catch (pdfErr) {
           console.warn("Could not restore PDF for analysis:", pdfErr);
         }
+      } else if (book.file_path) {
+        // B8 fix: PDF was expected (file_path exists) but blob download failed
+        toast.warning(
+          isRu
+            ? "PDF-файл не найден на сервере. Анализ будет недоступен до повторной загрузки."
+            : "PDF file not found on server. Analysis unavailable until re-upload."
+        );
       }
 
       setPdfRef(restoredPdf);
