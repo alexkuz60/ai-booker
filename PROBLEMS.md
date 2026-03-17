@@ -28,19 +28,16 @@
 
 ---
 
-## В. Маршрутизация ИИ-провайдеров в Edge Functions
+## В. Маршрутизация ИИ-провайдеров в Edge Functions — ✅ РЕШЕНО
 
-**Проблема:** `extract-characters` обновлён для роутинга через пользовательские ключи (OpenRouter / ProxyAPI). Но остальные аналитические функции работают **только** через Lovable Gateway (admin-ключ):
-- `segment-scene`
-- `profile-characters`
-- `detect-inline-narrations`
-- `generate-atmosphere-prompt`
+**Финальная формулировка (записана в ARCHITECTURE.md §3):**
 
-**Что не определено:**
-1. Должны ли все edge functions поддерживать пользовательский роутинг? Или часть остаётся admin-only?
-2. Если пользователь задал свой OpenRouter-ключ, но вызывает `segment-scene` — что происходит? Молчаливый фоллбек на Lovable Gateway? Ошибка?
-
-**Статус:** 🔴 Ожидает обсуждения
+- Все edge functions должны поддерживать пользовательский роутинг (клиент передаёт `model` + `apiKey`).
+- Lovable AI — высший приоритет **только для админов**.
+- Для пользователей приоритет: директ-подписка → OpenRouter → DotPoint ≡ ProxyAPI.
+- Фоллбек на сервере **не выполняется** — ошибка возвращается клиенту, клиент ищет аналог по пользовательским спискам.
+- TTS-модели имеют отдельную логику (будет определена позже).
+- **Текущий статус реализации:** `extract-characters` и `parse-book-structure` поддерживают роутинг; `segment-scene`, `profile-characters`, `detect-inline-narrations`, `generate-atmosphere-prompt` — требуют обновления.
 
 ---
 
