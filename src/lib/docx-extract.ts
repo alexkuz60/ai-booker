@@ -101,7 +101,7 @@ export async function extractFromDocx(file: File): Promise<DocxExtractResult> {
       chapterTexts.set(i, chapterHtml);
 
       // Estimate "page number" from character offset
-      const offsetChars = getTextBefore(doc.body, info.element).length;
+      const offsetChars = getCharOffsetBefore(doc.body, info.element);
       const pageNumber = Math.max(1, Math.ceil(offsetChars / CHARS_PER_PAGE));
 
       outline.push({
