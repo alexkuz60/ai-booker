@@ -273,10 +273,11 @@ function canFallbackToOpenRouter(userApiKey: string | null, model: string): { en
 
 /** Core AI request handler */
 async function handleAIRequest(
-  truncatedText: string, endpoint: string, model: string, apiKey: string,
+  inputText: string, endpoint: string, model: string, apiKey: string,
   provider: string, mode: string | undefined, chapterTitle: string | undefined,
   openrouterApiKey: string | null, lang: string = 'en', userId: string | null = null
 ): Promise<Response> {
+  let truncatedText = inputText;
   let systemPrompt: string;
   let userContent: string;
   let tools: unknown[];
@@ -342,6 +343,25 @@ async function handleAIRequest(
   const MAX_TOOL_RETRIES = 2;
   let lastMsg: unknown = null;
 
+  // Model-specific context limits (in characters, rough estimate: 1 token ≈ 3.5 chars for Russian)
+  const CONTEXT_CHAR_LIMITS: Record<string, number> = {
+    'deepseek/deepseek-chat': 55000,
+    'deepseek/deepseek-reasoner': 55000,
+  };
+
+  // Check if text might exceed model context — pre-truncate for known models
+  const charLimit = CONTEXT_CHAR_LIMITS[model];
+  if (charLimit && truncatedText.length > charLimit && mode === 'boundaries') {
+    console.warn(`[parse-book-structure] Pre-truncating text from ${truncatedText.length} to ${charLimit} chars for ${model}`);
+    truncatedText = truncatedText.slice(0, charLimit);
+    // Update userContent with truncated text
+    userContent = `Split the following chapter "${chapterTitle || 'Untitled'}" into scenes. Return boundaries and complete text only:\n\n${truncatedText}`;
+    requestBody.messages = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userContent },
+    ];
+  }
+
   for (let toolAttempt = 0; toolAttempt < MAX_TOOL_RETRIES; toolAttempt++) {
     const t0 = performance.now();
     let response = await callAI(endpoint, model, apiKey, provider);
@@ -354,6 +374,35 @@ async function handleAIRequest(
         await response.text();
         response = await callAI(fallback.endpoint, fallback.model, fallback.apiKey, 'openrouter');
       }
+    }
+
+    // Handle 400 context-length errors: try truncating text and retrying once
+    if (response.status === 400 && toolAttempt === 0) {
+      const errBody = await response.text();
+      if (errBody.includes('context length') || errBody.includes('too many tokens') || errBody.includes('maximum')) {
+        console.warn(`[parse-book-structure] Context length exceeded for ${model}, truncating to 50% and retrying`);
+        const halfLen = Math.floor(truncatedText.length / 2);
+        truncatedText = truncatedText.slice(0, halfLen);
+        if (mode === 'boundaries') {
+          userContent = `Split the following chapter "${chapterTitle || 'Untitled'}" into scenes. Return boundaries and complete text only:\n\n${truncatedText}`;
+        } else if (mode === 'enrich') {
+          userContent = `Analyze the following scene text and determine its type, mood, and tempo:\n\n${truncatedText}`;
+        } else if (mode === 'chapter') {
+          userContent = `Analyze the following chapter "${chapterTitle || 'Untitled'}" and decompose it into scenes:\n\n${truncatedText}`;
+        } else {
+          userContent = `Analyze the following book text and decompose it into chapters and scenes:\n\n${truncatedText}`;
+        }
+        requestBody.messages = [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ];
+        continue; // retry with shorter text
+      }
+      // Not a context error — fall through to normal error handling
+      console.error("AI error:", 400, "model:", model, "provider:", provider, errBody);
+      if (userId) logAiUsage({ userId, modelId: model, requestType: `parse-structure${mode ? `-${mode}` : ''}`, status: "error", latencyMs: Math.round(performance.now() - t0), errorMessage: `HTTP 400` });
+      return new Response(JSON.stringify({ error: `AI analysis failed (400)` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (!response.ok) {
