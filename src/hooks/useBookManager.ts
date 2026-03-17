@@ -940,15 +940,16 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         }));
         syncStructureToLocal(projectStorage, {
           bookId: book.id,
-          title: f.name.replace('.pdf', ''),
+          title: f.name.replace(/\.(pdf|docx?)$/i, ''),
           fileName: f.name,
           toc: chapters,
           parts: partsArr,
           chapterIdMap: newChapterIdMap,
           chapterResults: initMap,
         });
-        // Also save the source PDF locally
-        projectStorage.writeBlob("source/book.pdf", f).catch(() => {});
+        // Save the source file locally
+        const localSourceName = isDocx ? "source/book.docx" : "source/book.pdf";
+        projectStorage.writeBlob(localSourceName, f).catch(() => {});
       }
 
       setStep("workspace");
