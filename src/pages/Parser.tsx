@@ -86,7 +86,7 @@ export default function Parser() {
   });
 
   const {
-    step, setStep, books, loadingLibrary, fileName, errorMsg, bookId,
+    step, setStep, books, loadingLibrary, fileName, errorMsg, bookId, uploadProgress,
     chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
     partIdMap, chapterResults, setChapterResults, fileInputRef,
     openSavedBook, deleteBook, handleFileSelect, handleReset: bookReset, reloadBook, ensurePdfLoaded,
