@@ -89,6 +89,10 @@ export function useFileUpload({
       return;
     }
 
+    // Clear stale session data from previous uploads to prevent cross-book contamination
+    sessionStorage.removeItem("docx_chapter_texts");
+    sessionStorage.removeItem("docx_html");
+
     setFileName(f.name);
     setFile(f);
     setStep("extracting_toc");
