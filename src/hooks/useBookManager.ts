@@ -1062,10 +1062,28 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       }
     }
 
-    // 2. Fallback: download from server
-    const book = books.find(b => b.id === bookId);
-    const filePath = book?.file_path;
-    if (!filePath) return null;
+    // 2. Fallback: query file_path from DB directly (books state may be empty on restore)
+    let filePath: string | null = null;
+    const bookInState = books.find(b => b.id === bookId);
+    if (bookInState?.file_path) {
+      filePath = bookInState.file_path;
+    } else {
+      try {
+        const { data } = await supabase
+          .from("books")
+          .select("file_path")
+          .eq("id", bookId)
+          .maybeSingle();
+        filePath = data?.file_path || null;
+      } catch (err) {
+        console.warn("[EnsurePDF] DB lookup failed:", err);
+      }
+    }
+
+    if (!filePath) {
+      console.warn("[EnsurePDF] No file_path found for book", bookId);
+      return null;
+    }
 
     try {
       console.log("[EnsurePDF] Downloading from server");
