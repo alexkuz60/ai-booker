@@ -166,6 +166,7 @@ export default function Parser() {
     tocEntries, chapterIdMap, chapterResults, setChapterResults,
     onChapterResultsMutated: scheduleSave,
     ensurePdfLoaded,
+    fileFormat: projectMeta?.fileFormat || null,
   });
 
 
