@@ -229,17 +229,24 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     try {
       // Load local + server in parallel, merge once
       const [localBooks, serverBooks] = await Promise.all([
-        loadLocalLibrary().catch(() => [] as BookRecord[]),
+        loadLocalLibrary().catch((err) => {
+          console.warn("[Library] Local fetch failed:", err);
+          return [] as BookRecord[];
+        }),
         loadLibraryFromServer().catch((err) => {
           console.warn("[Library] Server fetch failed:", err);
           return [] as BookRecord[];
         }),
       ]);
 
+      console.log("[Library] local:", localBooks.length, "server:", serverBooks.length);
+
       // Merge: local takes priority, append server-only books
       const localIds = new Set(localBooks.map(b => b.id));
       const serverOnly = serverBooks.filter(sb => !localIds.has(sb.id));
-      setBooks([...localBooks, ...serverOnly]);
+      const merged = [...localBooks, ...serverOnly];
+      console.log("[Library] merged:", merged.length, "ids:", merged.map(b => b.id));
+      setBooks(merged);
     } catch (err) {
       console.error("Failed to load library:", err);
       setBooks([]);
