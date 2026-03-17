@@ -102,3 +102,56 @@
 - Не блокировать разработку отсутствием полного реестра. Вместо этого — фиксировать маппинг *по мере реализации* каждой фичи в `ARCHITECTURE.md`.
 - Ввести в `aiRoles.ts` поле `edgeFunctions?: string[]` для каждой роли — заполнять по мере подключения.
 - Чётко разделять: что делает AI-роль vs что делает хардкодовый алгоритм (regex, heuristics). Гибридные шаги документировать отдельно.
+
+---
+
+## З. Баги файлового пайплайна Парсера (аудит 2026-03-17)
+
+> Результат полного аудита логики работы с файлами, контентом, анализом и хранением.
+> Статус: 🔴 В работе
+
+### Реестр багов
+
+| ID | Описание | Файл | Серьёзность |
+|----|----------|------|-------------|
+| **B1** | `reloadBook` + `handleFileSelect`: после Reload код делает **INSERT** новой записи `books` вместо **UPDATE** существующей → дубликат в библиотеке | `useBookManager.ts:866-891` vs `:1010-1049` | 🔴 Критично |
+| **B2** | PDF folder-ноды не помечаются `done` при свежей загрузке → висят как `pending` навсегда | `useBookManager.ts:945-966` | 🟡 Средне |
+| **B3** | `reloadBook` не очищает `sessionStorage` от DOCX-данных (`docx_chapter_texts`, `docx_html`) → мусорные данные при смене формата | `useBookManager.ts:1010-1049` | 🟡 Средне |
+| **B4** | При обновлении страницы для DOCX-книги `pdfRef = null`, `file_path = null`. Нет флага «это DOCX» → анализ вызывает `ensurePdfLoaded()` → null → «PDF не загружен» | `useChapterAnalysis.ts` + `useBookManager.ts:1052` | 🔴 Критично |
+| **B5** | `mergeOutlineWithTextToc` при наличии новых текстовых записей **уплощает всю иерархию** outline (`flatten()` → `children: []`) → пропадают контейнерные узлы (Акт 3, Акт 4) | `pdf-extract.ts:452-458` | 🔴 Критично |
+| **B6** | `handleFileSelect` не проверяет «существует ли уже bookId?» → безусловный INSERT (= B1, другой ракурс) | `useBookManager.ts:886-891` | 🔴 = B1 |
+| **B7** | `ensurePdfLoaded` ищет `file_path` в `books` state, но после `restoreFromLocal` этот state пуст; для DOCX `file_path = null` → всегда null | `useBookManager.ts:1077-1093` | 🟡 Связан с B4 |
+| **B8** | `openSavedBook` с сервера: если PDF удалён или книга DOCX → `pdfBlob = null`, код продолжает без ошибки, но анализ позже падает | `useBookManager.ts:504-510` | 🟡 Средне |
+
+### План исправлений (порядок работы)
+
+#### Волна 1 — Критичные (блокируют пользователей)
+
+**B5: Merge уничтожает иерархию PDF outline**
+- Корень: `mergeOutlineWithTextToc` вызывает `flatten(outline)` → теряет `children`
+- Исправление: вставлять новые текстовые записи в существующую иерархию, не уплощая outline
+- Файл: `src/lib/pdf-extract.ts`
+
+**B1/B6: Reload → дубликат книги**
+- Корень: `handleFileSelect` всегда делает INSERT, не учитывая текущий `bookId`
+- Исправление: если `bookId` уже существует → UPDATE `books` + удалить старые chapters/parts/scenes, а не создавать новую запись
+- Файл: `src/hooks/useBookManager.ts`
+
+**B4/B7: DOCX-mode теряется после page refresh**
+- Корень: нет персистентного признака «книга = DOCX» (ни в локале, ни в state)
+- Исправление: сохранять `fileFormat: "pdf" | "docx"` в `project.json` и `structure/toc.json`; `useChapterAnalysis` проверяет формат перед вызовом `ensurePdfLoaded`
+- Файлы: `useBookManager.ts`, `useChapterAnalysis.ts`, `localSync.ts`
+
+#### Волна 2 — Средние (UX-проблемы)
+
+**B2: Folder-ноды остаются pending**
+- Исправление: в `handleFileSelect` после `sanitizeChapterResultsForStructure` дополнительно пройти по всем folder-нодам и выставить `done`
+- Файл: `src/hooks/useBookManager.ts`
+
+**B3: sessionStorage не очищается при reload**
+- Исправление: `reloadBook` должен удалять `docx_chapter_texts`, `docx_html`
+- Файл: `src/hooks/useBookManager.ts`
+
+**B8: Молчаливый null при отсутствии PDF на сервере**
+- Исправление: если `pdfBlob = null` и книга НЕ DOCX → показать toast-предупреждение
+- Файл: `src/hooks/useBookManager.ts`
