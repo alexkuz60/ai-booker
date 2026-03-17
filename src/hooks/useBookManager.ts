@@ -940,7 +940,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       const newPartIdMap = new Map<string, string>();
       for (let i = 0; i < uniqueParts.length; i++) {
         const { data: partRow } = await supabase
-          .from('book_parts').insert({ book_id: book.id, part_number: i + 1, title: uniqueParts[i] })
+          .from('book_parts').insert({ book_id: resolvedBookId, part_number: i + 1, title: uniqueParts[i] })
           .select('id').single();
         if (partRow) newPartIdMap.set(uniqueParts[i], partRow.id);
       }
