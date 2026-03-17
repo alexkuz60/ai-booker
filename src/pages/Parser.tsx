@@ -39,6 +39,8 @@ export default function Parser() {
   const { user } = useAuth();
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const userApiKeys = useUserApiKeys();
   const [aiRolesOpen, setAiRolesOpen] = useState(false);
@@ -51,6 +53,7 @@ export default function Parser() {
     storage: projectStorage,
     initialized: projectStorageInitialized,
     meta: projectMeta,
+    hardResetLocalData,
   } = useProjectStorageContext();
   const { getModelForRole } = useAiRoles(userApiKeys);
   const { toast } = useToast();
