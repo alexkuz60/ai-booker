@@ -70,6 +70,9 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
   const [chapterResults, setChapterResults] = useState<Map<number, { scenes: Scene[]; status: ChapterStatus }>>(new Map());
   const [localProjectNamesByBookId, setLocalProjectNamesByBookId] = useState<Map<string, string[]>>(new Map());
 
+  // Upload progress tracking
+  const [uploadProgress, setUploadProgress] = useState<{ step: number; totalSteps: number; message: string } | null>(null);
+
   type LocalLibraryCandidate = {
     record: BookRecord;
     projectName: string;
@@ -580,6 +583,13 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         } catch (pdfErr) {
           console.warn("Could not restore PDF for analysis:", pdfErr);
         }
+      } else if (book.file_path) {
+        // B8 fix: PDF was expected (file_path exists) but blob download failed
+        toast.warning(
+          isRu
+            ? "PDF-файл не найден на сервере. Анализ будет недоступен до повторной загрузки."
+            : "PDF file not found on server. Analysis unavailable until re-upload."
+        );
       }
 
       setPdfRef(restoredPdf);
@@ -778,6 +788,10 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     setFile(f);
     setStep("extracting_toc");
     setErrorMsg("");
+    const totalSteps = 6;
+    const progress = (step: number, msgRu: string, msgEn: string) =>
+      setUploadProgress({ step, totalSteps, message: isRu ? msgRu : msgEn });
+    progress(1, "Извлечение структуры документа...", "Extracting document structure...");
 
     try {
       let chapters: TocChapter[] = [];
@@ -857,6 +871,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
       chapters = normalizeTocRanges(normalizeLevels(chapters), localTotalPages);
       setTocEntries(chapters);
+      progress(2, "Подготовка базы данных...", "Preparing database...");
 
       // B1/B6 fix: if bookId already exists (reload flow), UPDATE instead of INSERT
       const isReload = !!bookId;
@@ -881,6 +896,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         }
       }
 
+      progress(3, isPdf ? "Загрузка PDF на сервер..." : "Сохранение книги...", isPdf ? "Uploading PDF to server..." : "Saving book...");
       if (isPdf && filePath) {
         await supabase.storage.from('book-uploads').upload(filePath, f);
       }
@@ -936,6 +952,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         ]);
       }
 
+      progress(4, "Создание структуры глав...", "Creating chapter structure...");
       const uniqueParts = [...new Set(chapters.map(c => c.partTitle).filter(Boolean))] as string[];
       const newPartIdMap = new Map<string, string>();
       for (let i = 0; i < uniqueParts.length; i++) {
@@ -997,6 +1014,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       setChapterResults(initMap);
 
       // ── Dual-write: sync to local project ──
+      progress(5, "Сохранение в локальное хранилище...", "Saving to local storage...");
       if (projectStorage?.isReady && resolvedBookId) {
         const partsArr = uniqueParts.map((title, i) => ({
           id: newPartIdMap.get(title) || "",
@@ -1025,8 +1043,9 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
           }
         } catch {}
       }
-
+      progress(6, "Готово!", "Done!");
       setStep("workspace");
+      setUploadProgress(null);
     } catch (err: any) {
       console.error("Parser error:", err);
       const msg = err.message || "Unknown error";
@@ -1039,6 +1058,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       else userErr = msg;
       setErrorMsg(userErr);
       setStep("error");
+      setUploadProgress(null);
       toast.error(userErr, { duration: 8000 });
     }
 
@@ -1175,7 +1195,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
   return {
     // State
-    step, setStep, books, loadingLibrary, fileName, errorMsg, bookId,
+    step, setStep, books, loadingLibrary, fileName, errorMsg, bookId, uploadProgress,
     partIdMap, chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
     chapterResults, setChapterResults, fileInputRef,
     // Actions
