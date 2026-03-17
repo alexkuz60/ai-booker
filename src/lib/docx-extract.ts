@@ -88,11 +88,10 @@ export async function extractFromDocx(file: File): Promise<DocxExtractResult> {
     const headingInfos: { title: string; level: number; element: Element }[] = [];
     headings.forEach((h) => {
       const tagLevel = parseInt(h.tagName.substring(1), 10) - 1; // h1→0, h2→1, h3→2
-      headingInfos.push({
-        title: h.textContent?.trim() || "Untitled",
-        level: tagLevel,
-        element: h,
-      });
+      const rawTitle = h.textContent?.trim() || "Untitled";
+      // Strip trailing TOC page numbers (e.g. "Глава 1\t6" → "Глава 1")
+      const title = rawTitle.replace(/[\t\s]+\d+\s*$/, "").trim() || rawTitle;
+      headingInfos.push({ title, level: tagLevel, element: h });
     });
 
     // Build TocEntry list and extract text between headings
