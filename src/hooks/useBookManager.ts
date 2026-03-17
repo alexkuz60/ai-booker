@@ -867,7 +867,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       await supabase.storage.from('book-uploads').upload(filePath, f);
       const { data: book, error: bookErr } = await supabase
         .from('books')
-        .insert({ user_id: userId, title: f.name.replace('.pdf', ''), file_name: f.name, file_path: filePath, status: 'uploaded' })
+        .insert({ user_id: userId, title: f.name.replace(/\.(pdf|docx?)$/i, ''), file_name: f.name, file_path: isPdf ? filePath : null, status: 'uploaded' })
         .select('id').single();
       if (bookErr) throw bookErr;
       setBookId(book.id);
