@@ -54,8 +54,8 @@ describe("localSync roundtrip", () => {
     chapterIdMap.set(1, "ch-1");
     chapterIdMap.set(2, "ch-2");
 
-    const chapterResults = new Map<number, { scenes: Scene[]; status: "done" as const }>();
-    chapterResults.set(1, { scenes: sampleScenes, status: "done" });
+    const chapterResults = new Map<number, { scenes: Scene[]; status: "done" }>();
+    chapterResults.set(1, { scenes: sampleScenes, status: "done" as const });
 
     await syncStructureToLocal(storage, {
       bookId: "b1",
