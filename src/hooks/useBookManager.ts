@@ -275,6 +275,7 @@ export function useBookManager({
     // Actions
     openSavedBook,
     deleteBook,
+    clearAllProjects,
     handleFileSelect: upload.handleFileSelect,
     handleReset,
     reloadBook,
