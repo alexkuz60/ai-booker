@@ -532,57 +532,8 @@ export default function Parser() {
         </SheetContent>
       </Sheet>
 
-      {/* ── New Project Name Dialog ── */}
-      <Dialog open={newProjectDialogOpen} onOpenChange={setNewProjectDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{isRu ? "Название проекта" : "Project Name"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label htmlFor="project-name">{isRu ? "Имя папки проекта" : "Project folder name"}</Label>
-            <Input
-              id="project-name"
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              placeholder={isRu ? "Моя книга" : "My Book"}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && newProjectName.trim()) {
-                  e.preventDefault();
-                  document.getElementById("create-project-btn")?.click();
-                }
-              }}
-            />
-            <p className="text-xs text-muted-foreground">
-              {storageBackend === "fs-access"
-                ? (isRu ? "Далее выберите родительскую папку на диске" : "Next you'll pick a parent folder on disk")
-                : (isRu ? "Проект будет сохранён в браузерном хранилище" : "Project will be saved in browser storage")}
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewProjectDialogOpen(false)}>
-              {isRu ? "Отмена" : "Cancel"}
-            </Button>
-            <Button
-              id="create-project-btn"
-              disabled={!newProjectName.trim()}
-              onClick={async () => {
-                setNewProjectDialogOpen(false);
-                try {
-                  await createProject(newProjectName.trim(), "", user?.id || "", isRu ? "ru" : "en");
-                  toast({ title: isRu ? "Проект создан" : "Project created", description: newProjectName.trim() });
-                } catch (err: any) {
-                  if (err?.name !== "AbortError") {
-                    toast({ title: isRu ? "Ошибка" : "Error", description: String(err?.message || err), variant: "destructive" });
-                  }
-                }
-              }}
-            >
-              {isRu ? "Создать" : "Create"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
+
 
       {/* ── Delete Confirmation Dialog ── */}
       <AlertDialog open={!!mutations.pendingDelete} onOpenChange={(open) => { if (!open) mutations.setPendingDelete(null); }}>
