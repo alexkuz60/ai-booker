@@ -95,7 +95,9 @@ export function useChapterAnalysis({
     } catch { return null; }
   };
 
+  // B4/B7 fix: check persisted fileFormat first, then fall back to sessionStorage
   const isDocxMode = (): boolean => {
+    if (fileFormat === "docx") return true;
     return sessionStorage.getItem("docx_chapter_texts") !== null;
   };
 
