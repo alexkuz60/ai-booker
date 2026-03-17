@@ -179,6 +179,26 @@ export function useBookManager({
     }
   }, [isRu, storageBackend, library.localProjectNamesByBookId, bookId, library.loadLibrary]);
 
+  // ── Clear all local projects ──────────────────────────────
+  const clearAllProjects = useCallback(async () => {
+    try {
+      if (storageBackend === "opfs") {
+        const allProjects = await OPFSStorage.listProjects();
+        await Promise.all(allProjects.map((name) => OPFSStorage.deleteProject(name)));
+      }
+      sessionStorage.removeItem(ACTIVE_BOOK_KEY);
+      sessionStorage.removeItem("docx_chapter_texts");
+      sessionStorage.removeItem("docx_html");
+      setStep("library");
+      setBookId(null);
+      await library.loadLibrary();
+      toast.success(isRu ? "Все проекты удалены" : "All projects cleared");
+    } catch (err) {
+      console.error("Failed to clear projects:", err);
+      toast.error(isRu ? "Не удалось очистить" : "Failed to clear");
+    }
+  }, [storageBackend, isRu, library.loadLibrary]);
+
   // ── Reload book ───────────────────────────────────────────
   const reloadBook = useCallback(async () => {
     if (!bookId) return;
