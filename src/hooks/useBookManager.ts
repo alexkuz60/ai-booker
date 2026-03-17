@@ -1058,6 +1058,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       else userErr = msg;
       setErrorMsg(userErr);
       setStep("error");
+      setUploadProgress(null);
       toast.error(userErr, { duration: 8000 });
     }
 
