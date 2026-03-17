@@ -59,7 +59,7 @@ export interface ProjectMeta {
   createdAt: string;
   updatedAt: string;
   language: "ru" | "en";
-  /** File format of the source book — persisted for B4/B7 fix */
+  /** File format of the source book — strict type from fileFormatUtils */
   fileFormat?: "pdf" | "docx";
 }
 
