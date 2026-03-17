@@ -121,7 +121,7 @@
 | **B5** | ~~`mergeOutlineWithTextToc` уплощает иерархию outline~~ | `pdf-extract.ts` | ✅ Исправлено |
 | **B6** | ~~`handleFileSelect` безусловный INSERT (= B1)~~ | `useBookManager.ts` | ✅ = B1 Исправлено |
 | **B7** | ~~`ensurePdfLoaded` для DOCX → null~~ (связан с B4) | `useBookManager.ts` | ✅ Исправлено |
-| **B8** | `openSavedBook` с сервера: если PDF удалён или книга DOCX → `pdfBlob = null`, код продолжает без ошибки, но анализ позже падает | `useBookManager.ts:504-510` | 🟡 Средне |
+| **B8** | ~~`openSavedBook`: если PDF отсутствует на сервере → молчаливый null~~ — добавлен toast-warning | `useBookManager.ts` | ✅ Исправлено |
 | **B9** | ~~Библиотека читает `toc.json` и запрашивает сервер без необходимости~~ | `useBookManager.ts` | ✅ Исправлено |
 | **B10** | ~~`openSavedBook` не проверяет серверный таймстамп при ручном открытии~~ | `useBookManager.ts` | ✅ Исправлено |
 | **B11** | ~~`restoreFromLocal` не читает `structure/characters.json`~~ — загрузка персонажей обеспечивается `useParserCharacters` | `useBookManager.ts` | ✅ Исправлено |
