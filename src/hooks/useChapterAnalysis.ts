@@ -263,7 +263,11 @@ export function useChapterAnalysis({
           return;
         }
 
-        addLog(`${t("logExtracted", isRu)}: ${charCount.toLocaleString()} ${t("logChars", isRu)} (${effectiveStartPage}–${effectiveEndPage} ${t("logPagesAbbr", isRu)})`);
+        if (docxMode) {
+          addLog(`${t("logExtracted", isRu)}: ${charCount.toLocaleString()} ${t("logChars", isRu)}`);
+        } else {
+          addLog(`${t("logExtracted", isRu)}: ${charCount.toLocaleString()} ${t("logChars", isRu)} (${entry.startPage}–${entry.endPage} ${t("logPagesAbbr", isRu)})`);
+        }
         addLog(t("logStage1", isRu));
         const screenwriterBody = buildBaseBody("screenwriter");
         addLog(`${t("logCallingAI", isRu)} ${screenwriterBody._modelName.split('/').pop()}...`);
