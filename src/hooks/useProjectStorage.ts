@@ -203,6 +203,26 @@ export function useProjectStorage(): UseProjectStorageReturn {
     try { localStorage.removeItem(LAST_PROJECT_KEY); } catch {}
   }, []);
 
+  const hardResetLocalData = useCallback(async () => {
+    setLoading(true);
+    try {
+      setStorage(null);
+      setMeta(null);
+
+      if (backend === "opfs") {
+        const projectNames = await OPFSStorage.listProjects();
+        await Promise.all(projectNames.map((projectName) => OPFSStorage.deleteProject(projectName)));
+      }
+
+      for (const key of LOCAL_RESET_KEYS) {
+        try { localStorage.removeItem(key); } catch {}
+        try { sessionStorage.removeItem(key); } catch {}
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [backend]);
+
   // ── Source file helpers (PDF or DOCX) ────────────────────
 
   const saveSourceFile = useCallback(async (file: File) => {
