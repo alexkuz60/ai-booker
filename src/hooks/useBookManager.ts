@@ -305,23 +305,34 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         chapterResults: sanitizedLocalResults,
       });
 
-      // ── Restore PDF from local project (async, non-blocking) ──
-      projectStorage.readBlob("source/book.pdf").then(async (pdfBlob) => {
-        if (!pdfBlob) {
-          console.log("[LocalRestore] No local PDF found, will download on demand");
-          return;
-        }
-        try {
-          const arrayBuffer = await pdfBlob.arrayBuffer();
-          const { getDocument } = await import("pdfjs-dist");
-          const pdf = await getDocument({ data: arrayBuffer }).promise;
-          setPdfRef(pdf);
-          setTotalPages(pdf.numPages);
-          console.log(`[LocalRestore] PDF restored locally: ${pdf.numPages} pages`);
-        } catch (pdfErr) {
-          console.warn("[LocalRestore] Failed to parse local PDF:", pdfErr);
-        }
-      });
+      // ── Restore source file from local project (async, non-blocking) ──
+      // Detect format from project.json or file name
+      const localMeta = await projectStorage.readJSON<Record<string, unknown>>("project.json");
+      const localFormat: FileFormat = (localMeta?.fileFormat as FileFormat) || detectFileFormat(structure.fileName);
+
+      if (localFormat === "pdf") {
+        // Only try to load PDF proxy for PDF books
+        const sourcePath = getSourcePath(localFormat);
+        projectStorage.readBlob(sourcePath).then(async (pdfBlob) => {
+          if (!pdfBlob) {
+            console.log("[LocalRestore] No local PDF found, will download on demand");
+            return;
+          }
+          try {
+            const arrayBuffer = await pdfBlob.arrayBuffer();
+            const { getDocument } = await import("pdfjs-dist");
+            const pdf = await getDocument({ data: arrayBuffer }).promise;
+            setPdfRef(pdf);
+            setTotalPages(pdf.numPages);
+            console.log(`[LocalRestore] PDF restored locally: ${pdf.numPages} pages`);
+          } catch (pdfErr) {
+            console.warn("[LocalRestore] Failed to parse local PDF:", pdfErr);
+          }
+        });
+      } else {
+        // DOCX: no PDF proxy needed, chapter texts are in sessionStorage
+        console.log("[LocalRestore] DOCX book — skipping PDF proxy restore");
+      }
 
       console.log(`[LocalRestore] Restored from local: ${structure.toc.length} chapters, ${localResults.size} results`);
       toast.success(
