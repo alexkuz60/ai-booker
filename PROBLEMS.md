@@ -127,6 +127,7 @@
 | **B11** | ~~`restoreFromLocal` не читает `structure/characters.json`~~ — загрузка персонажей обеспечивается `useParserCharacters` | `useBookManager.ts` | ✅ Исправлено |
 | **B12** | ~~`acceptServerVersion` не заменяет локалку серверной копией~~ | `useBookManager.ts` | ✅ Исправлено |
 | **B13** | ~~`openSavedBook` делает `upsert(rangeFixes)` — побочный эффект записи при чтении~~ | `useBookManager.ts` | ✅ Исправлено |
+| **B14** | ~~Хардкод `source/book.pdf` во всех хуках — DOCX-книги не находят свой исходный файл при восстановлении, загрузке на сервер и `ensurePdfLoaded`~~ | `useBookManager.ts`, `useSaveBookToProject.ts`, `useProjectStorage.ts` | ✅ Исправлено |
 
 ### Правильная логика операций (эталон)
 
