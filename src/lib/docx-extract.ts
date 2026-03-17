@@ -108,10 +108,29 @@ export async function extractFromDocx(file: File): Promise<DocxExtractResult> {
 
     // Filter out empty structural headings (book title, author, etc.)
     const MIN_CONTENT_CHARS = 20;
-    const filtered = rawEntries.filter((e) => {
+    const nonEmpty = rawEntries.filter((e) => {
       const textLen = e.html.replace(/<[^>]*>/g, "").trim().length;
       return textLen >= MIN_CONTENT_CHARS;
     });
+
+    // Deduplicate headings with identical titles — keep the one with most content
+    const seen = new Map<string, number>(); // title → index in `filtered`
+    const filtered: typeof nonEmpty = [];
+    for (const entry of nonEmpty) {
+      const key = entry.title.trim().toLowerCase();
+      const prevIdx = seen.get(key);
+      if (prevIdx !== undefined) {
+        // Replace if new entry has more content
+        const prevLen = filtered[prevIdx].html.replace(/<[^>]*>/g, "").length;
+        const curLen = entry.html.replace(/<[^>]*>/g, "").length;
+        if (curLen > prevLen) {
+          filtered[prevIdx] = entry;
+        }
+      } else {
+        seen.set(key, filtered.length);
+        filtered.push(entry);
+      }
+    }
 
     for (let i = 0; i < filtered.length; i++) {
       chapterTexts.set(i, filtered[i].html);
