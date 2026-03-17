@@ -783,14 +783,17 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     try {
       let chapters: TocChapter[] = [];
 
+      let localTotalPages = 1;
+
       if (isDocx) {
         // ── DOCX path ──
         const docxResult = await extractFromDocx(f);
         setPdfRef(null); // no PDF proxy for DOCX
-        setTotalPages(docxResult.totalPages);
+        localTotalPages = docxResult.totalPages;
+        setTotalPages(localTotalPages);
 
         if (docxResult.outline.length > 0) {
-          const flat = flattenTocWithRanges(docxResult.outline, docxResult.totalPages);
+          const flat = flattenTocWithRanges(docxResult.outline, localTotalPages);
           chapters = mapFlatToChapters(flat);
           const headingBased = docxResult.html.includes('<h1') || docxResult.html.includes('<h2');
           const msgKey = headingBased ? "docxTocFromHeadings" : "docxTocFromRegex";
@@ -800,7 +803,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
           chapters = [{
             title: f.name.replace(/\.(docx?|pdf)$/i, ''),
             startPage: 1,
-            endPage: docxResult.totalPages,
+            endPage: localTotalPages,
             level: 0,
             sectionType: "content",
           }];
@@ -815,16 +818,17 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         // ── PDF path (existing) ──
         const { outline, pdf } = await extractOutline(f);
         setPdfRef(pdf);
-        setTotalPages(pdf.numPages);
+        localTotalPages = pdf.numPages;
+        setTotalPages(localTotalPages);
 
         if (outline.length > 0) {
-          const flat = flattenTocWithRanges(outline, pdf.numPages);
+          const flat = flattenTocWithRanges(outline, localTotalPages);
           chapters = mapFlatToChapters(flat);
           toast.success(`${t("tocFound", isRu)}: ${chapters.length} ${t("items", isRu)}`);
         } else {
           const textToc = await extractTocFromText(pdf);
           if (textToc.length > 0) {
-            const flat = flattenTocWithRanges(textToc, pdf.numPages);
+            const flat = flattenTocWithRanges(textToc, localTotalPages);
             chapters = mapFlatToChapters(flat);
             toast.success(`${isRu ? "Найдены заголовки глав в тексте" : "Chapter headings found in text"}: ${chapters.length} ${t("items", isRu)}`);
           } else {
@@ -832,7 +836,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
             chapters = [{
               title: f.name.replace('.pdf', ''),
               startPage: 1,
-              endPage: pdf.numPages,
+              endPage: localTotalPages,
               level: 0,
               sectionType: "content",
             }];
@@ -840,10 +844,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         }
       }
 
-      const currentTotalPages = isDocx
-        ? Math.max(1, Math.ceil((sessionStorage.getItem("docx_html") || "").length / 2000))
-        : (pdfRef ? (pdfRef as any).numPages : 1);
-      chapters = normalizeTocRanges(normalizeLevels(chapters), currentTotalPages);
+      chapters = normalizeTocRanges(normalizeLevels(chapters), localTotalPages);
       setTocEntries(chapters);
 
       // Clean up previous uploads of the same file name
