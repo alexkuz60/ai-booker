@@ -127,7 +127,7 @@ export async function extractFromDocx(file: File): Promise<DocxExtractResult> {
     const seen = new Map<string, number>(); // title → index in `filtered`
     const filtered: typeof nonEmpty = [];
     for (const entry of nonEmpty) {
-      const key = entry.title.trim().toLowerCase();
+      const key = normalizeTocTitle(entry.title);
       const prevIdx = seen.get(key);
       if (prevIdx !== undefined) {
         // Replace if new entry has more content
