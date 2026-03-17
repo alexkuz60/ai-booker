@@ -1195,7 +1195,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
   return {
     // State
-    step, setStep, books, loadingLibrary, fileName, errorMsg, bookId,
+    step, setStep, books, loadingLibrary, fileName, errorMsg, bookId, uploadProgress,
     partIdMap, chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
     chapterResults, setChapterResults, fileInputRef,
     // Actions
