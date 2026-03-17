@@ -863,8 +863,10 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         await supabase.from('books').delete().in('id', oldIds);
       }
 
-      const filePath = `${userId}/${Date.now()}_${f.name}`;
-      await supabase.storage.from('book-uploads').upload(filePath, f);
+      const filePath = isPdf ? `${userId}/${Date.now()}_${f.name}` : null;
+      if (isPdf && filePath) {
+        await supabase.storage.from('book-uploads').upload(filePath, f);
+      }
       const { data: book, error: bookErr } = await supabase
         .from('books')
         .insert({ user_id: userId, title: f.name.replace(/\.(pdf|docx?)$/i, ''), file_name: f.name, file_path: isPdf ? filePath : null, status: 'uploaded' })
