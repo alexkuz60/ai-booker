@@ -275,6 +275,16 @@ export function useChapterAnalysis({
         const fnData = await callParseFunction({ ...screenwriterBody, text, mode: "boundaries", chapter_title: entry.title });
         if (fnData?.error) throw new Error(fnData.error);
 
+        // Show truncation warning if server had to trim the text
+        if (fnData?.truncated) {
+          const orig = fnData.truncated.originalLength;
+          const trunc = fnData.truncated.truncatedLength;
+          const pct = Math.round((trunc / orig) * 100);
+          addLog(isRu
+            ? `⚠️ Текст обрезан до ${pct}% (${trunc.toLocaleString()} из ${orig.toLocaleString()} зн.) из-за лимита контекста модели`
+            : `⚠️ Text truncated to ${pct}% (${trunc.toLocaleString()} of ${orig.toLocaleString()} chars) due to model context limit`);
+        }
+
         const rawScenes = fnData.structure?.scenes || [];
 
         // Split text by markers

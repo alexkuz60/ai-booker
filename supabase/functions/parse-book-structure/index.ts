@@ -277,7 +277,9 @@ async function handleAIRequest(
   provider: string, mode: string | undefined, chapterTitle: string | undefined,
   openrouterApiKey: string | null, lang: string = 'en', userId: string | null = null
 ): Promise<Response> {
+  const originalTextLength = inputText.length;
   let truncatedText = inputText;
+  let wasTruncated = false;
   let systemPrompt: string;
   let userContent: string;
   let tools: unknown[];
@@ -354,6 +356,7 @@ async function handleAIRequest(
   if (charLimit && truncatedText.length > charLimit && mode === 'boundaries') {
     console.warn(`[parse-book-structure] Pre-truncating text from ${truncatedText.length} to ${charLimit} chars for ${model}`);
     truncatedText = truncatedText.slice(0, charLimit);
+    wasTruncated = true;
     // Update userContent with truncated text
     userContent = `Split the following chapter "${chapterTitle || 'Untitled'}" into scenes. Return boundaries and complete text only:\n\n${truncatedText}`;
     requestBody.messages = [
@@ -383,6 +386,7 @@ async function handleAIRequest(
         console.warn(`[parse-book-structure] Context length exceeded for ${model}, truncating to 50% and retrying`);
         const halfLen = Math.floor(truncatedText.length / 2);
         truncatedText = truncatedText.slice(0, halfLen);
+        wasTruncated = true;
         if (mode === 'boundaries') {
           userContent = `Split the following chapter "${chapterTitle || 'Untitled'}" into scenes. Return boundaries and complete text only:\n\n${truncatedText}`;
         } else if (mode === 'enrich') {
@@ -446,7 +450,9 @@ async function handleAIRequest(
 
     if (toolCall) {
       const structure = JSON.parse(toolCall.function.arguments);
-      return new Response(JSON.stringify({ structure }), {
+      const resp: Record<string, unknown> = { structure };
+      if (wasTruncated) resp.truncated = { originalLength: originalTextLength, truncatedLength: truncatedText.length };
+      return new Response(JSON.stringify(resp), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -462,7 +468,9 @@ async function handleAIRequest(
           const parsed = JSON.parse(jsonMatch[0]);
           if (parsed.scene_type || parsed.scenes || parsed.chapters || parsed.book_title) {
             console.warn("AI returned text instead of tool_call, extracted JSON from fallback");
-            return new Response(JSON.stringify({ structure: parsed }), {
+            const resp: Record<string, unknown> = { structure: parsed };
+            if (wasTruncated) resp.truncated = { originalLength: originalTextLength, truncatedLength: truncatedText.length };
+            return new Response(JSON.stringify(resp), {
               headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
           }
