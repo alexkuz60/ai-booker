@@ -932,6 +932,25 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
       const initRawMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
       chapters.forEach((_, i) => initRawMap.set(i, { scenes: [], status: "pending" }));
+
+      // For DOCX: pre-mark chapters with no/minimal content as "done" (nothing to analyze)
+      if (isDocx) {
+        try {
+          const raw = sessionStorage.getItem("docx_chapter_texts");
+          if (raw) {
+            const entries: [number, string][] = JSON.parse(raw);
+            const chapterTextMap = new Map(entries);
+            for (let i = 0; i < chapters.length; i++) {
+              const html = chapterTextMap.get(i) || "";
+              const plain = html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+              if (plain.length < 50) {
+                initRawMap.set(i, { scenes: [], status: "done" });
+              }
+            }
+          }
+        } catch {}
+      }
+
       const initMap = sanitizeChapterResultsForStructure(chapters, initRawMap);
       setChapterResults(initMap);
 
