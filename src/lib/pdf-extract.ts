@@ -420,6 +420,52 @@ export async function extractTocFromText(
 }
 
 /**
+ * Merge PDF outline entries with text-based TOC entries.
+ * Adds text-based entries that don't overlap with existing outline entries
+ * (by page proximity), preserving outline hierarchy.
+ */
+export function mergeOutlineWithTextToc(
+  outline: TocEntry[],
+  textToc: TocEntry[],
+  pageProximity = 2,
+): TocEntry[] {
+  if (textToc.length === 0) return outline;
+
+  // Flatten outline to get all page numbers
+  const outlinePages = new Set<number>();
+  function collectPages(items: TocEntry[]) {
+    for (const item of items) {
+      for (let p = item.pageNumber - pageProximity; p <= item.pageNumber + pageProximity; p++) {
+        outlinePages.add(p);
+      }
+      if (item.children.length) collectPages(item.children);
+    }
+  }
+  collectPages(outline);
+
+  // Find text entries not covered by outline
+  const newEntries = textToc.filter(te => !outlinePages.has(te.pageNumber));
+  if (newEntries.length === 0) return outline;
+
+  // Merge: flatten outline + new entries, sort by page
+  const allFlat: TocEntry[] = [];
+  function flatten(items: TocEntry[]) {
+    for (const item of items) {
+      allFlat.push({ ...item, children: [] });
+      if (item.children.length) flatten(item.children);
+    }
+  }
+  flatten(outline);
+
+  for (const ne of newEntries) {
+    allFlat.push({ ...ne, children: [] });
+  }
+
+  allFlat.sort((a, b) => a.pageNumber - b.pageNumber);
+  return allFlat;
+}
+
+/**
  * Flatten the hierarchical TOC into a list with page ranges,
  * grouping by the given level (0=parts, 1=chapters).
  */

@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  extractOutline, extractTocFromText, flattenTocWithRanges, type TocEntry
+  extractOutline, extractTocFromText, flattenTocWithRanges, mergeOutlineWithTextToc, type TocEntry
 } from "@/lib/pdf-extract";
 import { extractFromDocx } from "@/lib/docx-extract";
 import { t } from "@/pages/parser/i18n";
@@ -825,9 +825,21 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         setTotalPages(localTotalPages);
 
         if (outline.length > 0) {
-          const flat = flattenTocWithRanges(outline, localTotalPages);
+          // Always also scan text for headings to catch entries missing from outline
+          const textToc = await extractTocFromText(pdf);
+          const merged = mergeOutlineWithTextToc(outline, textToc);
+          const flat = flattenTocWithRanges(merged, localTotalPages);
           chapters = mapFlatToChapters(flat);
-          toast.success(`${t("tocFound", isRu)}: ${chapters.length} ${t("items", isRu)}`);
+          const extra = merged.length - outline.length;
+          if (extra > 0) {
+            toast.success(
+              isRu
+                ? `Оглавление: ${chapters.length} записей (${extra} найдено в тексте)`
+                : `TOC: ${chapters.length} entries (${extra} found in text)`
+            );
+          } else {
+            toast.success(`${t("tocFound", isRu)}: ${chapters.length} ${t("items", isRu)}`);
+          }
         } else {
           const textToc = await extractTocFromText(pdf);
           if (textToc.length > 0) {
@@ -1062,10 +1074,28 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       }
     }
 
-    // 2. Fallback: download from server
-    const book = books.find(b => b.id === bookId);
-    const filePath = book?.file_path;
-    if (!filePath) return null;
+    // 2. Fallback: query file_path from DB directly (books state may be empty on restore)
+    let filePath: string | null = null;
+    const bookInState = books.find(b => b.id === bookId);
+    if (bookInState?.file_path) {
+      filePath = bookInState.file_path;
+    } else {
+      try {
+        const { data } = await supabase
+          .from("books")
+          .select("file_path")
+          .eq("id", bookId)
+          .maybeSingle();
+        filePath = data?.file_path || null;
+      } catch (err) {
+        console.warn("[EnsurePDF] DB lookup failed:", err);
+      }
+    }
+
+    if (!filePath) {
+      console.warn("[EnsurePDF] No file_path found for book", bookId);
+      return null;
+    }
 
     try {
       console.log("[EnsurePDF] Downloading from server");
