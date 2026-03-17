@@ -239,14 +239,10 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         }),
       ]);
 
-      console.log("[Library] local:", localBooks.length, "server:", serverBooks.length);
-
       // Merge: local takes priority, append server-only books
       const localIds = new Set(localBooks.map(b => b.id));
       const serverOnly = serverBooks.filter(sb => !localIds.has(sb.id));
-      const merged = [...localBooks, ...serverOnly];
-      console.log("[Library] merged:", merged.length, "ids:", merged.map(b => b.id));
-      setBooks(merged);
+      setBooks([...localBooks, ...serverOnly]);
     } catch (err) {
       console.error("Failed to load library:", err);
       setBooks([]);
