@@ -508,13 +508,13 @@ async function handleAIRequest(
         ? `Return ONLY a JSON object with key "scenes" containing an array of objects with keys: scene_number, title, start_marker. No extra text.`
         : `Return ONLY a JSON object. No extra text.`;
 
-    const fallbackBody = {
+    const fallbackBody: Record<string, unknown> = {
       messages: [
         { role: "system", content: systemPrompt + "\n\n" + jsonPrompt },
         { role: "user", content: userContent },
       ],
-      temperature: 0.3,
       model,
+      ...(useTemperature ? { temperature: 0.3 } : {}),
     };
 
     const hdrs: Record<string, string> = {
