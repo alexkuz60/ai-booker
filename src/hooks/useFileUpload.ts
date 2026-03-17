@@ -236,7 +236,7 @@ export function useFileUpload({
       if (!targetStorage && storageBackend === "opfs" && createProject) {
         try {
           targetStorage = await createProject(
-            stripFileExtension(f.name),
+            pendingProjectName || stripFileExtension(f.name),
             resolvedBookId,
             userId,
             isRu ? "ru" : "en",
