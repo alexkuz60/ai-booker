@@ -788,6 +788,10 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     setFile(f);
     setStep("extracting_toc");
     setErrorMsg("");
+    const totalSteps = 6;
+    const progress = (step: number, msgRu: string, msgEn: string) =>
+      setUploadProgress({ step, totalSteps, message: isRu ? msgRu : msgEn });
+    progress(1, "Извлечение структуры документа...", "Extracting document structure...");
 
     try {
       let chapters: TocChapter[] = [];
