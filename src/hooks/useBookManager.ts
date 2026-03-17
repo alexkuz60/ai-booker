@@ -227,14 +227,21 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
     setLoadingLibrary(true);
     try {
       const localBooks = await loadLocalLibrary();
-      setBooks(localBooks);
+      if (localBooks.length > 0) {
+        setBooks(localBooks);
+        return;
+      }
+
+      // Local storage empty — fall back to server
+      const serverBooks = await loadLibraryFromServer();
+      setBooks(serverBooks);
     } catch (err) {
-      console.error("Failed to load local library:", err);
+      console.error("Failed to load library:", err);
       setBooks([]);
     } finally {
       setLoadingLibrary(false);
     }
-  }, [userId, loadLocalLibrary]);
+  }, [userId, loadLocalLibrary, loadLibraryFromServer]);
 
   useEffect(() => {
     if (!userId) {

@@ -43,6 +43,20 @@ export async function syncStructureToLocal(
   },
 ): Promise<void> {
   try {
+    // ── Validation guard: refuse to overwrite with empty data ──
+    if (!data.toc || data.toc.length === 0) {
+      console.warn("[localSync] Refusing to save empty TOC — skipping write");
+      return;
+    }
+
+    const invalidEntry = data.toc.find(
+      (e) => !e.title || typeof e.startPage !== "number" || typeof e.endPage !== "number",
+    );
+    if (invalidEntry) {
+      console.warn("[localSync] Invalid TOC entry detected, skipping write:", invalidEntry);
+      return;
+    }
+
     // 1. Book structure (toc + parts)
     const structure: LocalBookStructure = {
       bookId: data.bookId,
