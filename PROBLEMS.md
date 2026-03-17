@@ -114,13 +114,13 @@
 
 | ID | Описание | Файл | Серьёзность |
 |----|----------|------|-------------|
-| **B1** | `reloadBook` + `handleFileSelect`: после Reload код делает **INSERT** новой записи `books` вместо **UPDATE** существующей → дубликат в библиотеке | `useBookManager.ts:866-891` vs `:1010-1049` | 🔴 Критично |
-| **B2** | PDF folder-ноды не помечаются `done` при свежей загрузке → висят как `pending` навсегда | `useBookManager.ts:945-966` | 🟡 Средне |
-| **B3** | `reloadBook` не очищает `sessionStorage` от DOCX-данных (`docx_chapter_texts`, `docx_html`) → мусорные данные при смене формата | `useBookManager.ts:1010-1049` | 🟡 Средне |
-| **B4** | При обновлении страницы для DOCX-книги `pdfRef = null`, `file_path = null`. Нет флага «это DOCX» → анализ вызывает `ensurePdfLoaded()` → null → «PDF не загружен» | `useChapterAnalysis.ts` + `useBookManager.ts:1052` | 🔴 Критично |
-| **B5** | `mergeOutlineWithTextToc` при наличии новых текстовых записей **уплощает всю иерархию** outline (`flatten()` → `children: []`) → пропадают контейнерные узлы (Акт 3, Акт 4) | `pdf-extract.ts:452-458` | 🔴 Критично |
-| **B6** | `handleFileSelect` не проверяет «существует ли уже bookId?» → безусловный INSERT (= B1, другой ракурс) | `useBookManager.ts:886-891` | 🔴 = B1 |
-| **B7** | `ensurePdfLoaded` ищет `file_path` в `books` state, но после `restoreFromLocal` этот state пуст; для DOCX `file_path = null` → всегда null | `useBookManager.ts:1077-1093` | 🟡 Связан с B4 |
+| **B1** | ~~`reloadBook` + `handleFileSelect`: после Reload код делает INSERT вместо UPDATE~~ | `useBookManager.ts` | ✅ Исправлено |
+| **B2** | ~~PDF folder-ноды не помечаются `done` при свежей загрузке~~ | `useBookManager.ts` | ✅ Исправлено |
+| **B3** | ~~`reloadBook` не очищает `sessionStorage` от DOCX-данных~~ | `useBookManager.ts` | ✅ Исправлено |
+| **B4** | ~~DOCX-mode теряется после page refresh → «PDF не загружен»~~ | `useChapterAnalysis.ts` + `useBookManager.ts` | ✅ Исправлено |
+| **B5** | ~~`mergeOutlineWithTextToc` уплощает иерархию outline~~ | `pdf-extract.ts` | ✅ Исправлено |
+| **B6** | ~~`handleFileSelect` безусловный INSERT (= B1)~~ | `useBookManager.ts` | ✅ = B1 Исправлено |
+| **B7** | ~~`ensurePdfLoaded` для DOCX → null~~ (связан с B4) | `useBookManager.ts` | ✅ Исправлено |
 | **B8** | `openSavedBook` с сервера: если PDF удалён или книга DOCX → `pdfBlob = null`, код продолжает без ошибки, но анализ позже падает | `useBookManager.ts:504-510` | 🟡 Средне |
 | **B9** | ~~Библиотека читает `toc.json` и запрашивает сервер без необходимости~~ | `useBookManager.ts` | ✅ Исправлено |
 | **B10** | ~~`openSavedBook` не проверяет серверный таймстамп при ручном открытии~~ | `useBookManager.ts` | ✅ Исправлено |

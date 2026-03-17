@@ -858,62 +858,89 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       chapters = normalizeTocRanges(normalizeLevels(chapters), localTotalPages);
       setTocEntries(chapters);
 
-      // Clean up previous uploads of the same file name
-      const { data: existingBooks } = await supabase
-        .from('books')
-        .select('id, file_path')
-        .eq('user_id', userId)
-        .eq('file_name', f.name);
-      if (existingBooks?.length) {
-        const oldPaths = existingBooks.map(b => b.file_path).filter(Boolean) as string[];
-        if (oldPaths.length) {
-          await supabase.storage.from('book-uploads').remove(oldPaths);
+      // B1/B6 fix: if bookId already exists (reload flow), UPDATE instead of INSERT
+      const isReload = !!bookId;
+      const filePath = isPdf ? `${userId}/${Date.now()}_${f.name}` : null;
+
+      if (!isReload) {
+        // Fresh upload — clean up previous uploads of the same file name
+        const { data: existingBooks } = await supabase
+          .from('books')
+          .select('id, file_path')
+          .eq('user_id', userId)
+          .eq('file_name', f.name);
+        if (existingBooks?.length) {
+          const oldPaths = existingBooks.map(b => b.file_path).filter(Boolean) as string[];
+          if (oldPaths.length) {
+            await supabase.storage.from('book-uploads').remove(oldPaths);
+          }
+          const oldIds = existingBooks.map(b => b.id);
+          await supabase.from('book_chapters').delete().in('book_id', oldIds);
+          await supabase.from('book_parts').delete().in('book_id', oldIds);
+          await supabase.from('books').delete().in('id', oldIds);
         }
-        const oldIds = existingBooks.map(b => b.id);
-        await supabase.from('book_chapters').delete().in('book_id', oldIds);
-        await supabase.from('book_parts').delete().in('book_id', oldIds);
-        await supabase.from('books').delete().in('id', oldIds);
       }
 
-      const filePath = isPdf ? `${userId}/${Date.now()}_${f.name}` : null;
       if (isPdf && filePath) {
         await supabase.storage.from('book-uploads').upload(filePath, f);
       }
-      const { data: book, error: bookErr } = await supabase
-        .from('books')
-        .insert({ user_id: userId, title: f.name.replace(/\.(pdf|docx?)$/i, ''), file_name: f.name, file_path: isPdf ? filePath : null, status: 'uploaded' })
-        .select('id').single();
-      if (bookErr) throw bookErr;
-      setBookId(book.id);
-      sessionStorage.setItem(ACTIVE_BOOK_KEY, book.id);
 
-      // Add default characters: Narrator and Commentator
-      await supabase.from('book_characters').insert([
-        {
-          book_id: book.id,
-          name: isRu ? 'Рассказчик' : 'Narrator',
-          gender: 'male',
-          age_group: 'adult',
-          description: isRu ? 'Голос повествования от третьего лица' : 'Third-person narration voice',
-          sort_order: -2,
-          voice_config: { provider: 'yandex' },
-        },
-        {
-          book_id: book.id,
-          name: isRu ? 'Комментатор' : 'Commentator',
-          gender: 'male',
-          age_group: 'adult',
-          description: isRu ? 'Озвучивание сносок и комментариев' : 'Footnote and commentary voice',
-          sort_order: -1,
-          voice_config: { provider: 'yandex' },
-        },
-      ]);
+      let resolvedBookId: string;
+      if (isReload) {
+        // UPDATE existing book record
+        const { error: updErr } = await supabase
+          .from('books')
+          .update({
+            title: f.name.replace(/\.(pdf|docx?)$/i, ''),
+            file_name: f.name,
+            file_path: isPdf ? filePath : null,
+            status: 'uploaded',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', bookId);
+        if (updErr) throw updErr;
+        resolvedBookId = bookId;
+      } else {
+        // INSERT new book
+        const { data: book, error: bookErr } = await supabase
+          .from('books')
+          .insert({ user_id: userId, title: f.name.replace(/\.(pdf|docx?)$/i, ''), file_name: f.name, file_path: isPdf ? filePath : null, status: 'uploaded' })
+          .select('id').single();
+        if (bookErr) throw bookErr;
+        resolvedBookId = book.id;
+      }
+      setBookId(resolvedBookId);
+      sessionStorage.setItem(ACTIVE_BOOK_KEY, resolvedBookId);
+
+      // Add default characters: Narrator and Commentator (only for fresh uploads)
+      if (!isReload) {
+        await supabase.from('book_characters').insert([
+          {
+            book_id: resolvedBookId,
+            name: isRu ? 'Рассказчик' : 'Narrator',
+            gender: 'male',
+            age_group: 'adult',
+            description: isRu ? 'Голос повествования от третьего лица' : 'Third-person narration voice',
+            sort_order: -2,
+            voice_config: { provider: 'yandex' },
+          },
+          {
+            book_id: resolvedBookId,
+            name: isRu ? 'Комментатор' : 'Commentator',
+            gender: 'male',
+            age_group: 'adult',
+            description: isRu ? 'Озвучивание сносок и комментариев' : 'Footnote and commentary voice',
+            sort_order: -1,
+            voice_config: { provider: 'yandex' },
+          },
+        ]);
+      }
 
       const uniqueParts = [...new Set(chapters.map(c => c.partTitle).filter(Boolean))] as string[];
       const newPartIdMap = new Map<string, string>();
       for (let i = 0; i < uniqueParts.length; i++) {
         const { data: partRow } = await supabase
-          .from('book_parts').insert({ book_id: book.id, part_number: i + 1, title: uniqueParts[i] })
+          .from('book_parts').insert({ book_id: resolvedBookId, part_number: i + 1, title: uniqueParts[i] })
           .select('id').single();
         if (partRow) newPartIdMap.set(uniqueParts[i], partRow.id);
       }
@@ -926,7 +953,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         const { data: chRow } = await supabase
           .from('book_chapters')
           .insert({
-            book_id: book.id, chapter_number: i + 1, title: ch.title,
+            book_id: resolvedBookId, chapter_number: i + 1, title: ch.title,
             scene_type: ch.sectionType !== 'content' ? ch.sectionType : null,
             level: ch.level,
             start_page: ch.startPage,
@@ -940,6 +967,13 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
       const initRawMap = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
       chapters.forEach((_, i) => initRawMap.set(i, { scenes: [], status: "pending" }));
+
+      // B2 fix: mark folder-nodes as done immediately
+      chapters.forEach((_, i) => {
+        if (isFolderNode(chapters, i)) {
+          initRawMap.set(i, { scenes: [], status: "done" });
+        }
+      });
 
       // For DOCX: pre-mark chapters with no/minimal content as "done" (nothing to analyze)
       if (isDocx) {
@@ -963,14 +997,14 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       setChapterResults(initMap);
 
       // ── Dual-write: sync to local project ──
-      if (projectStorage?.isReady && book?.id) {
+      if (projectStorage?.isReady && resolvedBookId) {
         const partsArr = uniqueParts.map((title, i) => ({
           id: newPartIdMap.get(title) || "",
           title,
           partNumber: i + 1,
         }));
         syncStructureToLocal(projectStorage, {
-          bookId: book.id,
+          bookId: resolvedBookId,
           title: f.name.replace(/\.(pdf|docx?)$/i, ''),
           fileName: f.name,
           toc: chapters,
@@ -981,6 +1015,15 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         // Save the source file locally
         const localSourceName = isDocx ? "source/book.docx" : "source/book.pdf";
         projectStorage.writeBlob(localSourceName, f).catch(() => {});
+
+        // B4/B7 fix: persist fileFormat in project.json
+        try {
+          const projectMeta = await projectStorage.readJSON<Record<string, unknown>>("project.json");
+          if (projectMeta) {
+            projectMeta.fileFormat = isDocx ? "docx" : "pdf";
+            await projectStorage.writeJSON("project.json", projectMeta);
+          }
+        } catch {}
       }
 
       setStep("workspace");
@@ -1003,9 +1046,14 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
   }, [userId, isRu, projectStorage]);
 
   // ─── Reload book (delete structure, re-upload new PDF) ─────
+  // B1/B6 fix: reloadBook preserves bookId, clears sessionStorage (B3)
   const reloadBook = useCallback(async () => {
     if (!bookId) return;
     try {
+      // B3: clear DOCX session data
+      sessionStorage.removeItem("docx_chapter_texts");
+      sessionStorage.removeItem("docx_html");
+
       // Delete scenes, chapters, parts for this book
       const { data: chapters } = await supabase
         .from('book_chapters').select('id').eq('book_id', bookId);
@@ -1016,23 +1064,28 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       await supabase.from('book_chapters').delete().eq('book_id', bookId);
       await supabase.from('book_parts').delete().eq('book_id', bookId);
 
-      // Clean up local OPFS project(s) for this book
+      // Clean up local OPFS project(s) — remove structure/ and scenes/ only, keep project.json and source/
       if (storageBackend === "opfs") {
         const projectNames = localProjectNamesByBookId.get(bookId);
         if (projectNames?.length) {
           for (const name of projectNames) {
-            try { await OPFSStorage.deleteProject(name); } catch {}
+            try {
+              const store = await OPFSStorage.openOrCreate(name);
+              const structFiles = await store.listDir("structure").catch(() => []);
+              for (const f of structFiles) await store.delete(`structure/${f}`).catch(() => {});
+              const sceneFiles = await store.listDir("scenes").catch(() => []);
+              for (const f of sceneFiles) await store.delete(`scenes/${f}`).catch(() => {});
+            } catch {}
           }
         }
       } else if (projectStorage?.isReady) {
-        // FS Access: clear structure files but keep project dir
         try {
           await projectStorage.writeJSON("structure/toc.json", []);
           await projectStorage.writeJSON("structure/characters.json", []);
         } catch {}
       }
 
-      // Reset state but keep bookId for re-association
+      // Reset state but keep bookId for re-association (B1/B6 fix)
       setPartIdMap(new Map()); setChapterIdMap(new Map());
       setTocEntries([]); setPdfRef(null); setFile(null);
       setChapterResults(new Map());

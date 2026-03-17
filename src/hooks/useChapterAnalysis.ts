@@ -26,11 +26,13 @@ interface UseChapterAnalysisParams {
   onChapterResultsMutated?: () => void;
   /** Lazy PDF loader — downloads from storage if not in memory */
   ensurePdfLoaded?: () => Promise<any>;
+  /** Persisted file format from project.json (B4/B7 fix) */
+  fileFormat?: "pdf" | "docx" | null;
 }
 
 export function useChapterAnalysis({
   isRu, pdfRef, userId, bookId, userApiKeys, getModelForRole,
-  tocEntries, chapterIdMap, chapterResults, setChapterResults, onChapterResultsMutated, ensurePdfLoaded,
+  tocEntries, chapterIdMap, chapterResults, setChapterResults, onChapterResultsMutated, ensurePdfLoaded, fileFormat,
 }: UseChapterAnalysisParams) {
   const [analysisLog, setAnalysisLog] = useState<string[]>([]);
   const analysisTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -93,7 +95,9 @@ export function useChapterAnalysis({
     } catch { return null; }
   };
 
+  // B4/B7 fix: check persisted fileFormat first, then fall back to sessionStorage
   const isDocxMode = (): boolean => {
+    if (fileFormat === "docx") return true;
     return sessionStorage.getItem("docx_chapter_texts") !== null;
   };
 

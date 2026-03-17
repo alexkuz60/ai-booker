@@ -53,6 +53,7 @@ export default function Parser() {
     openProject,
     storage: projectStorage,
     initialized: projectStorageInitialized,
+    meta: projectMeta,
   } = useProjectStorageContext();
   const { getModelForRole } = useAiRoles(userApiKeys);
   const { toast } = useToast();
@@ -165,6 +166,7 @@ export default function Parser() {
     tocEntries, chapterIdMap, chapterResults, setChapterResults,
     onChapterResultsMutated: scheduleSave,
     ensurePdfLoaded,
+    fileFormat: projectMeta?.fileFormat || null,
   });
 
 

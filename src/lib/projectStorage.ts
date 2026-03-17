@@ -59,6 +59,8 @@ export interface ProjectMeta {
   createdAt: string;
   updatedAt: string;
   language: "ru" | "en";
+  /** File format of the source book — persisted for B4/B7 fix */
+  fileFormat?: "pdf" | "docx";
 }
 
 export const PROJECT_META_VERSION = 1;
