@@ -700,7 +700,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
       if (targetStorage) {
         syncStructureToLocal(targetStorage, {
           bookId: book.id,
-          title: book.title || book.file_name.replace('.pdf', ''),
+          title: book.title || stripFileExtension(book.file_name),
           fileName: book.file_name,
           toc: normalizedToc,
           parts: parts.map(p => ({ id: p.id, title: p.title, partNumber: p.part_number })),
