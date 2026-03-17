@@ -178,7 +178,7 @@ export async function extractFromDocx(file: File): Promise<DocxExtractResult> {
         for (const pat of CHAPTER_PATTERNS) {
           const m = text.match(pat);
           if (m) {
-            const suffix = m[3]?.trim();
+            const suffix = stripTrailingPageNumber(m[3]?.trim() || "");
             const title = suffix ? `${m[1]} ${m[2]}. ${suffix}` : `${m[1]} ${m[2]}`;
             outline.push({
               title,
