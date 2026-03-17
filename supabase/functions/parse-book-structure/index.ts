@@ -273,7 +273,7 @@ function canFallbackToOpenRouter(userApiKey: string | null, model: string): { en
 
 /** Core AI request handler */
 async function handleAIRequest(
-  truncatedText: string, endpoint: string, model: string, apiKey: string,
+  inputText: string, endpoint: string, model: string, apiKey: string,
   provider: string, mode: string | undefined, chapterTitle: string | undefined,
   openrouterApiKey: string | null, lang: string = 'en', userId: string | null = null
 ): Promise<Response> {
