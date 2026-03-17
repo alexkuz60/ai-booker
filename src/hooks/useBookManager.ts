@@ -425,7 +425,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
 
   // ─── Auto-restore active book on mount (local-first) ───────
   const [restoredOnce, setRestoredOnce] = useState(false);
-  const openSavedBookRef = useRef<(book: BookRecord) => Promise<void>>();
+  const openSavedBookRef = useRef<(book: BookRecord, options?: { skipTimestampCheck?: boolean }) => Promise<void>>();
 
   useEffect(() => {
     if (restoredOnce || !userId || loadingLibrary) return;
