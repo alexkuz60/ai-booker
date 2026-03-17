@@ -953,7 +953,7 @@ export function useBookManager({ userId, isRu, projectStorage, projectStorageIni
         const { data: chRow } = await supabase
           .from('book_chapters')
           .insert({
-            book_id: book.id, chapter_number: i + 1, title: ch.title,
+            book_id: resolvedBookId, chapter_number: i + 1, title: ch.title,
             scene_type: ch.sectionType !== 'content' ? ch.sectionType : null,
             level: ch.level,
             start_page: ch.startPage,
