@@ -26,6 +26,8 @@ interface UseChapterAnalysisParams {
   onChapterResultsMutated?: () => void;
   /** Lazy PDF loader — downloads from storage if not in memory */
   ensurePdfLoaded?: () => Promise<any>;
+  /** Persisted file format from project.json (B4/B7 fix) */
+  fileFormat?: "pdf" | "docx" | null;
 }
 
 export function useChapterAnalysis({
