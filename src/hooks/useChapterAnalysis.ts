@@ -82,18 +82,38 @@ export function useChapterAnalysis({
   // ─── Two-stage Chapter Analysis (with resume) ─────────────
   const isFolder = (idx: number): boolean => isFolderNode(tocEntries, idx);
 
+  /** Try to get DOCX chapter text from sessionStorage cache */
+  const getDocxChapterText = (chapterIdx: number): string | null => {
+    try {
+      const raw = sessionStorage.getItem("docx_chapter_texts");
+      if (!raw) return null;
+      const entries: [number, string][] = JSON.parse(raw);
+      const found = entries.find(([k]) => k === chapterIdx);
+      return found ? found[1] : null;
+    } catch { return null; }
+  };
+
+  const isDocxMode = (): boolean => {
+    return sessionStorage.getItem("docx_chapter_texts") !== null;
+  };
+
   const analyzeChapter = async (idx: number, mode: "full" | "enrich" | "auto" = "auto") => {
     if (!userId) return;
     // Folders are structural-only — never analyze them
     if (isFolder(idx)) return;
-    // Try to load PDF on demand if not in memory
+
+    const docxMode = isDocxMode();
     let activePdf = pdfRef;
-    if (!activePdf && ensurePdfLoaded) {
-      activePdf = await ensurePdfLoaded();
-    }
-    if (!activePdf) {
-      toast.error(isRu ? "PDF не загружен. Перезагрузите книгу для анализа." : "PDF not loaded. Reload the book to analyze.");
-      return;
+
+    if (!docxMode) {
+      // Try to load PDF on demand if not in memory
+      if (!activePdf && ensurePdfLoaded) {
+        activePdf = await ensurePdfLoaded();
+      }
+      if (!activePdf) {
+        toast.error(isRu ? "PDF не загружен. Перезагрузите книгу для анализа." : "PDF not loaded. Reload the book to analyze.");
+        return;
+      }
     }
     const entry = tocEntries[idx];
     if (!entry) return;
@@ -178,49 +198,60 @@ export function useChapterAnalysis({
           await supabase.from('book_scenes').delete().eq('chapter_id', existingChId);
         }
 
-        // CONTRACT K1: shared resolver (same logic as navigator/server normalization)
-        const baseRange = resolveEntryPageRange(tocEntries, idx, activePdf?.numPages);
-        let effectiveStartPage = baseRange.startPage;
-        let effectiveEndPage = baseRange.endPage;
+        let text: string;
 
-        if (effectiveStartPage !== entry.startPage || effectiveEndPage !== entry.endPage) {
-          addLog(isRu
-            ? `↔️ Уточнен диапазон страниц: ${entry.startPage}–${entry.endPage} → ${effectiveStartPage}–${effectiveEndPage}`
-            : `↔️ Adjusted page range: ${entry.startPage}–${entry.endPage} → ${effectiveStartPage}–${effectiveEndPage}`);
-        }
+        if (docxMode) {
+          // ── DOCX path: get chapter HTML from sessionStorage, strip to plain text ──
+          const chapterHtml = getDocxChapterText(idx);
+          if (chapterHtml) {
+            text = stripHtml(chapterHtml);
+          } else {
+            text = "";
+          }
+          addLog(isRu ? "📄 Источник: DOCX (кэш глав)" : "📄 Source: DOCX (chapter cache)");
+        } else {
+          // ── PDF path: extract text by page range ──
+          // CONTRACT K1: shared resolver (same logic as navigator/server normalization)
+          const baseRange = resolveEntryPageRange(tocEntries, idx, activePdf?.numPages);
+          let effectiveStartPage = baseRange.startPage;
+          let effectiveEndPage = baseRange.endPage;
 
-        let text = await extractTextByPageRange(activePdf, effectiveStartPage, effectiveEndPage);
-        let charCount = text.trim().length;
-
-        // No title-page heuristic needed: page range is derived from TOC structure
-        // (current entry startPage → next entry startPage - 1), which inherently excludes title pages.
-
-        if (charCount < 50 && baseRange.subtreeStart && baseRange.subtreeEnd) {
-          const subtreeSpan = baseRange.subtreeEnd - baseRange.subtreeStart + 1;
-          const currentSpan = effectiveEndPage - effectiveStartPage + 1;
-          if (subtreeSpan > currentSpan) {
+          if (effectiveStartPage !== entry.startPage || effectiveEndPage !== entry.endPage) {
             addLog(isRu
-              ? `↪️ Текста мало, пробую диапазон подглав: ${baseRange.subtreeStart}–${baseRange.subtreeEnd}`
-              : `↪️ Too little text, retrying with child range: ${baseRange.subtreeStart}–${baseRange.subtreeEnd}`);
-            effectiveStartPage = baseRange.subtreeStart;
-            effectiveEndPage = baseRange.subtreeEnd;
-            text = await extractTextByPageRange(activePdf, effectiveStartPage, effectiveEndPage);
-            charCount = text.trim().length;
+              ? `↔️ Уточнен диапазон страниц: ${entry.startPage}–${entry.endPage} → ${effectiveStartPage}–${effectiveEndPage}`
+              : `↔️ Adjusted page range: ${entry.startPage}–${entry.endPage} → ${effectiveStartPage}–${effectiveEndPage}`);
+          }
+
+          text = await extractTextByPageRange(activePdf, effectiveStartPage, effectiveEndPage);
+          let charCount = text.trim().length;
+
+          if (charCount < 50 && baseRange.subtreeStart && baseRange.subtreeEnd) {
+            const subtreeSpan = baseRange.subtreeEnd - baseRange.subtreeStart + 1;
+            const currentSpan = effectiveEndPage - effectiveStartPage + 1;
+            if (subtreeSpan > currentSpan) {
+              addLog(isRu
+                ? `↪️ Текста мало, пробую диапазон подглав: ${baseRange.subtreeStart}–${baseRange.subtreeEnd}`
+                : `↪️ Too little text, retrying with child range: ${baseRange.subtreeStart}–${baseRange.subtreeEnd}`);
+              effectiveStartPage = baseRange.subtreeStart;
+              effectiveEndPage = baseRange.subtreeEnd;
+              text = await extractTextByPageRange(activePdf, effectiveStartPage, effectiveEndPage);
+              charCount = text.trim().length;
+            }
+          }
+
+          if (charCount < 50 && baseRange.nextSiblingStart && baseRange.nextSiblingStart > effectiveStartPage + 1) {
+            const expandedEnd = baseRange.nextSiblingStart - 1;
+            if (expandedEnd > effectiveEndPage) {
+              addLog(isRu
+                ? `↪️ Текста мало, расширяю до следующей главы: ${effectiveStartPage}–${expandedEnd}`
+                : `↪️ Too little text, widening to next chapter: ${effectiveStartPage}–${expandedEnd}`);
+              effectiveEndPage = expandedEnd;
+              text = await extractTextByPageRange(activePdf, effectiveStartPage, effectiveEndPage);
+            }
           }
         }
 
-        if (charCount < 50 && baseRange.nextSiblingStart && baseRange.nextSiblingStart > effectiveStartPage + 1) {
-          const expandedEnd = baseRange.nextSiblingStart - 1;
-          if (expandedEnd > effectiveEndPage) {
-            addLog(isRu
-              ? `↪️ Текста мало, расширяю до следующей главы: ${effectiveStartPage}–${expandedEnd}`
-              : `↪️ Too little text, widening to next chapter: ${effectiveStartPage}–${expandedEnd}`);
-            effectiveEndPage = expandedEnd;
-            text = await extractTextByPageRange(activePdf, effectiveStartPage, effectiveEndPage);
-            charCount = text.trim().length;
-          }
-        }
-
+        const charCount = text.trim().length;
         if (charCount < 50) {
           setChapterResults(prev => {
             const next = new Map(prev);
