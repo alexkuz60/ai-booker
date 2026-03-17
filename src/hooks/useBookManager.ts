@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   extractOutline, extractTocFromText, flattenTocWithRanges, type TocEntry
 } from "@/lib/pdf-extract";
+import { extractFromDocx } from "@/lib/docx-extract";
 import { t } from "@/pages/parser/i18n";
 import type {
   Scene, TocChapter, Step, ChapterStatus, BookRecord,
