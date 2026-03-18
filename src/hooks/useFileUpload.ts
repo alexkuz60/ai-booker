@@ -118,22 +118,25 @@ export function useFileUpload({
       let chapters: TocChapter[] = [];
       let localTotalPages = 1;
 
-      if (isDocx) {
-        const docxResult = await extractFromDocx(f);
+      if (isDocx || isFb2) {
+        // Unified path for DOCX and FB2 — both return the same shape
+        const extractResult = isDocx
+          ? await extractFromDocx(f)
+          : await extractFromFb2(f);
+
         setPdfRef(null);
-        localTotalPages = docxResult.totalPages;
+        localTotalPages = extractResult.totalPages;
         setTotalPages(localTotalPages);
 
-        if (docxResult.outline.length > 0) {
-          const flat = flattenTocWithRanges(docxResult.outline, localTotalPages);
+        if (extractResult.outline.length > 0) {
+          const flat = flattenTocWithRanges(extractResult.outline, localTotalPages);
           chapters = mapFlatToChapters(flat);
-          const headingBased = docxResult.html.includes('<h1') || docxResult.html.includes('<h2');
-          const msgKey = headingBased ? "docxTocFromHeadings" : "docxTocFromRegex";
-          toast.success(`${t(msgKey, isRu)}: ${chapters.length} ${t("items", isRu)}`);
+          const formatLabel = isFb2 ? "FB2" : "DOCX";
+          toast.success(`${formatLabel} TOC: ${chapters.length} ${t("items", isRu)}`);
         } else {
           toast.info(t("docxNoToc", isRu));
           chapters = [{
-            title: f.name.replace(/\.(docx?|pdf)$/i, ''),
+            title: stripFileExtension(f.name),
             startPage: 1,
             endPage: localTotalPages,
             level: 0,
@@ -142,9 +145,9 @@ export function useFileUpload({
         }
 
         sessionStorage.setItem("docx_chapter_texts", JSON.stringify(
-          Array.from(docxResult.chapterTexts.entries())
+          Array.from(extractResult.chapterTexts.entries())
         ));
-        sessionStorage.setItem("docx_html", docxResult.html);
+        sessionStorage.setItem("docx_html", extractResult.html);
       } else {
         const { outline, pdf } = await extractOutline(f);
         setPdfRef(pdf);
