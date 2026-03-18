@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Save, FolderOpen, Trash2, BookOpen } from "lucide-react";
+import { Save, FolderOpen, Trash2, BookOpen, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,6 +9,11 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
 import type { AiRoleModelMap } from "@/config/aiRoles";
 
@@ -18,6 +23,7 @@ export interface AiRolePreset {
   bookTitle?: string;
   models: AiRoleModelMap;
   createdAt: string;
+  updatedAt?: string;
 }
 
 interface AiRolePresetsProps {
@@ -58,6 +64,24 @@ export function AiRolePresets({
     setNewName("");
     setSaveOpen(false);
   }, [newName, bookTitle, resolvedModels, setPresets]);
+
+  const handleUpdate = useCallback(
+    (id: string) => {
+      setPresets((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                models: { ...resolvedModels } as AiRoleModelMap,
+                bookTitle: bookTitle || p.bookTitle,
+                updatedAt: new Date().toISOString(),
+              }
+            : p,
+        ),
+      );
+    },
+    [resolvedModels, bookTitle, setPresets],
+  );
 
   const handleDelete = useCallback(
     (id: string) => {
@@ -117,6 +141,46 @@ export function AiRolePresets({
               {isRu ? "Книга:" : "Book:"} {bookTitle}
             </p>
           )}
+
+          {/* Existing presets to overwrite */}
+          {presets.length > 0 && (
+            <>
+              <Separator className="my-2" />
+              <p className="text-[10px] text-muted-foreground mb-1.5">
+                {isRu ? "Или обновить существующий:" : "Or update existing:"}
+              </p>
+              <div className="max-h-32 overflow-y-auto space-y-0.5">
+                {presets.map((preset) => (
+                  <div
+                    key={preset.id}
+                    className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/50 group"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] truncate">{preset.name}</p>
+                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 shrink-0 text-primary hover:text-primary"
+                          onClick={() => {
+                            handleUpdate(preset.id);
+                            setSaveOpen(false);
+                          }}
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="text-xs">
+                        {isRu ? "Перезаписать" : "Overwrite"}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </PopoverContent>
       </Popover>
 
@@ -153,12 +217,19 @@ export function AiRolePresets({
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium truncate">{preset.name}</p>
-                  {preset.bookTitle && (
-                    <p className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
-                      <BookOpen className="h-2.5 w-2.5 shrink-0" />
-                      {preset.bookTitle}
-                    </p>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {preset.bookTitle && (
+                      <p className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
+                        <BookOpen className="h-2.5 w-2.5 shrink-0" />
+                        {preset.bookTitle}
+                      </p>
+                    )}
+                    {preset.updatedAt && (
+                      <p className="text-[9px] text-muted-foreground/60 shrink-0">
+                        {isRu ? "обн." : "upd."} {new Date(preset.updatedAt).toLocaleDateString(isRu ? "ru-RU" : "en-US")}
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <Button
                   variant="ghost"
