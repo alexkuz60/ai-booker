@@ -29,6 +29,11 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
   const [localProjectNamesByBookId, setLocalProjectNamesByBookId] = useState<Map<string, string[]>>(new Map());
   const libraryLoadedRef = useRef(false);
 
+  // Server books (separate section)
+  const [serverBooks, setServerBooks] = useState<BookRecord[]>([]);
+  const [loadingServerBooks, setLoadingServerBooks] = useState(false);
+  const serverBooksLoadedRef = useRef(false);
+
   const mapLocalStructureToBook = useCallback(async (storage: ProjectStorage): Promise<LocalLibraryCandidate | null> => {
     const meta = await storage.readJSON<{
       bookId?: string;
@@ -210,6 +215,24 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     }
   }, [userId, loadLocalLibrary]);
 
+  // Load server books (filtered to exclude already-local books)
+  const loadServerBooks = useCallback(async () => {
+    if (!userId) { setServerBooks([]); return; }
+    setLoadingServerBooks(true);
+    try {
+      const fromServer = await loadLibraryFromServer();
+      // Filter out books that already exist locally
+      const localIds = new Set(books.map(b => b.id));
+      const onlyServer = fromServer.filter(b => !localIds.has(b.id));
+      setServerBooks(onlyServer);
+    } catch (err) {
+      console.warn("[Library] Server books fetch failed:", err);
+      setServerBooks([]);
+    } finally {
+      setLoadingServerBooks(false);
+    }
+  }, [userId, loadLibraryFromServer, books]);
+
   // Auto-load when on library step
   useEffect(() => {
     console.debug("[Library] effect: userId=%s, step=%s, backend=%s, loaded=%s", userId ?? "null", step, storageBackend, libraryLoadedRef.current);
@@ -217,11 +240,13 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       setBooks([]);
       setLoadingLibrary(false);
       libraryLoadedRef.current = false;
+      serverBooksLoadedRef.current = false;
       return;
     }
 
     if (step !== "library") {
       libraryLoadedRef.current = false;
+      serverBooksLoadedRef.current = false;
       return;
     }
 
@@ -230,6 +255,15 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       void loadLibrary();
     }
   }, [userId, step, storageBackend, loadLibrary]);
+
+  // Auto-load server books after local library is ready
+  useEffect(() => {
+    if (!userId || step !== "library" || loadingLibrary) return;
+    if (!serverBooksLoadedRef.current) {
+      serverBooksLoadedRef.current = true;
+      void loadServerBooks();
+    }
+  }, [userId, step, loadingLibrary, loadServerBooks]);
 
   const renameBook = useCallback(async (bookId: string, newTitle: string) => {
     if (storageBackend !== "opfs") return;
@@ -271,5 +305,8 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     loadLibraryFromServer,
     loadBookFromServerById,
     renameBook,
+    serverBooks,
+    loadingServerBooks,
+    loadServerBooks,
   };
 }
