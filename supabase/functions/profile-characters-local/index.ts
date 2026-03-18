@@ -4,6 +4,7 @@
  * No DB reads — all data comes from client (OPFS).
  */
 import { logAiUsage } from "../_shared/logAiUsage.ts";
+import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
