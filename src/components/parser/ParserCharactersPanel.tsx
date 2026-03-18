@@ -57,6 +57,9 @@ export default function ParserCharactersPanel({
   onAdd,
   analyzedCount,
   profilerModel,
+  profiling,
+  profileProgress,
+  onProfile,
 }: ParserCharactersPanelProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
