@@ -246,8 +246,13 @@ export default function ParserCharactersPanel({
               {characters.map((char) => {
                 const isExpanded = expandedId === char.id;
                 const isSelected = selectedIds.has(char.id);
+                  const isNew = newCharIds.has(char.id);
                 return (
-                  <TableRow key={char.id} className="group" data-state={isSelected ? "selected" : undefined}>
+                  <TableRow
+                    key={char.id}
+                    className={`group ${isNew ? "animate-fade-in" : ""}`}
+                    data-state={isSelected ? "selected" : undefined}
+                  >
                     {/* Checkbox */}
                     <TableCell className="px-2">
                       <input
