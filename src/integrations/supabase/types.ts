@@ -869,6 +869,7 @@ export type Database = {
           scene_count: number
           status: string
           title: string
+          updated_at: string
         }[]
       }
       has_role: {

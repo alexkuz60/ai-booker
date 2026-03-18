@@ -160,6 +160,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
         file_path: b.file_path,
         status: b.status,
         created_at: b.created_at,
+        updated_at: b.updated_at || undefined,
         chapter_count: Number(b.chapter_count) || 0,
         scene_count: Number(b.scene_count) || 0,
       }));
