@@ -172,8 +172,8 @@ export function useChapterAnalysis({
   // ─── Two-stage Chapter Analysis (with resume) ─────────────
   const isFolder = (idx: number): boolean => isFolderNode(tocEntries, idx);
 
-  /** Try to get DOCX chapter text from sessionStorage cache */
-  const getDocxChapterText = (chapterIdx: number): string | null => {
+  /** Try to get chapter text from sessionStorage cache */
+  const getChapterTextFromCache = (chapterIdx: number): string | null => {
     try {
       const raw = sessionStorage.getItem("docx_chapter_texts");
       if (!raw) return null;
@@ -181,6 +181,33 @@ export function useChapterAnalysis({
       const found = entries.find(([k]) => k === chapterIdx);
       return found ? found[1] : null;
     } catch { return null; }
+  };
+
+  /** Re-extract chapter texts from OPFS source file and populate sessionStorage cache */
+  const reExtractChapterTexts = async (): Promise<boolean> => {
+    if (!projectStorage) return false;
+    const fmt = fileFormat || "docx";
+    const sourcePath = getSourcePath(fmt);
+    try {
+      const blob = await projectStorage.readBlob(sourcePath);
+      if (!blob) return false;
+      const file = new File([blob], `book.${fmt}`, { type: blob.type });
+      let chapterTexts: Map<number, string>;
+      if (fmt === "fb2") {
+        const result = await extractFromFb2(file);
+        chapterTexts = result.chapterTexts;
+      } else {
+        const result = await extractFromDocx(file);
+        chapterTexts = result.chapterTexts;
+      }
+      sessionStorage.setItem("docx_chapter_texts", JSON.stringify(
+        Array.from(chapterTexts.entries())
+      ));
+      return true;
+    } catch (err) {
+      console.warn("[ChapterAnalysis] Failed to re-extract chapter texts:", err);
+      return false;
+    }
   };
 
   // B4/B7 fix: text-first mode for DOCX and FB2 (no PDF rendering needed)
