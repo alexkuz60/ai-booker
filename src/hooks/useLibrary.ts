@@ -305,5 +305,8 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     loadLibraryFromServer,
     loadBookFromServerById,
     renameBook,
+    serverBooks,
+    loadingServerBooks,
+    loadServerBooks,
   };
 }
