@@ -383,7 +383,7 @@ export function useBookRestore({
       setErrorMsg(err.message || "Unknown error");
       setStep("error");
     }
-  }, [userId, isRu, projectStorage, storageBackend, createProject, restoreFromLocal, updatePdfRef, updateTotalPages,
+  }, [userId, isRu, projectStorage, storageBackend, localProjectNamesByBookId, createProject, restoreFromLocal, updatePdfRef, updateTotalPages,
       setStep, setFileName, setBookId, setTocEntries, setChapterIdMap, setPartIdMap, setChapterResults, setErrorMsg]);
 
   // ─── Ensure PDF is loaded (local-first, then server) ────────
