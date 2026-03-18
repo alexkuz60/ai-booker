@@ -3,10 +3,11 @@
  * Prevents hardcoding "source/book.pdf" across the codebase.
  */
 
-export type FileFormat = "pdf" | "docx";
+export type FileFormat = "pdf" | "docx" | "fb2";
 
 /** Detect format from file name */
 export function detectFileFormat(fileName: string): FileFormat {
+  if (/\.fb2$/i.test(fileName)) return "fb2";
   return /\.docx?$/i.test(fileName) ? "docx" : "pdf";
 }
 
