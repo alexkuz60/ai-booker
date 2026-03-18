@@ -421,6 +421,23 @@ export default function ParserCharactersPanel({
                       </Popover>
                     </TableCell>
 
+                    {/* Profile icon */}
+                    <TableCell className="text-center px-0">
+                      {char.profile?.description ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Brain className="h-3.5 w-3.5 text-primary mx-auto cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="left" className="max-w-xs text-xs">
+                            <p className="font-semibold mb-1">{char.profile.temperament || ""}</p>
+                            <p>{char.profile.description}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <span className="text-muted-foreground/20">—</span>
+                      )}
+                    </TableCell>
+
                     {/* Scene count */}
                     <TableCell className="text-center text-xs text-muted-foreground font-mono">
                       {char.sceneCount}
