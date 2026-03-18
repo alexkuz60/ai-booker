@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Upload, BookOpen, Library, Trash2, FolderOpen, Clock, Loader2, Eraser, Pencil, Check, X, Cloud, Download, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ export default function LibraryView({
   isRu, books, loadingLibrary, onUpload, onOpen, onDelete, onClearAll, onRename,
   serverBooks = [], loadingServerBooks = false, onOpenServerBook, onDeleteServerBook,
 }: LibraryViewProps) {
+  const syncedBookIds = useMemo(() => new Set(serverBooks.map(b => b.id)), [serverBooks]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
@@ -79,7 +80,14 @@ export default function LibraryView({
               </Button>
             </div>
           ) : (
-            <p className="font-medium text-sm text-foreground truncate">{book.title}</p>
+            <p className="font-medium text-sm text-foreground truncate flex items-center gap-1.5">
+              {book.title}
+              {syncedBookIds.has(book.id) && (
+                <span title={isRu ? "Синхронизировано с сервером" : "Synced to server"}>
+                  <Cloud className="h-3.5 w-3.5 text-primary/60 flex-shrink-0" />
+                </span>
+              )}
+            </p>
           )}
           <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5 flex-wrap">
             <span className="flex items-center gap-1">
