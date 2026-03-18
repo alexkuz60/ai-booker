@@ -115,6 +115,8 @@ export function useCharacterExtraction({
       return snapshot;
     };
 
+    let errorCount = 0;
+
     for (let ci = 0; ci < chaptersToProcess.length; ci++) {
       const { idx, entry, scenes } = chaptersToProcess[ci];
       setExtractProgress(
@@ -149,6 +151,7 @@ export function useCharacterExtraction({
 
         if (error) {
           console.error("extract-characters error for chapter", idx, error);
+          errorCount++;
           continue;
         }
 
@@ -202,6 +205,7 @@ export function useCharacterExtraction({
         setCharacters(buildSnapshot());
       } catch (err) {
         console.error("AI extraction failed for chapter", idx, err);
+        errorCount++;
         const msg = err instanceof Error ? err.message : "";
         if (msg.includes("rate_limited") || msg.includes("429")) {
           toast({
@@ -228,12 +232,31 @@ export function useCharacterExtraction({
     setExtracting(false);
     setExtractProgress(null);
 
-    toast({
-      title: isRu ? "Персонажи извлечены" : "Characters extracted",
-      description: isRu
-        ? `Найдено ${allResults.size} персонажей в ${chaptersToProcess.length} главах`
-        : `Found ${allResults.size} characters in ${chaptersToProcess.length} chapters`,
-    });
+    // Show appropriate toast based on error rate
+    if (errorCount >= chaptersToProcess.length) {
+      toast({
+        title: isRu ? "Сервер недоступен" : "Server unavailable",
+        description: isRu
+          ? "Не удалось связаться с AI-сервером. Попробуйте позже."
+          : "Could not reach AI server. Try again later.",
+        variant: "destructive",
+      });
+    } else if (errorCount > 0) {
+      toast({
+        title: isRu ? "Персонажи частично извлечены" : "Characters partially extracted",
+        description: isRu
+          ? `Найдено ${allResults.size} персонажей. Ошибки в ${errorCount} из ${chaptersToProcess.length} глав.`
+          : `Found ${allResults.size} characters. Errors in ${errorCount} of ${chaptersToProcess.length} chapters.`,
+        variant: "default",
+      });
+    } else {
+      toast({
+        title: isRu ? "Персонажи извлечены" : "Characters extracted",
+        description: isRu
+          ? `Найдено ${allResults.size} персонажей в ${chaptersToProcess.length} главах`
+          : `Found ${allResults.size} characters in ${chaptersToProcess.length} chapters`,
+      });
+    }
 
     return finalSnapshot;
   }, [chapterResults, tocEntries, characters, setCharacters, persist, profilerModel, userApiKeys, isRu, toast]);
