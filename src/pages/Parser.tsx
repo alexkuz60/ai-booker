@@ -440,6 +440,8 @@ export default function Parser() {
               isRu={isRu} books={books} loadingLibrary={loadingLibrary}
               onUpload={startNewProject} onOpen={openSavedBook} onDelete={deleteBook}
               onClearAll={clearAllProjects} onRename={renameBook}
+              serverBooks={serverBooks} loadingServerBooks={loadingServerBooks}
+              onOpenServerBook={openSavedBook}
             />
           )}
           {step === "upload" && (
