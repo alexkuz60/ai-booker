@@ -170,7 +170,9 @@ export function useBookRestore({
   ) => {
     if (!userId) return;
 
-    if (projectStorage?.isReady) {
+    // Try local-first restore (checks OPFS by bookId, not just current projectStorage)
+    const canTryLocal = projectStorage?.isReady || (storageBackend === "opfs" && localProjectNamesByBookId.has(book.id));
+    if (canTryLocal) {
       const restored = await restoreFromLocal(book.id);
       if (restored) {
         if (!options?.skipTimestampCheck && checkServerNewer && setServerNewerBookId) {
