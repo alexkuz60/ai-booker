@@ -82,8 +82,9 @@ export function useFileUpload({
     const ext = f.name.toLowerCase().split('.').pop() || '';
     const isDocx = ext === 'docx' || ext === 'doc';
     const isPdf = ext === 'pdf';
+    const isFb2 = ext === 'fb2';
 
-    if (!isPdf && !isDocx) {
+    if (!isPdf && !isDocx && !isFb2) {
       toast.error(t("onlySupported", isRu));
       return;
     }
