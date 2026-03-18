@@ -5,7 +5,7 @@
  */
 import { logAiUsage } from "../_shared/logAiUsage.ts";
 import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
-import { resolveTaskPrompt } from "../_shared/taskPrompts.ts";
+import { resolveTaskPromptWithOverrides } from "../_shared/taskPrompts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
