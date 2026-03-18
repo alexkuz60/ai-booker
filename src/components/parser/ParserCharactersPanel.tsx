@@ -65,6 +65,7 @@ export default function ParserCharactersPanel({
   const [newName, setNewName] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [genderPopoverOpen, setGenderPopoverOpen] = useState<string | null>(null);
+  const [genderFilter, setGenderFilter] = useState<"all" | "male" | "female">("all");
   const editRef = useRef<HTMLInputElement>(null);
   const aliasRef = useRef<HTMLInputElement>(null);
   const newRef = useRef<HTMLInputElement>(null);
