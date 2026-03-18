@@ -177,8 +177,9 @@ Return ONLY a JSON array. No markdown, no explanation.`;
       const errText = await aiRes.text();
       console.error("AI gateway error:", aiRes.status, errText);
       if (userId) logAiUsage({ userId, modelId: usedModel, requestType: "detect-inline-narrations", status: "error", latencyMs: Date.now() - aiStart, errorMessage: `HTTP ${aiRes.status}` });
+      const statusCode = (aiRes.status === 402 || aiRes.status === 429) ? aiRes.status : 502;
       return new Response(JSON.stringify({ error: `AI error: ${aiRes.status}` }), {
-        status: 502,
+        status: statusCode,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
