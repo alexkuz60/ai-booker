@@ -295,7 +295,8 @@ export function useChapterAnalysis({
           } else {
             text = "";
           }
-          addLog(isRu ? "📄 Источник: DOCX (кэш глав)" : "📄 Source: DOCX (chapter cache)");
+          const formatLabel = fileFormat === "fb2" ? "FB2" : "DOCX";
+          addLog(isRu ? `📄 Источник: ${formatLabel} (кэш глав)` : `📄 Source: ${formatLabel} (chapter cache)`);
         } else {
           // ── PDF path: extract text by page range ──
           // CONTRACT K1: shared resolver (same logic as navigator/server normalization)
