@@ -159,7 +159,7 @@ export function useBookRestore({
       console.warn("[LocalRestore] Failed:", err);
       return false;
     }
-  }, [projectStorage, isRu, setBookId, setFileName, setTocEntries, setChapterIdMap, setChapterResults, setPartIdMap, setStep, updatePdfRef, updateTotalPages]);
+  }, [projectStorage, storageBackend, localProjectNamesByBookId, isRu, setBookId, setFileName, setTocEntries, setChapterIdMap, setChapterResults, setPartIdMap, setStep, updatePdfRef, updateTotalPages]);
 
   // ─── Open saved book (local-first + server fallback) ────────
   const openSavedBook = useCallback(async (
