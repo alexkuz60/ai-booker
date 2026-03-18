@@ -47,7 +47,7 @@ interface UseBookRestoreParams {
 
 export function useBookRestore({
   userId, isRu, storageBackend, projectStorage, createProject,
-  books, fileName, bookId,
+  books, fileName, bookId, localProjectNamesByBookId,
   setStep, setFileName, setBookId, setTocEntries, setChapterIdMap,
   setPartIdMap, setChapterResults, setPdfRef, setTotalPages, setErrorMsg,
 }: UseBookRestoreParams) {
