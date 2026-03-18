@@ -281,6 +281,7 @@ export function useBookManager({
     reloadBook,
     ensurePdfLoaded: restore.ensurePdfLoaded,
     reloadLibrary: library.loadLibrary,
+    renameBook: library.renameBook,
     // Sync-check
     serverNewerBookId: serverSync.serverNewerBookId,
     dismissServerNewer: serverSync.dismissServerNewer,

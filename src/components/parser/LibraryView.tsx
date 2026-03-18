@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Upload, BookOpen, Library, Trash2, FolderOpen, Clock, Loader2, Eraser } from "lucide-react";
+import { Upload, BookOpen, Library, Trash2, FolderOpen, Clock, Loader2, Eraser, Pencil, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -19,9 +21,26 @@ interface LibraryViewProps {
   onOpen: (book: BookRecord) => void;
   onDelete: (bookId: string) => void;
   onClearAll?: () => void;
+  onRename?: (bookId: string, newTitle: string) => void;
 }
 
-export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onOpen, onDelete, onClearAll }: LibraryViewProps) {
+export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onOpen, onDelete, onClearAll, onRename }: LibraryViewProps) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+
+  const startRename = (book: BookRecord) => {
+    setEditingId(book.id);
+    setEditValue(book.title);
+  };
+
+  const commitRename = () => {
+    if (editingId && editValue.trim()) {
+      onRename?.(editingId, editValue.trim());
+    }
+    setEditingId(null);
+  };
+
+  const cancelRename = () => setEditingId(null);
   return (
     <motion.div key="library" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
       className="flex-1 h-full overflow-auto">
@@ -87,7 +106,25 @@ export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onO
                     <BookOpen className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-foreground truncate">{book.title}</p>
+                    {editingId === book.id ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          value={editValue}
+                          onChange={e => setEditValue(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") cancelRename(); }}
+                          className="h-7 text-sm"
+                          autoFocus
+                        />
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={commitRename}>
+                          <Check className="h-3.5 w-3.5 text-primary" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={cancelRename}>
+                          <X className="h-3.5 w-3.5 text-muted-foreground" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="font-medium text-sm text-foreground truncate">{book.title}</p>
+                    )}
                     <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
@@ -108,6 +145,11 @@ export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onO
                     </div>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {onRename && (
+                      <Button variant="ghost" size="sm" onClick={() => startRename(book)} className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                     <Button variant="outline" size="sm" onClick={() => onOpen(book)} className="gap-1.5 text-xs">
                       <FolderOpen className="h-3 w-3" />
                       {t("libraryOpen", isRu)}

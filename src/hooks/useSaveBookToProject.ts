@@ -112,9 +112,16 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         .maybeSingle();
 
       if (!existingBook && user?.id) {
-        const bookTitle = fileName
-          ? fileName.replace(/\.(pdf|docx?)$/i, "")
-          : (toc[0]?.title || "Book");
+        let bookTitle: string | undefined;
+        try {
+          const pjMeta = await storage?.readJSON<{ title?: string }>("project.json");
+          if (pjMeta?.title) bookTitle = pjMeta.title;
+        } catch {}
+        if (!bookTitle) {
+          bookTitle = fileName
+            ? fileName.replace(/\.(pdf|docx?|fb2)$/i, "")
+            : (toc[0]?.title || "Book");
+        }
         const { error: bookErr } = await supabase
           .from("books")
           .insert({
@@ -231,7 +238,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
           const serverHasFile = !!bookRow?.file_path;
 
           if (!serverHasFile && user?.id) {
-            const ext = sourceResult.format === "docx" ? "book.docx" : "book.pdf";
+            const ext = sourceResult.format === "fb2" ? "book.fb2" : sourceResult.format === "docx" ? "book.docx" : "book.pdf";
             const filePath = `${user.id}/${Date.now()}_${ext}`;
             const { error: uploadError } = await supabase.storage
               .from("book-uploads")

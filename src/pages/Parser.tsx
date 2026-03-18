@@ -90,7 +90,7 @@ export default function Parser() {
     chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
     partIdMap, chapterResults, setChapterResults, fileInputRef,
     openSavedBook, deleteBook, clearAllProjects, handleFileSelect, handleReset: bookReset, reloadBook, ensurePdfLoaded,
-    reloadLibrary,
+    reloadLibrary, renameBook,
     serverNewerBookId, dismissServerNewer, acceptServerVersion,
   } = useBookManager({ userId: user?.id, isRu, projectStorage, projectStorageInitialized, storageBackend, createProject, pendingProjectName });
 
@@ -443,7 +443,7 @@ export default function Parser() {
             <LibraryView
               isRu={isRu} books={books} loadingLibrary={loadingLibrary}
               onUpload={startNewProject} onOpen={openSavedBook} onDelete={deleteBook}
-              onClearAll={clearAllProjects}
+              onClearAll={clearAllProjects} onRename={renameBook}
             />
           )}
           {step === "upload" && (
