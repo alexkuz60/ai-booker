@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { logAiUsage } from "../_shared/logAiUsage.ts";
-import { resolveTaskPrompt } from "../_shared/taskPrompts.ts";
+import { resolveTaskPromptWithOverrides } from "../_shared/taskPrompts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
     const aiStart = Date.now();
 
     const promptLang = isRu ? "Russian" : "English";
-    const basePrompt = resolveTaskPrompt("sound_engineer:generate_atmosphere", isRu ? "ru" : "en")
+    const basePrompt = (await resolveTaskPromptWithOverrides("sound_engineer:generate_atmosphere", isRu ? "ru" : "en"))
       || "You are a sound designer for audiobook production.";
     const systemPrompt = `${basePrompt}\n\n- Prompts must be in ${promptLang}.`;
 

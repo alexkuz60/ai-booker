@@ -5,11 +5,13 @@
  * the system prompt from this registry. This is a server-side mirror
  * of src/config/aiTaskPrompts.ts — prompts must be kept in sync.
  *
- * We import the canonical prompts from the client config at build time
- * is NOT possible (Deno vs Vite), so this file duplicates prompt text.
- * The client registry is the source of truth for labels/metadata;
- * this file is the source of truth for server-side prompt resolution.
+ * Admin prompt overrides: stored in user_settings (key: task_prompt_overrides).
+ * resolveTaskPromptWithOverrides() checks for admin overrides before
+ * falling back to defaults. This avoids per-request polling — overrides
+ * are written on admin save and read when needed.
  */
+
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 export type TaskPromptId =
   | "screenwriter:parse_full_structure"
@@ -28,7 +30,7 @@ interface TaskPromptEntry {
   promptRu?: string;
 }
 
-// ─── Prompt texts (synced with src/config/aiTaskPrompts.ts) ────────
+// ─── Default prompt texts (synced with src/config/aiTaskPrompts.ts) ─
 
 const PROMPTS: Record<TaskPromptId, TaskPromptEntry> = {
   "screenwriter:parse_full_structure": {
@@ -251,7 +253,7 @@ Return ONLY the JSON array, no markdown, no explanation.`,
 };
 
 /**
- * Resolve a task prompt by ID and language.
+ * Resolve a task prompt by ID and language (default fallback only).
  * Returns the prompt text string, or null if not found.
  */
 export function resolveTaskPrompt(
@@ -262,4 +264,62 @@ export function resolveTaskPrompt(
   if (!entry) return null;
   if (lang === "ru" && entry.promptRu) return entry.promptRu;
   return entry.prompt;
+}
+
+/**
+ * Resolve a task prompt with admin overrides from user_settings.
+ * Checks if any admin has overridden this prompt; falls back to defaults.
+ * 
+ * This is NOT a per-request poll — admin writes override on save,
+ * and this function reads the latest override when called.
+ */
+export async function resolveTaskPromptWithOverrides(
+  taskPromptId: string,
+  lang: "ru" | "en" = "en",
+): Promise<string | null> {
+  const defaultPrompt = resolveTaskPrompt(taskPromptId, lang);
+
+  try {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    // Find admin users who have prompt overrides
+    const { data: adminRoles } = await supabase
+      .from("user_roles")
+      .select("user_id")
+      .eq("role", "admin")
+      .limit(5);
+
+    if (!adminRoles?.length) return defaultPrompt;
+
+    const adminIds = adminRoles.map((r: { user_id: string }) => r.user_id);
+
+    // Get the first admin's prompt overrides
+    const { data: settings } = await supabase
+      .from("user_settings")
+      .select("setting_value")
+      .eq("setting_key", "task_prompt_overrides")
+      .in("user_id", adminIds)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!settings?.setting_value) return defaultPrompt;
+
+    const overrides = settings.setting_value as Record<
+      string,
+      { prompt?: string; promptRu?: string }
+    >;
+
+    const taskOverride = overrides[taskPromptId];
+    if (!taskOverride) return defaultPrompt;
+
+    const field = lang === "ru" ? "promptRu" : "prompt";
+    return taskOverride[field] ?? taskOverride.prompt ?? defaultPrompt;
+  } catch (err) {
+    console.error("Failed to load admin prompt overrides:", err);
+    return defaultPrompt;
+  }
 }

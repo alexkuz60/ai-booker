@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
-import { resolveTaskPrompt } from "../_shared/taskPrompts.ts";
+import { resolveTaskPromptWithOverrides } from "../_shared/taskPrompts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -97,7 +97,7 @@ async function checkIsAdmin(authHeader: string): Promise<boolean> {
 function buildPrompt(scenes: { scene_number: number; text: string }[], lang: "ru" | "en") {
   const isRu = lang === "ru";
 
-  const systemPrompt = resolveTaskPrompt("profiler:extract_characters", lang)
+  const systemPrompt = (await resolveTaskPromptWithOverrides("profiler:extract_characters", lang))
     || "You are a literary analyst. Find all characters in the provided scenes.";
 
   const scenesText = scenes

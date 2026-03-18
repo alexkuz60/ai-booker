@@ -3,7 +3,7 @@ import { splitPhrases } from "../_shared/splitPhrases.ts";
 import { extractCharacters } from "../_shared/extractCharacters.ts";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
 import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
-import { resolveTaskPrompt } from "../_shared/taskPrompts.ts";
+import { resolveTaskPromptWithOverrides } from "../_shared/taskPrompts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
     const userId = await getUserIdFromAuth(authHeader);
     const aiStart = Date.now();
 
-    const systemPrompt = resolveTaskPrompt("screenwriter:segment_scene", lang) || "You are a literary text analyst.";
+    const systemPrompt = (await resolveTaskPromptWithOverrides("screenwriter:segment_scene", lang)) || "You are a literary text analyst.";
 
     const userPrompt = `Analyze this scene (language: ${lang}):\n\n${content}`;
 

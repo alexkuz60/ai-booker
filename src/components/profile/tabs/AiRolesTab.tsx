@@ -154,7 +154,7 @@ export function AiRolesTab({ apiKeys, isRu, onModelChanged, bookTitle }: AiRoles
                       <span className="text-sm font-medium font-body">
                         {isRu ? role.labelRu : role.labelEn}
                       </span>
-                      <TaskPromptsPopover roleId={role.id as AiRoleId} isRu={isRu} />
+                      {isAdmin && <TaskPromptsPopover roleId={role.id as AiRoleId} isRu={isRu} />}
                       <Badge
                         variant="outline"
                         className={`text-[9px] px-1.5 py-0 ${tierColor} border-current/30`}

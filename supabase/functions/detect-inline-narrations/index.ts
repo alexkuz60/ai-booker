@@ -1,7 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
 import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
-import { resolveTaskPrompt } from "../_shared/taskPrompts.ts";
+import { resolveTaskPromptWithOverrides } from "../_shared/taskPrompts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const systemPrompt = resolveTaskPrompt("profiler:detect_inline_narrations")
+    const systemPrompt = (await resolveTaskPromptWithOverrides("profiler:detect_inline_narrations"))
       || "You are a literary text analyst specializing in detecting narrator insertions within dialogue.";
 
     const userContent = batch.map((b, i) => 
