@@ -225,8 +225,11 @@ Deno.serve(async (req) => {
 
     if (mode === "suggest") {
       // ── AI mode: find ambiguous words in scene text ──────────────
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) {
+      const usedModel = model || "google/gemini-2.5-flash";
+      const effectiveApiKey = apiKey || user_api_key || null;
+      const resolved = resolveAiEndpoint(usedModel, effectiveApiKey, openrouter_api_key);
+
+      if (!resolved.apiKey) {
         return new Response(JSON.stringify({ error: "AI not configured" }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -250,14 +253,14 @@ Deno.serve(async (req) => {
 Не включай слова, ударение которых очевидно и не вызывает сомнений.
 ${existingWords.size > 0 ? `\nУже в словаре пользователя (не включай): ${[...existingWords].join(", ")}` : ""}`;
 
-      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const aiRes = await fetch(resolved.endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${resolved.apiKey}`,
         },
         body: JSON.stringify({
-          model: model || "google/gemini-2.5-flash",
+          model: resolved.model,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: `Найди слова с неоднозначным ударением в этом тексте:\n\n${sceneText}` },
