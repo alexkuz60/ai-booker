@@ -67,7 +67,27 @@ export function useBookRestore({
 
   // ─── Restore from local ProjectStorage ─────────────────────
   const restoreFromLocal = useCallback(async (savedBookId: string): Promise<boolean> => {
-    if (!projectStorage?.isReady) return false;
+    // ── Find the correct OPFS project for this bookId ──
+    let storage: ProjectStorage | null | undefined = null;
+
+    if (storageBackend === "opfs") {
+      const projectNames = localProjectNamesByBookId.get(savedBookId);
+      if (projectNames?.length) {
+        try {
+          storage = await OPFSStorage.openOrCreate(projectNames[0]);
+          console.debug("[LocalRestore] Opened OPFS project for book:", projectNames[0], savedBookId);
+        } catch (err) {
+          console.warn("[LocalRestore] Failed to open OPFS project:", projectNames[0], err);
+        }
+      }
+    }
+
+    // Fallback to current projectStorage if OPFS lookup didn't work
+    if (!storage?.isReady) {
+      storage = projectStorage;
+    }
+
+    if (!storage?.isReady) return false;
     try {
       const local = await readStructureFromLocal(projectStorage);
       if (!local?.structure || local.structure.bookId !== savedBookId) return false;
