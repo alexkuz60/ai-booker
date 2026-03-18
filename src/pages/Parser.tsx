@@ -309,16 +309,8 @@ export default function Parser() {
               {isRu ? "Структура" : "Structure"}
             </Button>
             <Button
-              variant={parserTab === "content" ? "secondary" : "ghost"} size="sm"
-              onClick={() => setParserTab("content")}
-              className="gap-1.5 text-xs"
-            >
-              <FileText className="h-3.5 w-3.5" />
-              {isRu ? "Контент" : "Content"}
-            </Button>
-            <Button
               variant={parserTab === "characters" ? "secondary" : "ghost"} size="sm"
-              onClick={() => setParserTab(parserTab === "characters" ? "content" : "characters")}
+              onClick={() => setParserTab(parserTab === "characters" ? "structure" : "characters")}
               className="gap-1.5 text-xs"
             >
               <Users className="h-3.5 w-3.5" />
