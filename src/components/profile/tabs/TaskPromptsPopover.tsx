@@ -208,7 +208,7 @@ function PromptCard({
 
 export function TaskPromptsPopover({ roleId, isRu }: TaskPromptsPopoverProps) {
   const tasks = getTaskPromptsForRole(roleId);
-  const [overrides, updateOverrides] = useCloudSettings<PromptOverrides>(
+  const { value: overrides, update: updateOverrides } = useCloudSettings<PromptOverrides>(
     "task_prompt_overrides",
     {},
   );
