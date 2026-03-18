@@ -549,6 +549,9 @@ export default function Parser() {
                 onAdd={addCharacter}
                 analyzedCount={analyzedCount}
                 profilerModel={getModelForRole("profiler")}
+                profiling={profiling}
+                profileProgress={profileProgress}
+                onProfile={profileCharacters}
               />
             </motion.div>
           )}
