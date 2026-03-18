@@ -226,10 +226,10 @@ export default function NavSidebar({
             />
           ) : (
             <span
-              className="text-[11px] text-muted-foreground font-mono flex-shrink-0 cursor-pointer hover:text-primary hover:underline"
+              className={`text-[11px] text-muted-foreground font-mono flex-shrink-0 ${isPdf ? 'cursor-pointer hover:text-primary hover:underline' : ''}`}
               onClick={(e) => {
                 e.stopPropagation();
-                onOpenPdf?.(entry.startPage);
+                if (isPdf) onOpenPdf?.(entry.startPage);
               }}
               onDoubleClick={(e) => {
                 e.stopPropagation();
