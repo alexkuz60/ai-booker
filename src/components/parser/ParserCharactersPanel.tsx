@@ -147,8 +147,10 @@ export default function ParserCharactersPanel({
     });
   };
 
+  const profileViewChar = profileViewId ? characters.find(c => c.id === profileViewId) : null;
+
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+    <div className="flex h-full min-h-0 overflow-hidden">
       {/* Header */}
       <div className="px-4 py-3 border-b border-border flex items-center gap-2 flex-shrink-0">
         <Users className="h-5 w-5 text-primary" />
