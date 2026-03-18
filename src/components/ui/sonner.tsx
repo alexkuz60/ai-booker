@@ -1,5 +1,5 @@
 import { useTheme } from "next-themes";
-import { Toaster as Sonner, toast } from "sonner";
+import { Toaster as Sonner, toast as sonnerToast, type ExternalToast } from "sonner";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
@@ -10,6 +10,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      closeButton
       toastOptions={{
         classNames: {
           toast:
@@ -23,5 +24,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
     />
   );
 };
+
+/** Wrapper: error toasts stay until manually dismissed (click ✕) */
+const toast = Object.assign(sonnerToast, {
+  error: (message: string | React.ReactNode, opts?: ExternalToast) =>
+    sonnerToast.error(message, { duration: Infinity, ...opts }),
+});
 
 export { Toaster, toast };

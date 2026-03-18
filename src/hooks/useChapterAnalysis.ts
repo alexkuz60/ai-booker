@@ -597,7 +597,7 @@ export function useChapterAnalysis({
         return next;
       });
       markResultsDirty();
-      toast.error(userError, { duration: 8000 });
+      toast.error(userError, { duration: Infinity });
     } finally {
       setIsAnalyzing(false);
     }

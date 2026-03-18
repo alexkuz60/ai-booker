@@ -314,7 +314,7 @@ export function useFileUpload({
       setErrorMsg(userErr);
       setStep("error");
       setUploadProgress(null);
-      toast.error(userErr, { duration: 8000 });
+      toast.error(userErr, { duration: Infinity });
     }
 
     if (fileInputRef.current) fileInputRef.current.value = "";
