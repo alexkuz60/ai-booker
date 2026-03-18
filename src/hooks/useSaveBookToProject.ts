@@ -19,6 +19,8 @@ import {
   sanitizeChapterResultsForStructure,
 } from "@/lib/tocStructure";
 import { findSourceBlob } from "@/lib/fileFormatUtils";
+import { readCharactersFromLocal } from "@/lib/localSync";
+import type { LocalCharacter } from "@/pages/parser/types";
 
 export interface LocalBookSnapshot {
   toc: TocChapter[];
