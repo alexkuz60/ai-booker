@@ -24,6 +24,30 @@ import {
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import type { LocalCharacter } from "@/pages/parser/types";
 
+// ─── i18n maps for profile badges ────────────────────────
+const AGE_LABELS: Record<string, { ru: string; en: string }> = {
+  infant: { ru: "Младенец", en: "Infant" },
+  child: { ru: "Ребёнок", en: "Child" },
+  teen: { ru: "Подросток", en: "Teen" },
+  young: { ru: "Молодой", en: "Young" },
+  adult: { ru: "Взрослый", en: "Adult" },
+  elder: { ru: "Пожилой", en: "Elder" },
+};
+
+const TEMPERAMENT_LABELS: Record<string, { ru: string; en: string }> = {
+  sanguine: { ru: "Сангвиник", en: "Sanguine" },
+  choleric: { ru: "Холерик", en: "Choleric" },
+  melancholic: { ru: "Меланхолик", en: "Melancholic" },
+  phlegmatic: { ru: "Флегматик", en: "Phlegmatic" },
+  mixed: { ru: "Смешанный", en: "Mixed" },
+};
+
+function localizeLabel(value: string, map: Record<string, { ru: string; en: string }>, isRu: boolean): string {
+  const key = value.toLowerCase().trim();
+  const entry = map[key];
+  return entry ? entry[isRu ? "ru" : "en"] : value;
+}
+
 interface ParserCharactersPanelProps {
   isRu: boolean;
   characters: LocalCharacter[];
@@ -642,12 +666,12 @@ export default function ParserCharactersPanel({
               )}
               {profileViewChar.profile.age_group && profileViewChar.profile.age_group !== "unknown" && (
                 <Badge variant="outline" className="text-xs">
-                  {profileViewChar.profile.age_group}
+                  {localizeLabel(profileViewChar.profile.age_group, AGE_LABELS, isRu)}
                 </Badge>
               )}
               {profileViewChar.profile.temperament && (
                 <Badge variant="secondary" className="text-xs">
-                  {profileViewChar.profile.temperament}
+                  {localizeLabel(profileViewChar.profile.temperament, TEMPERAMENT_LABELS, isRu)}
                 </Badge>
               )}
             </div>
