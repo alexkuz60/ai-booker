@@ -318,7 +318,7 @@ export default function Parser() {
             </Button>
             <Button
               variant={parserTab === "characters" ? "secondary" : "ghost"} size="sm"
-              onClick={() => setParserTab("characters")}
+              onClick={() => setParserTab(parserTab === "characters" ? "content" : "characters")}
               className="gap-1.5 text-xs"
             >
               <Users className="h-3.5 w-3.5" />
