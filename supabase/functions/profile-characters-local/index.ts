@@ -120,14 +120,15 @@ Deno.serve(async (req) => {
 
     const jsonSuffix = `\n\nRespond with ONLY a valid JSON: {"characters": [{"name": "...", "age_group": "...", "temperament": "...", "speech_style": "...", "description": "..."}]}`;
 
-    const usedModel = model || "google/gemini-2.5-flash";
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("AI key not configured");
+    const requestedModel = model || "google/gemini-2.5-flash";
+    const resolved = resolveAiEndpoint(requestedModel, apiKey || null);
+    if (!resolved.apiKey) throw new Error("AI key not configured");
+    const usedModel = resolved.model;
 
     const aiStart = Date.now();
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiRes = await fetch(resolved.endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${LOVABLE_API_KEY}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${resolved.apiKey}` },
       body: JSON.stringify({
         model: usedModel,
         messages: [
