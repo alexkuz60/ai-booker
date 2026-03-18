@@ -287,7 +287,7 @@ export function useChapterAnalysis({
 
         let text: string;
 
-        if (docxMode) {
+        if (textMode) {
           // ── DOCX path: get chapter HTML from sessionStorage, strip to plain text ──
           const chapterHtml = getDocxChapterText(idx);
           if (chapterHtml) {
