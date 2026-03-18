@@ -251,56 +251,10 @@ export function useParserCharacters({
       }
     }
 
-    // Merge with existing characters (keep manually edited data)
-    const existingByName = new Map<string, LocalCharacter>();
-    for (const ch of characters) {
-      existingByName.set(ch.name.toLowerCase(), ch);
-      for (const alias of ch.aliases) {
-        existingByName.set(alias.toLowerCase(), ch);
-      }
-    }
-
-    const updated: LocalCharacter[] = [...characters];
-    const usedIds = new Set(characters.map(c => c.id));
-
-    for (const [key, data] of allResults) {
-      const existing = existingByName.get(key)
-        || data.aliases.reduce<LocalCharacter | undefined>(
-          (found, a) => found || existingByName.get(a.toLowerCase()),
-          undefined,
-        );
-
-      if (existing) {
-        // Update appearances & gender, keep manually set data
-        existing.appearances = data.appearances;
-        existing.sceneCount = data.sceneCount;
-        if ((!existing.gender || existing.gender === "unknown") && data.gender !== "unknown") {
-          existing.gender = data.gender;
-        }
-        // Merge new aliases
-        const allAliases = new Set([...existing.aliases, ...data.aliases]);
-        allAliases.delete(existing.name);
-        existing.aliases = Array.from(allAliases);
-      } else {
-        const newChar: LocalCharacter = {
-          id: generateId(),
-          name: data.name,
-          aliases: data.aliases,
-          gender: data.gender,
-          appearances: data.appearances,
-          sceneCount: data.sceneCount,
-        };
-        updated.push(newChar);
-        usedIds.add(newChar.id);
-        existingByName.set(key, newChar);
-      }
-    }
-
-    // Sort by scene count descending
-    updated.sort((a, b) => b.sceneCount - a.sceneCount);
-
-    setCharacters(updated);
-    await persist(updated);
+    // Final snapshot (already pushed incrementally, persist to storage)
+    const finalSnapshot = buildSnapshot();
+    setCharacters(finalSnapshot);
+    await persist(finalSnapshot);
     setExtracting(false);
     setExtractProgress(null);
 
@@ -311,7 +265,7 @@ export function useParserCharacters({
         : `Found ${allResults.size} characters in ${chaptersToProcess.length} chapters`,
     });
 
-    return updated;
+    return finalSnapshot;
   }, [chapterResults, tocEntries, characters, persist, profilerModel, isRu, toast]);
 
   // CRUD operations
