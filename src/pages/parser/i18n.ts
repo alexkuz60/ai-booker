@@ -24,9 +24,9 @@ const texts: Record<string, { ru: string; en: string }> = {
 
   // Upload
   uploadTitle: { ru: "Загрузите книгу", en: "Upload a book" },
-  uploadHint: { ru: "Максимум 20 МБ • PDF или DOCX", en: "Max 20 MB • PDF or DOCX" },
+  uploadHint: { ru: "Максимум 20 МБ • PDF, DOCX или FB2", en: "Max 20 MB • PDF, DOCX or FB2" },
   selectFile: { ru: "Выбрать файл", en: "Select file" },
-  onlySupported: { ru: "Поддерживаются только PDF и DOCX форматы", en: "Only PDF and DOCX formats are supported" },
+  onlySupported: { ru: "Поддерживаются только PDF, DOCX и FB2 форматы", en: "Only PDF, DOCX and FB2 formats are supported" },
   maxSize: { ru: "Максимальный размер файла — 20 МБ", en: "Max file size is 20 MB" },
   docxTocFromHeadings: { ru: "Найдены заголовки (Heading) в документе", en: "Headings found in document" },
   docxTocFromRegex: { ru: "Найдены главы по паттернам в тексте", en: "Chapter patterns found in text" },

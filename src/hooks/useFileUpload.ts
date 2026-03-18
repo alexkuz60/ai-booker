@@ -11,6 +11,7 @@ import {
   mergeOutlineWithTextToc, type TocEntry,
 } from "@/lib/pdf-extract";
 import { extractFromDocx } from "@/lib/docx-extract";
+import { extractFromFb2 } from "@/lib/fb2-extract";
 import { t } from "@/pages/parser/i18n";
 import type { Scene, TocChapter, Step, ChapterStatus } from "@/pages/parser/types";
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
@@ -81,8 +82,9 @@ export function useFileUpload({
     const ext = f.name.toLowerCase().split('.').pop() || '';
     const isDocx = ext === 'docx' || ext === 'doc';
     const isPdf = ext === 'pdf';
+    const isFb2 = ext === 'fb2';
 
-    if (!isPdf && !isDocx) {
+    if (!isPdf && !isDocx && !isFb2) {
       toast.error(t("onlySupported", isRu));
       return;
     }
@@ -116,22 +118,25 @@ export function useFileUpload({
       let chapters: TocChapter[] = [];
       let localTotalPages = 1;
 
-      if (isDocx) {
-        const docxResult = await extractFromDocx(f);
+      if (isDocx || isFb2) {
+        // Unified path for DOCX and FB2 — both return the same shape
+        const extractResult = isDocx
+          ? await extractFromDocx(f)
+          : await extractFromFb2(f);
+
         setPdfRef(null);
-        localTotalPages = docxResult.totalPages;
+        localTotalPages = extractResult.totalPages;
         setTotalPages(localTotalPages);
 
-        if (docxResult.outline.length > 0) {
-          const flat = flattenTocWithRanges(docxResult.outline, localTotalPages);
+        if (extractResult.outline.length > 0) {
+          const flat = flattenTocWithRanges(extractResult.outline, localTotalPages);
           chapters = mapFlatToChapters(flat);
-          const headingBased = docxResult.html.includes('<h1') || docxResult.html.includes('<h2');
-          const msgKey = headingBased ? "docxTocFromHeadings" : "docxTocFromRegex";
-          toast.success(`${t(msgKey, isRu)}: ${chapters.length} ${t("items", isRu)}`);
+          const formatLabel = isFb2 ? "FB2" : "DOCX";
+          toast.success(`${formatLabel} TOC: ${chapters.length} ${t("items", isRu)}`);
         } else {
           toast.info(t("docxNoToc", isRu));
           chapters = [{
-            title: f.name.replace(/\.(docx?|pdf)$/i, ''),
+            title: stripFileExtension(f.name),
             startPage: 1,
             endPage: localTotalPages,
             level: 0,
@@ -140,9 +145,9 @@ export function useFileUpload({
         }
 
         sessionStorage.setItem("docx_chapter_texts", JSON.stringify(
-          Array.from(docxResult.chapterTexts.entries())
+          Array.from(extractResult.chapterTexts.entries())
         ));
-        sessionStorage.setItem("docx_html", docxResult.html);
+        sessionStorage.setItem("docx_html", extractResult.html);
       } else {
         const { outline, pdf } = await extractOutline(f);
         setPdfRef(pdf);
@@ -217,8 +222,8 @@ export function useFileUpload({
         }
       });
 
-      // For DOCX: pre-mark chapters with no/minimal content as done
-      if (isDocx) {
+      // For DOCX/FB2: pre-mark chapters with no/minimal content as done
+      if (isDocx || isFb2) {
         try {
           const raw = sessionStorage.getItem("docx_chapter_texts");
           if (raw) {
@@ -273,7 +278,7 @@ export function useFileUpload({
             createdAt: typeof existingMeta?.createdAt === "string" ? existingMeta.createdAt : new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             language: (existingMeta?.language === "en" ? "en" : (isRu ? "ru" : "en")),
-            fileFormat: isDocx ? "docx" : "pdf",
+            fileFormat: isFb2 ? "fb2" : (isDocx ? "docx" : "pdf"),
           });
 
           await syncStructureToLocal(targetStorage, {
@@ -286,7 +291,7 @@ export function useFileUpload({
             chapterResults: initMap,
           });
 
-          const localSourceName = isDocx ? "source/book.docx" : "source/book.pdf";
+          const localSourceName = isFb2 ? "source/book.fb2" : (isDocx ? "source/book.docx" : "source/book.pdf");
           await targetStorage.writeBlob(localSourceName, f).catch(() => {});
         }
       } catch (storageErr) {

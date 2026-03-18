@@ -23,6 +23,11 @@ describe("detectFileFormat", () => {
     expect(detectFileFormat("legacy.DOC")).toBe("docx");
   });
 
+  it("detects FB2", () => {
+    expect(detectFileFormat("book.fb2")).toBe("fb2");
+    expect(detectFileFormat("Novel.FB2")).toBe("fb2");
+  });
+
   it("defaults to pdf for unknown extensions", () => {
     expect(detectFileFormat("file.txt")).toBe("pdf");
     expect(detectFileFormat("noext")).toBe("pdf");
@@ -36,6 +41,10 @@ describe("getSourcePath", () => {
 
   it("returns correct path for docx", () => {
     expect(getSourcePath("docx")).toBe("source/book.docx");
+  });
+
+  it("returns correct path for fb2", () => {
+    expect(getSourcePath("fb2")).toBe("source/book.fb2");
   });
 });
 
@@ -58,6 +67,10 @@ describe("stripFileExtension", () => {
 
   it("leaves other extensions alone", () => {
     expect(stripFileExtension("file.txt")).toBe("file.txt");
+  });
+
+  it("strips .fb2", () => {
+    expect(stripFileExtension("Novel.fb2")).toBe("Novel");
   });
 });
 
