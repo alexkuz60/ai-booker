@@ -83,7 +83,6 @@ function PromptCard({
     e.stopPropagation();
     setEditText(currentText);
     setEditing(false);
-    setExpanded(false);
   };
 
   const preview = currentText.slice(0, 120).replace(/\n/g, " ") + (currentText.length > 120 ? "…" : "");
