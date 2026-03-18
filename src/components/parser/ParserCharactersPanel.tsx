@@ -666,7 +666,7 @@ export default function ParserCharactersPanel({
               )}
               {profileViewChar.profile.age_group && profileViewChar.profile.age_group !== "unknown" && (
                 <Badge variant="outline" className="text-xs">
-                  {profileViewChar.profile.age_group}
+                  {localizeLabel(profileViewChar.profile.age_group, AGE_LABELS, isRu)}
                 </Badge>
               )}
               {profileViewChar.profile.temperament && (
