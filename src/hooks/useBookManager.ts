@@ -96,7 +96,7 @@ export function useBookManager({
   const [restoredOnce, setRestoredOnce] = useState(false);
 
   useEffect(() => {
-    if (restoredOnce || !userId || library.loadingLibrary) return;
+    if (restoredOnce || !userId) return;
     const savedBookId = sessionStorage.getItem(ACTIVE_BOOK_KEY);
 
     if (!savedBookId) {
@@ -142,7 +142,7 @@ export function useBookManager({
       }
     });
   }, [
-    userId, library.loadingLibrary, restoredOnce,
+    userId, restoredOnce,
     restore.restoreFromLocal, serverSync.checkServerNewer,
     storageBackend, projectStorageInitialized,
     serverSync.shouldRunServerSyncCheck, serverSync.markServerSyncChecked,
