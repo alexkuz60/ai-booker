@@ -91,6 +91,7 @@ export default function Parser() {
     partIdMap, chapterResults, setChapterResults, fileInputRef,
     openSavedBook, deleteBook, clearAllProjects, handleFileSelect, handleReset: bookReset, reloadBook, ensurePdfLoaded,
     reloadLibrary, renameBook,
+    serverBooks, loadingServerBooks,
     serverNewerBookId, dismissServerNewer, acceptServerVersion,
   } = useBookManager({ userId: user?.id, isRu, projectStorage, projectStorageInitialized, storageBackend, createProject, pendingProjectName });
 
