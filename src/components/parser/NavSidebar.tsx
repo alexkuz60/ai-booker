@@ -307,10 +307,10 @@ export default function NavSidebar({
         <div className="flex items-center gap-2">
           <BookOpen className="h-5 w-5 text-primary" />
           <span className="font-display font-semibold text-base text-foreground truncate flex-1">
-            {fileName.replace(/\.(pdf|docx?)$/i, '')}
+            {fileName.replace(/\.(pdf|docx?|fb2)$/i, '')}
           </span>
           {(() => {
-            const ext = fileName.match(/\.(pdf|docx?)$/i)?.[1]?.toUpperCase() || "PDF";
+            const ext = fileName.match(/\.(pdf|docx?|fb2)$/i)?.[1]?.toUpperCase() || "PDF";
             return (
               <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 font-mono shrink-0">
                 {ext === "DOC" ? "DOCX" : ext}
