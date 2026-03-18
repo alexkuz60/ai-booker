@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
+import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,7 +38,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { scene_id, language } = await req.json();
+    const { scene_id, language, model: clientModel, provider, apiKey, user_api_key, openrouter_api_key } = await req.json();
     if (!scene_id) {
       return new Response(JSON.stringify({ error: "scene_id is required" }), {
         status: 400,
@@ -117,8 +118,11 @@ Deno.serve(async (req) => {
     }
 
     // AI detection
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
+    const usedModel = clientModel || "google/gemini-2.5-flash";
+    const effectiveApiKey = apiKey || user_api_key || null;
+    const resolved = resolveAiEndpoint(usedModel, effectiveApiKey, openrouter_api_key);
+
+    if (!resolved.apiKey) {
       return new Response(JSON.stringify({ error: "AI key not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -150,18 +154,17 @@ Return ONLY a JSON array. No markdown, no explanation.`;
       `[${i + 1}] segment_id: "${b.segment_id}"\nspeaker: ${b.speaker || "unknown"}\ntext: ${b.text}`
     ).join("\n\n");
 
-    const usedModel = "google/gemini-2.5-flash";
     const userId = await getUserIdFromAuth(authHeader!);
     const aiStart = Date.now();
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiRes = await fetch(resolved.endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${resolved.apiKey}`,
       },
       body: JSON.stringify({
-        model: usedModel,
+        model: resolved.model,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Analyze these ${batch.length} dialogue segments (language: ${lang}):\n\n${userContent}` },
@@ -174,8 +177,9 @@ Return ONLY a JSON array. No markdown, no explanation.`;
       const errText = await aiRes.text();
       console.error("AI gateway error:", aiRes.status, errText);
       if (userId) logAiUsage({ userId, modelId: usedModel, requestType: "detect-inline-narrations", status: "error", latencyMs: Date.now() - aiStart, errorMessage: `HTTP ${aiRes.status}` });
+      const statusCode = (aiRes.status === 402 || aiRes.status === 429) ? aiRes.status : 502;
       return new Response(JSON.stringify({ error: `AI error: ${aiRes.status}` }), {
-        status: 502,
+        status: statusCode,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

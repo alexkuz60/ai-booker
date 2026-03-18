@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { splitPhrases } from "../_shared/splitPhrases.ts";
 import { extractCharacters } from "../_shared/extractCharacters.ts";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
+import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -49,7 +50,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { scene_id, content: bodyContent, language, model: clientModel } = await req.json();
+    const { scene_id, content: bodyContent, language, model: clientModel, provider, apiKey, user_api_key, openrouter_api_key } = await req.json();
     if (!scene_id) {
       return new Response(
         JSON.stringify({ error: "scene_id is required" }),
@@ -81,8 +82,11 @@ Deno.serve(async (req) => {
     const lang = language === "ru" ? "ru" : "en";
 
     // ── AI segmentation ──────────────────────────────────
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
+    const usedModel = clientModel || "google/gemini-2.5-flash";
+    const effectiveApiKey = apiKey || user_api_key || null;
+    const resolved = resolveAiEndpoint(usedModel, effectiveApiKey, openrouter_api_key);
+
+    if (!resolved.apiKey) {
       return new Response(JSON.stringify({ error: "AI key not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -90,7 +94,6 @@ Deno.serve(async (req) => {
     }
 
     const userId = await getUserIdFromAuth(authHeader);
-    const usedModel = clientModel || "google/gemini-2.5-flash";
     const aiStart = Date.now();
 
     const systemPrompt = `You are a literary text analyst. Given a scene text, split it into structural segments.
@@ -135,14 +138,14 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
 
     const userPrompt = `Analyze this scene (language: ${lang}):\n\n${content}`;
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiRes = await fetch(resolved.endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${resolved.apiKey}`,
       },
       body: JSON.stringify({
-        model: usedModel,
+        model: resolved.model,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -159,9 +162,11 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
       if (userId) {
         logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "error", latencyMs: aiLatency, errorMessage: `AI error: ${aiRes.status}` });
       }
+      // Pass through 402/429 so client can cascade to next provider
+      const statusCode = (aiRes.status === 402 || aiRes.status === 429) ? aiRes.status : 502;
       return new Response(
         JSON.stringify({ error: `AI error: ${aiRes.status}` }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: statusCode, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 

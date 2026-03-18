@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Database } from "@/integrations/supabase/types";
 import { useAiRoles } from "@/hooks/useAiRoles";
+import { useUserApiKeys } from "@/hooks/useUserApiKeys";
+import { invokeWithFallback } from "@/lib/invokeWithFallback";
 import { Loader2, Sparkles, BookOpen, AudioLines, CheckCircle2, XCircle, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck } from "lucide-react";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -53,6 +55,7 @@ export function StoryboardPanel({
   onRecalcDone?: () => void;
 }) {
   const { getModelForRole } = useAiRoles();
+  const { apiKeys: userApiKeys } = useUserApiKeys();
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -567,11 +570,15 @@ export function StoryboardPanel({
     if (!sceneId || !sceneContent) return;
     setAnalyzing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("segment-scene", {
+      const { data, error } = await invokeWithFallback({
+        functionName: "segment-scene",
         body: { scene_id: sceneId, language: isRu ? "ru" : "en", model: getModelForRole("screenwriter") },
+        userApiKeys,
+        isRu,
       });
       if (error) throw error;
-      setSegments(data.segments || []);
+      const result = data as any;
+      setSegments(result.segments || []);
       onSegmented?.(sceneId);
       toast.success(isRu ? "Раскадровка готова" : "Storyboard ready");
     } catch (err: any) {
@@ -984,8 +991,11 @@ export function StoryboardPanel({
     if (!sceneId || dialogueCount === 0) return;
     setDetecting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("detect-inline-narrations", {
-        body: { scene_id: sceneId, language: isRu ? "ru" : "en" },
+      const { data, error } = await invokeWithFallback({
+        functionName: "detect-inline-narrations",
+        body: { scene_id: sceneId, language: isRu ? "ru" : "en", model: getModelForRole("screenwriter") },
+        userApiKeys,
+        isRu,
       });
       if (error) throw error;
       const det = data as { detected: number; segments_updated: number; message?: string };
@@ -1010,13 +1020,17 @@ export function StoryboardPanel({
     if (!sceneId) return;
     setCorrectingStress(true);
     try {
-      const { data, error } = await supabase.functions.invoke("correct-stress", {
+      const { data, error } = await invokeWithFallback({
+        functionName: "correct-stress",
         body: { scene_id: sceneId, mode, model: getModelForRole("screenwriter") },
+        userApiKeys,
+        isRu,
       });
       if (error) throw error;
 
       if (mode === "suggest") {
-        const suggestions = data.suggestions as Array<{ word: string; stressed_index: number; reason: string }>;
+        const result = data as any;
+        const suggestions = result.suggestions as Array<{ word: string; stressed_index: number; reason: string }>;
         if (!suggestions?.length) {
           toast.info(isRu ? "Неоднозначных ударений не найдено" : "No ambiguous stress found");
           return;
@@ -1036,15 +1050,16 @@ export function StoryboardPanel({
           );
         }
       } else {
-        if (data.applied > 0) {
+        const result = data as any;
+        if (result.applied > 0) {
           toast.success(
             isRu
-              ? `Расставлено ${data.applied} ударений в ${data.phrases_affected} фразах`
-              : `Applied ${data.applied} stress marks in ${data.phrases_affected} phrases`
+              ? `Расставлено ${result.applied} ударений в ${result.phrases_affected} фразах`
+              : `Applied ${result.applied} stress marks in ${result.phrases_affected} phrases`
           );
           await loadSegments(sceneId);
         } else {
-          toast.info(data.message || (isRu ? "Нет совпадений со словарём" : "No dictionary matches"));
+          toast.info(result.message || (isRu ? "Нет совпадений со словарём" : "No dictionary matches"));
         }
       }
     } catch (err: any) {

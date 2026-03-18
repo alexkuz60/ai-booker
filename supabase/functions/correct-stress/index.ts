@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -176,7 +177,7 @@ Deno.serve(async (req) => {
     }
 
     const userId = userData.user.id;
-    const { scene_id, mode, model } = await req.json();
+    const { scene_id, mode, model, provider, apiKey, user_api_key, openrouter_api_key } = await req.json();
     // mode: "correct" (apply dictionary to scene) | "suggest" (AI find ambiguous words)
 
     if (!scene_id) {
@@ -224,8 +225,11 @@ Deno.serve(async (req) => {
 
     if (mode === "suggest") {
       // ── AI mode: find ambiguous words in scene text ──────────────
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) {
+      const usedModel = model || "google/gemini-2.5-flash";
+      const effectiveApiKey = apiKey || user_api_key || null;
+      const resolved = resolveAiEndpoint(usedModel, effectiveApiKey, openrouter_api_key);
+
+      if (!resolved.apiKey) {
         return new Response(JSON.stringify({ error: "AI not configured" }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -249,14 +253,14 @@ Deno.serve(async (req) => {
 Не включай слова, ударение которых очевидно и не вызывает сомнений.
 ${existingWords.size > 0 ? `\nУже в словаре пользователя (не включай): ${[...existingWords].join(", ")}` : ""}`;
 
-      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const aiRes = await fetch(resolved.endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${resolved.apiKey}`,
         },
         body: JSON.stringify({
-          model: model || "google/gemini-2.5-flash",
+          model: resolved.model,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: `Найди слова с неоднозначным ударением в этом тексте:\n\n${sceneText}` },
@@ -294,13 +298,9 @@ ${existingWords.size > 0 ? `\nУже в словаре пользователя 
       if (!aiRes.ok) {
         const errText = await aiRes.text();
         console.error("AI error:", aiRes.status, errText);
-        if (aiRes.status === 429) {
-          return new Response(JSON.stringify({ error: "Rate limit exceeded, try again later" }), {
-            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        return new Response(JSON.stringify({ error: "AI analysis failed" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        const statusCode = (aiRes.status === 402 || aiRes.status === 429) ? aiRes.status : 500;
+        return new Response(JSON.stringify({ error: `AI error: ${aiRes.status}` }), {
+          status: statusCode, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
