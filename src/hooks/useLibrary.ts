@@ -222,10 +222,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     setLoadingServerBooks(true);
     try {
       const fromServer = await loadLibraryFromServer();
-      // Filter out books that already exist locally
-      const localIds = new Set(books.map(b => b.id));
-      const onlyServer = fromServer.filter(b => !localIds.has(b.id));
-      setServerBooks(onlyServer);
+      setServerBooks(fromServer);
     } catch (err) {
       console.warn("[Library] Server books fetch failed:", err);
       setServerBooks([]);
