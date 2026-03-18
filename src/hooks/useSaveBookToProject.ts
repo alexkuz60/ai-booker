@@ -255,18 +255,30 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       }
 
       // ── 5. Update local project.json ──
+      // LIR-3 + LIR-4: read title/meta from storage, not stale React context
       if (storage) {
         const nowIso = new Date().toISOString();
-        const nextMeta: ProjectMeta = {
-          version: PROJECT_META_VERSION,
-          bookId: currentBookId,
-          title: meta?.title || toc[0]?.title || "Book",
-          userId: meta?.userId || user?.id || "",
-          createdAt: meta?.createdAt || nowIso,
-          updatedAt: nowIso,
-          language: meta?.language || (isRu ? "ru" : "en"),
-        };
-        await storage.writeJSON("project.json", nextMeta);
+        let freshMeta: Partial<ProjectMeta> = {};
+        try {
+          const stored = await storage.readJSON<ProjectMeta>("project.json");
+          if (stored) freshMeta = stored;
+        } catch {}
+
+        // LIR-3: verify bookId matches before writing
+        if (freshMeta.bookId && freshMeta.bookId !== currentBookId) {
+          console.error("[SaveToServer] bookId mismatch! storage=%s, target=%s — aborting meta write", freshMeta.bookId, currentBookId);
+        } else {
+          const nextMeta: ProjectMeta = {
+            version: PROJECT_META_VERSION,
+            bookId: currentBookId,
+            title: freshMeta.title || toc[0]?.title || "Book",
+            userId: freshMeta.userId || user?.id || "",
+            createdAt: freshMeta.createdAt || nowIso,
+            updatedAt: nowIso,
+            language: freshMeta.language || (isRu ? "ru" : "en"),
+          };
+          await storage.writeJSON("project.json", nextMeta);
+        }
       }
 
       // ── 6. Update books.updated_at so other devices can detect newer version ──
