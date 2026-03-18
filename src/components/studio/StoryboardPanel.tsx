@@ -990,8 +990,11 @@ export function StoryboardPanel({
     if (!sceneId || dialogueCount === 0) return;
     setDetecting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("detect-inline-narrations", {
-        body: { scene_id: sceneId, language: isRu ? "ru" : "en" },
+      const { data, error } = await invokeWithFallback({
+        functionName: "detect-inline-narrations",
+        body: { scene_id: sceneId, language: isRu ? "ru" : "en", model: getModelForRole("screenwriter") },
+        userApiKeys,
+        isRu,
       });
       if (error) throw error;
       const det = data as { detected: number; segments_updated: number; message?: string };
