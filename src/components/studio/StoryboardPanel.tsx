@@ -577,7 +577,8 @@ export function StoryboardPanel({
         isRu,
       });
       if (error) throw error;
-      setSegments(data.segments || []);
+      const result = data as any;
+      setSegments(result.segments || []);
       onSegmented?.(sceneId);
       toast.success(isRu ? "Раскадровка готова" : "Storyboard ready");
     } catch (err: any) {
