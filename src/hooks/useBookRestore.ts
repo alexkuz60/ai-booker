@@ -123,12 +123,12 @@ export function useBookRestore({
       });
 
       // Restore source file (async, non-blocking)
-      const localMeta = await projectStorage.readJSON<Record<string, unknown>>("project.json");
+      const localMeta = await storage.readJSON<Record<string, unknown>>("project.json");
       const localFormat: FileFormat = (localMeta?.fileFormat as FileFormat) || detectFileFormat(structure.fileName);
 
       if (localFormat === "pdf") {
         const sourcePath = getSourcePath(localFormat);
-        projectStorage.readBlob(sourcePath).then(async (pdfBlob) => {
+        storage.readBlob(sourcePath).then(async (pdfBlob) => {
           if (!pdfBlob) {
             console.log("[LocalRestore] No local PDF found, will download on demand");
             return;
