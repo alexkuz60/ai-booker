@@ -570,8 +570,11 @@ export function StoryboardPanel({
     if (!sceneId || !sceneContent) return;
     setAnalyzing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("segment-scene", {
+      const { data, error } = await invokeWithFallback({
+        functionName: "segment-scene",
         body: { scene_id: sceneId, language: isRu ? "ru" : "en", model: getModelForRole("screenwriter") },
+        userApiKeys,
+        isRu,
       });
       if (error) throw error;
       setSegments(data.segments || []);
