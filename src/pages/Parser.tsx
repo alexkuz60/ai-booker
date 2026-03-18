@@ -443,7 +443,7 @@ export default function Parser() {
             <LibraryView
               isRu={isRu} books={books} loadingLibrary={loadingLibrary}
               onUpload={startNewProject} onOpen={openSavedBook} onDelete={deleteBook}
-              onClearAll={clearAllProjects}
+              onClearAll={clearAllProjects} onRename={renameBook}
             />
           )}
           {step === "upload" && (
