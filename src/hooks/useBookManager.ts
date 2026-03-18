@@ -77,6 +77,17 @@ export function useBookManager({
   const [pdfRefState, setPdfRef] = useState<any>(null);
   const [totalPagesState, setTotalPages] = useState(0);
 
+  // ── Heartbeat: write on step changes + beforeunload ──────
+  useEffect(() => {
+    if (step !== "library") writeHeartbeat();
+  }, [step]);
+
+  useEffect(() => {
+    const onUnload = () => writeHeartbeat();
+    window.addEventListener("beforeunload", onUnload);
+    return () => window.removeEventListener("beforeunload", onUnload);
+  }, []);
+
   // ── Sub-hooks ─────────────────────────────────────────────
   const library = useLibrary({ userId, storageBackend, projectStorage, step });
 
