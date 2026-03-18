@@ -326,7 +326,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         }
       }
 
-      // ── 6. Update books.updated_at so other devices can detect newer version ──
+      // ── 7. Update books.updated_at so other devices can detect newer version ──
       const serverNow = new Date().toISOString();
       await supabase
         .from("books")
