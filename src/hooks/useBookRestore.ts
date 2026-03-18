@@ -112,7 +112,7 @@ export function useBookRestore({
       setStep("workspace");
 
       // Normalize legacy local data immediately
-      void syncStructureToLocal(projectStorage, {
+      void syncStructureToLocal(storage, {
         bookId: savedBookId,
         title: structure.title,
         fileName: structure.fileName,
