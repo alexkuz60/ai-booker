@@ -142,7 +142,7 @@ export function useBookManager({
       }
     });
   }, [
-    userId, library.loadingLibrary, restoredOnce,
+    userId, restoredOnce,
     restore.restoreFromLocal, serverSync.checkServerNewer,
     storageBackend, projectStorageInitialized,
     serverSync.shouldRunServerSyncCheck, serverSync.markServerSyncChecked,
