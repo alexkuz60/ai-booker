@@ -45,8 +45,18 @@ export function useCharacterExtraction({
 
     // Collect chapters that have analyzed scenes
     const chaptersToProcess: { idx: number; entry: TocChapter; scenes: Scene[] }[] = [];
+
+    // Build set of chapter indices where characters were already extracted
+    const alreadyExtractedIdx = new Set<number>();
+    for (const ch of characters) {
+      for (const app of ch.appearances) {
+        alreadyExtractedIdx.add(app.chapterIdx);
+      }
+    }
+
     chapterResults.forEach((result, idx) => {
       if (result.status !== "done" || !result.scenes?.length) return;
+      if (alreadyExtractedIdx.has(idx)) return; // skip already extracted
       const entry = tocEntries[idx];
       if (!entry) return;
       chaptersToProcess.push({ idx, entry, scenes: result.scenes });
@@ -56,10 +66,16 @@ export function useCharacterExtraction({
       setExtracting(false);
       setExtractProgress(null);
       toast({
-        title: isRu ? "Нет проанализированных глав" : "No analyzed chapters",
-        variant: "destructive",
+        title: isRu
+          ? (alreadyExtractedIdx.size > 0 ? "Все главы уже обработаны" : "Нет проанализированных глав")
+          : (alreadyExtractedIdx.size > 0 ? "All chapters already processed" : "No analyzed chapters"),
+        variant: alreadyExtractedIdx.size > 0 ? "default" : "destructive",
       });
       return;
+    }
+
+    if (alreadyExtractedIdx.size > 0) {
+      console.log(`[CharExtract] Skipping ${alreadyExtractedIdx.size} already-extracted chapters, processing ${chaptersToProcess.length} new`);
     }
 
     // Accumulate all characters across chapters
