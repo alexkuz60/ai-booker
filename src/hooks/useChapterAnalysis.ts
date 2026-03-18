@@ -178,9 +178,9 @@ export function useChapterAnalysis({
     } catch { return null; }
   };
 
-  // B4/B7 fix: check persisted fileFormat first, then fall back to sessionStorage
-  const isDocxMode = (): boolean => {
-    if (fileFormat === "docx") return true;
+  // B4/B7 fix: text-first mode for DOCX and FB2 (no PDF rendering needed)
+  const isTextMode = (): boolean => {
+    if (fileFormat === "docx" || fileFormat === "fb2") return true;
     return sessionStorage.getItem("docx_chapter_texts") !== null;
   };
 
