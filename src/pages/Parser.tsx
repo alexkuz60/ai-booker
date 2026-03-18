@@ -44,7 +44,7 @@ export default function Parser() {
 
   const userApiKeys = useUserApiKeys();
   const [aiRolesOpen, setAiRolesOpen] = useState(false);
-  const [parserTab, setParserTab] = useState<"structure" | "content" | "characters">("structure");
+  const [parserTab, setParserTab] = useState<"structure" | "characters">("structure");
   const [pendingProjectName, setPendingProjectName] = useState<string | null>(null);
   const {
     backend: storageBackend,
