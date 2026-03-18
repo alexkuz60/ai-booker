@@ -84,6 +84,14 @@ function parseXml(text: string): XMLDocument | null {
   return xmlDoc.querySelector("parsererror") ? null : xmlDoc;
 }
 
+async function readBinaryFile(file: Blob): Promise<ArrayBuffer> {
+  if (typeof file.arrayBuffer === "function") {
+    return file.arrayBuffer();
+  }
+
+  return new Response(file).arrayBuffer();
+}
+
 export function decodeFb2Buffer(buffer: ArrayBuffer | Uint8Array): string {
   const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   const candidates = [
