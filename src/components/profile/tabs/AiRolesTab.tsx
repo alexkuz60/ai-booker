@@ -18,6 +18,7 @@ import { AiRolePresets } from "./AiRolePresets";
 import { AI_ROLE_LIST, TIER_LABELS, type AiRoleId } from "@/config/aiRoles";
 import type { ModelRegistryEntry } from "@/config/modelRegistry";
 import { RoleBadge } from "@/components/ui/RoleBadge";
+import { TaskPromptsPopover } from "./TaskPromptsPopover";
 
 const STORAGE_KEY = "ai-roles-collapsed-providers";
 
@@ -148,11 +149,12 @@ export function AiRolesTab({ apiKeys, isRu, onModelChanged, bookTitle }: AiRoles
               <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
                 <div className="flex items-start gap-3 flex-1 min-w-0">
                   <RoleBadge roleId={role.id as AiRoleId} model={currentModel} isRu={isRu} size={16} className="mt-0.5" />
-                  <div className="min-w-0">
+                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium font-body">
                         {isRu ? role.labelRu : role.labelEn}
                       </span>
+                      <TaskPromptsPopover roleId={role.id as AiRoleId} isRu={isRu} />
                       <Badge
                         variant="outline"
                         className={`text-[9px] px-1.5 py-0 ${tierColor} border-current/30`}

@@ -5,6 +5,7 @@
  */
 import { logAiUsage } from "../_shared/logAiUsage.ts";
 import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
+import { resolveTaskPrompt } from "../_shared/taskPrompts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -114,9 +115,8 @@ Deno.serve(async (req) => {
       return block;
     }).join("\n");
 
-    const systemPrompt = lang === "ru"
-      ? `Ты — литературный аналитик. Проанализируй персонажей на основе текста.\n\nДля каждого определи:\n- age_group: child / teen / young / adult / elder / unknown\n- temperament: sanguine / choleric / melancholic / phlegmatic / mixed\n- speech_style: описание стиля речи (2-3 предложения)\n- description: психологический портрет (3-5 предложений)\n\nОтвечай на русском в полях description и speech_style.`
-      : `You are a literary analyst. Analyze characters based on text.\n\nFor each determine:\n- age_group: child / teen / young / adult / elder / unknown\n- temperament: sanguine / choleric / melancholic / phlegmatic / mixed\n- speech_style: speech patterns description (2-3 sentences)\n- description: psychological portrait (3-5 sentences)`;
+    const systemPrompt = resolveTaskPrompt("profiler:profile_characters", lang)
+      || "You are a literary analyst. Analyze characters based on text.";
 
     const jsonSuffix = `\n\nRespond with ONLY a valid JSON: {"characters": [{"name": "...", "age_group": "...", "temperament": "...", "speech_style": "...", "description": "..."}]}`;
 

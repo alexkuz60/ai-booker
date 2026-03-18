@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
+import { resolveTaskPrompt } from "../_shared/taskPrompts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -96,33 +97,8 @@ async function checkIsAdmin(authHeader: string): Promise<boolean> {
 function buildPrompt(scenes: { scene_number: number; text: string }[], lang: "ru" | "en") {
   const isRu = lang === "ru";
 
-  const systemPrompt = isRu
-    ? `Ты — литературный аналитик. Твоя задача — найти ВСЕХ персонажей (людей, существ, 
-говорящих животных) в предложенных сценах главы. 
-
-Правила:
-1. Персонаж — это ИМЕНОВАННАЯ сущность, которая действует, говорит или упоминается по имени.
-2. Нарицательные слова (мужчина, старик, солдат) — НЕ персонажи, если у них нет имени.
-3. Учитывай все падежные формы русского языка: «Бригадир/Бригадира/Бригадиру» — один персонаж.
-4. Если персонажа называют по-разному (имя, фамилия, прозвище, сокращение), укажи основное 
-   имя в поле "name" и все варианты в "aliases".
-5. Определи пол персонажа по контексту (род глаголов, местоимения).
-6. Укажи номера сцен, где персонаж появляется (действует, говорит или упоминается).
-7. НЕ включай абстрактные понятия, топонимы, организации.
-8. Слова вроде «Угу», «Сейчас», «Тихо» — это НЕ имена персонажей.`
-    : `You are a literary analyst. Find ALL characters (people, creatures, talking animals) 
-in the provided chapter scenes.
-
-Rules:
-1. A character is a NAMED entity that acts, speaks, or is mentioned by name.
-2. Common nouns (man, old man, soldier) are NOT characters unless they have a name.
-3. Account for all grammatical forms: "John/John's" = one character.
-4. If a character is referred to differently (name, surname, nickname), put the primary 
-   name in "name" and all variants in "aliases".
-5. Determine gender from context (verb forms, pronouns).
-6. List scene numbers where the character appears (acts, speaks, or is mentioned).
-7. Do NOT include abstract concepts, place names, organizations.
-8. Words like "Yeah", "Now", "Quiet" are NOT character names.`;
+  const systemPrompt = resolveTaskPrompt("profiler:extract_characters", lang)
+    || "You are a literary analyst. Find all characters in the provided scenes.";
 
   const scenesText = scenes
     .map((s) => `── Сцена ${s.scene_number} ──\n${s.text.slice(0, 6000)}`)

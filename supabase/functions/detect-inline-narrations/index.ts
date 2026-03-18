@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
 import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
+import { resolveTaskPrompt } from "../_shared/taskPrompts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -129,26 +130,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const systemPrompt = `You are a literary text analyst specializing in detecting narrator/author insertions within character dialogue.
-
-Given a list of dialogue segments, detect any embedded narrator commentary (author's words) inside the speech.
-
-Common patterns (Russian literature):
-— «Родя, — тихо позвал он, — ты не умирай» → narrator: "тихо позвал он"
-— «Идём, — сказал он, вставая. — Пора» → narrator: "сказал он, вставая"
-— «Нет!» — крикнул он → narrator: "крикнул он" (after the speech)
-— «Ну, — он помолчал, — ладно» → narrator: "он помолчал"
-
-For each segment, return:
-- "segment_id": the original segment_id
-- "inline_narrations": array of detected narrator insertions:
-  - "text": the narrator's text (e.g. "тихо позвал он")
-  - "insert_after": the last piece of character speech BEFORE this narrator insertion
-- "clean_text": the dialogue text with ALL narrator parts removed (character's words only)
-
-If a segment has NO narrator insertions, return it with empty inline_narrations array and unchanged clean_text.
-
-Return ONLY a JSON array. No markdown, no explanation.`;
+    const systemPrompt = resolveTaskPrompt("profiler:detect_inline_narrations")
+      || "You are a literary text analyst specializing in detecting narrator insertions within dialogue.";
 
     const userContent = batch.map((b, i) => 
       `[${i + 1}] segment_id: "${b.segment_id}"\nspeaker: ${b.speaker || "unknown"}\ntext: ${b.text}`

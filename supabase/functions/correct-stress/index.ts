@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
+import { resolveTaskPrompt } from "../_shared/taskPrompts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -240,18 +241,11 @@ Deno.serve(async (req) => {
       const sceneText = phrases.map(p => p.text).join("\n");
       const existingWords = new Set(dictionary.map(d => d.word.toLowerCase()));
 
-      const systemPrompt = `Ты — эксперт по русской фонетике и орфоэпии. Твоя задача — найти в тексте слова с неоднозначным ударением (омографы и слова, часто произносимые неправильно).
-
-Для каждого найденного слова верни:
-- word: слово в начальной форме (именительный падеж, инфинитив)
-- stressed_index: индекс (0-based) ударной буквы в слове
-- reason: краткое объяснение почему ударение может быть неочевидным
-
-Примеры омографов: замОк/зАмок, мукА/мУка, Орган/оргАн, Атлас/атлАс, стрЕлки/стрелкИ.
-Примеры частых ошибок: звонИт (не звОнит), тОрты (не тортЫ), бАнты (не бантЫ).
-
-Не включай слова, ударение которых очевидно и не вызывает сомнений.
-${existingWords.size > 0 ? `\nУже в словаре пользователя (не включай): ${[...existingWords].join(", ")}` : ""}`;
+      const basePrompt = resolveTaskPrompt("proofreader:suggest_stress")
+        || "Ты — эксперт по русской фонетике. Найди слова с неоднозначным ударением.";
+      const systemPrompt = existingWords.size > 0
+        ? `${basePrompt}\n\nУже в словаре пользователя (не включай): ${[...existingWords].join(", ")}`
+        : basePrompt;
 
       const aiRes = await fetch(resolved.endpoint, {
         method: "POST",

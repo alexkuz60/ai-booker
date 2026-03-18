@@ -3,6 +3,7 @@ import { splitPhrases } from "../_shared/splitPhrases.ts";
 import { extractCharacters } from "../_shared/extractCharacters.ts";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
 import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
+import { resolveTaskPrompt } from "../_shared/taskPrompts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -96,45 +97,7 @@ Deno.serve(async (req) => {
     const userId = await getUserIdFromAuth(authHeader);
     const aiStart = Date.now();
 
-    const systemPrompt = `You are a literary text analyst. Given a scene text, split it into structural segments.
-Each segment must have:
-- "type": one of ${SEGMENT_TYPES.join(", ")}
-- "speaker": string or null (required for dialogue/monologue/first_person, null for others)
-- "text": the exact text of the segment (preserve original wording)
-- "inline_narrations": array (optional, for dialogue/monologue only) — narrator insertions embedded within a character's speech
-
-Rules:
-- "narrator" = third-person narration, descriptions, action
-- "first_person" = narration from a character's perspective (I/me)
-- "inner_thought" = character's internal thoughts, reflections
-- "dialogue" = spoken lines in a conversation (when multiple characters speak in sequence); set "speaker" to the character name
-- "monologue" = a single standalone spoken line (direct speech) NOT part of a back-and-forth exchange; set "speaker" to the character name. Use this when a character speaks once and the scene continues with narration, not another character's reply
-- "lyric" = songs, poems, verses, rhymed text, recitations. IMPORTANT: detect poetry even when embedded in prose — if a passage has verse structure (line breaks with rhythm/rhyme, stanza grouping, or meter), classify it as "lyric". Songs sung by characters are also "lyric" with "speaker" set to the singer. Preserve original line breaks in the "text" field for poetry.
-- "epigraph" = epigraphs, quotes at the start
-- "footnote" = footnotes, author comments. Text marked with [сн. N]...[/сн.] is footnote content.
-- "telephone" = phone conversations
-- Inline sound markers like [gunshot] should remain in the text as-is
-- Footnote reference markers [сн.→ N] MUST be preserved exactly as-is in the text. They mark where a footnote is referenced in the body text. Do NOT remove, alter, or split them.
-
-IMPORTANT — Inline narrator detection:
-When dialogue contains embedded narrator commentary (author words between dashes/commas), extract them as inline_narrations.
-Example input: «Родя, — тихо позвал он, — ты только не умирай, а?»
-Output:
-{
-  "type": "dialogue",
-  "speaker": "Разумихин",
-  "text": "Родя, ты только не умирай, а?",
-  "inline_narrations": [
-    { "text": "тихо позвал он", "insert_after": "Родя," }
-  ]
-}
-
-The "text" field must contain ONLY the character's spoken words (narrator parts removed).
-"insert_after" = the last spoken fragment before the narrator insertion.
-If there are multiple narrator insertions in one line, list them all in the array.
-If dialogue has no narrator insertions, omit inline_narrations or set to [].
-
-Return ONLY a JSON array of segments. No markdown, no explanation.`;
+    const systemPrompt = resolveTaskPrompt("screenwriter:segment_scene", lang) || "You are a literary text analyst.";
 
     const userPrompt = `Analyze this scene (language: ${lang}):\n\n${content}`;
 

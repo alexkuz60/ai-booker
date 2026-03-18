@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { logAiUsage } from "../_shared/logAiUsage.ts";
+import { resolveTaskPrompt } from "../_shared/taskPrompts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -90,20 +91,9 @@ Deno.serve(async (req) => {
     const aiStart = Date.now();
 
     const promptLang = isRu ? "Russian" : "English";
-    const systemPrompt = `You are a sound designer for audiobook production. Given scene metadata, generate atmospheric sound layer descriptions for ElevenLabs Sound Effects and Music APIs.
-
-Rules:
-- Return a JSON array of 1-3 layers
-- Each layer: { "layer_type": "ambience"|"music"|"sfx", "prompt": "...", "duration_seconds": N, "volume": 0.0-1.0, "fade_in_ms": N, "fade_out_ms": N }
-- "ambience" = continuous environmental sound (rain, forest, city, room tone). Duration 10-22 sec (will be looped). Volume 0.2-0.4.
-- "music" = background score matching mood. Duration 30-60 sec. Volume 0.15-0.3.
-- "sfx" = optional single accent sound effect. Duration 2-8 sec. Volume 0.3-0.5. Only include if the scene clearly suggests a specific sound event.
-- Prompts must be in ${promptLang}, detailed, cinematic. Describe the sound, not the visual.
-- Keep ambience present in every response. Music is optional. SFX is optional.
-- Fade-in: 500-2000ms. Fade-out: 1000-3000ms.
-- Match the mood and BPM closely.
-
-Return ONLY the JSON array, no markdown, no explanation.`;
+    const basePrompt = resolveTaskPrompt("sound_engineer:generate_atmosphere", isRu ? "ru" : "en")
+      || "You are a sound designer for audiobook production.";
+    const systemPrompt = `${basePrompt}\n\n- Prompts must be in ${promptLang}.`;
 
     const userPrompt = `Scene: "${scene.title}"
 Mood: ${scene.mood || "neutral"}
