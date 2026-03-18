@@ -45,13 +45,13 @@ export function useChapterAnalysis({
     onChapterResultsMutated?.();
   };
 
-  // ─── Helper: call edge function ─────────────────────────────
-  const callParseFunction = async (body: Record<string, unknown>): Promise<any> => {
-    const abortCtrl = new AbortController();
-    const timeoutId = setTimeout(() => abortCtrl.abort(), 180_000);
+  // ─── Helper: call edge function (with Lovable→OpenRouter fallback on 402) ──
+  const callParseFunctionRaw = async (body: Record<string, unknown>): Promise<Response> => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
     const session = (await supabase.auth.getSession()).data.session;
+    const abortCtrl = new AbortController();
+    const timeoutId = setTimeout(() => abortCtrl.abort(), 180_000);
 
     try {
       const resp = await fetch(`${supabaseUrl}/functions/v1/parse-book-structure`, {
@@ -65,13 +65,7 @@ export function useChapterAnalysis({
         signal: abortCtrl.signal,
       });
       clearTimeout(timeoutId);
-      if (!resp.ok) {
-        const errBody = await resp.text();
-        let errMsg: string;
-        try { errMsg = JSON.parse(errBody).error; } catch { errMsg = errBody; }
-        throw new Error(errMsg || `HTTP ${resp.status}`);
-      }
-      return await resp.json();
+      return resp;
     } catch (fetchErr: any) {
       clearTimeout(timeoutId);
       if (fetchErr.name === 'AbortError') {
@@ -79,6 +73,39 @@ export function useChapterAnalysis({
       }
       throw fetchErr;
     }
+  };
+
+  const callParseFunction = async (body: Record<string, unknown>): Promise<any> => {
+    let resp = await callParseFunctionRaw(body);
+
+    // Lovable AI 402 → automatic fallback to OpenRouter if key available
+    if (resp.status === 402 && body.provider === 'lovable' && userApiKeys['openrouter']) {
+      const originalModel = String(body.user_model || '');
+      const orModel = originalModel.startsWith('openrouter/')
+        ? originalModel
+        : `openrouter/${originalModel}`;
+      const orEntry = getModelRegistryEntry(orModel);
+      console.warn(`[Analysis] Lovable AI 402 — falling back to OpenRouter: ${orModel}`);
+      toast.info(isRu
+        ? 'Кредиты Lovable AI исчерпаны, переключаюсь на OpenRouter...'
+        : 'Lovable AI credits exhausted, switching to OpenRouter...');
+      resp = await callParseFunctionRaw({
+        ...body,
+        provider: 'openrouter',
+        user_model: orEntry ? orModel : originalModel,
+        user_api_key: userApiKeys['openrouter'],
+        openrouter_api_key: userApiKeys['openrouter'],
+        _modelName: orModel,
+      });
+    }
+
+    if (!resp.ok) {
+      const errBody = await resp.text();
+      let errMsg: string;
+      try { errMsg = JSON.parse(errBody).error; } catch { errMsg = errBody; }
+      throw new Error(errMsg || `HTTP ${resp.status}`);
+    }
+    return await resp.json();
   };
 
   // ─── Two-stage Chapter Analysis (with resume) ─────────────
