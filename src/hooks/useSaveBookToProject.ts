@@ -247,6 +247,8 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       }
 
       // ── 4. Sync characters to book_characters ──
+      let savedCharCount = 0;
+      let savedProfileCount = 0;
       if (storage) {
         const localChars = await readCharactersFromLocal(storage);
         if (localChars.length > 0) {
@@ -266,7 +268,11 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
 
           const { error: charErr } = await supabase.from("book_characters").insert(charInserts);
           if (charErr) console.warn("[SaveToServer] characters insert:", charErr);
-          else console.log(`[SaveToServer] Saved ${charInserts.length} characters`);
+          else {
+            savedCharCount = charInserts.length;
+            savedProfileCount = localChars.filter(c => c.profile?.description).length;
+            console.log(`[SaveToServer] Saved ${savedCharCount} characters, ${savedProfileCount} profiles`);
+          }
         }
       }
 
@@ -334,9 +340,19 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         .eq("id", currentBookId);
 
       const sceneCount = sceneInserts.length;
+      const descParts = [
+        `${chapterUpserts.length} ${isRu ? "глав" : "chapters"}`,
+        `${sceneCount} ${isRu ? "сцен" : "scenes"}`,
+      ];
+      if (savedCharCount > 0) {
+        descParts.push(`${savedCharCount} ${isRu ? "персонажей" : "characters"}`);
+      }
+      if (savedProfileCount > 0) {
+        descParts.push(`${savedProfileCount} ${isRu ? "профилей" : "profiles"}`);
+      }
       toast({
         title: isRu ? "Синхронизировано с сервером" : "Synced to server",
-        description: `${chapterUpserts.length} ${isRu ? "глав" : "chapters"}, ${sceneCount} ${isRu ? "сцен" : "scenes"}`,
+        description: descParts.join(", "),
       });
     } catch (error) {
       const message = getErrorMessage(error, isRu);
