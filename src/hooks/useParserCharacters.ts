@@ -94,6 +94,50 @@ export function useParserCharacters({
       sceneCount: number;
     }>();
 
+    // Helper: build intermediate LocalCharacter[] snapshot from allResults merged with existing
+    const buildSnapshot = (): LocalCharacter[] => {
+      const existingByName = new Map<string, LocalCharacter>();
+      for (const ch of characters) {
+        existingByName.set(ch.name.toLowerCase(), ch);
+        for (const alias of ch.aliases) existingByName.set(alias.toLowerCase(), ch);
+      }
+
+      const snapshot: LocalCharacter[] = [...characters];
+      const usedIds = new Set(characters.map(c => c.id));
+
+      for (const [key, data] of allResults) {
+        const existing = existingByName.get(key)
+          || data.aliases.reduce<LocalCharacter | undefined>(
+            (found, a) => found || existingByName.get(a.toLowerCase()), undefined);
+
+        if (existing) {
+          existing.appearances = data.appearances;
+          existing.sceneCount = data.sceneCount;
+          if ((!existing.gender || existing.gender === "unknown") && data.gender !== "unknown") {
+            existing.gender = data.gender;
+          }
+          const allAliases = new Set([...existing.aliases, ...data.aliases]);
+          allAliases.delete(existing.name);
+          existing.aliases = Array.from(allAliases);
+        } else {
+          const newChar: LocalCharacter = {
+            id: generateId(),
+            name: data.name,
+            aliases: data.aliases,
+            gender: data.gender,
+            appearances: data.appearances,
+            sceneCount: data.sceneCount,
+          };
+          snapshot.push(newChar);
+          usedIds.add(newChar.id);
+          existingByName.set(key, newChar);
+        }
+      }
+
+      snapshot.sort((a, b) => b.sceneCount - a.sceneCount);
+      return snapshot;
+    };
+
     for (let ci = 0; ci < chaptersToProcess.length; ci++) {
       const { idx, entry, scenes } = chaptersToProcess[ci];
       setExtractProgress(
@@ -182,6 +226,9 @@ export function useParserCharacters({
             });
           }
         }
+
+        // Push intermediate snapshot to UI so characters appear live
+        setCharacters(buildSnapshot());
       } catch (err) {
         console.error("AI extraction failed for chapter", idx, err);
         const msg = err instanceof Error ? err.message : "";
