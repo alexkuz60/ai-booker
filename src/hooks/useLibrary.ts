@@ -62,6 +62,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
         created_at: resolvedCreatedAt,
         chapter_count: 0,
         scene_count: 0,
+        file_format: resolvedFormat as "pdf" | "docx" | "fb2",
       },
       projectName: storage.projectName,
       dedupeKey,

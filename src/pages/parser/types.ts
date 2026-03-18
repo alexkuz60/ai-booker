@@ -54,6 +54,7 @@ export interface BookRecord {
   created_at: string;
   chapter_count?: number;
   scene_count?: number;
+  file_format?: "pdf" | "docx" | "fb2";
 }
 
 // ─── Classification ──────────────────────────────────────────
