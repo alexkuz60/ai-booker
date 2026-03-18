@@ -426,18 +426,16 @@ export default function ParserCharactersPanel({
                       </Popover>
                     </TableCell>
 
-                    {/* Profile icon */}
+                    {/* Profile icon — clickable to open profile panel */}
                     <TableCell className="text-center px-0">
                       {char.profile?.description ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Brain className="h-3.5 w-3.5 text-primary mx-auto cursor-help" />
-                          </TooltipTrigger>
-                          <TooltipContent side="left" className="max-w-xs text-xs">
-                            <p className="font-semibold mb-1">{char.profile.temperament || ""}</p>
-                            <p>{char.profile.description}</p>
-                          </TooltipContent>
-                        </Tooltip>
+                        <button
+                          onClick={() => setProfileViewId(profileViewId === char.id ? null : char.id)}
+                          className="mx-auto block"
+                          title={isRu ? "Показать профиль" : "Show profile"}
+                        >
+                          <Brain className={`h-3.5 w-3.5 ${profileViewId === char.id ? "text-primary" : "text-primary/60 hover:text-primary"} transition-colors`} />
+                        </button>
                       ) : (
                         <span className="text-muted-foreground/20">—</span>
                       )}
