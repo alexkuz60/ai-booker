@@ -17,6 +17,21 @@ import type { Scene, TocChapter, Step, ChapterStatus, BookRecord } from "@/pages
 import { ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
 
+// ── Heartbeat: detect stale sessionStorage after PC restart ──
+const HEARTBEAT_KEY = "parser_heartbeat";
+const HEARTBEAT_STALE_MS = 5 * 60 * 1000; // 5 minutes
+
+function isSessionStale(): boolean {
+  const raw = localStorage.getItem(HEARTBEAT_KEY);
+  if (!raw) return true; // no heartbeat → treat as stale
+  const elapsed = Date.now() - Number(raw);
+  return elapsed > HEARTBEAT_STALE_MS;
+}
+
+function writeHeartbeat() {
+  localStorage.setItem(HEARTBEAT_KEY, String(Date.now()));
+}
+
 import { useLibrary } from "@/hooks/useLibrary";
 import { useFileUpload } from "@/hooks/useFileUpload";
 import { useBookRestore } from "@/hooks/useBookRestore";
@@ -37,9 +52,17 @@ export function useBookManager({
   storageBackend = "none", createProject, pendingProjectName,
 }: UseBookManagerParams) {
   // ── Shared state ──────────────────────────────────────────
-  const [step, setStep] = useState<Step>(() =>
-    sessionStorage.getItem(ACTIVE_BOOK_KEY) ? "extracting_toc" : "library"
-  );
+  const [step, setStep] = useState<Step>(() => {
+    const savedBookId = sessionStorage.getItem(ACTIVE_BOOK_KEY);
+    if (!savedBookId) return "library";
+    // If heartbeat is stale (PC restart), clear session and go to library
+    if (isSessionStale()) {
+      console.info("[Heartbeat] Session stale after restart, clearing ACTIVE_BOOK_KEY");
+      sessionStorage.removeItem(ACTIVE_BOOK_KEY);
+      return "library";
+    }
+    return "extracting_toc";
+  });
   const [fileName, setFileName] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [bookId, setBookId] = useState<string | null>(null);
@@ -53,6 +76,17 @@ export function useBookManager({
   // pdfRef/totalPages are managed by useBookRestore but also set by useFileUpload
   const [pdfRefState, setPdfRef] = useState<any>(null);
   const [totalPagesState, setTotalPages] = useState(0);
+
+  // ── Heartbeat: write on step changes + beforeunload ──────
+  useEffect(() => {
+    if (step !== "library") writeHeartbeat();
+  }, [step]);
+
+  useEffect(() => {
+    const onUnload = () => writeHeartbeat();
+    window.addEventListener("beforeunload", onUnload);
+    return () => window.removeEventListener("beforeunload", onUnload);
+  }, []);
 
   // ── Sub-hooks ─────────────────────────────────────────────
   const library = useLibrary({ userId, storageBackend, projectStorage, step });
