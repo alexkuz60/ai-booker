@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
+import { resolveTaskPrompt } from "../_shared/taskPrompts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
