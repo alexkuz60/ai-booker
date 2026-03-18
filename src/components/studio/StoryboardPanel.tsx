@@ -1019,8 +1019,11 @@ export function StoryboardPanel({
     if (!sceneId) return;
     setCorrectingStress(true);
     try {
-      const { data, error } = await supabase.functions.invoke("correct-stress", {
+      const { data, error } = await invokeWithFallback({
+        functionName: "correct-stress",
         body: { scene_id: sceneId, mode, model: getModelForRole("screenwriter") },
+        userApiKeys,
+        isRu,
       });
       if (error) throw error;
 
