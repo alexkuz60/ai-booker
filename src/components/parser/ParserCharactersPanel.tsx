@@ -283,6 +283,9 @@ export default function ParserCharactersPanel({
                 <TableHead className="w-7 px-1"></TableHead>
                 <TableHead className="text-xs">{isRu ? "Имя" : "Name"}</TableHead>
                 <TableHead className="text-xs text-center w-10">{isRu ? "Пол" : "G"}</TableHead>
+                <TableHead className="text-xs text-center w-7 px-0">
+                  <Brain className="h-3 w-3 mx-auto text-muted-foreground/50" />
+                </TableHead>
                 <TableHead className="text-xs text-center w-12">{isRu ? "Сцен" : "Sc."}</TableHead>
                 <TableHead className="text-xs text-center w-12">{isRu ? "Гл." : "Ch."}</TableHead>
                 <TableHead className="w-7 px-1"></TableHead>
