@@ -27,7 +27,7 @@ interface UseChapterAnalysisParams {
   /** Lazy PDF loader — downloads from storage if not in memory */
   ensurePdfLoaded?: () => Promise<any>;
   /** Persisted file format from project.json (B4/B7 fix) */
-  fileFormat?: "pdf" | "docx" | null;
+  fileFormat?: "pdf" | "docx" | "fb2" | null;
 }
 
 export function useChapterAnalysis({
@@ -178,9 +178,9 @@ export function useChapterAnalysis({
     } catch { return null; }
   };
 
-  // B4/B7 fix: check persisted fileFormat first, then fall back to sessionStorage
-  const isDocxMode = (): boolean => {
-    if (fileFormat === "docx") return true;
+  // B4/B7 fix: text-first mode for DOCX and FB2 (no PDF rendering needed)
+  const isTextMode = (): boolean => {
+    if (fileFormat === "docx" || fileFormat === "fb2") return true;
     return sessionStorage.getItem("docx_chapter_texts") !== null;
   };
 
@@ -189,10 +189,10 @@ export function useChapterAnalysis({
     // Folders are structural-only — never analyze them
     if (isFolder(idx)) return;
 
-    const docxMode = isDocxMode();
+    const textMode = isTextMode();
     let activePdf = pdfRef;
 
-    if (!docxMode) {
+    if (!textMode) {
       // Try to load PDF on demand if not in memory
       if (!activePdf && ensurePdfLoaded) {
         activePdf = await ensurePdfLoaded();
@@ -287,7 +287,7 @@ export function useChapterAnalysis({
 
         let text: string;
 
-        if (docxMode) {
+        if (textMode) {
           // ── DOCX path: get chapter HTML from sessionStorage, strip to plain text ──
           const chapterHtml = getDocxChapterText(idx);
           if (chapterHtml) {
@@ -295,7 +295,8 @@ export function useChapterAnalysis({
           } else {
             text = "";
           }
-          addLog(isRu ? "📄 Источник: DOCX (кэш глав)" : "📄 Source: DOCX (chapter cache)");
+          const formatLabel = fileFormat === "fb2" ? "FB2" : "DOCX";
+          addLog(isRu ? `📄 Источник: ${formatLabel} (кэш глав)` : `📄 Source: ${formatLabel} (chapter cache)`);
         } else {
           // ── PDF path: extract text by page range ──
           // CONTRACT K1: shared resolver (same logic as navigator/server normalization)
@@ -350,7 +351,7 @@ export function useChapterAnalysis({
           return;
         }
 
-        if (docxMode) {
+        if (textMode) {
           addLog(`${t("logExtracted", isRu)}: ${charCount.toLocaleString()} ${t("logChars", isRu)}`);
         } else {
           addLog(`${t("logExtracted", isRu)}: ${charCount.toLocaleString()} ${t("logChars", isRu)} (${entry.startPage}–${entry.endPage} ${t("logPagesAbbr", isRu)})`);
@@ -477,7 +478,7 @@ export function useChapterAnalysis({
         addLog(`${t("logFoundScenes", isRu)} ${scenes.length} ${t("logScenesWord", isRu)}:`);
         const totalChars = text.length;
         let charOffset = 0;
-        if (!docxMode) {
+        if (!textMode) {
           const pageSpan = (entry.endPage || entry.startPage) - entry.startPage + 1;
           scenes.forEach((sc, i) => {
             const scLen = sc.content?.length || 0;
@@ -607,6 +608,7 @@ export function useChapterAnalysis({
     abortRef.current?.abort();
     abortRef.current = null;
     prefetchingRef.current = false;
+    userStartedAnalysis.current = false;
     setIsAnalyzing(false);
     setAnalysisLog(prev => [...prev, isRu ? "⏹️ Анализ остановлен пользователем" : "⏹️ Analysis stopped by user"]);
     // Set current analyzing chapters to error so user can resume
