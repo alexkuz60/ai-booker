@@ -14,7 +14,7 @@ import {
 import { t } from "@/pages/parser/i18n";
 import type { Scene, TocChapter, Step, ChapterStatus, BookRecord } from "@/pages/parser/types";
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
-import type { ProjectStorage } from "@/lib/projectStorage";
+import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
 import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
 import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 import { detectFileFormat, getSourcePath, stripFileExtension, type FileFormat } from "@/lib/fileFormatUtils";
@@ -30,6 +30,8 @@ interface UseBookRestoreParams {
   books: BookRecord[];
   fileName: string;
   bookId: string | null;
+  /** Map of bookId → OPFS project names (from useLibrary) */
+  localProjectNamesByBookId: Map<string, string[]>;
   // State setters from orchestrator
   setStep: (s: Step) => void;
   setFileName: (s: string) => void;
@@ -45,7 +47,7 @@ interface UseBookRestoreParams {
 
 export function useBookRestore({
   userId, isRu, storageBackend, projectStorage, createProject,
-  books, fileName, bookId,
+  books, fileName, bookId, localProjectNamesByBookId,
   setStep, setFileName, setBookId, setTocEntries, setChapterIdMap,
   setPartIdMap, setChapterResults, setPdfRef, setTotalPages, setErrorMsg,
 }: UseBookRestoreParams) {
@@ -65,9 +67,29 @@ export function useBookRestore({
 
   // ─── Restore from local ProjectStorage ─────────────────────
   const restoreFromLocal = useCallback(async (savedBookId: string): Promise<boolean> => {
-    if (!projectStorage?.isReady) return false;
+    // ── Find the correct OPFS project for this bookId ──
+    let storage: ProjectStorage | null | undefined = null;
+
+    if (storageBackend === "opfs") {
+      const projectNames = localProjectNamesByBookId.get(savedBookId);
+      if (projectNames?.length) {
+        try {
+          storage = await OPFSStorage.openOrCreate(projectNames[0]);
+          console.debug("[LocalRestore] Opened OPFS project for book:", projectNames[0], savedBookId);
+        } catch (err) {
+          console.warn("[LocalRestore] Failed to open OPFS project:", projectNames[0], err);
+        }
+      }
+    }
+
+    // Fallback to current projectStorage if OPFS lookup didn't work
+    if (!storage?.isReady) {
+      storage = projectStorage;
+    }
+
+    if (!storage?.isReady) return false;
     try {
-      const local = await readStructureFromLocal(projectStorage);
+      const local = await readStructureFromLocal(storage);
       if (!local?.structure || local.structure.bookId !== savedBookId) return false;
 
       const { structure, chapterIdMap: localChIdMap, chapterResults: localResults } = local;
@@ -90,7 +112,7 @@ export function useBookRestore({
       setStep("workspace");
 
       // Normalize legacy local data immediately
-      void syncStructureToLocal(projectStorage, {
+      void syncStructureToLocal(storage, {
         bookId: savedBookId,
         title: structure.title,
         fileName: structure.fileName,
@@ -101,12 +123,12 @@ export function useBookRestore({
       });
 
       // Restore source file (async, non-blocking)
-      const localMeta = await projectStorage.readJSON<Record<string, unknown>>("project.json");
+      const localMeta = await storage.readJSON<Record<string, unknown>>("project.json");
       const localFormat: FileFormat = (localMeta?.fileFormat as FileFormat) || detectFileFormat(structure.fileName);
 
       if (localFormat === "pdf") {
         const sourcePath = getSourcePath(localFormat);
-        projectStorage.readBlob(sourcePath).then(async (pdfBlob) => {
+        storage.readBlob(sourcePath).then(async (pdfBlob) => {
           if (!pdfBlob) {
             console.log("[LocalRestore] No local PDF found, will download on demand");
             return;
@@ -137,7 +159,7 @@ export function useBookRestore({
       console.warn("[LocalRestore] Failed:", err);
       return false;
     }
-  }, [projectStorage, isRu, setBookId, setFileName, setTocEntries, setChapterIdMap, setChapterResults, setPartIdMap, setStep, updatePdfRef, updateTotalPages]);
+  }, [projectStorage, storageBackend, localProjectNamesByBookId, isRu, setBookId, setFileName, setTocEntries, setChapterIdMap, setChapterResults, setPartIdMap, setStep, updatePdfRef, updateTotalPages]);
 
   // ─── Open saved book (local-first + server fallback) ────────
   const openSavedBook = useCallback(async (
@@ -148,7 +170,9 @@ export function useBookRestore({
   ) => {
     if (!userId) return;
 
-    if (projectStorage?.isReady) {
+    // Try local-first restore (checks OPFS by bookId, not just current projectStorage)
+    const canTryLocal = projectStorage?.isReady || (storageBackend === "opfs" && localProjectNamesByBookId.has(book.id));
+    if (canTryLocal) {
       const restored = await restoreFromLocal(book.id);
       if (restored) {
         if (!options?.skipTimestampCheck && checkServerNewer && setServerNewerBookId) {
@@ -359,7 +383,7 @@ export function useBookRestore({
       setErrorMsg(err.message || "Unknown error");
       setStep("error");
     }
-  }, [userId, isRu, projectStorage, storageBackend, createProject, restoreFromLocal, updatePdfRef, updateTotalPages,
+  }, [userId, isRu, projectStorage, storageBackend, localProjectNamesByBookId, createProject, restoreFromLocal, updatePdfRef, updateTotalPages,
       setStep, setFileName, setBookId, setTocEntries, setChapterIdMap, setPartIdMap, setChapterResults, setErrorMsg]);
 
   // ─── Ensure PDF is loaded (local-first, then server) ────────
