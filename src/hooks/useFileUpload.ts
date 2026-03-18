@@ -291,7 +291,7 @@ export function useFileUpload({
             chapterResults: initMap,
           });
 
-          const localSourceName = isDocx ? "source/book.docx" : "source/book.pdf";
+          const localSourceName = isFb2 ? "source/book.fb2" : (isDocx ? "source/book.docx" : "source/book.pdf");
           await targetStorage.writeBlob(localSourceName, f).catch(() => {});
         }
       } catch (storageErr) {

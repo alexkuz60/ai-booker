@@ -119,7 +119,7 @@ export default function UploadView({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.docx,.doc"
+        accept=".pdf,.docx,.doc,.fb2"
         className="hidden"
         onChange={onFileSelect}
       />
