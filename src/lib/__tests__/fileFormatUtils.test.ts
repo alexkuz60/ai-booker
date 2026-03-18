@@ -68,6 +68,10 @@ describe("stripFileExtension", () => {
   it("leaves other extensions alone", () => {
     expect(stripFileExtension("file.txt")).toBe("file.txt");
   });
+
+  it("strips .fb2", () => {
+    expect(stripFileExtension("Novel.fb2")).toBe("Novel");
+  });
 });
 
 describe("getMimeType", () => {
