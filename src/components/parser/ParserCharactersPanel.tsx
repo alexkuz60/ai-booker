@@ -66,6 +66,7 @@ export default function ParserCharactersPanel({
   const [editingAliasId, setEditingAliasId] = useState<string | null>(null);
   const [aliasValue, setAliasValue] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [profileViewId, setProfileViewId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addingNew, setAddingNew] = useState(false);
   const [newName, setNewName] = useState("");
