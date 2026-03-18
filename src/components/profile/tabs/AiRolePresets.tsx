@@ -49,7 +49,7 @@ export function AiRolePresets({
     if (!finalName) return;
     const preset: AiRolePreset = {
       id: crypto.randomUUID(),
-      name: newName.trim(),
+      name: finalName,
       bookTitle: bookTitle || undefined,
       models: { ...resolvedModels } as AiRoleModelMap,
       createdAt: new Date().toISOString(),
