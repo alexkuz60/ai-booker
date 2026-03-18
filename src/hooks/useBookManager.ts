@@ -213,6 +213,19 @@ export function useBookManager({
     }
   }, [isRu, storageBackend, library.localProjectNamesByBookId, bookId, library.loadLibrary]);
 
+  // ── Delete server-only book ──────────────────────────────
+  const deleteServerBook = useCallback(async (delBookId: string) => {
+    try {
+      const { error } = await supabase.from("books").delete().eq("id", delBookId);
+      if (error) throw error;
+      await library.loadServerBooks();
+      toast.success(t("bookDeleted", isRu));
+    } catch (err) {
+      console.error("Failed to delete server book:", err);
+      toast.error(t("bookDeleteFailed", isRu));
+    }
+  }, [isRu, library.loadServerBooks]);
+
   // ── Clear all local projects ──────────────────────────────
   const clearAllProjects = useCallback(async () => {
     try {
