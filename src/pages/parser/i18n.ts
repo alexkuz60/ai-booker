@@ -25,7 +25,10 @@ const texts: Record<string, { ru: string; en: string }> = {
   libraryServerEmpty: { ru: "На сервере нет книг", en: "No books on server" },
   libraryServerLoad: { ru: "Загрузить с сервера", en: "Load from server" },
   libraryServerDownload: { ru: "Скачать", en: "Download" },
+  libraryServerDelete: { ru: "Удалить с сервера", en: "Delete from server" },
+  libraryServerDeleteDesc: { ru: "будет безвозвратно удалена с сервера. Локальные копии не затрагиваются.", en: "will be permanently deleted from the server. Local copies are not affected." },
   libraryServerLoading: { ru: "Загрузка списка...", en: "Loading list..." },
+  libraryUpdated: { ru: "Изменено", en: "Updated" },
   libraryLocalTitle: { ru: "Локальные проекты", en: "Local projects" },
 
   // Upload

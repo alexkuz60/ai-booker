@@ -52,6 +52,7 @@ export interface BookRecord {
   file_path: string | null;
   status: string;
   created_at: string;
+  updated_at?: string;
   chapter_count?: number;
   scene_count?: number;
   file_format?: "pdf" | "docx" | "fb2";
