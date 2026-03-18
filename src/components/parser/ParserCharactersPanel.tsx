@@ -68,6 +68,19 @@ export default function ParserCharactersPanel({
   const editRef = useRef<HTMLInputElement>(null);
   const aliasRef = useRef<HTMLInputElement>(null);
   const newRef = useRef<HTMLInputElement>(null);
+  const seenIdsRef = useRef<Set<string>>(new Set());
+
+  // Track which character IDs are new (for entrance animation)
+  const newCharIds = useMemo(() => {
+    const newIds = new Set<string>();
+    for (const c of characters) {
+      if (!seenIdsRef.current.has(c.id)) newIds.add(c.id);
+    }
+    // Update seen set
+    for (const c of characters) seenIdsRef.current.add(c.id);
+    return newIds;
+  }, [characters]);
+  const newRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (editingId) { editRef.current?.focus(); editRef.current?.select(); }
