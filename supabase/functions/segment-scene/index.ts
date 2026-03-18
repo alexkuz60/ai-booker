@@ -138,14 +138,14 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
 
     const userPrompt = `Analyze this scene (language: ${lang}):\n\n${content}`;
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiRes = await fetch(resolved.endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${resolved.apiKey}`,
       },
       body: JSON.stringify({
-        model: usedModel,
+        model: resolved.model,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
