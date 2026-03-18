@@ -176,15 +176,21 @@
 | Функция | Статус | Детали |
 |---------|--------|--------|
 | Загрузка PDF | ✅ | pdfjs-dist, клиентское извлечение текста |
+| Загрузка DOCX | ✅ | mammoth.js, Heading-стили + regex-фоллбэк |
+| Загрузка FB2 | ✅ | Нативный XML-парсер, `<section>/<title>` |
+| Формат-агностический API | ✅ | `fileFormatUtils.ts`: detectFileFormat, getSourcePath, findSourceBlob |
 | TOC extraction (PDF outline) | ✅ | Автоматическое извлечение оглавления из PDF |
 | TOC-first → LLM fallback | ✅ | Если нет оглавления — LLM определяет структуру |
 | Пошаговый UI (Upload → TOC → Analysis) | ✅ | 3 шага с контролем пользователя |
+| Модульная декомпозиция | ✅ | 6+ специализированных хуков: useLibrary, useFileUpload, useBookRestore, useServerSync, useTocMutations, useBookManager |
 | Реестр моделей (Lovable AI + ProxyAPI + OpenRouter) | ✅ | 20+ моделей, динамическая фильтрация по ключам |
-| Маршрутизация в Edge Function | ✅ | Автоматический роутинг: lovable-gateway / proxyapi.ru / openrouter.ai |
-| Cloud-sync выбора модели | ✅ | useCloudSettings('parser-model') |
+| Маршрутизация в Edge Function | ✅ | Унифицированный `_shared/providerRouting.ts` |
+| Каскадный fallback (402/429) | ✅ | `invokeWithFallback.ts`: Lovable AI → OpenRouter → ProxyAPI → DotPoint |
+| Cloud-sync выбора модели | ✅ | useCloudSettings('parser-model') → AI Roles |
 | Параллельный анализ глав | ✅ | Батчи по 3, прогресс-бар |
-| Сохранение в БД | ✅ | books → book_parts → book_chapters → book_scenes |
+| Сохранение результатов | ✅ | **Только OPFS** (local-first). БД — по кнопке «На сервер» |
 | UI результатов (дерево) | ✅ | Части → Главы → Сцены с бейджами mood/type/bpm |
+| Библиотека из OPFS | ✅ | project.json → список, fallback на toc.json, аварийный сброс |
 | Character Profiler | ✅ | Таблицы, извлечение, профайлинг, авто-кастинг, дубликаты, системные персонажи |
 | ElevenLabs TTS интеграция | 🔧 | Реестр голосов, табовый UI, кредиты, предпрослушивание. Синтез сцен через ElevenLabs — ⏳ |
 | ProxyAPI (OpenAI) TTS интеграция | ✅ | 3 модели (gpt-4o-mini-tts, tts-1, tts-1-hd), 12 голосов, инструкции, Edge Function `proxyapi-tts`, табовый UI, динамическая фильтрация голосов по модели |
