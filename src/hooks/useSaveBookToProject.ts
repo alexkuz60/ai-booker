@@ -122,13 +122,15 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
             ? fileName.replace(/\.(pdf|docx?|fb2)$/i, "")
             : (toc[0]?.title || "Book");
         }
+        // LIR-5: preserve actual file format, don't hardcode .pdf
+        const resolvedFileName = fileName || `${bookTitle}.pdf`;
         const { error: bookErr } = await supabase
           .from("books")
           .insert({
             id: currentBookId,
             user_id: user.id,
             title: bookTitle,
-            file_name: fileName || `${bookTitle}.pdf`,
+            file_name: resolvedFileName,
             status: "uploaded",
           });
         if (bookErr) throw bookErr;
