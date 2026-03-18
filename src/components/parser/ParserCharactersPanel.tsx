@@ -326,14 +326,11 @@ export default function ParserCharactersPanel({
                         )}
                         {char.aliases.length > 0 && !isExpanded && (
                           <div className="flex flex-wrap gap-1 mt-0.5">
-                            {char.aliases.slice(0, 2).map(a => (
+                            {char.aliases.map(a => (
                               <span key={a} className="text-[10px] text-muted-foreground bg-muted/50 px-1 rounded">
                                 {a}
                               </span>
-                            ))}
-                            {char.aliases.length > 2 && (
-                              <span className="text-[10px] text-muted-foreground">+{char.aliases.length - 2}</span>
-                            )}
+                            ))
                           </div>
                         )}
                       </div>
