@@ -24,6 +24,30 @@ import {
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import type { LocalCharacter } from "@/pages/parser/types";
 
+// ─── i18n maps for profile badges ────────────────────────
+const AGE_LABELS: Record<string, { ru: string; en: string }> = {
+  infant: { ru: "Младенец", en: "Infant" },
+  child: { ru: "Ребёнок", en: "Child" },
+  teen: { ru: "Подросток", en: "Teen" },
+  young: { ru: "Молодой", en: "Young" },
+  adult: { ru: "Взрослый", en: "Adult" },
+  elder: { ru: "Пожилой", en: "Elder" },
+};
+
+const TEMPERAMENT_LABELS: Record<string, { ru: string; en: string }> = {
+  sanguine: { ru: "Сангвиник", en: "Sanguine" },
+  choleric: { ru: "Холерик", en: "Choleric" },
+  melancholic: { ru: "Меланхолик", en: "Melancholic" },
+  phlegmatic: { ru: "Флегматик", en: "Phlegmatic" },
+  mixed: { ru: "Смешанный", en: "Mixed" },
+};
+
+function localizeLabel(value: string, map: Record<string, { ru: string; en: string }>, isRu: boolean): string {
+  const key = value.toLowerCase().trim();
+  const entry = map[key];
+  return entry ? entry[isRu ? "ru" : "en"] : value;
+}
+
 interface ParserCharactersPanelProps {
   isRu: boolean;
   characters: LocalCharacter[];
