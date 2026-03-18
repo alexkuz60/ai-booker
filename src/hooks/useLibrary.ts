@@ -39,7 +39,8 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       fileFormat?: string;
     }>("project.json");
 
-    const structure = (!meta?.bookId || !meta?.title)
+    const needStructure = !meta?.bookId || !meta?.title || !meta?.fileFormat;
+    const structure = needStructure
       ? await storage.readJSON<LocalBookStructure>("structure/toc.json").catch(() => null)
       : null;
 
