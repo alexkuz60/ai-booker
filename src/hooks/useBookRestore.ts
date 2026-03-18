@@ -30,6 +30,8 @@ interface UseBookRestoreParams {
   books: BookRecord[];
   fileName: string;
   bookId: string | null;
+  /** Map of bookId → OPFS project names (from useLibrary) */
+  localProjectNamesByBookId: Map<string, string[]>;
   // State setters from orchestrator
   setStep: (s: Step) => void;
   setFileName: (s: string) => void;
