@@ -508,22 +508,6 @@ export default function Parser() {
               </ResizablePanelGroup>
             </motion.div>
           )}
-          {step === "workspace" && parserTab === "content" && (
-            <motion.div key="workspace-content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="flex items-center justify-center h-full">
-              <div className="text-center space-y-3">
-                <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto" />
-                <h2 className="text-lg font-display text-muted-foreground">
-                  {isRu ? "Анализ контента" : "Content Analysis"}
-                </h2>
-                <p className="text-sm text-muted-foreground/60 max-w-md">
-                  {isRu
-                    ? "Детальный анализ текста каждой сцены: стиль, ритм, ключевые события. Скоро."
-                    : "Detailed analysis of each scene's text: style, rhythm, key events. Coming soon."}
-                </p>
-              </div>
-            </motion.div>
-          )}
           {step === "workspace" && parserTab === "characters" && (
             <motion.div key="workspace-characters" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="flex h-full min-h-0 overflow-hidden">
