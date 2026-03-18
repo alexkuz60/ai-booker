@@ -104,6 +104,23 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         throw new Error(isRu ? "Нет данных для синхронизации" : "No data to sync");
       }
 
+      // LIR-3: verify storage bookId matches before any DB writes
+      if (storage) {
+        try {
+          const storedMeta = await storage.readJSON<{ bookId?: string }>("project.json");
+          if (storedMeta?.bookId && storedMeta.bookId !== currentBookId) {
+            throw new Error(
+              isRu
+                ? `Несоответствие проекта: хранилище содержит ${storedMeta.bookId}, ожидается ${currentBookId}`
+                : `Project mismatch: storage has ${storedMeta.bookId}, expected ${currentBookId}`
+            );
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.includes("mismatch")) throw e;
+          // If project.json can't be read, proceed cautiously
+        }
+      }
+
       // ── 0. Ensure books row exists (first-push from OPFS-only workflow) ──
       const { data: existingBook } = await supabase
         .from("books")
@@ -122,13 +139,15 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
             ? fileName.replace(/\.(pdf|docx?|fb2)$/i, "")
             : (toc[0]?.title || "Book");
         }
+        // LIR-5: preserve actual file format, don't hardcode .pdf
+        const resolvedFileName = fileName || `${bookTitle}.pdf`;
         const { error: bookErr } = await supabase
           .from("books")
           .insert({
             id: currentBookId,
             user_id: user.id,
             title: bookTitle,
-            file_name: fileName || `${bookTitle}.pdf`,
+            file_name: resolvedFileName,
             status: "uploaded",
           });
         if (bookErr) throw bookErr;
@@ -255,18 +274,30 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       }
 
       // ── 5. Update local project.json ──
+      // LIR-3 + LIR-4: read title/meta from storage, not stale React context
       if (storage) {
         const nowIso = new Date().toISOString();
-        const nextMeta: ProjectMeta = {
-          version: PROJECT_META_VERSION,
-          bookId: currentBookId,
-          title: meta?.title || toc[0]?.title || "Book",
-          userId: meta?.userId || user?.id || "",
-          createdAt: meta?.createdAt || nowIso,
-          updatedAt: nowIso,
-          language: meta?.language || (isRu ? "ru" : "en"),
-        };
-        await storage.writeJSON("project.json", nextMeta);
+        let freshMeta: Partial<ProjectMeta> = {};
+        try {
+          const stored = await storage.readJSON<ProjectMeta>("project.json");
+          if (stored) freshMeta = stored;
+        } catch {}
+
+        // LIR-3: verify bookId matches before writing
+        if (freshMeta.bookId && freshMeta.bookId !== currentBookId) {
+          console.error("[SaveToServer] bookId mismatch! storage=%s, target=%s — aborting meta write", freshMeta.bookId, currentBookId);
+        } else {
+          const nextMeta: ProjectMeta = {
+            version: PROJECT_META_VERSION,
+            bookId: currentBookId,
+            title: freshMeta.title || toc[0]?.title || "Book",
+            userId: freshMeta.userId || user?.id || "",
+            createdAt: freshMeta.createdAt || nowIso,
+            updatedAt: nowIso,
+            language: freshMeta.language || (isRu ? "ru" : "en"),
+          };
+          await storage.writeJSON("project.json", nextMeta);
+        }
       }
 
       // ── 6. Update books.updated_at so other devices can detect newer version ──
@@ -291,7 +322,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
     } finally {
       setSaving(false);
     }
-  }, [currentBookId, localSnapshot, storage, isRu, toast, meta, user?.id, fileName]);
+  }, [currentBookId, localSnapshot, storage, isRu, toast, user?.id, fileName]);
 
   const downloadZip = useCallback(async () => {
     try {
