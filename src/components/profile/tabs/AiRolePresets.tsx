@@ -45,10 +45,11 @@ export function AiRolePresets({
   const [newName, setNewName] = useState("");
 
   const handleSave = useCallback(() => {
-    if (!newName.trim()) return;
+    const finalName = newName.trim() || bookTitle?.trim() || "";
+    if (!finalName) return;
     const preset: AiRolePreset = {
       id: crypto.randomUUID(),
-      name: newName.trim(),
+      name: finalName,
       bookTitle: bookTitle || undefined,
       models: { ...resolvedModels } as AiRoleModelMap,
       createdAt: new Date().toISOString(),
@@ -106,7 +107,7 @@ export function AiRolePresets({
               className="h-8 text-xs"
               onKeyDown={(e) => e.key === "Enter" && handleSave()}
             />
-            <Button size="sm" className="h-8 px-3 text-xs" onClick={handleSave} disabled={!newName.trim()}>
+            <Button size="sm" className="h-8 px-3 text-xs" onClick={handleSave} disabled={!newName.trim() && !bookTitle?.trim()}>
               OK
             </Button>
           </div>
