@@ -62,7 +62,6 @@ function PromptCard({
   const handleSave = (e: React.MouseEvent) => {
     e.stopPropagation();
     const trimmed = editText.trim();
-    // If text matches default, remove override
     if (trimmed === defaultText.trim()) {
       onSaveOverride(task.id, field, null);
     } else {
@@ -80,6 +79,13 @@ function PromptCard({
     toast.info(isRu ? "Промпт сброшен к дефолту" : "Prompt reset to default");
   };
 
+  const handleCancel = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditText(currentText);
+    setEditing(false);
+    setExpanded(false);
+  };
+
   const preview = currentText.slice(0, 120).replace(/\n/g, " ") + (currentText.length > 120 ? "…" : "");
 
   return (
@@ -87,21 +93,21 @@ function PromptCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-medium">
+            <span className="text-sm font-medium">
               {isRu ? task.labelRu : task.labelEn}
             </span>
             {task.isMultilang && (
-              <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5">
+              <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">
                 RU/EN
               </Badge>
             )}
             {isOverridden && (
-              <Badge variant="secondary" className="text-[8px] px-1 py-0 h-3.5 text-amber-500">
+              <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 text-amber-500">
                 {isRu ? "изменён" : "modified"}
               </Badge>
             )}
           </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             {isRu ? task.descriptionRu : task.descriptionEn}
           </p>
         </div>
@@ -152,7 +158,7 @@ function PromptCard({
 
       {!expanded && (
         <p
-          className="text-[9px] text-muted-foreground/70 font-mono mt-1.5 cursor-pointer hover:text-muted-foreground transition-colors"
+          className="text-[10px] text-muted-foreground/70 font-mono mt-1.5 cursor-pointer hover:text-muted-foreground transition-colors"
           onClick={() => setExpanded(true)}
         >
           {preview}
@@ -164,21 +170,21 @@ function PromptCard({
           <Textarea
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
-            className="text-[10px] font-mono min-h-[180px] bg-background/50 border-border/30"
+            className="text-xs font-mono min-h-[180px] bg-background/50 border-border/30"
           />
           <div className="flex justify-end gap-1">
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 text-[10px] gap-1"
-              onClick={() => setEditing(false)}
+              className="h-6 text-xs gap-1"
+              onClick={handleCancel}
             >
               {isRu ? "Отмена" : "Cancel"}
             </Button>
             <Button
               variant="default"
               size="sm"
-              className="h-6 text-[10px] gap-1"
+              className="h-6 text-xs gap-1"
               onClick={handleSave}
             >
               <Save className="h-3 w-3" />
@@ -189,16 +195,16 @@ function PromptCard({
       )}
 
       {expanded && !editing && (
-        <pre className="text-[9px] text-muted-foreground font-mono mt-1.5 whitespace-pre-wrap break-words max-h-[200px] overflow-y-auto bg-background/50 rounded p-2 border border-border/30">
+        <pre className="text-[10px] text-muted-foreground font-mono mt-1.5 whitespace-pre-wrap break-words max-h-[200px] overflow-y-auto bg-background/50 rounded p-2 border border-border/30">
           {currentText}
         </pre>
       )}
 
       <div className="flex items-center gap-2 mt-1.5">
-        <Badge variant="secondary" className="text-[8px] px-1 py-0 h-3.5 font-mono">
+        <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 font-mono">
           {task.edgeFunction}
         </Badge>
-        <span className="text-[8px] text-muted-foreground/50 font-mono">
+        <span className="text-[9px] text-muted-foreground/50 font-mono">
           {task.id}
         </span>
       </div>
@@ -218,7 +224,6 @@ export function TaskPromptsPopover({ roleId, isRu }: TaskPromptsPopoverProps) {
       updateOverrides((prev) => {
         const next = { ...prev };
         if (text === null) {
-          // Remove this field override
           if (next[taskId]) {
             const entry = { ...next[taskId] };
             delete entry[field];
@@ -259,10 +264,10 @@ export function TaskPromptsPopover({ roleId, isRu }: TaskPromptsPopoverProps) {
         <div className="px-3 py-2 border-b border-border/50">
           <div className="flex items-center gap-1.5">
             <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-xs font-medium">
+            <span className="text-sm font-medium">
               {isRu ? "Промпты" : "Prompts"}
             </span>
-            <Badge variant="outline" className="text-[9px] px-1 py-0 ml-auto">
+            <Badge variant="outline" className="text-[10px] px-1 py-0 ml-auto">
               {tasks.length}
             </Badge>
           </div>
