@@ -48,6 +48,7 @@ export default function NavSidebar({
   onChangeLevel, onDeleteEntry, onRenameEntry, onChangeStartPage,
   onOpenPdf, onRenamePart, onMergeEntries, roleModels,
 }: NavSidebarProps) {
+  const isPdf = /\.pdf$/i.test(fileName);
   const [editingPartTitle, setEditingPartTitle] = useState<string | null>(null);
   const [editPartValue, setEditPartValue] = useState("");
   const editPartRef = useRef<HTMLInputElement>(null);
@@ -225,10 +226,10 @@ export default function NavSidebar({
             />
           ) : (
             <span
-              className="text-[11px] text-muted-foreground font-mono flex-shrink-0 cursor-pointer hover:text-primary hover:underline"
+              className={`text-[11px] text-muted-foreground font-mono flex-shrink-0 ${isPdf ? 'cursor-pointer hover:text-primary hover:underline' : ''}`}
               onClick={(e) => {
                 e.stopPropagation();
-                onOpenPdf?.(entry.startPage);
+                if (isPdf) onOpenPdf?.(entry.startPage);
               }}
               onDoubleClick={(e) => {
                 e.stopPropagation();
@@ -324,7 +325,7 @@ export default function NavSidebar({
               size={14}
             />
           )}
-          {onOpenPdf && (
+          {isPdf && onOpenPdf && (
             <Button
               variant="ghost" size="icon"
               className="h-6 w-6 flex-shrink-0 text-muted-foreground hover:text-primary"
@@ -445,7 +446,7 @@ export default function NavSidebar({
                     </span>
                   )}
                   <span className="ml-auto flex items-center gap-1.5 flex-shrink-0">
-                    {firstEntry && (
+                    {firstEntry && isPdf && (
                       <span
                         className="text-[11px] text-muted-foreground font-mono font-normal cursor-pointer hover:text-primary hover:underline"
                         onClick={(e) => {
