@@ -75,28 +75,84 @@ export function useChapterAnalysis({
     }
   };
 
+  /** Build a fallback chain: Lovable → OpenRouter → ProxyAPI → DotPoint */
+  const buildFallbackChain = (originalBody: Record<string, unknown>): Array<{
+    provider: string; body: Record<string, unknown>; label: string;
+  }> => {
+    const originalModel = String(originalBody.user_model || '');
+    const chain: Array<{ provider: string; body: Record<string, unknown>; label: string }> = [];
+
+    // 1. OpenRouter
+    if (userApiKeys['openrouter']) {
+      const orModel = originalModel.startsWith('openrouter/') ? originalModel : `openrouter/${originalModel}`;
+      const orEntry = getModelRegistryEntry(orModel);
+      chain.push({
+        provider: 'openrouter',
+        label: 'OpenRouter',
+        body: {
+          ...originalBody,
+          provider: 'openrouter',
+          user_model: orEntry ? orModel : originalModel,
+          user_api_key: userApiKeys['openrouter'],
+          openrouter_api_key: userApiKeys['openrouter'],
+          _modelName: orModel,
+        },
+      });
+    }
+
+    // 2. ProxyAPI
+    if (userApiKeys['proxyapi']) {
+      const paModel = originalModel.startsWith('proxyapi/') ? originalModel : `proxyapi/${originalModel.replace(/^(openrouter|lovable)\//, '')}`;
+      const paEntry = getModelRegistryEntry(paModel);
+      chain.push({
+        provider: 'proxyapi',
+        label: 'ProxyAPI',
+        body: {
+          ...originalBody,
+          provider: 'proxyapi',
+          user_model: paEntry ? paModel : originalModel.replace(/^(openrouter|lovable)\//, ''),
+          user_api_key: userApiKeys['proxyapi'],
+          openrouter_api_key: null,
+          _modelName: paModel,
+        },
+      });
+    }
+
+    // 3. DotPoint
+    if (userApiKeys['dotpoint']) {
+      const dpModel = originalModel.replace(/^(openrouter|lovable|proxyapi)\//, '');
+      chain.push({
+        provider: 'dotpoint',
+        label: 'DotPoint',
+        body: {
+          ...originalBody,
+          provider: 'dotpoint',
+          user_model: dpModel,
+          user_api_key: userApiKeys['dotpoint'],
+          openrouter_api_key: null,
+          _modelName: dpModel,
+        },
+      });
+    }
+
+    return chain;
+  };
+
   const callParseFunction = async (body: Record<string, unknown>): Promise<any> => {
     let resp = await callParseFunctionRaw(body);
 
-    // Lovable AI 402 → automatic fallback to OpenRouter if key available
-    if (resp.status === 402 && body.provider === 'lovable' && userApiKeys['openrouter']) {
-      const originalModel = String(body.user_model || '');
-      const orModel = originalModel.startsWith('openrouter/')
-        ? originalModel
-        : `openrouter/${originalModel}`;
-      const orEntry = getModelRegistryEntry(orModel);
-      console.warn(`[Analysis] Lovable AI 402 — falling back to OpenRouter: ${orModel}`);
-      toast.info(isRu
-        ? 'Кредиты Lovable AI исчерпаны, переключаюсь на OpenRouter...'
-        : 'Lovable AI credits exhausted, switching to OpenRouter...');
-      resp = await callParseFunctionRaw({
-        ...body,
-        provider: 'openrouter',
-        user_model: orEntry ? orModel : originalModel,
-        user_api_key: userApiKeys['openrouter'],
-        openrouter_api_key: userApiKeys['openrouter'],
-        _modelName: orModel,
-      });
+    // Cascading fallback on 402 (credits exhausted) or 429 (rate limit)
+    if ((resp.status === 402 || resp.status === 429) && body.provider === 'lovable') {
+      const fallbacks = buildFallbackChain(body);
+
+      for (const fb of fallbacks) {
+        console.warn(`[Analysis] ${resp.status} — falling back to ${fb.label}`);
+        toast.info(isRu
+          ? `Переключаюсь на ${fb.label}...`
+          : `Switching to ${fb.label}...`);
+        resp = await callParseFunctionRaw(fb.body);
+        if (resp.ok || (resp.status !== 402 && resp.status !== 429)) break;
+      }
     }
 
     if (!resp.ok) {
