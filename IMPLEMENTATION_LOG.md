@@ -399,9 +399,9 @@ Source → EQ (3-band) → Compressor → Limiter → Panner3D → Convolver (IR
 **Структура папок проекта:**
 ```
 📁 BookTitle/
-├── project.json           — ProjectMeta (version, bookId, title, userId, language)
+├── project.json           — ProjectMeta (version, bookId, title, userId, language, fileFormat)
 ├── 📁 source/
-│   └── book.pdf
+│   └── book.{pdf|docx|fb2}
 ├── 📁 structure/
 │   ├── toc.json           — TocChapter[]
 │   ├── parts.json
