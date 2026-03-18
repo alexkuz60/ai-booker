@@ -89,7 +89,7 @@ export function useBookRestore({
 
     if (!storage?.isReady) return false;
     try {
-      const local = await readStructureFromLocal(projectStorage);
+      const local = await readStructureFromLocal(storage);
       if (!local?.structure || local.structure.bookId !== savedBookId) return false;
 
       const { structure, chapterIdMap: localChIdMap, chapterResults: localResults } = local;
