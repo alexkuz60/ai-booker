@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, Library, PlusCircle, Network, FileText, Users, RefreshCw } from "lucide-react";
+import { Bot, Library, PlusCircle, Network, Users, RefreshCw } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -44,7 +44,7 @@ export default function Parser() {
 
   const userApiKeys = useUserApiKeys();
   const [aiRolesOpen, setAiRolesOpen] = useState(false);
-  const [parserTab, setParserTab] = useState<"structure" | "content" | "characters">("structure");
+  const [parserTab, setParserTab] = useState<"structure" | "characters">("structure");
   const [pendingProjectName, setPendingProjectName] = useState<string | null>(null);
   const {
     backend: storageBackend,
@@ -309,16 +309,8 @@ export default function Parser() {
               {isRu ? "Структура" : "Structure"}
             </Button>
             <Button
-              variant={parserTab === "content" ? "secondary" : "ghost"} size="sm"
-              onClick={() => setParserTab("content")}
-              className="gap-1.5 text-xs"
-            >
-              <FileText className="h-3.5 w-3.5" />
-              {isRu ? "Контент" : "Content"}
-            </Button>
-            <Button
               variant={parserTab === "characters" ? "secondary" : "ghost"} size="sm"
-              onClick={() => setParserTab(parserTab === "characters" ? "content" : "characters")}
+              onClick={() => setParserTab(parserTab === "characters" ? "structure" : "characters")}
               className="gap-1.5 text-xs"
             >
               <Users className="h-3.5 w-3.5" />
@@ -514,22 +506,6 @@ export default function Parser() {
                   </div>
                 </ResizablePanel>
               </ResizablePanelGroup>
-            </motion.div>
-          )}
-          {step === "workspace" && parserTab === "content" && (
-            <motion.div key="workspace-content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="flex items-center justify-center h-full">
-              <div className="text-center space-y-3">
-                <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto" />
-                <h2 className="text-lg font-display text-muted-foreground">
-                  {isRu ? "Анализ контента" : "Content Analysis"}
-                </h2>
-                <p className="text-sm text-muted-foreground/60 max-w-md">
-                  {isRu
-                    ? "Детальный анализ текста каждой сцены: стиль, ритм, ключевые события. Скоро."
-                    : "Detailed analysis of each scene's text: style, rhythm, key events. Coming soon."}
-                </p>
-              </div>
             </motion.div>
           )}
           {step === "workspace" && parserTab === "characters" && (
