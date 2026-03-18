@@ -66,6 +66,7 @@ export default function ParserCharactersPanel({
   const [editingAliasId, setEditingAliasId] = useState<string | null>(null);
   const [aliasValue, setAliasValue] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [profileViewId, setProfileViewId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addingNew, setAddingNew] = useState(false);
   const [newName, setNewName] = useState("");
@@ -146,8 +147,12 @@ export default function ParserCharactersPanel({
     });
   };
 
+  const profileViewChar = profileViewId ? characters.find(c => c.id === profileViewId) : null;
+
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+    <div className="flex h-full min-h-0 overflow-hidden">
+    {/* Left column: table */}
+    <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
       {/* Header */}
       <div className="px-4 py-3 border-b border-border flex items-center gap-2 flex-shrink-0">
         <Users className="h-5 w-5 text-primary" />
@@ -421,18 +426,16 @@ export default function ParserCharactersPanel({
                       </Popover>
                     </TableCell>
 
-                    {/* Profile icon */}
+                    {/* Profile icon — clickable to open profile panel */}
                     <TableCell className="text-center px-0">
                       {char.profile?.description ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Brain className="h-3.5 w-3.5 text-primary mx-auto cursor-help" />
-                          </TooltipTrigger>
-                          <TooltipContent side="left" className="max-w-xs text-xs">
-                            <p className="font-semibold mb-1">{char.profile.temperament || ""}</p>
-                            <p>{char.profile.description}</p>
-                          </TooltipContent>
-                        </Tooltip>
+                        <button
+                          onClick={() => setProfileViewId(profileViewId === char.id ? null : char.id)}
+                          className="mx-auto block"
+                          title={isRu ? "Показать профиль" : "Show profile"}
+                        >
+                          <Brain className={`h-3.5 w-3.5 ${profileViewId === char.id ? "text-primary" : "text-primary/60 hover:text-primary"} transition-colors`} />
+                        </button>
                       ) : (
                         <span className="text-muted-foreground/20">—</span>
                       )}
@@ -597,6 +600,95 @@ export default function ParserCharactersPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>{/* end left column */}
+
+    {/* Right column: profile detail */}
+    {profileViewChar?.profile?.description && (
+      <div className="w-72 flex-shrink-0 border-l border-border flex flex-col min-h-0 overflow-hidden bg-muted/10">
+        <div className="px-3 py-2.5 border-b border-border flex items-center gap-2 flex-shrink-0">
+          <Brain className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold text-foreground truncate flex-1">
+            {profileViewChar.name}
+          </h3>
+          <button
+            onClick={() => setProfileViewId(null)}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="px-3 py-3 space-y-3">
+            {profileViewChar.profile.age_group && profileViewChar.profile.age_group !== "unknown" && (
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  {isRu ? "Возраст" : "Age"}
+                </span>
+                <p className="text-sm text-foreground mt-0.5">{profileViewChar.profile.age_group}</p>
+              </div>
+            )}
+            {profileViewChar.profile.temperament && (
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  {isRu ? "Темперамент" : "Temperament"}
+                </span>
+                <p className="text-sm text-foreground mt-0.5">{profileViewChar.profile.temperament}</p>
+              </div>
+            )}
+            {profileViewChar.profile.speech_style && (
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  {isRu ? "Стиль речи" : "Speech style"}
+                </span>
+                <p className="text-sm text-foreground mt-0.5">{profileViewChar.profile.speech_style}</p>
+              </div>
+            )}
+            {profileViewChar.profile.description && (
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  {isRu ? "Описание" : "Description"}
+                </span>
+                <p className="text-sm text-foreground/80 mt-0.5 leading-relaxed whitespace-pre-line">
+                  {profileViewChar.profile.description}
+                </p>
+              </div>
+            )}
+            {profileViewChar.gender && profileViewChar.gender !== "unknown" && (
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  {isRu ? "Пол" : "Gender"}
+                </span>
+                <p className="text-sm text-foreground mt-0.5">
+                  {profileViewChar.gender === "male" ? (isRu ? "Мужской" : "Male") : (isRu ? "Женский" : "Female")}
+                </p>
+              </div>
+            )}
+            {profileViewChar.aliases.length > 0 && (
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  {isRu ? "Алиасы" : "Aliases"}
+                </span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {profileViewChar.aliases.map(a => (
+                    <Badge key={a} variant="outline" className="text-xs">{a}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                {isRu ? "Появления" : "Appearances"}
+              </span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {isRu
+                  ? `${profileViewChar.sceneCount} сцен в ${profileViewChar.appearances.length} главах`
+                  : `${profileViewChar.sceneCount} scenes in ${profileViewChar.appearances.length} chapters`}
+              </p>
+            </div>
+          </div>
+        </ScrollArea>
+      </div>
+    )}
     </div>
   );
 }
