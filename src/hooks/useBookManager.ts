@@ -319,6 +319,7 @@ export function useBookManager({
     // Server books
     serverBooks: library.serverBooks,
     loadingServerBooks: library.loadingServerBooks,
+    deleteServerBook,
     // Sync-check
     serverNewerBookId: serverSync.serverNewerBookId,
     dismissServerNewer: serverSync.dismissServerNewer,
