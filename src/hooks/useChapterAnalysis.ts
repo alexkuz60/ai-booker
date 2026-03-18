@@ -351,7 +351,7 @@ export function useChapterAnalysis({
           return;
         }
 
-        if (docxMode) {
+        if (textMode) {
           addLog(`${t("logExtracted", isRu)}: ${charCount.toLocaleString()} ${t("logChars", isRu)}`);
         } else {
           addLog(`${t("logExtracted", isRu)}: ${charCount.toLocaleString()} ${t("logChars", isRu)} (${entry.startPage}–${entry.endPage} ${t("logPagesAbbr", isRu)})`);
