@@ -18,6 +18,7 @@ import { AiRolePresets } from "./AiRolePresets";
 import { AI_ROLE_LIST, TIER_LABELS, type AiRoleId } from "@/config/aiRoles";
 import type { ModelRegistryEntry } from "@/config/modelRegistry";
 import { RoleBadge } from "@/components/ui/RoleBadge";
+import { TaskPromptsPopover } from "./TaskPromptsPopover";
 
 const STORAGE_KEY = "ai-roles-collapsed-providers";
 
