@@ -246,7 +246,31 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         }
       }
 
-      // ── 4. Upload source file to server if not already there ──
+      // ── 4. Sync characters to book_characters ──
+      if (storage) {
+        const localChars = await readCharactersFromLocal(storage);
+        if (localChars.length > 0) {
+          // Delete existing characters for this book, then insert fresh
+          await supabase.from("book_characters").delete().eq("book_id", currentBookId);
+
+          const charInserts = localChars.map((c: LocalCharacter) => ({
+            book_id: currentBookId,
+            name: c.name,
+            aliases: c.aliases || [],
+            gender: c.gender || "unknown",
+            age_group: c.profile?.age_group || "unknown",
+            temperament: c.profile?.temperament || null,
+            speech_style: c.profile?.speech_style || null,
+            description: c.profile?.description || null,
+          }));
+
+          const { error: charErr } = await supabase.from("book_characters").insert(charInserts);
+          if (charErr) console.warn("[SaveToServer] characters insert:", charErr);
+          else console.log(`[SaveToServer] Saved ${charInserts.length} characters`);
+        }
+      }
+
+      // ── 5. Upload source file to server if not already there ──
       if (storage) {
         const sourceResult = await findSourceBlob(storage);
         if (sourceResult) {
