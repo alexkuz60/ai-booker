@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Upload, BookOpen, Library, Trash2, FolderOpen, Clock, Loader2, Eraser, Pencil, Check, X, Cloud, Download, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
