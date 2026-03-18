@@ -45,7 +45,8 @@ export function AiRolePresets({
   const [newName, setNewName] = useState("");
 
   const handleSave = useCallback(() => {
-    if (!newName.trim()) return;
+    const finalName = newName.trim() || bookTitle?.trim() || "";
+    if (!finalName) return;
     const preset: AiRolePreset = {
       id: crypto.randomUUID(),
       name: newName.trim(),
