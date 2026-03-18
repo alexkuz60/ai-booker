@@ -48,6 +48,7 @@ export default function NavSidebar({
   onChangeLevel, onDeleteEntry, onRenameEntry, onChangeStartPage,
   onOpenPdf, onRenamePart, onMergeEntries, roleModels,
 }: NavSidebarProps) {
+  const isPdf = /\.pdf$/i.test(fileName);
   const [editingPartTitle, setEditingPartTitle] = useState<string | null>(null);
   const [editPartValue, setEditPartValue] = useState("");
   const editPartRef = useRef<HTMLInputElement>(null);
