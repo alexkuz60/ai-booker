@@ -19,6 +19,8 @@ import {
   sanitizeChapterResultsForStructure,
 } from "@/lib/tocStructure";
 import { findSourceBlob } from "@/lib/fileFormatUtils";
+import { readCharactersFromLocal } from "@/lib/localSync";
+import type { LocalCharacter } from "@/pages/parser/types";
 
 export interface LocalBookSnapshot {
   toc: TocChapter[];
@@ -244,7 +246,31 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         }
       }
 
-      // ── 4. Upload source file to server if not already there ──
+      // ── 4. Sync characters to book_characters ──
+      if (storage) {
+        const localChars = await readCharactersFromLocal(storage);
+        if (localChars.length > 0) {
+          // Delete existing characters for this book, then insert fresh
+          await supabase.from("book_characters").delete().eq("book_id", currentBookId);
+
+          const charInserts = localChars.map((c: LocalCharacter) => ({
+            book_id: currentBookId,
+            name: c.name,
+            aliases: c.aliases || [],
+            gender: c.gender || "unknown",
+            age_group: c.profile?.age_group || "unknown",
+            temperament: c.profile?.temperament || null,
+            speech_style: c.profile?.speech_style || null,
+            description: c.profile?.description || null,
+          }));
+
+          const { error: charErr } = await supabase.from("book_characters").insert(charInserts);
+          if (charErr) console.warn("[SaveToServer] characters insert:", charErr);
+          else console.log(`[SaveToServer] Saved ${charInserts.length} characters`);
+        }
+      }
+
+      // ── 5. Upload source file to server if not already there ──
       if (storage) {
         const sourceResult = await findSourceBlob(storage);
         if (sourceResult) {
@@ -273,7 +299,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         }
       }
 
-      // ── 5. Update local project.json ──
+      // ── 6. Update local project.json ──
       // LIR-3 + LIR-4: read title/meta from storage, not stale React context
       if (storage) {
         const nowIso = new Date().toISOString();
@@ -300,7 +326,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         }
       }
 
-      // ── 6. Update books.updated_at so other devices can detect newer version ──
+      // ── 7. Update books.updated_at so other devices can detect newer version ──
       const serverNow = new Date().toISOString();
       await supabase
         .from("books")

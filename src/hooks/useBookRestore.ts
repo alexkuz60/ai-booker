@@ -15,7 +15,8 @@ import { t } from "@/pages/parser/i18n";
 import type { Scene, TocChapter, Step, ChapterStatus, BookRecord } from "@/pages/parser/types";
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
-import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
+import { syncStructureToLocal, readStructureFromLocal, saveCharactersToLocal } from "@/lib/localSync";
+import type { LocalCharacter } from "@/pages/parser/types";
 import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 import { detectFileFormat, getSourcePath, stripFileExtension, type FileFormat } from "@/lib/fileFormatUtils";
 
@@ -415,6 +416,38 @@ export function useBookRestore({
           chapterIdMap: newChapterIdMap,
           chapterResults: initMap,
         });
+
+        // ── Load characters from server and save to local ──
+        try {
+          const { data: serverChars } = await supabase
+            .from("book_characters")
+            .select("name, aliases, gender, age_group, temperament, speech_style, description")
+            .eq("book_id", book.id)
+            .order("sort_order");
+
+          if (serverChars && serverChars.length > 0) {
+            const localChars: LocalCharacter[] = serverChars.map(sc => ({
+              id: crypto.randomUUID(),
+              name: sc.name,
+              aliases: sc.aliases || [],
+              gender: (sc.gender as "male" | "female" | "unknown") || "unknown",
+              appearances: [],
+              sceneCount: 0,
+              profile: (sc.age_group !== "unknown" || sc.temperament || sc.speech_style || sc.description)
+                ? {
+                    age_group: sc.age_group !== "unknown" ? sc.age_group : undefined,
+                    temperament: sc.temperament || undefined,
+                    speech_style: sc.speech_style || undefined,
+                    description: sc.description || undefined,
+                  }
+                : undefined,
+            }));
+            await saveCharactersToLocal(targetStorage, localChars);
+            console.log(`[OpenBook] Restored ${localChars.length} characters from server`);
+          }
+        } catch (charErr) {
+          console.warn("[OpenBook] Failed to restore characters from server:", charErr);
+        }
 
         if (pdfBlob) {
           const sourcePath = getSourcePath(bookFormat);
