@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
       return block;
     }).join("\n");
 
-    const systemPrompt = resolveTaskPrompt("profiler:profile_characters", lang)
+    const systemPrompt = (await resolveTaskPromptWithOverrides("profiler:profile_characters", lang))
       || "You are a literary analyst. Analyze characters based on text.";
 
     const jsonSuffix = `\n\nRespond with ONLY a valid JSON: {"characters": [{"name": "...", "age_group": "...", "temperament": "...", "speech_style": "...", "description": "..."}]}`;

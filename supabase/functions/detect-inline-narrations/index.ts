@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const systemPrompt = resolveTaskPrompt("profiler:detect_inline_narrations")
+    const systemPrompt = (await resolveTaskPromptWithOverrides("profiler:detect_inline_narrations"))
       || "You are a literary text analyst specializing in detecting narrator insertions within dialogue.";
 
     const userContent = batch.map((b, i) => 

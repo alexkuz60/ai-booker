@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
     const userId = await getUserIdFromAuth(authHeader);
     const aiStart = Date.now();
 
-    const systemPrompt = resolveTaskPrompt("screenwriter:segment_scene", lang) || "You are a literary text analyst.";
+    const systemPrompt = (await resolveTaskPromptWithOverrides("screenwriter:segment_scene", lang)) || "You are a literary text analyst.";
 
     const userPrompt = `Analyze this scene (language: ${lang}):\n\n${content}`;
 

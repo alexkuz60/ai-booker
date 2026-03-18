@@ -241,7 +241,7 @@ Deno.serve(async (req) => {
       const sceneText = phrases.map(p => p.text).join("\n");
       const existingWords = new Set(dictionary.map(d => d.word.toLowerCase()));
 
-      const basePrompt = resolveTaskPrompt("proofreader:suggest_stress")
+      const basePrompt = (await resolveTaskPromptWithOverrides("proofreader:suggest_stress"))
         || "Ты — эксперт по русской фонетике. Найди слова с неоднозначным ударением.";
       const systemPrompt = existingWords.size > 0
         ? `${basePrompt}\n\nУже в словаре пользователя (не включай): ${[...existingWords].join(", ")}`
