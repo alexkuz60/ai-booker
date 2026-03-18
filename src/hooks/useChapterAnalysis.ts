@@ -189,10 +189,10 @@ export function useChapterAnalysis({
     // Folders are structural-only — never analyze them
     if (isFolder(idx)) return;
 
-    const docxMode = isDocxMode();
+    const textMode = isTextMode();
     let activePdf = pdfRef;
 
-    if (!docxMode) {
+    if (!textMode) {
       // Try to load PDF on demand if not in memory
       if (!activePdf && ensurePdfLoaded) {
         activePdf = await ensurePdfLoaded();
