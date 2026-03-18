@@ -104,6 +104,23 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         throw new Error(isRu ? "Нет данных для синхронизации" : "No data to sync");
       }
 
+      // LIR-3: verify storage bookId matches before any DB writes
+      if (storage) {
+        try {
+          const storedMeta = await storage.readJSON<{ bookId?: string }>("project.json");
+          if (storedMeta?.bookId && storedMeta.bookId !== currentBookId) {
+            throw new Error(
+              isRu
+                ? `Несоответствие проекта: хранилище содержит ${storedMeta.bookId}, ожидается ${currentBookId}`
+                : `Project mismatch: storage has ${storedMeta.bookId}, expected ${currentBookId}`
+            );
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.includes("mismatch")) throw e;
+          // If project.json can't be read, proceed cautiously
+        }
+      }
+
       // ── 0. Ensure books row exists (first-push from OPFS-only workflow) ──
       const { data: existingBook } = await supabase
         .from("books")
