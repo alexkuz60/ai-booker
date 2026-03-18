@@ -29,6 +29,11 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
   const [localProjectNamesByBookId, setLocalProjectNamesByBookId] = useState<Map<string, string[]>>(new Map());
   const libraryLoadedRef = useRef(false);
 
+  // Server books (separate section)
+  const [serverBooks, setServerBooks] = useState<BookRecord[]>([]);
+  const [loadingServerBooks, setLoadingServerBooks] = useState(false);
+  const serverBooksLoadedRef = useRef(false);
+
   const mapLocalStructureToBook = useCallback(async (storage: ProjectStorage): Promise<LocalLibraryCandidate | null> => {
     const meta = await storage.readJSON<{
       bookId?: string;

@@ -21,6 +21,12 @@ const texts: Record<string, { ru: string; en: string }> = {
   libraryBack: { ru: "К библиотеке", en: "Back to library" },
   libraryLoading: { ru: "Загрузка библиотеки...", en: "Loading library..." },
   libraryLoadingBook: { ru: "Загрузка книги...", en: "Loading book..." },
+  libraryServerTitle: { ru: "На сервере", en: "On server" },
+  libraryServerEmpty: { ru: "На сервере нет книг", en: "No books on server" },
+  libraryServerLoad: { ru: "Загрузить с сервера", en: "Load from server" },
+  libraryServerDownload: { ru: "Скачать", en: "Download" },
+  libraryServerLoading: { ru: "Загрузка списка...", en: "Loading list..." },
+  libraryLocalTitle: { ru: "Локальные проекты", en: "Local projects" },
 
   // Upload
   uploadTitle: { ru: "Загрузите книгу", en: "Upload a book" },
