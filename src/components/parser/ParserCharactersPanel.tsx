@@ -330,7 +330,7 @@ export default function ParserCharactersPanel({
                               <span key={a} className="text-[10px] text-muted-foreground bg-muted/50 px-1 rounded">
                                 {a}
                               </span>
-                            ))
+                            ))}
                           </div>
                         )}
                       </div>
