@@ -19,6 +19,108 @@ export interface Fb2ExtractResult {
 }
 
 const CHARS_PER_PAGE = 2000;
+const XML_DECLARATION_SCAN_BYTES = 512;
+const FALLBACK_ENCODINGS = ["utf-8", "windows-1251", "koi8-r", "ibm866"] as const;
+const ENCODING_ALIASES: Record<string, string> = {
+  utf8: "utf-8",
+  "utf-8": "utf-8",
+  cp1251: "windows-1251",
+  windows1251: "windows-1251",
+  "windows-1251": "windows-1251",
+  "win-1251": "windows-1251",
+  koi8r: "koi8-r",
+  "koi8-r": "koi8-r",
+  cp866: "ibm866",
+  ibm866: "ibm866",
+  "utf-16le": "utf-16le",
+  "utf-16be": "utf-16be",
+};
+
+function normalizeEncoding(encoding: string | null | undefined): string | null {
+  if (!encoding) return null;
+  const normalized = encoding.trim().toLowerCase().replace(/[_\s]+/g, "-");
+  return ENCODING_ALIASES[normalized] || normalized;
+}
+
+function detectBomEncoding(bytes: Uint8Array): string | null {
+  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+    return "utf-8";
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return "utf-16le";
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return "utf-16be";
+  }
+  return null;
+}
+
+function detectXmlDeclarationEncoding(bytes: Uint8Array): string | null {
+  const head = new TextDecoder("latin1").decode(bytes.slice(0, XML_DECLARATION_SCAN_BYTES));
+  const match = head.match(/<\?xml[^>]*encoding=["']([^"']+)["']/i);
+  return normalizeEncoding(match?.[1]);
+}
+
+function decodeWithEncoding(bytes: Uint8Array, encoding: string): string | null {
+  try {
+    return new TextDecoder(encoding).decode(bytes);
+  } catch {
+    return null;
+  }
+}
+
+function scoreDecodedText(text: string): number {
+  const replacementCount = (text.match(/�/g) || []).length;
+  const cyrillicCount = (text.match(/[А-Яа-яЁё]/g) || []).length;
+  const xmlHints = ["<fictionbook", "<body", "<section", "<title"].reduce(
+    (sum, token) => sum + (text.toLowerCase().includes(token) ? 25 : 0),
+    0,
+  );
+  return xmlHints + cyrillicCount * 2 - replacementCount * 30;
+}
+
+function parseXml(text: string): XMLDocument | null {
+  const xmlDoc = new DOMParser().parseFromString(text, "application/xml");
+  return xmlDoc.querySelector("parsererror") ? null : xmlDoc;
+}
+
+async function readBinaryFile(file: Blob): Promise<ArrayBuffer> {
+  if (typeof file.arrayBuffer === "function") {
+    return file.arrayBuffer();
+  }
+
+  return new Response(file).arrayBuffer();
+}
+
+export function decodeFb2Buffer(buffer: ArrayBuffer | Uint8Array): string {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  const candidates = [
+    detectBomEncoding(bytes),
+    detectXmlDeclarationEncoding(bytes),
+    ...FALLBACK_ENCODINGS,
+  ].filter((encoding, index, arr): encoding is string => !!encoding && arr.indexOf(encoding) === index);
+
+  let bestText: string | null = null;
+  let bestScore = Number.NEGATIVE_INFINITY;
+
+  for (const encoding of candidates) {
+    const decoded = decodeWithEncoding(bytes, encoding);
+    if (!decoded) continue;
+
+    const score = scoreDecodedText(decoded);
+    if (score > bestScore) {
+      bestScore = score;
+      bestText = decoded;
+    }
+
+    if (!decoded.includes("�") && parseXml(decoded)) {
+      return decoded;
+    }
+  }
+
+  if (bestText) return bestText;
+  return new TextDecoder("utf-8").decode(bytes);
+}
 
 /**
  * Convert FB2 inline element to HTML.
@@ -121,7 +223,6 @@ function walkSections(
   result: SectionInfo[],
   charCounter: { offset: number },
 ): void {
-  // Extract title
   const titleEl = section.querySelector(":scope > title");
   let title = "Untitled";
   if (titleEl) {
@@ -131,7 +232,6 @@ function walkSections(
       .join(". ") || titleEl.textContent?.trim() || "Untitled";
   }
 
-  // Collect content (non-section, non-title children)
   let contentHtml = "";
   const childSections: Element[] = [];
 
@@ -156,7 +256,6 @@ function walkSections(
 
   charCounter.offset += plainContent.length;
 
-  // Recurse into child sections
   for (const childSection of childSections) {
     walkSections(childSection, level + 1, result, charCounter);
   }
@@ -166,24 +265,18 @@ function walkSections(
  * Extract structured content from an FB2 file.
  */
 export async function extractFromFb2(file: File): Promise<Fb2ExtractResult> {
-  const text = await file.text();
+  const text = decodeFb2Buffer(await readBinaryFile(file));
+  const xmlDoc = parseXml(text);
 
-  const parser = new DOMParser();
-  const xmlDoc = parser.parseFromString(text, "application/xml");
-
-  // Check for parsing errors
-  const parseError = xmlDoc.querySelector("parsererror");
-  if (parseError) {
+  if (!xmlDoc) {
     throw new Error("Invalid FB2 file: XML parsing failed");
   }
 
-  // FB2 body sections
   const bodies = xmlDoc.querySelectorAll("body");
   const sections: SectionInfo[] = [];
   const charCounter = { offset: 0 };
 
   bodies.forEach((body) => {
-    // Some FB2 files have <body name="notes"> for footnotes — process main body first
     const bodyName = body.getAttribute("name");
     if (bodyName === "notes" || bodyName === "footnotes") return;
 
@@ -191,7 +284,6 @@ export async function extractFromFb2(file: File): Promise<Fb2ExtractResult> {
     if (topSections.length > 0) {
       topSections.forEach((sec) => walkSections(sec, 0, sections, charCounter));
     } else {
-      // No sections — treat whole body as one chapter
       let html = "";
       for (const child of Array.from(body.children)) {
         html += fb2BlockToHtml(child);
@@ -205,12 +297,10 @@ export async function extractFromFb2(file: File): Promise<Fb2ExtractResult> {
     }
   });
 
-  // Build full HTML and plain text
   const fullHtml = sections.map((s) => `<h${s.level + 1}>${escapeHtml(s.title)}</h${s.level + 1}>${s.html}`).join("\n");
   const plainText = fullHtml.replace(/<[^>]*>/g, "");
   const totalPages = Math.max(1, Math.ceil(plainText.length / CHARS_PER_PAGE));
 
-  // Build outline and chapterTexts
   const outline: TocEntry[] = [];
   const chapterTexts = new Map<number, string>();
 
