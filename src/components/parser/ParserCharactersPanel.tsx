@@ -151,6 +151,8 @@ export default function ParserCharactersPanel({
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
+    {/* Left column: table */}
+    <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
       {/* Header */}
       <div className="px-4 py-3 border-b border-border flex items-center gap-2 flex-shrink-0">
         <Users className="h-5 w-5 text-primary" />
