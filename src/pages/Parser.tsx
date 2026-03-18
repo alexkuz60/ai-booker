@@ -49,7 +49,7 @@ export default function Parser() {
   const {
     backend: storageBackend,
     createProject,
-    openProject,
+    openProjectByName,
     storage: projectStorage,
     initialized: projectStorageInitialized,
     meta: projectMeta,

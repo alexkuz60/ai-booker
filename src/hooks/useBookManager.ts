@@ -44,6 +44,7 @@ interface UseBookManagerParams {
   projectStorageInitialized?: boolean;
   storageBackend?: "fs-access" | "opfs" | "none";
   createProject?: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<ProjectStorage>;
+  openProjectByName?: (projectName: string) => Promise<ProjectStorage | null>;
   pendingProjectName?: string | null;
 }
 

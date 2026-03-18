@@ -37,6 +37,8 @@ interface UseProjectStorageReturn {
   createProject: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<ProjectStorage>;
   /** Open existing project folder */
   openProject: () => Promise<ProjectStorage>;
+  /** Open specific OPFS project by directory name and make it active */
+  openProjectByName: (projectName: string) => Promise<ProjectStorage | null>;
   /** Open project from a ZIP file (cross-browser) */
   importProjectFromZip: (file: File) => Promise<ProjectStorage>;
   /** Download current project as ZIP */
