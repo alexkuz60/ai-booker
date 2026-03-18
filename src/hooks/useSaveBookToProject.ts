@@ -322,7 +322,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
     } finally {
       setSaving(false);
     }
-  }, [currentBookId, localSnapshot, storage, isRu, toast, meta, user?.id, fileName]);
+  }, [currentBookId, localSnapshot, storage, isRu, toast, user?.id, fileName]);
 
   const downloadZip = useCallback(async () => {
     try {
