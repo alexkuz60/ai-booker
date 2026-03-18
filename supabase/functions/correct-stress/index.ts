@@ -298,13 +298,9 @@ ${existingWords.size > 0 ? `\nУже в словаре пользователя 
       if (!aiRes.ok) {
         const errText = await aiRes.text();
         console.error("AI error:", aiRes.status, errText);
-        if (aiRes.status === 429) {
-          return new Response(JSON.stringify({ error: "Rate limit exceeded, try again later" }), {
-            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        return new Response(JSON.stringify({ error: "AI analysis failed" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        const statusCode = (aiRes.status === 402 || aiRes.status === 429) ? aiRes.status : 500;
+        return new Response(JSON.stringify({ error: `AI error: ${aiRes.status}` }), {
+          status: statusCode, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
