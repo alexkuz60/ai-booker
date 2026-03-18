@@ -278,7 +278,7 @@ export function useFileUpload({
             createdAt: typeof existingMeta?.createdAt === "string" ? existingMeta.createdAt : new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             language: (existingMeta?.language === "en" ? "en" : (isRu ? "ru" : "en")),
-            fileFormat: isDocx ? "docx" : "pdf",
+            fileFormat: isFb2 ? "fb2" : (isDocx ? "docx" : "pdf"),
           });
 
           await syncStructureToLocal(targetStorage, {
