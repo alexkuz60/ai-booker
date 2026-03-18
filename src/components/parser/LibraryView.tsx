@@ -32,6 +32,7 @@ export default function LibraryView({
   isRu, books, loadingLibrary, onUpload, onOpen, onDelete, onClearAll, onRename,
   serverBooks = [], loadingServerBooks = false, onOpenServerBook, onDeleteServerBook,
 }: LibraryViewProps) {
+  const syncedBookIds = useMemo(() => new Set(serverBooks.map(b => b.id)), [serverBooks]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
