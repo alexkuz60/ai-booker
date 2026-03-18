@@ -23,6 +23,11 @@ describe("detectFileFormat", () => {
     expect(detectFileFormat("legacy.DOC")).toBe("docx");
   });
 
+  it("detects FB2", () => {
+    expect(detectFileFormat("book.fb2")).toBe("fb2");
+    expect(detectFileFormat("Novel.FB2")).toBe("fb2");
+  });
+
   it("defaults to pdf for unknown extensions", () => {
     expect(detectFileFormat("file.txt")).toBe("pdf");
     expect(detectFileFormat("noext")).toBe("pdf");
