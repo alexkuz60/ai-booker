@@ -88,25 +88,25 @@ function PromptCard({
   const preview = currentText.slice(0, 120).replace(/\n/g, " ") + (currentText.length > 120 ? "…" : "");
 
   return (
-    <div className="rounded-md border border-border/50 bg-muted/30 p-2.5">
+    <div className="rounded-md border border-border/50 bg-muted/30 p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm font-medium">
+            <span className="text-base font-medium">
               {isRu ? task.labelRu : task.labelEn}
             </span>
             {task.isMultilang && (
-              <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">
+              <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
                 RU/EN
               </Badge>
             )}
             {isOverridden && (
-              <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 text-amber-500">
+              <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 text-amber-500">
                 {isRu ? "изменён" : "modified"}
               </Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="text-sm text-muted-foreground mt-0.5">
             {isRu ? task.descriptionRu : task.descriptionEn}
           </p>
         </div>
@@ -115,49 +115,49 @@ function PromptCard({
             <Button
               variant="ghost"
               size="icon"
-              className="h-5 w-5"
+              className="h-6 w-6"
               onClick={handleReset}
               title={isRu ? "Сбросить к дефолту" : "Reset to default"}
             >
-              <Undo2 className="h-3 w-3 text-amber-500" />
+              <Undo2 className="h-3.5 w-3.5 text-amber-500" />
             </Button>
           )}
           <Button
             variant="ghost"
             size="icon"
-            className="h-5 w-5"
+            className="h-6 w-6"
             onClick={handleStartEdit}
             title={isRu ? "Редактировать" : "Edit"}
           >
-            <Pencil className="h-3 w-3" />
+            <Pencil className="h-3.5 w-3.5" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-5 w-5"
+            className="h-6 w-6"
             onClick={handleCopy}
             title={isRu ? "Копировать промпт" : "Copy prompt"}
           >
             {copied
-              ? <Check className="h-3 w-3 text-green-500" />
-              : <Copy className="h-3 w-3" />}
+              ? <Check className="h-3.5 w-3.5 text-green-500" />
+              : <Copy className="h-3.5 w-3.5" />}
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-5 w-5"
+            className="h-6 w-6"
             onClick={() => { setExpanded(!expanded); if (editing && !expanded) setEditing(false); }}
           >
             {expanded
-              ? <ChevronUp className="h-3 w-3" />
-              : <ChevronDown className="h-3 w-3" />}
+              ? <ChevronUp className="h-3.5 w-3.5" />
+              : <ChevronDown className="h-3.5 w-3.5" />}
           </Button>
         </div>
       </div>
 
       {!expanded && (
         <p
-          className="text-[10px] text-muted-foreground/70 font-mono mt-1.5 cursor-pointer hover:text-muted-foreground transition-colors"
+          className="text-xs text-muted-foreground/70 font-mono mt-1.5 cursor-pointer hover:text-muted-foreground transition-colors"
           onClick={() => setExpanded(true)}
         >
           {preview}
@@ -169,13 +169,13 @@ function PromptCard({
           <Textarea
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
-            className="text-xs font-mono min-h-[180px] bg-background/50 border-border/30"
+            className="text-sm font-mono min-h-[180px] bg-background/50 border-border/30"
           />
           <div className="flex justify-end gap-1">
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 text-xs gap-1"
+              className="h-7 text-sm gap-1"
               onClick={handleCancel}
             >
               {isRu ? "Отмена" : "Cancel"}
@@ -183,10 +183,10 @@ function PromptCard({
             <Button
               variant="default"
               size="sm"
-              className="h-6 text-xs gap-1"
+              className="h-7 text-sm gap-1"
               onClick={handleSave}
             >
-              <Save className="h-3 w-3" />
+              <Save className="h-3.5 w-3.5" />
               {isRu ? "Сохранить" : "Save"}
             </Button>
           </div>
@@ -194,16 +194,16 @@ function PromptCard({
       )}
 
       {expanded && !editing && (
-        <pre className="text-[10px] text-muted-foreground font-mono mt-1.5 whitespace-pre-wrap break-words max-h-[200px] overflow-y-auto bg-background/50 rounded p-2 border border-border/30">
+        <pre className="text-xs text-muted-foreground font-mono mt-1.5 whitespace-pre-wrap break-words max-h-[200px] overflow-y-auto bg-background/50 rounded p-2 border border-border/30">
           {currentText}
         </pre>
       )}
 
       <div className="flex items-center gap-2 mt-1.5">
-        <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 font-mono">
+        <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 font-mono">
           {task.edgeFunction}
         </Badge>
-        <span className="text-[9px] text-muted-foreground/50 font-mono">
+        <span className="text-[10px] text-muted-foreground/50 font-mono">
           {task.id}
         </span>
       </div>
@@ -262,11 +262,11 @@ export function TaskPromptsPopover({ roleId, isRu }: TaskPromptsPopoverProps) {
       >
         <div className="px-3 py-2 border-b border-border/50">
           <div className="flex items-center gap-1.5">
-            <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-sm font-medium">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <span className="text-base font-medium">
               {isRu ? "Промпты" : "Prompts"}
             </span>
-            <Badge variant="outline" className="text-[10px] px-1 py-0 ml-auto">
+            <Badge variant="outline" className="text-xs px-1.5 py-0 ml-auto">
               {tasks.length}
             </Badge>
           </div>
