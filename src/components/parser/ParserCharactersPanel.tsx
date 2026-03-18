@@ -65,6 +65,7 @@ export default function ParserCharactersPanel({
   const [newName, setNewName] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [genderPopoverOpen, setGenderPopoverOpen] = useState<string | null>(null);
+  const [genderFilter, setGenderFilter] = useState<"all" | "male" | "female">("all");
   const editRef = useRef<HTMLInputElement>(null);
   const aliasRef = useRef<HTMLInputElement>(null);
   const newRef = useRef<HTMLInputElement>(null);
@@ -151,6 +152,32 @@ export default function ParserCharactersPanel({
         <Badge variant="secondary" className="text-xs">
           {characters.length}
         </Badge>
+        {characters.length > 0 && (
+          <div className="flex items-center gap-0.5 ml-1">
+            <button
+              onClick={() => setGenderFilter(f => f === "male" ? "all" : "male")}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                genderFilter === "male"
+                  ? "bg-sky-500/20 text-sky-500 dark:text-sky-400"
+                  : "text-muted-foreground/50 hover:text-muted-foreground"
+              }`}
+              title={isRu ? "Мужские" : "Male"}
+            >
+              М
+            </button>
+            <button
+              onClick={() => setGenderFilter(f => f === "female" ? "all" : "female")}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                genderFilter === "female"
+                  ? "bg-rose-500/20 text-rose-500 dark:text-rose-400"
+                  : "text-muted-foreground/50 hover:text-muted-foreground"
+              }`}
+              title={isRu ? "Женские" : "Female"}
+            >
+              Ж
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Toolbar */}
@@ -243,7 +270,9 @@ export default function ParserCharactersPanel({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {characters.map((char) => {
+              {characters
+                .filter(c => genderFilter === "all" || c.gender === genderFilter)
+                .map((char) => {
                 const isExpanded = expandedId === char.id;
                 const isSelected = selectedIds.has(char.id);
                   const isNew = newCharIds.has(char.id);
