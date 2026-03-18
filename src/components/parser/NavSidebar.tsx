@@ -446,7 +446,7 @@ export default function NavSidebar({
                     </span>
                   )}
                   <span className="ml-auto flex items-center gap-1.5 flex-shrink-0">
-                    {firstEntry && (
+                    {firstEntry && isPdf && (
                       <span
                         className="text-[11px] text-muted-foreground font-mono font-normal cursor-pointer hover:text-primary hover:underline"
                         onClick={(e) => {
