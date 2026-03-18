@@ -57,9 +57,16 @@ export async function autoSaveToLocal(
   fileName: string,
   snapshot: LocalBookSnapshot,
 ): Promise<void> {
+  // Prefer project title from project.json over fileName-derived title
+  let projectTitle = fileName.replace(/\.(pdf|docx?|fb2)$/i, "");
+  try {
+    const meta = await storage.readJSON<{ title?: string }>("project.json");
+    if (meta?.title) projectTitle = meta.title;
+  } catch {}
+
   await syncStructureToLocal(storage, {
     bookId,
-    title: fileName.replace(/\.(pdf|docx?)$/i, ""),
+    title: projectTitle,
     fileName,
     toc: snapshot.toc,
     parts: snapshot.parts,
