@@ -11,6 +11,7 @@ import {
   mergeOutlineWithTextToc, type TocEntry,
 } from "@/lib/pdf-extract";
 import { extractFromDocx } from "@/lib/docx-extract";
+import { extractFromFb2 } from "@/lib/fb2-extract";
 import { t } from "@/pages/parser/i18n";
 import type { Scene, TocChapter, Step, ChapterStatus } from "@/pages/parser/types";
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
