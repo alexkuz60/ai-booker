@@ -31,6 +31,8 @@ interface UseChapterAnalysisParams {
   ensurePdfLoaded?: () => Promise<any>;
   /** Persisted file format from project.json (B4/B7 fix) */
   fileFormat?: "pdf" | "docx" | "fb2" | null;
+  /** Local project storage for re-extracting chapter texts */
+  projectStorage?: ProjectStorage | null;
 }
 
 export function useChapterAnalysis({
