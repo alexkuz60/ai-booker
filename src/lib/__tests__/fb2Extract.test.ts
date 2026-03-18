@@ -32,14 +32,14 @@ describe("decodeFb2Buffer", () => {
 describe("extractFromFb2", () => {
   it("extracts russian UTF-8 text without mojibake", async () => {
     const xml = `<?xml version="1.0" encoding="utf-8"?>
-      <FictionBook>
-        <body>
-          <section>
-            <title><p>Глава 1</p></title>
-            <p>Русский текст сцены.</p>
-          </section>
-        </body>
-      </FictionBook>`;
+<FictionBook>
+  <body>
+    <section>
+      <title><p>Глава 1</p></title>
+      <p>Русский текст сцены.</p>
+    </section>
+  </body>
+</FictionBook>`;
 
     const file = new File([xml], "book.fb2", { type: "application/x-fictionbook+xml" });
     const result = await extractFromFb2(file);
