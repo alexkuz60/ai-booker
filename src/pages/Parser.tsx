@@ -49,7 +49,7 @@ export default function Parser() {
   const {
     backend: storageBackend,
     createProject,
-    openProject,
+    openProjectByName,
     storage: projectStorage,
     initialized: projectStorageInitialized,
     meta: projectMeta,
@@ -93,7 +93,7 @@ export default function Parser() {
     reloadLibrary, renameBook,
     serverBooks, loadingServerBooks, deleteServerBook,
     serverNewerBookId, dismissServerNewer, acceptServerVersion,
-  } = useBookManager({ userId: user?.id, isRu, projectStorage, projectStorageInitialized, storageBackend, createProject, pendingProjectName });
+  } = useBookManager({ userId: user?.id, isRu, projectStorage, projectStorageInitialized, storageBackend, createProject, openProjectByName, pendingProjectName });
 
   const {
     characters, extracting, extractProgress, extractCharacters,

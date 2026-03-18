@@ -44,12 +44,13 @@ interface UseBookManagerParams {
   projectStorageInitialized?: boolean;
   storageBackend?: "fs-access" | "opfs" | "none";
   createProject?: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<ProjectStorage>;
+  openProjectByName?: (projectName: string) => Promise<ProjectStorage | null>;
   pendingProjectName?: string | null;
 }
 
 export function useBookManager({
   userId, isRu, projectStorage, projectStorageInitialized = false,
-  storageBackend = "none", createProject, pendingProjectName,
+  storageBackend = "none", createProject, openProjectByName, pendingProjectName,
 }: UseBookManagerParams) {
   // ── Shared state ──────────────────────────────────────────
   const [step, setStep] = useState<Step>(() => {
@@ -98,7 +99,7 @@ export function useBookManager({
   });
 
   const restore = useBookRestore({
-    userId, isRu, storageBackend, projectStorage, createProject,
+    userId, isRu, storageBackend, projectStorage, createProject, openProjectByName,
     books: library.books, fileName, bookId,
     localProjectNamesByBookId: library.localProjectNamesByBookId,
     setStep, setFileName, setBookId, setTocEntries, setChapterIdMap,

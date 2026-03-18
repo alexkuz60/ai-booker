@@ -63,6 +63,32 @@ export function useServerSync({
     } catch {}
   }, []);
 
+  const getLocalStorageForBook = useCallback(async (targetBookId: string): Promise<ProjectStorage | null> => {
+    if (storageBackend === "opfs") {
+      const projectNames = localProjectNamesByBookId.get(targetBookId);
+      if (projectNames?.length) {
+        try {
+          return await OPFSStorage.openOrCreate(projectNames[0]);
+        } catch (err) {
+          console.warn("[SyncCheck] Failed to open OPFS project:", projectNames[0], err);
+        }
+      }
+    }
+
+    if (projectStorage?.isReady) {
+      try {
+        const meta = await projectStorage.readJSON<{ bookId?: string }>("project.json");
+        if (meta?.bookId === targetBookId) {
+          return projectStorage;
+        }
+      } catch (err) {
+        console.warn("[SyncCheck] Failed to inspect active project:", err);
+      }
+    }
+
+    return null;
+  }, [storageBackend, localProjectNamesByBookId, projectStorage]);
+
   const checkServerNewer = useCallback(async (
     savedBookId: string,
     options?: { allowMissingLocalTimestamp?: boolean },
@@ -71,11 +97,12 @@ export function useServerSync({
 
     try {
       let localUpdatedAt: string | undefined;
-      if (projectStorage?.isReady) {
-        const localMeta = await projectStorage.readJSON<{ updatedAt?: string }>("project.json");
+      const localStorage = await getLocalStorageForBook(savedBookId);
+      if (localStorage?.isReady) {
+        const localMeta = await localStorage.readJSON<{ updatedAt?: string }>("project.json");
         localUpdatedAt = localMeta?.updatedAt;
         if (!localUpdatedAt) {
-          const tocMeta = await projectStorage.readJSON<{ updatedAt?: string }>("structure/toc.json");
+          const tocMeta = await localStorage.readJSON<{ updatedAt?: string }>("structure/toc.json");
           localUpdatedAt = tocMeta?.updatedAt;
         }
       }
@@ -102,7 +129,7 @@ export function useServerSync({
       console.warn("[SyncCheck] Failed:", err);
       return false;
     }
-  }, [projectStorage]);
+  }, [getLocalStorageForBook]);
 
   const dismissServerNewer = useCallback(() => setServerNewerBookId(null), []);
 

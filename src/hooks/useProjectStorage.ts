@@ -37,6 +37,8 @@ interface UseProjectStorageReturn {
   createProject: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<ProjectStorage>;
   /** Open existing project folder */
   openProject: () => Promise<ProjectStorage>;
+  /** Open specific OPFS project by directory name and make it active */
+  openProjectByName: (projectName: string) => Promise<ProjectStorage | null>;
   /** Open project from a ZIP file (cross-browser) */
   importProjectFromZip: (file: File) => Promise<ProjectStorage>;
   /** Download current project as ZIP */
@@ -141,6 +143,42 @@ export function useProjectStorage(): UseProjectStorageReturn {
       setLoading(false);
     }
   }, [backend]);
+
+  const openProjectByName = useCallback(async (projectName: string): Promise<ProjectStorage | null> => {
+    if (!projectName) return null;
+
+    if (storage?.projectName === projectName && meta) {
+      return storage;
+    }
+
+    if (backend !== "opfs") {
+      return storage?.projectName === projectName ? storage : null;
+    }
+
+    setLoading(true);
+    try {
+      const store = await OPFSStorage.openOrCreate(projectName);
+      const projectMeta = await store.readJSON<ProjectMeta>("project.json");
+      if (!projectMeta) {
+        throw new Error("Not a valid Booker project (project.json not found)");
+      }
+
+      setStorage(store);
+      setMeta(projectMeta);
+
+      try {
+        localStorage.setItem(LAST_PROJECT_KEY, JSON.stringify({
+          name: store.projectName,
+          backend,
+          bookId: projectMeta.bookId,
+        }));
+      } catch {}
+
+      return store;
+    } finally {
+      setLoading(false);
+    }
+  }, [backend, storage, meta]);
 
   // ── Import project from ZIP ─────────────────────────────
 
@@ -292,6 +330,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
     loading,
     createProject,
     openProject,
+    openProjectByName,
     importProjectFromZip,
     downloadProjectAsZip,
     closeProject,
