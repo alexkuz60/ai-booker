@@ -1029,7 +1029,8 @@ export function StoryboardPanel({
       if (error) throw error;
 
       if (mode === "suggest") {
-        const suggestions = data.suggestions as Array<{ word: string; stressed_index: number; reason: string }>;
+        const result = data as any;
+        const suggestions = result.suggestions as Array<{ word: string; stressed_index: number; reason: string }>;
         if (!suggestions?.length) {
           toast.info(isRu ? "Неоднозначных ударений не найдено" : "No ambiguous stress found");
           return;
