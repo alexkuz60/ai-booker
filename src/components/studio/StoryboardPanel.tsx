@@ -1050,15 +1050,16 @@ export function StoryboardPanel({
           );
         }
       } else {
-        if (data.applied > 0) {
+        const result = data as any;
+        if (result.applied > 0) {
           toast.success(
             isRu
-              ? `Расставлено ${data.applied} ударений в ${data.phrases_affected} фразах`
-              : `Applied ${data.applied} stress marks in ${data.phrases_affected} phrases`
+              ? `Расставлено ${result.applied} ударений в ${result.phrases_affected} фразах`
+              : `Applied ${result.applied} stress marks in ${result.phrases_affected} phrases`
           );
           await loadSegments(sceneId);
         } else {
-          toast.info(data.message || (isRu ? "Нет совпадений со словарём" : "No dictionary matches"));
+          toast.info(result.message || (isRu ? "Нет совпадений со словарём" : "No dictionary matches"));
         }
       }
     } catch (err: any) {
