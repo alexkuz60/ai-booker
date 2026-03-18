@@ -82,8 +82,11 @@ Deno.serve(async (req) => {
     const lang = language === "ru" ? "ru" : "en";
 
     // ── AI segmentation ──────────────────────────────────
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
+    const usedModel = clientModel || "google/gemini-2.5-flash";
+    const effectiveApiKey = apiKey || user_api_key || null;
+    const resolved = resolveAiEndpoint(usedModel, effectiveApiKey, openrouter_api_key);
+
+    if (!resolved.apiKey) {
       return new Response(JSON.stringify({ error: "AI key not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -91,7 +94,6 @@ Deno.serve(async (req) => {
     }
 
     const userId = await getUserIdFromAuth(authHeader);
-    const usedModel = clientModel || "google/gemini-2.5-flash";
     const aiStart = Date.now();
 
     const systemPrompt = `You are a literary text analyst. Given a scene text, split it into structural segments.
