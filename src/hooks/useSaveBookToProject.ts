@@ -246,7 +246,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         const nextMeta: ProjectMeta = {
           version: PROJECT_META_VERSION,
           bookId: currentBookId,
-          title: toc[0]?.title || "Book",
+          title: meta?.title || toc[0]?.title || "Book",
           userId: meta?.userId || user?.id || "",
           createdAt: meta?.createdAt || nowIso,
           updatedAt: nowIso,
