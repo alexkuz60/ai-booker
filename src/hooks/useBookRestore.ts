@@ -15,7 +15,8 @@ import { t } from "@/pages/parser/i18n";
 import type { Scene, TocChapter, Step, ChapterStatus, BookRecord } from "@/pages/parser/types";
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
-import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
+import { syncStructureToLocal, readStructureFromLocal, saveCharactersToLocal } from "@/lib/localSync";
+import type { LocalCharacter } from "@/pages/parser/types";
 import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 import { detectFileFormat, getSourcePath, stripFileExtension, type FileFormat } from "@/lib/fileFormatUtils";
 
