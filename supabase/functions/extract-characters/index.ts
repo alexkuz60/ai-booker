@@ -287,7 +287,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { systemPrompt, userPrompt } = buildPrompt(scenes, lang as "ru" | "en");
+    const { systemPrompt, userPrompt } = await buildPrompt(scenes, lang as "ru" | "en");
     const characters = await callAI(systemPrompt, userPrompt, model, userId, apiKey);
 
     return new Response(
