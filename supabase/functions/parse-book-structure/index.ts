@@ -8,54 +8,21 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SYSTEM_PROMPT_FULL = (lang: string) => `You are "The Architect" — an AI agent that analyzes book text and decomposes it into a structured screenplay format.
+const SYSTEM_PROMPT_FULL = (lang: string) =>
+  resolveTaskPrompt("screenwriter:parse_full_structure", lang === "ru" ? "ru" : "en")
+  || "You are The Architect.";
 
-Your task:
-1. Clean the text: remove page numbers, footnotes, headers/footers, and other technical artifacts.
-2. Identify and segment the text into chapters. If chapters are not explicitly marked, infer logical chapter boundaries.
-3. Within each chapter, identify scenes — logical segments where setting, time, or action changes.
-4. For each scene, determine:
-   - scene_type: one of "action", "dialogue", "lyrical_digression", "description", "inner_monologue", "mixed"
-   - mood: the dominant emotional tone (e.g. "tense", "calm", "melancholic", "joyful", "dark", "romantic", "comedic")
-   - bpm: suggested narrative tempo as beats-per-minute metaphor (60-80 slow/contemplative, 80-110 moderate, 110-140 dynamic, 140+ intense)
-   - content: the COMPLETE text of the scene, preserving original wording exactly. Do NOT truncate or abbreviate.
-${lang === 'ru' ? 'IMPORTANT: All scene and chapter titles MUST be in Russian.' : ''}
-You MUST respond using the suggest_structure tool.`;
+const SYSTEM_PROMPT_CHAPTER = (lang: string) =>
+  resolveTaskPrompt("screenwriter:parse_chapter_scenes", lang === "ru" ? "ru" : "en")
+  || "You are The Architect.";
 
-const SYSTEM_PROMPT_CHAPTER = (lang: string) => `You are "The Architect" — an AI agent that analyzes a single chapter of a book and decomposes it into scenes.
+const SYSTEM_PROMPT_BOUNDARIES = (lang: string) =>
+  resolveTaskPrompt("screenwriter:parse_boundaries", lang === "ru" ? "ru" : "en")
+  || "You are The Architect.";
 
-Your task:
-1. Clean the text: remove page numbers, footnotes, headers/footers, and other technical artifacts.
-2. Identify scenes — logical segments where setting, time, or action changes.
-3. For each scene, determine:
-   - scene_type: one of "action", "dialogue", "lyrical_digression", "description", "inner_monologue", "mixed"
-   - mood: the dominant emotional tone (e.g. "tense", "calm", "melancholic", "joyful", "dark", "romantic", "comedic")
-   - bpm: suggested narrative tempo as beats-per-minute metaphor (60-80 slow/contemplative, 80-110 moderate, 110-140 dynamic, 140+ intense)
-   - content: the COMPLETE text of the scene, preserving original wording exactly. Do NOT truncate or abbreviate.
-${lang === 'ru' ? 'IMPORTANT: All scene titles MUST be in Russian.' : ''}
-You MUST respond using the suggest_scenes tool.`;
-
-const SYSTEM_PROMPT_BOUNDARIES = (lang: string) => `You are "The Architect" — an AI agent that quickly identifies scene boundaries in a chapter of a book.
-
-Your task:
-1. Split the chapter into scenes — logical segments where setting, time, or action changes.
-2. For each scene, provide:
-   - A brief descriptive title${lang === 'ru' ? ' IN RUSSIAN' : ''}
-   - start_marker: the EXACT first 60-80 characters of the scene text (verbatim copy from the original, enough to uniquely locate it in the chapter)
-
-IMPORTANT: Do NOT return the full scene text. Only return start_marker.
-Do NOT analyze mood, scene_type, or bpm.
-${lang === 'ru' ? 'IMPORTANT: All scene titles MUST be in Russian.' : ''}
-You MUST respond using the suggest_boundaries tool.`;
-
-const SYSTEM_PROMPT_ENRICH = `You are "The Architect" — an AI agent that analyzes a single scene from a book and determines its characteristics.
-
-Given the scene text, determine:
-- scene_type: one of "action", "dialogue", "lyrical_digression", "description", "inner_monologue", "mixed"
-- mood: the dominant emotional tone (e.g. "tense", "calm", "melancholic", "joyful", "dark", "romantic", "comedic")
-- bpm: suggested narrative tempo as beats-per-minute metaphor (60-80 slow/contemplative, 80-110 moderate, 110-140 dynamic, 140+ intense)
-
-You MUST respond using the suggest_metadata tool.`;
+const SYSTEM_PROMPT_ENRICH =
+  resolveTaskPrompt("screenwriter:enrich_scene")
+  || "You are The Architect.";
 
 const fullStructureTool = {
   type: "function",
