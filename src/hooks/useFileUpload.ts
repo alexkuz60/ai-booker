@@ -222,8 +222,8 @@ export function useFileUpload({
         }
       });
 
-      // For DOCX: pre-mark chapters with no/minimal content as done
-      if (isDocx) {
+      // For DOCX/FB2: pre-mark chapters with no/minimal content as done
+      if (isDocx || isFb2) {
         try {
           const raw = sessionStorage.getItem("docx_chapter_texts");
           if (raw) {
