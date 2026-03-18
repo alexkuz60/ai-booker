@@ -7,7 +7,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type { ProjectStorage } from "@/lib/projectStorage";
-import type { Scene, ChapterStatus, TocChapter, LocalCharacter, CharacterAppearance } from "@/pages/parser/types";
+import type { Scene, ChapterStatus, TocChapter, LocalCharacter, CharacterAppearance, CharacterProfile } from "@/pages/parser/types";
 import { saveCharactersToLocal, readCharactersFromLocal } from "@/lib/localSync";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
 
