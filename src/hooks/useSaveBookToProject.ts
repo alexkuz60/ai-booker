@@ -238,7 +238,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
           const serverHasFile = !!bookRow?.file_path;
 
           if (!serverHasFile && user?.id) {
-            const ext = sourceResult.format === "docx" ? "book.docx" : "book.pdf";
+            const ext = sourceResult.format === "fb2" ? "book.fb2" : sourceResult.format === "docx" ? "book.docx" : "book.pdf";
             const filePath = `${user.id}/${Date.now()}_${ext}`;
             const { error: uploadError } = await supabase.storage
               .from("book-uploads")

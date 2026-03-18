@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Upload, BookOpen, Library, Trash2, FolderOpen, Clock, Loader2, Eraser } from "lucide-react";
+import { Upload, BookOpen, Library, Trash2, FolderOpen, Clock, Loader2, Eraser, Pencil, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -19,6 +21,7 @@ interface LibraryViewProps {
   onOpen: (book: BookRecord) => void;
   onDelete: (bookId: string) => void;
   onClearAll?: () => void;
+  onRename?: (bookId: string, newTitle: string) => void;
 }
 
 export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onOpen, onDelete, onClearAll }: LibraryViewProps) {
