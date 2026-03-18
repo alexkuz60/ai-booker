@@ -602,13 +602,13 @@ export default function ParserCharactersPanel({
       </AlertDialog>
     </div>{/* end left column */}
 
-    {/* Right column: profile detail */}
+    {/* Right column: profile detail (Studio-style) */}
     {profileViewChar?.profile?.description && (
-      <div className="w-72 flex-shrink-0 border-l border-border flex flex-col min-h-0 overflow-hidden bg-muted/10">
-        <div className="px-3 py-2.5 border-b border-border flex items-center gap-2 flex-shrink-0">
+      <div className="w-[36rem] flex-shrink-0 border-l border-border flex flex-col min-h-0 overflow-hidden bg-muted/10">
+        <div className="px-4 py-2.5 border-b border-border flex items-center gap-2 flex-shrink-0">
           <Brain className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-semibold text-foreground truncate flex-1">
-            {profileViewChar.name}
+          <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider flex-1">
+            {isRu ? "Профайл" : "Profile"}
           </h3>
           <button
             onClick={() => setProfileViewId(null)}
@@ -618,72 +618,84 @@ export default function ParserCharactersPanel({
           </button>
         </div>
         <ScrollArea className="flex-1 min-h-0">
-          <div className="px-3 py-3 space-y-3">
-            {profileViewChar.profile.age_group && profileViewChar.profile.age_group !== "unknown" && (
-              <div>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                  {isRu ? "Возраст" : "Age"}
-                </span>
-                <p className="text-sm text-foreground mt-0.5">{profileViewChar.profile.age_group}</p>
-              </div>
+          <div className="p-4 space-y-4">
+            {/* Character name */}
+            <h4 className="text-base font-semibold font-display text-foreground">
+              {profileViewChar.name}
+            </h4>
+
+            {/* Description */}
+            {profileViewChar.profile.description && (
+              <p className="text-sm text-foreground/90 leading-relaxed">
+                {profileViewChar.profile.description}
+              </p>
             )}
-            {profileViewChar.profile.temperament && (
-              <div>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                  {isRu ? "Темперамент" : "Temperament"}
-                </span>
-                <p className="text-sm text-foreground mt-0.5">{profileViewChar.profile.temperament}</p>
-              </div>
-            )}
+
+            {/* Badges row: gender, age, temperament */}
+            <div className="flex flex-wrap gap-2">
+              {profileViewChar.gender && profileViewChar.gender !== "unknown" && (
+                <Badge variant="outline" className="text-xs">
+                  {profileViewChar.gender === "male"
+                    ? (isRu ? "Мужской ♂" : "Male ♂")
+                    : (isRu ? "Женский ♀" : "Female ♀")}
+                </Badge>
+              )}
+              {profileViewChar.profile.age_group && profileViewChar.profile.age_group !== "unknown" && (
+                <Badge variant="outline" className="text-xs">
+                  {profileViewChar.profile.age_group}
+                </Badge>
+              )}
+              {profileViewChar.profile.temperament && (
+                <Badge variant="secondary" className="text-xs">
+                  {profileViewChar.profile.temperament}
+                </Badge>
+              )}
+            </div>
+
+            {/* Speech style */}
             {profileViewChar.profile.speech_style && (
               <div>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                  {isRu ? "Стиль речи" : "Speech style"}
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                  {isRu ? "Стиль речи" : "Speech Style"}
                 </span>
-                <p className="text-sm text-foreground mt-0.5">{profileViewChar.profile.speech_style}</p>
-              </div>
-            )}
-            {profileViewChar.profile.description && (
-              <div>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                  {isRu ? "Описание" : "Description"}
-                </span>
-                <p className="text-sm text-foreground/80 mt-0.5 leading-relaxed whitespace-pre-line">
-                  {profileViewChar.profile.description}
+                <p className="text-xs text-muted-foreground mt-1 italic">
+                  {profileViewChar.profile.speech_style}
                 </p>
               </div>
             )}
-            {profileViewChar.gender && profileViewChar.gender !== "unknown" && (
-              <div>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                  {isRu ? "Пол" : "Gender"}
-                </span>
-                <p className="text-sm text-foreground mt-0.5">
-                  {profileViewChar.gender === "male" ? (isRu ? "Мужской" : "Male") : (isRu ? "Женский" : "Female")}
-                </p>
-              </div>
-            )}
+
+            {/* Aliases */}
             {profileViewChar.aliases.length > 0 && (
               <div>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                  {isRu ? "Алиасы" : "Aliases"}
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                  {isRu ? "Также известен как" : "Also known as"}
                 </span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {profileViewChar.aliases.map(a => (
-                    <Badge key={a} variant="outline" className="text-xs">{a}</Badge>
-                  ))}
-                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {profileViewChar.aliases.join(", ")}
+                </p>
               </div>
             )}
+
+            {/* Appearances */}
             <div>
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                 {isRu ? "Появления" : "Appearances"}
               </span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {isRu
-                  ? `${profileViewChar.sceneCount} сцен в ${profileViewChar.appearances.length} главах`
-                  : `${profileViewChar.sceneCount} scenes in ${profileViewChar.appearances.length} chapters`}
-              </p>
+              <div className="mt-1.5 space-y-1">
+                {profileViewChar.appearances.map((app) => (
+                  <div key={app.chapterIdx} className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground font-mono w-8 flex-shrink-0 text-right">
+                      #{app.chapterIdx + 1}
+                    </span>
+                    <span className="truncate flex-1 text-foreground/80">
+                      {app.chapterTitle}
+                    </span>
+                    <span className="text-muted-foreground font-mono flex-shrink-0">
+                      {isRu ? "сц." : "sc."} {app.sceneNumbers.join(", ")}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </ScrollArea>
