@@ -3,7 +3,10 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
 import { extractTextByPageRange } from "@/lib/pdf-extract";
-import { stripHtml } from "@/lib/docx-extract";
+import { extractFromDocx, stripHtml } from "@/lib/docx-extract";
+import { extractFromFb2 } from "@/lib/fb2-extract";
+import { getSourcePath } from "@/lib/fileFormatUtils";
+import type { ProjectStorage } from "@/lib/projectStorage";
 import { t } from "@/pages/parser/i18n";
 
 import type { Scene, TocChapter, ChapterStatus } from "@/pages/parser/types";
@@ -28,11 +31,13 @@ interface UseChapterAnalysisParams {
   ensurePdfLoaded?: () => Promise<any>;
   /** Persisted file format from project.json (B4/B7 fix) */
   fileFormat?: "pdf" | "docx" | "fb2" | null;
+  /** Local project storage for re-extracting chapter texts */
+  projectStorage?: ProjectStorage | null;
 }
 
 export function useChapterAnalysis({
   isRu, pdfRef, userId, bookId, userApiKeys, getModelForRole,
-  tocEntries, chapterIdMap, chapterResults, setChapterResults, onChapterResultsMutated, ensurePdfLoaded, fileFormat,
+  tocEntries, chapterIdMap, chapterResults, setChapterResults, onChapterResultsMutated, ensurePdfLoaded, fileFormat, projectStorage,
 }: UseChapterAnalysisParams) {
   const [analysisLog, setAnalysisLog] = useState<string[]>([]);
   const analysisTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -167,8 +172,8 @@ export function useChapterAnalysis({
   // ─── Two-stage Chapter Analysis (with resume) ─────────────
   const isFolder = (idx: number): boolean => isFolderNode(tocEntries, idx);
 
-  /** Try to get DOCX chapter text from sessionStorage cache */
-  const getDocxChapterText = (chapterIdx: number): string | null => {
+  /** Try to get chapter text from sessionStorage cache */
+  const getChapterTextFromCache = (chapterIdx: number): string | null => {
     try {
       const raw = sessionStorage.getItem("docx_chapter_texts");
       if (!raw) return null;
@@ -176,6 +181,33 @@ export function useChapterAnalysis({
       const found = entries.find(([k]) => k === chapterIdx);
       return found ? found[1] : null;
     } catch { return null; }
+  };
+
+  /** Re-extract chapter texts from OPFS source file and populate sessionStorage cache */
+  const reExtractChapterTexts = async (): Promise<boolean> => {
+    if (!projectStorage) return false;
+    const fmt = fileFormat || "docx";
+    const sourcePath = getSourcePath(fmt);
+    try {
+      const blob = await projectStorage.readBlob(sourcePath);
+      if (!blob) return false;
+      const file = new File([blob], `book.${fmt}`, { type: blob.type });
+      let chapterTexts: Map<number, string>;
+      if (fmt === "fb2") {
+        const result = await extractFromFb2(file);
+        chapterTexts = result.chapterTexts;
+      } else {
+        const result = await extractFromDocx(file);
+        chapterTexts = result.chapterTexts;
+      }
+      sessionStorage.setItem("docx_chapter_texts", JSON.stringify(
+        Array.from(chapterTexts.entries())
+      ));
+      return true;
+    } catch (err) {
+      console.warn("[ChapterAnalysis] Failed to re-extract chapter texts:", err);
+      return false;
+    }
   };
 
   // B4/B7 fix: text-first mode for DOCX and FB2 (no PDF rendering needed)
@@ -288,15 +320,19 @@ export function useChapterAnalysis({
         let text: string;
 
         if (textMode) {
-          // ── DOCX path: get chapter HTML from sessionStorage, strip to plain text ──
-          const chapterHtml = getDocxChapterText(idx);
-          if (chapterHtml) {
-            text = stripHtml(chapterHtml);
-          } else {
-            text = "";
+          // ── Text-mode path (DOCX/FB2): get chapter HTML, strip to plain text ──
+          let chapterHtml = getChapterTextFromCache(idx);
+          if (!chapterHtml) {
+            // Cache miss (e.g. restored session) — re-extract from OPFS source
+            addLog(isRu ? "🔄 Перечитываю исходный файл..." : "🔄 Re-reading source file...");
+            const extracted = await reExtractChapterTexts();
+            if (extracted) {
+              chapterHtml = getChapterTextFromCache(idx);
+            }
           }
+          text = chapterHtml ? stripHtml(chapterHtml) : "";
           const formatLabel = fileFormat === "fb2" ? "FB2" : "DOCX";
-          addLog(isRu ? `📄 Источник: ${formatLabel} (кэш глав)` : `📄 Source: ${formatLabel} (chapter cache)`);
+          addLog(isRu ? `📄 Источник: ${formatLabel}` : `📄 Source: ${formatLabel}`);
         } else {
           // ── PDF path: extract text by page range ──
           // CONTRACT K1: shared resolver (same logic as navigator/server normalization)
