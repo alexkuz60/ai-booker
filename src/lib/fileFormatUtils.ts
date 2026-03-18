@@ -36,11 +36,12 @@ export async function findSourceBlob(
 
 /** Strip file extension from name for display purposes */
 export function stripFileExtension(name: string): string {
-  return name.replace(/\.(pdf|docx?)$/i, "");
+  return name.replace(/\.(pdf|docx?|fb2)$/i, "");
 }
 
 /** MIME type for the format */
 export function getMimeType(format: FileFormat): string {
+  if (format === "fb2") return "application/x-fictionbook+xml";
   return format === "docx"
     ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     : "application/pdf";
