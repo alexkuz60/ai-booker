@@ -320,15 +320,19 @@ export function useChapterAnalysis({
         let text: string;
 
         if (textMode) {
-          // ── DOCX path: get chapter HTML from sessionStorage, strip to plain text ──
-          const chapterHtml = getDocxChapterText(idx);
-          if (chapterHtml) {
-            text = stripHtml(chapterHtml);
-          } else {
-            text = "";
+          // ── Text-mode path (DOCX/FB2): get chapter HTML, strip to plain text ──
+          let chapterHtml = getChapterTextFromCache(idx);
+          if (!chapterHtml) {
+            // Cache miss (e.g. restored session) — re-extract from OPFS source
+            addLog(isRu ? "🔄 Перечитываю исходный файл..." : "🔄 Re-reading source file...");
+            const extracted = await reExtractChapterTexts();
+            if (extracted) {
+              chapterHtml = getChapterTextFromCache(idx);
+            }
           }
+          text = chapterHtml ? stripHtml(chapterHtml) : "";
           const formatLabel = fileFormat === "fb2" ? "FB2" : "DOCX";
-          addLog(isRu ? `📄 Источник: ${formatLabel} (кэш глав)` : `📄 Source: ${formatLabel} (chapter cache)`);
+          addLog(isRu ? `📄 Источник: ${formatLabel}` : `📄 Source: ${formatLabel}`);
         } else {
           // ── PDF path: extract text by page range ──
           // CONTRACT K1: shared resolver (same logic as navigator/server normalization)
