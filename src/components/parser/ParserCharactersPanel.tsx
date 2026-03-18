@@ -152,6 +152,32 @@ export default function ParserCharactersPanel({
         <Badge variant="secondary" className="text-xs">
           {characters.length}
         </Badge>
+        {characters.length > 0 && (
+          <div className="flex items-center gap-0.5 ml-1">
+            <button
+              onClick={() => setGenderFilter(f => f === "male" ? "all" : "male")}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                genderFilter === "male"
+                  ? "bg-sky-500/20 text-sky-500 dark:text-sky-400"
+                  : "text-muted-foreground/50 hover:text-muted-foreground"
+              }`}
+              title={isRu ? "Мужские" : "Male"}
+            >
+              М
+            </button>
+            <button
+              onClick={() => setGenderFilter(f => f === "female" ? "all" : "female")}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                genderFilter === "female"
+                  ? "bg-rose-500/20 text-rose-500 dark:text-rose-400"
+                  : "text-muted-foreground/50 hover:text-muted-foreground"
+              }`}
+              title={isRu ? "Женские" : "Female"}
+            >
+              Ж
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Toolbar */}
