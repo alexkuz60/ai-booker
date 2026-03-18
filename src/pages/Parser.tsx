@@ -357,7 +357,7 @@ export default function Parser() {
   useEffect(() => {
     const title = t("parserTitle", isRu);
     const subtitle = step === "workspace" && fileName
-      ? fileName.replace(/\.(pdf|docx?)$/i, '')
+      ? fileName.replace(/\.(pdf|docx?|fb2)$/i, '')
       : t("parserSubtitle", isRu);
     setPageHeader({ title, subtitle, headerRight });
     return () => setPageHeader({});
