@@ -217,6 +217,19 @@ export default function ParserCharactersPanel({
             {isRu ? `Объединить (${selectedIds.size})` : `Merge (${selectedIds.size})`}
           </Button>
         )}
+        {onProfile && selectedIds.size >= 1 && (
+          <Button
+            variant="ghost" size="sm"
+            onClick={() => onProfile(Array.from(selectedIds))}
+            disabled={profiling || analyzedCount === 0}
+            className="gap-1.5 text-xs"
+          >
+            {profiling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Brain className="h-3.5 w-3.5" />}
+            {profiling
+              ? (profileProgress || (isRu ? "Профайлинг…" : "Profiling…"))
+              : (isRu ? `Профайл (${selectedIds.size})` : `Profile (${selectedIds.size})`)}
+          </Button>
+        )}
       </div>
 
       {/* Add new character inline */}
