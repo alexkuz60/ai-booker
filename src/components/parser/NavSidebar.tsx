@@ -325,7 +325,7 @@ export default function NavSidebar({
               size={14}
             />
           )}
-          {onOpenPdf && (
+          {isPdf && onOpenPdf && (
             <Button
               variant="ghost" size="icon"
               className="h-6 w-6 flex-shrink-0 text-muted-foreground hover:text-primary"
