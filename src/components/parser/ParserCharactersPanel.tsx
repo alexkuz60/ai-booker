@@ -80,7 +80,6 @@ export default function ParserCharactersPanel({
     for (const c of characters) seenIdsRef.current.add(c.id);
     return newIds;
   }, [characters]);
-  const newRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (editingId) { editRef.current?.focus(); editRef.current?.select(); }
