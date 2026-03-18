@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Upload, BookOpen, Library, Trash2, FolderOpen, Clock, Loader2, Eraser, Pencil, Check, X, Cloud, Download } from "lucide-react";
+import { Upload, BookOpen, Library, Trash2, FolderOpen, Clock, Loader2, Eraser, Pencil, Check, X, Cloud, Download, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,11 +25,12 @@ interface LibraryViewProps {
   serverBooks?: BookRecord[];
   loadingServerBooks?: boolean;
   onOpenServerBook?: (book: BookRecord) => void;
+  onDeleteServerBook?: (bookId: string) => void;
 }
 
 export default function LibraryView({
   isRu, books, loadingLibrary, onUpload, onOpen, onDelete, onClearAll, onRename,
-  serverBooks = [], loadingServerBooks = false, onOpenServerBook,
+  serverBooks = [], loadingServerBooks = false, onOpenServerBook, onDeleteServerBook,
 }: LibraryViewProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -47,6 +48,12 @@ export default function LibraryView({
   };
 
   const cancelRename = () => setEditingId(null);
+
+  const fmtDate = (val: string) => new Date(val).toLocaleDateString(isRu ? 'ru-RU' : 'en-US');
+  const fmtDateTime = (val: string) => {
+    const d = new Date(val);
+    return `${d.toLocaleDateString(isRu ? 'ru-RU' : 'en-US')} ${d.toLocaleTimeString(isRu ? 'ru-RU' : 'en-US', { hour: '2-digit', minute: '2-digit' })}`;
+  };
 
   const renderBookCard = (book: BookRecord, actions: React.ReactNode) => (
     <Card key={book.id} className="hover:border-primary/30 transition-colors group">
@@ -74,11 +81,17 @@ export default function LibraryView({
           ) : (
             <p className="font-medium text-sm text-foreground truncate">{book.title}</p>
           )}
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5 flex-wrap">
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              {new Date(book.created_at).toLocaleDateString(isRu ? 'ru-RU' : 'en-US')}
+              {fmtDate(book.created_at)}
             </span>
+            {book.updated_at && book.updated_at !== book.created_at && (
+              <span className="flex items-center gap-1" title={fmtDateTime(book.updated_at)}>
+                <CalendarClock className="h-3 w-3" />
+                {t("libraryUpdated", isRu)}: {fmtDateTime(book.updated_at)}
+              </span>
+            )}
             {(book.chapter_count || 0) > 0 && (
               <span>{book.chapter_count} {t("libraryChapters", isRu)}</span>
             )}
@@ -223,6 +236,29 @@ export default function LibraryView({
                         <Download className="h-3 w-3" />
                         {t("libraryServerDownload", isRu)}
                       </Button>
+                      {onDeleteServerBook && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-8 w-8 p-0">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>{t("deleteBookTitle", isRu)}</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                {isRu ? `«${book.title}» ` : `"${book.title}" `}{t("libraryServerDeleteDesc", isRu)}
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>{t("cancel", isRu)}</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => onDeleteServerBook(book.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                {t("libraryServerDelete", isRu)}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
                     </div>
                   )))
                 )}
