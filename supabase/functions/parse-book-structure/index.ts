@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
-import { resolveTaskPrompt } from "../_shared/taskPrompts.ts";
+import { resolveTaskPromptWithOverrides } from "../_shared/taskPrompts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,20 +8,20 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SYSTEM_PROMPT_FULL = (lang: string) =>
-  resolveTaskPrompt("screenwriter:parse_full_structure", lang === "ru" ? "ru" : "en")
+const getSystemPromptFull = async (lang: string) =>
+  (await resolveTaskPromptWithOverrides("screenwriter:parse_full_structure", lang === "ru" ? "ru" : "en"))
   || "You are The Architect.";
 
-const SYSTEM_PROMPT_CHAPTER = (lang: string) =>
-  resolveTaskPrompt("screenwriter:parse_chapter_scenes", lang === "ru" ? "ru" : "en")
+const getSystemPromptChapter = async (lang: string) =>
+  (await resolveTaskPromptWithOverrides("screenwriter:parse_chapter_scenes", lang === "ru" ? "ru" : "en"))
   || "You are The Architect.";
 
-const SYSTEM_PROMPT_BOUNDARIES = (lang: string) =>
-  resolveTaskPrompt("screenwriter:parse_boundaries", lang === "ru" ? "ru" : "en")
+const getSystemPromptBoundaries = async (lang: string) =>
+  (await resolveTaskPromptWithOverrides("screenwriter:parse_boundaries", lang === "ru" ? "ru" : "en"))
   || "You are The Architect.";
 
-const SYSTEM_PROMPT_ENRICH =
-  resolveTaskPrompt("screenwriter:enrich_scene")
+const getSystemPromptEnrich = async () =>
+  (await resolveTaskPromptWithOverrides("screenwriter:enrich_scene"))
   || "You are The Architect.";
 
 const fullStructureTool = {
