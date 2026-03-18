@@ -299,7 +299,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         }
       }
 
-      // ── 5. Update local project.json ──
+      // ── 6. Update local project.json ──
       // LIR-3 + LIR-4: read title/meta from storage, not stale React context
       if (storage) {
         const nowIso = new Date().toISOString();
