@@ -671,7 +671,7 @@ export default function ParserCharactersPanel({
               )}
               {profileViewChar.profile.temperament && (
                 <Badge variant="secondary" className="text-xs">
-                  {profileViewChar.profile.temperament}
+                  {localizeLabel(profileViewChar.profile.temperament, TEMPERAMENT_LABELS, isRu)}
                 </Badge>
               )}
             </div>
