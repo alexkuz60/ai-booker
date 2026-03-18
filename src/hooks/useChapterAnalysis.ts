@@ -478,7 +478,7 @@ export function useChapterAnalysis({
         addLog(`${t("logFoundScenes", isRu)} ${scenes.length} ${t("logScenesWord", isRu)}:`);
         const totalChars = text.length;
         let charOffset = 0;
-        if (!docxMode) {
+        if (!textMode) {
           const pageSpan = (entry.endPage || entry.startPage) - entry.startPage + 1;
           scenes.forEach((sc, i) => {
             const scLen = sc.content?.length || 0;
