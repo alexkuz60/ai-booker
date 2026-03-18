@@ -216,6 +216,38 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     }
   }, [userId, step, loadLibrary]);
 
+  const renameBook = useCallback(async (bookId: string, newTitle: string) => {
+    if (storageBackend !== "opfs") return;
+
+    // Find the project name(s) for this book
+    const projectNames = localProjectNamesByBookId.get(bookId);
+    if (!projectNames?.length) return;
+
+    // Update project.json in all matching OPFS projects
+    for (const projectName of projectNames) {
+      try {
+        const store = await OPFSStorage.openOrCreate(projectName);
+        const meta = await store.readJSON<Record<string, unknown>>("project.json");
+        if (meta) {
+          meta.title = newTitle;
+          meta.updatedAt = new Date().toISOString();
+          await store.writeJSON("project.json", meta);
+        }
+        // Also update toc.json title
+        const toc = await store.readJSON<Record<string, unknown>>("structure/toc.json").catch(() => null);
+        if (toc) {
+          toc.title = newTitle;
+          await store.writeJSON("structure/toc.json", toc);
+        }
+      } catch (err) {
+        console.warn("[Library] Rename failed for project:", projectName, err);
+      }
+    }
+
+    // Update in-memory state
+    setBooks(prev => prev.map(b => b.id === bookId ? { ...b, title: newTitle } : b));
+  }, [storageBackend, localProjectNamesByBookId]);
+
   return {
     books,
     loadingLibrary,
@@ -223,5 +255,6 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     loadLibrary,
     loadLibraryFromServer,
     loadBookFromServerById,
+    renameBook,
   };
 }
