@@ -340,9 +340,19 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         .eq("id", currentBookId);
 
       const sceneCount = sceneInserts.length;
+      const descParts = [
+        `${chapterUpserts.length} ${isRu ? "глав" : "chapters"}`,
+        `${sceneCount} ${isRu ? "сцен" : "scenes"}`,
+      ];
+      if (savedCharCount > 0) {
+        descParts.push(`${savedCharCount} ${isRu ? "персонажей" : "characters"}`);
+      }
+      if (savedProfileCount > 0) {
+        descParts.push(`${savedProfileCount} ${isRu ? "профилей" : "profiles"}`);
+      }
       toast({
         title: isRu ? "Синхронизировано с сервером" : "Synced to server",
-        description: `${chapterUpserts.length} ${isRu ? "глав" : "chapters"}, ${sceneCount} ${isRu ? "сцен" : "scenes"}`,
+        description: descParts.join(", "),
       });
     } catch (error) {
       const message = getErrorMessage(error, isRu);
