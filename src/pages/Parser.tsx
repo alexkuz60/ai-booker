@@ -96,6 +96,7 @@ export default function Parser() {
 
   const {
     characters, extracting, extractProgress, extractCharacters,
+    profiling, profileProgress, profileCharacters,
     renameCharacter, updateGender, updateAliases, deleteCharacter, mergeCharacters, addCharacter,
   } = useParserCharacters({
     storage: projectStorage,
@@ -548,6 +549,9 @@ export default function Parser() {
                 onAdd={addCharacter}
                 analyzedCount={analyzedCount}
                 profilerModel={getModelForRole("profiler")}
+                profiling={profiling}
+                profileProgress={profileProgress}
+                onProfile={profileCharacters}
               />
             </motion.div>
           )}

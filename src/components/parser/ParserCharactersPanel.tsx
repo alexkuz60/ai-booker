@@ -6,13 +6,14 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Users, Scan, Plus, Trash2, Merge, Edit2, X, Check, ChevronDown, ChevronRight,
-  ChevronUp,
+  ChevronUp, Brain, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -36,8 +37,10 @@ interface ParserCharactersPanelProps {
   onMerge: (sourceId: string, targetId: string) => void;
   onAdd: (name: string) => void;
   analyzedCount: number;
-  /** Model used for profiler role */
   profilerModel?: string;
+  profiling?: boolean;
+  profileProgress?: string | null;
+  onProfile?: (charIds: string[]) => void;
 }
 
 export default function ParserCharactersPanel({
@@ -54,6 +57,9 @@ export default function ParserCharactersPanel({
   onAdd,
   analyzedCount,
   profilerModel,
+  profiling,
+  profileProgress,
+  onProfile,
 }: ParserCharactersPanelProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -211,6 +217,19 @@ export default function ParserCharactersPanel({
             {isRu ? `Объединить (${selectedIds.size})` : `Merge (${selectedIds.size})`}
           </Button>
         )}
+        {onProfile && selectedIds.size >= 1 && (
+          <Button
+            variant="ghost" size="sm"
+            onClick={() => onProfile(Array.from(selectedIds))}
+            disabled={profiling || analyzedCount === 0}
+            className="gap-1.5 text-xs"
+          >
+            {profiling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Brain className="h-3.5 w-3.5" />}
+            {profiling
+              ? (profileProgress || (isRu ? "Профайлинг…" : "Profiling…"))
+              : (isRu ? `Профайл (${selectedIds.size})` : `Profile (${selectedIds.size})`)}
+          </Button>
+        )}
       </div>
 
       {/* Add new character inline */}
@@ -264,6 +283,9 @@ export default function ParserCharactersPanel({
                 <TableHead className="w-7 px-1"></TableHead>
                 <TableHead className="text-xs">{isRu ? "Имя" : "Name"}</TableHead>
                 <TableHead className="text-xs text-center w-10">{isRu ? "Пол" : "G"}</TableHead>
+                <TableHead className="text-xs text-center w-7 px-0">
+                  <Brain className="h-3 w-3 mx-auto text-muted-foreground/50" />
+                </TableHead>
                 <TableHead className="text-xs text-center w-12">{isRu ? "Сцен" : "Sc."}</TableHead>
                 <TableHead className="text-xs text-center w-12">{isRu ? "Гл." : "Ch."}</TableHead>
                 <TableHead className="w-7 px-1"></TableHead>
@@ -399,6 +421,23 @@ export default function ParserCharactersPanel({
                       </Popover>
                     </TableCell>
 
+                    {/* Profile icon */}
+                    <TableCell className="text-center px-0">
+                      {char.profile?.description ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Brain className="h-3.5 w-3.5 text-primary mx-auto cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="left" className="max-w-xs text-xs">
+                            <p className="font-semibold mb-1">{char.profile.temperament || ""}</p>
+                            <p>{char.profile.description}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <span className="text-muted-foreground/20">—</span>
+                      )}
+                    </TableCell>
+
                     {/* Scene count */}
                     <TableCell className="text-center text-xs text-muted-foreground font-mono">
                       {char.sceneCount}
@@ -473,6 +512,28 @@ export default function ParserCharactersPanel({
                   )}
                 </div>
               </div>
+
+              {/* Profile */}
+              {char.profile?.description && (
+                <div>
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <Brain className="h-3 w-3" />
+                    {isRu ? "Профиль" : "Profile"}
+                  </h4>
+                  <div className="text-xs text-foreground/80 space-y-1">
+                    {char.profile.temperament && (
+                      <p><span className="text-muted-foreground">{isRu ? "Темперамент:" : "Temperament:"}</span> {char.profile.temperament}</p>
+                    )}
+                    {char.profile.age_group && char.profile.age_group !== "unknown" && (
+                      <p><span className="text-muted-foreground">{isRu ? "Возраст:" : "Age:"}</span> {char.profile.age_group}</p>
+                    )}
+                    {char.profile.speech_style && (
+                      <p><span className="text-muted-foreground">{isRu ? "Речь:" : "Speech:"}</span> {char.profile.speech_style}</p>
+                    )}
+                    <p>{char.profile.description}</p>
+                  </div>
+                </div>
+              )}
 
               {/* Appearances */}
               <div>
