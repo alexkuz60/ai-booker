@@ -144,6 +144,42 @@ export function useProjectStorage(): UseProjectStorageReturn {
     }
   }, [backend]);
 
+  const openProjectByName = useCallback(async (projectName: string): Promise<ProjectStorage | null> => {
+    if (!projectName) return null;
+
+    if (storage?.projectName === projectName && meta) {
+      return storage;
+    }
+
+    if (backend !== "opfs") {
+      return storage?.projectName === projectName ? storage : null;
+    }
+
+    setLoading(true);
+    try {
+      const store = await OPFSStorage.openOrCreate(projectName);
+      const projectMeta = await store.readJSON<ProjectMeta>("project.json");
+      if (!projectMeta) {
+        throw new Error("Not a valid Booker project (project.json not found)");
+      }
+
+      setStorage(store);
+      setMeta(projectMeta);
+
+      try {
+        localStorage.setItem(LAST_PROJECT_KEY, JSON.stringify({
+          name: store.projectName,
+          backend,
+          bookId: projectMeta.bookId,
+        }));
+      } catch {}
+
+      return store;
+    } finally {
+      setLoading(false);
+    }
+  }, [backend, storage, meta]);
+
   // ── Import project from ZIP ─────────────────────────────
 
   const importProjectFromZip = useCallback(async (file: File): Promise<ProjectStorage> => {
