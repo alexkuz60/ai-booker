@@ -24,7 +24,23 @@ interface LibraryViewProps {
   onRename?: (bookId: string, newTitle: string) => void;
 }
 
-export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onOpen, onDelete, onClearAll }: LibraryViewProps) {
+export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onOpen, onDelete, onClearAll, onRename }: LibraryViewProps) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+
+  const startRename = (book: BookRecord) => {
+    setEditingId(book.id);
+    setEditValue(book.title);
+  };
+
+  const commitRename = () => {
+    if (editingId && editValue.trim()) {
+      onRename?.(editingId, editValue.trim());
+    }
+    setEditingId(null);
+  };
+
+  const cancelRename = () => setEditingId(null);
   return (
     <motion.div key="library" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
       className="flex-1 h-full overflow-auto">
