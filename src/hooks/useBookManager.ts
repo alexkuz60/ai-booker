@@ -17,6 +17,21 @@ import type { Scene, TocChapter, Step, ChapterStatus, BookRecord } from "@/pages
 import { ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
 
+// ── Heartbeat: detect stale sessionStorage after PC restart ──
+const HEARTBEAT_KEY = "parser_heartbeat";
+const HEARTBEAT_STALE_MS = 5 * 60 * 1000; // 5 minutes
+
+function isSessionStale(): boolean {
+  const raw = localStorage.getItem(HEARTBEAT_KEY);
+  if (!raw) return true; // no heartbeat → treat as stale
+  const elapsed = Date.now() - Number(raw);
+  return elapsed > HEARTBEAT_STALE_MS;
+}
+
+function writeHeartbeat() {
+  localStorage.setItem(HEARTBEAT_KEY, String(Date.now()));
+}
+
 import { useLibrary } from "@/hooks/useLibrary";
 import { useFileUpload } from "@/hooks/useFileUpload";
 import { useBookRestore } from "@/hooks/useBookRestore";
