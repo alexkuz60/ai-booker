@@ -177,7 +177,7 @@ Deno.serve(async (req) => {
     }
 
     const userId = userData.user.id;
-    const { scene_id, mode, model } = await req.json();
+    const { scene_id, mode, model, provider, apiKey, user_api_key, openrouter_api_key } = await req.json();
     // mode: "correct" (apply dictionary to scene) | "suggest" (AI find ambiguous words)
 
     if (!scene_id) {
