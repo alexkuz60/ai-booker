@@ -330,6 +330,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
     loading,
     createProject,
     openProject,
+    openProjectByName,
     importProjectFromZip,
     downloadProjectAsZip,
     closeProject,

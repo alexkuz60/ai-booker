@@ -18,7 +18,6 @@ import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
 import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
 import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 import { detectFileFormat, getSourcePath, stripFileExtension, type FileFormat } from "@/lib/fileFormatUtils";
-import { mapFlatToChapters } from "@/hooks/useFileUpload";
 
 interface UseBookRestoreParams {
   userId: string | undefined;
@@ -26,6 +25,7 @@ interface UseBookRestoreParams {
   storageBackend: "fs-access" | "opfs" | "none";
   projectStorage?: ProjectStorage | null;
   createProject?: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<ProjectStorage>;
+  openProjectByName?: (projectName: string) => Promise<ProjectStorage | null>;
   /** For ensurePdfLoaded fallback */
   books: BookRecord[];
   fileName: string;
@@ -46,7 +46,7 @@ interface UseBookRestoreParams {
 }
 
 export function useBookRestore({
-  userId, isRu, storageBackend, projectStorage, createProject,
+  userId, isRu, storageBackend, projectStorage, createProject, openProjectByName,
   books, fileName, bookId, localProjectNamesByBookId,
   setStep, setFileName, setBookId, setTocEntries, setChapterIdMap,
   setPartIdMap, setChapterResults, setPdfRef, setTotalPages, setErrorMsg,
@@ -54,7 +54,6 @@ export function useBookRestore({
   const [pdfRef, setPdfRefLocal] = useState<any>(null);
   const [totalPages, setTotalPagesLocal] = useState(0);
 
-  // Sync local + parent state for pdfRef and totalPages
   const updatePdfRef = useCallback((ref: any) => {
     setPdfRefLocal(ref);
     setPdfRef(ref);
@@ -65,29 +64,96 @@ export function useBookRestore({
     setTotalPages(pages);
   }, [setTotalPages]);
 
-  // ─── Restore from local ProjectStorage ─────────────────────
-  const restoreFromLocal = useCallback(async (savedBookId: string): Promise<boolean> => {
-    // ── Find the correct OPFS project for this bookId ──
-    let storage: ProjectStorage | null | undefined = null;
+  const clearTransientBookState = useCallback(() => {
+    updatePdfRef(null);
+    updateTotalPages(0);
+    try {
+      sessionStorage.removeItem("docx_chapter_texts");
+      sessionStorage.removeItem("docx_html");
+    } catch {}
+  }, [updatePdfRef, updateTotalPages]);
+
+  const getBookIdFromStorage = useCallback(async (storage: ProjectStorage | null | undefined): Promise<string | null> => {
+    if (!storage?.isReady) return null;
+    try {
+      const meta = await storage.readJSON<{ bookId?: string }>("project.json");
+      if (meta?.bookId) return meta.bookId;
+      const structure = await storage.readJSON<{ bookId?: string }>("structure/toc.json");
+      return structure?.bookId || null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const resolveLocalStorageForBook = useCallback(async (
+    targetBookId: string,
+    options?: { activate?: boolean },
+  ): Promise<ProjectStorage | null> => {
+    const activate = options?.activate ?? false;
 
     if (storageBackend === "opfs") {
-      const projectNames = localProjectNamesByBookId.get(savedBookId);
+      const projectNames = localProjectNamesByBookId.get(targetBookId);
       if (projectNames?.length) {
+        const projectName = projectNames[0];
         try {
-          storage = await OPFSStorage.openOrCreate(projectNames[0]);
-          console.debug("[LocalRestore] Opened OPFS project for book:", projectNames[0], savedBookId);
+          if (activate && openProjectByName) {
+            const activated = await openProjectByName(projectName);
+            if (activated?.isReady) {
+              console.debug("[BookRestore] Activated OPFS project:", projectName, targetBookId);
+              return activated;
+            }
+          }
+
+          const direct = await OPFSStorage.openOrCreate(projectName);
+          if (direct.isReady) {
+            console.debug("[BookRestore] Opened OPFS project directly:", projectName, targetBookId);
+            return direct;
+          }
         } catch (err) {
-          console.warn("[LocalRestore] Failed to open OPFS project:", projectNames[0], err);
+          console.warn("[BookRestore] Failed to open OPFS project:", projectName, err);
         }
       }
     }
 
-    // Fallback to current projectStorage if OPFS lookup didn't work
-    if (!storage?.isReady) {
-      storage = projectStorage;
+    const activeBookId = await getBookIdFromStorage(projectStorage);
+    if (projectStorage?.isReady && activeBookId === targetBookId) {
+      return projectStorage;
     }
 
+    return null;
+  }, [storageBackend, localProjectNamesByBookId, openProjectByName, getBookIdFromStorage, projectStorage]);
+
+  const ensureWritableLocalStorage = useCallback(async (
+    targetBookId: string,
+    targetTitle: string,
+    targetFileName: string,
+  ): Promise<ProjectStorage | null> => {
+    const existing = await resolveLocalStorageForBook(targetBookId, { activate: true });
+    if (existing?.isReady) return existing;
+
+    const activeBookId = await getBookIdFromStorage(projectStorage);
+    if (projectStorage?.isReady && activeBookId === targetBookId) {
+      return projectStorage;
+    }
+
+    if (storageBackend === "opfs" && createProject && userId) {
+      try {
+        const lang = isRu ? "ru" as const : "en" as const;
+        return await createProject(targetTitle || stripFileExtension(targetFileName), targetBookId, userId, lang);
+      } catch (err) {
+        console.warn("[BookRestore] Failed to create local project:", err);
+      }
+    }
+
+    return null;
+  }, [resolveLocalStorageForBook, getBookIdFromStorage, projectStorage, storageBackend, createProject, userId, isRu]);
+
+  const restoreFromLocal = useCallback(async (savedBookId: string): Promise<boolean> => {
+    clearTransientBookState();
+
+    const storage = await resolveLocalStorageForBook(savedBookId, { activate: true });
     if (!storage?.isReady) return false;
+
     try {
       const local = await readStructureFromLocal(storage);
       if (!local?.structure || local.structure.bookId !== savedBookId) return false;
@@ -111,7 +177,6 @@ export function useBookRestore({
       sessionStorage.setItem(ACTIVE_BOOK_KEY, savedBookId);
       setStep("workspace");
 
-      // Normalize legacy local data immediately
       void syncStructureToLocal(storage, {
         bookId: savedBookId,
         title: structure.title,
@@ -122,7 +187,6 @@ export function useBookRestore({
         chapterResults: sanitizedLocalResults,
       });
 
-      // Restore source file (async, non-blocking)
       const localMeta = await storage.readJSON<Record<string, unknown>>("project.json");
       const localFormat: FileFormat = (localMeta?.fileFormat as FileFormat) || detectFileFormat(structure.fileName);
 
@@ -130,7 +194,7 @@ export function useBookRestore({
         const sourcePath = getSourcePath(localFormat);
         storage.readBlob(sourcePath).then(async (pdfBlob) => {
           if (!pdfBlob) {
-            console.log("[LocalRestore] No local PDF found, will download on demand");
+            console.log("[LocalRestore] No local PDF found, keeping pdfRef empty");
             return;
           }
           try {
@@ -145,7 +209,7 @@ export function useBookRestore({
           }
         });
       } else {
-        console.log("[LocalRestore] DOCX book — skipping PDF proxy restore");
+        console.log("[LocalRestore] Non-PDF book — PDF proxy cleared");
       }
 
       console.log(`[LocalRestore] Restored from local: ${structure.toc.length} chapters, ${localResults.size} results`);
@@ -159,9 +223,8 @@ export function useBookRestore({
       console.warn("[LocalRestore] Failed:", err);
       return false;
     }
-  }, [projectStorage, storageBackend, localProjectNamesByBookId, isRu, setBookId, setFileName, setTocEntries, setChapterIdMap, setChapterResults, setPartIdMap, setStep, updatePdfRef, updateTotalPages]);
+  }, [clearTransientBookState, resolveLocalStorageForBook, isRu, setBookId, setFileName, setTocEntries, setChapterIdMap, setChapterResults, setPartIdMap, setStep, updatePdfRef, updateTotalPages]);
 
-  // ─── Open saved book (local-first + server fallback) ────────
   const openSavedBook = useCallback(async (
     book: BookRecord,
     options?: { skipTimestampCheck?: boolean },
@@ -170,8 +233,7 @@ export function useBookRestore({
   ) => {
     if (!userId) return;
 
-    // Try local-first restore (checks OPFS by bookId, not just current projectStorage)
-    const canTryLocal = projectStorage?.isReady || (storageBackend === "opfs" && localProjectNamesByBookId.has(book.id));
+    const canTryLocal = !!(await resolveLocalStorageForBook(book.id));
     if (canTryLocal) {
       const restored = await restoreFromLocal(book.id);
       if (restored) {
@@ -183,6 +245,7 @@ export function useBookRestore({
       }
     }
 
+    clearTransientBookState();
     setStep("extracting_toc");
     setFileName(book.file_name);
     setBookId(book.id);
@@ -190,10 +253,10 @@ export function useBookRestore({
 
     try {
       const [partsRes, chaptersRes, pdfBlob] = await Promise.all([
-        supabase.from('book_parts').select('id, part_number, title').eq('book_id', book.id).order('part_number'),
-        supabase.from('book_chapters').select('id, chapter_number, title, scene_type, mood, bpm, part_id, level, start_page, end_page').eq('book_id', book.id).order('chapter_number'),
+        supabase.from("book_parts").select("id, part_number, title").eq("book_id", book.id).order("part_number"),
+        supabase.from("book_chapters").select("id, chapter_number, title, scene_type, mood, bpm, part_id, level, start_page, end_page").eq("book_id", book.id).order("chapter_number"),
         book.file_path
-          ? supabase.storage.from('book-uploads').download(book.file_path).then(r => r.data)
+          ? supabase.storage.from("book-uploads").download(book.file_path).then(r => r.data)
           : Promise.resolve(null),
       ]);
 
@@ -216,7 +279,7 @@ export function useBookRestore({
       if (!isBookDocx && pdfBlob) {
         try {
           const arrayBuffer = await pdfBlob.arrayBuffer();
-          const { getDocument } = await import('pdfjs-dist');
+          const { getDocument } = await import("pdfjs-dist");
           const pdf = await getDocument({ data: arrayBuffer }).promise;
           restoredPdf = pdf;
           restoredTotalPages = pdf.numPages;
@@ -230,19 +293,19 @@ export function useBookRestore({
                   let pageNumber = 1;
                   try {
                     if (item.dest) {
-                      const dest = typeof item.dest === 'string' ? await pdf.getDestination(item.dest) : item.dest;
+                      const dest = typeof item.dest === "string" ? await pdf.getDestination(item.dest) : item.dest;
                       if (dest && dest[0]) {
                         const pageIndex = await pdf.getPageIndex(dest[0]);
                         pageNumber = pageIndex + 1;
                       }
                     }
-                  } catch { /* fallback */ }
+                  } catch {}
                   const children = item.items?.length ? await parseItems(item.items, level + 1) : [];
-                  entries.push({ title: item.title || 'Untitled', pageNumber, level, children });
+                  entries.push({ title: item.title || "Untitled", pageNumber, level, children });
                 }
                 return entries;
               })(rawOutline, 0),
-              pdf.numPages
+              pdf.numPages,
             );
 
             tocFromPdf = chapters.map((ch, i) => {
@@ -304,20 +367,24 @@ export function useBookRestore({
 
       const allChapterIds = chapters.map(c => c.id);
       const { data: allScenes } = await supabase
-        .from('book_scenes')
-        .select('id, chapter_id, scene_number, title, content, scene_type, mood, bpm')
-        .in('chapter_id', allChapterIds)
-        .order('scene_number');
+        .from("book_scenes")
+        .select("id, chapter_id, scene_number, title, content, scene_type, mood, bpm")
+        .in("chapter_id", allChapterIds)
+        .order("scene_number");
 
       const scenesByChapter = new Map<string, Scene[]>();
       for (const s of (allScenes || [])) {
         const list = scenesByChapter.get(s.chapter_id) || [];
         list.push({
-          id: s.id, scene_number: s.scene_number, title: s.title,
+          id: s.id,
+          scene_number: s.scene_number,
+          title: s.title,
           content: s.content || undefined,
-          content_preview: (s.content || '').slice(0, 200) || undefined,
-          scene_type: s.scene_type || "mixed", mood: s.mood || "neutral", bpm: s.bpm || 120,
-          char_count: (s.content || '').length,
+          content_preview: (s.content || "").slice(0, 200) || undefined,
+          scene_type: s.scene_type || "mixed",
+          mood: s.mood || "neutral",
+          bpm: s.bpm || 120,
+          char_count: (s.content || "").length,
         });
         scenesByChapter.set(s.chapter_id, list);
       }
@@ -332,21 +399,14 @@ export function useBookRestore({
       setChapterResults(initMap);
       setStep("workspace");
 
-      // ── Sync server data to local OPFS ──
-      let targetStorage = projectStorage?.isReady ? projectStorage : null;
-      if (!targetStorage && storageBackend === "opfs" && createProject && userId) {
-        try {
-          const projectTitle = book.title || stripFileExtension(book.file_name);
-          const lang = isRu ? "ru" as const : "en" as const;
-          targetStorage = await createProject(projectTitle, book.id, userId, lang);
-          console.log("[OpenBook] Auto-created OPFS project for server book:", projectTitle);
-        } catch (err) {
-          console.warn("[OpenBook] Failed to auto-create OPFS project:", err);
-        }
-      }
+      const targetStorage = await ensureWritableLocalStorage(
+        book.id,
+        book.title || stripFileExtension(book.file_name),
+        book.file_name,
+      );
 
-      if (targetStorage) {
-        syncStructureToLocal(targetStorage, {
+      if (targetStorage?.isReady) {
+        void syncStructureToLocal(targetStorage, {
           bookId: book.id,
           title: book.title || stripFileExtension(book.file_name),
           fileName: book.file_name,
@@ -356,14 +416,14 @@ export function useBookRestore({
           chapterResults: initMap,
         });
 
-        if (pdfBlob && targetStorage) {
+        if (pdfBlob) {
           const sourcePath = getSourcePath(bookFormat);
           targetStorage.writeBlob(sourcePath, pdfBlob).catch(err =>
             console.warn("[OpenBook] Failed to save source file to local project:", err)
           );
         }
 
-        if (targetStorage && isBookDocx) {
+        if (isBookDocx) {
           try {
             const projMeta = await targetStorage.readJSON<Record<string, unknown>>("project.json");
             if (projMeta) {
@@ -377,24 +437,41 @@ export function useBookRestore({
       const pdfStatus = restoredPdf
         ? ` (${t("pdfRestored", isRu)})`
         : ` (${t("pdfNotFound", isRu)})`;
-      toast.success(`${t("bookLoaded", isRu)}: «${book.title}»` + pdfStatus);
+      toast.success(`${t("bookLoaded", isRu)}: «${book.title}»${pdfStatus}`);
     } catch (err: any) {
       console.error("Failed to open book:", err);
       setErrorMsg(err.message || "Unknown error");
       setStep("error");
     }
-  }, [userId, isRu, projectStorage, storageBackend, localProjectNamesByBookId, createProject, restoreFromLocal, updatePdfRef, updateTotalPages,
-      setStep, setFileName, setBookId, setTocEntries, setChapterIdMap, setPartIdMap, setChapterResults, setErrorMsg]);
+  }, [
+    userId,
+    isRu,
+    resolveLocalStorageForBook,
+    restoreFromLocal,
+    clearTransientBookState,
+    updatePdfRef,
+    updateTotalPages,
+    setStep,
+    setFileName,
+    setBookId,
+    setTocEntries,
+    setChapterIdMap,
+    setPartIdMap,
+    setChapterResults,
+    ensureWritableLocalStorage,
+    setErrorMsg,
+  ]);
 
-  // ─── Ensure PDF is loaded (local-first, then server) ────────
   const ensurePdfLoaded = useCallback(async (): Promise<any> => {
     if (pdfRef) return pdfRef;
     if (!bookId) return null;
 
+    const storage = await resolveLocalStorageForBook(bookId, { activate: false });
+
     let format: FileFormat = "pdf";
-    if (projectStorage?.isReady) {
+    if (storage?.isReady) {
       try {
-        const meta = await projectStorage.readJSON<Record<string, unknown>>("project.json");
+        const meta = await storage.readJSON<Record<string, unknown>>("project.json");
         if (meta?.fileFormat === "docx") format = "docx";
       } catch {}
     }
@@ -415,10 +492,9 @@ export function useBookRestore({
       return pdf;
     };
 
-    // 1. Try local project first
-    if (projectStorage?.isReady) {
+    if (storage?.isReady) {
       try {
-        const localBlob = await projectStorage.readBlob(getSourcePath("pdf"));
+        const localBlob = await storage.readBlob(getSourcePath("pdf"));
         if (localBlob) {
           console.log("[EnsurePDF] Loading from local project");
           return await loadPdf(await localBlob.arrayBuffer());
@@ -428,7 +504,6 @@ export function useBookRestore({
       }
     }
 
-    // 2. Fallback: query file_path from DB
     let filePath: string | null = null;
     const bookInState = books.find(b => b.id === bookId);
     if (bookInState?.file_path) {
@@ -453,20 +528,19 @@ export function useBookRestore({
 
     try {
       console.log("[EnsurePDF] Downloading from server");
-      const { data: blob } = await supabase.storage.from('book-uploads').download(filePath);
+      const { data: blob } = await supabase.storage.from("book-uploads").download(filePath);
       if (!blob) return null;
       const pdf = await loadPdf(await blob.arrayBuffer());
 
-      // Cache locally for next time
-      if (projectStorage?.isReady) {
-        projectStorage.writeBlob(getSourcePath("pdf"), blob).catch(() => {});
+      if (storage?.isReady) {
+        storage.writeBlob(getSourcePath("pdf"), blob).catch(() => {});
       }
       return pdf;
     } catch (err) {
       console.warn("[EnsurePDF] Server download failed:", err);
       return null;
     }
-  }, [pdfRef, bookId, books, projectStorage, fileName, updatePdfRef, updateTotalPages]);
+  }, [pdfRef, bookId, books, resolveLocalStorageForBook, fileName, updatePdfRef, updateTotalPages]);
 
   return {
     pdfRef,

@@ -99,7 +99,7 @@ export function useBookManager({
   });
 
   const restore = useBookRestore({
-    userId, isRu, storageBackend, projectStorage, createProject,
+    userId, isRu, storageBackend, projectStorage, createProject, openProjectByName,
     books: library.books, fileName, bookId,
     localProjectNamesByBookId: library.localProjectNamesByBookId,
     setStep, setFileName, setBookId, setTocEntries, setChapterIdMap,
