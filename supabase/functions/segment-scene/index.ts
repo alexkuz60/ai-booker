@@ -162,9 +162,11 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`;
       if (userId) {
         logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "error", latencyMs: aiLatency, errorMessage: `AI error: ${aiRes.status}` });
       }
+      // Pass through 402/429 so client can cascade to next provider
+      const statusCode = (aiRes.status === 402 || aiRes.status === 429) ? aiRes.status : 502;
       return new Response(
         JSON.stringify({ error: `AI error: ${aiRes.status}` }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: statusCode, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
