@@ -107,7 +107,7 @@ export function AiRolePresets({
               className="h-8 text-xs"
               onKeyDown={(e) => e.key === "Enter" && handleSave()}
             />
-            <Button size="sm" className="h-8 px-3 text-xs" onClick={handleSave} disabled={!newName.trim()}>
+            <Button size="sm" className="h-8 px-3 text-xs" onClick={handleSave} disabled={!newName.trim() && !bookTitle?.trim()}>
               OK
             </Button>
           </div>
