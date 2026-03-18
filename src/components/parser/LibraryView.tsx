@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Upload, BookOpen, Library, Trash2, FolderOpen, Clock, Loader2, Eraser, Pencil, Check, X } from "lucide-react";
+import { Upload, BookOpen, Library, Trash2, FolderOpen, Clock, Loader2, Eraser, Pencil, Check, X, Cloud, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,9 +22,15 @@ interface LibraryViewProps {
   onDelete: (bookId: string) => void;
   onClearAll?: () => void;
   onRename?: (bookId: string, newTitle: string) => void;
+  serverBooks?: BookRecord[];
+  loadingServerBooks?: boolean;
+  onOpenServerBook?: (book: BookRecord) => void;
 }
 
-export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onOpen, onDelete, onClearAll, onRename }: LibraryViewProps) {
+export default function LibraryView({
+  isRu, books, loadingLibrary, onUpload, onOpen, onDelete, onClearAll, onRename,
+  serverBooks = [], loadingServerBooks = false, onOpenServerBook,
+}: LibraryViewProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
@@ -41,6 +47,54 @@ export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onO
   };
 
   const cancelRename = () => setEditingId(null);
+
+  const renderBookCard = (book: BookRecord, actions: React.ReactNode) => (
+    <Card key={book.id} className="hover:border-primary/30 transition-colors group">
+      <CardContent className="py-3 px-4 flex items-center gap-4">
+        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <BookOpen className="h-5 w-5 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          {editingId === book.id ? (
+            <div className="flex items-center gap-1">
+              <Input
+                value={editValue}
+                onChange={e => setEditValue(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") cancelRename(); }}
+                className="h-7 text-sm"
+                autoFocus
+              />
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={commitRename}>
+                <Check className="h-3.5 w-3.5 text-primary" />
+              </Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={cancelRename}>
+                <X className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+            </div>
+          ) : (
+            <p className="font-medium text-sm text-foreground truncate">{book.title}</p>
+          )}
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {new Date(book.created_at).toLocaleDateString(isRu ? 'ru-RU' : 'en-US')}
+            </span>
+            {(book.chapter_count || 0) > 0 && (
+              <span>{book.chapter_count} {t("libraryChapters", isRu)}</span>
+            )}
+            {(book.scene_count || 0) > 0 && (
+              <span>{book.scene_count} {t("libraryScenes", isRu)}</span>
+            )}
+            <Badge variant="outline" className="text-[10px] font-mono">
+              {book.file_format === "fb2" ? "FB2" : book.file_format === "docx" ? "DOCX" : (book.file_name?.match(/\.fb2$/i) ? "FB2" : book.file_name?.match(/\.(docx?)$/i) ? "DOCX" : "PDF")}
+            </Badge>
+          </div>
+        </div>
+        {actions}
+      </CardContent>
+    </Card>
+  );
+
   return (
     <motion.div key="library" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
       className="flex-1 h-full overflow-auto">
@@ -86,64 +140,15 @@ export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onO
             <Loader2 className="h-5 w-5 animate-spin" />
             <span className="text-sm">{t("libraryLoading", isRu)}</span>
           </div>
-        ) : books.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="py-16 flex flex-col items-center gap-4 text-muted-foreground">
-              <Library className="h-12 w-12 opacity-30" />
-              <p className="text-sm">{t("libraryEmpty", isRu)}</p>
-              <Button variant="outline" onClick={onUpload} className="gap-2">
-                <Upload className="h-4 w-4" />
-                {t("libraryUpload", isRu)}
-              </Button>
-            </CardContent>
-          </Card>
         ) : (
-          <div className="space-y-2">
-            {books.map(book => (
-              <Card key={book.id} className="hover:border-primary/30 transition-colors group">
-                <CardContent className="py-3 px-4 flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <BookOpen className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    {editingId === book.id ? (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          value={editValue}
-                          onChange={e => setEditValue(e.target.value)}
-                          onKeyDown={e => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") cancelRename(); }}
-                          className="h-7 text-sm"
-                          autoFocus
-                        />
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={commitRename}>
-                          <Check className="h-3.5 w-3.5 text-primary" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={cancelRename}>
-                          <X className="h-3.5 w-3.5 text-muted-foreground" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <p className="font-medium text-sm text-foreground truncate">{book.title}</p>
-                    )}
-                    <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {new Date(book.created_at).toLocaleDateString(isRu ? 'ru-RU' : 'en-US')}
-                      </span>
-                      {(book.chapter_count || 0) > 0 && (
-                        <span>{book.chapter_count} {t("libraryChapters", isRu)}</span>
-                      )}
-                      {(book.scene_count || 0) > 0 && (
-                        <span>{book.scene_count} {t("libraryScenes", isRu)}</span>
-                      )}
-                      <Badge variant="outline" className="text-[10px] font-mono">
-                        {book.file_format === "fb2" ? "FB2" : book.file_format === "docx" ? "DOCX" : (book.file_name?.match(/\.fb2$/i) ? "FB2" : book.file_name?.match(/\.(docx?)$/i) ? "DOCX" : "PDF")}
-                      </Badge>
-                      <Badge variant="outline" className="text-[10px]">
-                        {(book.chapter_count || 0) > 0 ? t("libraryAnalyzed", isRu) : t("libraryUploaded", isRu)}
-                      </Badge>
-                    </div>
-                  </div>
+          <>
+            {/* Local projects section */}
+            {books.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {t("libraryLocalTitle", isRu)}
+                </h3>
+                {books.map(book => renderBookCard(book, (
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     {onRename && (
                       <Button variant="ghost" size="sm" onClick={() => startRename(book)} className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground">
@@ -176,10 +181,54 @@ export default function LibraryView({ isRu, books, loadingLibrary, onUpload, onO
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
+                )))}
+              </div>
+            )}
+
+            {/* Empty state (no local AND no server books) */}
+            {books.length === 0 && serverBooks.length === 0 && !loadingServerBooks && (
+              <Card className="border-dashed">
+                <CardContent className="py-16 flex flex-col items-center gap-4 text-muted-foreground">
+                  <Library className="h-12 w-12 opacity-30" />
+                  <p className="text-sm">{t("libraryEmpty", isRu)}</p>
+                  <Button variant="outline" onClick={onUpload} className="gap-2">
+                    <Upload className="h-4 w-4" />
+                    {t("libraryUpload", isRu)}
+                  </Button>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+            )}
+
+            {/* Server books section */}
+            {(loadingServerBooks || serverBooks.length > 0) && (
+              <div className="space-y-2 pt-4 border-t border-border">
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Cloud className="h-3.5 w-3.5" />
+                  {t("libraryServerTitle", isRu)}
+                </h3>
+                {loadingServerBooks ? (
+                  <div className="flex items-center justify-center py-8 gap-3 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">{t("libraryServerLoading", isRu)}</span>
+                  </div>
+                ) : (
+                  serverBooks.map(book => renderBookCard(book, (
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onOpenServerBook?.(book)}
+                        className="gap-1.5 text-xs"
+                      >
+                        <Download className="h-3 w-3" />
+                        {t("libraryServerDownload", isRu)}
+                      </Button>
+                    </div>
+                  )))
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </motion.div>
