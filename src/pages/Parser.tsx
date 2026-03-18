@@ -274,14 +274,16 @@ export default function Parser() {
           <Library className="h-3.5 w-3.5" />
           {isRu ? "Библиотека" : "Library"}
         </Button>
-        <Button
-          variant={step === "upload" ? "secondary" : "ghost"} size="sm"
-          onClick={startNewProject}
-          className="gap-1.5 text-xs"
-        >
-          <PlusCircle className="h-3.5 w-3.5" />
-          {isRu ? "Новая книга" : "New Book"}
-        </Button>
+        {step === "library" && (
+          <Button
+            variant="ghost" size="sm"
+            onClick={startNewProject}
+            className="gap-1.5 text-xs"
+          >
+            <PlusCircle className="h-3.5 w-3.5" />
+            {isRu ? "Новая книга" : "New Book"}
+          </Button>
+        )}
         {step === "workspace" && (
           <Button
             variant="ghost" size="sm"
