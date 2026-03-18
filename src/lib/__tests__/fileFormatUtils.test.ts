@@ -42,6 +42,10 @@ describe("getSourcePath", () => {
   it("returns correct path for docx", () => {
     expect(getSourcePath("docx")).toBe("source/book.docx");
   });
+
+  it("returns correct path for fb2", () => {
+    expect(getSourcePath("fb2")).toBe("source/book.fb2");
+  });
 });
 
 describe("stripFileExtension", () => {
