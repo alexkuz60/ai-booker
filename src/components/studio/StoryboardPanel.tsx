@@ -54,6 +54,7 @@ export function StoryboardPanel({
   onRecalcDone?: () => void;
 }) {
   const { getModelForRole } = useAiRoles();
+  const { apiKeys: userApiKeys } = useUserApiKeys();
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
