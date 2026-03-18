@@ -4,6 +4,7 @@ import type { Json, Database } from "@/integrations/supabase/types";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
+import { Loader2, Sparkles, BookOpen, AudioLines, CheckCircle2, XCircle, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck } from "lucide-react";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
