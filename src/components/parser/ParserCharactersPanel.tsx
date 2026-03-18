@@ -150,7 +150,7 @@ export default function ParserCharactersPanel({
         </h2>
         <RoleBadge roleId="profiler" model={profilerModel} isRu={isRu} size={16} />
         <Badge variant="secondary" className="text-xs">
-          {characters.length}
+          {genderFilter === "all" ? characters.length : characters.filter(c => c.gender === genderFilter).length}
         </Badge>
         {characters.length > 0 && (
           <div className="flex items-center gap-0.5 ml-1">
