@@ -3,7 +3,7 @@
  * Supports: extraction, rename, aliases editing, merge, delete, appearance view.
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Users, Scan, Plus, Trash2, Merge, Edit2, X, Check, ChevronDown, ChevronRight,
   ChevronUp,
@@ -68,6 +68,18 @@ export default function ParserCharactersPanel({
   const editRef = useRef<HTMLInputElement>(null);
   const aliasRef = useRef<HTMLInputElement>(null);
   const newRef = useRef<HTMLInputElement>(null);
+  const seenIdsRef = useRef<Set<string>>(new Set());
+
+  // Track which character IDs are new (for entrance animation)
+  const newCharIds = useMemo(() => {
+    const newIds = new Set<string>();
+    for (const c of characters) {
+      if (!seenIdsRef.current.has(c.id)) newIds.add(c.id);
+    }
+    // Update seen set
+    for (const c of characters) seenIdsRef.current.add(c.id);
+    return newIds;
+  }, [characters]);
 
   useEffect(() => {
     if (editingId) { editRef.current?.focus(); editRef.current?.select(); }
@@ -234,8 +246,13 @@ export default function ParserCharactersPanel({
               {characters.map((char) => {
                 const isExpanded = expandedId === char.id;
                 const isSelected = selectedIds.has(char.id);
+                  const isNew = newCharIds.has(char.id);
                 return (
-                  <TableRow key={char.id} className="group" data-state={isSelected ? "selected" : undefined}>
+                  <TableRow
+                    key={char.id}
+                    className={`group ${isNew ? "animate-fade-in" : ""}`}
+                    data-state={isSelected ? "selected" : undefined}
+                  >
                     {/* Checkbox */}
                     <TableCell className="px-2">
                       <input
