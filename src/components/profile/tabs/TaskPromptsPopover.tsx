@@ -262,11 +262,11 @@ export function TaskPromptsPopover({ roleId, isRu }: TaskPromptsPopoverProps) {
       >
         <div className="px-3 py-2 border-b border-border/50">
           <div className="flex items-center gap-1.5">
-            <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-sm font-medium">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <span className="text-base font-medium">
               {isRu ? "Промпты" : "Prompts"}
             </span>
-            <Badge variant="outline" className="text-[10px] px-1 py-0 ml-auto">
+            <Badge variant="outline" className="text-xs px-1.5 py-0 ml-auto">
               {tasks.length}
             </Badge>
           </div>
