@@ -94,7 +94,7 @@ async function checkIsAdmin(authHeader: string): Promise<boolean> {
 
 // ── Prompt ──────────────────────────────────────────────────
 
-function buildPrompt(scenes: { scene_number: number; text: string }[], lang: "ru" | "en") {
+async function buildPrompt(scenes: { scene_number: number; text: string }[], lang: "ru" | "en") {
   const isRu = lang === "ru";
 
   const systemPrompt = (await resolveTaskPromptWithOverrides("profiler:extract_characters", lang))
@@ -287,7 +287,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { systemPrompt, userPrompt } = buildPrompt(scenes, lang as "ru" | "en");
+    const { systemPrompt, userPrompt } = await buildPrompt(scenes, lang as "ru" | "en");
     const characters = await callAI(systemPrompt, userPrompt, model, userId, apiKey);
 
     return new Response(
