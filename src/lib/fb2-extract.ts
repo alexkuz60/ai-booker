@@ -265,7 +265,7 @@ function walkSections(
  * Extract structured content from an FB2 file.
  */
 export async function extractFromFb2(file: File): Promise<Fb2ExtractResult> {
-  const text = decodeFb2Buffer(await file.arrayBuffer());
+  const text = decodeFb2Buffer(await readBinaryFile(file));
   const xmlDoc = parseXml(text);
 
   if (!xmlDoc) {
