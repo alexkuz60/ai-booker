@@ -608,6 +608,7 @@ export function useChapterAnalysis({
     abortRef.current?.abort();
     abortRef.current = null;
     prefetchingRef.current = false;
+    userStartedAnalysis.current = false;
     setIsAnalyzing(false);
     setAnalysisLog(prev => [...prev, isRu ? "⏹️ Анализ остановлен пользователем" : "⏹️ Analysis stopped by user"]);
     // Set current analyzing chapters to error so user can resume
