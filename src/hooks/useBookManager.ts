@@ -52,9 +52,17 @@ export function useBookManager({
   storageBackend = "none", createProject, pendingProjectName,
 }: UseBookManagerParams) {
   // ── Shared state ──────────────────────────────────────────
-  const [step, setStep] = useState<Step>(() =>
-    sessionStorage.getItem(ACTIVE_BOOK_KEY) ? "extracting_toc" : "library"
-  );
+  const [step, setStep] = useState<Step>(() => {
+    const savedBookId = sessionStorage.getItem(ACTIVE_BOOK_KEY);
+    if (!savedBookId) return "library";
+    // If heartbeat is stale (PC restart), clear session and go to library
+    if (isSessionStale()) {
+      console.info("[Heartbeat] Session stale after restart, clearing ACTIVE_BOOK_KEY");
+      sessionStorage.removeItem(ACTIVE_BOOK_KEY);
+      return "library";
+    }
+    return "extracting_toc";
+  });
   const [fileName, setFileName] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [bookId, setBookId] = useState<string | null>(null);
