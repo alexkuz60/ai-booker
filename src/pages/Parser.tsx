@@ -177,6 +177,7 @@ export default function Parser() {
     onChapterResultsMutated: scheduleSave,
     ensurePdfLoaded,
     fileFormat: projectMeta?.fileFormat || null,
+    projectStorage,
   });
 
   // ── Flush pending auto-save on page unload ──
