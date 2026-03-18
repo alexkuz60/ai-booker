@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { scene_id, content: bodyContent, language, model: clientModel } = await req.json();
+    const { scene_id, content: bodyContent, language, model: clientModel, provider, apiKey, user_api_key, openrouter_api_key } = await req.json();
     if (!scene_id) {
       return new Response(
         JSON.stringify({ error: "scene_id is required" }),
