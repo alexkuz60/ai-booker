@@ -3,7 +3,7 @@
  * Supports: extraction, rename, aliases editing, merge, delete, appearance view.
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Users, Scan, Plus, Trash2, Merge, Edit2, X, Check, ChevronDown, ChevronRight,
   ChevronUp,
