@@ -261,12 +261,12 @@ export default function ParserCharactersPanel({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-8"></TableHead>
+                <TableHead className="w-7 px-1"></TableHead>
                 <TableHead className="text-xs">{isRu ? "Имя" : "Name"}</TableHead>
-                <TableHead className="text-xs text-center w-12">{isRu ? "Пол" : "Gender"}</TableHead>
-                <TableHead className="text-xs text-center w-16">{isRu ? "Сцен" : "Scenes"}</TableHead>
-                <TableHead className="text-xs text-center w-16">{isRu ? "Глав" : "Ch."}</TableHead>
-                <TableHead className="w-8"></TableHead>
+                <TableHead className="text-xs text-center w-10">{isRu ? "Пол" : "G"}</TableHead>
+                <TableHead className="text-xs text-center w-12">{isRu ? "Сцен" : "Sc."}</TableHead>
+                <TableHead className="text-xs text-center w-12">{isRu ? "Гл." : "Ch."}</TableHead>
+                <TableHead className="w-7 px-1"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -326,14 +326,11 @@ export default function ParserCharactersPanel({
                         )}
                         {char.aliases.length > 0 && !isExpanded && (
                           <div className="flex flex-wrap gap-1 mt-0.5">
-                            {char.aliases.slice(0, 2).map(a => (
+                            {char.aliases.map(a => (
                               <span key={a} className="text-[10px] text-muted-foreground bg-muted/50 px-1 rounded">
                                 {a}
                               </span>
                             ))}
-                            {char.aliases.length > 2 && (
-                              <span className="text-[10px] text-muted-foreground">+{char.aliases.length - 2}</span>
-                            )}
                           </div>
                         )}
                       </div>
