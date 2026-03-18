@@ -78,9 +78,21 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
 
     if (storageBackend === "opfs") {
       const projectNames = await OPFSStorage.listProjects();
+      console.debug("[Library] OPFS projects found:", projectNames);
       const candidatesRaw = await Promise.all(projectNames.map(async (projectName) => {
-        const store = await OPFSStorage.openOrCreate(projectName);
-        return mapLocalStructureToBook(store);
+        try {
+          const store = await OPFSStorage.openOrCreate(projectName);
+          const result = await mapLocalStructureToBook(store);
+          if (!result) {
+            const meta = await store.readJSON<Record<string, unknown>>("project.json").catch(() => null);
+            const toc = await store.readJSON<Record<string, unknown>>("structure/toc.json").catch(() => null);
+            console.warn("[Library] Project skipped (no bookId):", projectName, { meta, tocBookId: (toc as any)?.bookId });
+          }
+          return result;
+        } catch (err) {
+          console.warn("[Library] Failed to read project:", projectName, err);
+          return null;
+        }
       }));
       const candidates = candidatesRaw.filter((v): v is LocalLibraryCandidate => !!v);
 
