@@ -212,6 +212,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
 
   // Auto-load when on library step
   useEffect(() => {
+    console.debug("[Library] effect: userId=%s, step=%s, backend=%s, loaded=%s", userId ?? "null", step, storageBackend, libraryLoadedRef.current);
     if (!userId) {
       setBooks([]);
       setLoadingLibrary(false);
@@ -228,7 +229,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       libraryLoadedRef.current = true;
       void loadLibrary();
     }
-  }, [userId, step, loadLibrary]);
+  }, [userId, step, storageBackend, loadLibrary]);
 
   const renameBook = useCallback(async (bookId: string, newTitle: string) => {
     if (storageBackend !== "opfs") return;
