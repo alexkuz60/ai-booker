@@ -37,8 +37,10 @@ interface ParserCharactersPanelProps {
   onMerge: (sourceId: string, targetId: string) => void;
   onAdd: (name: string) => void;
   analyzedCount: number;
-  /** Model used for profiler role */
   profilerModel?: string;
+  profiling?: boolean;
+  profileProgress?: string | null;
+  onProfile?: (charIds: string[]) => void;
 }
 
 export default function ParserCharactersPanel({
