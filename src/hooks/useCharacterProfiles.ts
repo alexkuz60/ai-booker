@@ -188,13 +188,14 @@ export function useCharacterProfiles({
     };
 
     // ── Merge profiles into character state ──
+    // skipPersist: in pool mode we persist once after all batches complete
     const applyProfiles = (profiles: Array<{
       name: string;
       age_group?: string;
       temperament?: string;
       speech_style?: string;
       description?: string;
-    }>, usedModel: string) => {
+    }>, usedModel: string, skipPersist = false) => {
       const profileByName = new Map<string, CharacterProfile>();
       for (const p of profiles) {
         profileByName.set(p.name.toLowerCase(), {
@@ -215,7 +216,9 @@ export function useCharacterProfiles({
           if (profile) return { ...c, profile };
           return c;
         });
-        persist(next);
+        if (!skipPersist) {
+          persist(next);
+        }
         return next;
       });
 
