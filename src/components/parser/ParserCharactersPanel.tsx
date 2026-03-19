@@ -883,6 +883,9 @@ export default function ParserCharactersPanel({
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                     <Brain className="h-3 w-3" />
                     {isRu ? "Профиль" : "Profile"}
+                    {char.profile.profiledBy && (
+                      <RoleBadge roleId="profiler" model={char.profile.profiledBy} isRu={isRu} size={12} />
+                    )}
                   </h4>
                   <div className="text-xs text-foreground/80 space-y-1">
                     {char.profile.temperament && (
