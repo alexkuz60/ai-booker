@@ -160,8 +160,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (aiRes.status === 429) throw new Error("rate_limited");
-    if (aiRes.status === 402) throw new Error("payment_required");
+    if (aiRes.status === 429) {
+      return new Response(JSON.stringify({ error: "rate_limited" }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (aiRes.status === 402) {
+      return new Response(JSON.stringify({ error: "payment_required" }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     if (!aiRes.ok) {
       const errText = await aiRes.text().catch(() => "");
       throw new Error(`AI error: ${aiRes.status} ${errText.slice(0, 200)}`);
