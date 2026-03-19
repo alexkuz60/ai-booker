@@ -152,11 +152,15 @@ export interface CharacterProfile {
   description?: string;
 }
 
+export type CharacterRole = "speaking" | "mentioned" | "crowd" | "system";
+
 export interface LocalCharacter {
   id: string;
   name: string;
   aliases: string[];
   gender?: "male" | "female" | "unknown";
+  /** Role classification: speaking (has dialogue), mentioned (only referenced), crowd (anonymous voice), system (Narrator/Commentator) */
+  role?: CharacterRole;
   appearances: CharacterAppearance[];
   /** Number of scenes the character appears in */
   sceneCount: number;
