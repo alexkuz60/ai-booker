@@ -669,7 +669,7 @@ export default function ParserCharactersPanel({
                 );
               })}
             </TableBody>
-          </Table>
+          </table>
         )}
 
         {/* Expanded detail panel */}
