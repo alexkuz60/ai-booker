@@ -279,30 +279,55 @@ export default function ParserCharactersPanel({
         <RoleBadge roleId="profiler" model={profilerModel} isRu={isRu} size={16} />
         {characters.length > 0 && (
           <div className="flex items-center gap-1 ml-1">
-            {/* Role filter: characters vs crowd vs all */}
+            {/* Search toggle */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => setRoleFilter(f => f === "characters" ? "crowd" : f === "crowd" ? "all" : "characters")}
-                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors flex items-center gap-0.5 ${
-                    roleFilter === "characters"
-                      ? "bg-emerald-500/20 text-emerald-500 dark:text-emerald-400"
-                      : roleFilter === "crowd"
-                        ? "bg-amber-500/20 text-amber-500 dark:text-amber-400"
-                        : "text-muted-foreground/50 hover:text-muted-foreground"
+                  onClick={() => { setSearchOpen(o => !o); if (searchOpen) setSearchQuery(""); }}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                    searchOpen ? "bg-primary/20 text-primary" : "text-muted-foreground/50 hover:text-muted-foreground"
                   }`}
                 >
-                  {roleFilter === "crowd" ? <MicOff className="h-3 w-3" /> : <Mic className="h-3 w-3" />}
+                  <Search className="h-3 w-3" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">
-                {roleFilter === "characters"
-                  ? (isRu ? "Персонажи · Нажми для массовки" : "Characters · Click for crowd")
-                  : roleFilter === "crowd"
-                    ? (isRu ? "Массовка · Нажми для всех" : "Crowd · Click for all")
-                    : (isRu ? "Все · Нажми для персонажей" : "All · Click for characters")}
+                {isRu ? "Поиск по имени" : "Search by name"}
               </TooltipContent>
             </Tooltip>
+            {/* Role filter dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors flex items-center gap-0.5 ${
+                    roleFilter !== "all"
+                      ? "bg-primary/20 text-primary"
+                      : "text-muted-foreground/50 hover:text-muted-foreground"
+                  }`}
+                >
+                  <Filter className="h-3 w-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[160px]">
+                {([
+                  { key: "all", label: { ru: "Все", en: "All" }, icon: Users },
+                  { key: "main", label: { ru: "Главные", en: "Main" }, icon: Star },
+                  { key: "episodic", label: { ru: "Эпизодические", en: "Episodic" }, icon: UserRound },
+                  { key: "crowd", label: { ru: "Массовка", en: "Crowd" }, icon: UsersRound },
+                  { key: "mentioned", label: { ru: "Упомянуты", en: "Mentioned" }, icon: Eye },
+                ] as const).map(({ key, label, icon: Icon }) => (
+                  <DropdownMenuItem
+                    key={key}
+                    onClick={() => setRoleFilter(key)}
+                    className={`gap-2 text-xs ${roleFilter === key ? "bg-accent" : ""}`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {isRu ? label.ru : label.en}
+                    {roleFilter === key && <Check className="h-3 w-3 ml-auto" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             {/* Gender filters */}
             <button
               onClick={() => setGenderFilter(f => f === "male" ? "all" : "male")}
