@@ -12,6 +12,7 @@ interface ExtractedCharacter {
   name: string;
   aliases: string[];
   gender: "male" | "female" | "unknown";
+  role: "speaking" | "mentioned" | "crowd";
   scene_numbers: number[];
 }
 
