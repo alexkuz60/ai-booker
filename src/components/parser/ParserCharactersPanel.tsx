@@ -42,6 +42,13 @@ const TEMPERAMENT_LABELS: Record<string, { ru: string; en: string }> = {
   mixed: { ru: "Смешанный", en: "Mixed" },
 };
 
+const ROLE_LABELS: Record<string, { ru: string; en: string; color: string }> = {
+  speaking: { ru: "Говорит", en: "Speaking", color: "text-emerald-500 dark:text-emerald-400" },
+  mentioned: { ru: "Упомянут", en: "Mentioned", color: "text-muted-foreground/60" },
+  crowd: { ru: "Массовка", en: "Crowd", color: "text-amber-500 dark:text-amber-400" },
+  system: { ru: "Системный", en: "System", color: "text-primary/70" },
+};
+
 function localizeLabel(value: string, map: Record<string, { ru: string; en: string }>, isRu: boolean): string {
   const key = value.toLowerCase().trim();
   const entry = map[key];
