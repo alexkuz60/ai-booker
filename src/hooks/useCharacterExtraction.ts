@@ -39,9 +39,17 @@ export function useCharacterExtraction({
   const [extractProgress, setExtractProgress] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const extractCharacters = useCallback(async () => {
+  const extractCharacters = useCallback(async (opts?: { mode?: "fresh" | "continue" | "chapter"; chapterIdx?: number }) => {
+    const mode = opts?.mode ?? "continue";
     setExtracting(true);
     setExtractProgress(isRu ? "Подготовка…" : "Preparing…");
+
+    // ── "fresh" mode: wipe all non-system characters (including profiles) ──
+    if (mode === "fresh") {
+      const systemOnly = characters.filter(c => c.role === "system");
+      setCharacters(systemOnly);
+      await persist(systemOnly);
+    }
 
     // ── Pre-populate system characters (Narrator + Commentator) if absent ──
     const SYSTEM_CHARS: Array<{ name: string; nameEn: string; role: CharacterRole }> = [
@@ -49,7 +57,7 @@ export function useCharacterExtraction({
       { name: "Комментатор", nameEn: "Commentator", role: "system" },
     ];
 
-    let currentChars = characters;
+    let currentChars = mode === "fresh" ? characters.filter(c => c.role === "system") : characters;
     const needSystemInsert: LocalCharacter[] = [];
     for (const sys of SYSTEM_CHARS) {
       const exists = currentChars.some(c =>
@@ -89,7 +97,14 @@ export function useCharacterExtraction({
 
     chapterResults.forEach((result, idx) => {
       if (result.status !== "done" || !result.scenes?.length) return;
-      if (alreadyExtractedIdx.has(idx)) return;
+      // "chapter" mode — only process the specified chapter
+      if (mode === "chapter") {
+        if (idx !== opts?.chapterIdx) return;
+      } else if (mode === "continue") {
+        // "continue" — skip already-extracted
+        if (alreadyExtractedIdx.has(idx)) return;
+      }
+      // "fresh" — process all (alreadyExtractedIdx is empty after wipe)
       const entry = tocEntries[idx];
       if (!entry) return;
       chaptersToProcess.push({ idx, entry, scenes: result.scenes });
@@ -125,14 +140,15 @@ export function useCharacterExtraction({
 
     // Build intermediate LocalCharacter[] snapshot from allResults merged with existing
     const buildSnapshot = (): LocalCharacter[] => {
+      const baseChars = mode === "fresh" ? currentChars : characters;
       const existingByName = new Map<string, LocalCharacter>();
-      for (const ch of characters) {
+      for (const ch of baseChars) {
         existingByName.set(ch.name.toLowerCase(), ch);
         for (const alias of ch.aliases) existingByName.set(alias.toLowerCase(), ch);
       }
 
-      const snapshot: LocalCharacter[] = [...characters];
-      const usedIds = new Set(characters.map(c => c.id));
+      const snapshot: LocalCharacter[] = [...baseChars];
+      const usedIds = new Set(baseChars.map(c => c.id));
 
       for (const [key, data] of allResults) {
         const existing = existingByName.get(key)

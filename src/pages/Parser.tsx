@@ -532,6 +532,8 @@ export default function Parser() {
                 profiling={profiling}
                 profileProgress={profileProgress}
                 onProfile={profileCharacters}
+                tocEntries={tocEntries}
+                chapterResults={chapterResults}
               />
             </motion.div>
           )}

@@ -94,5 +94,8 @@ export function useParserCharacters({
     deleteCharacter: crud.deleteCharacter,
     mergeCharacters: crud.mergeCharacters,
     addCharacter: crud.addCharacter,
+    // Data for UI (chapter list in extraction menu)
+    tocEntries,
+    chapterResults,
   };
 }

@@ -6,7 +6,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Users, Scan, Plus, Trash2, Merge, Edit2, X, Check, ChevronDown, ChevronRight,
-  ChevronUp, Brain, Loader2, Mic, MicOff, UserRound,
+  ChevronUp, Brain, Loader2, Mic, MicOff, UserRound, RotateCcw, Play, BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,8 +21,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub,
+  DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { RoleBadge } from "@/components/ui/RoleBadge";
-import type { LocalCharacter, CharacterRole } from "@/pages/parser/types";
+import type { LocalCharacter, CharacterRole, TocChapter, Scene, ChapterStatus } from "@/pages/parser/types";
 
 // ─── i18n maps for profile badges ────────────────────────
 const AGE_LABELS: Record<string, { ru: string; en: string }> = {
@@ -60,7 +64,7 @@ interface ParserCharactersPanelProps {
   characters: LocalCharacter[];
   extracting: boolean;
   extractProgress?: string | null;
-  onExtract: () => void;
+  onExtract: (opts?: { mode?: "fresh" | "continue" | "chapter"; chapterIdx?: number }) => void;
   onRename: (id: string, newName: string) => void;
   onUpdateGender: (id: string, gender: "male" | "female" | "unknown") => void;
   onUpdateAliases: (id: string, aliases: string[]) => void;
@@ -72,6 +76,8 @@ interface ParserCharactersPanelProps {
   profiling?: boolean;
   profileProgress?: string | null;
   onProfile?: (charIds: string[]) => void;
+  tocEntries: TocChapter[];
+  chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
 }
 
 export default function ParserCharactersPanel({
@@ -91,6 +97,8 @@ export default function ParserCharactersPanel({
   profiling,
   profileProgress,
   onProfile,
+  tocEntries,
+  chapterResults,
 }: ParserCharactersPanelProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -258,17 +266,65 @@ export default function ParserCharactersPanel({
 
       {/* Toolbar */}
       <div className="px-3 py-2 border-b border-border flex items-center gap-2 flex-wrap flex-shrink-0">
-        <Button
-          variant="outline" size="sm"
-          onClick={onExtract}
-          disabled={extracting || analyzedCount === 0}
-          className="gap-1.5 text-xs"
-        >
-          <Scan className="h-3.5 w-3.5" />
-          {extracting
-            ? (extractProgress || (isRu ? "Извлечение..." : "Extracting..."))
-            : (isRu ? "Извлечь (AI)" : "Extract (AI)")}
-        </Button>
+        {extracting ? (
+          <Button variant="outline" size="sm" disabled className="gap-1.5 text-xs">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            {extractProgress || (isRu ? "Извлечение..." : "Extracting...")}
+          </Button>
+        ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={analyzedCount === 0} className="gap-1.5 text-xs">
+                <Scan className="h-3.5 w-3.5" />
+                {isRu ? "Поиск (AI)" : "Search (AI)"}
+                <ChevronDown className="h-3 w-3 ml-0.5 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[200px]">
+              <DropdownMenuItem onClick={() => onExtract({ mode: "fresh" })} className="gap-2 text-xs">
+                <RotateCcw className="h-3.5 w-3.5" />
+                {isRu ? "Новый поиск" : "New search"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExtract({ mode: "continue" })} className="gap-2 text-xs">
+                <Play className="h-3.5 w-3.5" />
+                {isRu ? "Продолжить поиск" : "Continue search"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="gap-2 text-xs">
+                  <BookOpen className="h-3.5 w-3.5" />
+                  {isRu ? "Искать в главе" : "Search in chapter"}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="max-h-[300px] overflow-y-auto min-w-[220px]">
+                  {(() => {
+                    const analyzed: { idx: number; title: string }[] = [];
+                    chapterResults.forEach((r, idx) => {
+                      if (r.status === "done" && r.scenes?.length && tocEntries[idx]) {
+                        analyzed.push({ idx, title: tocEntries[idx].title });
+                      }
+                    });
+                    if (analyzed.length === 0) {
+                      return (
+                        <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                          {isRu ? "Нет проанализированных глав" : "No analyzed chapters"}
+                        </DropdownMenuItem>
+                      );
+                    }
+                    return analyzed.map(ch => (
+                      <DropdownMenuItem
+                        key={ch.idx}
+                        onClick={() => onExtract({ mode: "chapter", chapterIdx: ch.idx })}
+                        className="text-xs"
+                      >
+                        <span className="truncate">{ch.title.slice(0, 50)}</span>
+                      </DropdownMenuItem>
+                    ));
+                  })()}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         <Button
           variant="ghost" size="sm"
           onClick={() => { setAddingNew(true); setNewName(""); }}
