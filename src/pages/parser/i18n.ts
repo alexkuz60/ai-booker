@@ -354,6 +354,13 @@ const MOOD_MAP: Record<string, string> = {
   conspiratorial: "moodConspiratorial",
   heartwarming: "moodHeartwarming",
   idealistic: "moodIdealistic",
+  comic: "moodHumorous",
+  amused: "moodAmused",
+  bemused: "moodAmused",
+  panicked: "moodPanicked",
+  panic: "moodPanicked",
+  wry: "moodWry",
+  undertone: "moodHumorous",
 };
 
 const SCENE_TYPE_MAP: Record<string, string> = {
