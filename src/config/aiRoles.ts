@@ -26,6 +26,8 @@ export interface AiRoleDefinition {
   defaultModelUser: string;
   /** Model tier hint: lite | standard | heavy */
   tier: "lite" | "standard" | "heavy";
+  /** Whether this role supports a multi-model pool for parallel batch processing */
+  poolable: boolean;
   /** System prompt template for this role */
   systemPrompt: string;
 }
@@ -40,6 +42,7 @@ export const AI_ROLES: Record<AiRoleId, AiRoleDefinition> = {
     defaultModelAdmin: "google/gemini-2.5-flash-lite",
     defaultModelUser: "google/gemini-2.5-flash-lite",
     tier: "lite",
+    poolable: false,
     systemPrompt:
       "You are a professional translator. Translate concisely and naturally. " +
       "Preserve meaning and tone. Return ONLY the translation, no explanations.",
@@ -54,6 +57,7 @@ export const AI_ROLES: Record<AiRoleId, AiRoleDefinition> = {
     defaultModelAdmin: "google/gemini-2.5-flash",
     defaultModelUser: "google/gemini-2.5-flash",
     tier: "standard",
+    poolable: true,
     systemPrompt:
       "You are an expert Russian-language proofreader and SSML specialist. " +
       "Fix grammar, punctuation, and add stress marks (ударения) where needed for TTS synthesis. " +
@@ -69,6 +73,7 @@ export const AI_ROLES: Record<AiRoleId, AiRoleDefinition> = {
     defaultModelAdmin: "google/gemini-2.5-flash",
     defaultModelUser: "google/gemini-2.5-flash",
     tier: "standard",
+    poolable: true,
     systemPrompt:
       "You are an audiobook screenwriter and dramaturg. " +
       "Analyze literary text structure: identify scenes, segment types (narrator, dialogue, " +
@@ -85,6 +90,7 @@ export const AI_ROLES: Record<AiRoleId, AiRoleDefinition> = {
     defaultModelAdmin: "google/gemini-2.5-pro",
     defaultModelUser: "google/gemini-2.5-pro",
     tier: "heavy",
+    poolable: true,
     systemPrompt:
       "You are an experienced audiobook director and dramaturg. " +
       "Analyze chapters for pacing, emotional arc, and dramatic tension. " +
@@ -102,6 +108,7 @@ export const AI_ROLES: Record<AiRoleId, AiRoleDefinition> = {
     defaultModelAdmin: "google/gemini-2.5-pro",
     defaultModelUser: "google/gemini-2.5-pro",
     tier: "heavy",
+    poolable: true,
     systemPrompt:
       "You are an expert literary psychologist and character profiler. " +
       "Analyze characters deeply: determine gender, age group, temperament (sanguine/choleric/" +
@@ -119,6 +126,7 @@ export const AI_ROLES: Record<AiRoleId, AiRoleDefinition> = {
     defaultModelAdmin: "google/gemini-2.5-flash",
     defaultModelUser: "google/gemini-2.5-flash",
     tier: "standard",
+    poolable: true,
     systemPrompt:
       "You are a professional sound designer for audiobooks. " +
       "Generate precise, evocative prompts for sound effects, ambient atmosphere, " +
@@ -146,6 +154,14 @@ export const TIER_LABELS = {
 
 /** User-overridable mapping: roleId → modelId */
 export type AiRoleModelMap = Partial<Record<AiRoleId, string>>;
+
+/** User-overridable pool mapping: roleId → list of modelIds for parallel processing */
+export type AiRolePoolMap = Partial<Record<AiRoleId, string[]>>;
+
+/** Roles that support model pooling */
+export const POOLABLE_ROLES: AiRoleId[] = AI_ROLE_LIST
+  .filter((r) => r.poolable)
+  .map((r) => r.id);
 
 /** Get default model map for admin */
 export function getDefaultAdminModels(): Record<AiRoleId, string> {
