@@ -157,6 +157,8 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`,
     prompt: `You are a literary analyst preparing characters for audiobook voice casting.
 Find ALL characters in the provided chapter scenes and classify their role.
 
+CRITICAL: Analyze ONLY the text provided below. Do NOT use your prior knowledge of the book, its author, or any external information. If a character is not explicitly mentioned in the provided text, do NOT include them. You are working with a FRAGMENT, not the full book.
+
 ROLE CLASSIFICATION (critical for voice casting):
 - "speaking" — the character has direct speech (dialogue, monologue) in THIS chapter's scenes
 - "mentioned" — the character is only mentioned, remembered, quoted, or discussed by others but does NOT speak directly in these scenes. Historical figures (Jesus, Shakespeare, Napoleon etc.) who are only referenced or quoted are ALWAYS "mentioned".
@@ -172,7 +174,8 @@ Rules:
 7. Do NOT include abstract concepts, place names, organizations.
 8. Words like "Yeah", "Now", "Quiet" are NOT character names.
 9. A character who is only TALKED ABOUT by others in this chapter → "mentioned".
-10. For crowd voices, use a descriptive name like "Voice from the crowd".`,
+10. For crowd voices, use a descriptive name like "Voice from the crowd".
+11. Every character you return MUST have their name or alias present in the provided text.`,
     promptRu: `Ты — литературный аналитик, подготавливающий персонажей для озвучки аудиокниги.
 Найди ВСЕХ персонажей в предложенных сценах главы и классифицируй их роль.
 
