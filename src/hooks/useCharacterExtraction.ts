@@ -11,7 +11,7 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
-import { ModelPoolManager, type PoolTask } from "@/lib/modelPoolManager";
+import { ModelPoolManager, type PoolTask, type PoolStats } from "@/lib/modelPoolManager";
 import type { Scene, ChapterStatus, TocChapter, LocalCharacter, CharacterAppearance, CharacterRole } from "@/pages/parser/types";
 
 function generateId(): string {
@@ -44,6 +44,7 @@ export function useCharacterExtraction({
 }: UseCharacterExtractionParams) {
   const [extracting, setExtracting] = useState(false);
   const [extractProgress, setExtractProgress] = useState<string | null>(null);
+  const [extractPoolStats, setExtractPoolStats] = useState<PoolStats[]>([]);
   const { toast } = useToast();
 
   const extractCharacters = useCallback(async (opts?: { mode?: "fresh" | "continue" | "chapter"; chapterIdx?: number }) => {
@@ -318,7 +319,9 @@ export function useCharacterExtraction({
             ? `Извлечение: ${progress.done}/${progress.total} глав`
             : `Extracting: ${progress.done}/${progress.total} chapters`
         );
+        setExtractPoolStats(manager.getStats());
       });
+      setExtractPoolStats(manager.getStats());
 
       // Merge all results (maintain order for consistency)
       const sortedKeys = [...results.keys()].sort((a, b) => Number(a) - Number(b));
@@ -378,6 +381,7 @@ export function useCharacterExtraction({
     await persist(finalSnapshot);
     setExtracting(false);
     setExtractProgress(null);
+    setExtractPoolStats([]);
 
     // Show appropriate toast based on error rate
     if (errorCount >= chaptersToProcess.length) {
@@ -411,6 +415,7 @@ export function useCharacterExtraction({
   return {
     extracting,
     extractProgress,
+    extractPoolStats,
     extractCharacters,
   };
 }

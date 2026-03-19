@@ -7,7 +7,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Users, Scan, Plus, Trash2, Merge, Edit2, X, Check, ChevronDown, ChevronRight,
   ChevronUp, Brain, Loader2, Mic, MicOff, UserRound, RotateCcw, Play, BookOpen,
-  Search, Filter, Star, Eye, UsersRound,
+  Search, Filter, Star, Eye, UsersRound, Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,9 @@ import {
   DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { RoleBadge } from "@/components/ui/RoleBadge";
+import { cn } from "@/lib/utils";
 import type { LocalCharacter, CharacterRole, TocChapter, Scene, ChapterStatus } from "@/pages/parser/types";
+import type { PoolStats } from "@/lib/modelPoolManager";
 
 // ─── i18n maps for profile badges ────────────────────────
 const AGE_LABELS: Record<string, { ru: string; en: string }> = {
@@ -65,6 +67,7 @@ interface ParserCharactersPanelProps {
   characters: LocalCharacter[];
   extracting: boolean;
   extractProgress?: string | null;
+  extractPoolStats?: PoolStats[];
   onExtract: (opts?: { mode?: "fresh" | "continue" | "chapter"; chapterIdx?: number }) => void;
   onRename: (id: string, newName: string) => void;
   onUpdateGender: (id: string, gender: "male" | "female" | "unknown") => void;
@@ -76,6 +79,7 @@ interface ParserCharactersPanelProps {
   profilerModel?: string;
   profiling?: boolean;
   profileProgress?: string | null;
+  profilePoolStats?: PoolStats[];
   onProfile?: (charIds: string[]) => void;
   tocEntries: TocChapter[];
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
@@ -86,6 +90,7 @@ export default function ParserCharactersPanel({
   characters,
   extracting,
   extractProgress,
+  extractPoolStats,
   onExtract,
   onRename,
   onUpdateGender,
@@ -97,6 +102,7 @@ export default function ParserCharactersPanel({
   profilerModel,
   profiling,
   profileProgress,
+  profilePoolStats,
   onProfile,
   tocEntries,
   chapterResults,
@@ -466,6 +472,50 @@ export default function ParserCharactersPanel({
           </Button>
         )}
       </div>
+
+      {/* Pool stats — extraction or profiling */}
+      {(() => {
+        const activeStats = extracting && extractPoolStats && extractPoolStats.length > 0
+          ? extractPoolStats
+          : profiling && profilePoolStats && profilePoolStats.length > 0
+            ? profilePoolStats
+            : null;
+        if (!activeStats) return null;
+        return (
+          <div className="px-3 py-1.5 border-b border-border flex-shrink-0">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Layers className="h-3 w-3 text-muted-foreground" />
+              <span className="text-[10px] text-muted-foreground font-medium">
+                {isRu ? "Воркеры пула" : "Pool workers"}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {activeStats.map((s) => (
+                <div
+                  key={s.model}
+                  className={cn(
+                    "text-[10px] font-mono px-2 py-0.5 rounded-md border",
+                    s.disabled
+                      ? "border-destructive/30 text-destructive bg-destructive/5"
+                      : s.active > 0
+                        ? "border-primary/30 text-primary bg-primary/5"
+                        : "border-border text-muted-foreground bg-card/50",
+                  )}
+                >
+                  <span className="truncate max-w-[100px] inline-block align-middle">
+                    {s.model.split("/").pop()}
+                  </span>
+                  <span className="ml-1">
+                    ✓{s.completed}
+                    {s.errors > 0 && <span className="text-destructive ml-0.5">✗{s.errors}</span>}
+                    {s.active > 0 && <span className="text-primary ml-0.5">⟳{s.active}</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Add new character inline */}
       {addingNew && (

@@ -87,10 +87,12 @@ export function useParserCharacters({
     // Extraction
     extracting: extraction.extracting,
     extractProgress: extraction.extractProgress,
+    extractPoolStats: extraction.extractPoolStats,
     extractCharacters: extraction.extractCharacters,
     // Profiling
     profiling: profiles.profiling,
     profileProgress: profiles.profileProgress,
+    profilePoolStats: profiles.profilePoolStats,
     profileCharacters: profiles.profileCharacters,
     // CRUD
     renameCharacter: crud.renameCharacter,

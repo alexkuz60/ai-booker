@@ -12,7 +12,7 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
-import { ModelPoolManager, type PoolTask } from "@/lib/modelPoolManager";
+import { ModelPoolManager, type PoolTask, type PoolStats } from "@/lib/modelPoolManager";
 import type { Scene, ChapterStatus, TocChapter, LocalCharacter, CharacterProfile } from "@/pages/parser/types";
 
 interface UseCharacterProfilesParams {
@@ -51,6 +51,7 @@ export function useCharacterProfiles({
 }: UseCharacterProfilesParams) {
   const [profiling, setProfiling] = useState(false);
   const [profileProgress, setProfileProgress] = useState<string | null>(null);
+  const [profilePoolStats, setProfilePoolStats] = useState<PoolStats[]>([]);
   const { toast } = useToast();
 
   const profileCharacters = useCallback(async (charIds: string[]) => {
@@ -192,7 +193,9 @@ export function useCharacterProfiles({
               ? `Профайлинг: ${progress.done}/${progress.total} групп`
               : `Profiling: ${progress.done}/${progress.total} batches`
           );
+          setProfilePoolStats(manager.getStats());
         });
+        setProfilePoolStats(manager.getStats());
 
         // Collect all successful profiles
         const allProfiles: Array<{
@@ -261,12 +264,14 @@ export function useCharacterProfiles({
     } finally {
       setProfiling(false);
       setProfileProgress(null);
+      setProfilePoolStats([]);
     }
   }, [characters, chapterResults, tocEntries, profilerModel, userApiKeys, isRu, setCharacters, persist, toast, effectivePool]);
 
   return {
     profiling,
     profileProgress,
+    profilePoolStats,
     profileCharacters,
   };
 }

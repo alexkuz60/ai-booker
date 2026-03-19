@@ -96,8 +96,8 @@ export default function Parser() {
   } = useBookManager({ userId: user?.id, isRu, projectStorage, projectStorageInitialized, storageBackend, createProject, openProjectByName, pendingProjectName });
 
   const {
-    characters, extracting, extractProgress, extractCharacters,
-    profiling, profileProgress, profileCharacters,
+    characters, extracting, extractProgress, extractPoolStats, extractCharacters,
+    profiling, profileProgress, profilePoolStats, profileCharacters,
     renameCharacter, updateGender, updateAliases, deleteCharacter, mergeCharacters, addCharacter,
   } = useParserCharacters({
     storage: projectStorage,
@@ -521,6 +521,7 @@ export default function Parser() {
                 characters={characters}
                 extracting={extracting}
                 extractProgress={extractProgress}
+                extractPoolStats={extractPoolStats}
                 onExtract={extractCharacters}
                 onRename={renameCharacter}
                 onUpdateGender={updateGender}
@@ -532,6 +533,7 @@ export default function Parser() {
                 profilerModel={getModelForRole("profiler")}
                 profiling={profiling}
                 profileProgress={profileProgress}
+                profilePoolStats={profilePoolStats}
                 onProfile={profileCharacters}
                 tocEntries={tocEntries}
                 chapterResults={chapterResults}
