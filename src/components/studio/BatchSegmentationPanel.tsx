@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAiRoles } from "@/hooks/useAiRoles";
-import { ModelPoolManager, type PoolTask, type PoolStats } from "@/lib/modelPoolManager";
+import { ModelPoolManager, type PoolTask, type PoolStats, logPoolStats } from "@/lib/modelPoolManager";
 import { toast } from "sonner";
 
 interface SceneInfo {
