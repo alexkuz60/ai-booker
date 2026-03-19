@@ -42,6 +42,7 @@ export const AI_ROLES: Record<AiRoleId, AiRoleDefinition> = {
     defaultModelAdmin: "google/gemini-2.5-flash-lite",
     defaultModelUser: "google/gemini-2.5-flash-lite",
     tier: "lite",
+    poolable: false,
     systemPrompt:
       "You are a professional translator. Translate concisely and naturally. " +
       "Preserve meaning and tone. Return ONLY the translation, no explanations.",
