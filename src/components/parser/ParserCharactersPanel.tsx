@@ -325,6 +325,7 @@ export default function ParserCharactersPanel({
             </DropdownMenuContent>
           </DropdownMenu>
         )}
+        <Button
           variant="ghost" size="sm"
           onClick={() => { setAddingNew(true); setNewName(""); }}
           className="gap-1.5 text-xs"
