@@ -522,6 +522,8 @@ export default function Parser() {
                 extracting={extracting}
                 extractProgress={extractProgress}
                 extractPoolStats={extractPoolStats}
+                extractedCount={extractedCount}
+                extractTotal={extractTotal}
                 onExtract={extractCharacters}
                 onRename={renameCharacter}
                 onUpdateGender={updateGender}

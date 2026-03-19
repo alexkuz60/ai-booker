@@ -382,7 +382,9 @@ export default function ParserCharactersPanel({
         {extracting ? (
           <Button variant="outline" size="sm" disabled className="gap-1.5 text-xs">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            {extractProgress || (isRu ? "Извлечение..." : "Extracting...")}
+            {extractedCount != null && extractTotal
+              ? `${extractedCount}/${extractTotal}`
+              : (extractProgress || (isRu ? "Извлечение..." : "Extracting..."))}
           </Button>
         ) : (
           <DropdownMenu>

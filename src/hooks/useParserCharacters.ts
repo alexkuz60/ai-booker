@@ -88,6 +88,8 @@ export function useParserCharacters({
     extracting: extraction.extracting,
     extractProgress: extraction.extractProgress,
     extractPoolStats: extraction.extractPoolStats,
+    extractedCount: extraction.extractedCount,
+    extractTotal: extraction.extractTotal,
     extractCharacters: extraction.extractCharacters,
     // Profiling
     profiling: profiles.profiling,

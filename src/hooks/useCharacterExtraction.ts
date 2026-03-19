@@ -426,6 +426,8 @@ export function useCharacterExtraction({
     extracting,
     extractProgress,
     extractPoolStats,
+    extractedCount,
+    extractTotal,
     extractCharacters,
   };
 }
