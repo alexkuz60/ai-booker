@@ -71,15 +71,18 @@ export async function invokeWithFallback<T = unknown>(
 }
 
 function isRetryableError(result: { data: unknown; error: any }): boolean {
-  // Check explicit error from SDK
+  if (!result.error) {
+    // Edge function returned 200 but with error in body
+    const dataErr = (result.data as Record<string, unknown>)?.error;
+    if (dataErr && /402|429|payment|credits|rate.?limit/i.test(String(dataErr))) return true;
+    return false;
+  }
+  // Check error message text
   const errMsg = String(result.error?.message || result.error || "");
   if (/402|429|payment|credits|rate.?limit/i.test(errMsg)) return true;
-  // Check error embedded in response data (edge function returning JSON error)
-  const dataErr = (result.data as Record<string, unknown>)?.error;
-  if (dataErr) {
-    const dataMsg = String(dataErr);
-    if (/402|429|payment|credits|rate.?limit/i.test(dataMsg)) return true;
-  }
+  // Check HTTP status from FunctionsHttpError.context (Response object)
+  const status = result.error?.context?.status;
+  if (status === 402 || status === 429) return true;
   return false;
 }
 
