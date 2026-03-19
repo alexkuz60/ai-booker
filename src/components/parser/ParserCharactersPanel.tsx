@@ -80,6 +80,8 @@ interface ParserCharactersPanelProps {
   profiling?: boolean;
   profileProgress?: string | null;
   profilePoolStats?: PoolStats[];
+  profiledCount?: number;
+  profileTotal?: number;
   onProfile?: (charIds: string[]) => void;
   tocEntries: TocChapter[];
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
