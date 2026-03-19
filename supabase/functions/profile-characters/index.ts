@@ -84,6 +84,9 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
   const isReasoningModel = usedModel.includes("gpt-5") || usedModel.includes("o3") || usedModel.includes("o4") || usedModel.includes("gemini-2.5-pro");
   const aiStart = Date.now();
 
+  // Models that require max_completion_tokens instead of max_tokens
+  const useMaxCompletionTokens = /gpt-5|o1|o3|o4/.test(usedModel);
+
   // Build two variants: with tools (preferred) and without (fallback for reasoning models)
   const toolsPayload = {
     model: usedModel,
@@ -92,7 +95,7 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       { role: "user", content: userPrompt },
     ],
     temperature: 0.3,
-    max_tokens: 4096,
+    ...(useMaxCompletionTokens ? { max_completion_tokens: 4096 } : { max_tokens: 4096 }),
     tools: [{
       type: "function",
       function: {
