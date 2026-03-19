@@ -123,7 +123,7 @@ export function AiRolesTab({ apiKeys, isRu, onModelChanged, bookTitle }: AiRoles
             bookTitle={bookTitle}
             isRu={isRu}
           />
-          {hasOverrides && (
+          {(hasOverrides || hasAnyPools) && (
             <Button
               variant="ghost"
               size="sm"
