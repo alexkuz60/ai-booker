@@ -462,9 +462,23 @@ export default function ParserCharactersPanel({
                             {isExpanded ? <ChevronDown className="h-3 w-3 flex-shrink-0" /> : <ChevronRight className="h-3 w-3 flex-shrink-0" />}
                             <span className="truncate">{char.name}</span>
                             {char.role && char.role !== "speaking" && (
-                              <span className={`text-[9px] font-medium ${ROLE_LABELS[char.role]?.color || "text-muted-foreground"}`}>
-                                {ROLE_LABELS[char.role]?.[isRu ? "ru" : "en"] || char.role}
-                              </span>
+                              char.role === "crowd" && (char.age_hint || char.manner_hint) ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className={`text-[9px] font-medium cursor-default ${ROLE_LABELS[char.role]?.color || "text-muted-foreground"}`}>
+                                      {ROLE_LABELS[char.role]?.[isRu ? "ru" : "en"] || char.role}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="text-xs max-w-[200px]">
+                                    {char.age_hint && <div>{isRu ? "Возраст" : "Age"}: {char.age_hint}</div>}
+                                    {char.manner_hint && <div>{isRu ? "Манера" : "Manner"}: {char.manner_hint}</div>}
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <span className={`text-[9px] font-medium ${ROLE_LABELS[char.role]?.color || "text-muted-foreground"}`}>
+                                  {ROLE_LABELS[char.role]?.[isRu ? "ru" : "en"] || char.role}
+                                </span>
+                              )
                             )}
                             <Edit2
                               className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-50 hover:!opacity-100 flex-shrink-0"
