@@ -263,24 +263,28 @@ export default function ParserCharactersPanel({
         <RoleBadge roleId="profiler" model={profilerModel} isRu={isRu} size={16} />
         {characters.length > 0 && (
           <div className="flex items-center gap-1 ml-1">
-            {/* Role filter: speaking vs all */}
+            {/* Role filter: characters vs crowd vs all */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => setRoleFilter(f => f === "speaking" ? "all" : "speaking")}
+                  onClick={() => setRoleFilter(f => f === "characters" ? "crowd" : f === "crowd" ? "all" : "characters")}
                   className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors flex items-center gap-0.5 ${
-                    roleFilter === "speaking"
+                    roleFilter === "characters"
                       ? "bg-emerald-500/20 text-emerald-500 dark:text-emerald-400"
-                      : "text-muted-foreground/50 hover:text-muted-foreground"
+                      : roleFilter === "crowd"
+                        ? "bg-amber-500/20 text-amber-500 dark:text-amber-400"
+                        : "text-muted-foreground/50 hover:text-muted-foreground"
                   }`}
                 >
-                  <Mic className="h-3 w-3" />
+                  {roleFilter === "crowd" ? <MicOff className="h-3 w-3" /> : <Mic className="h-3 w-3" />}
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">
-                {roleFilter === "speaking"
-                  ? (isRu ? "Показаны говорящие · Нажми для всех" : "Showing speakers · Click for all")
-                  : (isRu ? "Показаны все · Нажми для говорящих" : "Showing all · Click for speakers")}
+                {roleFilter === "characters"
+                  ? (isRu ? "Персонажи · Нажми для массовки" : "Characters · Click for crowd")
+                  : roleFilter === "crowd"
+                    ? (isRu ? "Массовка · Нажми для всех" : "Crowd · Click for all")
+                    : (isRu ? "Все · Нажми для персонажей" : "All · Click for characters")}
               </TooltipContent>
             </Tooltip>
             {/* Gender filters */}
