@@ -266,6 +266,24 @@ function SceneCards({
                 <Trash2 className="h-4 w-4" />
                 {isRu ? "Удалить выделенное" : "Delete selected"}
               </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                onClick={() => {
+                  if (scenes.length <= 1) {
+                    toast.error(isRu ? "Нельзя удалить единственную сцену" : "Cannot delete the only scene");
+                    return;
+                  }
+                  const updated = scenes
+                    .filter((_, idx) => idx !== i)
+                    .map((sc, idx) => ({ ...sc, scene_number: idx + 1, char_count: (sc.content || '').length }));
+                  onScenesUpdate?.(updated, isRu ? `Сцена ${sc.scene_number} удалена` : `Scene ${sc.scene_number} deleted`);
+                  toast.success(isRu ? `Сцена ${sc.scene_number} удалена` : `Scene ${sc.scene_number} deleted`);
+                }}
+                className="gap-2 text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+                {isRu ? "Удалить сцену" : "Delete scene"}
+              </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>
         );
