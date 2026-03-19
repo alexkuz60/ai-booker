@@ -209,26 +209,18 @@ export function useCharacterProfiles({
         });
         setProfilePoolStats(manager.getStats());
 
-        // Collect all successful profiles
-        const allProfiles: Array<{
-          name: string;
-          age_group?: string;
-          temperament?: string;
-          speech_style?: string;
-          description?: string;
-        }> = [];
+        // Count errors (profiles already applied incrementally)
         let errorCount = 0;
+        let totalProfiled = 0;
 
         for (const [, result] of results) {
           if (result instanceof Error) {
             errorCount++;
             console.error("[CharProfile] Pool batch error:", result.message);
           } else {
-            allProfiles.push(...result);
+            totalProfiled += result.length;
           }
         }
-
-        const profiledCount = applyProfiles(allProfiles);
 
         if (errorCount > 0 && profiledCount > 0) {
           toast({
