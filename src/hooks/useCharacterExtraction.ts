@@ -57,7 +57,7 @@ export function useCharacterExtraction({
       { name: "Комментатор", nameEn: "Commentator", role: "system" },
     ];
 
-    let currentChars = characters;
+    let currentChars = mode === "fresh" ? characters.filter(c => c.role === "system") : characters;
     const needSystemInsert: LocalCharacter[] = [];
     for (const sys of SYSTEM_CHARS) {
       const exists = currentChars.some(c =>
