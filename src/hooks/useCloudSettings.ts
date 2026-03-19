@@ -24,6 +24,8 @@ export function useCloudSettings<T>(
   const pendingSaveRef = useRef<{ userId: string; value: T } | null>(null);
   /** Flag: true once the user has made a local change in this hook instance */
   const locallyDirtyRef = useRef(false);
+  /** Stable ref to flushToDb so the unmount effect doesn't need it as a dep */
+  const flushRef = useRef<(userId: string, value: T) => Promise<void>>();
 
   const [value, setValue] = useState<T>(() => {
     try {
@@ -80,6 +82,9 @@ export function useCloudSettings<T>(
     }
   }, [settingKey]);
 
+  // Keep flushRef in sync
+  flushRef.current = flushToDb;
+
   const saveToDb = useCallback((newValue: T) => {
     if (!user?.id) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -113,6 +118,7 @@ export function useCloudSettings<T>(
   }, [defaultValue, cacheKey, user?.id, settingKey]);
 
   // On unmount: FLUSH pending save instead of cancelling
+  // Empty deps — reads only from refs, safe during HMR
   useEffect(() => {
     return () => {
       if (debounceRef.current) {
@@ -122,11 +128,10 @@ export function useCloudSettings<T>(
       const pending = pendingSaveRef.current;
       if (pending) {
         pendingSaveRef.current = null;
-        // Fire-and-forget: save completes even after unmount
-        flushToDb(pending.userId, pending.value);
+        flushRef.current?.(pending.userId, pending.value);
       }
     };
-  }, [flushToDb]);
+  }, []);
 
   return { value, update, reset, loaded };
 }
