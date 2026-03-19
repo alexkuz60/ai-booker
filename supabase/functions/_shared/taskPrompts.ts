@@ -164,6 +164,9 @@ For EVERY character you report, you MUST be able to point to a SPECIFIC QUOTE fr
 Do NOT infer characters from your training data. Do NOT complete the cast list from memory. Do NOT add characters who "should be" in this chapter based on your knowledge of the full work.
 If the text mentions 3 characters, return 3. If it mentions 30, return 30. The number of results must match ONLY what the text contains.
 
+IGNORE METADATA AND PUBLISHING BOILERPLATE:
+The text may contain publisher disclaimers, copyright notices, advertisements, or links (e.g. "Read the full version on ...", "Text provided by ...", "Buy the book at ..."). These are NOT part of the literary content. Do NOT interpret them as clues that the text is incomplete or that you should supplement it with external knowledge. The text you received IS complete for your task — analyze only what is given, nothing more.
+
 ROLE CLASSIFICATION (critical for voice casting):
 - "speaking" — the character has direct speech (dialogue, monologue) in THIS chapter's scenes
 - "mentioned" — the character is only mentioned, remembered, quoted, or discussed by others but does NOT speak directly in these scenes. Historical figures (Jesus, Shakespeare, Napoleon etc.) who are only referenced or quoted are ALWAYS "mentioned".
@@ -190,6 +193,9 @@ Rules:
 Для КАЖДОГО персонажа ты ДОЛЖЕН мочь указать КОНКРЕТНУЮ ЦИТАТУ из предоставленного текста, где имя этого персонажа встречается ДОСЛОВНО. Если такой цитаты нет — НЕ включай персонажа.
 НЕ достраивай список персонажей из обучающих данных. НЕ дополняй состав из памяти. НЕ добавляй персонажей, которые «должны быть» в этой главе по твоим знаниям о полном произведении.
 Если в тексте упомянуты 3 персонажа — верни 3. Если 30 — верни 30. Количество результатов должно соответствовать ТОЛЬКО тому, что содержит текст.
+
+ИГНОРИРУЙ МЕТАДАННЫЕ И ИЗДАТЕЛЬСКИЕ ВСТАВКИ:
+Текст может содержать рекламу издательства, копирайты, ссылки на магазины (например: «Прочитайте полную версию на…», «Текст предоставлен ООО…», «Купить книгу на…»). Это НЕ часть литературного контента. НЕ интерпретируй их как подсказку, что текст неполный или что нужно дополнить список из внешних знаний. Полученный текст — это ВСЁ, что у тебя есть для задачи. Анализируй только то, что дано, ничего больше.
 
 КЛАССИФИКАЦИЯ РОЛЕЙ (критически важно для кастинга голосов):
 - "speaking" — персонаж произносит прямую речь (диалог, монолог) В ЭТОЙ главе
