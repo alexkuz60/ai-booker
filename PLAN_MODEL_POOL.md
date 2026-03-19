@@ -153,17 +153,70 @@ interface AiRolePreset {
 
 ## Порядок реализации
 
-| # | Задача | Файлы | Зависимости |
-|---|--------|-------|-------------|
-| 1 | ModelPoolManager | `src/lib/modelPoolManager.ts` | — |
-| 2 | Тесты менеджера | `src/lib/__tests__/modelPoolManager.test.ts` | #1 |
-| 3 | Расширить aiRoles.ts | `src/config/aiRoles.ts` | — |
-| 4 | Расширить useAiRoles | `src/hooks/useAiRoles.ts` | #3 |
-| 5 | UI пулов в AiRolesTab | `src/components/profile/tabs/AiRolesTab.tsx` | #4 |
-| 6 | Интеграция BatchSegmentationPanel | `src/components/studio/BatchSegmentationPanel.tsx` | #1, #4 |
-| 7 | Интеграция useCharacterExtraction | `src/hooks/useCharacterExtraction.ts` | #1, #4 |
-| 8 | Интеграция useCharacterProfiles | `src/hooks/useCharacterProfiles.ts` | #1, #4 |
-| 9 | Пресеты с пулами | `src/components/profile/tabs/AiRolePresets.tsx` | #4 |
+| # | Задача | Файлы | Зависимости | Статус |
+|---|--------|-------|-------------|--------|
+| 1 | ModelPoolManager | `src/lib/modelPoolManager.ts` | — | ✅ Done |
+| 2 | Тесты менеджера | `src/lib/__tests__/modelPoolManager.test.ts` | #1 | ✅ Done |
+| 3 | Расширить aiRoles.ts | `src/config/aiRoles.ts` | — | ✅ Done |
+| 4 | Расширить useAiRoles | `src/hooks/useAiRoles.ts` | #3 | ✅ Done |
+| 5 | UI пулов в AiRolesTab | `src/components/profile/tabs/AiRolesTab.tsx` | #4 | 🔲 |
+| 6 | Интеграция BatchSegmentationPanel | `src/components/studio/BatchSegmentationPanel.tsx` | #1, #4 | 🔲 |
+| 7 | Интеграция useCharacterExtraction | `src/hooks/useCharacterExtraction.ts` | #1, #4 | 🔲 |
+| 8 | Интеграция useCharacterProfiles | `src/hooks/useCharacterProfiles.ts` | #1, #4 | 🔲 |
+| 9 | Пресеты с пулами | `src/components/profile/tabs/AiRolePresets.tsx` | #4 | 🔲 |
+
+---
+
+## Итоги реализованных этапов
+
+### Этап 1–2: ModelPoolManager + тесты
+
+**Файл:** `src/lib/modelPoolManager.ts`
+
+Реализован класс `ModelPoolManager` — ядро параллельной обработки:
+
+- **Конструктор:** принимает `models: string[]`, `userApiKeys`, `perModelConcurrency` (default 2). Создаёт массив `PoolWorker` с привязкой к провайдеру и API-ключу через `getModelRegistryEntry()`.
+- **`runAll(tasks, onProgress)`** — главный метод. Диспатчит задачи через bounded concurrency:
+  - Создаёт пул слотов = `workers.length × perModelConcurrency`
+  - Каждая задача получает воркера через `waitForWorker()` (round-robin)
+  - При retryable-ошибке (429/402/rate-limit) — retry на следующем воркере (до `MAX_RETRIES=2`)
+  - При `DISABLE_THRESHOLD=3` последовательных ошибках — воркер отключается
+  - Возвращает `Map<taskId, T | Error>`
+- **`waitForWorker()`** — polling (50ms) до появления свободного слота, round-robin с пропуском disabled
+- **`getStats()`** — snapshot по воркерам для UI (completed, errors, active, disabled)
+- **`isRetryable()`** — regex-матчинг паттернов 429/402/rate-limit/quota/payment/credit
+
+**Тесты:** 8/8 — round-robin порядок, retry на другой воркер, disable после 3 ошибок, progress callback, concurrency ≤ 2, all-disabled fallback.
+
+### Этап 3: Расширение aiRoles.ts
+
+**Файл:** `src/config/aiRoles.ts`
+
+- Добавлено поле `poolable: boolean` в `AiRoleDefinition`:
+  - `translator` → `poolable: false` (lite tier, не нужен пул)
+  - Все остальные 5 ролей → `poolable: true` (standard + heavy)
+- Новый тип `AiRolePoolMap = Partial<Record<AiRoleId, string[]>>` — маппинг роли → массив моделей пула
+- Константа `POOLABLE_ROLES: AiRoleId[]` — фильтрованный список ролей с `poolable: true`
+
+### Этап 4: Расширение useAiRoles
+
+**Файл:** `src/hooks/useAiRoles.ts`
+
+Хук расширен пул-методами при полной обратной совместимости:
+
+- **Персистенция:** новый `useCloudSettings<AiRolePoolMap>("ai_role_model_pools", {})` — пулы синхронизируются между устройствами
+- **`getPoolForRole(roleId)`** — возвращает текущий пул (пустой массив если роль не poolable)
+- **`setPoolForRole(roleId, modelIds[])`** — сохраняет пул с валидацией:
+  - Проверяет `poolable` у роли
+  - Фильтрует модели по доступности (Lovable AI → только admin, остальные → по apiKey)
+  - Пустой валидный список → удаляет ключ из pools
+  - Вызывает `takeSnapshot()` для возможности отката
+- **`isPoolEnabled(roleId)`** — `pool.length > 1`
+- **`getEffectivePool(roleId)`** — primary модель + pool, дедупликация через `Set`. Это массив для передачи в `ModelPoolManager`. Если пул не задан → `[primaryModel]` (single-model fallback)
+- **`loadPreset`** — расширен: принимает опциональный `presetPools?: AiRolePoolMap`
+- **`resetAll`** — сбрасывает и `overrides`, и `pools`
+- **`loaded`** — теперь `loaded && poolsLoaded` (оба стора готовы)
+- Экспортируется `poolableRoles` для UI-фильтрации
 
 ## Ограничения и риски
 
