@@ -6,7 +6,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Users, Scan, Plus, Trash2, Merge, Edit2, X, Check, ChevronDown, ChevronRight,
-  ChevronUp, Brain, Loader2, Mic, MicOff, UserRound,
+  ChevronUp, Brain, Loader2, Mic, MicOff, UserRound, RotateCcw, Play, BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,8 +21,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub,
+  DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { RoleBadge } from "@/components/ui/RoleBadge";
-import type { LocalCharacter, CharacterRole } from "@/pages/parser/types";
+import type { LocalCharacter, CharacterRole, TocChapter, Scene, ChapterStatus } from "@/pages/parser/types";
 
 // ─── i18n maps for profile badges ────────────────────────
 const AGE_LABELS: Record<string, { ru: string; en: string }> = {
