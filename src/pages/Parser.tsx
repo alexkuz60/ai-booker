@@ -96,8 +96,8 @@ export default function Parser() {
   } = useBookManager({ userId: user?.id, isRu, projectStorage, projectStorageInitialized, storageBackend, createProject, openProjectByName, pendingProjectName });
 
   const {
-    characters, extracting, extractProgress, extractCharacters,
-    profiling, profileProgress, profileCharacters,
+    characters, extracting, extractProgress, extractPoolStats, extractCharacters,
+    profiling, profileProgress, profilePoolStats, profileCharacters,
     renameCharacter, updateGender, updateAliases, deleteCharacter, mergeCharacters, addCharacter,
   } = useParserCharacters({
     storage: projectStorage,
