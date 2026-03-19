@@ -140,14 +140,15 @@ export function useCharacterExtraction({
 
     // Build intermediate LocalCharacter[] snapshot from allResults merged with existing
     const buildSnapshot = (): LocalCharacter[] => {
+      const baseChars = mode === "fresh" ? currentChars : characters;
       const existingByName = new Map<string, LocalCharacter>();
-      for (const ch of characters) {
+      for (const ch of baseChars) {
         existingByName.set(ch.name.toLowerCase(), ch);
         for (const alias of ch.aliases) existingByName.set(alias.toLowerCase(), ch);
       }
 
-      const snapshot: LocalCharacter[] = [...characters];
-      const usedIds = new Set(characters.map(c => c.id));
+      const snapshot: LocalCharacter[] = [...baseChars];
+      const usedIds = new Set(baseChars.map(c => c.id));
 
       for (const [key, data] of allResults) {
         const existing = existingByName.get(key)
