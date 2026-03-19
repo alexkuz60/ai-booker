@@ -5,6 +5,12 @@ import { useAuth } from '@/hooks/useAuth';
 
 /**
  * Cloud-synced settings hook. Stores in user_settings table + localStorage cache.
+ *
+ * Key behaviors:
+ * - localStorage is updated synchronously on every change (instant UI).
+ * - DB save is debounced (400ms) for performance.
+ * - On unmount: pending DB save is FLUSHED (not cancelled) to prevent data loss.
+ * - On DB load: skipped if local changes were made since mount (prevents overwrite).
  */
 export function useCloudSettings<T>(
   settingKey: string,
@@ -14,6 +20,11 @@ export function useCloudSettings<T>(
   const { user } = useAuth();
   const cacheKey = localStorageKey || `cloud-${settingKey}`;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Track the pending save payload so we can flush it on unmount */
+  const pendingSaveRef = useRef<{ userId: string; value: T } | null>(null);
+  /** Flag: true once the user has made a local change in this hook instance */
+  const locallyDirtyRef = useRef(false);
+
   const [value, setValue] = useState<T>(() => {
     try {
       const cached = localStorage.getItem(cacheKey);
@@ -37,7 +48,8 @@ export function useCloudSettings<T>(
           .maybeSingle();
 
         if (cancelled) return;
-        if (!error && data) {
+        // Only apply DB value if we haven't made local changes since mount
+        if (!error && data && !locallyDirtyRef.current) {
           const dbValue = data.setting_value as T;
           setValue(dbValue);
           try { localStorage.setItem(cacheKey, JSON.stringify(dbValue)); } catch {}
@@ -53,25 +65,33 @@ export function useCloudSettings<T>(
     return () => { cancelled = true; };
   }, [user?.id, settingKey, cacheKey]);
 
+  /** Immediately persist to DB (no debounce) */
+  const flushToDb = useCallback(async (userId: string, newValue: T) => {
+    try {
+      await supabase
+        .from('user_settings')
+        .upsert({
+          user_id: userId,
+          setting_key: settingKey,
+          setting_value: newValue as Json,
+        }, { onConflict: 'user_id,setting_key' });
+    } catch (err) {
+      console.error(`[useCloudSettings] Failed to save "${settingKey}":`, err);
+    }
+  }, [settingKey]);
+
   const saveToDb = useCallback((newValue: T) => {
     if (!user?.id) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    pendingSaveRef.current = { userId: user.id, value: newValue };
     debounceRef.current = setTimeout(async () => {
-      try {
-        await supabase
-          .from('user_settings')
-          .upsert({
-            user_id: user.id,
-            setting_key: settingKey,
-            setting_value: newValue as Json,
-          }, { onConflict: 'user_id,setting_key' });
-      } catch (err) {
-        console.error(`[useCloudSettings] Failed to save "${settingKey}":`, err);
-      }
+      pendingSaveRef.current = null;
+      await flushToDb(user.id, newValue);
     }, 400);
-  }, [user?.id, settingKey]);
+  }, [user?.id, flushToDb]);
 
   const update = useCallback((newValue: T | ((prev: T) => T)) => {
+    locallyDirtyRef.current = true;
     setValue((prev) => {
       const resolved = typeof newValue === 'function'
         ? (newValue as (prev: T) => T)(prev)
@@ -83,6 +103,7 @@ export function useCloudSettings<T>(
   }, [cacheKey, saveToDb]);
 
   const reset = useCallback(() => {
+    locallyDirtyRef.current = true;
     setValue(defaultValue);
     try { localStorage.removeItem(cacheKey); } catch {}
     if (user?.id) {
@@ -91,9 +112,21 @@ export function useCloudSettings<T>(
     }
   }, [defaultValue, cacheKey, user?.id, settingKey]);
 
+  // On unmount: FLUSH pending save instead of cancelling
   useEffect(() => {
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, []);
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      const pending = pendingSaveRef.current;
+      if (pending) {
+        pendingSaveRef.current = null;
+        // Fire-and-forget: save completes even after unmount
+        flushToDb(pending.userId, pending.value);
+      }
+    };
+  }, [flushToDb]);
 
   return { value, update, reset, loaded };
 }
