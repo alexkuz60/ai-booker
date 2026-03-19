@@ -377,7 +377,7 @@ export function useCharacterProfiles({
     } finally {
       setProfiling(false);
       setProfileProgress(null);
-      setProfilePoolStats([]);
+      // Keep profilePoolStats visible after completion — cleared on next run start
       setProfiledCount(0);
       setProfileTotal(0);
       abortRef.current = null;
