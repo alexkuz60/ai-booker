@@ -27,7 +27,9 @@ import {
   DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { RoleBadge } from "@/components/ui/RoleBadge";
+import { cn } from "@/lib/utils";
 import type { LocalCharacter, CharacterRole, TocChapter, Scene, ChapterStatus } from "@/pages/parser/types";
+import type { PoolStats } from "@/lib/modelPoolManager";
 
 // ─── i18n maps for profile badges ────────────────────────
 const AGE_LABELS: Record<string, { ru: string; en: string }> = {
