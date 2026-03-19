@@ -193,7 +193,9 @@ export function useCharacterProfiles({
               ? `Профайлинг: ${progress.done}/${progress.total} групп`
               : `Profiling: ${progress.done}/${progress.total} batches`
           );
+          setProfilePoolStats(manager.getStats());
         });
+        setProfilePoolStats(manager.getStats());
 
         // Collect all successful profiles
         const allProfiles: Array<{
