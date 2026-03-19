@@ -129,6 +129,9 @@ Deno.serve(async (req) => {
     const MODELS_NO_TEMPERATURE = ["o1", "o3", "o4-mini", "deepseek-r1"];
     const skipTemp = MODELS_NO_TEMPERATURE.some(m => usedModel.includes(m));
 
+    // Models that require max_completion_tokens instead of max_tokens
+    const useMaxCompletionTokens = /gpt-5|o1|o3|o4/.test(usedModel);
+
     const buildBody = (includeTemp: boolean) => JSON.stringify({
       model: usedModel,
       messages: [
@@ -136,7 +139,7 @@ Deno.serve(async (req) => {
         { role: "user", content: `## Characters to profile:\n\n${charBlocks}\n\nRespond with ONLY the JSON object.` },
       ],
       ...(includeTemp && !skipTemp ? { temperature: 0.3 } : {}),
-      max_tokens: 4096,
+      ...(useMaxCompletionTokens ? { max_completion_tokens: 4096 } : { max_tokens: 4096 }),
     });
 
     const aiStart = Date.now();
