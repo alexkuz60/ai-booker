@@ -78,15 +78,6 @@ interface ParserCharactersPanelProps {
   onProfile?: (charIds: string[]) => void;
   tocEntries: TocChapter[];
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
-  onUpdateAliases: (id: string, aliases: string[]) => void;
-  onDelete: (id: string) => void;
-  onMerge: (sourceId: string, targetId: string) => void;
-  onAdd: (name: string) => void;
-  analyzedCount: number;
-  profilerModel?: string;
-  profiling?: boolean;
-  profileProgress?: string | null;
-  onProfile?: (charIds: string[]) => void;
 }
 
 export default function ParserCharactersPanel({
