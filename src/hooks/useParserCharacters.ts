@@ -40,9 +40,18 @@ export function useParserCharacters({
   const [loading, setLoading] = useState(false);
   const loadedBookRef = useRef<string | null>(null);
 
-  // Load characters from local storage when book changes
+  // Clear characters immediately when bookId changes (prevents stale data from previous book)
   useEffect(() => {
-    if (!storage || !bookId || bookId === loadedBookRef.current) return;
+    if (!bookId || bookId === loadedBookRef.current) return;
+    // bookId changed — clear old data right away
+    setCharacters([]);
+    loadedBookRef.current = null; // force reload
+  }, [bookId]);
+
+  // Load characters from local storage when book/storage are ready
+  useEffect(() => {
+    if (!storage || !bookId) return;
+    if (bookId === loadedBookRef.current) return;
     loadedBookRef.current = bookId;
     (async () => {
       setLoading(true);
