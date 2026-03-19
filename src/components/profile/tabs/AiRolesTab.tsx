@@ -105,6 +105,7 @@ export function AiRolesTab({ apiKeys, isRu, onModelChanged, bookTitle }: AiRoles
   };
 
   const hasOverrides = Object.keys(overrides).length > 0;
+  const hasAnyPools = Object.values(pools).some((p) => p && p.length > 0);
 
   return (
     <div className="space-y-4">
