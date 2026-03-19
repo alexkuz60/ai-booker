@@ -8,7 +8,7 @@
  */
 
 import { useState, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeWithFallback } from "@/lib/invokeWithFallback";
 import { useToast } from "@/hooks/use-toast";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
 import { ModelPoolManager, type PoolTask, type PoolStats, logPoolStats } from "@/lib/modelPoolManager";
@@ -276,16 +276,20 @@ export function useCharacterExtraction({
         ? userApiKeys[registryEntry.apiKeyField] || null
         : null;
 
-      const { data, error } = await supabase.functions.invoke("extract-characters", {
+      const { data, error } = await invokeWithFallback({
+        functionName: "extract-characters",
         body: {
           scenes: scenesPayload,
           lang: isRu ? "ru" : "en",
           model: modelId,
           apiKey: apiKeyForModel,
         },
+        userApiKeys,
+        modelField: "model",
+        isRu,
       });
       if (error) throw error;
-      return data?.characters || [];
+      return (data as any)?.characters || [];
     };
 
     let errorCount = 0;
