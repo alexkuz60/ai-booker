@@ -107,6 +107,7 @@ export default function Parser() {
     profilerModel: getModelForRole("profiler"),
     userApiKeys,
     isRu,
+    effectivePool: getEffectivePool("profiler"),
   });
 
   const selectedIdx = selectedIndices.size === 1 ? Array.from(selectedIndices)[0] : null;
