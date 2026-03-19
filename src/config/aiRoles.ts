@@ -57,6 +57,7 @@ export const AI_ROLES: Record<AiRoleId, AiRoleDefinition> = {
     defaultModelAdmin: "google/gemini-2.5-flash",
     defaultModelUser: "google/gemini-2.5-flash",
     tier: "standard",
+    poolable: true,
     systemPrompt:
       "You are an expert Russian-language proofreader and SSML specialist. " +
       "Fix grammar, punctuation, and add stress marks (ударения) where needed for TTS synthesis. " +
