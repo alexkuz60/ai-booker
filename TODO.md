@@ -21,6 +21,7 @@
 
 - [ ] **Сайдбар AI-ролей не сохраняет выбор модели** — при смене модели в Sheet (AiRolesButton → AiRolesTab) изменения не персистятся
 - [ ] **Просмотр промпта роли в сайдбаре** — в панели AI-ролей добавить возможность посмотреть системный промпт каждой роли (expand/collapse или tooltip)
+- [ ] **Логирование статистики пула** — сохранять время, модели и ошибки пула в proxy_api_logs для аналитики
 
 ## Профайлер
 
@@ -51,3 +52,7 @@
 - [x] **Библиотека из OPFS** — project.json → список проектов, fallback на toc.json
 - [x] **Аварийный сброс** — `?resetLocal=1` для полной очистки OPFS
 - [x] **Объединить «Загрузить PDF» и «Новый проект»** — единый UploadView с именем проекта
+- [x] **Model Pool** — параллельная обработка через пул моделей (ModelPoolManager, PoolSelector, пресеты). Интеграция: BatchSegmentationPanel, useCharacterExtraction, useCharacterProfiles. ~10x ускорение
+- [x] **Инкрементальный профайлинг** — профили применяются по мере готовности батчей, 🧠 иконки и счётчик обновляются в реальном времени
+- [x] **Pool stats UI** — визуальные бейджи воркеров (completed/errors/active) в BatchSegmentationPanel и ParserCharactersPanel
+- [x] **Retry без temperature** — автоматическая повторная попытка в profile-characters-local при 400 от моделей, не поддерживающих temperature
