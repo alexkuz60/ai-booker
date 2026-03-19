@@ -22,6 +22,8 @@ interface UseParserCharactersParams {
   /** User API keys map (e.g. { openrouter: "sk-...", proxyapi: "..." }) */
   userApiKeys?: Record<string, string>;
   isRu?: boolean;
+  /** Effective pool for the profiler role (from useAiRoles.getEffectivePool) */
+  effectivePool?: string[];
 }
 
 export function useParserCharacters({
@@ -32,6 +34,7 @@ export function useParserCharacters({
   profilerModel = "google/gemini-2.5-flash",
   userApiKeys = {},
   isRu = true,
+  effectivePool,
 }: UseParserCharactersParams) {
   const [characters, setCharacters] = useState<LocalCharacter[]>([]);
   const [loading, setLoading] = useState(false);
@@ -62,6 +65,7 @@ export function useParserCharacters({
     profilerModel,
     userApiKeys,
     isRu,
+    effectivePool,
   });
 
   // AI profiling
@@ -74,6 +78,7 @@ export function useParserCharacters({
     profilerModel,
     userApiKeys,
     isRu,
+    effectivePool,
   });
 
   return {
