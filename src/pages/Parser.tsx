@@ -504,12 +504,15 @@ export default function Parser() {
                     onOpenPdf={handleOpenPdf}
                     onRenamePart={mutations.renamePart}
                     onMergeEntries={mutations.mergeEntries}
-                    roleModels={{
+                     roleModels={{
                       screenwriter: getModelForRole("screenwriter"),
                       director: getModelForRole("director"),
                       translator: getModelForRole("translator"),
                       proofreader: getModelForRole("proofreader"),
                     }}
+                    onBatchAnalyze={batchAnalyzeAll}
+                    onStopAnalysis={stopAnalysis}
+                    isAnalyzing={isAnalyzing}
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle />
