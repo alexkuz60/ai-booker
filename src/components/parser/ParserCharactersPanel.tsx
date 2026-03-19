@@ -115,6 +115,7 @@ export default function ParserCharactersPanel({
   profiledCount,
   profileTotal,
   onProfile,
+  onStopProfile,
   tocEntries,
   chapterResults,
 }: ParserCharactersPanelProps) {
