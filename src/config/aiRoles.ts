@@ -126,6 +126,7 @@ export const AI_ROLES: Record<AiRoleId, AiRoleDefinition> = {
     defaultModelAdmin: "google/gemini-2.5-flash",
     defaultModelUser: "google/gemini-2.5-flash",
     tier: "standard",
+    poolable: true,
     systemPrompt:
       "You are a professional sound designer for audiobooks. " +
       "Generate precise, evocative prompts for sound effects, ambient atmosphere, " +
