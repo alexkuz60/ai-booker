@@ -105,6 +105,8 @@ export default function ParserCharactersPanel({
   profiling,
   profileProgress,
   profilePoolStats,
+  profiledCount,
+  profileTotal,
   onProfile,
   tocEntries,
   chapterResults,

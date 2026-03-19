@@ -534,6 +534,8 @@ export default function Parser() {
                 profiling={profiling}
                 profileProgress={profileProgress}
                 profilePoolStats={profilePoolStats}
+                profiledCount={profiledCount}
+                profileTotal={profileTotal}
                 onProfile={profileCharacters}
                 tocEntries={tocEntries}
                 chapterResults={chapterResults}
