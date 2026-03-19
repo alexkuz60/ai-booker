@@ -359,6 +359,7 @@ export function useCharacterExtraction({
           if (extracted) {
             mergeChapterResults(chapterData.idx, chapterData.entry, extracted);
           }
+          setExtractedCount(ci + 1);
           setCharacters(buildSnapshot());
         } catch (err) {
           console.error("AI extraction failed for chapter", chapterData.idx, err);
