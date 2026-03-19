@@ -122,6 +122,7 @@ export function AiRolesTab({ apiKeys, isRu, onModelChanged, bookTitle }: AiRoles
             onLoadPreset={loadPreset}
             bookTitle={bookTitle}
             isRu={isRu}
+            currentPools={pools}
           />
           {(hasOverrides || hasAnyPools) && (
             <Button
