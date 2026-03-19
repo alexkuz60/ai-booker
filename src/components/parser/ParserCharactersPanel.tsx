@@ -461,7 +461,13 @@ export default function ParserCharactersPanel({
           >
             {profiling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Brain className="h-3.5 w-3.5" />}
             {profiling
-              ? (profileProgress || (isRu ? "Профайлинг…" : "Profiling…"))
+              ? (
+                <>
+                  {profiledCount != null && profileTotal
+                    ? `${profiledCount}/${profileTotal}`
+                    : (profileProgress || (isRu ? "Профайлинг…" : "Profiling…"))}
+                </>
+              )
               : (isRu ? `Профайл (${selectedIds.size})` : `Profile (${selectedIds.size})`)}
           </Button>
         )}
