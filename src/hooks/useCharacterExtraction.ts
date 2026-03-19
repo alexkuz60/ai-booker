@@ -326,6 +326,7 @@ export function useCharacterExtraction({
           },
         }));
 
+      const poolStartTime = Date.now();
       const results = await manager.runAll(tasks, (progress) => {
         setExtractProgress(
           isRu
@@ -334,7 +335,9 @@ export function useCharacterExtraction({
         );
         setExtractPoolStats(manager.getStats());
       });
-      setExtractPoolStats(manager.getStats());
+      const finalStats = manager.getStats();
+      setExtractPoolStats(finalStats);
+      logPoolStats(finalStats, "extract_characters", Date.now() - poolStartTime);
 
       // Count errors from pool results
       for (const [key, result] of results) {
