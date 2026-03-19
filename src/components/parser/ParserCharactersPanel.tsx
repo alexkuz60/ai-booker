@@ -467,21 +467,33 @@ export default function ParserCharactersPanel({
           </div>
         ) : (
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                 <TableHead className="w-7 px-1"></TableHead>
-                <TableHead className="text-xs">{isRu ? "Имя" : "Name"}</TableHead>
+                <TableHead
+                  className="text-xs cursor-pointer select-none hover:text-foreground transition-colors"
+                  onClick={() => handleSort("name")}
+                >
+                  {isRu ? "Имя" : "Name"}<SortIcon col="name" />
+                </TableHead>
                 <TableHead className="text-xs text-center w-10">{isRu ? "Пол" : "G"}</TableHead>
-                <TableHead className="text-xs text-center w-7 px-0">
-                  <Brain className="h-3 w-3 mx-auto text-muted-foreground/50" />
+                <TableHead
+                  className="text-xs text-center w-7 px-0 cursor-pointer select-none hover:text-foreground transition-colors"
+                  onClick={() => handleSort("brain")}
+                >
+                  <Brain className={`h-3 w-3 mx-auto ${sortCol === "brain" ? "text-primary" : "text-muted-foreground/50"}`} />
                 </TableHead>
                 <TableHead className="text-xs text-center w-12">{isRu ? "Сцен" : "Sc."}</TableHead>
-                <TableHead className="text-xs text-center w-12">{isRu ? "Гл." : "Ch."}</TableHead>
-                <TableHead className="w-7 px-1"></TableHead>
+                <TableHead
+                  className="text-xs text-center w-12 cursor-pointer select-none hover:text-foreground transition-colors"
+                  onClick={() => handleSort("ch")}
+                >
+                  {isRu ? "Гл." : "Ch."}<SortIcon col="ch" />
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredCharacters
+              {sortedCharacters
                 .map((char) => {
                 const isExpanded = expandedId === char.id;
                 const isSelected = selectedIds.has(char.id);
