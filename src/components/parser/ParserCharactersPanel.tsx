@@ -6,7 +6,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Users, Scan, Plus, Trash2, Merge, Edit2, X, Check, ChevronDown, ChevronRight,
-  ChevronUp, Brain, Loader2,
+  ChevronUp, Brain, Loader2, Mic, MicOff, UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
