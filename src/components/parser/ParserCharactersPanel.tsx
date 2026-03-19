@@ -7,7 +7,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Users, Scan, Plus, Trash2, Merge, Edit2, X, Check, ChevronDown, ChevronRight,
   ChevronUp, Brain, Loader2, Mic, MicOff, UserRound, RotateCcw, Play, BookOpen,
-  Search, Filter, Star, Eye, UsersRound, Layers, Square, ListFilter,
+  Search, Filter, Star, Eye, UsersRound, Layers, Square, ListFilter, AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -686,6 +686,16 @@ export default function ParserCharactersPanel({
                           >
                             {isExpanded ? <ChevronDown className="h-3 w-3 flex-shrink-0" /> : <ChevronRight className="h-3 w-3 flex-shrink-0" />}
                             <span className="truncate">{char.name}</span>
+                            {char.textConfirmed === false && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <AlertTriangle className="h-3 w-3 text-amber-500 flex-shrink-0" />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs max-w-[220px]">
+                                  {isRu ? "Имя не найдено в тексте — возможно, модель использовала внешние знания" : "Name not found in text — model may have used external knowledge"}
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
                             {char.extractedBy && (
                               <RoleBadge roleId="profiler" model={char.extractedBy} isRu={isRu} size={11} />
                             )}
