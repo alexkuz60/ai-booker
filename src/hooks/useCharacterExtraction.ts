@@ -97,7 +97,14 @@ export function useCharacterExtraction({
 
     chapterResults.forEach((result, idx) => {
       if (result.status !== "done" || !result.scenes?.length) return;
-      if (alreadyExtractedIdx.has(idx)) return;
+      // "chapter" mode — only process the specified chapter
+      if (mode === "chapter") {
+        if (idx !== opts?.chapterIdx) return;
+      } else if (mode === "continue") {
+        // "continue" — skip already-extracted
+        if (alreadyExtractedIdx.has(idx)) return;
+      }
+      // "fresh" — process all (alreadyExtractedIdx is empty after wipe)
       const entry = tocEntries[idx];
       if (!entry) return;
       chaptersToProcess.push({ idx, entry, scenes: result.scenes });
