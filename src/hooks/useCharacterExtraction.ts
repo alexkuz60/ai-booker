@@ -325,16 +325,16 @@ export function useCharacterExtraction({
                 ? `Глава ${ch.idx + 1}: ${ch.entry.title.slice(0, 40)}`
                 : `Chapter ${ch.idx + 1}: ${ch.entry.title.slice(0, 40)}`
             );
-            const extracted = await invokeForChapter(ch, modelId);
-            const result = extracted || [];
+            const resp = await invokeForChapter(ch, modelId);
+            const chars = resp?.characters || [];
             // Incremental merge + UI update
-            if (result.length > 0) {
-              mergeChapterResults(ch.idx, ch.entry, result);
+            if (chars.length > 0) {
+              mergeChapterResults(ch.idx, ch.entry, chars, resp?.usedModel);
             }
             completedChapters++;
             setExtractedCount(completedChapters);
             setCharacters(buildSnapshot());
-            return { idx: ch.idx, entry: ch.entry, extracted: result };
+            return { idx: ch.idx, entry: ch.entry, extracted: chars };
           },
         }));
 
