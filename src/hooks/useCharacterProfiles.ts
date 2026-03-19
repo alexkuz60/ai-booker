@@ -112,6 +112,7 @@ export function useCharacterProfiles({
 
     setProfiling(true);
     setProfileProgress(isRu ? "Подготовка…" : "Preparing…");
+    setProfilePoolStats([]);
     setProfiledCount(0);
     setProfileTotal(charsToProfile.length);
 
