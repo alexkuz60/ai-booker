@@ -400,9 +400,49 @@ export function t(key: string, isRu: boolean): string {
 }
 
 export function tMood(raw: string, isRu: boolean): string {
+  // Try exact match first
   const normalized = normalizeToken(raw);
   const key = MOOD_MAP[normalized];
   if (key) return t(key, isRu);
+
+  // Composite mood: split by comma, slash, "and", "with" and translate each part
+  const parts = raw
+    .split(/[,/]|\band\b|\bwith\b|\bс\b|\bи\b/i)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  if (parts.length > 1) {
+    const translated = parts.map(part => {
+      // Each part may be multi-word like "darkly comedic" — try full match first
+      const partNorm = normalizeToken(part);
+      const partKey = MOOD_MAP[partNorm];
+      if (partKey) return t(partKey, isRu);
+      // Try individual words
+      const words = part.split(/\s+/);
+      if (words.length > 1) {
+        for (const word of words) {
+          const wNorm = normalizeToken(word);
+          const wKey = MOOD_MAP[wNorm];
+          if (wKey) return t(wKey, isRu);
+        }
+      }
+      return humanizeToken(part);
+    });
+    // Deduplicate and join
+    const unique = [...new Set(translated)];
+    return unique.join(", ");
+  }
+
+  // Single unrecognized token — try word-level lookup
+  const words = raw.trim().split(/\s+/);
+  if (words.length > 1) {
+    for (const word of words) {
+      const wNorm = normalizeToken(word);
+      const wKey = MOOD_MAP[wNorm];
+      if (wKey) return t(wKey, isRu);
+    }
+  }
+
   return humanizeToken(raw);
 }
 
