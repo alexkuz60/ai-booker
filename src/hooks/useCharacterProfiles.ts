@@ -270,7 +270,7 @@ export function useCharacterProfiles({
             if (result.profiles.length > 0) {
               completedProfiles += result.profiles.length;
               setProfiledCount(completedProfiles);
-              applyProfiles(result.profiles, result.usedModel);
+              applyProfiles(result.profiles, result.usedModel, true /* skipPersist — single persist after all batches */);
             }
             return result;
           },
