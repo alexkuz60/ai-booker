@@ -370,9 +370,9 @@ export function useCharacterExtraction({
         );
 
         try {
-          const extracted = await invokeForChapter(chapterData, profilerModel);
-          if (extracted) {
-            mergeChapterResults(chapterData.idx, chapterData.entry, extracted);
+          const resp = await invokeForChapter(chapterData, profilerModel);
+          if (resp) {
+            mergeChapterResults(chapterData.idx, chapterData.entry, resp.characters, resp.usedModel);
           }
           setExtractedCount(ci + 1);
           setCharacters(buildSnapshot());
