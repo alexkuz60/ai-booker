@@ -62,6 +62,8 @@ function localizeLabel(value: string, map: Record<string, { ru: string; en: stri
   return entry ? entry[isRu ? "ru" : "en"] : value;
 }
 
+import type { ProfileMode } from "@/hooks/useCharacterProfiles";
+
 interface ParserCharactersPanelProps {
   isRu: boolean;
   characters: LocalCharacter[];
@@ -84,7 +86,8 @@ interface ParserCharactersPanelProps {
   profilePoolStats?: PoolStats[];
   profiledCount?: number;
   profileTotal?: number;
-  onProfile?: (charIds: string[]) => void;
+  onProfile?: (charIds: string[], mode?: ProfileMode) => void;
+  onStopProfile?: () => void;
   tocEntries: TocChapter[];
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
 }
