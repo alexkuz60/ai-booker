@@ -97,7 +97,7 @@ export default function Parser() {
 
   const {
     characters, extracting, extractProgress, extractPoolStats, extractedCount, extractTotal, extractCharacters,
-    profiling, profileProgress, profilePoolStats, profiledCount, profileTotal, profileCharacters,
+    profiling, profileProgress, profilePoolStats, profiledCount, profileTotal, profileCharacters, stopProfiling,
     renameCharacter, updateGender, updateAliases, deleteCharacter, mergeCharacters, addCharacter,
   } = useParserCharacters({
     storage: projectStorage,
@@ -539,6 +539,7 @@ export default function Parser() {
                 profiledCount={profiledCount}
                 profileTotal={profileTotal}
                 onProfile={profileCharacters}
+                onStopProfile={stopProfiling}
                 tocEntries={tocEntries}
                 chapterResults={chapterResults}
               />

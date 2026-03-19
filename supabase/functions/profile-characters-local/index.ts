@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
         { role: "user", content: `## Characters to profile:\n\n${charBlocks}\n\nRespond with ONLY the JSON object.` },
       ],
       ...(includeTemp && !skipTemp ? { temperature: 0.3 } : {}),
-      ...(useMaxCompletionTokens ? { max_completion_tokens: 4096 } : { max_tokens: 4096 }),
+      ...(useMaxCompletionTokens ? { max_completion_tokens: 16384 } : { max_tokens: 16384 }),
     });
 
     const aiStart = Date.now();
