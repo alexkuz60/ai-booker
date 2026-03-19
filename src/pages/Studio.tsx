@@ -418,6 +418,7 @@ const Studio = () => {
                 batchScenes={batchScenes}
                 onBatchComplete={handleBatchComplete}
                 onBatchClose={handleBatchClose}
+                userApiKeys={userApiKeys}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
