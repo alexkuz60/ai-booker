@@ -236,6 +236,11 @@ export function useCharacterExtraction({
             if (existing.gender === "unknown" && char.gender !== "unknown") {
               existing.gender = char.gender;
             }
+            // Promote role: mentioned → speaking/crowd
+            const charRole = char.role || "speaking";
+            if (existing.role === "mentioned" && charRole !== "mentioned") {
+              existing.role = charRole;
+            }
             existing.appearances.push({
               chapterIdx: idx,
               chapterTitle: entry.title,
@@ -247,6 +252,7 @@ export function useCharacterExtraction({
               name: char.name,
               aliases: char.aliases,
               gender: char.gender,
+              role: char.role || "speaking",
               appearances: [{
                 chapterIdx: idx,
                 chapterTitle: entry.title,
