@@ -11,6 +11,7 @@
  */
 
 import { getModelRegistryEntry } from "@/config/modelRegistry";
+import { supabase } from "@/integrations/supabase/client";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -265,5 +266,48 @@ export class ModelPoolManager {
   private isRetryable(error: Error): boolean {
     const msg = error.message;
     return RETRYABLE_PATTERNS.some((pattern) => pattern.test(msg));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pool stats logging
+// ---------------------------------------------------------------------------
+
+/**
+ * Log pool execution stats to proxy_api_logs for analytics.
+ * One row per worker model, with request_type = "pool_<taskType>".
+ *
+ * @param stats - Final pool stats from manager.getStats()
+ * @param taskType - e.g. "extract_characters", "profile_characters", "segment_scene"
+ * @param totalDurationMs - Wall-clock time of the entire pool run
+ */
+export async function logPoolStats(
+  stats: PoolStats[],
+  taskType: string,
+  totalDurationMs: number,
+): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const rows = stats
+      .filter(s => s.completed > 0 || s.errors > 0)
+      .map(s => ({
+        user_id: user.id,
+        model_id: s.model,
+        provider: s.provider,
+        request_type: `pool_${taskType}`,
+        status: s.disabled ? "error" : "success",
+        latency_ms: stats.length > 0 ? Math.round(totalDurationMs / stats.length) : 0,
+        tokens_input: s.completed,  // repurpose: completed task count
+        tokens_output: s.errors,    // repurpose: error count
+        error_message: s.disabled ? "worker_disabled" : null,
+      }));
+
+    if (rows.length > 0) {
+      await supabase.from("proxy_api_logs").insert(rows);
+    }
+  } catch (err) {
+    console.warn("[PoolStats] Failed to log pool stats:", err);
   }
 }

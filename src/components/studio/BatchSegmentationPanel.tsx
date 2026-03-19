@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAiRoles } from "@/hooks/useAiRoles";
-import { ModelPoolManager, type PoolTask, type PoolStats } from "@/lib/modelPoolManager";
+import { ModelPoolManager, type PoolTask, type PoolStats, logPoolStats } from "@/lib/modelPoolManager";
 import { toast } from "sonner";
 
 interface SceneInfo {
@@ -100,6 +100,7 @@ export function BatchSegmentationPanel({
       },
     }));
 
+    const poolStartTime = Date.now();
     const results = await manager.runAll(tasks, (progress) => {
       setPoolStats(manager.getStats());
     });
@@ -117,7 +118,9 @@ export function BatchSegmentationPanel({
       }
     }
 
-    setPoolStats(manager.getStats());
+    const finalStats = manager.getStats();
+    setPoolStats(finalStats);
+    logPoolStats(finalStats, "segment_scene", Date.now() - poolStartTime);
     managerRef.current = null;
   }, [effectivePool, userApiKeys, isRu, updateJob, onSceneSegmented]);
 
