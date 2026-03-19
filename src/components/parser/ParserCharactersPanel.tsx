@@ -279,22 +279,6 @@ export default function ParserCharactersPanel({
         <RoleBadge roleId="profiler" model={profilerModel} isRu={isRu} size={16} />
         {characters.length > 0 && (
           <div className="flex items-center gap-1 ml-1">
-            {/* Search toggle */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => { setSearchOpen(o => !o); if (searchOpen) setSearchQuery(""); }}
-                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
-                    searchOpen ? "bg-primary/20 text-primary" : "text-muted-foreground/50 hover:text-muted-foreground"
-                  }`}
-                >
-                  <Search className="h-3 w-3" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">
-                {isRu ? "Поиск по имени" : "Search by name"}
-              </TooltipContent>
-            </Tooltip>
             {/* Role filter dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
