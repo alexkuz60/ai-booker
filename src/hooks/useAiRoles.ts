@@ -4,20 +4,22 @@ import { useUserRole } from "./useUserRole";
 import {
   type AiRoleId,
   type AiRoleModelMap,
+  type AiRolePoolMap,
   AI_ROLES,
+  POOLABLE_ROLES,
   getDefaultAdminModels,
   getDefaultUserModels,
 } from "@/config/aiRoles";
 import { getModelRegistryEntry, getAvailableModels } from "@/config/modelRegistry";
 
 /**
- * Hook to manage AI role → model mappings.
- * Admin gets Lovable AI defaults, users get external provider defaults.
- * Overrides are stored in cloud settings.
+ * Hook to manage AI role → model mappings AND model pools.
+ *
+ * Single-model mapping: used for lite roles and as the "primary" model for poolable roles.
+ * Pool mapping: additional models for parallel batch processing (standard + heavy roles).
  *
  * "Pre-edit snapshot": before the first change in a session,
- * the current overrides are saved. Reset restores to that snapshot
- * (the last "working" set) instead of clearing everything.
+ * the current overrides are saved. Reset restores to that snapshot.
  */
 export function useAiRoles(userApiKeys: Record<string, string> = {}) {
   const { isAdmin } = useUserRole();
@@ -27,6 +29,10 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
     value: preEditSnapshot,
     update: setPreEditSnapshot,
   } = useCloudSettings<AiRoleModelMap | null>("ai_role_models_pre_edit", null);
+
+  // ── Pool state ──────────────────────────────────────────────────────────
+  const { value: pools, update: setPools, loaded: poolsLoaded } =
+    useCloudSettings<AiRolePoolMap>("ai_role_model_pools", {});
 
   /** Track whether we've already taken a snapshot this session */
   const snapshotTakenRef = useRef(false);
@@ -58,14 +64,18 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
     return AI_ROLES[roleId].systemPrompt;
   }, []);
 
+  // ── Snapshot helper ─────────────────────────────────────────────────────
+  const takeSnapshot = useCallback(() => {
+    if (!snapshotTakenRef.current && preEditSnapshot === null) {
+      setPreEditSnapshot({ ...overrides });
+      snapshotTakenRef.current = true;
+    }
+  }, [preEditSnapshot, setPreEditSnapshot, overrides]);
+
   /** Set model override for a specific role — snapshots pre-edit state on first change */
   const setModelForRole = useCallback(
     (roleId: AiRoleId, modelId: string | null) => {
-      // Snapshot current overrides before first edit
-      if (!snapshotTakenRef.current && preEditSnapshot === null) {
-        setPreEditSnapshot({ ...overrides });
-        snapshotTakenRef.current = true;
-      }
+      takeSnapshot();
       setOverrides((prev) => {
         const next = { ...prev };
         if (modelId === null || modelId === defaults[roleId]) {
@@ -76,7 +86,7 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
         return next;
       });
     },
-    [setOverrides, defaults, preEditSnapshot, setPreEditSnapshot, overrides]
+    [setOverrides, defaults, takeSnapshot]
   );
 
   /** Reset to pre-edit snapshot (last working set) or defaults */
@@ -87,18 +97,14 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
     } else {
       setOverrides({});
     }
+    setPools({});
     snapshotTakenRef.current = false;
-  }, [setOverrides, preEditSnapshot, setPreEditSnapshot]);
+  }, [setOverrides, setPools, preEditSnapshot, setPreEditSnapshot]);
 
   /** Load a preset — apply all its model mappings as overrides */
   const loadPreset = useCallback(
-    (models: AiRoleModelMap) => {
-      // Snapshot before loading
-      if (!snapshotTakenRef.current && preEditSnapshot === null) {
-        setPreEditSnapshot({ ...overrides });
-        snapshotTakenRef.current = true;
-      }
-      // Convert resolved models to overrides (skip if matches default)
+    (models: AiRoleModelMap, presetPools?: AiRolePoolMap) => {
+      takeSnapshot();
       const next: AiRoleModelMap = {};
       for (const [roleId, modelId] of Object.entries(models)) {
         if (modelId && modelId !== defaults[roleId as AiRoleId]) {
@@ -106,8 +112,74 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
         }
       }
       setOverrides(next);
+      if (presetPools) {
+        setPools(presetPools);
+      }
     },
-    [setOverrides, defaults, preEditSnapshot, setPreEditSnapshot, overrides],
+    [setOverrides, setPools, defaults, takeSnapshot],
+  );
+
+  // ── Pool methods ────────────────────────────────────────────────────────
+
+  /** Get the model pool for a role (empty array = no pool, single-model mode) */
+  const getPoolForRole = useCallback(
+    (roleId: AiRoleId): string[] => {
+      if (!AI_ROLES[roleId].poolable) return [];
+      return pools[roleId] ?? [];
+    },
+    [pools]
+  );
+
+  /**
+   * Set the pool for a role. Pass empty array to disable pooling.
+   * Only models available to the current user (by API keys) are kept.
+   */
+  const setPoolForRole = useCallback(
+    (roleId: AiRoleId, modelIds: string[]) => {
+      if (!AI_ROLES[roleId].poolable) return;
+      takeSnapshot();
+      setPools((prev) => {
+        const next = { ...prev };
+        const valid = modelIds.filter((id) => {
+          const entry = getModelRegistryEntry(id);
+          if (!entry) return false;
+          if (entry.provider === "lovable") return isAdmin;
+          return entry.apiKeyField ? !!userApiKeys[entry.apiKeyField] : false;
+        });
+        if (valid.length === 0) {
+          delete next[roleId];
+        } else {
+          next[roleId] = valid;
+        }
+        return next;
+      });
+    },
+    [setPools, takeSnapshot, isAdmin, userApiKeys]
+  );
+
+  /** Whether a role has an active pool (>1 model) */
+  const isPoolEnabled = useCallback(
+    (roleId: AiRoleId): boolean => {
+      const pool = pools[roleId];
+      return !!pool && pool.length > 1;
+    },
+    [pools]
+  );
+
+  /**
+   * Effective pool for batch operations: pool models + primary model (deduplicated).
+   * If no pool configured, returns [primaryModel] for single-model fallback.
+   */
+  const getEffectivePool = useCallback(
+    (roleId: AiRoleId): string[] => {
+      const primary = getModelForRole(roleId);
+      const pool = pools[roleId];
+      if (!pool || pool.length === 0) return [primary];
+      // Ensure primary is included, deduplicate
+      const set = new Set([primary, ...pool]);
+      return [...set];
+    },
+    [getModelForRole, pools]
   );
 
   /** Full resolved map */
@@ -129,6 +201,7 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
   const hasPreEditSnapshot = preEditSnapshot !== null;
 
   return {
+    // Single-model API (unchanged)
     resolvedModels,
     overrides,
     getModelForRole,
@@ -138,7 +211,14 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
     loadPreset,
     availableModels,
     isAdmin,
-    loaded,
+    loaded: loaded && poolsLoaded,
     hasPreEditSnapshot,
+    // Pool API (new)
+    pools,
+    getPoolForRole,
+    setPoolForRole,
+    isPoolEnabled,
+    getEffectivePool,
+    poolableRoles: POOLABLE_ROLES,
   };
 }
