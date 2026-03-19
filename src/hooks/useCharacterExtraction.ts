@@ -336,18 +336,13 @@ export function useCharacterExtraction({
       });
       setExtractPoolStats(manager.getStats());
 
-      // Merge all results (maintain order for consistency)
-      const sortedKeys = [...results.keys()].sort((a, b) => Number(a) - Number(b));
-      for (const key of sortedKeys) {
-        const result = results.get(key)!;
+      // Count errors from pool results
+      for (const [key, result] of results) {
         if (result instanceof Error) {
           errorCount++;
           console.error(`[CharExtract] Pool error for chapter ${key}:`, result.message);
-        } else {
-          mergeChapterResults(result.idx, result.entry, result.extracted);
         }
       }
-      setCharacters(buildSnapshot());
 
     } else {
       // ── Classic sequential mode ──
