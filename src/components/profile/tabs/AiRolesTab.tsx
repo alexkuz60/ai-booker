@@ -151,91 +151,115 @@ export function AiRolesTab({ apiKeys, isRu, onModelChanged, bookTitle }: AiRoles
 
           return (
             <Card key={role.id} className="border-border/50">
-              <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-                <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <RoleBadge roleId={role.id as AiRoleId} model={currentModel} isRu={isRu} size={16} className="mt-0.5" />
-                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium font-body">
-                        {isRu ? role.labelRu : role.labelEn}
-                      </span>
-                      {isAdmin && <TaskPromptsPopover roleId={role.id as AiRoleId} isRu={isRu} />}
-                      <Badge
-                        variant="outline"
-                        className={`text-[9px] px-1.5 py-0 ${tierColor} border-current/30`}
-                      >
-                        {isRu
-                          ? TIER_LABELS[role.tier].ru
-                          : TIER_LABELS[role.tier].en}
-                      </Badge>
-                      {isOverridden && (
+              <CardContent className="p-4 space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <RoleBadge roleId={role.id as AiRoleId} model={currentModel} isRu={isRu} size={16} className="mt-0.5" />
+                     <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium font-body">
+                          {isRu ? role.labelRu : role.labelEn}
+                        </span>
+                        {isAdmin && <TaskPromptsPopover roleId={role.id as AiRoleId} isRu={isRu} />}
                         <Badge
-                          variant="secondary"
-                          className="text-[9px] px-1.5 py-0"
+                          variant="outline"
+                          className={`text-[9px] px-1.5 py-0 ${tierColor} border-current/30`}
                         >
-                          {isRu ? "изменено" : "custom"}
+                          {isRu
+                            ? TIER_LABELS[role.tier].ru
+                            : TIER_LABELS[role.tier].en}
                         </Badge>
-                      )}
+                        {isOverridden && (
+                          <Badge
+                            variant="secondary"
+                            className="text-[9px] px-1.5 py-0"
+                          >
+                            {isRu ? "изменено" : "custom"}
+                          </Badge>
+                        )}
+                        {isPoolEnabled(role.id) && (
+                          <Badge
+                            variant="secondary"
+                            className="text-[9px] px-1.5 py-0 gap-0.5"
+                          >
+                            <Layers className="h-2.5 w-2.5" />
+                            {isRu ? "пул" : "pool"}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground font-body mt-0.5 truncate">
+                        {isRu ? role.descriptionRu : role.descriptionEn}
+                      </p>
                     </div>
-                    <p className="text-[11px] text-muted-foreground font-body mt-0.5 truncate">
-                      {isRu ? role.descriptionRu : role.descriptionEn}
-                    </p>
                   </div>
+
+                  <Select
+                    value={currentModel}
+                    onValueChange={(v) => {
+                      setModelForRole(role.id as AiRoleId, v);
+                      onModelChanged?.(role.id as AiRoleId);
+                    }}
+                  >
+                    <SelectTrigger className="w-full sm:w-[240px] h-8 text-xs shrink-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {grouped.map(({ provider, models }) => {
+                        const isCollapsed = collapsedProviders.has(provider);
+                        const Chevron = isCollapsed ? ChevronRight : ChevronDown;
+                        return (
+                          <SelectGroup key={provider}>
+                            <SelectLabel
+                              className="text-[10px] uppercase tracking-wider text-muted-foreground cursor-pointer select-none flex items-center gap-1 hover:text-foreground transition-colors"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                toggleProvider(provider);
+                              }}
+                            >
+                              <Chevron className="h-3 w-3 shrink-0" />
+                              {providerLabel(provider)}
+                              <span className="text-muted-foreground/50 ml-0.5">
+                                ({models.length})
+                              </span>
+                              {provider === "lovable" && !isAdmin && (
+                                <span className="ml-1 text-destructive">
+                                  (admin only)
+                                </span>
+                              )}
+                            </SelectLabel>
+                            {!isCollapsed &&
+                              models.map((m) => (
+                                <SelectItem
+                                  key={m.id}
+                                  value={m.id}
+                                  disabled={
+                                    m.provider === "lovable" && !isAdmin
+                                  }
+                                  className="text-xs"
+                                >
+                                  {m.displayName}
+                                </SelectItem>
+                              ))}
+                          </SelectGroup>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                <Select
-                  value={currentModel}
-                  onValueChange={(v) => {
-                    setModelForRole(role.id as AiRoleId, v);
-                    onModelChanged?.(role.id as AiRoleId);
-                  }}
-                >
-                  <SelectTrigger className="w-full sm:w-[240px] h-8 text-xs shrink-0">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {grouped.map(({ provider, models }) => {
-                      const isCollapsed = collapsedProviders.has(provider);
-                      const Chevron = isCollapsed ? ChevronRight : ChevronDown;
-                      return (
-                        <SelectGroup key={provider}>
-                          <SelectLabel
-                            className="text-[10px] uppercase tracking-wider text-muted-foreground cursor-pointer select-none flex items-center gap-1 hover:text-foreground transition-colors"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              toggleProvider(provider);
-                            }}
-                          >
-                            <Chevron className="h-3 w-3 shrink-0" />
-                            {providerLabel(provider)}
-                            <span className="text-muted-foreground/50 ml-0.5">
-                              ({models.length})
-                            </span>
-                            {provider === "lovable" && !isAdmin && (
-                              <span className="ml-1 text-destructive">
-                                (admin only)
-                              </span>
-                            )}
-                          </SelectLabel>
-                          {!isCollapsed &&
-                            models.map((m) => (
-                              <SelectItem
-                                key={m.id}
-                                value={m.id}
-                                disabled={
-                                  m.provider === "lovable" && !isAdmin
-                                }
-                                className="text-xs"
-                              >
-                                {m.displayName}
-                              </SelectItem>
-                            ))}
-                        </SelectGroup>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
+                {/* Pool selector — only for poolable roles */}
+                {role.poolable && (
+                  <PoolSelector
+                    roleId={role.id}
+                    pool={pools[role.id] ?? []}
+                    primaryModel={currentModel}
+                    availableModels={availableModels}
+                    isAdmin={isAdmin}
+                    isRu={isRu}
+                    onChange={setPoolForRole}
+                  />
+                )}
               </CardContent>
             </Card>
           );
