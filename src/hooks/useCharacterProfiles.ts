@@ -188,13 +188,14 @@ export function useCharacterProfiles({
     };
 
     // ── Merge profiles into character state ──
+    // skipPersist: in pool mode we persist once after all batches complete
     const applyProfiles = (profiles: Array<{
       name: string;
       age_group?: string;
       temperament?: string;
       speech_style?: string;
       description?: string;
-    }>, usedModel: string) => {
+    }>, usedModel: string, skipPersist = false) => {
       const profileByName = new Map<string, CharacterProfile>();
       for (const p of profiles) {
         profileByName.set(p.name.toLowerCase(), {
@@ -215,7 +216,9 @@ export function useCharacterProfiles({
           if (profile) return { ...c, profile };
           return c;
         });
-        persist(next);
+        if (!skipPersist) {
+          persist(next);
+        }
         return next;
       });
 
@@ -267,7 +270,7 @@ export function useCharacterProfiles({
             if (result.profiles.length > 0) {
               completedProfiles += result.profiles.length;
               setProfiledCount(completedProfiles);
-              applyProfiles(result.profiles, result.usedModel);
+              applyProfiles(result.profiles, result.usedModel, true /* skipPersist — single persist after all batches */);
             }
             return result;
           },
@@ -288,9 +291,14 @@ export function useCharacterProfiles({
         logPoolStats(finalStats, "profile_characters", Date.now() - poolStartTime);
 
         if (abort.signal.aborted) {
+          // Still persist what we have so far
+          setCharacters(prev => { persist(prev); return prev; });
           toast({ title: isRu ? "Профайлинг остановлен" : "Profiling stopped" });
           return;
         }
+
+        // ── Single final persist with all profiles applied ──
+        setCharacters(prev => { persist(prev); return prev; });
 
         // Count errors (profiles already applied incrementally)
         let errorCount = 0;
