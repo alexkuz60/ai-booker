@@ -136,13 +136,59 @@ export default function ParserCharactersPanel({
   const filteredCharacters = useMemo(() => {
     return characters.filter(c => {
       if (genderFilter !== "all" && c.gender !== genderFilter) return false;
-      if (roleFilter === "speaking") {
-        const role = c.role || "speaking";
-        return role === "speaking" || role === "crowd" || role === "system";
+      const role = c.role || "speaking";
+      if (roleFilter === "characters") {
+        return role === "speaking" || role === "mentioned" || role === "system";
+      }
+      if (roleFilter === "crowd") {
+        return role === "crowd";
       }
       return true;
     });
   }, [characters, genderFilter, roleFilter]);
+
+  // Sorted characters
+  const sortedCharacters = useMemo(() => {
+    const arr = [...filteredCharacters];
+    const dir = sortDir === "asc" ? 1 : -1;
+    switch (sortCol) {
+      case "name":
+        arr.sort((a, b) => dir * a.name.localeCompare(b.name));
+        break;
+      case "ch":
+        arr.sort((a, b) => {
+          const aMin = a.appearances.length > 0 ? Math.min(...a.appearances.map(ap => ap.chapterIdx)) : Infinity;
+          const bMin = b.appearances.length > 0 ? Math.min(...b.appearances.map(ap => ap.chapterIdx)) : Infinity;
+          return dir * (aMin - bMin) || a.name.localeCompare(b.name);
+        });
+        break;
+      case "brain":
+        arr.sort((a, b) => {
+          const aHas = a.profile?.description ? 1 : 0;
+          const bHas = b.profile?.description ? 1 : 0;
+          if (aHas !== bHas) return dir * (bHas - aHas);
+          return a.name.localeCompare(b.name);
+        });
+        break;
+    }
+    return arr;
+  }, [filteredCharacters, sortCol, sortDir]);
+
+  const handleSort = (col: "name" | "ch" | "brain") => {
+    if (sortCol === col) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortCol(col);
+      setSortDir("asc");
+    }
+  };
+
+  const SortIcon = ({ col }: { col: "name" | "ch" | "brain" }) => {
+    if (sortCol !== col) return null;
+    return sortDir === "asc"
+      ? <ChevronUp className="h-2.5 w-2.5 inline ml-0.5" />
+      : <ChevronDown className="h-2.5 w-2.5 inline ml-0.5" />;
+  };
 
   useEffect(() => {
     if (editingId) { editRef.current?.focus(); editRef.current?.select(); }
