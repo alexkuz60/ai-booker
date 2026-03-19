@@ -400,7 +400,18 @@ export function useCharacterExtraction({
       }
     }
 
-    const finalSnapshot = buildSnapshot();
+    // ── Post-validation: verify character names appear in actual scene text ──
+    const allSceneTexts = chaptersToProcess
+      .flatMap(ch => ch.scenes)
+      .map(s => (s.content || "").toLowerCase())
+      .join(" ");
+
+    const finalSnapshot = buildSnapshot().map(ch => {
+      if (ch.role === "system") return { ...ch, textConfirmed: true };
+      const names = [ch.name, ...ch.aliases];
+      const confirmed = names.some(n => allSceneTexts.includes(n.toLowerCase()));
+      return { ...ch, textConfirmed: confirmed };
+    });
     setCharacters(finalSnapshot);
     await persist(finalSnapshot);
     setExtracting(false);
