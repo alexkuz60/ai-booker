@@ -141,13 +141,13 @@ export function useCharacterProfiles({
     const invokeProfile = async (
       chars: LocalCharacter[],
       modelId: string,
-    ): Promise<Array<{
+    ): Promise<{ profiles: Array<{
       name: string;
       age_group?: string;
       temperament?: string;
       speech_style?: string;
       description?: string;
-    }>> => {
+    }>; usedModel: string }> => {
       if (abort.signal.aborted) throw new Error("aborted");
 
       const registryEntry = getModelRegistryEntry(modelId);
@@ -173,7 +173,7 @@ export function useCharacterProfiles({
 
       if (abort.signal.aborted) throw new Error("aborted");
       if (error) throw error;
-      return data?.profiles || [];
+      return { profiles: data?.profiles || [], usedModel: data?.usedModel || modelId };
     };
 
     // ── Merge profiles into character state ──
