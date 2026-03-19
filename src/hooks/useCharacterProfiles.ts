@@ -291,9 +291,14 @@ export function useCharacterProfiles({
         logPoolStats(finalStats, "profile_characters", Date.now() - poolStartTime);
 
         if (abort.signal.aborted) {
+          // Still persist what we have so far
+          setCharacters(prev => { persist(prev); return prev; });
           toast({ title: isRu ? "Профайлинг остановлен" : "Profiling stopped" });
           return;
         }
+
+        // ── Single final persist with all profiles applied ──
+        setCharacters(prev => { persist(prev); return prev; });
 
         // Count errors (profiles already applied incrementally)
         let errorCount = 0;
