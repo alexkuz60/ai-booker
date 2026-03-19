@@ -43,12 +43,45 @@ export function useCharacterExtraction({
     setExtracting(true);
     setExtractProgress(isRu ? "Подготовка…" : "Preparing…");
 
+    // ── Pre-populate system characters (Narrator + Commentator) if absent ──
+    const SYSTEM_CHARS: Array<{ name: string; nameEn: string; role: CharacterRole }> = [
+      { name: "Рассказчик", nameEn: "Narrator", role: "system" },
+      { name: "Комментатор", nameEn: "Commentator", role: "system" },
+    ];
+
+    let currentChars = characters;
+    const needSystemInsert: LocalCharacter[] = [];
+    for (const sys of SYSTEM_CHARS) {
+      const exists = currentChars.some(c =>
+        c.name.toLowerCase() === sys.name.toLowerCase() ||
+        c.name.toLowerCase() === sys.nameEn.toLowerCase() ||
+        c.aliases.some(a => a.toLowerCase() === sys.name.toLowerCase() || a.toLowerCase() === sys.nameEn.toLowerCase())
+      );
+      if (!exists) {
+        needSystemInsert.push({
+          id: generateId(),
+          name: isRu ? sys.name : sys.nameEn,
+          aliases: isRu ? [sys.nameEn] : [sys.name],
+          gender: "unknown",
+          role: sys.role,
+          appearances: [],
+          sceneCount: 0,
+        });
+      }
+    }
+    if (needSystemInsert.length > 0) {
+      currentChars = [...currentChars, ...needSystemInsert];
+      setCharacters(currentChars);
+      await persist(currentChars);
+    }
+
     // Collect chapters that have analyzed scenes
     const chaptersToProcess: { idx: number; entry: TocChapter; scenes: Scene[] }[] = [];
 
     // Build set of chapter indices where characters were already extracted
     const alreadyExtractedIdx = new Set<number>();
-    for (const ch of characters) {
+    for (const ch of currentChars) {
+      if (ch.role === "system") continue; // system chars don't count for extraction tracking
       for (const app of ch.appearances) {
         alreadyExtractedIdx.add(app.chapterIdx);
       }
@@ -56,7 +89,7 @@ export function useCharacterExtraction({
 
     chapterResults.forEach((result, idx) => {
       if (result.status !== "done" || !result.scenes?.length) return;
-      if (alreadyExtractedIdx.has(idx)) return; // skip already extracted
+      if (alreadyExtractedIdx.has(idx)) return;
       const entry = tocEntries[idx];
       if (!entry) return;
       chaptersToProcess.push({ idx, entry, scenes: result.scenes });
