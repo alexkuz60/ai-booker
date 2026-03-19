@@ -227,4 +227,20 @@ interface AiRolePreset {
 3. **Стоимость** — параллельные запросы увеличивают расход. UI должен показывать 
    ожидаемый расход (количество API calls).
 4. **Lovable AI** — только admin, отдельный rate limit workspace.
-   Не смешивать с пользовательскими провайдерами в одном пуле для не-админов.
+    Не смешивать с пользовательскими провайдерами в одном пуле для не-админов.
+
+### Этап 5: UI пулов в AiRolesTab
+
+**Файлы:** `src/components/profile/tabs/PoolSelector.tsx` (новый), `src/components/profile/tabs/AiRolesTab.tsx`
+
+Извлечён отдельный компонент `PoolSelector` для мультивыбора моделей в пул:
+
+- **Collapsible-секция** под основным Select каждой poolable-роли
+- **Primary модель** отображается как disabled checkbox с бейджем «основная/primary» — всегда включена в effective pool
+- **Остальные модели** группируются по провайдерам (Lovable AI / ProxyAPI / OpenRouter) с чекбоксами
+- **Lovable AI модели** — disabled для не-админов с пометкой `(admin)`
+- **Worker count badge** `⚡ N потоков/workers` — рассчитывается как `uniqueModels × 2` (perModelConcurrency)
+- **Auto-open**: если пул уже заполнен при загрузке — секция развёрнута
+- **AiRolesTab** интегрирует `PoolSelector` только для ролей с `poolable: true` (5 из 6, кроме Translator)
+- **Pool badge** `🔲 пул/pool` в заголовке карточки роли — виден когда `isPoolEnabled` (>1 модели)
+- **Reset** сбрасывает пулы вместе с overrides
