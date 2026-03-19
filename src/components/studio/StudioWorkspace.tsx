@@ -33,6 +33,7 @@ interface StudioWorkspaceProps {
   batchScenes?: { id: string; title: string; sceneNumber: number; content?: string | null }[];
   onBatchComplete?: () => void;
   onBatchClose?: () => void;
+  userApiKeys?: Record<string, string>;
 }
 
 export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter, activeTab: externalTab, onTabChange, selectedSegmentId, onSelectSegment, onSynthesizingChange, onErrorSegmentsChange, silenceSec, onSilenceSecChange, onRecalcDone, onVoiceSaved, batchSceneIds, batchScenes, onBatchComplete, onBatchClose }: StudioWorkspaceProps) {
