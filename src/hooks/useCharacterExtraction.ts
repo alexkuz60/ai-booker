@@ -39,9 +39,17 @@ export function useCharacterExtraction({
   const [extractProgress, setExtractProgress] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const extractCharacters = useCallback(async () => {
+  const extractCharacters = useCallback(async (opts?: { mode?: "fresh" | "continue" | "chapter"; chapterIdx?: number }) => {
+    const mode = opts?.mode ?? "continue";
     setExtracting(true);
     setExtractProgress(isRu ? "Подготовка…" : "Preparing…");
+
+    // ── "fresh" mode: wipe all non-system characters (including profiles) ──
+    if (mode === "fresh") {
+      const systemOnly = characters.filter(c => c.role === "system");
+      setCharacters(systemOnly);
+      await persist(systemOnly);
+    }
 
     // ── Pre-populate system characters (Narrator + Commentator) if absent ──
     const SYSTEM_CHARS: Array<{ name: string; nameEn: string; role: CharacterRole }> = [
