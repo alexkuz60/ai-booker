@@ -68,6 +68,8 @@ interface ParserCharactersPanelProps {
   extracting: boolean;
   extractProgress?: string | null;
   extractPoolStats?: PoolStats[];
+  extractedCount?: number;
+  extractTotal?: number;
   onExtract: (opts?: { mode?: "fresh" | "continue" | "chapter"; chapterIdx?: number }) => void;
   onRename: (id: string, newName: string) => void;
   onUpdateGender: (id: string, gender: "male" | "female" | "unknown") => void;
