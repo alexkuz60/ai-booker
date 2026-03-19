@@ -164,8 +164,6 @@ For EVERY character you report, you MUST be able to point to a SPECIFIC QUOTE fr
 Do NOT infer characters from your training data. Do NOT complete the cast list from memory. Do NOT add characters who "should be" in this chapter based on your knowledge of the full work.
 If the text mentions 3 characters, return 3. If it mentions 30, return 30. The number of results must match ONLY what the text contains.
 
-IGNORE METADATA AND PUBLISHING BOILERPLATE:
-The text may contain publisher disclaimers, copyright notices, advertisements, or links (e.g. "Read the full version on ...", "Text provided by ...", "Buy the book at ..."). These are NOT part of the literary content. Do NOT interpret them as clues that the text is incomplete or that you should supplement it with external knowledge. The text you received IS complete for your task — analyze only what is given, nothing more.
 
 ROLE CLASSIFICATION (critical for voice casting):
 - "speaking" — the character has direct speech (dialogue, monologue) in THIS chapter's scenes
