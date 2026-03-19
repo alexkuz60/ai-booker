@@ -240,6 +240,9 @@ export function useCharacterExtraction({
             if (existing.gender === "unknown" && char.gender !== "unknown") {
               existing.gender = char.gender;
             }
+            // Capture age/manner hints (first non-empty wins)
+            if (!existing.age_hint && char.age_hint) existing.age_hint = char.age_hint;
+            if (!existing.manner_hint && char.manner_hint) existing.manner_hint = char.manner_hint;
             // Promote role: mentioned → speaking/crowd
             const charRole = char.role || "speaking";
             if (existing.role === "mentioned" && charRole !== "mentioned") {
