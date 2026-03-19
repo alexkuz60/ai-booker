@@ -7,6 +7,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Users, Scan, Plus, Trash2, Merge, Edit2, X, Check, ChevronDown, ChevronRight,
   ChevronUp, Brain, Loader2, Mic, MicOff, UserRound, RotateCcw, Play, BookOpen,
+  Search, Filter, Star, Eye, UsersRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -113,7 +114,10 @@ export default function ParserCharactersPanel({
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [genderPopoverOpen, setGenderPopoverOpen] = useState<string | null>(null);
   const [genderFilter, setGenderFilter] = useState<"all" | "male" | "female">("all");
-  const [roleFilter, setRoleFilter] = useState<"characters" | "crowd" | "all">("characters");
+  const [roleFilter, setRoleFilter] = useState<"all" | "main" | "episodic" | "crowd" | "mentioned">("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [sortCol, setSortCol] = useState<"name" | "ch" | "brain">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const editRef = useRef<HTMLInputElement>(null);
@@ -136,16 +140,28 @@ export default function ParserCharactersPanel({
   const filteredCharacters = useMemo(() => {
     return characters.filter(c => {
       if (genderFilter !== "all" && c.gender !== genderFilter) return false;
+      // Search filter
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const nameMatch = c.name.toLowerCase().includes(q);
+        const aliasMatch = c.aliases.some(a => a.toLowerCase().includes(q));
+        if (!nameMatch && !aliasMatch) return false;
+      }
       const role = c.role || "speaking";
-      if (roleFilter === "characters") {
-        return role === "speaking" || role === "mentioned" || role === "system";
+      switch (roleFilter) {
+        case "main":
+          return (role === "speaking" || role === "system") && c.sceneCount > 1;
+        case "episodic":
+          return (role === "speaking" || role === "system") && c.sceneCount <= 1;
+        case "crowd":
+          return role === "crowd";
+        case "mentioned":
+          return role === "mentioned";
+        default:
+          return true;
       }
-      if (roleFilter === "crowd") {
-        return role === "crowd";
-      }
-      return true;
     });
-  }, [characters, genderFilter, roleFilter]);
+  }, [characters, genderFilter, roleFilter, searchQuery]);
 
   // Sorted characters
   const sortedCharacters = useMemo(() => {
@@ -263,30 +279,55 @@ export default function ParserCharactersPanel({
         <RoleBadge roleId="profiler" model={profilerModel} isRu={isRu} size={16} />
         {characters.length > 0 && (
           <div className="flex items-center gap-1 ml-1">
-            {/* Role filter: characters vs crowd vs all */}
+            {/* Search toggle */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => setRoleFilter(f => f === "characters" ? "crowd" : f === "crowd" ? "all" : "characters")}
-                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors flex items-center gap-0.5 ${
-                    roleFilter === "characters"
-                      ? "bg-emerald-500/20 text-emerald-500 dark:text-emerald-400"
-                      : roleFilter === "crowd"
-                        ? "bg-amber-500/20 text-amber-500 dark:text-amber-400"
-                        : "text-muted-foreground/50 hover:text-muted-foreground"
+                  onClick={() => { setSearchOpen(o => !o); if (searchOpen) setSearchQuery(""); }}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                    searchOpen ? "bg-primary/20 text-primary" : "text-muted-foreground/50 hover:text-muted-foreground"
                   }`}
                 >
-                  {roleFilter === "crowd" ? <MicOff className="h-3 w-3" /> : <Mic className="h-3 w-3" />}
+                  <Search className="h-3 w-3" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">
-                {roleFilter === "characters"
-                  ? (isRu ? "Персонажи · Нажми для массовки" : "Characters · Click for crowd")
-                  : roleFilter === "crowd"
-                    ? (isRu ? "Массовка · Нажми для всех" : "Crowd · Click for all")
-                    : (isRu ? "Все · Нажми для персонажей" : "All · Click for characters")}
+                {isRu ? "Поиск по имени" : "Search by name"}
               </TooltipContent>
             </Tooltip>
+            {/* Role filter dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors flex items-center gap-0.5 ${
+                    roleFilter !== "all"
+                      ? "bg-primary/20 text-primary"
+                      : "text-muted-foreground/50 hover:text-muted-foreground"
+                  }`}
+                >
+                  <Filter className="h-3 w-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[160px]">
+                {([
+                  { key: "all", label: { ru: "Все", en: "All" }, icon: Users },
+                  { key: "main", label: { ru: "Главные", en: "Main" }, icon: Star },
+                  { key: "episodic", label: { ru: "Эпизодические", en: "Episodic" }, icon: UserRound },
+                  { key: "crowd", label: { ru: "Массовка", en: "Crowd" }, icon: UsersRound },
+                  { key: "mentioned", label: { ru: "Упомянуты", en: "Mentioned" }, icon: Eye },
+                ] as const).map(({ key, label, icon: Icon }) => (
+                  <DropdownMenuItem
+                    key={key}
+                    onClick={() => setRoleFilter(key)}
+                    className={`gap-2 text-xs ${roleFilter === key ? "bg-accent" : ""}`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {isRu ? label.ru : label.en}
+                    {roleFilter === key && <Check className="h-3 w-3 ml-auto" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             {/* Gender filters */}
             <button
               onClick={() => setGenderFilter(f => f === "male" ? "all" : "male")}
@@ -316,6 +357,27 @@ export default function ParserCharactersPanel({
           {filteredCharacters.length}{characters.length !== filteredCharacters.length ? `/${characters.length}` : ""}
         </Badge>
       </div>
+
+      {/* Search bar */}
+      {searchOpen && (
+        <div className="px-3 py-1.5 border-b border-border flex items-center gap-2 flex-shrink-0">
+          <Search className="h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            ref={searchRef}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder={isRu ? "Поиск по имени / алиасу…" : "Search by name / alias…"}
+            className="h-7 text-sm flex-1"
+            autoFocus
+            onKeyDown={e => { if (e.key === "Escape") { setSearchQuery(""); setSearchOpen(false); } }}
+          />
+          {searchQuery && (
+            <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => setSearchQuery("")}>
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Toolbar */}
       <div className="px-3 py-2 border-b border-border flex items-center gap-2 flex-wrap flex-shrink-0">
