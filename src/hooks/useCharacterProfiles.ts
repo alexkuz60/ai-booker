@@ -199,6 +199,7 @@ export function useCharacterProfiles({
           },
         }));
 
+        const poolStartTime = Date.now();
         const results = await manager.runAll(tasks, (progress) => {
           setProfileProgress(
             isRu
@@ -207,7 +208,9 @@ export function useCharacterProfiles({
           );
           setProfilePoolStats(manager.getStats());
         });
-        setProfilePoolStats(manager.getStats());
+        const finalStats = manager.getStats();
+        setProfilePoolStats(finalStats);
+        logPoolStats(finalStats, "profile_characters", Date.now() - poolStartTime);
 
         // Count errors (profiles already applied incrementally)
         let errorCount = 0;
