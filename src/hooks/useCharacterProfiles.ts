@@ -183,7 +183,7 @@ export function useCharacterProfiles({
       temperament?: string;
       speech_style?: string;
       description?: string;
-    }>) => {
+    }>, usedModel: string) => {
       const profileByName = new Map<string, CharacterProfile>();
       for (const p of profiles) {
         profileByName.set(p.name.toLowerCase(), {
@@ -191,6 +191,7 @@ export function useCharacterProfiles({
           temperament: p.temperament,
           speech_style: p.speech_style,
           description: p.description,
+          profiledBy: usedModel,
         });
       }
 
