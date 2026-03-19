@@ -260,6 +260,8 @@ export function useCharacterExtraction({
               aliases: char.aliases,
               gender: char.gender,
               role: char.role || "speaking",
+              age_hint: char.age_hint,
+              manner_hint: char.manner_hint,
               appearances: [{
                 chapterIdx: idx,
                 chapterTitle: entry.title,
