@@ -87,8 +87,9 @@ export function PoolSelector({
           <Badge
             variant="secondary"
             className="text-[9px] px-1.5 py-0 ml-1 gap-0.5"
+            title={isRu ? `${effectiveCount} моделей × ${PER_MODEL_CONCURRENCY} = ${workerCount} потоков` : `${effectiveCount} models × ${PER_MODEL_CONCURRENCY} = ${workerCount} workers`}
           >
-            ⚡ {workerCount} {isRu ? "потоков" : "workers"}
+            ⚡ {effectiveCount} {isRu ? "моделей" : "models"}
           </Badge>
         )}
         {open ? (
