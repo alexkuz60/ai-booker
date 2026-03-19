@@ -159,7 +159,7 @@ interface AiRolePreset {
 | 2 | Тесты менеджера | `src/lib/__tests__/modelPoolManager.test.ts` | #1 | ✅ Done |
 | 3 | Расширить aiRoles.ts | `src/config/aiRoles.ts` | — | ✅ Done |
 | 4 | Расширить useAiRoles | `src/hooks/useAiRoles.ts` | #3 | ✅ Done |
-| 5 | UI пулов в AiRolesTab | `src/components/profile/tabs/AiRolesTab.tsx` | #4 | 🔲 |
+| 5 | UI пулов в AiRolesTab | `AiRolesTab.tsx`, `PoolSelector.tsx` | #4 | ✅ Done |
 | 6 | Интеграция BatchSegmentationPanel | `src/components/studio/BatchSegmentationPanel.tsx` | #1, #4 | 🔲 |
 | 7 | Интеграция useCharacterExtraction | `src/hooks/useCharacterExtraction.ts` | #1, #4 | 🔲 |
 | 8 | Интеграция useCharacterProfiles | `src/hooks/useCharacterProfiles.ts` | #1, #4 | 🔲 |
@@ -227,4 +227,20 @@ interface AiRolePreset {
 3. **Стоимость** — параллельные запросы увеличивают расход. UI должен показывать 
    ожидаемый расход (количество API calls).
 4. **Lovable AI** — только admin, отдельный rate limit workspace.
-   Не смешивать с пользовательскими провайдерами в одном пуле для не-админов.
+    Не смешивать с пользовательскими провайдерами в одном пуле для не-админов.
+
+### Этап 5: UI пулов в AiRolesTab
+
+**Файлы:** `src/components/profile/tabs/PoolSelector.tsx` (новый), `src/components/profile/tabs/AiRolesTab.tsx`
+
+Извлечён отдельный компонент `PoolSelector` для мультивыбора моделей в пул:
+
+- **Collapsible-секция** под основным Select каждой poolable-роли
+- **Primary модель** отображается как disabled checkbox с бейджем «основная/primary» — всегда включена в effective pool
+- **Остальные модели** группируются по провайдерам (Lovable AI / ProxyAPI / OpenRouter) с чекбоксами
+- **Lovable AI модели** — disabled для не-админов с пометкой `(admin)`
+- **Worker count badge** `⚡ N потоков/workers` — рассчитывается как `uniqueModels × 2` (perModelConcurrency)
+- **Auto-open**: если пул уже заполнен при загрузке — секция развёрнута
+- **AiRolesTab** интегрирует `PoolSelector` только для ролей с `poolable: true` (5 из 6, кроме Translator)
+- **Pool badge** `🔲 пул/pool` в заголовке карточки роли — виден когда `isPoolEnabled` (>1 модели)
+- **Reset** сбрасывает пулы вместе с overrides
