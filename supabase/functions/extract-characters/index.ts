@@ -209,11 +209,29 @@ async function callAI(
     headers["X-Title"] = "AI Booker";
   }
 
-  const resp = await fetch(endpoint, {
+  let resp = await fetch(endpoint, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
   });
+
+  // Retry without tools on 400 (model doesn't support tool_choice)
+  if (resp.status === 400 && body.tools) {
+    console.warn(`[extract-characters] 400 with tools, retrying text-only mode for ${resolvedModel}`);
+    const textBody = { ...body };
+    delete textBody.tools;
+    delete textBody.tool_choice;
+    // Ask for JSON in the system message
+    textBody.messages = [
+      { role: "system", content: systemPrompt + "\n\nIMPORTANT: Return your answer as a JSON object with a single key \"characters\" containing an array. Do NOT wrap in markdown fences." },
+      { role: "user", content: userPrompt },
+    ];
+    resp = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(textBody),
+    });
+  }
 
   const latencyMs = Date.now() - t0;
 
@@ -257,11 +275,24 @@ async function callAI(
     }
   }
 
-  // Fallback: try to extract from content
+  // Fallback: try to extract from content (text mode or missing tool_calls)
   const content = json.choices?.[0]?.message?.content || "";
   try {
-    const match = content.match(/\[[\s\S]*\]/);
-    if (match) return JSON.parse(match[0]);
+    // Strip markdown fences
+    const cleaned = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+    // Try full object parse first
+    const obj = JSON.parse(cleaned);
+    if (Array.isArray(obj)) return obj;
+    if (obj.characters && Array.isArray(obj.characters)) return obj.characters;
+  } catch { /* try regex */ }
+  try {
+    const match = content.match(/\{[\s\S]*"characters"\s*:\s*\[[\s\S]*\]\s*\}/);
+    if (match) {
+      const parsed = JSON.parse(match[0]);
+      return parsed.characters || [];
+    }
+    const arrMatch = content.match(/\[[\s\S]*\]/);
+    if (arrMatch) return JSON.parse(arrMatch[0]);
   } catch { /* ignore */ }
 
   return [];
