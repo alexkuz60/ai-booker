@@ -405,6 +405,11 @@ export default function ParserCharactersPanel({
                           >
                             {isExpanded ? <ChevronDown className="h-3 w-3 flex-shrink-0" /> : <ChevronRight className="h-3 w-3 flex-shrink-0" />}
                             <span className="truncate">{char.name}</span>
+                            {char.role && char.role !== "speaking" && (
+                              <span className={`text-[9px] font-medium ${ROLE_LABELS[char.role]?.color || "text-muted-foreground"}`}>
+                                {ROLE_LABELS[char.role]?.[isRu ? "ru" : "en"] || char.role}
+                              </span>
+                            )}
                             <Edit2
                               className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-50 hover:!opacity-100 flex-shrink-0"
                               onClick={(e) => {
