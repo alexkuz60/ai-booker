@@ -157,7 +157,12 @@ Return ONLY a JSON array of segments. No markdown, no explanation.`,
     prompt: `You are a literary analyst preparing characters for audiobook voice casting.
 Find ALL characters in the provided chapter scenes and classify their role.
 
-CRITICAL: Analyze ONLY the text provided below. Do NOT use your prior knowledge of the book, its author, or any external information. If a character is not explicitly mentioned in the provided text, do NOT include them. You are working with a FRAGMENT, not the full book.
+ANTI-HALLUCINATION PROTOCOL (MANDATORY):
+You are a TEXT SCANNER, not a literary expert. You MUST pretend you have NEVER read this book before and know NOTHING about it — not its title, author, plot, or characters.
+Your ONLY input is the raw text fragment below. Treat it as an anonymous, untitled text by an unknown author.
+For EVERY character you report, you MUST be able to point to a SPECIFIC QUOTE from the provided text where that character's name appears verbatim. If you cannot find such a quote — DO NOT include the character.
+Do NOT infer characters from your training data. Do NOT complete the cast list from memory. Do NOT add characters who "should be" in this chapter based on your knowledge of the full work.
+If the text mentions 3 characters, return 3. If it mentions 30, return 30. The number of results must match ONLY what the text contains.
 
 ROLE CLASSIFICATION (critical for voice casting):
 - "speaking" — the character has direct speech (dialogue, monologue) in THIS chapter's scenes
@@ -165,21 +170,26 @@ ROLE CLASSIFICATION (critical for voice casting):
 - "crowd" — an anonymous voice without a name (e.g. "a voice from the crowd", "someone shouted"). Use contextual clues for gender/age.
 
 Rules:
-1. A character is a NAMED entity that acts, speaks, or is mentioned by name.
+1. A character is a NAMED entity that acts, speaks, or is mentioned by name IN THE PROVIDED TEXT.
 2. Common nouns are NOT characters unless they have a name — EXCEPT for anonymous speakers (crowd voices).
 3. Account for all grammatical forms: "John/John's" = one character.
 4. If a character is referred to differently, put the primary name in "name" and all variants in "aliases".
 5. Determine gender from context (verb forms, pronouns).
-6. List scene numbers where the character appears.
+6. List scene numbers where the character appears — ONLY scenes where their name/alias appears verbatim.
 7. Do NOT include abstract concepts, place names, organizations.
 8. Words like "Yeah", "Now", "Quiet" are NOT character names.
 9. A character who is only TALKED ABOUT by others in this chapter → "mentioned".
 10. For crowd voices, use a descriptive name like "Voice from the crowd".
-11. Every character you return MUST have their name or alias present in the provided text.`,
+11. SELF-CHECK before returning: re-read the text and confirm every name you listed is literally present. Remove any that are not.`,
     promptRu: `Ты — литературный аналитик, подготавливающий персонажей для озвучки аудиокниги.
 Найди ВСЕХ персонажей в предложенных сценах главы и классифицируй их роль.
 
-КРИТИЧЕСКИ ВАЖНО: Анализируй ТОЛЬКО предоставленный ниже текст. НЕ используй свои знания о книге, авторе или любую внешнюю информацию. Если персонаж НЕ упоминается явно в предоставленном тексте — НЕ включай его. Ты работаешь с ФРАГМЕНТОМ, а не с полной книгой.
+ПРОТОКОЛ ЗАЩИТЫ ОТ ГАЛЛЮЦИНАЦИЙ (ОБЯЗАТЕЛЬНО):
+Ты — ТЕКСТОВЫЙ СКАНЕР, а не литературный эксперт. Ты ОБЯЗАН представить, что НИКОГДА не читал эту книгу и НИЧЕГО о ней не знаешь — ни название, ни автора, ни сюжет, ни персонажей.
+Твой ЕДИНСТВЕННЫЙ вход — фрагмент текста ниже. Воспринимай его как анонимный, безымянный текст неизвестного автора.
+Для КАЖДОГО персонажа ты ДОЛЖЕН мочь указать КОНКРЕТНУЮ ЦИТАТУ из предоставленного текста, где имя этого персонажа встречается ДОСЛОВНО. Если такой цитаты нет — НЕ включай персонажа.
+НЕ достраивай список персонажей из обучающих данных. НЕ дополняй состав из памяти. НЕ добавляй персонажей, которые «должны быть» в этой главе по твоим знаниям о полном произведении.
+Если в тексте упомянуты 3 персонажа — верни 3. Если 30 — верни 30. Количество результатов должно соответствовать ТОЛЬКО тому, что содержит текст.
 
 КЛАССИФИКАЦИЯ РОЛЕЙ (критически важно для кастинга голосов):
 - "speaking" — персонаж произносит прямую речь (диалог, монолог) В ЭТОЙ главе
@@ -187,17 +197,17 @@ Rules:
 - "crowd" — анонимный голос без имени. Используй контекстные подсказки для пола/возраста.
 
 Правила:
-1. Персонаж — это ИМЕНОВАННАЯ сущность, которая действует, говорит или упоминается по имени.
+1. Персонаж — это ИМЕНОВАННАЯ сущность, которая действует, говорит или упоминается по имени В ПРЕДОСТАВЛЕННОМ ТЕКСТЕ.
 2. Нарицательные слова — НЕ персонажи, если нет имени — КРОМЕ анонимных говорящих.
 3. Учитывай все падежные формы русского языка.
 4. Если называют по-разному — основное имя в "name", варианты в "aliases".
 5. Определи пол по контексту.
-6. Укажи номера сцен, где персонаж появляется.
+6. Укажи номера сцен, где персонаж появляется — ТОЛЬКО сцены, где имя/алиас встречается ДОСЛОВНО.
 7. НЕ включай абстрактные понятия, топонимы, организации.
 8. Слова вроде «Угу», «Сейчас», «Тихо» — НЕ имена.
 9. Персонаж, о котором только говорят → "mentioned".
 10. Для голосов из толпы: «Голос из толпы», «Неизвестный голос».
-11. Каждый возвращённый персонаж ОБЯЗАН присутствовать в предоставленном тексте (имя или алиас).`,
+11. САМОПРОВЕРКА перед ответом: перечитай текст и убедись, что каждое имя, которое ты указал, БУКВАЛЬНО присутствует в тексте. Убери все, которых нет.`,
   },
 
   "profiler:profile_characters": {
