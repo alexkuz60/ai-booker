@@ -125,24 +125,44 @@ Deno.serve(async (req) => {
     if (!resolved.apiKey) throw new Error("AI key not configured");
     const usedModel = resolved.model;
 
+    // Models that don't support temperature
+    const MODELS_NO_TEMPERATURE = ["o1", "o3", "o4-mini", "deepseek-r1"];
+    const skipTemp = MODELS_NO_TEMPERATURE.some(m => usedModel.includes(m));
+
+    const buildBody = (includeTemp: boolean) => JSON.stringify({
+      model: usedModel,
+      messages: [
+        { role: "system", content: systemPrompt + jsonSuffix },
+        { role: "user", content: `## Characters to profile:\n\n${charBlocks}\n\nRespond with ONLY the JSON object.` },
+      ],
+      ...(includeTemp && !skipTemp ? { temperature: 0.3 } : {}),
+      max_tokens: 4096,
+    });
+
     const aiStart = Date.now();
-    const aiRes = await fetch(resolved.endpoint, {
+    let aiRes = await fetch(resolved.endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${resolved.apiKey}` },
-      body: JSON.stringify({
-        model: usedModel,
-        messages: [
-          { role: "system", content: systemPrompt + jsonSuffix },
-          { role: "user", content: `## Characters to profile:\n\n${charBlocks}\n\nRespond with ONLY the JSON object.` },
-        ],
-        temperature: 0.3,
-        max_tokens: 4096,
-      }),
+      body: buildBody(true),
     });
+
+    // Retry without temperature on 400 (some models reject it)
+    if (aiRes.status === 400 && !skipTemp) {
+      const errBody = await aiRes.text();
+      console.warn(`[profile-characters-local] 400 with temperature, retrying without. Model: ${usedModel}, body: ${errBody.slice(0, 300)}`);
+      aiRes = await fetch(resolved.endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${resolved.apiKey}` },
+        body: buildBody(false),
+      });
+    }
 
     if (aiRes.status === 429) throw new Error("rate_limited");
     if (aiRes.status === 402) throw new Error("payment_required");
-    if (!aiRes.ok) throw new Error(`AI error: ${aiRes.status}`);
+    if (!aiRes.ok) {
+      const errText = await aiRes.text().catch(() => "");
+      throw new Error(`AI error: ${aiRes.status} ${errText.slice(0, 200)}`);
+    }
 
     const aiData = await aiRes.json();
     const usage = aiData.usage;
