@@ -188,6 +188,7 @@ export function useCharacterExtraction({
             manner_hint: data.manner_hint,
             appearances: data.appearances,
             sceneCount: data.sceneCount,
+            extractedBy: data.extractedBy,
           };
           snapshot.push(newChar);
           usedIds.add(newChar.id);

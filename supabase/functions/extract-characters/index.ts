@@ -341,7 +341,7 @@ Deno.serve(async (req) => {
     const characters = await callAI(systemPrompt, userPrompt, model, userId, apiKey);
 
     return new Response(
-      JSON.stringify({ characters }),
+      JSON.stringify({ characters, usedModel: model }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
