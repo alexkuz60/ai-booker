@@ -218,6 +218,8 @@ export function useCharacterExtraction({
           gender: "male" | "female" | "unknown";
           role?: "speaking" | "mentioned" | "crowd";
           scene_numbers: number[];
+          age_hint?: string;
+          manner_hint?: string;
         }> = data?.characters || [];
 
         for (const char of extracted) {
