@@ -303,6 +303,7 @@ export function useCharacterExtraction({
       );
 
       const manager = new ModelPoolManager(effectivePool, userApiKeys, 2);
+      let completedChapters = 0;
       const tasks: PoolTask<{ idx: number; entry: TocChapter; extracted: any[] }>[] =
         chaptersToProcess.map(ch => ({
           id: String(ch.idx),
@@ -313,7 +314,15 @@ export function useCharacterExtraction({
                 : `Chapter ${ch.idx + 1}: ${ch.entry.title.slice(0, 40)}`
             );
             const extracted = await invokeForChapter(ch, modelId);
-            return { idx: ch.idx, entry: ch.entry, extracted: extracted || [] };
+            const result = extracted || [];
+            // Incremental merge + UI update
+            if (result.length > 0) {
+              mergeChapterResults(ch.idx, ch.entry, result);
+            }
+            completedChapters++;
+            setExtractedCount(completedChapters);
+            setCharacters(buildSnapshot());
+            return { idx: ch.idx, entry: ch.entry, extracted: result };
           },
         }));
 
