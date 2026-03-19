@@ -26,6 +26,8 @@ export interface AiRoleDefinition {
   defaultModelUser: string;
   /** Model tier hint: lite | standard | heavy */
   tier: "lite" | "standard" | "heavy";
+  /** Whether this role supports a multi-model pool for parallel batch processing */
+  poolable: boolean;
   /** System prompt template for this role */
   systemPrompt: string;
 }
