@@ -97,7 +97,7 @@ export default function Parser() {
 
   const {
     characters, extracting, extractProgress, extractPoolStats, extractCharacters,
-    profiling, profileProgress, profilePoolStats, profileCharacters,
+    profiling, profileProgress, profilePoolStats, profiledCount, profileTotal, profileCharacters,
     renameCharacter, updateGender, updateAliases, deleteCharacter, mergeCharacters, addCharacter,
   } = useParserCharacters({
     storage: projectStorage,
