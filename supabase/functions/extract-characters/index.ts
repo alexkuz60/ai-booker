@@ -134,13 +134,16 @@ async function callAI(
 
   const t0 = Date.now();
 
+  // Some models (e.g. o1, o3, deepseek-reasoner) don't support temperature
+  const supportsTemperature = !/\b(o1|o3|o4|deepseek-reasoner)\b/i.test(resolvedModel);
+
   const body: Record<string, unknown> = {
     model: resolvedModel,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    temperature: 0.3,
+    ...(supportsTemperature ? { temperature: 0.3 } : {}),
     tools: [
       {
         type: "function",
