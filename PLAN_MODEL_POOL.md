@@ -50,7 +50,7 @@ class ModelPoolManager {
   private workers: PoolWorker[];
   private roundRobinIdx: number = 0;
   
-  constructor(models: string[], userApiKeys: Record<string, string>, perModelConcurrency = 2);
+  constructor(models: string[], userApiKeys: Record<string, string>, perModelConcurrency = 3);
   
   // Главный метод — выполнить массив задач через пул
   async runAll<T>(tasks: PoolTask<T>[], onProgress?: (done: number, total: number) => void): Promise<Map<string, T | Error>>;
