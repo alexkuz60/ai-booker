@@ -62,6 +62,8 @@ export function useCharacterProfiles({
 
     setProfiling(true);
     setProfileProgress(isRu ? "Подготовка…" : "Preparing…");
+    setProfiledCount(0);
+    setProfileTotal(charsToProfile.length);
 
     // Collect scene texts for context
     const scenesPayload: Array<{ title: string; text: string }> = [];
