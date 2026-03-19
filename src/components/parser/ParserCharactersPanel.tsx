@@ -515,7 +515,17 @@ export default function ParserCharactersPanel({
           <table className="w-full caption-bottom text-sm">
             <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
-                <TableHead className="w-7 px-1"></TableHead>
+                <TableHead className="w-7 px-1">
+                  <input
+                    type="checkbox"
+                    checked={sortedCharacters.length > 0 && sortedCharacters.every(c => selectedIds.has(c.id))}
+                    onChange={() => {
+                      const allSelected = sortedCharacters.every(c => selectedIds.has(c.id));
+                      setSelectedIds(allSelected ? new Set() : new Set(sortedCharacters.map(c => c.id)));
+                    }}
+                    className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+                  />
+                </TableHead>
                 <TableHead
                   className="text-xs cursor-pointer select-none hover:text-foreground transition-colors"
                   onClick={() => handleSort("name")}
