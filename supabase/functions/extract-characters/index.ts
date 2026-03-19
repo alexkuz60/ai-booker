@@ -14,6 +14,8 @@ interface ExtractedCharacter {
   gender: "male" | "female" | "unknown";
   role: "speaking" | "mentioned" | "crowd";
   scene_numbers: number[];
+  age_hint?: string;
+  manner_hint?: string;
 }
 
 // ── ProxyAPI model mapping ─────────────────────────────────
