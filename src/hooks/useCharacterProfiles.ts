@@ -264,6 +264,7 @@ export function useCharacterProfiles({
     } finally {
       setProfiling(false);
       setProfileProgress(null);
+      setProfilePoolStats([]);
     }
   }, [characters, chapterResults, tocEntries, profilerModel, userApiKeys, isRu, setCharacters, persist, toast, effectivePool]);
 
