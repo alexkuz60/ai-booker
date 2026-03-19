@@ -114,7 +114,10 @@ export default function ParserCharactersPanel({
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [genderPopoverOpen, setGenderPopoverOpen] = useState<string | null>(null);
   const [genderFilter, setGenderFilter] = useState<"all" | "male" | "female">("all");
-  const [roleFilter, setRoleFilter] = useState<"characters" | "crowd" | "all">("characters");
+  const [roleFilter, setRoleFilter] = useState<"all" | "main" | "episodic" | "crowd" | "mentioned">("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [sortCol, setSortCol] = useState<"name" | "ch" | "brain">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const editRef = useRef<HTMLInputElement>(null);
