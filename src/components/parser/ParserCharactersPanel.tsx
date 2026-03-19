@@ -192,11 +192,29 @@ export default function ParserCharactersPanel({
           {isRu ? "Персонажи" : "Characters"}
         </h2>
         <RoleBadge roleId="profiler" model={profilerModel} isRu={isRu} size={16} />
-        <Badge variant="secondary" className="text-xs">
-          {genderFilter === "all" ? characters.length : characters.filter(c => c.gender === genderFilter).length}
-        </Badge>
         {characters.length > 0 && (
-          <div className="flex items-center gap-0.5 ml-1">
+          <div className="flex items-center gap-1 ml-1">
+            {/* Role filter: speaking vs all */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setRoleFilter(f => f === "speaking" ? "all" : "speaking")}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors flex items-center gap-0.5 ${
+                    roleFilter === "speaking"
+                      ? "bg-emerald-500/20 text-emerald-500 dark:text-emerald-400"
+                      : "text-muted-foreground/50 hover:text-muted-foreground"
+                  }`}
+                >
+                  <Mic className="h-3 w-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                {roleFilter === "speaking"
+                  ? (isRu ? "Показаны говорящие · Нажми для всех" : "Showing speakers · Click for all")
+                  : (isRu ? "Показаны все · Нажми для говорящих" : "Showing all · Click for speakers")}
+              </TooltipContent>
+            </Tooltip>
+            {/* Gender filters */}
             <button
               onClick={() => setGenderFilter(f => f === "male" ? "all" : "male")}
               className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
@@ -221,6 +239,9 @@ export default function ParserCharactersPanel({
             </button>
           </div>
         )}
+        <Badge variant="secondary" className="text-xs">
+          {filteredCharacters.length}{characters.length !== filteredCharacters.length ? `/${characters.length}` : ""}
+        </Badge>
       </div>
 
       {/* Toolbar */}
