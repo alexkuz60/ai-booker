@@ -108,6 +108,7 @@ export const AI_ROLES: Record<AiRoleId, AiRoleDefinition> = {
     defaultModelAdmin: "google/gemini-2.5-pro",
     defaultModelUser: "google/gemini-2.5-pro",
     tier: "heavy",
+    poolable: true,
     systemPrompt:
       "You are an expert literary psychologist and character profiler. " +
       "Analyze characters deeply: determine gender, age group, temperament (sanguine/choleric/" +
