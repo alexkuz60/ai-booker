@@ -805,6 +805,35 @@ export default function ParserCharactersPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk delete confirmation */}
+      <AlertDialog open={bulkDeleteConfirm} onOpenChange={setBulkDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isRu ? `Удалить ${selectedIds.size} персонажей?` : `Delete ${selectedIds.size} characters?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isRu
+                ? "Выбранные персонажи будут удалены из списка."
+                : "Selected characters will be removed from the list."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                for (const id of selectedIds) onDelete(id);
+                setSelectedIds(new Set());
+                setBulkDeleteConfirm(false);
+              }}
+            >
+              {isRu ? "Удалить" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>{/* end left column */}
 
     {/* Right column: profile detail (Studio-style) */}
