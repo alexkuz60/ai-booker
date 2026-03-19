@@ -22,7 +22,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { RoleBadge } from "@/components/ui/RoleBadge";
-import type { LocalCharacter } from "@/pages/parser/types";
+import type { LocalCharacter, CharacterRole } from "@/pages/parser/types";
 
 // ─── i18n maps for profile badges ────────────────────────
 const AGE_LABELS: Record<string, { ru: string; en: string }> = {
