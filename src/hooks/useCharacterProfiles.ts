@@ -215,18 +215,23 @@ export function useCharacterProfiles({
 
     try {
       if (usePool) {
-        // ── Pool mode: split characters into small batches ──
-        const batches = chunkBySize(charsToProfile, MAX_CHARS_PER_BATCH);
+        // ── Pool mode: size batches so each pool model gets work ──
+        const poolSize = effectivePool.length;
+        const batchSize = Math.min(
+          MAX_CHARS_PER_BATCH,
+          Math.max(1, Math.ceil(charsToProfile.length / poolSize)),
+        );
+        const batches = chunkBySize(charsToProfile, batchSize);
 
-        console.log(`[CharProfile] Pool mode: ${effectivePool.length} models, ${batches.length} batches (max ${MAX_CHARS_PER_BATCH} chars each), ${charsToProfile.length} chars total`);
+        console.log(`[CharProfile] Pool mode: ${poolSize} models, ${batches.length} batches (${batchSize} chars each), ${charsToProfile.length} chars total`);
 
         setProfileProgress(
           isRu
-            ? `Пул: ${effectivePool.length} моделей × ${charsToProfile.length} персонажей`
-            : `Pool: ${effectivePool.length} models × ${charsToProfile.length} characters`
+            ? `Пул: ${poolSize} моделей × ${charsToProfile.length} персонажей`
+            : `Pool: ${poolSize} models × ${charsToProfile.length} characters`
         );
 
-        const manager = new ModelPoolManager(effectivePool, userApiKeys, 2);
+        const manager = new ModelPoolManager(effectivePool, userApiKeys, 3);
         let completedProfiles = 0;
         const tasks: PoolTask<{ profiles: Array<{
           name: string;

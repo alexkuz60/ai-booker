@@ -314,7 +314,7 @@ export function useCharacterExtraction({
           : `Pool: ${effectivePool.length} models × ${chaptersToProcess.length} chapters`
       );
 
-      const manager = new ModelPoolManager(effectivePool, userApiKeys, 2);
+      const manager = new ModelPoolManager(effectivePool, userApiKeys, 3);
       let completedChapters = 0;
       const tasks: PoolTask<{ idx: number; entry: TocChapter; extracted: any[] }>[] =
         chaptersToProcess.map(ch => ({
