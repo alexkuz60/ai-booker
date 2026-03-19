@@ -271,6 +271,7 @@ export function useCharacterProfiles({
   return {
     profiling,
     profileProgress,
+    profilePoolStats,
     profileCharacters,
   };
 }

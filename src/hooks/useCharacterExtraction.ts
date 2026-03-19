@@ -414,6 +414,7 @@ export function useCharacterExtraction({
   return {
     extracting,
     extractProgress,
+    extractPoolStats,
     extractCharacters,
   };
 }
