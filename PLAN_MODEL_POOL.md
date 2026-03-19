@@ -186,7 +186,9 @@ interface AiRolePreset {
 - **`getStats()`** — snapshot по воркерам для UI (completed, errors, active, disabled)
 - **`isRetryable()`** — regex-матчинг паттернов 429/402/rate-limit/quota/payment/credit
 
-**Тесты:** 8/8 — round-robin порядок, retry на другой воркер, disable после 3 ошибок, progress callback, concurrency ≤ 2, all-disabled fallback.
+**Тесты:** 8/8 — round-robin порядок, retry на другой воркер, disable после 3 ошибок, progress callback, concurrency ≤ 3, all-disabled fallback.
+
+**Адаптивный размер батча (профайлинг):** размер батча = `ceil(chars / poolSize)`, но не более `MAX_CHARS_PER_BATCH` (10). Это гарантирует, что каждая модель в пуле получит работу даже при малом числе персонажей (например, 4 персонажа на 10 моделей → 4 батча по 1).
 
 ### Этап 3: Расширение aiRoles.ts
 
