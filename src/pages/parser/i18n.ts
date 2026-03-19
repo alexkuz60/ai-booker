@@ -143,6 +143,9 @@ const texts: Record<string, { ru: string; en: string }> = {
   moodConspiratorial: { ru: "Заговорщический", en: "Conspiratorial" },
   moodHeartwarming: { ru: "Тёплый", en: "Heartwarming" },
   moodIdealistic: { ru: "Идеалистичный", en: "Idealistic" },
+  moodAmused: { ru: "Забавный", en: "Amused" },
+  moodPanicked: { ru: "Паникующий", en: "Panicked" },
+  moodWry: { ru: "Саркастичный", en: "Wry" },
 
   // Scene label prefix
   scenePrefix: { ru: "Сцена", en: "Scene" },
