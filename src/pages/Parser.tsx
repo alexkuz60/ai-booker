@@ -415,6 +415,28 @@ export default function Parser() {
     });
   };
 
+  /** Batch-analyze all pending content chapters sequentially */
+  const batchAnalyzeAll = useCallback(async () => {
+    const pendingIndices = contentEntries
+      .map((_, i) => {
+        const globalIdx = tocEntries.indexOf(contentEntries[i]);
+        return globalIdx;
+      })
+      .filter(idx => {
+        const r = chapterResults.get(idx);
+        return !r || r.status === "pending" || r.status === "error";
+      });
+
+    if (pendingIndices.length === 0) {
+      toast({ title: isRu ? "Все главы уже проанализированы" : "All chapters already analyzed" });
+      return;
+    }
+
+    for (const idx of pendingIndices) {
+      await analyzeChapter(idx);
+    }
+  }, [contentEntries, tocEntries, chapterResults, analyzeChapter, isRu, toast]);
+
   useEffect(() => {
     if (navRestoredFromStorage) return;
     if (tocEntries.length > 0 && expandedNodes.size === 0) {
