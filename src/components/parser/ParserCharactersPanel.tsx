@@ -409,6 +409,16 @@ export default function ParserCharactersPanel({
               : (isRu ? `Профайл (${selectedIds.size})` : `Profile (${selectedIds.size})`)}
           </Button>
         )}
+        {selectedIds.size >= 1 && (
+          <Button
+            variant="ghost" size="sm"
+            onClick={() => setBulkDeleteConfirm(true)}
+            className="gap-1.5 text-xs text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {isRu ? `Удалить (${selectedIds.size})` : `Delete (${selectedIds.size})`}
+          </Button>
+        )}
       </div>
 
       {/* Add new character inline */}
