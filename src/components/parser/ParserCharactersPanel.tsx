@@ -9,7 +9,6 @@ import {
   ChevronUp, Brain, Loader2, Mic, MicOff, UserRound, RotateCcw, Play, BookOpen,
   Search, Filter, Star, Eye, UsersRound, Layers, Square, ListFilter,
 } from "lucide-react";
-import { RoleBadge } from "@/components/ui/RoleBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
