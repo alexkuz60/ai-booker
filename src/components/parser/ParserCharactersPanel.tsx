@@ -455,7 +455,7 @@ export default function ParserCharactersPanel({
       )}
 
       {/* Characters table */}
-      <ScrollArea className="flex-1 min-h-0">
+      <ScrollArea className="flex-1 min-h-0" type="auto">
         {characters.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center px-4">
             <Users className="h-10 w-10 text-muted-foreground/30 mb-3" />
@@ -466,7 +466,7 @@ export default function ParserCharactersPanel({
             </p>
           </div>
         ) : (
-          <Table>
+          <table className="w-full caption-bottom text-sm">
             <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                 <TableHead className="w-7 px-1"></TableHead>
@@ -669,7 +669,7 @@ export default function ParserCharactersPanel({
                 );
               })}
             </TableBody>
-          </Table>
+          </table>
         )}
 
         {/* Expanded detail panel */}
