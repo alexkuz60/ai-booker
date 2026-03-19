@@ -95,6 +95,8 @@ export default function ParserCharactersPanel({
   extracting,
   extractProgress,
   extractPoolStats,
+  extractedCount,
+  extractTotal,
   onExtract,
   onRename,
   onUpdateGender,
