@@ -113,6 +113,36 @@ const texts: Record<string, { ru: string; en: string }> = {
   moodUplifting: { ru: "Воодушевляющий", en: "Uplifting" },
   moodEerie: { ru: "Зловещий", en: "Eerie" },
   moodTragic: { ru: "Трагичный", en: "Tragic" },
+  moodContemplative: { ru: "Задумчивый", en: "Contemplative" },
+  moodDetermined: { ru: "Решительный", en: "Determined" },
+  moodDesperate: { ru: "Отчаянный", en: "Desperate" },
+  moodDefiant: { ru: "Дерзкий", en: "Defiant" },
+  moodIronic: { ru: "Ироничный", en: "Ironic" },
+  moodPlayful: { ru: "Игривый", en: "Playful" },
+  moodCheerful: { ru: "Весёлый", en: "Cheerful" },
+  moodGentle: { ru: "Нежный", en: "Gentle" },
+  moodGrim: { ru: "Суровый", en: "Grim" },
+  moodOminous: { ru: "Зловещий", en: "Ominous" },
+  moodCurious: { ru: "Любопытный", en: "Curious" },
+  moodConfused: { ru: "Растерянный", en: "Confused" },
+  moodExcited: { ru: "Восторженный", en: "Excited" },
+  moodTriumphant: { ru: "Триумфальный", en: "Triumphant" },
+  moodResigned: { ru: "Смирённый", en: "Resigned" },
+  moodFrustrated: { ru: "Раздражённый", en: "Frustrated" },
+  moodLonging: { ru: "Тоскующий", en: "Longing" },
+  moodNervous: { ru: "Нервный", en: "Nervous" },
+  moodConfident: { ru: "Уверенный", en: "Confident" },
+  moodDreamy: { ru: "Мечтательный", en: "Dreamy" },
+  moodHostile: { ru: "Враждебный", en: "Hostile" },
+  moodPragmatic: { ru: "Деловой", en: "Pragmatic" },
+  moodEarnest: { ru: "Искренний", en: "Earnest" },
+  moodInspired: { ru: "Вдохновлённый", en: "Inspired" },
+  moodNightmarish: { ru: "Кошмарный", en: "Nightmarish" },
+  moodDarklyComedic: { ru: "Чёрный юмор", en: "Darkly comedic" },
+  moodChaotic: { ru: "Хаотичный", en: "Chaotic" },
+  moodConspiratorial: { ru: "Заговорщический", en: "Conspiratorial" },
+  moodHeartwarming: { ru: "Тёплый", en: "Heartwarming" },
+  moodIdealistic: { ru: "Идеалистичный", en: "Idealistic" },
 
   // Scene label prefix
   scenePrefix: { ru: "Сцена", en: "Scene" },
@@ -241,6 +271,89 @@ const MOOD_MAP: Record<string, string> = {
   uplifting: "moodUplifting", вдохновляющий: "moodUplifting", воодушевляющий: "moodUplifting",
   eerie: "moodEerie", зловещий: "moodEerie",
   tragic: "moodTragic", трагичный: "moodTragic", трагический: "moodTragic",
+  // Extended mood tokens from AI output
+  contemplative: "moodContemplative",
+  reflective: "moodContemplative",
+  determined: "moodDetermined",
+  resolute: "moodDetermined",
+  desperate: "moodDesperate",
+  frantic: "moodDesperate",
+  defiant: "moodDefiant",
+  rebellious: "moodDefiant",
+  ironic: "moodIronic",
+  sardonic: "moodIronic",
+  sarcastic: "moodIronic",
+  playful: "moodPlayful",
+  mischievous: "moodPlayful",
+  cheerful: "moodCheerful",
+  lighthearted: "moodCheerful",
+  lively: "moodCheerful",
+  buoyant: "moodCheerful",
+  gentle: "moodGentle",
+  tender: "moodGentle",
+  compassionate: "moodGentle",
+  grim: "moodGrim",
+  bleak: "moodGrim",
+  somber: "moodGrim",
+  sombre: "moodGrim",
+  ominous: "moodOminous",
+  foreboding: "moodOminous",
+  menacing: "moodOminous",
+  threatening: "moodOminous",
+  curious: "moodCurious",
+  intrigued: "moodCurious",
+  confused: "moodConfused",
+  disoriented: "moodConfused",
+  excited: "moodExcited",
+  exhilarated: "moodExcited",
+  ecstatic: "moodExcited",
+  triumphant: "moodTriumphant",
+  exultant: "moodTriumphant",
+  proud: "moodTriumphant",
+  resigned: "moodResigned",
+  weary: "moodResigned",
+  exhausted: "moodResigned",
+  listless: "moodResigned",
+  frustrated: "moodFrustrated",
+  irritated: "moodFrustrated",
+  impatient: "moodFrustrated",
+  indignant: "moodFrustrated",
+  longing: "moodLonging",
+  yearning: "moodLonging",
+  wistful: "moodLonging",
+  nervous: "moodNervous",
+  awkward: "moodNervous",
+  embarrassed: "moodNervous",
+  confident: "moodConfident",
+  bold: "moodConfident",
+  ambitious: "moodConfident",
+  dreamy: "moodDreamy",
+  enchanted: "moodDreamy",
+  whimsical: "moodDreamy",
+  hostile: "moodHostile",
+  confrontational: "moodHostile",
+  furious: "moodHostile",
+  vengeful: "moodHostile",
+  heated: "moodHostile",
+  pragmatic: "moodPragmatic",
+  businesslike: "moodPragmatic",
+  methodical: "moodPragmatic",
+  focused: "moodPragmatic",
+  brisk: "moodPragmatic",
+  earnest: "moodEarnest",
+  sincere: "moodEarnest",
+  inspired: "moodInspired",
+  majestic: "moodInspired",
+  awestruck: "moodInspired",
+  awe: "moodInspired",
+  nightmarish: "moodNightmarish",
+  grotesque: "moodNightmarish",
+  claustrophobic: "moodNightmarish",
+  darkly: "moodDarklyComedic",
+  chaotic: "moodChaotic",
+  conspiratorial: "moodConspiratorial",
+  heartwarming: "moodHeartwarming",
+  idealistic: "moodIdealistic",
 };
 
 const SCENE_TYPE_MAP: Record<string, string> = {
@@ -287,9 +400,49 @@ export function t(key: string, isRu: boolean): string {
 }
 
 export function tMood(raw: string, isRu: boolean): string {
+  // Try exact match first
   const normalized = normalizeToken(raw);
   const key = MOOD_MAP[normalized];
   if (key) return t(key, isRu);
+
+  // Composite mood: split by comma, slash, "and", "with" and translate each part
+  const parts = raw
+    .split(/[,/]|\band\b|\bwith\b|\bс\b|\bи\b/i)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  if (parts.length > 1) {
+    const translated = parts.map(part => {
+      // Each part may be multi-word like "darkly comedic" — try full match first
+      const partNorm = normalizeToken(part);
+      const partKey = MOOD_MAP[partNorm];
+      if (partKey) return t(partKey, isRu);
+      // Try individual words
+      const words = part.split(/\s+/);
+      if (words.length > 1) {
+        for (const word of words) {
+          const wNorm = normalizeToken(word);
+          const wKey = MOOD_MAP[wNorm];
+          if (wKey) return t(wKey, isRu);
+        }
+      }
+      return humanizeToken(part);
+    });
+    // Deduplicate and join
+    const unique = [...new Set(translated)];
+    return unique.join(", ");
+  }
+
+  // Single unrecognized token — try word-level lookup
+  const words = raw.trim().split(/\s+/);
+  if (words.length > 1) {
+    for (const word of words) {
+      const wNorm = normalizeToken(word);
+      const wKey = MOOD_MAP[wNorm];
+      if (wKey) return t(wKey, isRu);
+    }
+  }
+
   return humanizeToken(raw);
 }
 
