@@ -2,12 +2,16 @@
  * AI-powered character extraction from analyzed scenes.
  * Iterates chapters, calls extract-characters edge function,
  * merges results live into UI state.
+ *
+ * When a model pool is configured for the "profiler" role,
+ * chapters are distributed across pool workers via ModelPoolManager.
  */
 
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
+import { ModelPoolManager, type PoolTask } from "@/lib/modelPoolManager";
 import type { Scene, ChapterStatus, TocChapter, LocalCharacter, CharacterAppearance, CharacterRole } from "@/pages/parser/types";
 
 function generateId(): string {
@@ -23,6 +27,8 @@ interface UseCharacterExtractionParams {
   profilerModel: string;
   userApiKeys: Record<string, string>;
   isRu: boolean;
+  /** Effective pool for the profiler role (from useAiRoles.getEffectivePool) */
+  effectivePool?: string[];
 }
 
 export function useCharacterExtraction({
@@ -34,6 +40,7 @@ export function useCharacterExtraction({
   profilerModel,
   userApiKeys,
   isRu,
+  effectivePool,
 }: UseCharacterExtractionParams) {
   const [extracting, setExtracting] = useState(false);
   const [extractProgress, setExtractProgress] = useState<string | null>(null);
@@ -89,7 +96,7 @@ export function useCharacterExtraction({
     // Build set of chapter indices where characters were already extracted
     const alreadyExtractedIdx = new Set<number>();
     for (const ch of currentChars) {
-      if (ch.role === "system") continue; // system chars don't count for extraction tracking
+      if (ch.role === "system") continue;
       for (const app of ch.appearances) {
         alreadyExtractedIdx.add(app.chapterIdx);
       }
@@ -97,14 +104,11 @@ export function useCharacterExtraction({
 
     chapterResults.forEach((result, idx) => {
       if (result.status !== "done" || !result.scenes?.length) return;
-      // "chapter" mode — only process the specified chapter
       if (mode === "chapter") {
         if (idx !== opts?.chapterIdx) return;
       } else if (mode === "continue") {
-        // "continue" — skip already-extracted
         if (alreadyExtractedIdx.has(idx)) return;
       }
-      // "fresh" — process all (alreadyExtractedIdx is empty after wipe)
       const entry = tocEntries[idx];
       if (!entry) return;
       chaptersToProcess.push({ idx, entry, scenes: result.scenes });
@@ -163,7 +167,6 @@ export function useCharacterExtraction({
           }
           if (!existing.age_hint && data.age_hint) existing.age_hint = data.age_hint;
           if (!existing.manner_hint && data.manner_hint) existing.manner_hint = data.manner_hint;
-          // Promote role: mentioned → speaking if seen speaking in another chapter
           if (existing.role === "mentioned" && (data.role === "speaking" || data.role === "crowd")) {
             existing.role = data.role;
           }
@@ -192,127 +195,180 @@ export function useCharacterExtraction({
       return snapshot;
     };
 
-    let errorCount = 0;
+    // ── Merge a single chapter's extraction results into allResults ──
+    const mergeChapterResults = (
+      idx: number,
+      entry: TocChapter,
+      extracted: Array<{
+        name: string;
+        aliases: string[];
+        gender: "male" | "female" | "unknown";
+        role?: "speaking" | "mentioned" | "crowd";
+        scene_numbers: number[];
+        age_hint?: string;
+        manner_hint?: string;
+      }>,
+    ) => {
+      for (const char of extracted) {
+        const key = char.name.toLowerCase();
 
-    for (let ci = 0; ci < chaptersToProcess.length; ci++) {
-      const { idx, entry, scenes } = chaptersToProcess[ci];
-      setExtractProgress(
-        isRu
-          ? `Глава ${ci + 1}/${chaptersToProcess.length}: ${entry.title.slice(0, 40)}`
-          : `Chapter ${ci + 1}/${chaptersToProcess.length}: ${entry.title.slice(0, 40)}`
-      );
-
-      const scenesPayload = scenes
-        .filter(s => s.content && s.content.length > 20)
-        .map(s => ({
-          scene_number: s.scene_number,
-          text: s.content!,
-        }));
-
-      if (scenesPayload.length === 0) continue;
-
-      try {
-        const registryEntry = getModelRegistryEntry(profilerModel);
-        const apiKeyForModel = registryEntry?.apiKeyField
-          ? userApiKeys[registryEntry.apiKeyField] || null
-          : null;
-
-        const { data, error } = await supabase.functions.invoke("extract-characters", {
-          body: {
-            scenes: scenesPayload,
-            lang: isRu ? "ru" : "en",
-            model: profilerModel,
-            apiKey: apiKeyForModel,
-          },
-        });
-
-        if (error) {
-          console.error("extract-characters error for chapter", idx, error);
-          errorCount++;
-          continue;
+        let existingKey: string | null = null;
+        for (const [k, v] of allResults) {
+          if (k === key) { existingKey = k; break; }
+          if (v.aliases.some(a => a.toLowerCase() === key)) { existingKey = k; break; }
+          if (char.aliases.some(a => a.toLowerCase() === k)) { existingKey = k; break; }
         }
 
-        const extracted: Array<{
-          name: string;
-          aliases: string[];
-          gender: "male" | "female" | "unknown";
-          role?: "speaking" | "mentioned" | "crowd";
-          scene_numbers: number[];
-          age_hint?: string;
-          manner_hint?: string;
-        }> = data?.characters || [];
-
-        for (const char of extracted) {
-          const key = char.name.toLowerCase();
-
-          let existingKey: string | null = null;
-          for (const [k, v] of allResults) {
-            if (k === key) { existingKey = k; break; }
-            if (v.aliases.some(a => a.toLowerCase() === key)) { existingKey = k; break; }
-            if (char.aliases.some(a => a.toLowerCase() === k)) { existingKey = k; break; }
+        if (existingKey) {
+          const existing = allResults.get(existingKey)!;
+          const allAliases = new Set([...existing.aliases, ...char.aliases]);
+          allAliases.delete(existing.name);
+          existing.aliases = Array.from(allAliases);
+          if (existing.gender === "unknown" && char.gender !== "unknown") {
+            existing.gender = char.gender;
           }
-
-          if (existingKey) {
-            const existing = allResults.get(existingKey)!;
-            const allAliases = new Set([...existing.aliases, ...char.aliases]);
-            allAliases.delete(existing.name);
-            existing.aliases = Array.from(allAliases);
-            if (existing.gender === "unknown" && char.gender !== "unknown") {
-              existing.gender = char.gender;
-            }
-            // Capture age/manner hints (first non-empty wins)
-            if (!existing.age_hint && char.age_hint) existing.age_hint = char.age_hint;
-            if (!existing.manner_hint && char.manner_hint) existing.manner_hint = char.manner_hint;
-            // Promote role: mentioned → speaking/crowd
-            const charRole = char.role || "speaking";
-            if (existing.role === "mentioned" && charRole !== "mentioned") {
-              existing.role = charRole;
-            }
-            existing.appearances.push({
+          if (!existing.age_hint && char.age_hint) existing.age_hint = char.age_hint;
+          if (!existing.manner_hint && char.manner_hint) existing.manner_hint = char.manner_hint;
+          const charRole = char.role || "speaking";
+          if (existing.role === "mentioned" && charRole !== "mentioned") {
+            existing.role = charRole;
+          }
+          existing.appearances.push({
+            chapterIdx: idx,
+            chapterTitle: entry.title,
+            sceneNumbers: char.scene_numbers,
+          });
+          existing.sceneCount += char.scene_numbers.length;
+        } else {
+          allResults.set(key, {
+            name: char.name,
+            aliases: char.aliases,
+            gender: char.gender,
+            role: char.role || "speaking",
+            age_hint: char.age_hint,
+            manner_hint: char.manner_hint,
+            appearances: [{
               chapterIdx: idx,
               chapterTitle: entry.title,
               sceneNumbers: char.scene_numbers,
-            });
-            existing.sceneCount += char.scene_numbers.length;
-          } else {
-            allResults.set(key, {
-              name: char.name,
-              aliases: char.aliases,
-              gender: char.gender,
-              role: char.role || "speaking",
-              age_hint: char.age_hint,
-              manner_hint: char.manner_hint,
-              appearances: [{
-                chapterIdx: idx,
-                chapterTitle: entry.title,
-                sceneNumbers: char.scene_numbers,
-              }],
-              sceneCount: char.scene_numbers.length,
-            });
-          }
+            }],
+            sceneCount: char.scene_numbers.length,
+          });
         }
+      }
+    };
 
-        // Push intermediate snapshot to UI
-        setCharacters(buildSnapshot());
-      } catch (err) {
-        console.error("AI extraction failed for chapter", idx, err);
-        errorCount++;
-        const msg = err instanceof Error ? err.message : "";
-        if (msg.includes("rate_limited") || msg.includes("429")) {
-          toast({
-            title: isRu ? "Превышен лимит запросов" : "Rate limit exceeded",
-            description: isRu ? "Подождите и попробуйте снова" : "Wait and try again",
-            variant: "destructive",
-          });
-          break;
+    // ── Invoke edge function for a single chapter ──
+    const invokeForChapter = async (
+      chapterData: typeof chaptersToProcess[0],
+      modelId: string,
+    ) => {
+      const scenesPayload = chapterData.scenes
+        .filter(s => s.content && s.content.length > 20)
+        .map(s => ({ scene_number: s.scene_number, text: s.content! }));
+      if (scenesPayload.length === 0) return null;
+
+      const registryEntry = getModelRegistryEntry(modelId);
+      const apiKeyForModel = registryEntry?.apiKeyField
+        ? userApiKeys[registryEntry.apiKeyField] || null
+        : null;
+
+      const { data, error } = await supabase.functions.invoke("extract-characters", {
+        body: {
+          scenes: scenesPayload,
+          lang: isRu ? "ru" : "en",
+          model: modelId,
+          apiKey: apiKeyForModel,
+        },
+      });
+      if (error) throw error;
+      return data?.characters || [];
+    };
+
+    let errorCount = 0;
+    const usePool = effectivePool && effectivePool.length > 1;
+
+    if (usePool) {
+      // ── Pool mode: distribute chapters across models ──
+      console.log(`[CharExtract] Pool mode: ${effectivePool.length} models, ${chaptersToProcess.length} chapters`);
+      setExtractProgress(
+        isRu
+          ? `Пул: ${effectivePool.length} моделей × ${chaptersToProcess.length} глав`
+          : `Pool: ${effectivePool.length} models × ${chaptersToProcess.length} chapters`
+      );
+
+      const manager = new ModelPoolManager(effectivePool, userApiKeys, 2);
+      const tasks: PoolTask<{ idx: number; entry: TocChapter; extracted: any[] }>[] =
+        chaptersToProcess.map(ch => ({
+          id: String(ch.idx),
+          execute: async (modelId: string) => {
+            setExtractProgress(
+              isRu
+                ? `Глава ${ch.idx + 1}: ${ch.entry.title.slice(0, 40)}`
+                : `Chapter ${ch.idx + 1}: ${ch.entry.title.slice(0, 40)}`
+            );
+            const extracted = await invokeForChapter(ch, modelId);
+            return { idx: ch.idx, entry: ch.entry, extracted: extracted || [] };
+          },
+        }));
+
+      const results = await manager.runAll(tasks, (progress) => {
+        setExtractProgress(
+          isRu
+            ? `Извлечение: ${progress.done}/${progress.total} глав`
+            : `Extracting: ${progress.done}/${progress.total} chapters`
+        );
+      });
+
+      // Merge all results (maintain order for consistency)
+      const sortedKeys = [...results.keys()].sort((a, b) => Number(a) - Number(b));
+      for (const key of sortedKeys) {
+        const result = results.get(key)!;
+        if (result instanceof Error) {
+          errorCount++;
+          console.error(`[CharExtract] Pool error for chapter ${key}:`, result.message);
+        } else {
+          mergeChapterResults(result.idx, result.entry, result.extracted);
         }
-        if (msg.includes("payment_required") || msg.includes("402")) {
-          toast({
-            title: isRu ? "Недостаточно средств" : "Payment required",
-            description: isRu ? "Пополните баланс AI" : "Top up your AI credits",
-            variant: "destructive",
-          });
-          break;
+      }
+      setCharacters(buildSnapshot());
+
+    } else {
+      // ── Classic sequential mode ──
+      for (let ci = 0; ci < chaptersToProcess.length; ci++) {
+        const chapterData = chaptersToProcess[ci];
+        setExtractProgress(
+          isRu
+            ? `Глава ${ci + 1}/${chaptersToProcess.length}: ${chapterData.entry.title.slice(0, 40)}`
+            : `Chapter ${ci + 1}/${chaptersToProcess.length}: ${chapterData.entry.title.slice(0, 40)}`
+        );
+
+        try {
+          const extracted = await invokeForChapter(chapterData, profilerModel);
+          if (extracted) {
+            mergeChapterResults(chapterData.idx, chapterData.entry, extracted);
+          }
+          setCharacters(buildSnapshot());
+        } catch (err) {
+          console.error("AI extraction failed for chapter", chapterData.idx, err);
+          errorCount++;
+          const msg = err instanceof Error ? err.message : "";
+          if (msg.includes("rate_limited") || msg.includes("429")) {
+            toast({
+              title: isRu ? "Превышен лимит запросов" : "Rate limit exceeded",
+              description: isRu ? "Подождите и попробуйте снова" : "Wait and try again",
+              variant: "destructive",
+            });
+            break;
+          }
+          if (msg.includes("payment_required") || msg.includes("402")) {
+            toast({
+              title: isRu ? "Недостаточно средств" : "Payment required",
+              description: isRu ? "Пополните баланс AI" : "Top up your AI credits",
+              variant: "destructive",
+            });
+            break;
+          }
         }
       }
     }
@@ -350,7 +406,7 @@ export function useCharacterExtraction({
     }
 
     return finalSnapshot;
-  }, [chapterResults, tocEntries, characters, setCharacters, persist, profilerModel, userApiKeys, isRu, toast]);
+  }, [chapterResults, tocEntries, characters, setCharacters, persist, profilerModel, userApiKeys, isRu, toast, effectivePool]);
 
   return {
     extracting,

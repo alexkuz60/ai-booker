@@ -55,7 +55,7 @@ export default function Parser() {
     meta: projectMeta,
     hardResetLocalData,
   } = useProjectStorageContext();
-  const { getModelForRole } = useAiRoles(userApiKeys);
+  const { getModelForRole, getEffectivePool } = useAiRoles(userApiKeys);
   const { toast } = useToast();
   const [navRestoredFromStorage] = useState<boolean>(() => {
     try {
@@ -107,6 +107,7 @@ export default function Parser() {
     profilerModel: getModelForRole("profiler"),
     userApiKeys,
     isRu,
+    effectivePool: getEffectivePool("profiler"),
   });
 
   const selectedIdx = selectedIndices.size === 1 ? Array.from(selectedIndices)[0] : null;

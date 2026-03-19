@@ -161,8 +161,8 @@ interface AiRolePreset {
 | 4 | Расширить useAiRoles | `src/hooks/useAiRoles.ts` | #3 | ✅ Done |
 | 5 | UI пулов в AiRolesTab | `AiRolesTab.tsx`, `PoolSelector.tsx` | #4 | ✅ Done |
 | 6 | Интеграция BatchSegmentationPanel | `BatchSegmentationPanel.tsx`, `StudioWorkspace.tsx`, `Studio.tsx` | #1, #4 | ✅ Done |
-| 7 | Интеграция useCharacterExtraction | `src/hooks/useCharacterExtraction.ts` | #1, #4 | 🔲 |
-| 8 | Интеграция useCharacterProfiles | `src/hooks/useCharacterProfiles.ts` | #1, #4 | 🔲 |
+| 7 | Интеграция useCharacterExtraction | `useCharacterExtraction.ts`, `useParserCharacters.ts`, `Parser.tsx` | #1, #4 | ✅ Done |
+| 8 | Интеграция useCharacterProfiles | `useCharacterProfiles.ts`, `useParserCharacters.ts`, `Parser.tsx` | #1, #4 | ✅ Done |
 | 9 | Пресеты с пулами | `src/components/profile/tabs/AiRolePresets.tsx` | #4 | 🔲 |
 
 ---
@@ -269,3 +269,48 @@ BatchSegmentationPanel переработан для двухрежимной р
   - Цветовая кодировка: primary (active), destructive (disabled), muted (idle)
 
 - **Проброс данных:** `userApiKeys` пробрасывается Studio.tsx → StudioWorkspace → BatchSegmentationPanel
+
+### Этап 7: Интеграция пула в useCharacterExtraction
+
+**Файлы:** `src/hooks/useCharacterExtraction.ts`, `src/hooks/useParserCharacters.ts`, `src/pages/Parser.tsx`
+
+Извлечение персонажей переработано для двухрежимной работы:
+
+- **Режим пула** (`effectivePool.length > 1`):
+  - Каждая глава = отдельная `PoolTask` → распределение через `ModelPoolManager`
+  - Общий throughput: `models × 2` параллельных вызовов `extract-characters`
+  - Прогресс: `Извлечение: N/M глав` обновляется через `onProgress` callback менеджера
+  - Результаты мержатся в `allResults` Map по порядку индексов глав (sorted keys)
+  - Retry при 429/402 обрабатывается менеджером автоматически (до 2 попыток)
+
+- **Классический режим** (single model):
+  - Последовательная обработка глав с ручным break при rate-limit/payment ошибках
+  - Промежуточные snapshot'ы через `buildSnapshot()` после каждой главы
+
+- **Рефакторинг:**
+  - Выделена функция `invokeForChapter(chapterData, modelId)` — единая точка вызова edge function
+  - Выделена функция `mergeChapterResults(idx, entry, extracted)` — слияние результатов в accumulator
+  - Обе используются и в pool, и в classic режиме
+
+- **Проброс:** `effectivePool` передаётся Parser.tsx → useParserCharacters → useCharacterExtraction
+
+### Этап 8: Интеграция пула в useCharacterProfiles
+
+**Файлы:** `src/hooks/useCharacterProfiles.ts`, `src/hooks/useParserCharacters.ts`
+
+Профайлинг персонажей переработан для параллельной обработки:
+
+- **Режим пула** (`effectivePool.length > 1` и `charsToProfile.length > 1`):
+  - Персонажи разбиваются на N групп (N = min(pool.length, chars.length)) через `chunkArray()`
+  - Каждая группа = `PoolTask` → профилируется отдельной моделью из пула
+  - Все 30 сцен-контекста передаются каждой группе (общий контекст)
+  - Результаты собираются и применяются единым `applyProfiles()` вызовом
+  - Частичный успех: toast с кол-вом удачных профилей и ошибок
+
+- **Классический режим** (single model):
+  - Один вызов `profile-characters-local` со всеми персонажами (как было)
+
+- **Рефакторинг:**
+  - Выделена функция `invokeProfile(chars, modelId)` — единая точка вызова edge function
+  - Выделена функция `applyProfiles(profiles)` — слияние результатов в state + persist
+  - Утилита `chunkArray<T>(arr, numChunks)` для деления массива на группы
