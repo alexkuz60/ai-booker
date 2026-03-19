@@ -93,6 +93,8 @@ export function useParserCharacters({
     profiling: profiles.profiling,
     profileProgress: profiles.profileProgress,
     profilePoolStats: profiles.profilePoolStats,
+    profiledCount: profiles.profiledCount,
+    profileTotal: profiles.profileTotal,
     profileCharacters: profiles.profileCharacters,
     // CRUD
     renameCharacter: crud.renameCharacter,
