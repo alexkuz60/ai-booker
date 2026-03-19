@@ -24,6 +24,8 @@ export function useCloudSettings<T>(
   const pendingSaveRef = useRef<{ userId: string; value: T } | null>(null);
   /** Flag: true once the user has made a local change in this hook instance */
   const locallyDirtyRef = useRef(false);
+  /** Stable ref to flushToDb so the unmount effect doesn't need it as a dep */
+  const flushRef = useRef<(userId: string, value: T) => Promise<void>>();
 
   const [value, setValue] = useState<T>(() => {
     try {
