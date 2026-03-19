@@ -521,7 +521,7 @@ export default function ParserCharactersPanel({
       {(() => {
         const activeStats = extracting && extractPoolStats && extractPoolStats.length > 0
           ? extractPoolStats
-          : profiling && profilePoolStats && profilePoolStats.length > 0
+          : profilePoolStats && profilePoolStats.length > 0
             ? profilePoolStats
             : null;
         if (!activeStats) return null;
