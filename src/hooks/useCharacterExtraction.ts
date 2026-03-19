@@ -290,6 +290,8 @@ export function useCharacterExtraction({
 
     let errorCount = 0;
     const usePool = effectivePool && effectivePool.length > 1;
+    setExtractedCount(0);
+    setExtractTotal(chaptersToProcess.length);
 
     if (usePool) {
       // ── Pool mode: distribute chapters across models ──
