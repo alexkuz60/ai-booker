@@ -341,10 +341,35 @@ export default function NavSidebar({
             </Button>
           )}
         </div>
-        <p className="text-xs text-muted-foreground mt-1">
-          {totalPages} {t("pages", isRu)} • {contentEntries.length} {t("chapters", isRu)}
-          {supplementaryEntries.length > 0 && ` • ${supplementaryEntries.length} ${t("suppl", isRu)}`}
-        </p>
+        <div className="flex items-center justify-between mt-1">
+          <p className="text-xs text-muted-foreground">
+            {totalPages} {t("pages", isRu)} • {contentEntries.length} {t("chapters", isRu)}
+            {supplementaryEntries.length > 0 && ` • ${supplementaryEntries.length} ${t("suppl", isRu)}`}
+          </p>
+          {onBatchAnalyze && (
+            isAnalyzing ? (
+              <Button
+                variant="ghost" size="sm"
+                className="h-6 px-2 gap-1 text-[11px] text-destructive hover:text-destructive"
+                title={isRu ? "Остановить анализ" : "Stop analysis"}
+                onClick={onStopAnalysis}
+              >
+                <StopCircle className="h-3.5 w-3.5" />
+                {isRu ? "Стоп" : "Stop"}
+              </Button>
+            ) : (
+              <Button
+                variant="ghost" size="sm"
+                className="h-6 px-2 gap-1 text-[11px] text-primary hover:text-primary"
+                title={isRu ? "Раскадровка всех глав" : "Analyze all chapters"}
+                onClick={onBatchAnalyze}
+              >
+                <PlayCircle className="h-3.5 w-3.5" />
+                {isRu ? "Все главы" : "All chapters"}
+              </Button>
+            )
+          )}
+        </div>
       </div>
 
       {/* Bulk actions toolbar */}
