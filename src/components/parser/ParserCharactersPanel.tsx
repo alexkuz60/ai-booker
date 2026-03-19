@@ -686,6 +686,9 @@ export default function ParserCharactersPanel({
                           >
                             {isExpanded ? <ChevronDown className="h-3 w-3 flex-shrink-0" /> : <ChevronRight className="h-3 w-3 flex-shrink-0" />}
                             <span className="truncate">{char.name}</span>
+                            {char.extractedBy && (
+                              <RoleBadge roleId="profiler" model={char.extractedBy} isRu={isRu} size={11} />
+                            )}
                             {char.role && char.role !== "speaking" && (
                               char.role === "crowd" && (char.age_hint || char.manner_hint) ? (
                                 <Tooltip>
