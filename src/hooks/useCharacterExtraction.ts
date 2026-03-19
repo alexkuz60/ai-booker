@@ -143,6 +143,7 @@ export function useCharacterExtraction({
       manner_hint?: string;
       appearances: CharacterAppearance[];
       sceneCount: number;
+      extractedBy?: string;
     }>();
 
     // Build intermediate LocalCharacter[] snapshot from allResults merged with existing
@@ -187,6 +188,7 @@ export function useCharacterExtraction({
             manner_hint: data.manner_hint,
             appearances: data.appearances,
             sceneCount: data.sceneCount,
+            extractedBy: data.extractedBy,
           };
           snapshot.push(newChar);
           usedIds.add(newChar.id);
@@ -211,6 +213,7 @@ export function useCharacterExtraction({
         age_hint?: string;
         manner_hint?: string;
       }>,
+      usedModel?: string,
     ) => {
       for (const char of extracted) {
         const key = char.name.toLowerCase();
@@ -256,6 +259,7 @@ export function useCharacterExtraction({
               sceneNumbers: char.scene_numbers,
             }],
             sceneCount: char.scene_numbers.length,
+            extractedBy: usedModel,
           });
         }
       }
@@ -265,7 +269,7 @@ export function useCharacterExtraction({
     const invokeForChapter = async (
       chapterData: typeof chaptersToProcess[0],
       modelId: string,
-    ) => {
+    ): Promise<{ characters: any[]; usedModel: string } | null> => {
       const scenesPayload = chapterData.scenes
         .filter(s => s.content && s.content.length > 20)
         .map(s => ({ scene_number: s.scene_number, text: s.content! }));
@@ -289,7 +293,11 @@ export function useCharacterExtraction({
         isRu,
       });
       if (error) throw error;
-      return (data as any)?.characters || [];
+      const resp = data as any;
+      return {
+        characters: resp?.characters || [],
+        usedModel: resp?.usedModel || modelId,
+      };
     };
 
     let errorCount = 0;
@@ -317,16 +325,16 @@ export function useCharacterExtraction({
                 ? `Глава ${ch.idx + 1}: ${ch.entry.title.slice(0, 40)}`
                 : `Chapter ${ch.idx + 1}: ${ch.entry.title.slice(0, 40)}`
             );
-            const extracted = await invokeForChapter(ch, modelId);
-            const result = extracted || [];
+            const resp = await invokeForChapter(ch, modelId);
+            const chars = resp?.characters || [];
             // Incremental merge + UI update
-            if (result.length > 0) {
-              mergeChapterResults(ch.idx, ch.entry, result);
+            if (chars.length > 0) {
+              mergeChapterResults(ch.idx, ch.entry, chars, resp?.usedModel);
             }
             completedChapters++;
             setExtractedCount(completedChapters);
             setCharacters(buildSnapshot());
-            return { idx: ch.idx, entry: ch.entry, extracted: result };
+            return { idx: ch.idx, entry: ch.entry, extracted: chars };
           },
         }));
 
@@ -362,9 +370,9 @@ export function useCharacterExtraction({
         );
 
         try {
-          const extracted = await invokeForChapter(chapterData, profilerModel);
-          if (extracted) {
-            mergeChapterResults(chapterData.idx, chapterData.entry, extracted);
+          const resp = await invokeForChapter(chapterData, profilerModel);
+          if (resp) {
+            mergeChapterResults(chapterData.idx, chapterData.entry, resp.characters, resp.usedModel);
           }
           setExtractedCount(ci + 1);
           setCharacters(buildSnapshot());

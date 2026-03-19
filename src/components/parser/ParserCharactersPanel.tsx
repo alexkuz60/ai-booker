@@ -686,6 +686,9 @@ export default function ParserCharactersPanel({
                           >
                             {isExpanded ? <ChevronDown className="h-3 w-3 flex-shrink-0" /> : <ChevronRight className="h-3 w-3 flex-shrink-0" />}
                             <span className="truncate">{char.name}</span>
+                            {char.extractedBy && (
+                              <RoleBadge roleId="profiler" model={char.extractedBy} isRu={isRu} size={11} />
+                            )}
                             {char.role && char.role !== "speaking" && (
                               char.role === "crowd" && (char.age_hint || char.manner_hint) ? (
                                 <Tooltip>
@@ -1016,8 +1019,11 @@ export default function ParserCharactersPanel({
         <ScrollArea className="flex-1 min-h-0">
           <div className="p-4 space-y-4">
             {/* Character name */}
-            <h4 className="text-base font-semibold font-display text-foreground">
+            <h4 className="text-base font-semibold font-display text-foreground flex items-center gap-1.5">
               {profileViewChar.name}
+              {profileViewChar.extractedBy && (
+                <RoleBadge roleId="profiler" model={profileViewChar.extractedBy} isRu={isRu} size={13} />
+              )}
             </h4>
 
             {/* Description */}
