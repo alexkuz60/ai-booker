@@ -163,7 +163,7 @@ interface AiRolePreset {
 | 6 | Интеграция BatchSegmentationPanel | `BatchSegmentationPanel.tsx`, `StudioWorkspace.tsx`, `Studio.tsx` | #1, #4 | ✅ Done |
 | 7 | Интеграция useCharacterExtraction | `useCharacterExtraction.ts`, `useParserCharacters.ts`, `Parser.tsx` | #1, #4 | ✅ Done |
 | 8 | Интеграция useCharacterProfiles | `useCharacterProfiles.ts`, `useParserCharacters.ts`, `Parser.tsx` | #1, #4 | ✅ Done |
-| 9 | Пресеты с пулами | `src/components/profile/tabs/AiRolePresets.tsx` | #4 | 🔲 |
+| 9 | Пресеты с пулами | `AiRolePresets.tsx`, `AiRolesTab.tsx` | #4 | ✅ Done |
 
 ---
 
