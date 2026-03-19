@@ -143,6 +143,10 @@ export function useCharacterExtraction({
           if ((!existing.gender || existing.gender === "unknown") && data.gender !== "unknown") {
             existing.gender = data.gender;
           }
+          // Promote role: mentioned → speaking if seen speaking in another chapter
+          if (existing.role === "mentioned" && (data.role === "speaking" || data.role === "crowd")) {
+            existing.role = data.role;
+          }
           const allAliases = new Set([...existing.aliases, ...data.aliases]);
           allAliases.delete(existing.name);
           existing.aliases = Array.from(allAliases);
@@ -152,6 +156,7 @@ export function useCharacterExtraction({
             name: data.name,
             aliases: data.aliases,
             gender: data.gender,
+            role: data.role,
             appearances: data.appearances,
             sceneCount: data.sceneCount,
           };
