@@ -44,6 +44,7 @@ export function useCharacterExtraction({
 }: UseCharacterExtractionParams) {
   const [extracting, setExtracting] = useState(false);
   const [extractProgress, setExtractProgress] = useState<string | null>(null);
+  const [extractPoolStats, setExtractPoolStats] = useState<PoolStats[]>([]);
   const { toast } = useToast();
 
   const extractCharacters = useCallback(async (opts?: { mode?: "fresh" | "continue" | "chapter"; chapterIdx?: number }) => {
