@@ -466,7 +466,7 @@ export default function ParserCharactersPanel({
             </p>
           </div>
         ) : (
-          <Table>
+          <table className="w-full caption-bottom text-sm">
             <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                 <TableHead className="w-7 px-1"></TableHead>
