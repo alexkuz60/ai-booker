@@ -319,7 +319,9 @@ export function useCharacterExtraction({
             ? `Извлечение: ${progress.done}/${progress.total} глав`
             : `Extracting: ${progress.done}/${progress.total} chapters`
         );
+        setExtractPoolStats(manager.getStats());
       });
+      setExtractPoolStats(manager.getStats());
 
       // Merge all results (maintain order for consistency)
       const sortedKeys = [...results.keys()].sort((a, b) => Number(a) - Number(b));
