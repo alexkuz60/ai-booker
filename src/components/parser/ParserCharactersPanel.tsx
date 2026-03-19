@@ -880,31 +880,6 @@ export default function ParserCharactersPanel({
                 </div>
               </div>
 
-              {/* Profile */}
-              {char.profile?.description && (
-                <div>
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                    <Brain className="h-3 w-3" />
-                    {isRu ? "Профиль" : "Profile"}
-                    {char.profile.profiledBy && (
-                      <RoleBadge roleId="profiler" model={char.profile.profiledBy} isRu={isRu} size={12} />
-                    )}
-                  </h4>
-                  <div className="text-xs text-foreground/80 space-y-1">
-                    {char.profile.temperament && (
-                      <p><span className="text-muted-foreground">{isRu ? "Темперамент:" : "Temperament:"}</span> {char.profile.temperament}</p>
-                    )}
-                    {char.profile.age_group && char.profile.age_group !== "unknown" && (
-                      <p><span className="text-muted-foreground">{isRu ? "Возраст:" : "Age:"}</span> {char.profile.age_group}</p>
-                    )}
-                    {char.profile.speech_style && (
-                      <p><span className="text-muted-foreground">{isRu ? "Речь:" : "Speech:"}</span> {char.profile.speech_style}</p>
-                    )}
-                    <p>{char.profile.description}</p>
-                  </div>
-                </div>
-              )}
-
               {/* Appearances */}
               <div>
                 <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
