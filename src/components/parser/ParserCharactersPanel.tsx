@@ -266,18 +266,65 @@ export default function ParserCharactersPanel({
 
       {/* Toolbar */}
       <div className="px-3 py-2 border-b border-border flex items-center gap-2 flex-wrap flex-shrink-0">
-        <Button
-          variant="outline" size="sm"
-          onClick={onExtract}
-          disabled={extracting || analyzedCount === 0}
-          className="gap-1.5 text-xs"
-        >
-          <Scan className="h-3.5 w-3.5" />
-          {extracting
-            ? (extractProgress || (isRu ? "Извлечение..." : "Extracting..."))
-            : (isRu ? "Извлечь (AI)" : "Extract (AI)")}
-        </Button>
-        <Button
+        {extracting ? (
+          <Button variant="outline" size="sm" disabled className="gap-1.5 text-xs">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            {extractProgress || (isRu ? "Извлечение..." : "Extracting...")}
+          </Button>
+        ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={analyzedCount === 0} className="gap-1.5 text-xs">
+                <Scan className="h-3.5 w-3.5" />
+                {isRu ? "Поиск (AI)" : "Search (AI)"}
+                <ChevronDown className="h-3 w-3 ml-0.5 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[200px]">
+              <DropdownMenuItem onClick={() => onExtract({ mode: "fresh" })} className="gap-2 text-xs">
+                <RotateCcw className="h-3.5 w-3.5" />
+                {isRu ? "Новый поиск" : "New search"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExtract({ mode: "continue" })} className="gap-2 text-xs">
+                <Play className="h-3.5 w-3.5" />
+                {isRu ? "Продолжить поиск" : "Continue search"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="gap-2 text-xs">
+                  <BookOpen className="h-3.5 w-3.5" />
+                  {isRu ? "Искать в главе" : "Search in chapter"}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="max-h-[300px] overflow-y-auto min-w-[220px]">
+                  {(() => {
+                    const analyzed: { idx: number; title: string }[] = [];
+                    chapterResults.forEach((r, idx) => {
+                      if (r.status === "done" && r.scenes?.length && tocEntries[idx]) {
+                        analyzed.push({ idx, title: tocEntries[idx].title });
+                      }
+                    });
+                    if (analyzed.length === 0) {
+                      return (
+                        <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                          {isRu ? "Нет проанализированных глав" : "No analyzed chapters"}
+                        </DropdownMenuItem>
+                      );
+                    }
+                    return analyzed.map(ch => (
+                      <DropdownMenuItem
+                        key={ch.idx}
+                        onClick={() => onExtract({ mode: "chapter", chapterIdx: ch.idx })}
+                        className="text-xs"
+                      >
+                        <span className="truncate">{ch.title.slice(0, 50)}</span>
+                      </DropdownMenuItem>
+                    ));
+                  })()}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
           variant="ghost" size="sm"
           onClick={() => { setAddingNew(true); setNewName(""); }}
           className="gap-1.5 text-xs"
