@@ -1000,8 +1000,11 @@ export default function ParserCharactersPanel({
       <div className="w-[36rem] flex-shrink-0 border-l border-border flex flex-col min-h-0 overflow-hidden bg-muted/10">
         <div className="px-4 py-2.5 border-b border-border flex items-center gap-2 flex-shrink-0">
           <Brain className="h-4 w-4 text-primary" />
-          <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider flex-1">
+          <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider flex-1 flex items-center gap-1.5">
             {isRu ? "Профайл" : "Profile"}
+            {profileViewChar.profile.profiledBy && (
+              <RoleBadge roleId="profiler" model={profileViewChar.profile.profiledBy} isRu={isRu} size={13} />
+            )}
           </h3>
           <button
             onClick={() => setProfileViewId(null)}
