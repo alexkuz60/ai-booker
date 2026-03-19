@@ -159,7 +159,7 @@ interface AiRolePreset {
 | 2 | Тесты менеджера | `src/lib/__tests__/modelPoolManager.test.ts` | #1 | ✅ Done |
 | 3 | Расширить aiRoles.ts | `src/config/aiRoles.ts` | — | ✅ Done |
 | 4 | Расширить useAiRoles | `src/hooks/useAiRoles.ts` | #3 | ✅ Done |
-| 5 | UI пулов в AiRolesTab | `src/components/profile/tabs/AiRolesTab.tsx` | #4 | 🔲 |
+| 5 | UI пулов в AiRolesTab | `AiRolesTab.tsx`, `PoolSelector.tsx` | #4 | ✅ Done |
 | 6 | Интеграция BatchSegmentationPanel | `src/components/studio/BatchSegmentationPanel.tsx` | #1, #4 | 🔲 |
 | 7 | Интеграция useCharacterExtraction | `src/hooks/useCharacterExtraction.ts` | #1, #4 | 🔲 |
 | 8 | Интеграция useCharacterProfiles | `src/hooks/useCharacterProfiles.ts` | #1, #4 | 🔲 |
