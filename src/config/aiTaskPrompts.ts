@@ -225,32 +225,48 @@ const PROFILER_EXTRACT_CHARACTERS: TaskPromptDefinition = {
   roleId: "profiler",
   labelRu: "Извлечение персонажей",
   labelEn: "Character extraction",
-  descriptionRu: "Поиск всех именованных персонажей в сценах главы",
-  descriptionEn: "Find all named characters in chapter scenes",
+  descriptionRu: "Поиск всех именованных персонажей в сценах главы с классификацией роли",
+  descriptionEn: "Find all named characters in chapter scenes with role classification",
   edgeFunction: "extract-characters",
   isMultilang: true,
-  prompt: `You are a literary analyst. Find ALL characters (people, creatures, talking animals) in the provided chapter scenes.
+  prompt: `You are a literary analyst preparing characters for audiobook voice casting.
+Find ALL characters in the provided chapter scenes and classify their role.
+
+ROLE CLASSIFICATION (critical for voice casting):
+- "speaking" — the character has direct speech (dialogue, monologue) in THIS chapter's scenes
+- "mentioned" — the character is only mentioned, remembered, quoted, or discussed by others but does NOT speak directly in these scenes. Historical figures (Jesus, Shakespeare, Napoleon etc.) who are only referenced or quoted are ALWAYS "mentioned".
+- "crowd" — an anonymous voice without a name (e.g. "a voice from the crowd", "someone shouted"). Use contextual clues for gender/age: "an old man croaked" → male/elder; "a woman screamed from the crowd" → female.
 
 Rules:
 1. A character is a NAMED entity that acts, speaks, or is mentioned by name.
-2. Common nouns (man, old man, soldier) are NOT characters unless they have a name.
+2. Common nouns (man, old man, soldier) are NOT characters unless they have a name — EXCEPT for anonymous speakers (crowd voices).
 3. Account for all grammatical forms: "John/John's" = one character.
 4. If a character is referred to differently (name, surname, nickname), put the primary name in "name" and all variants in "aliases".
 5. Determine gender from context (verb forms, pronouns).
-6. List scene numbers where the character appears (acts, speaks, or is mentioned).
+6. List scene numbers where the character appears.
 7. Do NOT include abstract concepts, place names, organizations.
-8. Words like "Yeah", "Now", "Quiet" are NOT character names.`,
-  promptRu: `Ты — литературный аналитик. Твоя задача — найти ВСЕХ персонажей (людей, существ, говорящих животных) в предложенных сценах главы. 
+8. Words like "Yeah", "Now", "Quiet" are NOT character names.
+9. A character who will appear later but is only TALKED ABOUT by others in this chapter → "mentioned".
+10. For crowd voices, use a descriptive name like "Voice from the crowd" or "Unknown voice".`,
+  promptRu: `Ты — литературный аналитик, подготавливающий персонажей для озвучки аудиокниги.
+Найди ВСЕХ персонажей в предложенных сценах главы и классифицируй их роль.
+
+КЛАССИФИКАЦИЯ РОЛЕЙ (критически важно для кастинга голосов):
+- "speaking" — персонаж произносит прямую речь (диалог, монолог) В ЭТОЙ главе
+- "mentioned" — персонаж только упоминается, вспоминается, цитируется или обсуждается другими, но НЕ говорит напрямую в этих сценах. Исторические личности (Иисус, Шекспир, Наполеон и т.п.), которые только упоминаются или цитируются — ВСЕГДА "mentioned".
+- "crowd" — анонимный голос без имени (например, «голос из толпы», «кто-то крикнул»). Используй контекстные подсказки для пола/возраста: «старчески проскрипел кто-то» → male/elder; «выкрикнула из толпы» → female.
 
 Правила:
 1. Персонаж — это ИМЕНОВАННАЯ сущность, которая действует, говорит или упоминается по имени.
-2. Нарицательные слова (мужчина, старик, солдат) — НЕ персонажи, если у них нет имени.
+2. Нарицательные слова (мужчина, старик, солдат) — НЕ персонажи, если у них нет имени — КРОМЕ анонимных говорящих (голоса из толпы).
 3. Учитывай все падежные формы русского языка: «Бригадир/Бригадира/Бригадиру» — один персонаж.
 4. Если персонажа называют по-разному (имя, фамилия, прозвище, сокращение), укажи основное имя в поле "name" и все варианты в "aliases".
 5. Определи пол персонажа по контексту (род глаголов, местоимения).
-6. Укажи номера сцен, где персонаж появляется (действует, говорит или упоминается).
+6. Укажи номера сцен, где персонаж появляется.
 7. НЕ включай абстрактные понятия, топонимы, организации.
-8. Слова вроде «Угу», «Сейчас», «Тихо» — это НЕ имена персонажей.`,
+8. Слова вроде «Угу», «Сейчас», «Тихо» — это НЕ имена персонажей.
+9. Персонаж, который появится позже, но в этой главе о нём только ГОВОРЯТ другие → "mentioned".
+10. Для голосов из толпы используй описательное имя: «Голос из толпы», «Неизвестный голос».`,
 };
 
 const PROFILER_PROFILE_CHARACTERS: TaskPromptDefinition = {

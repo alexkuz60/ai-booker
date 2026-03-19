@@ -6,7 +6,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Users, Scan, Plus, Trash2, Merge, Edit2, X, Check, ChevronDown, ChevronRight,
-  ChevronUp, Brain, Loader2,
+  ChevronUp, Brain, Loader2, Mic, MicOff, UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { RoleBadge } from "@/components/ui/RoleBadge";
-import type { LocalCharacter } from "@/pages/parser/types";
+import type { LocalCharacter, CharacterRole } from "@/pages/parser/types";
 
 // ─── i18n maps for profile badges ────────────────────────
 const AGE_LABELS: Record<string, { ru: string; en: string }> = {
@@ -40,6 +40,13 @@ const TEMPERAMENT_LABELS: Record<string, { ru: string; en: string }> = {
   melancholic: { ru: "Меланхолик", en: "Melancholic" },
   phlegmatic: { ru: "Флегматик", en: "Phlegmatic" },
   mixed: { ru: "Смешанный", en: "Mixed" },
+};
+
+const ROLE_LABELS: Record<string, { ru: string; en: string; color: string }> = {
+  speaking: { ru: "Говорит", en: "Speaking", color: "text-emerald-500 dark:text-emerald-400" },
+  mentioned: { ru: "Упомянут", en: "Mentioned", color: "text-muted-foreground/60" },
+  crowd: { ru: "Массовка", en: "Crowd", color: "text-amber-500 dark:text-amber-400" },
+  system: { ru: "Системный", en: "System", color: "text-primary/70" },
 };
 
 function localizeLabel(value: string, map: Record<string, { ru: string; en: string }>, isRu: boolean): string {
@@ -97,6 +104,7 @@ export default function ParserCharactersPanel({
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [genderPopoverOpen, setGenderPopoverOpen] = useState<string | null>(null);
   const [genderFilter, setGenderFilter] = useState<"all" | "male" | "female">("all");
+  const [roleFilter, setRoleFilter] = useState<"speaking" | "all">("speaking");
   const editRef = useRef<HTMLInputElement>(null);
   const aliasRef = useRef<HTMLInputElement>(null);
   const newRef = useRef<HTMLInputElement>(null);
@@ -112,6 +120,18 @@ export default function ParserCharactersPanel({
     for (const c of characters) seenIdsRef.current.add(c.id);
     return newIds;
   }, [characters]);
+
+  // Filtered characters based on role + gender
+  const filteredCharacters = useMemo(() => {
+    return characters.filter(c => {
+      if (genderFilter !== "all" && c.gender !== genderFilter) return false;
+      if (roleFilter === "speaking") {
+        const role = c.role || "speaking";
+        return role === "speaking" || role === "crowd" || role === "system";
+      }
+      return true;
+    });
+  }, [characters, genderFilter, roleFilter]);
 
   useEffect(() => {
     if (editingId) { editRef.current?.focus(); editRef.current?.select(); }
@@ -184,11 +204,29 @@ export default function ParserCharactersPanel({
           {isRu ? "Персонажи" : "Characters"}
         </h2>
         <RoleBadge roleId="profiler" model={profilerModel} isRu={isRu} size={16} />
-        <Badge variant="secondary" className="text-xs">
-          {genderFilter === "all" ? characters.length : characters.filter(c => c.gender === genderFilter).length}
-        </Badge>
         {characters.length > 0 && (
-          <div className="flex items-center gap-0.5 ml-1">
+          <div className="flex items-center gap-1 ml-1">
+            {/* Role filter: speaking vs all */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setRoleFilter(f => f === "speaking" ? "all" : "speaking")}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors flex items-center gap-0.5 ${
+                    roleFilter === "speaking"
+                      ? "bg-emerald-500/20 text-emerald-500 dark:text-emerald-400"
+                      : "text-muted-foreground/50 hover:text-muted-foreground"
+                  }`}
+                >
+                  <Mic className="h-3 w-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                {roleFilter === "speaking"
+                  ? (isRu ? "Показаны говорящие · Нажми для всех" : "Showing speakers · Click for all")
+                  : (isRu ? "Показаны все · Нажми для говорящих" : "Showing all · Click for speakers")}
+              </TooltipContent>
+            </Tooltip>
+            {/* Gender filters */}
             <button
               onClick={() => setGenderFilter(f => f === "male" ? "all" : "male")}
               className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
@@ -213,6 +251,9 @@ export default function ParserCharactersPanel({
             </button>
           </div>
         )}
+        <Badge variant="secondary" className="text-xs">
+          {filteredCharacters.length}{characters.length !== filteredCharacters.length ? `/${characters.length}` : ""}
+        </Badge>
       </div>
 
       {/* Toolbar */}
@@ -321,8 +362,7 @@ export default function ParserCharactersPanel({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {characters
-                .filter(c => genderFilter === "all" || c.gender === genderFilter)
+              {filteredCharacters
                 .map((char) => {
                 const isExpanded = expandedId === char.id;
                 const isSelected = selectedIds.has(char.id);
@@ -365,6 +405,11 @@ export default function ParserCharactersPanel({
                           >
                             {isExpanded ? <ChevronDown className="h-3 w-3 flex-shrink-0" /> : <ChevronRight className="h-3 w-3 flex-shrink-0" />}
                             <span className="truncate">{char.name}</span>
+                            {char.role && char.role !== "speaking" && (
+                              <span className={`text-[9px] font-medium ${ROLE_LABELS[char.role]?.color || "text-muted-foreground"}`}>
+                                {ROLE_LABELS[char.role]?.[isRu ? "ru" : "en"] || char.role}
+                              </span>
+                            )}
                             <Edit2
                               className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-50 hover:!opacity-100 flex-shrink-0"
                               onClick={(e) => {

@@ -12,6 +12,7 @@ interface ExtractedCharacter {
   name: string;
   aliases: string[];
   gender: "male" | "female" | "unknown";
+  role: "speaking" | "mentioned" | "crowd";
   scene_numbers: number[];
 }
 
@@ -159,13 +160,18 @@ async function callAI(
                       description: "Alternative names, nicknames, diminutives",
                     },
                     gender: { type: "string", enum: ["male", "female", "unknown"] },
+                    role: {
+                      type: "string",
+                      enum: ["speaking", "mentioned", "crowd"],
+                      description: "speaking = has direct speech; mentioned = only referenced/quoted by others; crowd = anonymous voice",
+                    },
                     scene_numbers: {
                       type: "array",
                       items: { type: "integer" },
                       description: "Scene numbers where the character appears",
                     },
                   },
-                  required: ["name", "aliases", "gender", "scene_numbers"],
+                  required: ["name", "aliases", "gender", "role", "scene_numbers"],
                   additionalProperties: false,
                 },
               },
