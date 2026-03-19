@@ -221,17 +221,20 @@ export function useCharacterProfiles({
 
     const usePool = effectivePool && effectivePool.length > 1 && charsToProfile.length > 1;
 
+    console.log(`[CharProfile] effectivePool:`, effectivePool, `| usePool: ${usePool} | chars: ${charsToProfile.length} | profilerModel: ${profilerModel}`);
+
     try {
       if (usePool) {
         // ── Pool mode: size batches so each pool model gets work ──
         const poolSize = effectivePool.length;
+        // Ensure at least as many batches as pool models for full distribution
         const batchSize = Math.min(
           MAX_CHARS_PER_BATCH,
           Math.max(1, Math.ceil(charsToProfile.length / poolSize)),
         );
         const batches = chunkBySize(charsToProfile, batchSize);
 
-        console.log(`[CharProfile] Pool mode: ${poolSize} models, ${batches.length} batches (${batchSize} chars each), ${charsToProfile.length} chars total`);
+        console.log(`[CharProfile] Pool mode: ${poolSize} models [${effectivePool.join(', ')}], ${batches.length} batches (${batchSize} chars each), ${charsToProfile.length} chars total`);
 
         setProfileProgress(
           isRu
