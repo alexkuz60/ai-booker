@@ -222,12 +222,12 @@ export function useCharacterProfiles({
           }
         }
 
-        if (errorCount > 0 && profiledCount > 0) {
+        if (errorCount > 0 && totalProfiled > 0) {
           toast({
             title: isRu ? "Профайлинг частично завершён" : "Profiling partially complete",
             description: isRu
-              ? `Профили созданы для ${profiledCount} персонажей. Ошибки: ${errorCount} из ${batches.length} групп.`
-              : `Profiles created for ${profiledCount} characters. Errors: ${errorCount} of ${batches.length} batches.`,
+              ? `Профили созданы для ${totalProfiled} персонажей. Ошибки: ${errorCount} из ${batches.length} групп.`
+              : `Profiles created for ${totalProfiled} characters. Errors: ${errorCount} of ${batches.length} batches.`,
           });
         } else if (errorCount > 0) {
           throw new Error(isRu ? "Все группы завершились с ошибкой" : "All batches failed");
@@ -235,8 +235,8 @@ export function useCharacterProfiles({
           toast({
             title: isRu ? "Профайлинг завершён" : "Profiling complete",
             description: isRu
-              ? `Профили созданы для ${profiledCount} персонажей`
-              : `Profiles created for ${profiledCount} characters`,
+              ? `Профили созданы для ${totalProfiled} персонажей`
+              : `Profiles created for ${totalProfiled} characters`,
           });
         }
       } else {
