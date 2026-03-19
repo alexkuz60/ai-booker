@@ -276,13 +276,17 @@ export function useCharacterExtraction({
         ? userApiKeys[registryEntry.apiKeyField] || null
         : null;
 
-      const { data, error } = await supabase.functions.invoke("extract-characters", {
+      const { data, error } = await invokeWithFallback({
+        functionName: "extract-characters",
         body: {
           scenes: scenesPayload,
           lang: isRu ? "ru" : "en",
           model: modelId,
           apiKey: apiKeyForModel,
         },
+        userApiKeys,
+        modelField: "model",
+        isRu,
       });
       if (error) throw error;
       return data?.characters || [];
