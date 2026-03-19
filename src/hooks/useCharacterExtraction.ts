@@ -143,6 +143,7 @@ export function useCharacterExtraction({
       manner_hint?: string;
       appearances: CharacterAppearance[];
       sceneCount: number;
+      extractedBy?: string;
     }>();
 
     // Build intermediate LocalCharacter[] snapshot from allResults merged with existing
