@@ -155,6 +155,14 @@ export const TIER_LABELS = {
 /** User-overridable mapping: roleId → modelId */
 export type AiRoleModelMap = Partial<Record<AiRoleId, string>>;
 
+/** User-overridable pool mapping: roleId → list of modelIds for parallel processing */
+export type AiRolePoolMap = Partial<Record<AiRoleId, string[]>>;
+
+/** Roles that support model pooling */
+export const POOLABLE_ROLES: AiRoleId[] = AI_ROLE_LIST
+  .filter((r) => r.poolable)
+  .map((r) => r.id);
+
 /** Get default model map for admin */
 export function getDefaultAdminModels(): Record<AiRoleId, string> {
   return Object.fromEntries(
