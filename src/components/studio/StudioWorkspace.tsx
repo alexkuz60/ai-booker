@@ -119,6 +119,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
                 sceneIds={batchSceneIds!}
                 scenes={batchScenes!}
                 bookId={bookId ?? null}
+                userApiKeys={userApiKeys}
                 concurrency={3}
                 onComplete={onBatchComplete}
                 onSceneSegmented={onSegmented}
