@@ -279,22 +279,6 @@ export default function ParserCharactersPanel({
         <RoleBadge roleId="profiler" model={profilerModel} isRu={isRu} size={16} />
         {characters.length > 0 && (
           <div className="flex items-center gap-1 ml-1">
-            {/* Search toggle */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => { setSearchOpen(o => !o); if (searchOpen) setSearchQuery(""); }}
-                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
-                    searchOpen ? "bg-primary/20 text-primary" : "text-muted-foreground/50 hover:text-muted-foreground"
-                  }`}
-                >
-                  <Search className="h-3 w-3" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">
-                {isRu ? "Поиск по имени" : "Search by name"}
-              </TooltipContent>
-            </Tooltip>
             {/* Role filter dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -358,29 +342,29 @@ export default function ParserCharactersPanel({
         </Badge>
       </div>
 
-      {/* Search bar */}
-      {searchOpen && (
-        <div className="px-3 py-1.5 border-b border-border flex items-center gap-2 flex-shrink-0">
-          <Search className="h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            ref={searchRef}
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder={isRu ? "Поиск по имени / алиасу…" : "Search by name / alias…"}
-            className="h-7 text-sm flex-1"
-            autoFocus
-            onKeyDown={e => { if (e.key === "Escape") { setSearchQuery(""); setSearchOpen(false); } }}
-          />
-          {searchQuery && (
-            <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => setSearchQuery("")}>
-              <X className="h-3 w-3" />
-            </Button>
-          )}
-        </div>
-      )}
-
       {/* Toolbar */}
       <div className="px-3 py-2 border-b border-border flex items-center gap-2 flex-wrap flex-shrink-0">
+        {/* Search inline in toolbar */}
+        {searchOpen ? (
+          <div className="flex items-center gap-1 min-w-[120px] max-w-[180px]">
+            <Input
+              ref={searchRef}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder={isRu ? "Имя…" : "Name…"}
+              className="h-7 text-xs flex-1"
+              autoFocus
+              onKeyDown={e => { if (e.key === "Escape") { setSearchQuery(""); setSearchOpen(false); } }}
+            />
+            <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => { setSearchQuery(""); setSearchOpen(false); }}>
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        ) : (
+          <Button variant="ghost" size="sm" onClick={() => setSearchOpen(true)} className="gap-1.5 text-xs px-2">
+            <Search className="h-3.5 w-3.5" />
+          </Button>
+        )}
         {extracting ? (
           <Button variant="outline" size="sm" disabled className="gap-1.5 text-xs">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
