@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Save, FolderOpen, Trash2, BookOpen, RefreshCw } from "lucide-react";
+import { Save, FolderOpen, Trash2, BookOpen, RefreshCw, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,13 +15,15 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
-import type { AiRoleModelMap } from "@/config/aiRoles";
+import type { AiRoleModelMap, AiRolePoolMap } from "@/config/aiRoles";
 
 export interface AiRolePreset {
   id: string;
   name: string;
   bookTitle?: string;
   models: AiRoleModelMap;
+  /** Pool configurations (optional, added in pool feature) */
+  pools?: AiRolePoolMap;
   createdAt: string;
   updatedAt?: string;
 }
@@ -29,9 +31,11 @@ export interface AiRolePreset {
 interface AiRolePresetsProps {
   currentOverrides: AiRoleModelMap;
   resolvedModels: Record<string, string>;
-  onLoadPreset: (models: AiRoleModelMap) => void;
+  onLoadPreset: (models: AiRoleModelMap, pools?: AiRolePoolMap) => void;
   bookTitle?: string;
   isRu: boolean;
+  /** Current pool configurations */
+  currentPools?: AiRolePoolMap;
 }
 
 export function AiRolePresets({
@@ -40,6 +44,7 @@ export function AiRolePresets({
   onLoadPreset,
   bookTitle,
   isRu,
+  currentPools,
 }: AiRolePresetsProps) {
   const { value: presets, update: setPresets } = useCloudSettings<AiRolePreset[]>(
     "ai_role_presets",
@@ -50,6 +55,12 @@ export function AiRolePresets({
   const [loadOpen, setLoadOpen] = useState(false);
   const [newName, setNewName] = useState("");
 
+  /** Count non-empty pools */
+  const poolCount = (pools?: AiRolePoolMap): number => {
+    if (!pools) return 0;
+    return Object.values(pools).filter(p => p && p.length > 0).length;
+  };
+
   const handleSave = useCallback(() => {
     const finalName = newName.trim() || bookTitle?.trim() || "";
     if (!finalName) return;
@@ -58,12 +69,15 @@ export function AiRolePresets({
       name: finalName,
       bookTitle: bookTitle || undefined,
       models: { ...resolvedModels } as AiRoleModelMap,
+      pools: currentPools && Object.keys(currentPools).length > 0
+        ? { ...currentPools }
+        : undefined,
       createdAt: new Date().toISOString(),
     };
     setPresets((prev) => [...prev, preset]);
     setNewName("");
     setSaveOpen(false);
-  }, [newName, bookTitle, resolvedModels, setPresets]);
+  }, [newName, bookTitle, resolvedModels, currentPools, setPresets]);
 
   const handleUpdate = useCallback(
     (id: string) => {
@@ -73,6 +87,9 @@ export function AiRolePresets({
             ? {
                 ...p,
                 models: { ...resolvedModels } as AiRoleModelMap,
+                pools: currentPools && Object.keys(currentPools).length > 0
+                  ? { ...currentPools }
+                  : undefined,
                 bookTitle: bookTitle || p.bookTitle,
                 updatedAt: new Date().toISOString(),
               }
@@ -80,7 +97,7 @@ export function AiRolePresets({
         ),
       );
     },
-    [resolvedModels, bookTitle, setPresets],
+    [resolvedModels, currentPools, bookTitle, setPresets],
   );
 
   const handleDelete = useCallback(
@@ -92,7 +109,7 @@ export function AiRolePresets({
 
   const handleLoad = useCallback(
     (preset: AiRolePreset) => {
-      onLoadPreset(preset.models);
+      onLoadPreset(preset.models, preset.pools);
       setLoadOpen(false);
     },
     [onLoadPreset],
@@ -141,6 +158,14 @@ export function AiRolePresets({
               {isRu ? "Книга:" : "Book:"} {bookTitle}
             </p>
           )}
+          {poolCount(currentPools) > 0 && (
+            <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+              <Layers className="h-3 w-3 shrink-0" />
+              {isRu
+                ? `Включены пулы: ${poolCount(currentPools)} ролей`
+                : `Pools included: ${poolCount(currentPools)} roles`}
+            </p>
+          )}
 
           {/* Existing presets to overwrite */}
           {presets.length > 0 && (
@@ -156,7 +181,12 @@ export function AiRolePresets({
                     className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/50 group"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-[11px] truncate">{preset.name}</p>
+                      <div className="flex items-center gap-1">
+                        <p className="text-[11px] truncate">{preset.name}</p>
+                        {poolCount(preset.pools) > 0 && (
+                          <Layers className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
+                        )}
+                      </div>
                     </div>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -216,7 +246,15 @@ export function AiRolePresets({
                 onClick={() => handleLoad(preset)}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium truncate">{preset.name}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-medium truncate">{preset.name}</p>
+                    {poolCount(preset.pools) > 0 && (
+                      <Badge variant="secondary" className="text-[8px] px-1 py-0 gap-0.5 shrink-0">
+                        <Layers className="h-2 w-2" />
+                        {poolCount(preset.pools)}
+                      </Badge>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     {preset.bookTitle && (
                       <p className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
