@@ -68,6 +68,9 @@ export function AiRolesTab({ apiKeys, isRu, onModelChanged, bookTitle }: AiRoles
     availableModels,
     isAdmin,
     hasPreEditSnapshot,
+    pools,
+    setPoolForRole,
+    isPoolEnabled,
   } = useAiRoles(apiKeys);
 
   const [collapsedProviders, setCollapsedProviders] = useState<Set<string>>(loadCollapsed);
