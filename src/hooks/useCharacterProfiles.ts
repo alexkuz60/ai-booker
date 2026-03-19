@@ -155,6 +155,9 @@ export function useCharacterProfiles({
         ? userApiKeys[registryEntry.apiKeyField] || null
         : null;
 
+      console.log(`[CharProfile] invokeProfile model=${modelId} | registryEntry=${registryEntry?.id ?? 'NOT FOUND'} | apiKeyField=${registryEntry?.apiKeyField ?? 'none'} | hasApiKey=${!!apiKeyForModel} | userApiKeysFields=${Object.keys(userApiKeys).join(',')}`);
+
+
       const existingProfiles: Record<string, string> = {};
       for (const c of chars) {
         if (c.profile?.description) existingProfiles[c.name] = c.profile.description;
