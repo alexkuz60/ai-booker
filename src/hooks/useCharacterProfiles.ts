@@ -52,6 +52,8 @@ export function useCharacterProfiles({
   const [profiling, setProfiling] = useState(false);
   const [profileProgress, setProfileProgress] = useState<string | null>(null);
   const [profilePoolStats, setProfilePoolStats] = useState<PoolStats[]>([]);
+  const [profiledCount, setProfiledCount] = useState(0);
+  const [profileTotal, setProfileTotal] = useState(0);
   const { toast } = useToast();
 
   const profileCharacters = useCallback(async (charIds: string[]) => {
