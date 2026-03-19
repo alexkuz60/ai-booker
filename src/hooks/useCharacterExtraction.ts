@@ -45,6 +45,8 @@ export function useCharacterExtraction({
   const [extracting, setExtracting] = useState(false);
   const [extractProgress, setExtractProgress] = useState<string | null>(null);
   const [extractPoolStats, setExtractPoolStats] = useState<PoolStats[]>([]);
+  const [extractedCount, setExtractedCount] = useState(0);
+  const [extractTotal, setExtractTotal] = useState(0);
   const { toast } = useToast();
 
   const extractCharacters = useCallback(async (opts?: { mode?: "fresh" | "continue" | "chapter"; chapterIdx?: number }) => {
@@ -288,6 +290,8 @@ export function useCharacterExtraction({
 
     let errorCount = 0;
     const usePool = effectivePool && effectivePool.length > 1;
+    setExtractedCount(0);
+    setExtractTotal(chaptersToProcess.length);
 
     if (usePool) {
       // ── Pool mode: distribute chapters across models ──
@@ -299,6 +303,7 @@ export function useCharacterExtraction({
       );
 
       const manager = new ModelPoolManager(effectivePool, userApiKeys, 2);
+      let completedChapters = 0;
       const tasks: PoolTask<{ idx: number; entry: TocChapter; extracted: any[] }>[] =
         chaptersToProcess.map(ch => ({
           id: String(ch.idx),
@@ -309,7 +314,15 @@ export function useCharacterExtraction({
                 : `Chapter ${ch.idx + 1}: ${ch.entry.title.slice(0, 40)}`
             );
             const extracted = await invokeForChapter(ch, modelId);
-            return { idx: ch.idx, entry: ch.entry, extracted: extracted || [] };
+            const result = extracted || [];
+            // Incremental merge + UI update
+            if (result.length > 0) {
+              mergeChapterResults(ch.idx, ch.entry, result);
+            }
+            completedChapters++;
+            setExtractedCount(completedChapters);
+            setCharacters(buildSnapshot());
+            return { idx: ch.idx, entry: ch.entry, extracted: result };
           },
         }));
 
@@ -323,18 +336,13 @@ export function useCharacterExtraction({
       });
       setExtractPoolStats(manager.getStats());
 
-      // Merge all results (maintain order for consistency)
-      const sortedKeys = [...results.keys()].sort((a, b) => Number(a) - Number(b));
-      for (const key of sortedKeys) {
-        const result = results.get(key)!;
+      // Count errors from pool results
+      for (const [key, result] of results) {
         if (result instanceof Error) {
           errorCount++;
           console.error(`[CharExtract] Pool error for chapter ${key}:`, result.message);
-        } else {
-          mergeChapterResults(result.idx, result.entry, result.extracted);
         }
       }
-      setCharacters(buildSnapshot());
 
     } else {
       // ── Classic sequential mode ──
@@ -351,6 +359,7 @@ export function useCharacterExtraction({
           if (extracted) {
             mergeChapterResults(chapterData.idx, chapterData.entry, extracted);
           }
+          setExtractedCount(ci + 1);
           setCharacters(buildSnapshot());
         } catch (err) {
           console.error("AI extraction failed for chapter", chapterData.idx, err);
@@ -382,6 +391,8 @@ export function useCharacterExtraction({
     setExtracting(false);
     setExtractProgress(null);
     setExtractPoolStats([]);
+    setExtractedCount(0);
+    setExtractTotal(0);
 
     // Show appropriate toast based on error rate
     if (errorCount >= chaptersToProcess.length) {
@@ -416,6 +427,8 @@ export function useCharacterExtraction({
     extracting,
     extractProgress,
     extractPoolStats,
+    extractedCount,
+    extractTotal,
     extractCharacters,
   };
 }
