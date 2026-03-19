@@ -8,7 +8,7 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
-import type { Scene, ChapterStatus, TocChapter, LocalCharacter, CharacterAppearance } from "@/pages/parser/types";
+import type { Scene, ChapterStatus, TocChapter, LocalCharacter, CharacterAppearance, CharacterRole } from "@/pages/parser/types";
 
 function generateId(): string {
   return crypto.randomUUID();
