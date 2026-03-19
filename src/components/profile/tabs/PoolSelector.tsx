@@ -11,7 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import type { AiRoleId } from "@/config/aiRoles";
 import type { ModelRegistryEntry } from "@/config/modelRegistry";
 
-const PER_MODEL_CONCURRENCY = 8;
+const PER_MODEL_CONCURRENCY = 3;
 
 interface PoolSelectorProps {
   roleId: AiRoleId;
