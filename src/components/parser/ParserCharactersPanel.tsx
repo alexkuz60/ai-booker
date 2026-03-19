@@ -121,6 +121,18 @@ export default function ParserCharactersPanel({
     return newIds;
   }, [characters]);
 
+  // Filtered characters based on role + gender
+  const filteredCharacters = useMemo(() => {
+    return characters.filter(c => {
+      if (genderFilter !== "all" && c.gender !== genderFilter) return false;
+      if (roleFilter === "speaking") {
+        const role = c.role || "speaking";
+        return role === "speaking" || role === "crowd" || role === "system";
+      }
+      return true;
+    });
+  }, [characters, genderFilter, roleFilter]);
+
   useEffect(() => {
     if (editingId) { editRef.current?.focus(); editRef.current?.select(); }
   }, [editingId]);
