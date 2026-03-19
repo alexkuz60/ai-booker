@@ -228,13 +228,13 @@ export function useCharacterProfiles({
 
         const manager = new ModelPoolManager(effectivePool, userApiKeys, 2);
         let completedProfiles = 0;
-        const tasks: PoolTask<Array<{
+        const tasks: PoolTask<{ profiles: Array<{
           name: string;
           age_group?: string;
           temperament?: string;
           speech_style?: string;
           description?: string;
-        }>>[] = batches.map((batch, i) => ({
+        }>; usedModel: string }>[] = batches.map((batch, i) => ({
           id: `batch-${i}`,
           execute: async (modelId: string) => {
             if (abort.signal.aborted) throw new Error("aborted");
@@ -245,10 +245,10 @@ export function useCharacterProfiles({
             );
             const result = await invokeProfile(batch, modelId);
             // Apply profiles incrementally as each batch completes
-            if (result.length > 0) {
-              completedProfiles += result.length;
+            if (result.profiles.length > 0) {
+              completedProfiles += result.profiles.length;
               setProfiledCount(completedProfiles);
-              applyProfiles(result);
+              applyProfiles(result.profiles, result.usedModel);
             }
             return result;
           },
