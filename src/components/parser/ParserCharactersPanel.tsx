@@ -67,6 +67,7 @@ interface ParserCharactersPanelProps {
   characters: LocalCharacter[];
   extracting: boolean;
   extractProgress?: string | null;
+  extractPoolStats?: PoolStats[];
   onExtract: (opts?: { mode?: "fresh" | "continue" | "chapter"; chapterIdx?: number }) => void;
   onRename: (id: string, newName: string) => void;
   onUpdateGender: (id: string, gender: "male" | "female" | "unknown") => void;
@@ -78,6 +79,7 @@ interface ParserCharactersPanelProps {
   profilerModel?: string;
   profiling?: boolean;
   profileProgress?: string | null;
+  profilePoolStats?: PoolStats[];
   onProfile?: (charIds: string[]) => void;
   tocEntries: TocChapter[];
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;

@@ -521,6 +521,7 @@ export default function Parser() {
                 characters={characters}
                 extracting={extracting}
                 extractProgress={extractProgress}
+                extractPoolStats={extractPoolStats}
                 onExtract={extractCharacters}
                 onRename={renameCharacter}
                 onUpdateGender={updateGender}
@@ -532,6 +533,7 @@ export default function Parser() {
                 profilerModel={getModelForRole("profiler")}
                 profiling={profiling}
                 profileProgress={profileProgress}
+                profilePoolStats={profilePoolStats}
                 onProfile={profileCharacters}
                 tocEntries={tocEntries}
                 chapterResults={chapterResults}
