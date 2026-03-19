@@ -362,8 +362,7 @@ export default function ParserCharactersPanel({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {characters
-                .filter(c => genderFilter === "all" || c.gender === genderFilter)
+              {filteredCharacters
                 .map((char) => {
                 const isExpanded = expandedId === char.id;
                 const isSelected = selectedIds.has(char.id);
