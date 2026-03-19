@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from "react";
-import { Bot, RotateCcw, Sparkles, Zap, Cpu, ChevronDown, ChevronRight } from "lucide-react";
+import { Bot, RotateCcw, Sparkles, Zap, Cpu, ChevronDown, ChevronRight, Layers } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
