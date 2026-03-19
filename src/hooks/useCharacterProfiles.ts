@@ -173,6 +173,7 @@ export function useCharacterProfiles({
         );
 
         const manager = new ModelPoolManager(effectivePool, userApiKeys, 2);
+        let completedProfiles = 0;
         const tasks: PoolTask<Array<{
           name: string;
           age_group?: string;
@@ -187,7 +188,14 @@ export function useCharacterProfiles({
                 ? `Профайлинг: группа ${i + 1}/${batches.length} (${batch.length} перс.)`
                 : `Profiling: batch ${i + 1}/${batches.length} (${batch.length} chars)`
             );
-            return invokeProfile(batch, modelId);
+            const result = await invokeProfile(batch, modelId);
+            // Apply profiles incrementally as each batch completes
+            if (result.length > 0) {
+              completedProfiles += result.length;
+              setProfiledCount(completedProfiles);
+              applyProfiles(result);
+            }
+            return result;
           },
         }));
 
