@@ -71,9 +71,16 @@ export async function invokeWithFallback<T = unknown>(
 }
 
 function isRetryableError(result: { data: unknown; error: any }): boolean {
-  if (!result.error) return false;
-  const msg = String(result.error?.message || result.error || "");
-  return /402|429|payment|credits|rate.?limit/i.test(msg);
+  // Check explicit error from SDK
+  const errMsg = String(result.error?.message || result.error || "");
+  if (/402|429|payment|credits|rate.?limit/i.test(errMsg)) return true;
+  // Check error embedded in response data (edge function returning JSON error)
+  const dataErr = (result.data as Record<string, unknown>)?.error;
+  if (dataErr) {
+    const dataMsg = String(dataErr);
+    if (/402|429|payment|credits|rate.?limit/i.test(dataMsg)) return true;
+  }
+  return false;
 }
 
 interface FallbackEntry {

@@ -14,9 +14,9 @@
  */
 
 import { useState, useCallback, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
+import { invokeWithFallback } from "@/lib/invokeWithFallback";
 import { ModelPoolManager, type PoolTask, type PoolStats, logPoolStats } from "@/lib/modelPoolManager";
 import type { Scene, ChapterStatus, TocChapter, LocalCharacter, CharacterProfile } from "@/pages/parser/types";
 
@@ -160,7 +160,8 @@ export function useCharacterProfiles({
         if (c.profile?.description) existingProfiles[c.name] = c.profile.description;
       }
 
-      const { data, error } = await supabase.functions.invoke("profile-characters-local", {
+      const { data, error } = await invokeWithFallback({
+        functionName: "profile-characters-local",
         body: {
           characters: chars.map(c => ({ name: c.name, aliases: c.aliases })),
           scenes: scenesSlice,
@@ -169,11 +170,18 @@ export function useCharacterProfiles({
           apiKey: apiKeyForModel,
           existingProfiles: Object.keys(existingProfiles).length > 0 ? existingProfiles : undefined,
         },
+        userApiKeys,
+        modelField: "model",
+        isRu,
       });
 
       if (abort.signal.aborted) throw new Error("aborted");
       if (error) throw error;
-      return { profiles: data?.profiles || [], usedModel: data?.usedModel || modelId };
+      const result = data as Record<string, unknown> | null;
+      return { profiles: (result?.profiles || []) as Array<{
+        name: string; age_group?: string; temperament?: string;
+        speech_style?: string; description?: string;
+      }>, usedModel: String(result?.usedModel || modelId) };
     };
 
     // ── Merge profiles into character state ──
