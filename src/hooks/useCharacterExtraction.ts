@@ -269,7 +269,7 @@ export function useCharacterExtraction({
     const invokeForChapter = async (
       chapterData: typeof chaptersToProcess[0],
       modelId: string,
-    ) => {
+    ): Promise<{ characters: any[]; usedModel: string } | null> => {
       const scenesPayload = chapterData.scenes
         .filter(s => s.content && s.content.length > 20)
         .map(s => ({ scene_number: s.scene_number, text: s.content! }));
@@ -293,7 +293,11 @@ export function useCharacterExtraction({
         isRu,
       });
       if (error) throw error;
-      return (data as any)?.characters || [];
+      const resp = data as any;
+      return {
+        characters: resp?.characters || [],
+        usedModel: resp?.usedModel || modelId,
+      };
     };
 
     let errorCount = 0;
