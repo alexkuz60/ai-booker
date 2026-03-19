@@ -52,6 +52,8 @@ export function useCharacterProfiles({
   const [profiling, setProfiling] = useState(false);
   const [profileProgress, setProfileProgress] = useState<string | null>(null);
   const [profilePoolStats, setProfilePoolStats] = useState<PoolStats[]>([]);
+  const [profiledCount, setProfiledCount] = useState(0);
+  const [profileTotal, setProfileTotal] = useState(0);
   const { toast } = useToast();
 
   const profileCharacters = useCallback(async (charIds: string[]) => {
@@ -60,6 +62,8 @@ export function useCharacterProfiles({
 
     setProfiling(true);
     setProfileProgress(isRu ? "Подготовка…" : "Preparing…");
+    setProfiledCount(0);
+    setProfileTotal(charsToProfile.length);
 
     // Collect scene texts for context
     const scenesPayload: Array<{ title: string; text: string }> = [];
@@ -169,6 +173,7 @@ export function useCharacterProfiles({
         );
 
         const manager = new ModelPoolManager(effectivePool, userApiKeys, 2);
+        let completedProfiles = 0;
         const tasks: PoolTask<Array<{
           name: string;
           age_group?: string;
@@ -183,7 +188,14 @@ export function useCharacterProfiles({
                 ? `Профайлинг: группа ${i + 1}/${batches.length} (${batch.length} перс.)`
                 : `Profiling: batch ${i + 1}/${batches.length} (${batch.length} chars)`
             );
-            return invokeProfile(batch, modelId);
+            const result = await invokeProfile(batch, modelId);
+            // Apply profiles incrementally as each batch completes
+            if (result.length > 0) {
+              completedProfiles += result.length;
+              setProfiledCount(completedProfiles);
+              applyProfiles(result);
+            }
+            return result;
           },
         }));
 
@@ -197,33 +209,25 @@ export function useCharacterProfiles({
         });
         setProfilePoolStats(manager.getStats());
 
-        // Collect all successful profiles
-        const allProfiles: Array<{
-          name: string;
-          age_group?: string;
-          temperament?: string;
-          speech_style?: string;
-          description?: string;
-        }> = [];
+        // Count errors (profiles already applied incrementally)
         let errorCount = 0;
+        let totalProfiled = 0;
 
         for (const [, result] of results) {
           if (result instanceof Error) {
             errorCount++;
             console.error("[CharProfile] Pool batch error:", result.message);
           } else {
-            allProfiles.push(...result);
+            totalProfiled += result.length;
           }
         }
 
-        const profiledCount = applyProfiles(allProfiles);
-
-        if (errorCount > 0 && profiledCount > 0) {
+        if (errorCount > 0 && totalProfiled > 0) {
           toast({
             title: isRu ? "Профайлинг частично завершён" : "Profiling partially complete",
             description: isRu
-              ? `Профили созданы для ${profiledCount} персонажей. Ошибки: ${errorCount} из ${batches.length} групп.`
-              : `Profiles created for ${profiledCount} characters. Errors: ${errorCount} of ${batches.length} batches.`,
+              ? `Профили созданы для ${totalProfiled} персонажей. Ошибки: ${errorCount} из ${batches.length} групп.`
+              : `Profiles created for ${totalProfiled} characters. Errors: ${errorCount} of ${batches.length} batches.`,
           });
         } else if (errorCount > 0) {
           throw new Error(isRu ? "Все группы завершились с ошибкой" : "All batches failed");
@@ -231,8 +235,8 @@ export function useCharacterProfiles({
           toast({
             title: isRu ? "Профайлинг завершён" : "Profiling complete",
             description: isRu
-              ? `Профили созданы для ${profiledCount} персонажей`
-              : `Profiles created for ${profiledCount} characters`,
+              ? `Профили созданы для ${totalProfiled} персонажей`
+              : `Profiles created for ${totalProfiled} characters`,
           });
         }
       } else {
@@ -265,6 +269,8 @@ export function useCharacterProfiles({
       setProfiling(false);
       setProfileProgress(null);
       setProfilePoolStats([]);
+      setProfiledCount(0);
+      setProfileTotal(0);
     }
   }, [characters, chapterResults, tocEntries, profilerModel, userApiKeys, isRu, setCharacters, persist, toast, effectivePool]);
 
@@ -272,6 +278,8 @@ export function useCharacterProfiles({
     profiling,
     profileProgress,
     profilePoolStats,
+    profiledCount,
+    profileTotal,
     profileCharacters,
   };
 }

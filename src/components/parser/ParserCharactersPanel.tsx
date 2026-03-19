@@ -80,6 +80,8 @@ interface ParserCharactersPanelProps {
   profiling?: boolean;
   profileProgress?: string | null;
   profilePoolStats?: PoolStats[];
+  profiledCount?: number;
+  profileTotal?: number;
   onProfile?: (charIds: string[]) => void;
   tocEntries: TocChapter[];
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
@@ -103,6 +105,8 @@ export default function ParserCharactersPanel({
   profiling,
   profileProgress,
   profilePoolStats,
+  profiledCount,
+  profileTotal,
   onProfile,
   tocEntries,
   chapterResults,
@@ -457,7 +461,13 @@ export default function ParserCharactersPanel({
           >
             {profiling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Brain className="h-3.5 w-3.5" />}
             {profiling
-              ? (profileProgress || (isRu ? "Профайлинг…" : "Profiling…"))
+              ? (
+                <>
+                  {profiledCount != null && profileTotal
+                    ? `${profiledCount}/${profileTotal}`
+                    : (profileProgress || (isRu ? "Профайлинг…" : "Profiling…"))}
+                </>
+              )
               : (isRu ? `Профайл (${selectedIds.size})` : `Profile (${selectedIds.size})`)}
           </Button>
         )}
@@ -754,8 +764,14 @@ export default function ParserCharactersPanel({
                           className="mx-auto block"
                           title={isRu ? "Показать профиль" : "Show profile"}
                         >
-                          <Brain className={`h-3.5 w-3.5 ${profileViewId === char.id ? "text-primary" : "text-primary/60 hover:text-primary"} transition-colors`} />
+                          <Brain className={cn(
+                            "h-3.5 w-3.5 transition-colors",
+                            profileViewId === char.id ? "text-primary" : "text-primary/60 hover:text-primary",
+                            profiling && "animate-pulse",
+                          )} />
                         </button>
+                      ) : profiling && selectedIds.has(char.id) ? (
+                        <Loader2 className="h-3 w-3 mx-auto text-muted-foreground/40 animate-spin" />
                       ) : (
                         <span className="text-muted-foreground/20">—</span>
                       )}
