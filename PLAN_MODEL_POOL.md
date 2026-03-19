@@ -35,7 +35,7 @@ interface PoolWorker {
   provider: string;
   apiKey: string | null;
   activeCount: number;   // текущие in-flight запросы
-  maxConcurrency: number; // 2
+  maxConcurrency: number; // 3
   errorCount: number;     // счётчик ошибок для отключения
   disabled: boolean;      // true после 3+ ошибок подряд
 }
