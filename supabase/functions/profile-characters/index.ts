@@ -136,7 +136,7 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       { role: "user", content: userPrompt + "\n\nRespond with ONLY the JSON object, nothing else." },
     ],
     temperature: 0.3,
-    max_tokens: 8192,
+    ...(useMaxCompletionTokens ? { max_completion_tokens: 8192 } : { max_tokens: 8192 }),
   };
   // For OpenAI non-reasoning models, request structured JSON output
   // (Gemini models don't reliably support response_format through the gateway)
