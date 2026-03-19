@@ -110,9 +110,12 @@ export default function ParserCharactersPanel({
   const [addingNew, setAddingNew] = useState(false);
   const [newName, setNewName] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [genderPopoverOpen, setGenderPopoverOpen] = useState<string | null>(null);
   const [genderFilter, setGenderFilter] = useState<"all" | "male" | "female">("all");
-  const [roleFilter, setRoleFilter] = useState<"speaking" | "all">("speaking");
+  const [roleFilter, setRoleFilter] = useState<"characters" | "crowd" | "all">("characters");
+  const [sortCol, setSortCol] = useState<"name" | "ch" | "brain">("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const editRef = useRef<HTMLInputElement>(null);
   const aliasRef = useRef<HTMLInputElement>(null);
   const newRef = useRef<HTMLInputElement>(null);
@@ -133,13 +136,59 @@ export default function ParserCharactersPanel({
   const filteredCharacters = useMemo(() => {
     return characters.filter(c => {
       if (genderFilter !== "all" && c.gender !== genderFilter) return false;
-      if (roleFilter === "speaking") {
-        const role = c.role || "speaking";
-        return role === "speaking" || role === "crowd" || role === "system";
+      const role = c.role || "speaking";
+      if (roleFilter === "characters") {
+        return role === "speaking" || role === "mentioned" || role === "system";
+      }
+      if (roleFilter === "crowd") {
+        return role === "crowd";
       }
       return true;
     });
   }, [characters, genderFilter, roleFilter]);
+
+  // Sorted characters
+  const sortedCharacters = useMemo(() => {
+    const arr = [...filteredCharacters];
+    const dir = sortDir === "asc" ? 1 : -1;
+    switch (sortCol) {
+      case "name":
+        arr.sort((a, b) => dir * a.name.localeCompare(b.name));
+        break;
+      case "ch":
+        arr.sort((a, b) => {
+          const aMin = a.appearances.length > 0 ? Math.min(...a.appearances.map(ap => ap.chapterIdx)) : Infinity;
+          const bMin = b.appearances.length > 0 ? Math.min(...b.appearances.map(ap => ap.chapterIdx)) : Infinity;
+          return dir * (aMin - bMin) || a.name.localeCompare(b.name);
+        });
+        break;
+      case "brain":
+        arr.sort((a, b) => {
+          const aHas = a.profile?.description ? 1 : 0;
+          const bHas = b.profile?.description ? 1 : 0;
+          if (aHas !== bHas) return dir * (bHas - aHas);
+          return a.name.localeCompare(b.name);
+        });
+        break;
+    }
+    return arr;
+  }, [filteredCharacters, sortCol, sortDir]);
+
+  const handleSort = (col: "name" | "ch" | "brain") => {
+    if (sortCol === col) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortCol(col);
+      setSortDir("asc");
+    }
+  };
+
+  const SortIcon = ({ col }: { col: "name" | "ch" | "brain" }) => {
+    if (sortCol !== col) return null;
+    return sortDir === "asc"
+      ? <ChevronUp className="h-2.5 w-2.5 inline ml-0.5" />
+      : <ChevronDown className="h-2.5 w-2.5 inline ml-0.5" />;
+  };
 
   useEffect(() => {
     if (editingId) { editRef.current?.focus(); editRef.current?.select(); }
@@ -214,24 +263,28 @@ export default function ParserCharactersPanel({
         <RoleBadge roleId="profiler" model={profilerModel} isRu={isRu} size={16} />
         {characters.length > 0 && (
           <div className="flex items-center gap-1 ml-1">
-            {/* Role filter: speaking vs all */}
+            {/* Role filter: characters vs crowd vs all */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => setRoleFilter(f => f === "speaking" ? "all" : "speaking")}
+                  onClick={() => setRoleFilter(f => f === "characters" ? "crowd" : f === "crowd" ? "all" : "characters")}
                   className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors flex items-center gap-0.5 ${
-                    roleFilter === "speaking"
+                    roleFilter === "characters"
                       ? "bg-emerald-500/20 text-emerald-500 dark:text-emerald-400"
-                      : "text-muted-foreground/50 hover:text-muted-foreground"
+                      : roleFilter === "crowd"
+                        ? "bg-amber-500/20 text-amber-500 dark:text-amber-400"
+                        : "text-muted-foreground/50 hover:text-muted-foreground"
                   }`}
                 >
-                  <Mic className="h-3 w-3" />
+                  {roleFilter === "crowd" ? <MicOff className="h-3 w-3" /> : <Mic className="h-3 w-3" />}
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">
-                {roleFilter === "speaking"
-                  ? (isRu ? "Показаны говорящие · Нажми для всех" : "Showing speakers · Click for all")
-                  : (isRu ? "Показаны все · Нажми для говорящих" : "Showing all · Click for speakers")}
+                {roleFilter === "characters"
+                  ? (isRu ? "Персонажи · Нажми для массовки" : "Characters · Click for crowd")
+                  : roleFilter === "crowd"
+                    ? (isRu ? "Массовка · Нажми для всех" : "Crowd · Click for all")
+                    : (isRu ? "Все · Нажми для персонажей" : "All · Click for characters")}
               </TooltipContent>
             </Tooltip>
             {/* Gender filters */}
@@ -356,6 +409,16 @@ export default function ParserCharactersPanel({
               : (isRu ? `Профайл (${selectedIds.size})` : `Profile (${selectedIds.size})`)}
           </Button>
         )}
+        {selectedIds.size >= 1 && (
+          <Button
+            variant="ghost" size="sm"
+            onClick={() => setBulkDeleteConfirm(true)}
+            className="gap-1.5 text-xs text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {isRu ? `Удалить (${selectedIds.size})` : `Delete (${selectedIds.size})`}
+          </Button>
+        )}
       </div>
 
       {/* Add new character inline */}
@@ -404,21 +467,33 @@ export default function ParserCharactersPanel({
           </div>
         ) : (
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                 <TableHead className="w-7 px-1"></TableHead>
-                <TableHead className="text-xs">{isRu ? "Имя" : "Name"}</TableHead>
+                <TableHead
+                  className="text-xs cursor-pointer select-none hover:text-foreground transition-colors"
+                  onClick={() => handleSort("name")}
+                >
+                  {isRu ? "Имя" : "Name"}<SortIcon col="name" />
+                </TableHead>
                 <TableHead className="text-xs text-center w-10">{isRu ? "Пол" : "G"}</TableHead>
-                <TableHead className="text-xs text-center w-7 px-0">
-                  <Brain className="h-3 w-3 mx-auto text-muted-foreground/50" />
+                <TableHead
+                  className="text-xs text-center w-7 px-0 cursor-pointer select-none hover:text-foreground transition-colors"
+                  onClick={() => handleSort("brain")}
+                >
+                  <Brain className={`h-3 w-3 mx-auto ${sortCol === "brain" ? "text-primary" : "text-muted-foreground/50"}`} />
                 </TableHead>
                 <TableHead className="text-xs text-center w-12">{isRu ? "Сцен" : "Sc."}</TableHead>
-                <TableHead className="text-xs text-center w-12">{isRu ? "Гл." : "Ch."}</TableHead>
-                <TableHead className="w-7 px-1"></TableHead>
+                <TableHead
+                  className="text-xs text-center w-12 cursor-pointer select-none hover:text-foreground transition-colors"
+                  onClick={() => handleSort("ch")}
+                >
+                  {isRu ? "Гл." : "Ch."}<SortIcon col="ch" />
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredCharacters
+              {sortedCharacters
                 .map((char) => {
                 const isExpanded = expandedId === char.id;
                 const isSelected = selectedIds.has(char.id);
@@ -590,15 +665,6 @@ export default function ParserCharactersPanel({
                       {char.appearances.length}
                     </TableCell>
 
-                    {/* Delete */}
-                    <TableCell className="px-2">
-                      <button
-                        className="opacity-0 group-hover:opacity-50 hover:!opacity-100 text-destructive"
-                        onClick={() => setDeleteConfirm(char.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -732,6 +798,35 @@ export default function ParserCharactersPanel({
               onClick={() => {
                 if (deleteConfirm) onDelete(deleteConfirm);
                 setDeleteConfirm(null);
+              }}
+            >
+              {isRu ? "Удалить" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk delete confirmation */}
+      <AlertDialog open={bulkDeleteConfirm} onOpenChange={setBulkDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isRu ? `Удалить ${selectedIds.size} персонажей?` : `Delete ${selectedIds.size} characters?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isRu
+                ? "Выбранные персонажи будут удалены из списка."
+                : "Selected characters will be removed from the list."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                for (const id of selectedIds) onDelete(id);
+                setSelectedIds(new Set());
+                setBulkDeleteConfirm(false);
               }}
             >
               {isRu ? "Удалить" : "Delete"}
