@@ -462,23 +462,47 @@ export default function ParserCharactersPanel({
             {isRu ? `Объединить (${selectedIds.size})` : `Merge (${selectedIds.size})`}
           </Button>
         )}
-        {onProfile && selectedIds.size >= 1 && (
+        {onProfile && !profiling && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" disabled={analyzedCount === 0} className="gap-1.5 text-xs">
+                <Brain className="h-3.5 w-3.5" />
+                {isRu ? "Профайл (AI)" : "Profile (AI)"}
+                <ChevronDown className="h-3 w-3 ml-0.5 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[200px]">
+              <DropdownMenuItem onClick={() => onProfile([], "fresh")} className="gap-2 text-xs">
+                <RotateCcw className="h-3.5 w-3.5" />
+                {isRu ? "Пересоздать заново" : "Re-create all"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onProfile([], "continue")} className="gap-2 text-xs">
+                <Play className="h-3.5 w-3.5" />
+                {isRu ? "Продолжить" : "Continue"}
+              </DropdownMenuItem>
+              {selectedIds.size >= 1 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onProfile(Array.from(selectedIds), "selective")} className="gap-2 text-xs">
+                    <ListFilter className="h-3.5 w-3.5" />
+                    {isRu ? `Выборочно (${selectedIds.size})` : `Selective (${selectedIds.size})`}
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {profiling && (
           <Button
             variant="ghost" size="sm"
-            onClick={() => onProfile(Array.from(selectedIds))}
-            disabled={profiling || analyzedCount === 0}
+            onClick={onStopProfile}
             className="gap-1.5 text-xs"
           >
-            {profiling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Brain className="h-3.5 w-3.5" />}
-            {profiling
-              ? (
-                <>
-                  {profiledCount != null && profileTotal
-                    ? `${profiledCount}/${profileTotal}`
-                    : (profileProgress || (isRu ? "Профайлинг…" : "Profiling…"))}
-                </>
-              )
-              : (isRu ? `Профайл (${selectedIds.size})` : `Profile (${selectedIds.size})`)}
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            {profiledCount != null && profileTotal
+              ? `${profiledCount}/${profileTotal}`
+              : (profileProgress || (isRu ? "Профайлинг…" : "Profiling…"))}
+            <Square className="h-3 w-3 ml-1 fill-current" />
           </Button>
         )}
         {selectedIds.size >= 1 && (
