@@ -289,7 +289,7 @@ export function useCharacterExtraction({
         isRu,
       });
       if (error) throw error;
-      return data?.characters || [];
+      return (data as any)?.characters || [];
     };
 
     let errorCount = 0;
