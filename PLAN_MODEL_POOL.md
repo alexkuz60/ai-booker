@@ -175,7 +175,7 @@ interface AiRolePreset {
 
 Реализован класс `ModelPoolManager` — ядро параллельной обработки:
 
-- **Конструктор:** принимает `models: string[]`, `userApiKeys`, `perModelConcurrency` (default 2). Создаёт массив `PoolWorker` с привязкой к провайдеру и API-ключу через `getModelRegistryEntry()`.
+- **Конструктор:** принимает `models: string[]`, `userApiKeys`, `perModelConcurrency` (default 3). Создаёт массив `PoolWorker` с привязкой к провайдеру и API-ключу через `getModelRegistryEntry()`.
 - **`runAll(tasks, onProgress)`** — главный метод. Диспатчит задачи через bounded concurrency:
   - Создаёт пул слотов = `workers.length × perModelConcurrency`
   - Каждая задача получает воркера через `waitForWorker()` (round-robin)
