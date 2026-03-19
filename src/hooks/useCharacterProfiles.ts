@@ -3,17 +3,24 @@
  * Sends character names + scene excerpts to profile-characters-local edge function,
  * merges resulting profiles into local state.
  *
+ * Supports modes:
+ *  - "fresh": Re-profile all selected characters (clear existing profiles first)
+ *  - "continue": Skip characters that already have profiles
+ *  - "selective": Profile only specific charIds (default)
+ *
  * When a model pool is configured for the "profiler" role,
  * characters are split into batches and distributed across pool workers
  * via ModelPoolManager for parallel profiling.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
 import { ModelPoolManager, type PoolTask, type PoolStats, logPoolStats } from "@/lib/modelPoolManager";
 import type { Scene, ChapterStatus, TocChapter, LocalCharacter, CharacterProfile } from "@/pages/parser/types";
+
+export type ProfileMode = "fresh" | "continue" | "selective";
 
 interface UseCharacterProfilesParams {
   tocEntries: TocChapter[];
@@ -28,12 +35,14 @@ interface UseCharacterProfilesParams {
   effectivePool?: string[];
 }
 
-/** Split array into N roughly equal chunks */
-function chunkArray<T>(arr: T[], numChunks: number): T[][] {
+/** Max characters per batch to avoid output truncation */
+const MAX_CHARS_PER_BATCH = 10;
+
+/** Split array into chunks of at most `maxSize` */
+function chunkBySize<T>(arr: T[], maxSize: number): T[][] {
   const chunks: T[][] = [];
-  const size = Math.ceil(arr.length / numChunks);
-  for (let i = 0; i < arr.length; i += size) {
-    chunks.push(arr.slice(i, i + size));
+  for (let i = 0; i < arr.length; i += maxSize) {
+    chunks.push(arr.slice(i, i + maxSize));
   }
   return chunks;
 }
@@ -55,10 +64,51 @@ export function useCharacterProfiles({
   const [profiledCount, setProfiledCount] = useState(0);
   const [profileTotal, setProfileTotal] = useState(0);
   const { toast } = useToast();
+  const abortRef = useRef<AbortController | null>(null);
 
-  const profileCharacters = useCallback(async (charIds: string[]) => {
-    const charsToProfile = characters.filter(c => charIds.includes(c.id));
-    if (charsToProfile.length === 0) return;
+  const stopProfiling = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+  }, []);
+
+  const profileCharacters = useCallback(async (
+    charIds: string[],
+    mode: ProfileMode = "selective",
+  ) => {
+    // Determine which characters to profile based on mode
+    let charsToProfile: LocalCharacter[];
+
+    if (mode === "fresh") {
+      // All non-system characters, clear their profiles first
+      charsToProfile = characters.filter(c => c.role !== "system");
+      // Clear existing profiles
+      setCharacters(prev => {
+        const next = prev.map(c => c.role !== "system" ? { ...c, profile: undefined } : c);
+        persist(next);
+        return next;
+      });
+    } else if (mode === "continue") {
+      // Only characters without profiles
+      charsToProfile = characters.filter(c => c.role !== "system" && !c.profile?.description);
+    } else {
+      // selective — only selected charIds
+      charsToProfile = characters.filter(c => charIds.includes(c.id));
+    }
+
+    if (charsToProfile.length === 0) {
+      toast({
+        title: isRu ? "Нечего профилировать" : "Nothing to profile",
+        description: isRu
+          ? (mode === "continue" ? "У всех персонажей уже есть профили" : "Нет подходящих персонажей")
+          : (mode === "continue" ? "All characters already have profiles" : "No matching characters"),
+      });
+      return;
+    }
+
+    const abort = new AbortController();
+    abortRef.current = abort;
 
     setProfiling(true);
     setProfileProgress(isRu ? "Подготовка…" : "Preparing…");
@@ -80,6 +130,7 @@ export function useCharacterProfiles({
     if (scenesPayload.length === 0) {
       setProfiling(false);
       setProfileProgress(null);
+      abortRef.current = null;
       toast({ title: isRu ? "Нет сцен для анализа" : "No scenes to analyze", variant: "destructive" });
       return;
     }
@@ -97,6 +148,8 @@ export function useCharacterProfiles({
       speech_style?: string;
       description?: string;
     }>> => {
+      if (abort.signal.aborted) throw new Error("aborted");
+
       const registryEntry = getModelRegistryEntry(modelId);
       const apiKeyForModel = registryEntry?.apiKeyField
         ? userApiKeys[registryEntry.apiKeyField] || null
@@ -118,6 +171,7 @@ export function useCharacterProfiles({
         },
       });
 
+      if (abort.signal.aborted) throw new Error("aborted");
       if (error) throw error;
       return data?.profiles || [];
     };
@@ -160,11 +214,10 @@ export function useCharacterProfiles({
 
     try {
       if (usePool) {
-        // ── Pool mode: split characters into batches per model ──
-        const numBatches = Math.min(effectivePool.length, charsToProfile.length);
-        const batches = chunkArray(charsToProfile, numBatches);
+        // ── Pool mode: split characters into small batches ──
+        const batches = chunkBySize(charsToProfile, MAX_CHARS_PER_BATCH);
 
-        console.log(`[CharProfile] Pool mode: ${effectivePool.length} models, ${batches.length} batches, ${charsToProfile.length} chars`);
+        console.log(`[CharProfile] Pool mode: ${effectivePool.length} models, ${batches.length} batches (max ${MAX_CHARS_PER_BATCH} chars each), ${charsToProfile.length} chars total`);
 
         setProfileProgress(
           isRu
@@ -183,6 +236,7 @@ export function useCharacterProfiles({
         }>>[] = batches.map((batch, i) => ({
           id: `batch-${i}`,
           execute: async (modelId: string) => {
+            if (abort.signal.aborted) throw new Error("aborted");
             setProfileProgress(
               isRu
                 ? `Профайлинг: группа ${i + 1}/${batches.length} (${batch.length} перс.)`
@@ -201,6 +255,7 @@ export function useCharacterProfiles({
 
         const poolStartTime = Date.now();
         const results = await manager.runAll(tasks, (progress) => {
+          if (abort.signal.aborted) return;
           setProfileProgress(
             isRu
               ? `Профайлинг: ${progress.done}/${progress.total} групп`
@@ -211,6 +266,11 @@ export function useCharacterProfiles({
         const finalStats = manager.getStats();
         setProfilePoolStats(finalStats);
         logPoolStats(finalStats, "profile_characters", Date.now() - poolStartTime);
+
+        if (abort.signal.aborted) {
+          toast({ title: isRu ? "Профайлинг остановлен" : "Profiling stopped" });
+          return;
+        }
 
         // Count errors (profiles already applied incrementally)
         let errorCount = 0;
@@ -243,24 +303,41 @@ export function useCharacterProfiles({
           });
         }
       } else {
-        // ── Classic single-call mode ──
-        setProfileProgress(
-          isRu
-            ? `Профайлинг ${charsToProfile.length} персонажей…`
-            : `Profiling ${charsToProfile.length} characters…`
-        );
+        // ── Single/sequential mode: chunk into batches of MAX_CHARS_PER_BATCH ──
+        const batches = chunkBySize(charsToProfile, MAX_CHARS_PER_BATCH);
+        let completedProfiles = 0;
 
-        const profiles = await invokeProfile(charsToProfile, profilerModel);
-        const profiledCount = applyProfiles(profiles);
+        for (let i = 0; i < batches.length; i++) {
+          if (abort.signal.aborted) {
+            toast({ title: isRu ? "Профайлинг остановлен" : "Profiling stopped" });
+            return;
+          }
+
+          const batch = batches[i];
+          setProfileProgress(
+            isRu
+              ? `Профайлинг: группа ${i + 1}/${batches.length} (${batch.length} перс.)`
+              : `Profiling: batch ${i + 1}/${batches.length} (${batch.length} chars)`
+          );
+
+          const profiles = await invokeProfile(batch, profilerModel);
+          const count = applyProfiles(profiles);
+          completedProfiles += count;
+          setProfiledCount(completedProfiles);
+        }
 
         toast({
           title: isRu ? "Профайлинг завершён" : "Profiling complete",
           description: isRu
-            ? `Профили созданы для ${profiledCount} персонажей`
-            : `Profiles created for ${profiledCount} characters`,
+            ? `Профили созданы для ${completedProfiles} персонажей`
+            : `Profiles created for ${completedProfiles} characters`,
         });
       }
     } catch (err) {
+      if (abort.signal.aborted) {
+        toast({ title: isRu ? "Профайлинг остановлен" : "Profiling stopped" });
+        return;
+      }
       console.error("Profile characters failed:", err);
       const msg = err instanceof Error ? err.message : String(err);
       toast({
@@ -274,6 +351,7 @@ export function useCharacterProfiles({
       setProfilePoolStats([]);
       setProfiledCount(0);
       setProfileTotal(0);
+      abortRef.current = null;
     }
   }, [characters, chapterResults, tocEntries, profilerModel, userApiKeys, isRu, setCharacters, persist, toast, effectivePool]);
 
@@ -284,5 +362,6 @@ export function useCharacterProfiles({
     profiledCount,
     profileTotal,
     profileCharacters,
+    stopProfiling,
   };
 }
