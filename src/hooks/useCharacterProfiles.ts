@@ -321,8 +321,8 @@ export function useCharacterProfiles({
               : `Profiling: batch ${i + 1}/${batches.length} (${batch.length} chars)`
           );
 
-          const profiles = await invokeProfile(batch, profilerModel);
-          const count = applyProfiles(profiles);
+          const { profiles, usedModel } = await invokeProfile(batch, profilerModel);
+          const count = applyProfiles(profiles, usedModel);
           completedProfiles += count;
           setProfiledCount(completedProfiles);
         }
