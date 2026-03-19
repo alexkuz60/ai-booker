@@ -145,6 +145,8 @@ export function useCharacterExtraction({
           if ((!existing.gender || existing.gender === "unknown") && data.gender !== "unknown") {
             existing.gender = data.gender;
           }
+          if (!existing.age_hint && data.age_hint) existing.age_hint = data.age_hint;
+          if (!existing.manner_hint && data.manner_hint) existing.manner_hint = data.manner_hint;
           // Promote role: mentioned → speaking if seen speaking in another chapter
           if (existing.role === "mentioned" && (data.role === "speaking" || data.role === "crowd")) {
             existing.role = data.role;
@@ -159,6 +161,8 @@ export function useCharacterExtraction({
             aliases: data.aliases,
             gender: data.gender,
             role: data.role,
+            age_hint: data.age_hint,
+            manner_hint: data.manner_hint,
             appearances: data.appearances,
             sceneCount: data.sceneCount,
           };
