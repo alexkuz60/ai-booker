@@ -883,6 +883,9 @@ export default function ParserCharactersPanel({
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                     <Brain className="h-3 w-3" />
                     {isRu ? "Профиль" : "Profile"}
+                    {char.profile.profiledBy && (
+                      <RoleBadge roleId="profiler" model={char.profile.profiledBy} isRu={isRu} size={12} />
+                    )}
                   </h4>
                   <div className="text-xs text-foreground/80 space-y-1">
                     {char.profile.temperament && (
@@ -997,8 +1000,11 @@ export default function ParserCharactersPanel({
       <div className="w-[36rem] flex-shrink-0 border-l border-border flex flex-col min-h-0 overflow-hidden bg-muted/10">
         <div className="px-4 py-2.5 border-b border-border flex items-center gap-2 flex-shrink-0">
           <Brain className="h-4 w-4 text-primary" />
-          <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider flex-1">
+          <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider flex-1 flex items-center gap-1.5">
             {isRu ? "Профайл" : "Profile"}
+            {profileViewChar.profile.profiledBy && (
+              <RoleBadge roleId="profiler" model={profileViewChar.profile.profiledBy} isRu={isRu} size={13} />
+            )}
           </h3>
           <button
             onClick={() => setProfileViewId(null)}

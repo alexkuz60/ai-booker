@@ -141,13 +141,13 @@ export function useCharacterProfiles({
     const invokeProfile = async (
       chars: LocalCharacter[],
       modelId: string,
-    ): Promise<Array<{
+    ): Promise<{ profiles: Array<{
       name: string;
       age_group?: string;
       temperament?: string;
       speech_style?: string;
       description?: string;
-    }>> => {
+    }>; usedModel: string }> => {
       if (abort.signal.aborted) throw new Error("aborted");
 
       const registryEntry = getModelRegistryEntry(modelId);
@@ -173,7 +173,7 @@ export function useCharacterProfiles({
 
       if (abort.signal.aborted) throw new Error("aborted");
       if (error) throw error;
-      return data?.profiles || [];
+      return { profiles: data?.profiles || [], usedModel: data?.usedModel || modelId };
     };
 
     // ── Merge profiles into character state ──
@@ -183,7 +183,7 @@ export function useCharacterProfiles({
       temperament?: string;
       speech_style?: string;
       description?: string;
-    }>) => {
+    }>, usedModel: string) => {
       const profileByName = new Map<string, CharacterProfile>();
       for (const p of profiles) {
         profileByName.set(p.name.toLowerCase(), {
@@ -191,6 +191,7 @@ export function useCharacterProfiles({
           temperament: p.temperament,
           speech_style: p.speech_style,
           description: p.description,
+          profiledBy: usedModel,
         });
       }
 
@@ -227,13 +228,13 @@ export function useCharacterProfiles({
 
         const manager = new ModelPoolManager(effectivePool, userApiKeys, 2);
         let completedProfiles = 0;
-        const tasks: PoolTask<Array<{
+        const tasks: PoolTask<{ profiles: Array<{
           name: string;
           age_group?: string;
           temperament?: string;
           speech_style?: string;
           description?: string;
-        }>>[] = batches.map((batch, i) => ({
+        }>; usedModel: string }>[] = batches.map((batch, i) => ({
           id: `batch-${i}`,
           execute: async (modelId: string) => {
             if (abort.signal.aborted) throw new Error("aborted");
@@ -244,10 +245,10 @@ export function useCharacterProfiles({
             );
             const result = await invokeProfile(batch, modelId);
             // Apply profiles incrementally as each batch completes
-            if (result.length > 0) {
-              completedProfiles += result.length;
+            if (result.profiles.length > 0) {
+              completedProfiles += result.profiles.length;
               setProfiledCount(completedProfiles);
-              applyProfiles(result);
+              applyProfiles(result.profiles, result.usedModel);
             }
             return result;
           },
@@ -281,7 +282,7 @@ export function useCharacterProfiles({
             errorCount++;
             console.error("[CharProfile] Pool batch error:", result.message);
           } else {
-            totalProfiled += result.length;
+            totalProfiled += result.profiles.length;
           }
         }
 
@@ -320,8 +321,8 @@ export function useCharacterProfiles({
               : `Profiling: batch ${i + 1}/${batches.length} (${batch.length} chars)`
           );
 
-          const profiles = await invokeProfile(batch, profilerModel);
-          const count = applyProfiles(profiles);
+          const { profiles, usedModel } = await invokeProfile(batch, profilerModel);
+          const count = applyProfiles(profiles, usedModel);
           completedProfiles += count;
           setProfiledCount(completedProfiles);
         }

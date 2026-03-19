@@ -150,6 +150,8 @@ export interface CharacterProfile {
   temperament?: string;
   speech_style?: string;
   description?: string;
+  /** AI model that generated this profile ("клеймо мастера") */
+  profiledBy?: string;
 }
 
 export type CharacterRole = "speaking" | "mentioned" | "crowd" | "system";
