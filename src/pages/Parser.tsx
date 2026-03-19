@@ -539,6 +539,7 @@ export default function Parser() {
                 profiledCount={profiledCount}
                 profileTotal={profileTotal}
                 onProfile={profileCharacters}
+                onStopProfile={stopProfiling}
                 tocEntries={tocEntries}
                 chapterResults={chapterResults}
               />
