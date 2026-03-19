@@ -213,6 +213,7 @@ export function useCharacterExtraction({
         age_hint?: string;
         manner_hint?: string;
       }>,
+      usedModel?: string,
     ) => {
       for (const char of extracted) {
         const key = char.name.toLowerCase();
@@ -258,6 +259,7 @@ export function useCharacterExtraction({
               sceneNumbers: char.scene_numbers,
             }],
             sceneCount: char.scene_numbers.length,
+            extractedBy: usedModel,
           });
         }
       }
