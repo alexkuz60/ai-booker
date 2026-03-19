@@ -11,6 +11,7 @@
  */
 
 import { getModelRegistryEntry } from "@/config/modelRegistry";
+import { supabase } from "@/integrations/supabase/client";
 
 // ---------------------------------------------------------------------------
 // Types
