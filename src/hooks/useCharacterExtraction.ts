@@ -117,6 +117,8 @@ export function useCharacterExtraction({
       aliases: string[];
       gender: "male" | "female" | "unknown";
       role: CharacterRole;
+      age_hint?: string;
+      manner_hint?: string;
       appearances: CharacterAppearance[];
       sceneCount: number;
     }>();

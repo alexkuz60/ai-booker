@@ -172,6 +172,14 @@ async function callAI(
                       items: { type: "integer" },
                       description: "Scene numbers where the character appears",
                     },
+                    age_hint: {
+                      type: "string",
+                      description: "Optional age hint extracted from context (e.g. 'старик', 'ребёнок', 'elder', 'child'). Especially useful for crowd/anonymous voices.",
+                    },
+                    manner_hint: {
+                      type: "string",
+                      description: "Optional speech manner or emotional hint from context (e.g. 'хрипло', 'визгливо', 'gruffly', 'shrilly'). Especially useful for crowd/anonymous voices.",
+                    },
                   },
                   required: ["name", "aliases", "gender", "role", "scene_numbers"],
                   additionalProperties: false,
