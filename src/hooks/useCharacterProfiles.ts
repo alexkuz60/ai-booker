@@ -282,7 +282,7 @@ export function useCharacterProfiles({
             errorCount++;
             console.error("[CharProfile] Pool batch error:", result.message);
           } else {
-            totalProfiled += result.length;
+            totalProfiled += result.profiles.length;
           }
         }
 
