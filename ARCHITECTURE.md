@@ -397,7 +397,7 @@ Edge-функции получают `model` и `apiKey` от клиента. Л
 
 | Компонент | Файл | Назначение |
 |-----------|------|------------|
-| `ModelPoolManager` | `src/lib/modelPoolManager.ts` | Round-robin dispatch, concurrency=2/модель, retry 429/402, circuit breaker (3 ошибки → disable) |
+| `ModelPoolManager` | `src/lib/modelPoolManager.ts` | Round-robin dispatch, concurrency=3/модель, retry 429/402, circuit breaker (3 ошибки → disable), адаптивный размер батча для профайлинга |
 | `PoolSelector` | `src/components/profile/tabs/PoolSelector.tsx` | UI выбора моделей для пула роли |
 | `AiRolePresets` | `src/components/profile/tabs/AiRolePresets.tsx` | Пресеты с сохранением конфигурации пулов |
 | Pool в Extraction | `src/hooks/useCharacterExtraction.ts` | Распределение глав по моделям пула |

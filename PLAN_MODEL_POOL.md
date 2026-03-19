@@ -4,10 +4,10 @@
 
 Тяжёлые и стандартные ИИ-роли (Screenwriter, Director, Profiler, Proofreader, Sound Engineer)
 получают **пул моделей** вместо одной. Менеджер распределяет задачи round-robin с retry при 429/402.
-Конкурентность: **2 параллельных запроса на модель**.
+Конкурентность: **3 параллельных запроса на модель**.
 
-**Пример:** Profiler с пулом [gemini-2.5-pro, gpt-5, claude-3.5-sonnet] и concurrency=2 →
-6 параллельных потоков вместо 1.
+**Пример:** Profiler с пулом [gemini-2.5-pro, gpt-5, claude-3.5-sonnet] и concurrency=3 →
+9 параллельных потоков вместо 1.
 
 ## Архитектура
 
@@ -35,7 +35,7 @@ interface PoolWorker {
   provider: string;
   apiKey: string | null;
   activeCount: number;   // текущие in-flight запросы
-  maxConcurrency: number; // 2
+  maxConcurrency: number; // 3
   errorCount: number;     // счётчик ошибок для отключения
   disabled: boolean;      // true после 3+ ошибок подряд
 }
@@ -50,7 +50,7 @@ class ModelPoolManager {
   private workers: PoolWorker[];
   private roundRobinIdx: number = 0;
   
-  constructor(models: string[], userApiKeys: Record<string, string>, perModelConcurrency = 2);
+  constructor(models: string[], userApiKeys: Record<string, string>, perModelConcurrency = 3);
   
   // Главный метод — выполнить массив задач через пул
   async runAll<T>(tasks: PoolTask<T>[], onProgress?: (done: number, total: number) => void): Promise<Map<string, T | Error>>;
@@ -175,7 +175,7 @@ interface AiRolePreset {
 
 Реализован класс `ModelPoolManager` — ядро параллельной обработки:
 
-- **Конструктор:** принимает `models: string[]`, `userApiKeys`, `perModelConcurrency` (default 2). Создаёт массив `PoolWorker` с привязкой к провайдеру и API-ключу через `getModelRegistryEntry()`.
+- **Конструктор:** принимает `models: string[]`, `userApiKeys`, `perModelConcurrency` (default 3). Создаёт массив `PoolWorker` с привязкой к провайдеру и API-ключу через `getModelRegistryEntry()`.
 - **`runAll(tasks, onProgress)`** — главный метод. Диспатчит задачи через bounded concurrency:
   - Создаёт пул слотов = `workers.length × perModelConcurrency`
   - Каждая задача получает воркера через `waitForWorker()` (round-robin)
@@ -186,7 +186,9 @@ interface AiRolePreset {
 - **`getStats()`** — snapshot по воркерам для UI (completed, errors, active, disabled)
 - **`isRetryable()`** — regex-матчинг паттернов 429/402/rate-limit/quota/payment/credit
 
-**Тесты:** 8/8 — round-robin порядок, retry на другой воркер, disable после 3 ошибок, progress callback, concurrency ≤ 2, all-disabled fallback.
+**Тесты:** 8/8 — round-robin порядок, retry на другой воркер, disable после 3 ошибок, progress callback, concurrency ≤ 3, all-disabled fallback.
+
+**Адаптивный размер батча (профайлинг):** размер батча = `ceil(chars / poolSize)`, но не более `MAX_CHARS_PER_BATCH` (10). Это гарантирует, что каждая модель в пуле получит работу даже при малом числе персонажей (например, 4 персонажа на 10 моделей → 4 батча по 1).
 
 ### Этап 3: Расширение aiRoles.ts
 
