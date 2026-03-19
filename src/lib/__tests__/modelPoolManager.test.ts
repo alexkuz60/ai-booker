@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// Mock supabase client
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    auth: { getUser: () => Promise.resolve({ data: { user: { id: "test-user" } } }) },
+    from: () => ({ insert: () => Promise.resolve({ error: null }) }),
+  },
+}));
+
 // Mock modelRegistry before importing manager
 vi.mock("@/config/modelRegistry", () => ({
   getModelRegistryEntry: (id: string) => {
