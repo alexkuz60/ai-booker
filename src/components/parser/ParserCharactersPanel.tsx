@@ -140,16 +140,28 @@ export default function ParserCharactersPanel({
   const filteredCharacters = useMemo(() => {
     return characters.filter(c => {
       if (genderFilter !== "all" && c.gender !== genderFilter) return false;
+      // Search filter
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const nameMatch = c.name.toLowerCase().includes(q);
+        const aliasMatch = c.aliases.some(a => a.toLowerCase().includes(q));
+        if (!nameMatch && !aliasMatch) return false;
+      }
       const role = c.role || "speaking";
-      if (roleFilter === "characters") {
-        return role === "speaking" || role === "mentioned" || role === "system";
+      switch (roleFilter) {
+        case "main":
+          return (role === "speaking" || role === "system") && c.sceneCount > 1;
+        case "episodic":
+          return (role === "speaking" || role === "system") && c.sceneCount <= 1;
+        case "crowd":
+          return role === "crowd";
+        case "mentioned":
+          return role === "mentioned";
+        default:
+          return true;
       }
-      if (roleFilter === "crowd") {
-        return role === "crowd";
-      }
-      return true;
     });
-  }, [characters, genderFilter, roleFilter]);
+  }, [characters, genderFilter, roleFilter, searchQuery]);
 
   // Sorted characters
   const sortedCharacters = useMemo(() => {
