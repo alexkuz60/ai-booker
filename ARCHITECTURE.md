@@ -388,3 +388,29 @@ Edge-функции получают `model` и `apiKey` от клиента. Л
 | `supabase/functions/_shared/providerRouting.ts` | Унифицированный серверный роутинг (endpoint + model + apiKey) |
 | `supabase/functions/_shared/proxyapi.ts` | Маппинг моделей ProxyAPI + определение endpoint |
 | `src/lib/invokeWithFallback.ts` | Клиентский каскадный fallback при 402/429 |
+
+### 4.6 Model Pool — параллельная обработка
+
+Тяжёлые AI-операции (извлечение, профайлинг персонажей, пакетная раскадровка) могут использовать **пул моделей** для параллельного выполнения. Ускорение: ~10x на реальных данных (106 персонажей: ~30 мин → ~2-3 мин).
+
+**Архитектура:**
+
+| Компонент | Файл | Назначение |
+|-----------|------|------------|
+| `ModelPoolManager` | `src/lib/modelPoolManager.ts` | Round-robin dispatch, concurrency=2/модель, retry 429/402, circuit breaker (3 ошибки → disable) |
+| `PoolSelector` | `src/components/profile/tabs/PoolSelector.tsx` | UI выбора моделей для пула роли |
+| `AiRolePresets` | `src/components/profile/tabs/AiRolePresets.tsx` | Пресеты с сохранением конфигурации пулов |
+| Pool в Extraction | `src/hooks/useCharacterExtraction.ts` | Распределение глав по моделям пула |
+| Pool в Profiling | `src/hooks/useCharacterProfiles.ts` | Батчинг персонажей + инкрементальное применение профилей |
+| Pool в Segmentation | `src/components/studio/BatchSegmentationPanel.tsx` | Пакетная раскадровка сцен через пул |
+
+**Поведение:**
+- Пул активируется при `effectivePool.length > 1` (основная модель + дополнительные)
+- Задачи распределяются round-robin с 2 параллельными запросами на модель
+- При 429/402 задача автоматически перенаправляется на другой воркер (до 2 retry)
+- Воркер отключается после 3 последовательных ошибок (circuit breaker)
+- Профили персонажей применяются инкрементально по мере готовности батчей
+- Pool stats отображаются в UI в реальном времени (✓completed, ✗errors, ⟳active)
+- Конфигурация пулов сохраняется в пресетах и `useCloudSettings` (ключ `ai_role_model_pools`)
+
+**Роли с поддержкой пула:** `poolable: true` в `aiRoles.ts` — screenwriter, director, profiler, proofreader, sound-engineer.
