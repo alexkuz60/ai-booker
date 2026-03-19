@@ -76,7 +76,7 @@ export class ModelPoolManager {
   constructor(
     models: string[],
     userApiKeys: Record<string, string>,
-    private perModelConcurrency = 8,
+    private perModelConcurrency = 3,
   ) {
     if (models.length === 0) {
       throw new Error("ModelPoolManager requires at least one model");

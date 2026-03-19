@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2, AlertCircle,
   BookOpen, FolderOpen, Clapperboard, ChevronLeft, ChevronRightIcon, Trash2, ExternalLink, Clock, Merge,
+  PlayCircle, StopCircle,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +38,9 @@ interface NavSidebarProps {
   onOpenPdf?: (page?: number) => void;
   onRenamePart?: (oldTitle: string, newTitle: string) => void;
   onMergeEntries?: (indices: number[]) => void;
+  onBatchAnalyze?: () => void;
+  onStopAnalysis?: () => void;
+  isAnalyzing?: boolean;
   roleModels?: Partial<Record<AiRoleId, string>>;
 }
 
@@ -46,7 +50,8 @@ export default function NavSidebar({
   partGroups, partlessIndices,
   onSelectChapter, onAnalyzeChapter, onToggleNode, onSendToStudio, isChapterFullyDone,
   onChangeLevel, onDeleteEntry, onRenameEntry, onChangeStartPage,
-  onOpenPdf, onRenamePart, onMergeEntries, roleModels,
+  onOpenPdf, onRenamePart, onMergeEntries, onBatchAnalyze, onStopAnalysis, isAnalyzing,
+  roleModels,
 }: NavSidebarProps) {
   const isPdf = /\.pdf$/i.test(fileName);
   const [editingPartTitle, setEditingPartTitle] = useState<string | null>(null);
@@ -336,10 +341,35 @@ export default function NavSidebar({
             </Button>
           )}
         </div>
-        <p className="text-xs text-muted-foreground mt-1">
-          {totalPages} {t("pages", isRu)} • {contentEntries.length} {t("chapters", isRu)}
-          {supplementaryEntries.length > 0 && ` • ${supplementaryEntries.length} ${t("suppl", isRu)}`}
-        </p>
+        <div className="flex items-center justify-between mt-1">
+          <p className="text-xs text-muted-foreground">
+            {totalPages} {t("pages", isRu)} • {contentEntries.length} {t("chapters", isRu)}
+            {supplementaryEntries.length > 0 && ` • ${supplementaryEntries.length} ${t("suppl", isRu)}`}
+          </p>
+          {onBatchAnalyze && (
+            isAnalyzing ? (
+              <Button
+                variant="ghost" size="sm"
+                className="h-6 px-2 gap-1 text-[11px] text-destructive hover:text-destructive"
+                title={isRu ? "Остановить анализ" : "Stop analysis"}
+                onClick={onStopAnalysis}
+              >
+                <StopCircle className="h-3.5 w-3.5" />
+                {isRu ? "Стоп" : "Stop"}
+              </Button>
+            ) : (
+              <Button
+                variant="ghost" size="sm"
+                className="h-6 px-2 gap-1 text-[11px] text-primary hover:text-primary"
+                title={isRu ? "Раскадровка всех глав" : "Analyze all chapters"}
+                onClick={onBatchAnalyze}
+              >
+                <PlayCircle className="h-3.5 w-3.5" />
+                {isRu ? "Все главы" : "All chapters"}
+              </Button>
+            )
+          )}
+        </div>
       </div>
 
       {/* Bulk actions toolbar */}
