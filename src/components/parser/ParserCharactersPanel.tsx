@@ -665,15 +665,6 @@ export default function ParserCharactersPanel({
                       {char.appearances.length}
                     </TableCell>
 
-                    {/* Delete */}
-                    <TableCell className="px-2">
-                      <button
-                        className="opacity-0 group-hover:opacity-50 hover:!opacity-100 text-destructive"
-                        onClick={() => setDeleteConfirm(char.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </TableCell>
                   </TableRow>
                 );
               })}
