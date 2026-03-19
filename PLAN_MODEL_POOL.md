@@ -314,3 +314,34 @@ BatchSegmentationPanel переработан для двухрежимной р
   - Выделена функция `invokeProfile(chars, modelId)` — единая точка вызова edge function
   - Выделена функция `applyProfiles(profiles)` — слияние результатов в state + persist
   - Утилита `chunkArray<T>(arr, numChunks)` для деления массива на группы
+
+### Этап 9: Пресеты с пулами
+
+**Файлы:** `src/components/profile/tabs/AiRolePresets.tsx`, `src/components/profile/tabs/AiRolesTab.tsx`
+
+Формат пресетов расширен для сохранения/восстановления конфигураций пулов:
+
+- **Интерфейс `AiRolePreset`**: добавлено опциональное поле `pools?: AiRolePoolMap`
+- **Сохранение** (`handleSave`/`handleUpdate`): текущие `pools` записываются в пресет (если непустые)
+- **Загрузка** (`handleLoad`): вызывает `onLoadPreset(preset.models, preset.pools)` — `loadPreset` в useAiRoles уже поддерживает второй аргумент
+- **UI индикаторы:**
+  - При сохранении: информация о количестве включённых пулов (иконка Layers + текст)
+  - В списке overwrite: иконка Layers у пресетов с пулами
+  - В списке загрузки: бейдж с количеством пулов (⚡ N) у пресетов с пулами
+- **Обратная совместимость**: старые пресеты без поля `pools` загружаются корректно (undefined → пулы не затрагиваются)
+- **Проброс:** `currentPools` передаётся из AiRolesTab в AiRolePresets
+
+---
+
+## Статус: все 9 этапов завершены ✅
+
+Система пулов моделей полностью реализована:
+1. ✅ ModelPoolManager (ядро)
+2. ✅ Тесты менеджера
+3. ✅ aiRoles.ts (poolable, AiRolePoolMap)
+4. ✅ useAiRoles (pool API)
+5. ✅ UI пулов (PoolSelector)
+6. ✅ BatchSegmentationPanel (пакетная раскадровка)
+7. ✅ useCharacterExtraction (извлечение персонажей)
+8. ✅ useCharacterProfiles (профайлинг персонажей)
+9. ✅ Пресеты с пулами
