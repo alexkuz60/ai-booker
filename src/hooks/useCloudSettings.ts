@@ -82,6 +82,9 @@ export function useCloudSettings<T>(
     }
   }, [settingKey]);
 
+  // Keep flushRef in sync
+  flushRef.current = flushToDb;
+
   const saveToDb = useCallback((newValue: T) => {
     if (!user?.id) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -115,6 +118,7 @@ export function useCloudSettings<T>(
   }, [defaultValue, cacheKey, user?.id, settingKey]);
 
   // On unmount: FLUSH pending save instead of cancelling
+  // Empty deps — reads only from refs, safe during HMR
   useEffect(() => {
     return () => {
       if (debounceRef.current) {
@@ -124,11 +128,10 @@ export function useCloudSettings<T>(
       const pending = pendingSaveRef.current;
       if (pending) {
         pendingSaveRef.current = null;
-        // Fire-and-forget: save completes even after unmount
-        flushToDb(pending.userId, pending.value);
+        flushRef.current?.(pending.userId, pending.value);
       }
     };
-  }, [flushToDb]);
+  }, []);
 
   return { value, update, reset, loaded };
 }
