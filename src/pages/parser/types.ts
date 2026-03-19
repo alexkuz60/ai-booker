@@ -161,6 +161,10 @@ export interface LocalCharacter {
   gender?: "male" | "female" | "unknown";
   /** Role classification: speaking (has dialogue), mentioned (only referenced), crowd (anonymous voice), system (Narrator/Commentator) */
   role?: CharacterRole;
+  /** Contextual age hint extracted from text (e.g. "старик", "ребёнок") — mostly for crowd */
+  age_hint?: string;
+  /** Contextual manner/emotion hint from text (e.g. "хрипло", "визгливо") — mostly for crowd */
+  manner_hint?: string;
   appearances: CharacterAppearance[];
   /** Number of scenes the character appears in */
   sceneCount: number;

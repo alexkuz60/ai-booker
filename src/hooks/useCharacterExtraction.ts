@@ -117,6 +117,8 @@ export function useCharacterExtraction({
       aliases: string[];
       gender: "male" | "female" | "unknown";
       role: CharacterRole;
+      age_hint?: string;
+      manner_hint?: string;
       appearances: CharacterAppearance[];
       sceneCount: number;
     }>();
@@ -143,6 +145,8 @@ export function useCharacterExtraction({
           if ((!existing.gender || existing.gender === "unknown") && data.gender !== "unknown") {
             existing.gender = data.gender;
           }
+          if (!existing.age_hint && data.age_hint) existing.age_hint = data.age_hint;
+          if (!existing.manner_hint && data.manner_hint) existing.manner_hint = data.manner_hint;
           // Promote role: mentioned → speaking if seen speaking in another chapter
           if (existing.role === "mentioned" && (data.role === "speaking" || data.role === "crowd")) {
             existing.role = data.role;
@@ -157,6 +161,8 @@ export function useCharacterExtraction({
             aliases: data.aliases,
             gender: data.gender,
             role: data.role,
+            age_hint: data.age_hint,
+            manner_hint: data.manner_hint,
             appearances: data.appearances,
             sceneCount: data.sceneCount,
           };
@@ -216,6 +222,8 @@ export function useCharacterExtraction({
           gender: "male" | "female" | "unknown";
           role?: "speaking" | "mentioned" | "crowd";
           scene_numbers: number[];
+          age_hint?: string;
+          manner_hint?: string;
         }> = data?.characters || [];
 
         for (const char of extracted) {
@@ -236,6 +244,9 @@ export function useCharacterExtraction({
             if (existing.gender === "unknown" && char.gender !== "unknown") {
               existing.gender = char.gender;
             }
+            // Capture age/manner hints (first non-empty wins)
+            if (!existing.age_hint && char.age_hint) existing.age_hint = char.age_hint;
+            if (!existing.manner_hint && char.manner_hint) existing.manner_hint = char.manner_hint;
             // Promote role: mentioned → speaking/crowd
             const charRole = char.role || "speaking";
             if (existing.role === "mentioned" && charRole !== "mentioned") {
@@ -253,6 +264,8 @@ export function useCharacterExtraction({
               aliases: char.aliases,
               gender: char.gender,
               role: char.role || "speaking",
+              age_hint: char.age_hint,
+              manner_hint: char.manner_hint,
               appearances: [{
                 chapterIdx: idx,
                 chapterTitle: entry.title,
