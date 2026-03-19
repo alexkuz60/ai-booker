@@ -1019,8 +1019,11 @@ export default function ParserCharactersPanel({
         <ScrollArea className="flex-1 min-h-0">
           <div className="p-4 space-y-4">
             {/* Character name */}
-            <h4 className="text-base font-semibold font-display text-foreground">
+            <h4 className="text-base font-semibold font-display text-foreground flex items-center gap-1.5">
               {profileViewChar.name}
+              {profileViewChar.extractedBy && (
+                <RoleBadge roleId="profiler" model={profileViewChar.extractedBy} isRu={isRu} size={13} />
+              )}
             </h4>
 
             {/* Description */}
