@@ -226,10 +226,12 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     } catch (err) {
       console.warn("[Library] Server books fetch failed:", err);
       setServerBooks([]);
+      // Allow retry on next effect cycle if fetch failed
+      serverBooksLoadedRef.current = false;
     } finally {
       setLoadingServerBooks(false);
     }
-  }, [userId, loadLibraryFromServer, books]);
+  }, [userId, loadLibraryFromServer]);
 
   // Auto-load when on library step
   useEffect(() => {
