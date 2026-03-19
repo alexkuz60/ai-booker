@@ -90,6 +90,7 @@ export const AI_ROLES: Record<AiRoleId, AiRoleDefinition> = {
     defaultModelAdmin: "google/gemini-2.5-pro",
     defaultModelUser: "google/gemini-2.5-pro",
     tier: "heavy",
+    poolable: true,
     systemPrompt:
       "You are an experienced audiobook director and dramaturg. " +
       "Analyze chapters for pacing, emotional arc, and dramatic tension. " +
