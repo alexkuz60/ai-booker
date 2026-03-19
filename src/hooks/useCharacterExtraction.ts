@@ -381,6 +381,7 @@ export function useCharacterExtraction({
     await persist(finalSnapshot);
     setExtracting(false);
     setExtractProgress(null);
+    setExtractPoolStats([]);
 
     // Show appropriate toast based on error rate
     if (errorCount >= chaptersToProcess.length) {
