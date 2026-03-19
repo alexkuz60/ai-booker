@@ -38,6 +38,9 @@ interface NavSidebarProps {
   onOpenPdf?: (page?: number) => void;
   onRenamePart?: (oldTitle: string, newTitle: string) => void;
   onMergeEntries?: (indices: number[]) => void;
+  onBatchAnalyze?: () => void;
+  onStopAnalysis?: () => void;
+  isAnalyzing?: boolean;
   roleModels?: Partial<Record<AiRoleId, string>>;
 }
 
