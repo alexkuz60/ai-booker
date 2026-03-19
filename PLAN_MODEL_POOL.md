@@ -160,7 +160,7 @@ interface AiRolePreset {
 | 3 | Расширить aiRoles.ts | `src/config/aiRoles.ts` | — | ✅ Done |
 | 4 | Расширить useAiRoles | `src/hooks/useAiRoles.ts` | #3 | ✅ Done |
 | 5 | UI пулов в AiRolesTab | `AiRolesTab.tsx`, `PoolSelector.tsx` | #4 | ✅ Done |
-| 6 | Интеграция BatchSegmentationPanel | `src/components/studio/BatchSegmentationPanel.tsx` | #1, #4 | 🔲 |
+| 6 | Интеграция BatchSegmentationPanel | `BatchSegmentationPanel.tsx`, `StudioWorkspace.tsx`, `Studio.tsx` | #1, #4 | ✅ Done |
 | 7 | Интеграция useCharacterExtraction | `src/hooks/useCharacterExtraction.ts` | #1, #4 | 🔲 |
 | 8 | Интеграция useCharacterProfiles | `src/hooks/useCharacterProfiles.ts` | #1, #4 | 🔲 |
 | 9 | Пресеты с пулами | `src/components/profile/tabs/AiRolePresets.tsx` | #4 | 🔲 |
@@ -244,3 +244,28 @@ interface AiRolePreset {
 - **AiRolesTab** интегрирует `PoolSelector` только для ролей с `poolable: true` (5 из 6, кроме Translator)
 - **Pool badge** `🔲 пул/pool` в заголовке карточки роли — виден когда `isPoolEnabled` (>1 модели)
 - **Reset** сбрасывает пулы вместе с overrides
+
+### Этап 6: Интеграция ModelPoolManager в BatchSegmentationPanel
+
+**Файлы:** `src/components/studio/BatchSegmentationPanel.tsx`, `src/components/studio/StudioWorkspace.tsx`, `src/pages/Studio.tsx`
+
+BatchSegmentationPanel переработан для двухрежимной работы:
+
+- **Режим пула** (pool enabled, >1 модели для роли `screenwriter`):
+  - Создаётся `ModelPoolManager(effectivePool, userApiKeys, 2)` — round-robin с retry
+  - Каждая сцена → `PoolTask`, execute вызывает `segment-scene` с `modelId` от менеджера
+  - `PoolStats` отображаются в реальном времени: per-model completed/errors/active/disabled
+  - Общий throughput: `models × 2` параллельных запросов
+  - При abort (`abortRef`) задачи выбрасывают ошибку и пул завершается
+
+- **Классический режим** (single model, без пула):
+  - Прежний паттерн с фиксированным concurrency (default 3 workers)
+  - Используется `getModelForRole("screenwriter")` — одна модель для всех сцен
+
+- **UI расширения:**
+  - Badge `⚡ N потоков/workers` в хедере при активном пуле
+  - Строка прогресса показывает `Pool: N models × 2 workers` вместо `Concurrency: N workers`
+  - Блок pool stats под прогресс-баром: per-model бейджи с ✓completed, ✗errors, ⟳active
+  - Цветовая кодировка: primary (active), destructive (disabled), muted (idle)
+
+- **Проброс данных:** `userApiKeys` пробрасывается Studio.tsx → StudioWorkspace → BatchSegmentationPanel

@@ -1,11 +1,13 @@
-import { useState, useCallback, useEffect, useRef } from "react";
-import { Loader2, CheckCircle2, XCircle, Sparkles, Play, Square } from "lucide-react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { Loader2, CheckCircle2, XCircle, Sparkles, Play, Square, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAiRoles } from "@/hooks/useAiRoles";
+import { ModelPoolManager, type PoolTask, type PoolStats } from "@/lib/modelPoolManager";
 import { toast } from "sonner";
 
 interface SceneInfo {
@@ -22,6 +24,8 @@ interface SceneJob {
   status: SceneStatus;
   error?: string;
   segmentCount?: number;
+  /** Which model processed this scene (pool mode) */
+  modelUsed?: string;
 }
 
 interface BatchSegmentationPanelProps {
@@ -29,6 +33,8 @@ interface BatchSegmentationPanelProps {
   sceneIds: string[];
   scenes: SceneInfo[];
   bookId: string | null;
+  /** User API keys for pool model resolution */
+  userApiKeys?: Record<string, string>;
   concurrency?: number;
   onComplete?: () => void;
   onSceneSegmented?: (sceneId: string) => void;
@@ -40,16 +46,22 @@ export function BatchSegmentationPanel({
   sceneIds,
   scenes,
   bookId,
+  userApiKeys = {},
   concurrency = 3,
   onComplete,
   onSceneSegmented,
   onClose,
 }: BatchSegmentationPanelProps) {
-  const { getModelForRole } = useAiRoles();
+  const { getModelForRole, getEffectivePool, isPoolEnabled } = useAiRoles(userApiKeys);
   const [jobs, setJobs] = useState<SceneJob[]>([]);
   const [running, setRunning] = useState(false);
+  const [poolStats, setPoolStats] = useState<PoolStats[]>([]);
   const abortRef = useRef(false);
   const startedRef = useRef(false);
+  const managerRef = useRef<ModelPoolManager | null>(null);
+
+  const poolActive = isPoolEnabled("screenwriter");
+  const effectivePool = useMemo(() => getEffectivePool("screenwriter"), [getEffectivePool]);
 
   // Initialize jobs
   useEffect(() => {
@@ -63,55 +75,111 @@ export function BatchSegmentationPanel({
     setJobs(prev => prev.map(j => j.scene.id === sceneId ? { ...j, ...update } : j));
   }, []);
 
-  const processScene = useCallback(async (job: SceneJob): Promise<void> => {
-    if (abortRef.current) return;
-    const { scene } = job;
+  // ── Pool-based batch ──────────────────────────────────────────────────
 
-    updateJob(scene.id, { status: "analyzing" });
+  const runPoolBatch = useCallback(async (pendingJobs: SceneJob[]) => {
+    const manager = new ModelPoolManager(effectivePool, userApiKeys, 2);
+    managerRef.current = manager;
 
-    try {
-      const { data, error } = await supabase.functions.invoke("segment-scene", {
-        body: {
-          scene_id: scene.id,
-          language: isRu ? "ru" : "en",
-          model: getModelForRole("screenwriter"),
-        },
-      });
-      if (error) throw error;
-      const count = data?.segments?.length ?? 0;
-      updateJob(scene.id, { status: "done", segmentCount: count });
-      onSceneSegmented?.(scene.id);
-    } catch (err: any) {
-      const msg = err?.message || String(err);
-      updateJob(scene.id, { status: "error", error: msg });
+    const tasks: PoolTask<{ sceneId: string; count: number }>[] = pendingJobs.map(job => ({
+      id: job.scene.id,
+      execute: async (modelId: string, _apiKey: string | null) => {
+        if (abortRef.current) throw new Error("Aborted");
+        updateJob(job.scene.id, { status: "analyzing" });
+
+        const { data, error } = await supabase.functions.invoke("segment-scene", {
+          body: {
+            scene_id: job.scene.id,
+            language: isRu ? "ru" : "en",
+            model: modelId,
+          },
+        });
+        if (error) throw error;
+        const count = data?.segments?.length ?? 0;
+        return { sceneId: job.scene.id, count };
+      },
+    }));
+
+    const results = await manager.runAll(tasks, (progress) => {
+      setPoolStats(manager.getStats());
+    });
+
+    // Apply results
+    for (const [sceneId, result] of results) {
+      if (result instanceof Error) {
+        updateJob(sceneId, { status: "error", error: result.message });
+      } else {
+        updateJob(sceneId, {
+          status: "done",
+          segmentCount: result.count,
+        });
+        onSceneSegmented?.(sceneId);
+      }
     }
-  }, [isRu, getModelForRole, updateJob, onSceneSegmented]);
 
-  const runBatch = useCallback(async () => {
-    if (running) return;
-    setRunning(true);
-    abortRef.current = false;
+    setPoolStats(manager.getStats());
+    managerRef.current = null;
+  }, [effectivePool, userApiKeys, isRu, updateJob, onSceneSegmented]);
 
-    const queue = [...jobs.filter(j => j.status === "pending" || j.status === "error")];
+  // ── Classic fixed-concurrency batch ───────────────────────────────────
+
+  const runClassicBatch = useCallback(async (pendingJobs: SceneJob[]) => {
+    const model = getModelForRole("screenwriter");
+    const queue = [...pendingJobs];
     let idx = 0;
 
     const worker = async () => {
       while (idx < queue.length && !abortRef.current) {
         const job = queue[idx++];
         if (!job) break;
-        await processScene(job);
+        updateJob(job.scene.id, { status: "analyzing" });
+        try {
+          const { data, error } = await supabase.functions.invoke("segment-scene", {
+            body: {
+              scene_id: job.scene.id,
+              language: isRu ? "ru" : "en",
+              model,
+            },
+          });
+          if (error) throw error;
+          const count = data?.segments?.length ?? 0;
+          updateJob(job.scene.id, { status: "done", segmentCount: count });
+          onSceneSegmented?.(job.scene.id);
+        } catch (err: any) {
+          updateJob(job.scene.id, { status: "error", error: err?.message || String(err) });
+        }
       }
     };
 
-    const workers = Array.from({ length: Math.min(concurrency, queue.length) }, () => worker());
+    const workers = Array.from(
+      { length: Math.min(concurrency, queue.length) },
+      () => worker(),
+    );
     await Promise.all(workers);
+  }, [getModelForRole, concurrency, isRu, updateJob, onSceneSegmented]);
+
+  // ── Orchestrator ──────────────────────────────────────────────────────
+
+  const runBatch = useCallback(async () => {
+    if (running) return;
+    setRunning(true);
+    abortRef.current = false;
+    setPoolStats([]);
+
+    const pending = jobs.filter(j => j.status === "pending" || j.status === "error");
+
+    if (poolActive && effectivePool.length > 1) {
+      await runPoolBatch(pending);
+    } else {
+      await runClassicBatch(pending);
+    }
 
     setRunning(false);
     if (!abortRef.current) {
       onComplete?.();
       toast.success(isRu ? "Пакетный анализ завершён" : "Batch analysis complete");
     }
-  }, [jobs, running, concurrency, processScene, onComplete, isRu]);
+  }, [jobs, running, poolActive, effectivePool, runPoolBatch, runClassicBatch, onComplete, isRu]);
 
   const handleStop = useCallback(() => {
     abortRef.current = true;
@@ -121,7 +189,6 @@ export function BatchSegmentationPanel({
   useEffect(() => {
     if (jobs.length > 0 && !startedRef.current) {
       startedRef.current = true;
-      // Small delay to allow render
       setTimeout(() => runBatch(), 100);
     }
   }, [jobs.length]);
@@ -158,6 +225,8 @@ export function BatchSegmentationPanel({
     return isRu ? labels[status][0] : labels[status][1];
   };
 
+  const totalWorkers = poolActive ? effectivePool.length * 2 : concurrency;
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -171,6 +240,12 @@ export function BatchSegmentationPanel({
             {doneCount}/{totalCount}
             {errorCount > 0 && <span className="text-destructive ml-1">({errorCount} err)</span>}
           </span>
+          {poolActive && (
+            <Badge variant="secondary" className="text-[9px] px-1.5 py-0 gap-0.5">
+              <Layers className="h-2.5 w-2.5" />
+              {isRu ? `${totalWorkers} потоков` : `${totalWorkers} workers`}
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
           {running ? (
@@ -201,15 +276,49 @@ export function BatchSegmentationPanel({
         <Progress value={progressPct} className="h-2" />
         <div className="flex items-center justify-between mt-1">
           <span className="text-[11px] text-muted-foreground font-body">
-            {isRu
-              ? `Параллельность: ${concurrency} потока`
-              : `Concurrency: ${concurrency} workers`}
+            {poolActive
+              ? (isRu
+                ? `Пул: ${effectivePool.length} моделей × 2 потока`
+                : `Pool: ${effectivePool.length} models × 2 workers`)
+              : (isRu
+                ? `Параллельность: ${concurrency} потока`
+                : `Concurrency: ${concurrency} workers`)}
           </span>
           <span className="text-[11px] text-muted-foreground font-mono">
             {Math.round(progressPct)}%
           </span>
         </div>
       </div>
+
+      {/* Pool stats — shown only when pool is active and running/completed */}
+      {poolActive && poolStats.length > 0 && (
+        <div className="px-4 py-1.5 border-b border-border shrink-0">
+          <div className="flex flex-wrap gap-2">
+            {poolStats.map((s) => (
+              <div
+                key={s.model}
+                className={cn(
+                  "text-[10px] font-mono px-2 py-0.5 rounded-md border",
+                  s.disabled
+                    ? "border-destructive/30 text-destructive bg-destructive/5"
+                    : s.active > 0
+                      ? "border-primary/30 text-primary bg-primary/5"
+                      : "border-border text-muted-foreground bg-card/50",
+                )}
+              >
+                <span className="truncate max-w-[120px] inline-block align-middle">
+                  {s.model.split("/").pop()}
+                </span>
+                <span className="ml-1.5">
+                  ✓{s.completed}
+                  {s.errors > 0 && <span className="text-destructive ml-0.5">✗{s.errors}</span>}
+                  {s.active > 0 && <span className="text-primary ml-0.5">⟳{s.active}</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Scene list */}
       <ScrollArea className="flex-1 min-h-0">
