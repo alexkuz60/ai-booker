@@ -211,9 +211,34 @@ Character {
   archetype: string               // тембровый архетип: Мудрец/Герой/Опекун/Трикстер/...
   voice_config: json              // { provider, voice_id, role, speed, pitch, volume }
   color: string                   // цвет для UI-маркировки на таймлайне
+  sort_order: number              // по частоте появления
+}
+```
+
+#### Схема БД
+
+**Таблица `book_characters`** — глобальный реестр персонажей книги:
+
+| Поле | Тип | Описание |
+|------|------|----------|
+| `id` | uuid PK | — |
+| `book_id` | uuid FK → books | Привязка к книге |
+| `name` | text | Основное имя |
+| `aliases` | text[] | Псевдонимы и вариации |
+| `gender` | text | male / female / unknown |
+| `age_group` | text | child / teen / young / adult / elder / unknown |
+| `temperament` | text | sanguine / choleric / melancholic / phlegmatic |
+| `speech_style` | text | Свободное описание стиля речи |
+| `description` | text | Краткий профиль от AI |
+| `speech_tags` | text[] | Теги манеры речи для TTS (#отрывисто, #быстро) |
+| `psycho_tags` | text[] | Теги психотипа (#паникер, #невротик) |
+| `voice_config` | jsonb | `{ provider, voice_id, role, speed, pitch, volume }` |
+| `color` | text | Цвет для UI-маркировки |
 | `sort_order` | int | Порядок (по частоте появления) |
 | `created_at` | timestamptz | — |
 | `updated_at` | timestamptz | — |
+
+> **Примечание:** `accentuation` и `archetype` хранятся в LocalCharacter.profile (OPFS) и в voice_config.meta при Push to Server. Отдельные колонки не нужны — расширяемость без миграций.
 
 **Таблица `character_appearances`** — связь "персонаж ↔ сцена":
 
