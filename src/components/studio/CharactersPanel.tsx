@@ -1436,6 +1436,41 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                         </p>
                       </div>
                     )}
+                    {/* Scene-level Speech Refinement */}
+                    {sceneId && sceneCharIds.has(selectedChar.id) && (
+                      <div className="mt-4 pt-3 border-t border-border">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                            <MessageSquareQuote className="h-3 w-3" />
+                            {isRu ? "Речь в сцене" : "Speech in Scene"}
+                          </span>
+                          <Button variant="outline" size="sm" className="h-6 px-2 gap-1 text-xs" onClick={handleRefineSpeech} disabled={refiningSpeech || profiling}>
+                            {refiningSpeech ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                            {refiningSpeech ? (isRu ? "Анализ…" : "Analyzing…") : (isRu ? "Уточнить речь" : "Refine Speech")}
+                          </Button>
+                        </div>
+                        {(() => {
+                          const ctx = speechContextMap.get(`${selectedChar.id}:${sceneId}`);
+                          if (!ctx) return (<p className="text-[10px] text-muted-foreground/50 italic">{isRu ? "Нажмите «Уточнить речь» для анализа манеры в этой сцене" : "Click 'Refine Speech' to analyze manner in this scene"}</p>);
+                          return (
+                            <div className="space-y-1.5">
+                              {ctx.emotion && (<div className="flex items-center gap-2"><Badge variant="secondary" className="text-[10px] px-1.5 py-0">{isRu ? "Эмоция" : "Emotion"}</Badge><span className="text-xs text-foreground">{String(ctx.emotion)}</span></div>)}
+                              <div className="flex flex-wrap gap-1.5">
+                                {ctx.tempo && (<Badge variant="outline" className="text-[10px] px-1.5 py-0">⏱ {String(ctx.tempo)}</Badge>)}
+                                {ctx.volume_hint && (<Badge variant="outline" className="text-[10px] px-1.5 py-0">🔊 {String(ctx.volume_hint)}</Badge>)}
+                              </div>
+                              {ctx.manner && (<p className="text-xs text-muted-foreground italic">{String(ctx.manner)}</p>)}
+                              {(ctx.tts_instructions_ru || ctx.tts_instructions_en) && (
+                                <div className="mt-1 p-2 rounded-md bg-muted/30 border border-border">
+                                  <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "TTS инструкции" : "TTS Instructions"}</span>
+                                  <p className="text-[11px] text-foreground/80 mt-0.5">{String(isRu ? (ctx.tts_instructions_ru || ctx.tts_instructions_en) : (ctx.tts_instructions_en || ctx.tts_instructions_ru))}</p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (
