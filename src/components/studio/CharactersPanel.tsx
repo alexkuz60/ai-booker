@@ -471,58 +471,108 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     }
   };
 
-  // ── Auto-cast voices (incremental: only uncast characters) ──
+  // ── Auto-cast voices — show candidates panel for user choice ──
   const handleAutoCast = async () => {
     if (characters.length === 0) return;
+
+    // Only cast characters that don't have a voice yet
+    const toCast = characters.filter(ch => !ch.voice_config?.voice_id);
+    if (toCast.length === 0) {
+      toast.info(isRu ? "Все персонажи уже озвучены" : "All characters already have voices");
+      return;
+    }
+
+    // Build candidates for each character
+    const castChars: CastingCharacter[] = [];
+    for (const ch of toCast) {
+      if (isExtra(ch.id)) {
+        // Extras get random voices — no UI needed, auto-assign
+        continue;
+      }
+      const candidates = suggestVoiceCandidates({
+        gender: ch.gender,
+        ageGroup: ch.age_group,
+        temperament: ch.temperament,
+        speechTags: ch.speech_tags || [],
+        psychoTags: ch.psycho_tags || [],
+        provider: "yandex", // default provider
+      }, 3);
+      if (candidates.length > 0) {
+        castChars.push({
+          id: ch.id,
+          name: ch.name,
+          gender: ch.gender,
+          ageGroup: ch.age_group,
+          temperament: ch.temperament,
+          candidates,
+        });
+      }
+    }
+
+    // Auto-assign extras immediately
+    const extras = toCast.filter(ch => isExtra(ch.id));
+    if (extras.length > 0) {
+      for (const ch of extras) {
+        const pool = YANDEX_VOICES;
+        const randomVoice = pool[Math.floor(Math.random() * pool.length)] || YANDEX_VOICES[0];
+        const roles = randomVoice.roles ?? ["neutral"];
+        const roleId = roles[Math.floor(Math.random() * roles.length)];
+        const vc: BookCharacter["voice_config"] = {
+          provider: "yandex",
+          voice_id: randomVoice.id,
+          role: roleId !== "neutral" ? roleId : undefined,
+          speed: 1.0,
+          is_extra: true,
+        };
+        await supabase
+          .from("book_characters")
+          .update({ voice_config: vc, updated_at: new Date().toISOString() })
+          .eq("id", ch.id);
+        setCharacters(prev => prev.map(c => c.id === ch.id ? { ...c, voice_config: vc } : c));
+      }
+      if (extras.length > 0) {
+        toast.success(
+          isRu
+            ? `Массовка: ${extras.length} голосов назначено автоматически`
+            : `Extras: ${extras.length} voices auto-assigned`
+        );
+      }
+    }
+
+    // Show candidates panel for non-extras
+    if (castChars.length > 0) {
+      setCastingCandidates(castChars);
+    }
+  };
+
+  // ── Confirm casting choices ──
+  const handleCastingConfirm = async (picks: Map<string, VoiceCandidate>) => {
     setCasting(true);
+    setCastingCandidates(null);
     try {
-      // Collect already-used voice IDs from previously cast characters
       const usedVoices = new Set<string>();
       for (const ch of characters) {
         if (ch.voice_config?.voice_id) usedVoices.add(ch.voice_config.voice_id);
       }
 
-      // Only cast characters that don't have a voice yet
-      const toCast = characters.filter(ch => !ch.voice_config?.voice_id);
-      if (toCast.length === 0) {
-        toast.info(isRu ? "Все персонажи уже озвучены" : "All characters already have voices");
-        setCasting(false);
-        return;
-      }
-
       const updates: { id: string; voice_config: BookCharacter["voice_config"]; gender?: string }[] = [];
 
-      for (const ch of toCast) {
-        let voiceId: string;
-        let roleId: string;
+      for (const [charId, candidate] of picks) {
+        const ch = characters.find(c => c.id === charId);
+        if (!ch) continue;
 
-        if (isExtra(ch.id)) {
-          const pool = YANDEX_VOICES;
-          const randomVoice = pool[Math.floor(Math.random() * pool.length)] || YANDEX_VOICES[0];
-          voiceId = randomVoice.id;
-          const roles = randomVoice.roles ?? ["neutral"];
-          roleId = roles[Math.floor(Math.random() * roles.length)];
-        } else {
-          voiceId = matchVoice(ch.gender, ch.age_group);
-
-          const genderVoices = YANDEX_VOICES.filter(v =>
-            ch.gender !== "unknown" ? v.gender === ch.gender : true
-          );
-          if (usedVoices.has(voiceId) && genderVoices.length > 1) {
-            const alt = genderVoices.find(v => !usedVoices.has(v.id));
-            if (alt) voiceId = alt.id;
-          }
-
-          roleId = matchRole(voiceId, ch.temperament);
-        }
+        const voiceId = candidate.voiceId;
+        const accentuation = detectAccentuation(ch.psycho_tags || []);
+        const roleId = candidate.role
+          || (accentuation ? ACCENTUATION_YANDEX_ROLE[accentuation] : undefined)
+          || matchRole(voiceId, ch.temperament);
         usedVoices.add(voiceId);
 
-        // Sync gender from the chosen voice
         const chosenVoice = YANDEX_VOICES.find(v => v.id === voiceId);
         const syncedGender = chosenVoice ? chosenVoice.gender : ch.gender;
 
         const vc: BookCharacter["voice_config"] = {
-          provider: "yandex",
+          provider: candidate.provider,
           voice_id: voiceId,
           role: roleId !== "neutral" ? roleId : undefined,
           speed: 1.0,
@@ -531,7 +581,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         updates.push({ id: ch.id, voice_config: vc, gender: syncedGender });
       }
 
-      // Batch save to DB (voice_config + gender sync)
+      // Batch save to DB
       for (const u of updates) {
         const updateData: Record<string, unknown> = {
           voice_config: u.voice_config,
@@ -563,10 +613,11 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         }
       }
 
+      onVoiceSaved?.();
       toast.success(
         isRu
-          ? `Голоса подобраны для ${updates.length} новых персонажей`
-          : `Voices matched for ${updates.length} new characters`
+          ? `Голоса подобраны для ${updates.length} персонажей`
+          : `Voices matched for ${updates.length} characters`
       );
     } catch (e) {
       console.error("Auto-cast error:", e);
@@ -574,6 +625,10 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     } finally {
       setCasting(false);
     }
+  };
+
+  const handleCastingCancel = () => {
+    setCastingCandidates(null);
   };
 
   useImperativeHandle(ref, () => ({ autoCast: handleAutoCast, incrementalProfile: handleIncrementalProfile, casting, profiling }), [characters, selectedId, casting, profiling, chapterSceneIds]);
