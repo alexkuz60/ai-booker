@@ -162,7 +162,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [casting, setCasting] = useState(false);
 
   // Filter: "all" or "scene"
-  const [filterMode, setFilterMode] = useState<"all" | "scene">("all");
+  const [filterMode, setFilterMode] = useState<"all" | "scene" | "chapter">("chapter");
   const [sceneCharIds, setSceneCharIds] = useState<Set<string>>(new Set());
 
   // Sync with external selectedCharacterId
