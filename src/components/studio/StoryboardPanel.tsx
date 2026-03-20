@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json, Database } from "@/integrations/supabase/types";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
+import { useStoryboardPersistence, type StoryboardSnapshot } from "@/hooks/useStoryboardPersistence";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
 import { Loader2, Sparkles, BookOpen, AudioLines, CheckCircle2, XCircle, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck, AlertTriangle } from "lucide-react";
 import { RoleBadge } from "@/components/ui/RoleBadge";
@@ -24,6 +25,7 @@ import { SEGMENT_CONFIG } from "./storyboard/constants";
 import { EditablePhrase } from "./storyboard/EditablePhrase";
 import { SegmentTypeBadge } from "./storyboard/SegmentTypeBadge";
 import { SpeakerBadge } from "./storyboard/SpeakerBadge";
+import type { LocalTypeMappingEntry } from "@/lib/storyboardSync";
 
 // ─── Main component ─────────────────────────────────────────
 
@@ -56,6 +58,7 @@ export function StoryboardPanel({
 }) {
   const userApiKeys = useUserApiKeys();
   const { getModelForRole } = useAiRoles(userApiKeys);
+  const { loadFromLocal, persist, persistNow, clearLocal, hasStorage } = useStoryboardPersistence(sceneId);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -78,6 +81,18 @@ export function StoryboardPanel({
   const [cleaningMetadata, setCleaningMetadata] = useState(false);
   const [contentDirty, setContentDirty] = useState(false);
   const autoAnalyzeAttemptedRef = useRef<string | null>(null);
+  const typeMappingsRef = useRef<LocalTypeMappingEntry[]>([]);
+
+  /** Build a snapshot for OPFS persistence */
+  const buildSnapshot = useCallback(
+    (segs?: Segment[], audio?: Map<string, { status: string; durationMs: number }>, speaker?: string | null): StoryboardSnapshot => ({
+      segments: segs ?? segments,
+      typeMappings: typeMappingsRef.current,
+      audioStatus: audio ?? audioStatus,
+      inlineNarrationSpeaker: speaker !== undefined ? speaker : inlineNarrationSpeaker,
+    }),
+    [segments, audioStatus, inlineNarrationSpeaker],
+  );
 
   // Reset merge selection when scene changes
   useEffect(() => { setMergeChecked(new Set()); }, [sceneId]);
@@ -209,132 +224,134 @@ export function StoryboardPanel({
     setAudioStatus(map);
   }, []);
 
-  // Load existing segments from DB
+  // Load segments: OPFS first → DB fallback (seed after AI analysis only)
+  const loadSegmentsFromDb = useCallback(async (sid: string): Promise<Segment[]> => {
+    const { data: segs, error: segErr } = await supabase
+      .from("scene_segments")
+      .select("id, segment_number, segment_type, speaker, metadata")
+      .eq("scene_id", sid)
+      .order("segment_number");
+
+    if (segErr) throw segErr;
+    if (!segs || segs.length === 0) return [];
+
+    const segIds = segs.map((s) => s.id);
+    const [{ data: phrases, error: phErr }, { data: mappings }] = await Promise.all([
+      supabase
+        .from("segment_phrases")
+        .select("id, segment_id, phrase_number, text, metadata")
+        .in("segment_id", segIds)
+        .order("phrase_number"),
+      supabase
+        .from("scene_type_mappings")
+        .select("segment_type, character_id")
+        .eq("scene_id", sid),
+    ]);
+
+    if (phErr) throw phErr;
+
+    const charNameMap = new Map(characters.map(c => [c.id, c.name]));
+    const typeSpeakerMap = new Map<string, string>();
+    let loadedInlineSpeaker: string | null = null;
+    const localMappings: LocalTypeMappingEntry[] = [];
+    if (mappings) {
+      for (const m of mappings) {
+        const name = charNameMap.get(m.character_id);
+        if (name) {
+          typeSpeakerMap.set(m.segment_type, name);
+          localMappings.push({ segmentType: m.segment_type, characterId: m.character_id, characterName: name });
+          if (m.segment_type === "inline_narration") loadedInlineSpeaker = name;
+        }
+      }
+    }
+    typeMappingsRef.current = localMappings;
+    setInlineNarrationSpeaker(loadedInlineSpeaker);
+
+    const phraseMap = new Map<string, Phrase[]>();
+    for (const p of phrases || []) {
+      const list = phraseMap.get(p.segment_id) || [];
+      const phMeta = (p.metadata ?? {}) as Record<string, unknown>;
+      const annotations = Array.isArray(phMeta.annotations) ? phMeta.annotations as PhraseAnnotation[] : undefined;
+      list.push({ phrase_id: p.id, phrase_number: p.phrase_number, text: p.text, annotations });
+      phraseMap.set(p.segment_id, list);
+    }
+
+    const builtSegments = segs.map((s) => {
+      let speaker = s.speaker;
+      if (!speaker && typeSpeakerMap.has(s.segment_type)) {
+        speaker = typeSpeakerMap.get(s.segment_type)!;
+      }
+      const meta = (s.metadata ?? {}) as Record<string, unknown>;
+      const inlineNarr = Array.isArray(meta.inline_narrations) ? meta.inline_narrations as any[] : undefined;
+      const splitSilence = typeof meta.split_silence_ms === "number" ? meta.split_silence_ms : undefined;
+      return {
+        segment_id: s.id,
+        segment_number: s.segment_number,
+        segment_type: s.segment_type,
+        speaker,
+        phrases: phraseMap.get(s.id) || [],
+        inline_narrations: inlineNarr,
+        split_silence_ms: splitSilence,
+      };
+    });
+
+    return builtSegments;
+  }, [characters]);
+
+  /** Apply loaded segments to component state + persist to OPFS */
+  const applySegments = useCallback((builtSegments: Segment[], sid: string) => {
+    setSegments(builtSegments);
+    const inlineIds = new Set(builtSegments.filter(s => s.inline_narrations && s.inline_narrations.length > 0).map(s => s.segment_id));
+    setInlineNarrationSegIds(inlineIds);
+    setStaleAudioSegIds(new Set()); // stale detection is DB-specific, skip for OPFS
+    setLoaded(true);
+    loadAudioStatus(builtSegments.map(s => s.segment_id));
+  }, [loadAudioStatus]);
+
   const loadSegments = useCallback(async (sid: string) => {
     setLoading(true);
     try {
-      const { data: segs, error: segErr } = await supabase
-        .from("scene_segments")
-        .select("id, segment_number, segment_type, speaker, metadata")
-        .eq("scene_id", sid)
-        .order("segment_number");
+      // 1. Try OPFS first
+      if (hasStorage) {
+        const local = await loadFromLocal(sid);
+        if (local && local.segments.length > 0) {
+          console.debug(`[Storyboard] Loaded ${local.segments.length} segments from OPFS`);
+          typeMappingsRef.current = local.typeMappings || [];
+          setInlineNarrationSpeaker(local.inlineNarrationSpeaker);
+          setAudioStatus(new Map(Object.entries(local.audioStatus || {})));
+          applySegments(local.segments, sid);
+          setLoading(false);
+          return;
+        }
+      }
 
-      if (segErr) throw segErr;
-      if (!segs || segs.length === 0) {
+      // 2. Fallback: load from DB (seed after AI analysis)
+      const builtSegments = await loadSegmentsFromDb(sid);
+      if (builtSegments.length === 0) {
         setSegments([]);
         setLoaded(true);
         setLoading(false);
         return;
       }
 
-      const segIds = segs.map((s) => s.id);
-      const [{ data: phrases, error: phErr }, { data: mappings }] = await Promise.all([
-        supabase
-          .from("segment_phrases")
-          .select("id, segment_id, phrase_number, text, metadata")
-          .in("segment_id", segIds)
-          .order("phrase_number"),
-        supabase
-          .from("scene_type_mappings")
-          .select("segment_type, character_id")
-          .eq("scene_id", sid),
-      ]);
+      applySegments(builtSegments, sid);
 
-      if (phErr) throw phErr;
-
-      const charNameMap = new Map(characters.map(c => [c.id, c.name]));
-      const typeSpeakerMap = new Map<string, string>();
-      let loadedInlineSpeaker: string | null = null;
-      if (mappings) {
-        for (const m of mappings) {
-          const name = charNameMap.get(m.character_id);
-          if (name) {
-            typeSpeakerMap.set(m.segment_type, name);
-            if (m.segment_type === "inline_narration") loadedInlineSpeaker = name;
-          }
-        }
+      // 3. Seed OPFS with DB data
+      if (hasStorage) {
+        await persistNow({
+          segments: builtSegments,
+          typeMappings: typeMappingsRef.current,
+          audioStatus,
+          inlineNarrationSpeaker,
+        });
+        console.debug(`[Storyboard] Seeded OPFS from DB: ${builtSegments.length} segments`);
       }
-      setInlineNarrationSpeaker(loadedInlineSpeaker);
-
-      const phraseMap = new Map<string, Phrase[]>();
-      for (const p of phrases || []) {
-        const list = phraseMap.get(p.segment_id) || [];
-        const phMeta = (p.metadata ?? {}) as Record<string, unknown>;
-        const annotations = Array.isArray(phMeta.annotations) ? phMeta.annotations as PhraseAnnotation[] : undefined;
-        list.push({ phrase_id: p.id, phrase_number: p.phrase_number, text: p.text, annotations });
-        phraseMap.set(p.segment_id, list);
-      }
-
-      const needUpdate: string[] = [];
-      const builtSegments = segs.map((s) => {
-        let speaker = s.speaker;
-        if (!speaker && typeSpeakerMap.has(s.segment_type)) {
-          speaker = typeSpeakerMap.get(s.segment_type)!;
-          needUpdate.push(s.id);
-        }
-        const meta = (s.metadata ?? {}) as Record<string, unknown>;
-        const inlineNarr = Array.isArray(meta.inline_narrations) ? meta.inline_narrations as any[] : undefined;
-        const splitSilence = typeof meta.split_silence_ms === "number" ? meta.split_silence_ms : undefined;
-        return {
-          segment_id: s.id,
-          segment_number: s.segment_number,
-          segment_type: s.segment_type,
-          speaker,
-          phrases: phraseMap.get(s.id) || [],
-          inline_narrations: inlineNarr,
-          split_silence_ms: splitSilence,
-        };
-      });
-
-      // Persist auto-applied speakers and ensure character_appearances exist
-      if (needUpdate.length > 0) {
-        for (const [type, name] of typeSpeakerMap) {
-          const ids = builtSegments
-            .filter(s => s.segment_type === type && needUpdate.includes(s.segment_id))
-            .map(s => s.segment_id);
-          if (ids.length > 0) {
-            await supabase.from("scene_segments").update({ speaker: name }).in("id", ids);
-            const charRecord = characters.find(c => c.name === name);
-            if (charRecord && sid) {
-              const { data: existing } = await supabase
-                .from("character_appearances")
-                .select("id, segment_ids")
-                .eq("character_id", charRecord.id)
-                .eq("scene_id", sid)
-                .maybeSingle();
-              if (existing) {
-                const merged = [...new Set([...existing.segment_ids, ...ids])];
-                await supabase.from("character_appearances").update({ segment_ids: merged }).eq("id", existing.id);
-              } else {
-                await supabase.from("character_appearances").upsert(
-                  { character_id: charRecord.id, scene_id: sid, role_in_scene: "speaker", segment_ids: ids },
-                  { onConflict: "character_id,scene_id" }
-                );
-              }
-            }
-          }
-        }
-      }
-
-      setSegments(builtSegments);
-      const inlineIds = new Set(builtSegments.filter(s => s.inline_narrations && s.inline_narrations.length > 0).map(s => s.segment_id));
-      setInlineNarrationSegIds(inlineIds);
-      const staleIds = new Set<string>();
-      for (const s of segs) {
-        const meta = (s.metadata ?? {}) as Record<string, unknown>;
-        if (Array.isArray(meta.inline_narrations_audio) && (meta.inline_narrations_audio as unknown[]).length > 0) {
-          staleIds.add(s.id);
-        }
-      }
-      setStaleAudioSegIds(staleIds);
-      setLoaded(true);
-      loadAudioStatus(builtSegments.map(s => s.segment_id));
     } catch (err) {
       console.error("Failed to load segments:", err);
       toast.error(isRu ? "Ошибка загрузки сегментов" : "Failed to load segments");
     }
     setLoading(false);
-  }, [isRu, characters, loadAudioStatus]);
+  }, [isRu, hasStorage, loadFromLocal, loadSegmentsFromDb, applySegments, persistNow, audioStatus, inlineNarrationSpeaker]);
 
   // ─── Segment Operations ───────────────────────────────────
 
@@ -342,9 +359,10 @@ export function StoryboardPanel({
     if (!sceneId || mergeGroups.length === 0) return;
     setMerging(true);
     try {
+      let updated = [...segments];
       for (const group of mergeGroups) {
         const [keeper, ...toMerge] = group;
-        const mergeIds = toMerge.map(s => s.segment_id);
+        const mergeIds = new Set(toMerge.map(s => s.segment_id));
 
         let allPhrases = [...keeper.phrases];
         for (const seg of toMerge) {
@@ -354,57 +372,36 @@ export function StoryboardPanel({
             if (pi === 0 && !startsNewSentence && allPhrases.length > 0) {
               const prev = allPhrases[allPhrases.length - 1];
               const separator = prev.text.endsWith(" ") ? "" : " ";
-              allPhrases[allPhrases.length - 1] = {
-                ...prev,
-                text: prev.text + separator + ph.text,
-              };
-              await supabase.from("segment_phrases").delete().eq("id", ph.phrase_id);
+              allPhrases[allPhrases.length - 1] = { ...prev, text: prev.text + separator + ph.text };
             } else {
               allPhrases.push(ph);
             }
           }
         }
 
-        for (let i = 0; i < allPhrases.length; i++) {
-          const ph = allPhrases[i];
-          const isFromKeeper = keeper.phrases.some(kp => kp.phrase_id === ph.phrase_id);
-          if (isFromKeeper) {
-            await supabase.from("segment_phrases")
-              .update({ phrase_number: i + 1, text: ph.text })
-              .eq("id", ph.phrase_id);
-          } else {
-            await supabase.from("segment_phrases")
-              .update({ segment_id: keeper.segment_id, phrase_number: i + 1 })
-              .eq("id", ph.phrase_id);
-          }
-        }
+        // Renumber phrases
+        allPhrases = allPhrases.map((ph, i) => ({ ...ph, phrase_number: i + 1 }));
 
-        await supabase.from("segment_audio").delete().in("segment_id", mergeIds);
-        await supabase.from("scene_segments").delete().in("id", mergeIds);
+        // Update keeper with merged phrases, remove merged segments
+        updated = updated
+          .map(s => s.segment_id === keeper.segment_id ? { ...s, phrases: allPhrases } : s)
+          .filter(s => !mergeIds.has(s.segment_id));
       }
-      const { data: remaining } = await supabase
-        .from("scene_segments")
-        .select("id, segment_number")
-        .eq("scene_id", sceneId)
-        .order("segment_number");
-      if (remaining) {
-        for (let i = 0; i < remaining.length; i++) {
-          if (remaining[i].segment_number !== i + 1) {
-            await supabase.from("scene_segments").update({ segment_number: i + 1 }).eq("id", remaining[i].id);
-          }
-        }
-      }
-      await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
+
+      // Renumber segments
+      updated = updated.map((s, i) => ({ ...s, segment_number: i + 1 }));
+
+      setSegments(updated);
       setMergeChecked(new Set());
+      await persistNow(buildSnapshot(updated));
       toast.success(isRu ? "Блоки объединены" : "Segments merged");
-      await loadSegments(sceneId);
       onSegmented?.(sceneId);
     } catch (err: any) {
       console.error("Merge failed:", err);
       toast.error(isRu ? "Ошибка объединения" : "Merge failed");
     }
     setMerging(false);
-  }, [sceneId, mergeGroups, isRu, loadSegments, onSegmented]);
+  }, [sceneId, mergeGroups, segments, isRu, persistNow, buildSnapshot, onSegmented]);
 
   const handleDeleteSegments = useCallback(async () => {
     if (!sceneId || mergeChecked.size === 0) return;
@@ -416,113 +413,84 @@ export function StoryboardPanel({
     }
     setDeleting(true);
     try {
-      const deleteIds = toDelete.map(s => s.segment_id);
-      await supabase.from("segment_phrases").delete().in("segment_id", deleteIds);
-      await supabase.from("segment_audio").delete().in("segment_id", deleteIds);
-      await supabase.from("scene_segments").delete().in("id", deleteIds);
-      const { data: remaining } = await supabase
-        .from("scene_segments")
-        .select("id, segment_number")
-        .eq("scene_id", sceneId)
-        .order("segment_number");
-      if (remaining) {
-        for (let i = 0; i < remaining.length; i++) {
-          if (remaining[i].segment_number !== i + 1) {
-            await supabase.from("scene_segments").update({ segment_number: i + 1 }).eq("id", remaining[i].id);
-          }
-        }
-      }
-      await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
+      const deleteIds = new Set(toDelete.map(s => s.segment_id));
+      const updated = segments
+        .filter(s => !deleteIds.has(s.segment_id))
+        .map((s, i) => ({ ...s, segment_number: i + 1 }));
+
+      setSegments(updated);
       setMergeChecked(new Set());
+      await persistNow(buildSnapshot(updated));
       toast.success(isRu ? `Удалено ${toDelete.length} блок(ов)` : `Deleted ${toDelete.length} segment(s)`);
-      await loadSegments(sceneId);
       onSegmented?.(sceneId);
     } catch (err: any) {
       console.error("Delete segments failed:", err);
       toast.error(isRu ? "Ошибка удаления" : "Delete failed");
     }
     setDeleting(false);
-  }, [sceneId, mergeChecked, segments, isRu, loadSegments, onSegmented]);
+  }, [sceneId, mergeChecked, segments, isRu, persistNow, buildSnapshot, onSegmented]);
 
   const handleSplitAtPhrase = useCallback(async (phraseId: string, textBefore: string, textAfter: string) => {
     if (!sceneId) return;
-    const seg = segments.find(s => s.phrases.some(p => p.phrase_id === phraseId));
-    if (!seg) return;
+    const segIdx = segments.findIndex(s => s.phrases.some(p => p.phrase_id === phraseId));
+    if (segIdx < 0) return;
+    const seg = segments[segIdx];
     const phraseIdx = seg.phrases.findIndex(p => p.phrase_id === phraseId);
     if (phraseIdx < 0) return;
 
     try {
-      const movePhrases = seg.phrases.slice(phraseIdx + 1);
-      await supabase.from("segment_phrases").update({ text: textBefore }).eq("id", phraseId);
+      // Build keeper phrases (up to and including the split point)
+      const keeperPhrases = seg.phrases.slice(0, phraseIdx + 1).map((ph, i) => ({
+        ...ph,
+        text: i === phraseIdx ? textBefore : ph.text,
+        phrase_number: i + 1,
+      }));
 
-      const { data: allSegs } = await supabase
-        .from("scene_segments")
-        .select("id, segment_number")
-        .eq("scene_id", sceneId)
-        .gt("segment_number", seg.segment_number)
-        .order("segment_number", { ascending: false });
-      if (allSegs) {
-        for (const s of allSegs) {
-          await supabase.from("scene_segments").update({ segment_number: s.segment_number + 1 }).eq("id", s.id);
-        }
-      }
+      // Build new segment phrases
+      const newSegId = crypto.randomUUID();
+      const newPhrases = [
+        { phrase_id: crypto.randomUUID(), phrase_number: 1, text: textAfter },
+        ...seg.phrases.slice(phraseIdx + 1).map((ph, i) => ({
+          ...ph, phrase_number: i + 2,
+        })),
+      ];
 
-      const { data: newSeg } = await supabase
-        .from("scene_segments")
-        .insert({
-          scene_id: sceneId,
-          segment_number: seg.segment_number + 1,
-          segment_type: seg.segment_type as any,
-          speaker: seg.speaker,
-          metadata: { split_silence_ms: 1000 },
-        })
-        .select("id")
-        .single();
+      const newSeg: Segment = {
+        segment_id: newSegId,
+        segment_number: seg.segment_number + 1,
+        segment_type: seg.segment_type,
+        speaker: seg.speaker,
+        phrases: newPhrases,
+        split_silence_ms: 1000,
+      };
 
-      if (!newSeg) throw new Error("Failed to create new segment");
+      const updated = [
+        ...segments.slice(0, segIdx),
+        { ...seg, phrases: keeperPhrases },
+        newSeg,
+        ...segments.slice(segIdx + 1),
+      ].map((s, i) => ({ ...s, segment_number: i + 1 }));
 
-      await supabase.from("segment_phrases").insert({
-        segment_id: newSeg.id,
-        phrase_number: 1,
-        text: textAfter,
-      });
-
-      for (let i = 0; i < movePhrases.length; i++) {
-        await supabase.from("segment_phrases")
-          .update({ segment_id: newSeg.id, phrase_number: i + 2 })
-          .eq("id", movePhrases[i].phrase_id);
-      }
-
-      await supabase.from("segment_audio").delete().eq("segment_id", seg.segment_id);
-      await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
-
+      setSegments(updated);
+      await persistNow(buildSnapshot(updated));
       toast.success(isRu ? "Блок разделён" : "Segment split");
-      await loadSegments(sceneId);
       onSegmented?.(sceneId);
     } catch (err: any) {
       console.error("Split failed:", err);
       toast.error(isRu ? "Ошибка разделения" : "Split failed");
     }
-  }, [sceneId, segments, isRu, loadSegments, onSegmented]);
+  }, [sceneId, segments, isRu, persistNow, buildSnapshot, onSegmented]);
 
-  const handleSplitSilenceChange = useCallback(async (segmentId: string, ms: number) => {
-    setSegments(prev => prev.map(s =>
+  const handleSplitSilenceChange = useCallback((segmentId: string, ms: number) => {
+    const updated = segments.map(s =>
       s.segment_id === segmentId ? { ...s, split_silence_ms: ms } : s
-    ));
-    const { data: row } = await supabase
-      .from("scene_segments")
-      .select("metadata")
-      .eq("id", segmentId)
-      .single();
-    const existing = (row?.metadata ?? {}) as Record<string, unknown>;
-    await supabase.from("scene_segments")
-      .update({ metadata: { ...existing, split_silence_ms: ms } })
-      .eq("id", segmentId);
-    if (sceneId) {
-      await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
-      onSegmented?.(sceneId);
-    }
-  }, [sceneId, onSegmented]);
+    );
+    setSegments(updated);
+    persist(buildSnapshot(updated));
+    onSegmented?.(sceneId!);
+  }, [sceneId, segments, persist, buildSnapshot, onSegmented]);
+
+
 
   useEffect(() => {
     setSegments([]);
@@ -643,21 +611,15 @@ export function StoryboardPanel({
   // ─── Phrase CRUD ──────────────────────────────────────────
 
   const savePhrase = useCallback(async (phraseId: string, newText: string) => {
-    const { error } = await supabase
-      .from("segment_phrases")
-      .update({ text: newText })
-      .eq("id", phraseId);
-    if (error) {
-      toast.error(isRu ? "Ошибка сохранения" : "Save failed");
-      return;
-    }
-    setSegments(prev => prev.map(seg => ({
+    const updated = segments.map(seg => ({
       ...seg,
       phrases: seg.phrases.map(ph =>
         ph.phrase_id === phraseId ? { ...ph, text: newText } : ph
       ),
-    })));
-  }, [isRu]);
+    }));
+    setSegments(updated);
+    persist(buildSnapshot(updated));
+  }, [segments, persist, buildSnapshot]);
 
   const addToStressDictionary = useCallback(async (phraseId: string, annotation: PhraseAnnotation) => {
     if (annotation.type !== "stress" || annotation.start === undefined) return;
@@ -695,37 +657,20 @@ export function StoryboardPanel({
     }
     currentAnnotations.push(annotation);
 
-    const { data: existing } = await supabase
-      .from("segment_phrases")
-      .select("metadata")
-      .eq("id", phraseId)
-      .maybeSingle();
-
-    const meta = (existing?.metadata ?? {}) as Record<string, unknown>;
-    const updatedMeta = { ...meta, annotations: currentAnnotations };
-
-    const { error } = await supabase
-      .from("segment_phrases")
-      .update({ metadata: updatedMeta as unknown as Json })
-      .eq("id", phraseId);
-
-    if (error) {
-      toast.error(isRu ? "Ошибка сохранения аннотации" : "Annotation save failed");
-      return;
-    }
-
     if (annotation.type === "stress") {
       addToStressDictionary(phraseId, annotation);
     }
 
-    setSegments(prev => prev.map(seg => ({
+    const updated = segments.map(seg => ({
       ...seg,
       phrases: seg.phrases.map(ph =>
         ph.phrase_id === phraseId ? { ...ph, annotations: currentAnnotations } : ph
       ),
-    })));
+    }));
+    setSegments(updated);
+    persist(buildSnapshot(updated));
     toast.success(isRu ? "Аннотация добавлена" : "Annotation added");
-  }, [segments, isRu, addToStressDictionary]);
+  }, [segments, isRu, addToStressDictionary, persist, buildSnapshot]);
 
   const removeAnnotation = useCallback(async (phraseId: string, index: number) => {
     let currentAnnotations: PhraseAnnotation[] = [];
@@ -738,94 +683,34 @@ export function StoryboardPanel({
     }
     currentAnnotations.splice(index, 1);
 
-    const { data: existing } = await supabase
-      .from("segment_phrases")
-      .select("metadata")
-      .eq("id", phraseId)
-      .maybeSingle();
-
-    const meta = (existing?.metadata ?? {}) as Record<string, unknown>;
-    const updatedMeta = { ...meta, annotations: currentAnnotations.length > 0 ? currentAnnotations : undefined };
-    if (!currentAnnotations.length) delete updatedMeta.annotations;
-
-    const { error } = await supabase
-      .from("segment_phrases")
-      .update({ metadata: updatedMeta as unknown as Json })
-      .eq("id", phraseId);
-
-    if (error) {
-      toast.error(isRu ? "Ошибка удаления аннотации" : "Annotation remove failed");
-      return;
-    }
-
-    setSegments(prev => prev.map(seg => ({
+    const updated = segments.map(seg => ({
       ...seg,
       phrases: seg.phrases.map(ph =>
         ph.phrase_id === phraseId ? { ...ph, annotations: currentAnnotations.length > 0 ? currentAnnotations : undefined } : ph
       ),
-    })));
+    }));
+    setSegments(updated);
+    persist(buildSnapshot(updated));
     toast.success(isRu ? "Аннотация удалена" : "Annotation removed");
-  }, [segments, isRu]);
+  }, [segments, isRu, persist, buildSnapshot]);
 
-  // ─── Character Sync ───────────────────────────────────────
+  // ─── Character Sync (local-only — update typeMappings ref) ──
 
-  const syncSceneCharacters = useCallback(async (updatedSegments: Segment[]) => {
-    if (!sceneId) return;
-    const usedCharIds = new Set<string>();
-
+  const syncTypeMappings = useCallback((updatedSegments: Segment[]) => {
+    // Rebuild typeMappings from current segments + characters
+    const mappings: LocalTypeMappingEntry[] = [];
+    const seen = new Set<string>();
     for (const seg of updatedSegments) {
-      if (seg.speaker) {
+      if (seg.speaker && !seen.has(seg.segment_type)) {
         const charRecord = characters.find(c => c.name === seg.speaker);
-        if (charRecord) usedCharIds.add(charRecord.id);
+        if (charRecord) {
+          mappings.push({ segmentType: seg.segment_type, characterId: charRecord.id, characterName: charRecord.name });
+          seen.add(seg.segment_type);
+        }
       }
     }
-
-    const { data: mappings } = await supabase
-      .from("scene_type_mappings")
-      .select("character_id")
-      .eq("scene_id", sceneId);
-    if (mappings) {
-      for (const m of mappings) usedCharIds.add(m.character_id);
-    }
-
-    const SYSTEM_TYPES: Record<string, string> = {
-      narrator: "рассказчик", epigraph: "рассказчик", lyric: "рассказчик",
-      footnote: "комментатор",
-    };
-    for (const seg of updatedSegments) {
-      const sysName = SYSTEM_TYPES[seg.segment_type];
-      if (sysName) {
-        const sysChar = characters.find(c => c.name.toLowerCase() === sysName);
-        if (sysChar) usedCharIds.add(sysChar.id);
-      }
-    }
-
-    const { data: currentAppearances } = await supabase
-      .from("character_appearances")
-      .select("id, character_id")
-      .eq("scene_id", sceneId);
-
-    if (!currentAppearances) return;
-
-    const staleIds = currentAppearances
-      .filter(a => !usedCharIds.has(a.character_id))
-      .map(a => a.id);
-    if (staleIds.length > 0) {
-      await supabase.from("character_appearances").delete().in("id", staleIds);
-    }
-
-    const existingCharIds = new Set(currentAppearances.map(a => a.character_id));
-    for (const charId of usedCharIds) {
-      if (!existingCharIds.has(charId)) {
-        await supabase.from("character_appearances").upsert(
-          { character_id: charId, scene_id: sceneId, role_in_scene: "speaker", segment_ids: [] },
-          { onConflict: "character_id,scene_id" }
-        );
-      }
-    }
-
-    onSegmented?.(sceneId);
-  }, [sceneId, characters, onSegmented]);
+    typeMappingsRef.current = mappings;
+  }, [characters]);
 
   const PROPAGATE_TYPES = new Set(["narrator", "first_person", "inner_thought", "epigraph", "lyric", "footnote"]);
 
@@ -849,15 +734,6 @@ export function StoryboardPanel({
     );
     setSegments(updatedSegments);
 
-    const { error } = await supabase
-      .from("scene_segments")
-      .update({ segment_type: newType as any })
-      .in("id", affectedIds);
-    if (error) {
-      toast.error(isRu ? "Ошибка сохранения типа" : "Failed to save type");
-      return;
-    }
-
     if (affectedIds.length > 1) {
       const newLabel = isRu ? SEGMENT_CONFIG[newType]?.label_ru : SEGMENT_CONFIG[newType]?.label_en;
       toast.success(
@@ -867,21 +743,10 @@ export function StoryboardPanel({
       );
     }
 
-    if (!sceneId) return;
-
-    if (PROPAGATE_TYPES.has(oldType) && oldType !== newType) {
-      const remainingOfOldType = updatedSegments.filter(s => s.segment_type === oldType);
-      if (remainingOfOldType.length === 0) {
-        await supabase
-          .from("scene_type_mappings")
-          .delete()
-          .eq("scene_id", sceneId)
-          .eq("segment_type", oldType);
-      }
-    }
-
-    await syncSceneCharacters(updatedSegments);
-  }, [isRu, segments, sceneId, characters, syncSceneCharacters]);
+    syncTypeMappings(updatedSegments);
+    persist(buildSnapshot(updatedSegments));
+    onSegmented?.(sceneId!);
+  }, [isRu, segments, sceneId, syncTypeMappings, persist, buildSnapshot, onSegmented]);
 
   const updateSpeaker = useCallback(async (segmentId: string, newSpeaker: string | null) => {
     const targetSeg = segments.find(s => s.segment_id === segmentId);
@@ -897,34 +762,10 @@ export function StoryboardPanel({
     );
     setSegments(updatedSegments);
 
-    const { error } = await supabase
-      .from("scene_segments")
-      .update({ speaker: newSpeaker })
-      .in("id", affectedIds);
+    syncTypeMappings(updatedSegments);
+    persist(buildSnapshot(updatedSegments));
 
-    if (sceneId && shouldPropagate) {
-      const charRecord = newSpeaker ? characters.find(c => c.name === newSpeaker) : null;
-      if (charRecord) {
-        await supabase
-          .from("scene_type_mappings" as any)
-          .upsert(
-            { scene_id: sceneId, segment_type: targetSeg.segment_type, character_id: charRecord.id },
-            { onConflict: "scene_id,segment_type" }
-          );
-      } else {
-        await supabase
-          .from("scene_type_mappings" as any)
-          .delete()
-          .eq("scene_id", sceneId)
-          .eq("segment_type", targetSeg.segment_type);
-      }
-    }
-
-    await syncSceneCharacters(updatedSegments);
-
-    if (error) {
-      toast.error(isRu ? "Ошибка сохранения персонажа" : "Failed to save speaker");
-    } else if (affectedIds.length > 1) {
+    if (affectedIds.length > 1) {
       const typeLabel = isRu
         ? SEGMENT_CONFIG[targetSeg.segment_type]?.label_ru
         : SEGMENT_CONFIG[targetSeg.segment_type]?.label_en;
@@ -934,7 +775,8 @@ export function StoryboardPanel({
           : `"${typeLabel}" → ${newSpeaker || "?"} (${affectedIds.length} seg.)`
       );
     }
-  }, [isRu, segments, sceneId, characters, syncSceneCharacters]);
+    onSegmented?.(sceneId!);
+  }, [isRu, segments, sceneId, syncTypeMappings, persist, buildSnapshot, onSegmented]);
 
   // ─── Synthesis ────────────────────────────────────────────
 
@@ -1119,55 +961,45 @@ export function StoryboardPanel({
     if (!sceneId || staleAudioSegIds.size === 0) return;
     setCleaningMetadata(true);
     try {
-      const ids = [...staleAudioSegIds];
-      const { data: segs } = await supabase
-        .from("scene_segments")
-        .select("id, metadata")
-        .in("id", ids);
-      if (segs) {
-        for (const seg of segs) {
-          const meta = { ...((seg.metadata ?? {}) as Record<string, unknown>) };
-          delete meta.inline_narrations_audio;
-          await supabase.from("scene_segments").update({ metadata: meta as any }).eq("id", seg.id);
-        }
-      }
-      await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
+      // Remove inline_narrations from segments locally
+      const updated = segments.map(s => {
+        if (!staleAudioSegIds.has(s.segment_id)) return s;
+        return { ...s, inline_narrations: undefined };
+      });
+      setSegments(updated);
       setStaleAudioSegIds(new Set());
+      await persistNow(buildSnapshot(updated));
       if (onSegmented) onSegmented(sceneId);
       toast.success(
         isRu
-          ? `Очищено ${ids.length} устаревших аудио-вставок`
-          : `Cleared ${ids.length} stale audio metadata entries`
+          ? `Очищено ${staleAudioSegIds.size} устаревших аудио-вставок`
+          : `Cleared ${staleAudioSegIds.size} stale audio metadata entries`
       );
     } catch (err) {
       console.error("Cleanup failed:", err);
       toast.error(isRu ? "Ошибка очистки" : "Cleanup failed");
     }
     setCleaningMetadata(false);
-  }, [sceneId, staleAudioSegIds, isRu, onSegmented]);
+  }, [sceneId, staleAudioSegIds, segments, isRu, onSegmented, persistNow, buildSnapshot]);
 
   const updateInlineNarrationSpeaker = useCallback(async (newSpeaker: string | null) => {
     if (!sceneId) return;
     setInlineNarrationSpeaker(newSpeaker);
+
+    // Update typeMappings locally
     const charRecord = newSpeaker ? characters.find(c => c.name === newSpeaker) : null;
     if (charRecord) {
-      await supabase
-        .from("scene_type_mappings" as any)
-        .upsert(
-          { scene_id: sceneId, segment_type: "inline_narration", character_id: charRecord.id },
-          { onConflict: "scene_id,segment_type" }
-        );
+      typeMappingsRef.current = [
+        ...typeMappingsRef.current.filter(m => m.segmentType !== "inline_narration"),
+        { segmentType: "inline_narration", characterId: charRecord.id, characterName: charRecord.name },
+      ];
       toast.success(isRu ? `Голос вставок → ${newSpeaker}` : `Narration voice → ${newSpeaker}`);
     } else {
-      await supabase
-        .from("scene_type_mappings" as any)
-        .delete()
-        .eq("scene_id", sceneId)
-        .eq("segment_type", "inline_narration");
+      typeMappingsRef.current = typeMappingsRef.current.filter(m => m.segmentType !== "inline_narration");
       toast.success(isRu ? "Голос вставок сброшен" : "Narration voice reset");
     }
-    await syncSceneCharacters(segments);
-  }, [sceneId, characters, isRu, segments, syncSceneCharacters]);
+    persist(buildSnapshot(undefined, undefined, newSpeaker));
+  }, [sceneId, characters, isRu, persist, buildSnapshot]);
 
   // ─── Render ───────────────────────────────────────────────
 
