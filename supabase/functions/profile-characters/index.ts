@@ -508,6 +508,8 @@ Deno.serve(async (req) => {
           temperament: profile.temperament || null,
           speech_style: profile.speech_style || null,
           description: profile.description || null,
+          speech_tags: profile.speech_tags || [],
+          psycho_tags: profile.psycho_tags || [],
           updated_at: new Date().toISOString(),
         })
         .eq("id", char.id);
