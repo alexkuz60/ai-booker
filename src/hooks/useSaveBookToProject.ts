@@ -89,7 +89,34 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
    * Handles first-push: creates books row if it doesn't exist yet.
    */
   const saveBook = useCallback(async () => {
-    if (!currentBookId || !localSnapshot) {
+    if (!currentBookId) {
+      toast({
+        title: isRu ? "Нечего сохранять" : "Nothing to save",
+        description: isRu ? "Откройте книгу и начните работу" : "Open a book and start working",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // If no in-memory snapshot provided (e.g. Studio), read from OPFS
+    let snapshot = localSnapshot;
+    if (!snapshot && storage) {
+      try {
+        const fromLocal = await readStructureFromLocal(storage);
+        if (fromLocal?.structure && fromLocal.structure.toc?.length > 0) {
+          snapshot = {
+            toc: fromLocal.structure.toc as TocChapter[],
+            parts: fromLocal.structure.parts || [],
+            chapterIdMap: fromLocal.chapterIdMap,
+            chapterResults: fromLocal.chapterResults,
+          };
+        }
+      } catch (e) {
+        console.warn("[SaveToServer] Failed to read snapshot from OPFS:", e);
+      }
+    }
+
+    if (!snapshot) {
       toast({
         title: isRu ? "Нечего сохранять" : "Nothing to save",
         description: isRu ? "Откройте книгу и начните работу" : "Open a book and start working",
