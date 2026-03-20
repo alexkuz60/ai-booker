@@ -143,11 +143,9 @@ export function useCharacterProfiles({
       chars: LocalCharacter[],
       modelId: string,
     ): Promise<{ profiles: Array<{
-      name: string;
-      age_group?: string;
-      temperament?: string;
-      speech_style?: string;
-      description?: string;
+      name: string; age_group?: string; temperament?: string;
+      speech_style?: string; description?: string;
+      speech_tags?: string[]; psycho_tags?: string[];
     }>; usedModel: string }> => {
       if (abort.signal.aborted) throw new Error("aborted");
 
@@ -185,6 +183,7 @@ export function useCharacterProfiles({
       return { profiles: (result?.profiles || []) as Array<{
         name: string; age_group?: string; temperament?: string;
         speech_style?: string; description?: string;
+        speech_tags?: string[]; psycho_tags?: string[];
       }>, usedModel: String(result?.usedModel || modelId) };
     };
 
@@ -196,6 +195,8 @@ export function useCharacterProfiles({
       temperament?: string;
       speech_style?: string;
       description?: string;
+      speech_tags?: string[];
+      psycho_tags?: string[];
     }>, usedModel: string, skipPersist = false) => {
       const profileByName = new Map<string, CharacterProfile>();
       for (const p of profiles) {
@@ -204,6 +205,8 @@ export function useCharacterProfiles({
           temperament: p.temperament,
           speech_style: p.speech_style,
           description: p.description,
+          speech_tags: p.speech_tags,
+          psycho_tags: p.psycho_tags,
           profiledBy: usedModel,
         });
       }
@@ -252,11 +255,9 @@ export function useCharacterProfiles({
         const manager = new ModelPoolManager(effectivePool, userApiKeys, 3);
         let completedProfiles = 0;
         const tasks: PoolTask<{ profiles: Array<{
-          name: string;
-          age_group?: string;
-          temperament?: string;
-          speech_style?: string;
-          description?: string;
+          name: string; age_group?: string; temperament?: string;
+          speech_style?: string; description?: string;
+          speech_tags?: string[]; psycho_tags?: string[];
         }>; usedModel: string }>[] = batches.map((batch, i) => ({
           id: `batch-${i}`,
           execute: async (modelId: string) => {

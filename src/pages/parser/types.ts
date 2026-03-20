@@ -150,6 +150,10 @@ export interface CharacterProfile {
   temperament?: string;
   speech_style?: string;
   description?: string;
+  /** Tags for TTS voice casting: speech manner (e.g. #отрывисто #быстро) */
+  speech_tags?: string[];
+  /** Tags for psychotype classification (e.g. #паникер #невротик) */
+  psycho_tags?: string[];
   /** AI model that generated this profile ("клеймо мастера") */
   profiledBy?: string;
 }
