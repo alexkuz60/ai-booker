@@ -532,10 +532,27 @@ export function ChapterNavigator({
             size="sm"
             variant="ghost"
             className="h-6 w-6 p-0"
+            disabled={!onBatchAnalyze}
+            onClick={() => {
+              if (!onBatchAnalyze) return;
+              const unsegmented = chapter.scenes
+                .filter(s => s.id && !segmentedSceneIds?.has(s.id))
+                .map(s => s.id) as string[];
+              const ids = unsegmented.length > 0
+                ? unsegmented
+                : chapter.scenes.map(s => s.id).filter(Boolean) as string[];
+              if (ids.length > 0) onBatchAnalyze(ids);
+            }}
+            title={isRu ? "Раскадровка всех сцен" : "Segment all scenes"}
+          >
+            <Sparkles className="h-3 w-3" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 w-6 p-0"
             onClick={() => {
               if (bookId) sessionStorage.setItem("montage_book_id", bookId);
-              const chapterId = chapter.scenes[0]?.id ? undefined : undefined;
-              // Find chapter ID from scenes
               const sceneId = chapter.scenes[0]?.id;
               if (sceneId) {
                 supabase.from("book_scenes").select("chapter_id").eq("id", sceneId).single().then(({ data }) => {
