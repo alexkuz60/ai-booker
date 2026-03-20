@@ -19,6 +19,7 @@ export function useCloudSettings<T>(
 ) {
   const { user } = useAuth();
   const cacheKey = localStorageKey || `cloud-${settingKey}`;
+  const tsKey = `${cacheKey}__ts`;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Track the pending save payload so we can flush it on unmount */
   const pendingSaveRef = useRef<{ userId: string; value: T } | null>(null);
@@ -50,8 +51,11 @@ export function useCloudSettings<T>(
           .maybeSingle();
 
         if (cancelled) return;
-        // Only apply DB value if we haven't made local changes since mount
-        if (!error && data && !locallyDirtyRef.current) {
+        // Skip DB overwrite if local changes exist OR a recent write is pending (Sheet close/reopen race)
+        const recentWrite = (() => {
+          try { const ts = localStorage.getItem(tsKey); return ts ? Date.now() - Number(ts) < 2000 : false; } catch { return false; }
+        })();
+        if (!error && data && !locallyDirtyRef.current && !recentWrite) {
           const dbValue = data.setting_value as T;
           setValue(dbValue);
           try { localStorage.setItem(cacheKey, JSON.stringify(dbValue)); } catch {}
@@ -65,7 +69,7 @@ export function useCloudSettings<T>(
 
     loadFromDb();
     return () => { cancelled = true; };
-  }, [user?.id, settingKey, cacheKey]);
+  }, [user?.id, settingKey, cacheKey, tsKey]);
 
   /** Immediately persist to DB (no debounce) */
   const flushToDb = useCallback(async (userId: string, newValue: T) => {
@@ -101,7 +105,10 @@ export function useCloudSettings<T>(
       const resolved = typeof newValue === 'function'
         ? (newValue as (prev: T) => T)(prev)
         : newValue;
-      try { localStorage.setItem(cacheKey, JSON.stringify(resolved)); } catch {}
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(resolved));
+        localStorage.setItem(tsKey, String(Date.now()));
+      } catch {}
       saveToDb(resolved);
       return resolved;
     });
