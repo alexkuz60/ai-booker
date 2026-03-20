@@ -164,6 +164,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   // Filter: "all" or "scene"
   const [filterMode, setFilterMode] = useState<"all" | "scene" | "chapter">("chapter");
   const [sceneCharIds, setSceneCharIds] = useState<Set<string>>(new Set());
+  const [chapterCharIds, setChapterCharIds] = useState<Set<string>>(new Set());
 
   // Sync with external selectedCharacterId
   useEffect(() => {
