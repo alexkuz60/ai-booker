@@ -247,6 +247,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
             scene_type: sc.scene_type || "mixed",
             mood: sc.mood || "neutral",
             bpm: sc.bpm || 120,
+            content_dirty: sc.dirty ?? false,
           });
         }
       }
