@@ -83,6 +83,7 @@
 | `src/lib/fileFormatUtils.ts` | Формат-агностические утилиты (PDF/DOCX/FB2) |
 | `src/hooks/useImperativeSave.ts` | Мгновенное автосохранение без debounce, сериализованная очередь |
 | `src/hooks/useSaveBookToProject.ts` | Кнопка «На сервер»: upsert в Supabase + `autoSaveToLocal()` |
+| `src/lib/storyboardSync.ts` | `saveStoryboardToLocal()` / `readStoryboardFromLocal()` — раскадровка сцен |
 
 ### 1.7 Интерфейс ProjectStorage
 
