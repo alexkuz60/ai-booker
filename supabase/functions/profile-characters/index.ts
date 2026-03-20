@@ -494,7 +494,7 @@ Deno.serve(async (req) => {
     const { systemPrompt, userPrompt } = buildPrompt(
       charsToProfile, speakerDialogues, narratorExcerpts, lang, existingProfiles,
     );
-    const profiles = await callAI(systemPrompt, userPrompt, lang, clientModel, userId);
+    const profiles = await callAI(systemPrompt, userPrompt, lang, clientModel, userId, providerFields.apiKey, providerFields.openrouterApiKey);
 
     // ── Update DB ────────────────────────────────────────
     let updated = 0;
