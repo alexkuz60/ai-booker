@@ -1,8 +1,9 @@
 /**
- * useImperativeSave — immediate local save on every mutation.
+ * useImperativeSave — queued local save after state mutations commit.
  *
- * The caller explicitly triggers `save()` after every mutation.
- * Writes happen immediately (no debounce) — local FS writes are fast.
+ * The caller explicitly triggers `scheduleSave()` after every mutation.
+ * Save is deferred to the next macrotask so React state/refs have time
+ * to commit before the OPFS snapshot is read.
  * Also flushes on beforeunload as a safety net.
  */
 
@@ -33,6 +34,7 @@ export function useImperativeSave({
   const getSnapshotRef = useRef(getSnapshot);
   const savingRef = useRef(false);
   const pendingRef = useRef(false);
+  const queuedSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     getSnapshotRef.current = getSnapshot;
@@ -68,11 +70,23 @@ export function useImperativeSave({
       console.warn("[AutoSave] Storage not ready — edits will NOT persist.");
       return;
     }
-    doSave();
+
+    if (queuedSaveRef.current) return;
+
+    queuedSaveRef.current = setTimeout(() => {
+      queuedSaveRef.current = null;
+      void doSave();
+    }, 0);
   }, [storage, bookId, doSave]);
 
   /** Flush — same as scheduleSave since writes are now immediate. */
   const flushSave = scheduleSave;
+
+  useEffect(() => {
+    return () => {
+      if (queuedSaveRef.current) clearTimeout(queuedSaveRef.current);
+    };
+  }, []);
 
   return { scheduleSave, flushSave };
 }
