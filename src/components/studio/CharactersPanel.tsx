@@ -146,6 +146,7 @@ interface CharactersPanelProps {
   selectedCharacterId?: string | null;
   onSelectCharacter?: (characterId: string | null) => void;
   onVoiceSaved?: () => void;
+  userApiKeys?: Record<string, string>;
 }
 
 export interface CharactersPanelHandle {
