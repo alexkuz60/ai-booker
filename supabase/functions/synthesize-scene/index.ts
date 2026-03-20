@@ -894,6 +894,23 @@ Deno.serve(async (req) => {
 
       const voiceConfig = resolveVoice(seg.speaker, voiceConfigMap);
 
+      // ── Apply mood + scene_type context for narrator-like segments ──
+      const ttsCtx = getSceneTtsContext(seg.segment_type);
+      if (ttsCtx.rateMultiplier !== 1.0) {
+        (voiceConfig as any).speed = Math.round(((voiceConfig as any).speed || 1.0) * ttsCtx.rateMultiplier * 100) / 100;
+      }
+      if (ttsCtx.roleHint && NARRATOR_SEGMENT_TYPES.has(seg.segment_type) && !(voiceConfig as any).instructions) {
+        // Only override role for Yandex narrator segments without custom instructions
+        if ((voiceConfig as any).provider === "yandex" || !(voiceConfig as any).provider) {
+          (voiceConfig as any).role = ttsCtx.roleHint;
+        }
+      }
+      // Append mood instructions for ProxyAPI/ElevenLabs
+      if (ttsCtx.instructionText && ((voiceConfig as any).provider === "proxyapi")) {
+        const existing = (voiceConfig as any).instructions || "";
+        (voiceConfig as any).instructions = [existing, ttsCtx.instructionText].filter(Boolean).join(". ");
+      }
+
       // ── Cache check: skip if audio exists with same voice config ──
       // Include annotations in hash so annotation changes trigger re-synthesis
       const annotSuffix = segmentHasAnnotations[i]
