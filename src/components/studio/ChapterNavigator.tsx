@@ -649,6 +649,11 @@ export function ChapterNavigator({
                         {isRu ? (SCENE_TYPE_RU[scene.scene_type] || scene.scene_type) : scene.scene_type}
                       </span>
                       <span className="truncate flex-1">{scene.title}</span>
+                       {isDirty && (
+                         <span title={isRu ? "Контент изменён в Парсере — нужен переанализ" : "Content edited in Parser — re-analysis needed"}>
+                           <RefreshCw className="h-3 w-3 text-orange-500 shrink-0" />
+                         </span>
+                       )}
                        {isStale && (
                          <span title={isRu ? "Голос изменился — аудио устарело" : "Voice changed — audio outdated"}>
                            <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0" />
