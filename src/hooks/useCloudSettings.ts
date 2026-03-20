@@ -19,6 +19,7 @@ export function useCloudSettings<T>(
 ) {
   const { user } = useAuth();
   const cacheKey = localStorageKey || `cloud-${settingKey}`;
+  const tsKey = `${cacheKey}__ts`;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Track the pending save payload so we can flush it on unmount */
   const pendingSaveRef = useRef<{ userId: string; value: T } | null>(null);
