@@ -183,34 +183,36 @@ export function StoryboardPanel({
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [selectedSegmentId]);
 
-  // Load characters from OPFS (local-first)
+  // Load characters: OPFS first (names/aliases), then enrich with DB voice configs
   const { storage } = useProjectStorageContext();
   useEffect(() => {
     if (!bookId) { setCharacters([]); return; }
-    if (!storage) return;
     (async () => {
-      const localChars = await readCharactersFromLocal(storage);
-      if (localChars.length > 0) {
-        setCharacters(localChars.map(c => ({
-          id: c.id,
-          name: c.name,
-          color: undefined,
-          voiceConfig: (c.voiceConfig || {}) as Record<string, unknown>,
-        })));
-        return;
+      // Try OPFS names first
+      let charMap = new Map<string, CharacterOption>();
+      if (storage) {
+        const localChars = await readCharactersFromLocal(storage);
+        for (const c of localChars) {
+          charMap.set(c.name.toLowerCase(), { id: c.id, name: c.name, color: undefined, voiceConfig: {} });
+        }
       }
-      // Fallback: seed from DB if OPFS has no characters yet
+      // Enrich with DB voice_config (required for TTS provider detection)
       const { data } = await supabase
         .from("book_characters")
         .select("id, name, color, voice_config")
         .eq("book_id", bookId)
         .order("sort_order");
-      if (data) setCharacters(data.map(c => ({
-        id: c.id,
-        name: c.name,
-        color: c.color,
-        voiceConfig: (c.voice_config || {}) as Record<string, unknown>,
-      })));
+      if (data) {
+        for (const c of data) {
+          charMap.set(c.name.toLowerCase(), {
+            id: c.id,
+            name: c.name,
+            color: c.color,
+            voiceConfig: (c.voice_config || {}) as Record<string, unknown>,
+          });
+        }
+      }
+      setCharacters(Array.from(charMap.values()));
     })();
   }, [bookId, storage]);
 
