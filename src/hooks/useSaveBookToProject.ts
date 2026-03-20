@@ -309,6 +309,17 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         }
       }
 
+      // ── 4b. Push storyboard data (segments/phrases/mappings) to DB ──
+      let savedStoryboardCount = 0;
+      try {
+        savedStoryboardCount = await pushAllToDb();
+        if (savedStoryboardCount > 0) {
+          console.log(`[SaveToServer] Pushed ${savedStoryboardCount} storyboarded scenes`);
+        }
+      } catch (e) {
+        console.warn("[SaveToServer] Storyboard push failed:", e);
+      }
+
       // ── 5. Upload source file to server if not already there ──
       if (storage) {
         const sourceResult = await findSourceBlob(storage);
