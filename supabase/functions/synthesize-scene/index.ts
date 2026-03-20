@@ -905,10 +905,13 @@ Deno.serve(async (req) => {
           (voiceConfig as any).role = ttsCtx.roleHint;
         }
       }
-      // Append mood instructions for ProxyAPI/ElevenLabs
-      if (ttsCtx.instructionText && ((voiceConfig as any).provider === "proxyapi")) {
+      // Append mood instructions + speech_context for ProxyAPI
+      if ((voiceConfig as any).provider === "proxyapi") {
         const existing = (voiceConfig as any).instructions || "";
-        (voiceConfig as any).instructions = [existing, ttsCtx.instructionText].filter(Boolean).join(". ");
+        const speechCtx = (metadata.speech_context as Record<string, string> | undefined);
+        const ctxInstr = speechCtx?.tts_instructions_ru && isRu ? speechCtx.tts_instructions_ru
+          : speechCtx?.tts_instructions_en ? speechCtx.tts_instructions_en : "";
+        (voiceConfig as any).instructions = [existing, ttsCtx.instructionText, ctxInstr].filter(Boolean).join(". ");
       }
 
       // ── Cache check: skip if audio exists with same voice config ──
