@@ -15,6 +15,8 @@ interface CharacterProfile {
   temperament: string;
   speech_style: string;
   description: string;
+  speech_tags?: string[];
+  psycho_tags?: string[];
 }
 
 // ── Helpers ──────────────────────────────────────────────
