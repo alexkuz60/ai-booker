@@ -192,11 +192,18 @@ const Studio = () => {
       const segData = segDataFull ?? [];
 
       const segIds = segData.map(s => s.id);
-      const { data: audioData } = await supabase
-        .from("segment_audio")
-        .select("segment_id, voice_config")
-        .in("segment_id", segIds)
-        .eq("status", "ready");
+      // Fetch audio in chunks to avoid 1000-row limit
+      let audioData: { segment_id: string; voice_config: unknown }[] = [];
+      for (let i = 0; i < segIds.length; i += CHUNK) {
+        const slice = segIds.slice(i, i + CHUNK);
+        const { data } = await supabase
+          .from("segment_audio")
+          .select("segment_id, voice_config")
+          .in("segment_id", slice)
+          .eq("status", "ready")
+          .limit(5000);
+        if (data?.length) audioData.push(...data);
+      }
 
       // Load current character voice configs for staleness check
       const currentBookId = bookId ?? chapter.bookId;
