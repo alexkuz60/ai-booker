@@ -964,7 +964,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                       {ch.voice_config?.voice_id && <Volume2 className="h-3 w-3 text-primary/60" />}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                     {ch.gender !== "unknown" && (
                       <span className="text-[10px] text-muted-foreground/60">
                         {ch.gender === "female" ? "♀" : "♂"}
@@ -973,6 +973,11 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                     {ch.temperament && (
                       <span className="text-[10px] text-muted-foreground/50 truncate">
                         {TEMPERAMENT_LABELS[ch.temperament]?.[isRu ? "ru" : "en"] ?? ch.temperament}
+                      </span>
+                    )}
+                    {(ch.psycho_tags?.length > 0 || ch.speech_tags?.length > 0) && (
+                      <span className="text-[10px] text-violet-400/70" title={[...(ch.psycho_tags || []), ...(ch.speech_tags || [])].join(", ")}>
+                        🎭{(ch.psycho_tags?.length ?? 0) + (ch.speech_tags?.length ?? 0)}
                       </span>
                     )}
                   </div>
