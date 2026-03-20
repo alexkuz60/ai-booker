@@ -46,8 +46,12 @@ export function PoolSelector({
   isAdmin,
   isRu,
   onChange,
+  open: controlledOpen,
+  onOpenChange,
 }: PoolSelectorProps) {
-  const [open, setOpen] = useState(pool.length > 0);
+  const [internalOpen, setInternalOpen] = useState(pool.length > 0);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
 
   // Exclude the primary model from the checkbox list — it's always included
   const grouped = useMemo(() => {
