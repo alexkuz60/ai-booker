@@ -197,6 +197,8 @@ export function useCharacterProfiles({
       temperament?: string;
       speech_style?: string;
       description?: string;
+      speech_tags?: string[];
+      psycho_tags?: string[];
     }>, usedModel: string, skipPersist = false) => {
       const profileByName = new Map<string, CharacterProfile>();
       for (const p of profiles) {
@@ -205,6 +207,8 @@ export function useCharacterProfiles({
           temperament: p.temperament,
           speech_style: p.speech_style,
           description: p.description,
+          speech_tags: p.speech_tags,
+          psycho_tags: p.psycho_tags,
           profiledBy: usedModel,
         });
       }
