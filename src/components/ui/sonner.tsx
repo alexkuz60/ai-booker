@@ -26,9 +26,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
 };
 
 /** Wrapper: error toasts stay until manually dismissed (click ✕) */
-const toast = Object.assign(sonnerToast, {
+const baseToastError = sonnerToast.error.bind(sonnerToast);
+const toast = {
+  ...sonnerToast,
   error: (message: string | React.ReactNode, opts?: ExternalToast) =>
-    sonnerToast.error(message, { duration: Infinity, ...opts }),
-});
+    baseToastError(message, { duration: Infinity, ...opts }),
+};
 
 export { Toaster, toast };
