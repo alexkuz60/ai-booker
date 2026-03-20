@@ -1051,6 +1051,38 @@ export default function ParserCharactersPanel({
               </div>
             )}
 
+            {/* Speech tags */}
+            {profileViewChar.profile.speech_tags && profileViewChar.profile.speech_tags.length > 0 && (
+              <div>
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                  {isRu ? "Теги речи" : "Speech Tags"}
+                </span>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {profileViewChar.profile.speech_tags.map((tag) => (
+                    <Badge key={tag} variant="outline" className="text-[10px] bg-accent/30 border-accent/50 text-accent-foreground">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Psycho tags */}
+            {profileViewChar.profile.psycho_tags && profileViewChar.profile.psycho_tags.length > 0 && (
+              <div>
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                  {isRu ? "Теги психотипа" : "Psychotype Tags"}
+                </span>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {profileViewChar.profile.psycho_tags.map((tag) => (
+                    <Badge key={tag} variant="secondary" className="text-[10px]">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Aliases */}
             {profileViewChar.aliases.length > 0 && (
               <div>
