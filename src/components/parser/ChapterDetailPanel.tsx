@@ -226,24 +226,15 @@ function SceneCards({
         </h3>
         <div className="flex items-center gap-2">
           <Button
-            variant={mergeMode ? "secondary" : "ghost"} size="sm"
-            className="h-6 px-2 text-xs"
-            onClick={() => { setMergeMode(m => !m); setMergeChecked(new Set()); }}
+            variant="default" size="sm"
+            className="h-6 px-2 text-xs gap-1"
+            disabled={!canMerge}
+            onClick={handleMerge}
           >
-            <Merge className="h-3 w-3 mr-1" />
-            {t("mergeScenes", isRu)}
+            <Merge className="h-3 w-3" />
+            {t("mergeScenes", isRu)}{mergeChecked.size >= 2 ? ` (${mergeChecked.size})` : ""}
           </Button>
-          {mergeMode && canMerge && (
-            <Button
-              variant="default" size="sm"
-              className="h-6 px-2 text-xs gap-1"
-              onClick={handleMerge}
-            >
-              <CheckSquare className="h-3 w-3" />
-              {t("mergeScenes", isRu)} ({mergeChecked.size})
-            </Button>
-          )}
-          {mergeMode && !canMerge && mergeChecked.size >= 2 && (
+          {mergeChecked.size >= 2 && !mergeAdjacent && (
             <span className="text-[10px] text-destructive">{t("mergeNotAdjacent", isRu)}</span>
           )}
           <Button
