@@ -706,37 +706,20 @@ export function StoryboardPanel({
     }
     currentAnnotations.push(annotation);
 
-    const { data: existing } = await supabase
-      .from("segment_phrases")
-      .select("metadata")
-      .eq("id", phraseId)
-      .maybeSingle();
-
-    const meta = (existing?.metadata ?? {}) as Record<string, unknown>;
-    const updatedMeta = { ...meta, annotations: currentAnnotations };
-
-    const { error } = await supabase
-      .from("segment_phrases")
-      .update({ metadata: updatedMeta as unknown as Json })
-      .eq("id", phraseId);
-
-    if (error) {
-      toast.error(isRu ? "Ошибка сохранения аннотации" : "Annotation save failed");
-      return;
-    }
-
     if (annotation.type === "stress") {
       addToStressDictionary(phraseId, annotation);
     }
 
-    setSegments(prev => prev.map(seg => ({
+    const updated = segments.map(seg => ({
       ...seg,
       phrases: seg.phrases.map(ph =>
         ph.phrase_id === phraseId ? { ...ph, annotations: currentAnnotations } : ph
       ),
-    })));
+    }));
+    setSegments(updated);
+    persist(buildSnapshot(updated));
     toast.success(isRu ? "Аннотация добавлена" : "Annotation added");
-  }, [segments, isRu, addToStressDictionary]);
+  }, [segments, isRu, addToStressDictionary, persist, buildSnapshot]);
 
   const removeAnnotation = useCallback(async (phraseId: string, index: number) => {
     let currentAnnotations: PhraseAnnotation[] = [];
@@ -749,34 +732,16 @@ export function StoryboardPanel({
     }
     currentAnnotations.splice(index, 1);
 
-    const { data: existing } = await supabase
-      .from("segment_phrases")
-      .select("metadata")
-      .eq("id", phraseId)
-      .maybeSingle();
-
-    const meta = (existing?.metadata ?? {}) as Record<string, unknown>;
-    const updatedMeta = { ...meta, annotations: currentAnnotations.length > 0 ? currentAnnotations : undefined };
-    if (!currentAnnotations.length) delete updatedMeta.annotations;
-
-    const { error } = await supabase
-      .from("segment_phrases")
-      .update({ metadata: updatedMeta as unknown as Json })
-      .eq("id", phraseId);
-
-    if (error) {
-      toast.error(isRu ? "Ошибка удаления аннотации" : "Annotation remove failed");
-      return;
-    }
-
-    setSegments(prev => prev.map(seg => ({
+    const updated = segments.map(seg => ({
       ...seg,
       phrases: seg.phrases.map(ph =>
         ph.phrase_id === phraseId ? { ...ph, annotations: currentAnnotations.length > 0 ? currentAnnotations : undefined } : ph
       ),
-    })));
+    }));
+    setSegments(updated);
+    persist(buildSnapshot(updated));
     toast.success(isRu ? "Аннотация удалена" : "Annotation removed");
-  }, [segments, isRu]);
+  }, [segments, isRu, persist, buildSnapshot]);
 
   // ─── Character Sync ───────────────────────────────────────
 
