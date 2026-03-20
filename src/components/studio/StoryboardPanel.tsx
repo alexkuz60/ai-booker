@@ -183,10 +183,23 @@ export function StoryboardPanel({
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [selectedSegmentId]);
 
-  // Load characters for the book
+  // Load characters from OPFS (local-first)
+  const { storage } = useProjectStorageContext();
   useEffect(() => {
     if (!bookId) { setCharacters([]); return; }
+    if (!storage) return;
     (async () => {
+      const localChars = await readCharactersFromLocal(storage);
+      if (localChars.length > 0) {
+        setCharacters(localChars.map(c => ({
+          id: c.id,
+          name: c.name,
+          color: undefined,
+          voiceConfig: (c.voiceConfig || {}) as Record<string, unknown>,
+        })));
+        return;
+      }
+      // Fallback: seed from DB if OPFS has no characters yet
       const { data } = await supabase
         .from("book_characters")
         .select("id, name, color, voice_config")
@@ -199,7 +212,7 @@ export function StoryboardPanel({
         voiceConfig: (c.voice_config || {}) as Record<string, unknown>,
       })));
     })();
-  }, [bookId]);
+  }, [bookId, storage]);
 
   // Load audio status for segments
   const loadAudioStatus = useCallback(async (segIds: string[]) => {
