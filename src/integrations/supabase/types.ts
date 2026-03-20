@@ -179,6 +179,7 @@ export type Database = {
           bpm: number | null
           chapter_id: string
           content: string | null
+          content_dirty: boolean
           created_at: string
           id: string
           mood: string | null
@@ -191,6 +192,7 @@ export type Database = {
           bpm?: number | null
           chapter_id: string
           content?: string | null
+          content_dirty?: boolean
           created_at?: string
           id?: string
           mood?: string | null
@@ -203,6 +205,7 @@ export type Database = {
           bpm?: number | null
           chapter_id?: string
           content?: string | null
+          content_dirty?: boolean
           created_at?: string
           id?: string
           mood?: string | null
