@@ -20,6 +20,8 @@ import { useStudioSession } from "@/hooks/useStudioSession";
 import { AiRolesButton } from "@/components/AiRolesButton";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { SaveBookButton } from "@/components/SaveBookButton";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import type { LocalChapterData } from "@/lib/localSync";
 
 const Studio = () => {
   const { isRu } = useLanguage();
@@ -96,6 +98,7 @@ const Studio = () => {
     isRu,
     currentBookId: bookId,
   });
+  const { storage } = useProjectStorageContext();
 
   const chapterEstimate = useMemo(() => chapter ? estimateChapterDuration(chapter) : null, [chapter]);
   const sceneEstimate = useMemo(() => {
@@ -177,6 +180,45 @@ const Studio = () => {
       }
     })();
   }, [chapter?.chapterId, chapter?.chapterTitle, bookId, chapter, setChapter]);
+
+  // Hydrate current chapter scene content from local project storage.
+  // Session restore may only contain metadata; Studio analysis must use local text only.
+  useEffect(() => {
+    if (!storage || !chapter?.chapterId) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const localChapter = await storage.readJSON<LocalChapterData>(`scenes/chapter_${chapter.chapterId}.json`);
+      if (cancelled || !localChapter?.scenes?.length) return;
+
+      const localById = new Map(localChapter.scenes.filter((scene) => scene.id).map((scene) => [scene.id as string, scene]));
+      const localByNumber = new Map(localChapter.scenes.map((scene) => [scene.scene_number, scene]));
+
+      setChapter((prev) => {
+        if (!prev || prev.chapterId !== chapter.chapterId) return prev;
+
+        let changed = false;
+        const scenes = prev.scenes.map((scene) => {
+          const localScene = (scene.id ? localById.get(scene.id) : undefined) ?? localByNumber.get(scene.scene_number);
+          const localContent = localScene?.content ?? localScene?.content_preview;
+
+          if (localContent === undefined || localContent === scene.content) {
+            return scene;
+          }
+
+          changed = true;
+          return { ...scene, content: localContent };
+        });
+
+        return changed ? { ...prev, scenes } : prev;
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [storage, chapter?.chapterId, setChapter]);
 
   // Check which scenes already have segments, audio rendered, and stale audio
   useEffect(() => {
