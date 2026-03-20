@@ -156,7 +156,7 @@ export interface CharactersPanelHandle {
   profiling: boolean;
 }
 
-export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanelProps>(function CharactersPanel({ isRu, bookId, sceneId, chapterSceneIds, selectedCharacterId, onSelectCharacter, onVoiceSaved }, ref) {
+export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanelProps>(function CharactersPanel({ isRu, bookId, sceneId, chapterSceneIds, selectedCharacterId, onSelectCharacter, onVoiceSaved, userApiKeys = {} }, ref) {
   const { getModelForRole } = useAiRoles();
   const [characters, setCharacters] = useState<BookCharacter[]>([]);
   const [loading, setLoading] = useState(false);
