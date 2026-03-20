@@ -590,20 +590,12 @@ export function StoryboardPanel({
     supabase.from("book_scenes").update({ content_dirty: false } as any).eq("id", sceneId).then(() => {});
 
     try {
-      let analysisContent = sceneContent;
+      // LOCAL-FIRST: use only the content passed from local state (prop).
+      // Never fetch content from DB — if it's missing locally, tell the user.
+      const analysisContent = sceneContent;
 
       if (!analysisContent) {
-        const { data: freshScene } = await supabase
-          .from("book_scenes")
-          .select("content")
-          .eq("id", sceneId)
-          .maybeSingle();
-
-        analysisContent = freshScene?.content ?? null;
-      }
-
-      if (!analysisContent) {
-        toast.error(isRu ? "Текст сцены не найден" : "Scene text not found");
+        toast.error(isRu ? "Текст сцены не найден в локальном проекте. Откройте книгу через Парсер." : "Scene text not found in local project. Open the book via Parser.");
         setAnalyzing(false);
         return;
       }

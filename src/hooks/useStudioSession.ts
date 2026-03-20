@@ -73,9 +73,11 @@ async function restoreChapterFromDb(params: {
 
   const resolvedBookId = chapterRow.book_id;
 
+  // LOCAL-FIRST: fetch only metadata (id, title, etc.) — never content.
+  // Content lives in local OPFS and flows through Parser → sessionStorage.
   const { data: dbScenes, error: sceneError } = await supabase
     .from("book_scenes")
-    .select("id, scene_number, title, scene_type, mood, bpm, content")
+    .select("id, scene_number, title, scene_type, mood, bpm")
     .in("chapter_id", chapterIds)
     .order("scene_number");
 
@@ -103,8 +105,7 @@ async function restoreChapterFromDb(params: {
       scene_type: scene.scene_type || "mixed",
       mood: scene.mood || "",
       bpm: scene.bpm || 120,
-      content: scene.content || undefined,
-      content_preview: scene.content?.slice(0, 200) || undefined,
+      // No content from DB — content comes from local storage only
     })),
   };
 }

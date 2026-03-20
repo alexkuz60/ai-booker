@@ -160,9 +160,10 @@ const Studio = () => {
 
       if (needIds) {
         const chapterIds = dbChapters.map(c => c.id);
+        // LOCAL-FIRST: fetch only IDs for mapping, never content
         const { data: dbScenes } = await supabase
           .from("book_scenes")
-          .select("id, chapter_id, scene_number, content")
+          .select("id, chapter_id, scene_number")
           .in("chapter_id", chapterIds)
           .order("scene_number");
         if (!dbScenes?.length) return;
@@ -301,53 +302,21 @@ const Studio = () => {
     })();
   }, [chapter?.scenes.map(s => s.id).join(","), bookId, clipsRefreshToken]);
 
-  // Load scene content and silenceSec: local-first, DB only as fallback when local content is absent
+  // LOCAL-FIRST: use local content only. DB used only for metadata (silence_sec).
+  // Content never fetched from server — it comes from Parser → sessionStorage.
   useEffect(() => {
     setSceneContent(null);
     if (!selectedScene) return;
 
+    // Use whatever content is already in local state
     if (selectedScene.content) {
       setSceneContent(selectedScene.content);
     }
 
     if (!selectedScene.id) return;
 
+    // Only fetch metadata (silence_sec) from DB — never content
     (async () => {
-      const needsContentFallback = !selectedScene.content;
-
-      if (needsContentFallback) {
-        const { data } = await supabase
-          .from("book_scenes")
-          .select("content, silence_sec")
-          .eq("id", selectedScene.id)
-          .maybeSingle();
-
-        const dbContent = typeof data?.content === "string" ? data.content : null;
-        if (dbContent !== null) {
-          setSceneContent(dbContent);
-          setChapter((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              scenes: prev.scenes.map((scene) => (
-                scene.id === selectedScene.id
-                  ? {
-                      ...scene,
-                      content: dbContent,
-                      content_preview: dbContent.slice(0, 200) || undefined,
-                    }
-                  : scene
-              )),
-            };
-          });
-        }
-
-        if (typeof data?.silence_sec === "number") {
-          setSilenceSec(data.silence_sec);
-        }
-        return;
-      }
-
       const { data } = await supabase
         .from("book_scenes")
         .select("silence_sec")
@@ -358,7 +327,7 @@ const Studio = () => {
         setSilenceSec(data.silence_sec);
       }
     })();
-  }, [selectedScene?.id, selectedScene?.content, setChapter]);
+  }, [selectedScene?.id, selectedScene?.content]);
 
   // Save silenceSec when changed
   const handleSilenceSecChange = useCallback(async (sec: number) => {
