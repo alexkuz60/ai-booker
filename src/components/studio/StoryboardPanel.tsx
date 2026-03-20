@@ -76,6 +76,7 @@ export function StoryboardPanel({
   const [deleting, setDeleting] = useState(false);
   const [staleAudioSegIds, setStaleAudioSegIds] = useState<Set<string>>(new Set());
   const [cleaningMetadata, setCleaningMetadata] = useState(false);
+  const [contentDirty, setContentDirty] = useState(false);
 
   // Reset merge selection when scene changes
   useEffect(() => { setMergeChecked(new Set()); }, [sceneId]);
