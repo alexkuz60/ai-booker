@@ -27,8 +27,29 @@
 
 - [x] **Теги манеры речи и психотипа** — speech_tags (#отрывисто, #быстро) и psycho_tags (#паникер, #невротик) генерируются при профайлинге в Парсере, отображаются как цветные бейджи в ParserCharactersPanel. Предназначены для auto-casting голосов и настройки TTS в Студии
 - [ ] **Доработать логику Профайлера в Парсере** — inline-нарротации, UI ревью результатов профайлинга
-- [ ] **Перенос тегов в Студию** — отображение speech_tags/psycho_tags в CharactersPanel, использование для автоподбора голосов (matchVoice/matchRole) и TTS-инструкций
+- [ ] **Расширить промпт профайлера** — добавить `accentuation` (акцентуация по Леонгарду: гипертим/шизоид/истероид/эпилептоид/депрессив) и `archetype` (тембровый архетип: Мудрец/Герой/Опекун/Трикстер) для автоматического маппинга на голоса TTS-провайдеров
+- [ ] **Перенос тегов в Студию** — отображение speech_tags/psycho_tags/accentuation/archetype в CharactersPanel, использование для автоподбора голосов (matchVoice/matchRole) и TTS-инструкций
 - [ ] **Доработать логику Профайлера в Студии** — отображение/правка inline-нарротаций в Раскадровке, хранение в `segment_phrases.metadata`
+
+## План «В Студию» (Парсер → Студия)
+
+> Принятые решения: scene-specific речь → `scene_segments.metadata`; теги сцены → из `mood`/`scene_type`; фильтр персонажей дефолт = chapter.
+
+### Фаза 1 — Данные и миграция
+- [ ] **Миграция БД** — `ALTER TABLE book_characters ADD COLUMN speech_tags text[] DEFAULT '{}', psycho_tags text[] DEFAULT '{}'`
+- [ ] **Мост useSaveBookToProject** — маппинг `LocalCharacter.profile.speech_tags/psycho_tags` → новые колонки при Push to Server
+- [ ] **Edge-функция profile-characters** — добавить генерацию speech_tags/psycho_tags аналогично profile-characters-local
+
+### Фаза 2 — Студия / Персонажи
+- [ ] **Фильтр по умолчанию = chapter** — CharactersPanel: дефолт `filterMode="chapter"`, toggle «Сцена»/«Глава»/«Все»
+- [ ] **Бейджи speech_tags/psycho_tags** — отображение рядом с temperament в карточке персонажа
+- [ ] **Scene-level профайлинг** — кнопка «Уточнить речь» для выбранного персонажа → AI дообогащает `scene_segments.metadata.speech_context` с учётом психотипа + контекста сцены, НЕ перезаписывая глобальный профиль
+- [ ] **Психотип → TTS-пресет** — маппинг accentuation/archetype → конкретные настройки провайдера (Yandex: voice+emotion+SSML prosody, SaluteSpeech: voice+prosody, OpenAI/ProxyAPI: voice+instructions, ElevenLabs: stability/similarity/style). См. PSYCHOTYPE_TTS_ANALYTICS.md
+- [ ] **Матрица «segment_type → TTS mode»** — дифференцированные настройки: dialogue=полная эмоциональность, inner_thought=тише+медленнее+«близкий микрофон», narrator=нейтральная подача, lyric=певучий ритм
+
+### Фаза 3 — Инструкции Рассказчику
+- [ ] **Теги сцены → инструкции** — при открытии сцены `book_scenes.mood + scene_type` конвертируются в TTS-инструкции (темп, тональность) и показываются в карточке Рассказчика
+- [ ] **Редактирование** — пользователь может скорректировать авто-инструкции перед синтезом
 
 ## Студия / Раскадровка (после завершения Парсера)
 
