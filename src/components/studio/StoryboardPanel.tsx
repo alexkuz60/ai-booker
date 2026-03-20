@@ -60,7 +60,7 @@ export function StoryboardPanel({
 }) {
   const userApiKeys = useUserApiKeys();
   const { getModelForRole } = useAiRoles(userApiKeys);
-  const { loadFromLocal, persist, persistNow, clearLocal, hasStorage } = useStoryboardPersistence(sceneId);
+  const { loadFromLocal, persist, persistNow, clearLocal, pushToDb, hasStorage } = useStoryboardPersistence(sceneId);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
