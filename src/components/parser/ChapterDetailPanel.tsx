@@ -362,14 +362,24 @@ function SceneCards({
                   }
                   if (i >= scenes.length - 1) return;
                   const currentContent = scenes[i].content || scenes[i].content_preview || "";
-                  // Validate: selection must go to end of scene
-                  if (!currentContent.trimEnd().endsWith(selectedText.trimEnd())) {
+                  const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+                  if (!norm(currentContent).endsWith(norm(selectedText))) {
                     toast.warning(isRu ? "Выделение должно доходить до конца сцены" : "Selection must reach the end of the scene");
                     return;
                   }
+                  // Build regex from selected text words to find split point in original
+                  const selWords = selectedText.trim().split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+                  const pattern = new RegExp(selWords.join("\\s+"));
+                  const match = currentContent.match(pattern);
+                  const splitIdx = match ? currentContent.indexOf(match[0]) : -1;
+                  if (splitIdx < 0) {
+                    toast.error(isRu ? "Не удалось определить границу" : "Could not determine boundary");
+                    return;
+                  }
+                  const newCurrent = currentContent.slice(0, splitIdx).replace(/\n{3,}/g, "\n\n").trim();
+                  const movedText = currentContent.slice(splitIdx).trim();
                   const nextContent = scenes[i + 1].content || scenes[i + 1].content_preview || "";
-                  const newCurrent = currentContent.slice(0, currentContent.lastIndexOf(selectedText)).replace(/\n{3,}/g, "\n\n").trim();
-                  const newNext = selectedText.trim() + "\n\n" + nextContent;
+                  const newNext = movedText + "\n\n" + nextContent;
                   const updated = scenes.map((sc, idx) => {
                     if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length, dirty: true };
                     if (idx === i + 1) return { ...sc, content: newNext, content_preview: newNext.slice(0, 200), char_count: newNext.length, dirty: true };
@@ -395,14 +405,24 @@ function SceneCards({
                   }
                   if (i <= 0) return;
                   const currentContent = scenes[i].content || scenes[i].content_preview || "";
-                  // Validate: selection must start from beginning of scene
-                  if (!currentContent.trimStart().startsWith(selectedText.trimStart())) {
+                  const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+                  if (!norm(currentContent).startsWith(norm(selectedText))) {
                     toast.warning(isRu ? "Выделение должно начинаться с начала сцены" : "Selection must start from the beginning of the scene");
                     return;
                   }
+                  // Build regex to find end of selected text in original
+                  const selWords = selectedText.trim().split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+                  const pattern = new RegExp(selWords.join("\\s+"));
+                  const match = currentContent.match(pattern);
+                  const cutIdx = match ? currentContent.indexOf(match[0]) + match[0].length : -1;
+                  if (cutIdx < 0) {
+                    toast.error(isRu ? "Не удалось определить границу" : "Could not determine boundary");
+                    return;
+                  }
+                  const movedText = currentContent.slice(0, cutIdx).trim();
+                  const newCurrent = currentContent.slice(cutIdx).replace(/\n{3,}/g, "\n\n").trim();
                   const prevContent = scenes[i - 1].content || scenes[i - 1].content_preview || "";
-                  const newCurrent = currentContent.slice(currentContent.indexOf(selectedText) + selectedText.length).replace(/\n{3,}/g, "\n\n").trim();
-                  const newPrev = prevContent + "\n\n" + selectedText.trim();
+                  const newPrev = prevContent + "\n\n" + movedText;
                   const updated = scenes.map((sc, idx) => {
                     if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length, dirty: true };
                     if (idx === i - 1) return { ...sc, content: newPrev, content_preview: newPrev.slice(0, 200), char_count: newPrev.length, dirty: true };
