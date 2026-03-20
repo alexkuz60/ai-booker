@@ -163,6 +163,20 @@ Deno.serve(async (req) => {
       );
     }
 
+    // ── Coverage validation: ensure segments cover most of the original text ──
+    const segmentTextTotal = segments.reduce((sum, s) => sum + (s.text?.length || 0), 0);
+    const coverageRatio = segmentTextTotal / content.length;
+    if (coverageRatio < 0.5) {
+      console.warn(`Low coverage: ${Math.round(coverageRatio * 100)}% (${segmentTextTotal}/${content.length} chars). Segments: ${segments.length}`);
+      if (userId) {
+        logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "error", latencyMs: aiLatency, tokensInput: usage?.prompt_tokens, tokensOutput: usage?.completion_tokens, errorMessage: `Low coverage: ${Math.round(coverageRatio * 100)}%` });
+      }
+      return new Response(
+        JSON.stringify({ error: lang === "ru" ? "AI вернул неполную раскадровку (покрыто менее 50% текста). Попробуйте ещё раз." : "AI returned incomplete segmentation (less than 50% coverage). Please retry." }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // ── Post-process: detect first-person narration by pronouns ──
     const FIRST_PERSON_RU = /\b(я|мне|меня|мной|мною|моего|моей|моему|моим|моими|моих|моё|мое|мои)\b/i;
     const FIRST_PERSON_EN = /\b(I|me|my|mine|myself)\b/;
