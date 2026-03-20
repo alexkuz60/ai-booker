@@ -318,15 +318,15 @@ export function StoryboardPanel({
     return builtSegments;
   }, [characters]);
 
-  /** Apply loaded segments to component state + persist to OPFS */
+  /** Apply loaded segments to component state */
   const applySegments = useCallback((builtSegments: Segment[], sid: string) => {
     setSegments(builtSegments);
     const inlineIds = new Set(builtSegments.filter(s => s.inline_narrations && s.inline_narrations.length > 0).map(s => s.segment_id));
     setInlineNarrationSegIds(inlineIds);
-    setStaleAudioSegIds(new Set()); // stale detection is DB-specific, skip for OPFS
+    setStaleAudioSegIds(new Set());
     setLoaded(true);
-    loadAudioStatus(builtSegments.map(s => s.segment_id));
-  }, [loadAudioStatus]);
+    // Audio status is loaded from OPFS snapshot or refreshed after synthesis
+  }, []);
 
   const loadSegments = useCallback(async (sid: string) => {
     setLoading(true);
