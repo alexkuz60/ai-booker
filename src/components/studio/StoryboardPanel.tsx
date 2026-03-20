@@ -84,6 +84,10 @@ export function StoryboardPanel({
   const [contentDirty, setContentDirty] = useState(false);
   const autoAnalyzeAttemptedRef = useRef<string | null>(null);
   const typeMappingsRef = useRef<LocalTypeMappingEntry[]>([]);
+  const audioStatusRef = useRef(audioStatus);
+  audioStatusRef.current = audioStatus;
+  const inlineNarrationSpeakerRef = useRef(inlineNarrationSpeaker);
+  inlineNarrationSpeakerRef.current = inlineNarrationSpeaker;
 
   /** Build a snapshot for OPFS persistence */
   const buildSnapshot = useCallback(
