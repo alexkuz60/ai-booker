@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { readStoryboardFromLocal } from "@/lib/storyboardSync";
 
 const CHARS_PER_SEC = 14;
 
@@ -53,13 +55,6 @@ export interface SceneBoundary {
   sceneId: string;
 }
 
-interface RawPhrase {
-  id: string;
-  segment_id: string;
-  phrase_number: number;
-  text: string;
-}
-
 interface InlineNarrationAudio {
   text: string;
   insert_after: string;
@@ -72,9 +67,8 @@ interface InlineNarrationAudio {
 export type TypeMappingsByScene = Map<string, Map<string, string>>;
 
 /**
- * Load real clips for timeline from scene_segments + segment_phrases.
+ * Load real clips for timeline from local storyboard in OPFS.
  * Uses actual durations from segment_audio when available, falls back to char-based estimate.
- * Supports inline narration overlays from segment metadata.
  * Now reads per-scene silence_sec from book_scenes.
  * Applies scene_type_mappings to route narrator/first_person clips to character tracks.
  */
@@ -84,6 +78,7 @@ export function useTimelineClips(
   refreshToken: number = 0,
   typeMappings?: TypeMappingsByScene,
 ) {
+  const { storage } = useProjectStorageContext();
   const [clips, setClips] = useState<TimelineClip[]>([]);
   const [loading, setLoading] = useState(false);
   /** Scene boundaries with absolute start offset and silence duration */
@@ -93,7 +88,7 @@ export function useTimelineClips(
   const key = sceneIds.join(",") + "|" + [...characterMap.entries()].map(([k, v]) => `${k}:${v}`).join(",") + "|" + refreshToken + "|" + typeMappingsKey;
 
   useEffect(() => {
-    if (sceneIds.length === 0) {
+    if (sceneIds.length === 0 || !storage) {
       setClips([]);
       setSceneBoundaries([]);
       return;
@@ -103,14 +98,14 @@ export function useTimelineClips(
     setLoading(true);
 
     (async () => {
-      // Load segments, scenes, and atmosphere layers in parallel
-      const [{ data: segments }, { data: sceneData }, { data: atmosphereLayers }] = await Promise.all([
-        supabase
-          .from("scene_segments")
-          .select("id, segment_number, segment_type, speaker, scene_id, metadata")
-          .in("scene_id", sceneIds)
-          .order("scene_id")
-          .order("segment_number"),
+      // Local storyboard is the only source of truth for runtime text/segmentation data.
+      const [localStoryboards, { data: sceneData }, { data: atmosphereLayers }] = await Promise.all([
+        Promise.all(
+          sceneIds.map(async (sceneId) => ({
+            sceneId,
+            data: await readStoryboardFromLocal(storage, sceneId),
+          })),
+        ),
         supabase
           .from("book_scenes")
           .select("id, silence_sec")
@@ -122,7 +117,20 @@ export function useTimelineClips(
           .order("created_at"),
       ]);
 
-      if (cancelled || !segments?.length) {
+      const segments = localStoryboards.flatMap(({ sceneId, data }) =>
+        (data?.segments ?? []).map((segment) => ({
+          id: segment.segment_id,
+          segment_number: segment.segment_number,
+          segment_type: segment.segment_type,
+          speaker: segment.speaker,
+          scene_id: sceneId,
+          split_silence_ms: segment.split_silence_ms,
+          inline_narrations: segment.inline_narrations,
+          phrases: [...segment.phrases].sort((a, b) => a.phrase_number - b.phrase_number),
+        })),
+      );
+
+      if (cancelled || segments.length === 0) {
         if (!cancelled) { setClips([]); setSceneBoundaries([]); setLoading(false); }
         return;
       }
@@ -137,13 +145,8 @@ export function useTimelineClips(
 
       const segIds = segments.map(s => s.id);
 
-      // Load phrases and audio metadata in parallel
-      const [{ data: phrases }, { data: audioData }] = await Promise.all([
-        supabase
-          .from("segment_phrases")
-          .select("id, segment_id, phrase_number, text")
-          .in("segment_id", segIds)
-          .order("phrase_number"),
+      // Load audio metadata only; text/phrases stay strictly local.
+      const [{ data: audioData }] = await Promise.all([
         supabase
           .from("segment_audio")
           .select("segment_id, duration_ms, audio_path, status")
@@ -162,14 +165,6 @@ export function useTimelineClips(
             audioPath: a.audio_path,
           });
         }
-      }
-
-      // Group phrases by segment
-      const phrasesBySegment = new Map<string, RawPhrase[]>();
-      for (const p of (phrases ?? [])) {
-        const list = phrasesBySegment.get(p.segment_id) ?? [];
-        list.push(p);
-        phrasesBySegment.set(p.segment_id, list);
       }
 
       // Build clips: sequential timeline with per-scene silence gap
@@ -198,7 +193,7 @@ export function useTimelineClips(
           if (audioInfo && audioInfo.durationMs > 0) {
             durationSec = audioInfo.durationMs / 1000;
           } else {
-            const segPhrases = phrasesBySegment.get(seg.id) ?? [];
+            const segPhrases = seg.phrases ?? [];
             const totalChars = segPhrases.reduce((sum, p) => sum + p.text.length, 0);
             durationSec = Math.max(0.5, totalChars / CHARS_PER_SEC);
           }
@@ -238,8 +233,7 @@ export function useTimelineClips(
           }
 
           // Check for split silence (e.g. 1s gap before second part of a split block)
-          const segMeta = (seg.metadata ?? {}) as Record<string, unknown>;
-          const splitSilenceMs = typeof segMeta.split_silence_ms === "number" ? segMeta.split_silence_ms : 0;
+          const splitSilenceMs = typeof seg.split_silence_ms === "number" ? seg.split_silence_ms : 0;
           if (splitSilenceMs > 0) {
             sceneOffset += splitSilenceMs / 1000;
           }
@@ -258,10 +252,8 @@ export function useTimelineClips(
           });
 
           // ── Inline narration overlay clips ──────────────────
-          // Route to first_person character if mapped (voice consistency),
-          // then to Рассказчик system character, then narrator-fallback
-          const metadata = (seg.metadata ?? {}) as Record<string, unknown>;
-          const inlineNarrAudio = (metadata.inline_narrations_audio ?? []) as InlineNarrationAudio[];
+          // Audio overlays are attached after synthesis; runtime text still comes only from OPFS.
+          const inlineNarrAudio: InlineNarrationAudio[] = [];
 
           let inlineTrackId = "narrator-fallback";
           const inlineMappings = typeMappings?.get(sceneId);
@@ -362,7 +354,7 @@ export function useTimelineClips(
     })();
 
     return () => { cancelled = true; };
-  }, [key]);
+  }, [key, storage]);
 
   // ── Auto-sync scene_playlists when clips change ──────────────
   // Ensures the montage scheme stays in sync with any timing change
