@@ -34,17 +34,20 @@
 ## План «В Студию» (Парсер → Студия)
 
 > Принятые решения: scene-specific речь → `scene_segments.metadata`; теги сцены → из `mood`/`scene_type`; фильтр персонажей дефолт = chapter.
+> Психотип-TTS стратегия: accentuation (Леонгард) + archetype (тембровый) → матрица маппинга на провайдеров. См. PSYCHOTYPE_TTS_ANALYTICS.md.
 
 ### Фаза 1 — Данные и миграция
 - [ ] **Миграция БД** — `ALTER TABLE book_characters ADD COLUMN speech_tags text[] DEFAULT '{}', psycho_tags text[] DEFAULT '{}'`
 - [ ] **Мост useSaveBookToProject** — маппинг `LocalCharacter.profile.speech_tags/psycho_tags` → новые колонки при Push to Server
 - [ ] **Edge-функция profile-characters** — добавить генерацию speech_tags/psycho_tags аналогично profile-characters-local
+- [ ] **Расширить промпт профайлера** — добавить `accentuation` (акцентуация по Леонгарду: гипертим/шизоид/истероид/эпилептоид/депрессив/тревожный/эмотивный/циклоид/застревающий/демонстративный) и `archetype` (тембровый архетип: Мудрец/Герой/Опекун/Трикстер/Любовник/Бунтарь) для автоматического маппинга на голоса TTS-провайдеров
 
-### Фаза 2 — Студия / Персонажи
+### Фаза 2 — Студия / Персонажи + Кастинг
 - [ ] **Фильтр по умолчанию = chapter** — CharactersPanel: дефолт `filterMode="chapter"`, toggle «Сцена»/«Глава»/«Все»
 - [ ] **Бейджи speech_tags/psycho_tags** — отображение рядом с temperament в карточке персонажа
 - [ ] **Scene-level профайлинг** — кнопка «Уточнить речь» для выбранного персонажа → AI дообогащает `scene_segments.metadata.speech_context` с учётом психотипа + контекста сцены, НЕ перезаписывая глобальный профиль
-- [ ] **Психотип → TTS-пресет** — маппинг accentuation/archetype → конкретные настройки провайдера (Yandex: voice+emotion+SSML prosody, SaluteSpeech: voice+prosody, OpenAI/ProxyAPI: voice+instructions, ElevenLabs: stability/similarity/style). См. PSYCHOTYPE_TTS_ANALYTICS.md
+- [ ] **Психотип → TTS-пресет** — конфиг `src/config/psychotypeVoicePresets.ts`: маппинг `{ accentuation, archetype, provider }` → конкретные настройки провайдера (Yandex: voice+emotion+SSML prosody, SaluteSpeech: voice+prosody, OpenAI/ProxyAPI: voice+instructions, ElevenLabs: stability/similarity/style). См. PSYCHOTYPE_TTS_ANALYTICS.md
+- [ ] **Авто-кастинг с альтернативами** — AI предлагает 2-3 голоса-кандидата для персонажа на основе psycho_tags/accentuation/archetype, пользователь делает финальный выбор
 - [ ] **Матрица «segment_type → TTS mode»** — дифференцированные настройки: dialogue=полная эмоциональность, inner_thought=тише+медленнее+«близкий микрофон», narrator=нейтральная подача, lyric=певучий ритм
 
 ### Фаза 3 — Инструкции Рассказчику
