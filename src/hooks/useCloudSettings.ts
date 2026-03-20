@@ -105,7 +105,10 @@ export function useCloudSettings<T>(
       const resolved = typeof newValue === 'function'
         ? (newValue as (prev: T) => T)(prev)
         : newValue;
-      try { localStorage.setItem(cacheKey, JSON.stringify(resolved)); } catch {}
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(resolved));
+        localStorage.setItem(tsKey, String(Date.now()));
+      } catch {}
       saveToDb(resolved);
       return resolved;
     });
