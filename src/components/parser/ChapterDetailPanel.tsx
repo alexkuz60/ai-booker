@@ -188,11 +188,16 @@ function SceneCards({
     }
     const result = applyCleanup(action, scenes, selectedText, sceneIndex);
     if (result.changeCount > 0 && onScenesUpdate) {
-      // Update char_count for all scenes after cleanup
-      const updatedScenes = result.scenes.map(sc => ({
-        ...sc,
-        char_count: (sc.content || '').length,
-      }));
+      // Update char_count and mark dirty for all modified scenes
+      const updatedScenes = result.scenes.map((sc, idx) => {
+        const originalContent = scenes[idx]?.content ?? scenes[idx]?.content_preview ?? "";
+        const wasModified = sc.content !== originalContent;
+        return {
+          ...sc,
+          char_count: (sc.content || '').length,
+          ...(wasModified ? { dirty: true } : {}),
+        };
+      });
       onScenesUpdate(updatedScenes, result.summary);
       // Mark scene(s) as edited
       setEditedIndices(prev => {
