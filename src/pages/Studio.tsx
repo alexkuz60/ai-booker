@@ -279,9 +279,11 @@ const Studio = () => {
   }, [chapter?.scenes.map(s => s.id).join(","), bookId, clipsRefreshToken]);
 
   // Load scene content and silenceSec: prefer in-memory, fallback to DB
+  // Load scene content: always prefer DB content over stale session content
   useEffect(() => {
     setSceneContent(null);
     if (!selectedScene) return;
+    // Show in-memory content immediately as placeholder
     if (selectedScene.content) {
       setSceneContent(selectedScene.content);
     }
@@ -292,10 +294,11 @@ const Studio = () => {
         .select("content, silence_sec")
         .eq("id", selectedScene.id)
         .maybeSingle();
-      if (!selectedScene.content && data?.content) setSceneContent(data.content);
+      // Always prefer DB content when available (session may be stale)
+      if (data?.content) setSceneContent(data.content);
       if (data?.silence_sec !== undefined) setSilenceSec(data.silence_sec);
     })();
-  }, [selectedScene?.id, selectedScene?.content]);
+  }, [selectedScene?.id]);
 
   // Save silenceSec when changed
   const handleSilenceSecChange = useCallback(async (sec: number) => {
