@@ -244,6 +244,12 @@ export function useBookRestore({
         }
         return;
       }
+
+      if (!options?.skipTimestampCheck) {
+        return;
+      }
+    } else if (!options?.skipTimestampCheck) {
+      return;
     }
 
     clearTransientBookState();
@@ -407,7 +413,7 @@ export function useBookRestore({
       );
 
       if (targetStorage?.isReady) {
-        void syncStructureToLocal(targetStorage, {
+        await syncStructureToLocal(targetStorage, {
           bookId: book.id,
           title: book.title || stripFileExtension(book.file_name),
           fileName: book.file_name,
@@ -451,20 +457,21 @@ export function useBookRestore({
 
         if (pdfBlob) {
           const sourcePath = getSourcePath(bookFormat);
-          targetStorage.writeBlob(sourcePath, pdfBlob).catch(err =>
-            console.warn("[OpenBook] Failed to save source file to local project:", err)
-          );
+          try {
+            await targetStorage.writeBlob(sourcePath, pdfBlob);
+          } catch (err) {
+            console.warn("[OpenBook] Failed to save source file to local project:", err);
+          }
         }
 
-        if (isBookDocx) {
-          try {
-            const projMeta = await targetStorage.readJSON<Record<string, unknown>>("project.json");
-            if (projMeta) {
-              projMeta.fileFormat = "docx";
-              await targetStorage.writeJSON("project.json", projMeta);
-            }
-          } catch {}
-        }
+        try {
+          const projMeta = await targetStorage.readJSON<Record<string, unknown>>("project.json");
+          if (projMeta) {
+            projMeta.fileFormat = bookFormat;
+            projMeta.updatedAt = new Date().toISOString();
+            await targetStorage.writeJSON("project.json", projMeta);
+          }
+        } catch {}
       }
 
       const pdfStatus = restoredPdf

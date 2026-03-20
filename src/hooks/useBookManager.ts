@@ -118,8 +118,8 @@ export function useBookManager({
 
   // ── Wrap openSavedBook to inject sync dependencies ─────────
   const openSavedBook = useCallback(async (book: BookRecord, options?: { skipTimestampCheck?: boolean }) => {
-    await restore.openSavedBook(book, options, serverSync.checkServerNewer, serverSync.setServerNewerBookId);
-  }, [restore.openSavedBook, serverSync.checkServerNewer, serverSync.setServerNewerBookId]);
+    await restore.openSavedBook(book, options);
+  }, [restore.openSavedBook]);
 
   // Keep ref in sync
   openSavedBookRef.current = openSavedBook;
@@ -146,43 +146,18 @@ export function useBookManager({
     setRestoredOnce(true);
 
     restore.restoreFromLocal(savedBookId).then(async (restored) => {
-      const shouldSync = serverSync.shouldRunServerSyncCheck(savedBookId);
-
       if (restored) {
-        if (shouldSync) {
-          const isNewer = await serverSync.checkServerNewer(savedBookId);
-          serverSync.markServerSyncChecked(savedBookId);
-          if (isNewer) serverSync.setServerNewerBookId(savedBookId);
-        }
         return;
       }
 
-      if (!shouldSync) {
-        setStep("library");
-        return;
-      }
-
-      const isServerNewerForThisBrowser = await serverSync.checkServerNewer(savedBookId, { allowMissingLocalTimestamp: true });
-      serverSync.markServerSyncChecked(savedBookId);
-      if (!isServerNewerForThisBrowser) {
-        setStep("library");
-        return;
-      }
-
-      const book = await library.loadBookFromServerById(savedBookId);
-      if (book) {
-        await openSavedBook(book, { skipTimestampCheck: true });
-      } else {
-        sessionStorage.removeItem(ACTIVE_BOOK_KEY);
-        setStep("library");
-      }
+      sessionStorage.removeItem(ACTIVE_BOOK_KEY);
+      setStep("library");
     });
   }, [
     userId, restoredOnce,
-    restore.restoreFromLocal, serverSync.checkServerNewer,
+    restore.restoreFromLocal,
     storageBackend, projectStorageInitialized,
-    serverSync.shouldRunServerSyncCheck, serverSync.markServerSyncChecked,
-    library.loadBookFromServerById, step, openSavedBook,
+    step,
   ]);
 
   // ── Delete book ───────────────────────────────────────────
