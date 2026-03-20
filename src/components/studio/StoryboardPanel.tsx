@@ -1383,6 +1383,26 @@ export function StoryboardPanel({
           </Button>
         </div>
       </div>
+      {contentDirty && segments.length > 0 && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-destructive/10 border-b border-destructive/20 shrink-0">
+          <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+          <span className="text-xs text-destructive">
+            {isRu
+              ? "Контент сцены изменён в Парсере. Рекомендуется переанализировать раскадровку."
+              : "Scene content was edited in Parser. Re-analysis recommended."}
+          </span>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="h-6 px-2 text-xs ml-auto shrink-0"
+            onClick={runAnalysis}
+            disabled={analyzing || !sceneContent}
+          >
+            <RefreshCw className="h-3 w-3 mr-1" />
+            {isRu ? "Переанализ" : "Re-analyze"}
+          </Button>
+        </div>
+      )}
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-3 space-y-2">
           {segments.map((seg) => {
