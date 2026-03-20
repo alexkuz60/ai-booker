@@ -810,19 +810,28 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
               <RoleBadge roleId="director" model={getModelForRole("director")} isRu={isRu} size={13} />
             </span>
             <div className="flex items-center gap-1">
-              {/* Filter toggle */}
-              {sceneId && (
-                <Button
-                  variant={filterMode === "scene" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={() => setFilterMode(prev => prev === "all" ? "scene" : "all")}
-                  title={filterMode === "all"
-                    ? (isRu ? "Только из сцены" : "Scene only")
-                    : (isRu ? "Все персонажи" : "All characters")}
-                >
-                  <Filter className={`h-3 w-3 ${filterMode === "scene" ? "text-primary" : ""}`} />
-                </Button>
+              {/* Filter toggle: chapter → scene → all → chapter */}
+              <Button
+                variant={filterMode !== "all" ? "secondary" : "ghost"}
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setFilterMode(prev =>
+                  prev === "chapter" ? (sceneId ? "scene" : "all")
+                    : prev === "scene" ? "all"
+                    : "chapter"
+                )}
+                title={filterMode === "chapter"
+                  ? (isRu ? "Фильтр: глава" : "Filter: chapter")
+                  : filterMode === "scene"
+                    ? (isRu ? "Фильтр: сцена" : "Filter: scene")
+                    : (isRu ? "Фильтр: все" : "Filter: all")}
+              >
+                <Filter className={`h-3 w-3 ${filterMode !== "all" ? "text-primary" : ""}`} />
+              </Button>
+              {filterMode !== "all" && (
+                <span className="text-[9px] text-primary font-medium">
+                  {filterMode === "chapter" ? (isRu ? "гл." : "ch.") : (isRu ? "сц." : "sc.")}
+                </span>
               )}
               {/* Extras toggle for selected character */}
               {selectedId && !multiSelect && (
