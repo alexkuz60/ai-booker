@@ -4,6 +4,8 @@
  * IDs are generated locally via crypto.randomUUID().
  */
 
+import { setChapterTextsCache, setDocxHtmlCache, clearChapterTextsCache } from "@/lib/chapterTextsCache";
+
 import { useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import {
