@@ -37,6 +37,53 @@ interface AISegment {
   inline_narrations?: InlineNarration[];
 }
 
+function normalizeText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[\u00a0\s]+/g, " ")
+    .replace(/[«»"'„“”()\[\]{}.,!?;:—–-]+/g, "")
+    .trim();
+}
+
+function getCoverageFromSource(sourceNorm: string, segments: AISegment[]): number {
+  if (!sourceNorm) return 0;
+  const combined = normalizeText(segments.map((s) => s.text || "").join(" "));
+  if (!combined) return 0;
+
+  let matched = 0;
+  for (const seg of segments) {
+    const normalizedSeg = normalizeText(seg.text || "");
+    if (!normalizedSeg) continue;
+    if (sourceNorm.includes(normalizedSeg)) {
+      matched += normalizedSeg.length;
+    }
+  }
+
+  return Math.min(1, matched / Math.max(sourceNorm.length, 1));
+}
+
+function buildFallbackSegments(content: string, lang: "ru" | "en"): AISegment[] {
+  const phrases = splitPhrases(content).filter(Boolean);
+  if (phrases.length === 0) {
+    return [{ type: lang === "ru" ? "inner_thought" : "narrator", text: content }];
+  }
+
+  const segments: AISegment[] = [];
+  const chunkSize = 4;
+  for (let i = 0; i < phrases.length; i += chunkSize) {
+    const text = phrases.slice(i, i + chunkSize).join(" ").trim();
+    if (!text) continue;
+    segments.push({
+      type: lang === "ru" && /\b(я|мне|меня|мной|мною|моего|моей|моему|моим|моими|моих|моё|мое|мои)\b/i.test(text)
+        ? "first_person"
+        : "narrator",
+      text,
+    });
+  }
+
+  return segments.length > 0 ? segments : [{ type: "narrator", text: content }];
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -183,6 +230,7 @@ Deno.serve(async (req) => {
     let segments: AISegment[];
     let usage: any;
     let aiLatency: number;
+    let usedFallbackSegmentation = false;
 
     try {
       // First attempt: with response_format json
@@ -200,34 +248,36 @@ Deno.serve(async (req) => {
         const r = await callAiForSegments(false);
         segments = r.segments; usage = r.usage; aiLatency = r.latency;
       } catch (e2: any) {
-        if (e2.statusCode) {
-          return new Response(JSON.stringify({ error: e2.message }), {
-            status: e2.statusCode, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        console.error("Both AI attempts failed:", e2.message);
-        if (userId) {
-          logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "error", latencyMs: Date.now() - aiStart, errorMessage: "Unparseable AI response" });
-        }
-        return new Response(
-          JSON.stringify({ error: "AI returned an unstructured response. Please retry." }),
-          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        console.error("AI segmentation failed, using fallback segmentation:", e2.message);
+        segments = buildFallbackSegments(content, lang);
+        usage = null;
+        aiLatency = Date.now() - aiStart;
+        usedFallbackSegmentation = true;
       }
     }
 
-    // ── Coverage validation: ensure segments cover most of the original text ──
+    // ── Validation: ensure segments belong to this source text ──
+    const sourceNorm = normalizeText(content);
     const segmentTextTotal = segments.reduce((sum, s) => sum + (s.text?.length || 0), 0);
     const coverageRatio = segmentTextTotal / content.length;
-    if (coverageRatio < 0.5) {
-      console.warn(`Low coverage: ${Math.round(coverageRatio * 100)}% (${segmentTextTotal}/${content.length} chars). Segments: ${segments.length}`);
+    const sourceCoverage = getCoverageFromSource(sourceNorm, segments);
+
+    if (!usedFallbackSegmentation && (coverageRatio < 0.5 || sourceCoverage < 0.55)) {
+      console.warn(`Invalid segmentation. Length coverage=${Math.round(coverageRatio * 100)}%, source coverage=${Math.round(sourceCoverage * 100)}%, segments=${segments.length}`);
       if (userId) {
-        logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "error", latencyMs: aiLatency, tokensInput: usage?.prompt_tokens, tokensOutput: usage?.completion_tokens, errorMessage: `Low coverage: ${Math.round(coverageRatio * 100)}%` });
+        logAiUsage({
+          userId,
+          modelId: usedModel,
+          requestType: "segment-scene",
+          status: "error",
+          latencyMs: aiLatency,
+          tokensInput: usage?.prompt_tokens,
+          tokensOutput: usage?.completion_tokens,
+          errorMessage: `Invalid segmentation: len=${Math.round(coverageRatio * 100)}% source=${Math.round(sourceCoverage * 100)}%`,
+        });
       }
-      return new Response(
-        JSON.stringify({ error: lang === "ru" ? "AI вернул неполную раскадровку (покрыто менее 50% текста). Попробуйте ещё раз." : "AI returned incomplete segmentation (less than 50% coverage). Please retry." }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      segments = buildFallbackSegments(content, lang);
+      usedFallbackSegmentation = true;
     }
 
     // ── Post-process: detect first-person narration by pronouns ──
