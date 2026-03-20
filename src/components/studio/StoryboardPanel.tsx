@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Database } from "@/integrations/supabase/types";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
-import { readCharactersFromLocal } from "@/lib/localSync";
+import { readCharactersFromLocal, type LocalChapterData } from "@/lib/localSync";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { useStoryboardPersistence, type StoryboardSnapshot } from "@/hooks/useStoryboardPersistence";
@@ -584,9 +584,25 @@ export function StoryboardPanel({
     supabase.from("book_scenes").update({ content_dirty: false } as any).eq("id", sceneId).then(() => {});
 
     try {
-      // LOCAL-FIRST: use only the content passed from local state (prop).
-      // Never fetch content from DB — if it's missing locally, tell the user.
-      const analysisContent = sceneContent;
+      // OPFS-ONLY: read authoritative content directly from local project storage.
+      // Never trust sceneContent prop (may be stale from sessionStorage hydration).
+      let analysisContent: string | null = null;
+      if (storage) {
+        try {
+          const sceneFiles = await storage.listDir("scenes");
+          for (const file of sceneFiles) {
+            if (!file.startsWith("chapter_") || !file.endsWith(".json")) continue;
+            const localChapter = await storage.readJSON<LocalChapterData>(`scenes/${file}`);
+            const localScene = localChapter?.scenes?.find((item: any) => item.id === sceneId);
+            if (localScene?.content) { analysisContent = localScene.content; break; }
+            if (localScene?.content_preview) { analysisContent = localScene.content_preview; break; }
+          }
+        } catch (err) {
+          console.warn("[StoryboardPanel] Failed to read OPFS scene content:", err);
+        }
+      }
+      // Fallback to prop only if OPFS unavailable
+      if (!analysisContent) analysisContent = sceneContent;
 
       if (!analysisContent) {
         toast.error(isRu ? "Текст сцены не найден в локальном проекте. Откройте книгу через Парсер." : "Scene text not found in local project. Open the book via Parser.");
@@ -618,7 +634,7 @@ export function StoryboardPanel({
       await loadSegments(sceneId);
     }
     setAnalyzing(false);
-  }, [sceneId, sceneContent, isRu, onSegmented, loadSegments, clearLocal, getModelForRole, userApiKeys]);
+  }, [sceneId, sceneContent, isRu, onSegmented, loadSegments, clearLocal, getModelForRole, userApiKeys, storage]);
 
   // Auto-trigger analysis when scene has no segments and content is available
   useEffect(() => {

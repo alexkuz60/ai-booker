@@ -79,12 +79,11 @@ export function BatchSegmentationPanel({
     setJobs(prev => prev.map(j => j.scene.id === sceneId ? { ...j, ...update } : j));
   }, []);
 
+  // OPFS-ONLY: always read authoritative content from local project storage.
+  // Never trust in-memory scene.content (may be stale from sessionStorage).
+  // Never fall back to DB — if OPFS is missing, it's a real error.
   const resolveFreshSceneContent = useCallback(async (scene: SceneInfo) => {
-    if (scene.content) {
-      return scene.content;
-    }
-
-     if (storage) {
+    if (storage) {
       try {
         const sceneFiles = await storage.listDir("scenes");
         for (const file of sceneFiles) {
@@ -103,13 +102,8 @@ export function BatchSegmentationPanel({
       }
     }
 
-    const { data } = await supabase
-      .from("book_scenes")
-      .select("content")
-      .eq("id", scene.id)
-      .maybeSingle();
-
-    return data?.content ?? scene.content ?? undefined;
+    // Last resort: use whatever was passed in props (e.g. OPFS not open)
+    return scene.content ?? undefined;
   }, [storage]);
 
   // ── Pool-based batch ──────────────────────────────────────────────────
