@@ -19,8 +19,8 @@
 
 ## AI-роли
 
-- [ ] **Сайдбар AI-ролей не сохраняет выбор модели** — при смене модели в Sheet (AiRolesButton → AiRolesTab) изменения не персистятся
-- [ ] **Просмотр промпта роли в сайдбаре** — в панели AI-ролей добавить возможность посмотреть системный промпт каждой роли (expand/collapse или tooltip)
+- [x] **Фикс персистенции выбора модели в сайдбаре** — гонка при закрытии/открытии Sheet: DB-load перезаписывал свежий localStorage. Решено через write-timestamp guard в useCloudSettings
+- [x] **Просмотр/редактирование промптов роли** — TaskPromptsPopover с expand/collapse, inline-editing (admin-only), двуязычные версии (Ru/En), write-through в user_settings
 - [x] **Логирование статистики пула** — сохранять время, модели и ошибки пула в proxy_api_logs для аналитики
 
 ## Профайлер
