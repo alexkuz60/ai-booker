@@ -170,7 +170,7 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       });
       clearTimeout(timeout);
 
-      console.log(`AI attempt ${attempt}/${MAX_RETRIES}, status=${aiRes.status}`);
+      console.log(`AI attempt ${attempt}/${MAX_RETRIES}, status=${aiRes.status}, endpoint=${resolved.endpoint}, model=${usedModel}`);
 
       if (aiRes.status === 429) {
         lastError = lang === "ru" ? "Превышен лимит запросов" : "Rate limit exceeded";
@@ -348,6 +348,7 @@ Deno.serve(async (req) => {
     const reqBody = await req.json();
     const { book_id, language, scene_ids, model: clientModel } = reqBody;
     const providerFields = extractProviderFields(reqBody);
+    console.log(`Provider routing: model=${providerFields.model}, hasApiKey=${!!providerFields.apiKey}, hasOrKey=${!!providerFields.openrouterApiKey}`);
     if (!book_id) {
       return new Response(JSON.stringify({ error: "book_id is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
