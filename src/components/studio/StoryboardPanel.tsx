@@ -251,98 +251,21 @@ export function StoryboardPanel({
       }
     }
     setAudioStatus(map);
-    // Persist updated audio status to OPFS
     persist(buildSnapshot(undefined, map));
   }, [persist, buildSnapshot]);
 
-  // Load segments: OPFS first → DB fallback (seed after AI analysis only)
-  const loadSegmentsFromDb = useCallback(async (sid: string): Promise<Segment[]> => {
-    const { data: segs, error: segErr } = await supabase
-      .from("scene_segments")
-      .select("id, segment_number, segment_type, speaker, metadata")
-      .eq("scene_id", sid)
-      .order("segment_number");
-
-    if (segErr) throw segErr;
-    if (!segs || segs.length === 0) return [];
-
-    const segIds = segs.map((s) => s.id);
-    const [{ data: phrases, error: phErr }, { data: mappings }] = await Promise.all([
-      supabase
-        .from("segment_phrases")
-        .select("id, segment_id, phrase_number, text, metadata")
-        .in("segment_id", segIds)
-        .order("phrase_number"),
-      supabase
-        .from("scene_type_mappings")
-        .select("segment_type, character_id")
-        .eq("scene_id", sid),
-    ]);
-
-    if (phErr) throw phErr;
-
-    const charNameMap = new Map(characters.map(c => [c.id, c.name]));
-    const typeSpeakerMap = new Map<string, string>();
-    let loadedInlineSpeaker: string | null = null;
-    const localMappings: LocalTypeMappingEntry[] = [];
-    if (mappings) {
-      for (const m of mappings) {
-        const name = charNameMap.get(m.character_id);
-        if (name) {
-          typeSpeakerMap.set(m.segment_type, name);
-          localMappings.push({ segmentType: m.segment_type, characterId: m.character_id, characterName: name });
-          if (m.segment_type === "inline_narration") loadedInlineSpeaker = name;
-        }
-      }
-    }
-    typeMappingsRef.current = localMappings;
-    setInlineNarrationSpeaker(loadedInlineSpeaker);
-
-    const phraseMap = new Map<string, Phrase[]>();
-    for (const p of phrases || []) {
-      const list = phraseMap.get(p.segment_id) || [];
-      const phMeta = (p.metadata ?? {}) as Record<string, unknown>;
-      const annotations = Array.isArray(phMeta.annotations) ? phMeta.annotations as PhraseAnnotation[] : undefined;
-      list.push({ phrase_id: p.id, phrase_number: p.phrase_number, text: p.text, annotations });
-      phraseMap.set(p.segment_id, list);
-    }
-
-    const builtSegments = segs.map((s) => {
-      let speaker = s.speaker;
-      if (!speaker && typeSpeakerMap.has(s.segment_type)) {
-        speaker = typeSpeakerMap.get(s.segment_type)!;
-      }
-      const meta = (s.metadata ?? {}) as Record<string, unknown>;
-      const inlineNarr = Array.isArray(meta.inline_narrations) ? meta.inline_narrations as any[] : undefined;
-      const splitSilence = typeof meta.split_silence_ms === "number" ? meta.split_silence_ms : undefined;
-      return {
-        segment_id: s.id,
-        segment_number: s.segment_number,
-        segment_type: s.segment_type,
-        speaker,
-        phrases: phraseMap.get(s.id) || [],
-        inline_narrations: inlineNarr,
-        split_silence_ms: splitSilence,
-      };
-    });
-
-    return builtSegments;
-  }, [characters]);
-
   /** Apply loaded segments to component state */
-  const applySegments = useCallback((builtSegments: Segment[], sid: string) => {
+  const applySegments = useCallback((builtSegments: Segment[]) => {
     setSegments(builtSegments);
     const inlineIds = new Set(builtSegments.filter(s => s.inline_narrations && s.inline_narrations.length > 0).map(s => s.segment_id));
     setInlineNarrationSegIds(inlineIds);
     setStaleAudioSegIds(new Set());
     setLoaded(true);
-    // Audio status is loaded from OPFS snapshot or refreshed after synthesis
   }, []);
 
   const loadSegments = useCallback(async (sid: string) => {
     setLoading(true);
     try {
-      // 1. Try OPFS first
       if (hasStorage) {
         const local = await loadFromLocal(sid);
         if (local && local.segments.length > 0) {
@@ -350,39 +273,23 @@ export function StoryboardPanel({
           typeMappingsRef.current = local.typeMappings || [];
           setInlineNarrationSpeaker(local.inlineNarrationSpeaker);
           setAudioStatus(new Map(Object.entries(local.audioStatus || {})));
-          applySegments(local.segments, sid);
+          applySegments(local.segments);
           setLoading(false);
           return;
         }
       }
 
-      // 2. Fallback: load from DB (seed after AI analysis)
-      const builtSegments = await loadSegmentsFromDb(sid);
-      if (builtSegments.length === 0) {
-        setSegments([]);
-        setLoaded(true);
-        setLoading(false);
-        return;
-      }
-
-      applySegments(builtSegments, sid);
-
-      // 3. Seed OPFS with DB data
-      if (hasStorage) {
-        await persistNow({
-          segments: builtSegments,
-          typeMappings: typeMappingsRef.current,
-          audioStatus: audioStatusRef.current,
-          inlineNarrationSpeaker: inlineNarrationSpeakerRef.current,
-        });
-        console.debug(`[Storyboard] Seeded OPFS from DB: ${builtSegments.length} segments`);
-      }
+      typeMappingsRef.current = [];
+      setInlineNarrationSpeaker(null);
+      setAudioStatus(new Map());
+      setSegments([]);
+      setLoaded(true);
     } catch (err) {
       console.error("Failed to load segments:", err);
       toast.error(isRu ? "Ошибка загрузки сегментов" : "Failed to load segments");
     }
     setLoading(false);
-  }, [isRu, hasStorage, loadFromLocal, loadSegmentsFromDb, applySegments, persistNow]);
+  }, [isRu, hasStorage, loadFromLocal, applySegments]);
 
   // ─── Segment Operations ───────────────────────────────────
 
@@ -410,16 +317,13 @@ export function StoryboardPanel({
           }
         }
 
-        // Renumber phrases
         allPhrases = allPhrases.map((ph, i) => ({ ...ph, phrase_number: i + 1 }));
 
-        // Update keeper with merged phrases, remove merged segments
         updated = updated
           .map(s => s.segment_id === keeper.segment_id ? { ...s, phrases: allPhrases } : s)
           .filter(s => !mergeIds.has(s.segment_id));
       }
 
-      // Renumber segments
       updated = updated.map((s, i) => ({ ...s, segment_number: i + 1 }));
 
       setSegments(updated);
@@ -470,14 +374,12 @@ export function StoryboardPanel({
     if (phraseIdx < 0) return;
 
     try {
-      // Build keeper phrases (up to and including the split point)
       const keeperPhrases = seg.phrases.slice(0, phraseIdx + 1).map((ph, i) => ({
         ...ph,
         text: i === phraseIdx ? textBefore : ph.text,
         phrase_number: i + 1,
       }));
 
-      // Build new segment phrases
       const newSegId = crypto.randomUUID();
       const newPhrases = [
         { phrase_id: crypto.randomUUID(), phrase_number: 1, text: textAfter },
@@ -521,8 +423,6 @@ export function StoryboardPanel({
     onSegmented?.(sceneId!);
   }, [sceneId, segments, persist, buildSnapshot, onSegmented]);
 
-
-
   useEffect(() => {
     setSegments([]);
     setLoaded(false);
@@ -530,13 +430,11 @@ export function StoryboardPanel({
     autoAnalyzeAttemptedRef.current = null;
     if (sceneId) {
       loadSegments(sceneId);
-      // Check if scene was edited in Parser
       supabase.from("book_scenes").select("content_dirty").eq("id", sceneId).maybeSingle()
         .then(({ data }) => { if (data?.content_dirty) setContentDirty(true); });
     }
   }, [sceneId, loadSegments]);
 
-  // Realtime subscription for segment_audio changes
   const synthIdsRef = useRef<Set<string>>(new Set());
   synthIdsRef.current = currentlySynthesizingIds;
 
@@ -578,16 +476,17 @@ export function StoryboardPanel({
     if (!sceneId) return;
     setAnalyzing(true);
 
-    // ── Clear stale segments before re-analysis ──
+    const previousLocal = hasStorage ? await loadFromLocal(sceneId) : null;
+
     setSegments([]);
     setAudioStatus(new Map());
     setInlineNarrationSegIds(new Set());
     setStaleAudioSegIds(new Set());
     setMergeChecked(new Set());
     setContentDirty(false);
-    // Clear stale OPFS storyboard so loadSegments falls through to fresh DB data
+    typeMappingsRef.current = [];
+    setInlineNarrationSpeaker(null);
     await clearLocal();
-    // Clear dirty flag in DB
     supabase.from("book_scenes").update({ content_dirty: false } as any).eq("id", sceneId).then(() => {});
 
     try {
@@ -618,24 +517,49 @@ export function StoryboardPanel({
         isRu,
       });
       if (error) throw error;
-      const result = data as any;
+
+      const result = data as { segments?: Segment[] };
       const newSegments = result.segments || [];
-      setSegments(newSegments);
-      // Reload from DB to get full phrase/metadata state
-      if (newSegments.length > 0) {
-        await loadSegments(sceneId);
+      const freshAudio = new Map<string, { status: string; durationMs: number }>();
+
+      setAudioStatus(freshAudio);
+      applySegments(newSegments);
+
+      if (hasStorage) {
+        await persistNow({
+          segments: newSegments,
+          typeMappings: [],
+          audioStatus: freshAudio,
+          inlineNarrationSpeaker: null,
+        });
       }
+
       onSegmented?.(sceneId);
       toast.success(isRu ? "Раскадровка готова" : "Storyboard ready");
     } catch (err: any) {
       const msg = err?.message || err?.context?.body || String(err);
       console.error("Segmentation failed:", msg, err);
+
+      if (previousLocal && hasStorage) {
+        await persistNow({
+          segments: previousLocal.segments,
+          typeMappings: previousLocal.typeMappings,
+          audioStatus: new Map(Object.entries(previousLocal.audioStatus || {})),
+          inlineNarrationSpeaker: previousLocal.inlineNarrationSpeaker,
+        });
+        typeMappingsRef.current = previousLocal.typeMappings || [];
+        setInlineNarrationSpeaker(previousLocal.inlineNarrationSpeaker);
+        setAudioStatus(new Map(Object.entries(previousLocal.audioStatus || {})));
+        applySegments(previousLocal.segments);
+      } else {
+        setSegments([]);
+        setLoaded(true);
+      }
+
       toast.error(`${isRu ? "Ошибка анализа" : "Analysis failed"}: ${msg}`);
-      // Reload whatever is in DB after failed analysis
-      await loadSegments(sceneId);
     }
     setAnalyzing(false);
-  }, [sceneId, chapterId, sceneNumber, sceneTitle, isRu, onSegmented, loadSegments, clearLocal, getModelForRole, userApiKeys, storage]);
+  }, [sceneId, chapterId, sceneNumber, sceneTitle, isRu, onSegmented, clearLocal, getModelForRole, userApiKeys, storage, hasStorage, loadFromLocal, persistNow, applySegments]);
 
   // Auto-trigger analysis when scene has no segments and content is available
   useEffect(() => {
