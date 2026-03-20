@@ -84,6 +84,16 @@ export function PoolSelector({
   const effectiveCount = new Set([primaryModel, ...pool]).size;
   const workerCount = effectiveCount * PER_MODEL_CONCURRENCY;
 
+  const modelListTooltip = useMemo(() => {
+    const primaryName = availableModels.find((m) => m.id === primaryModel)?.displayName ?? primaryModel.replace(/^(google|openai)\//, "");
+    const poolNames = pool.map((id) => availableModels.find((m) => m.id === id)?.displayName ?? id.replace(/^(google|openai)\//, ""));
+    const lines = [`★ ${primaryName}`, ...poolNames.map((n) => `• ${n}`)];
+    const stats = isRu
+      ? `\n${effectiveCount} моделей × ${PER_MODEL_CONCURRENCY} = ${workerCount} потоков`
+      : `\n${effectiveCount} models × ${PER_MODEL_CONCURRENCY} = ${workerCount} workers`;
+    return lines.join("\n") + stats;
+  }, [pool, primaryModel, availableModels, effectiveCount, workerCount, isRu]);
+
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="mt-2">
       <CollapsibleTrigger className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors select-none w-full">
@@ -95,7 +105,7 @@ export function PoolSelector({
           <Badge
             variant="secondary"
             className="text-[9px] px-1.5 py-0 ml-1 gap-0.5"
-            title={isRu ? `${effectiveCount} моделей × ${PER_MODEL_CONCURRENCY} = ${workerCount} потоков` : `${effectiveCount} models × ${PER_MODEL_CONCURRENCY} = ${workerCount} workers`}
+            title={modelListTooltip}
           >
             ⚡ {effectiveCount} {isRu ? "моделей" : "models"}
           </Badge>
