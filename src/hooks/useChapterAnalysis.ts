@@ -178,7 +178,7 @@ export function useChapterAnalysis({
     return getChapterTextFromCache(chapterIdx);
   };
 
-  /** Re-extract chapter texts from OPFS source file and populate sessionStorage cache */
+  /** Re-extract chapter texts from OPFS source file and populate in-memory cache */
   const reExtractChapterTexts = async (): Promise<boolean> => {
     if (!projectStorage) return false;
     const fmt = fileFormat || "docx";
@@ -195,9 +195,8 @@ export function useChapterAnalysis({
         const result = await extractFromDocx(file);
         chapterTexts = result.chapterTexts;
       }
-      sessionStorage.setItem("docx_chapter_texts", JSON.stringify(
-        Array.from(chapterTexts.entries())
-      ));
+      // К4: store in memory only, never in sessionStorage
+      setChapterTextsCache(chapterTexts);
       return true;
     } catch (err) {
       console.warn("[ChapterAnalysis] Failed to re-extract chapter texts:", err);
