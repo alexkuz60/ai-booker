@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
+import { useStoryboardPersistence } from "@/hooks/useStoryboardPersistence";
 import type {
   ChapterStatus,
   Scene,
@@ -81,6 +82,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
   const { toast } = useToast();
   const { user } = useAuth();
   const { storage, openProject, backend, meta, downloadProjectAsZip, importProjectFromZip } = useProjectStorageContext();
+  const { pushAllToDb } = useStoryboardPersistence(null);
   const [saving, setSaving] = useState(false);
 
   /**
@@ -307,6 +309,17 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         }
       }
 
+      // ── 4b. Push storyboard data (segments/phrases/mappings) to DB ──
+      let savedStoryboardCount = 0;
+      try {
+        savedStoryboardCount = await pushAllToDb();
+        if (savedStoryboardCount > 0) {
+          console.log(`[SaveToServer] Pushed ${savedStoryboardCount} storyboarded scenes`);
+        }
+      } catch (e) {
+        console.warn("[SaveToServer] Storyboard push failed:", e);
+      }
+
       // ── 5. Upload source file to server if not already there ──
       if (storage) {
         const sourceResult = await findSourceBlob(storage);
@@ -380,6 +393,9 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       }
       if (savedProfileCount > 0) {
         descParts.push(`${savedProfileCount} ${isRu ? "профилей" : "profiles"}`);
+      }
+      if (savedStoryboardCount > 0) {
+        descParts.push(`${savedStoryboardCount} ${isRu ? "раскадровок" : "storyboards"}`);
       }
       toast({
         title: isRu ? "Синхронизировано с сервером" : "Synced to server",

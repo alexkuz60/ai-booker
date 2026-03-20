@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Database } from "@/integrations/supabase/types";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { readCharactersFromLocal } from "@/lib/localSync";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { useStoryboardPersistence, type StoryboardSnapshot } from "@/hooks/useStoryboardPersistence";
@@ -58,7 +60,7 @@ export function StoryboardPanel({
 }) {
   const userApiKeys = useUserApiKeys();
   const { getModelForRole } = useAiRoles(userApiKeys);
-  const { loadFromLocal, persist, persistNow, clearLocal, hasStorage } = useStoryboardPersistence(sceneId);
+  const { loadFromLocal, persist, persistNow, clearLocal, pushToDb, hasStorage } = useStoryboardPersistence(sceneId);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -181,27 +183,43 @@ export function StoryboardPanel({
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [selectedSegmentId]);
 
-  // Load characters for the book
+  // Load characters: OPFS first (names/aliases), then enrich with DB voice configs
+  const { storage } = useProjectStorageContext();
   useEffect(() => {
     if (!bookId) { setCharacters([]); return; }
     (async () => {
+      // Try OPFS names first
+      let charMap = new Map<string, CharacterOption>();
+      if (storage) {
+        const localChars = await readCharactersFromLocal(storage);
+        for (const c of localChars) {
+          charMap.set(c.name.toLowerCase(), { id: c.id, name: c.name, color: undefined, voiceConfig: {} });
+        }
+      }
+      // Enrich with DB voice_config (required for TTS provider detection)
       const { data } = await supabase
         .from("book_characters")
         .select("id, name, color, voice_config")
         .eq("book_id", bookId)
         .order("sort_order");
-      if (data) setCharacters(data.map(c => ({
-        id: c.id,
-        name: c.name,
-        color: c.color,
-        voiceConfig: (c.voice_config || {}) as Record<string, unknown>,
-      })));
+      if (data) {
+        for (const c of data) {
+          charMap.set(c.name.toLowerCase(), {
+            id: c.id,
+            name: c.name,
+            color: c.color,
+            voiceConfig: (c.voice_config || {}) as Record<string, unknown>,
+          });
+        }
+      }
+      setCharacters(Array.from(charMap.values()));
     })();
-  }, [bookId]);
+  }, [bookId, storage]);
 
-  // Load audio status for segments
-  const loadAudioStatus = useCallback(async (segIds: string[]) => {
-    if (segIds.length === 0) { setAudioStatus(new Map()); return; }
+  // Load audio status: from OPFS snapshot (already loaded by loadSegments).
+  // This DB-based loader is kept only for post-synthesis refresh.
+  const refreshAudioStatusFromDb = useCallback(async (segIds: string[]) => {
+    if (segIds.length === 0) return;
     const { data } = await supabase
       .from("segment_audio")
       .select("segment_id, status, duration_ms, created_at")
@@ -222,7 +240,9 @@ export function StoryboardPanel({
       }
     }
     setAudioStatus(map);
-  }, []);
+    // Persist updated audio status to OPFS
+    persist(buildSnapshot(undefined, map));
+  }, [persist, buildSnapshot]);
 
   // Load segments: OPFS first → DB fallback (seed after AI analysis only)
   const loadSegmentsFromDb = useCallback(async (sid: string): Promise<Segment[]> => {
@@ -298,15 +318,15 @@ export function StoryboardPanel({
     return builtSegments;
   }, [characters]);
 
-  /** Apply loaded segments to component state + persist to OPFS */
+  /** Apply loaded segments to component state */
   const applySegments = useCallback((builtSegments: Segment[], sid: string) => {
     setSegments(builtSegments);
     const inlineIds = new Set(builtSegments.filter(s => s.inline_narrations && s.inline_narrations.length > 0).map(s => s.segment_id));
     setInlineNarrationSegIds(inlineIds);
-    setStaleAudioSegIds(new Set()); // stale detection is DB-specific, skip for OPFS
+    setStaleAudioSegIds(new Set());
     setLoaded(true);
-    loadAudioStatus(builtSegments.map(s => s.segment_id));
-  }, [loadAudioStatus]);
+    // Audio status is loaded from OPFS snapshot or refreshed after synthesis
+  }, []);
 
   const loadSegments = useCallback(async (sid: string) => {
     setLoading(true);
@@ -787,8 +807,12 @@ export function StoryboardPanel({
     setCurrentlySynthesizingIds(allIds);
     onSynthesizingChange?.(allIds);
     onErrorSegmentsChange?.(new Set());
-    setSynthProgress(isRu ? "Запуск синтеза…" : "Starting synthesis…");
+    setSynthProgress(isRu ? "Синхронизация с сервером…" : "Syncing to server…");
     try {
+      // Push OPFS → DB before TTS (edge functions read from DB)
+      await pushToDb(sceneId, buildSnapshot());
+      setSynthProgress(isRu ? "Запуск синтеза…" : "Starting synthesis…");
+
       const { data, error } = await supabase.functions.invoke("synthesize-scene", {
         body: { scene_id: sceneId, language: isRu ? "ru" : "en" },
       });
@@ -818,7 +842,7 @@ export function StoryboardPanel({
         );
       }
       onSegmented?.(sceneId);
-      loadAudioStatus(segments.map(s => s.segment_id));
+      refreshAudioStatusFromDb(segments.map(s => s.segment_id));
     } catch (err: any) {
       console.error("Synthesis failed:", err);
       toast.error(isRu ? "Ошибка синтеза" : "Synthesis failed");
@@ -827,7 +851,7 @@ export function StoryboardPanel({
     setCurrentlySynthesizingIds(new Set());
     onSynthesizingChange?.(new Set());
     setSynthProgress("");
-  }, [sceneId, segments, isRu, onSegmented, loadAudioStatus, onSynthesizingChange, onErrorSegmentsChange]);
+  }, [sceneId, segments, isRu, onSegmented, refreshAudioStatusFromDb, onSynthesizingChange, onErrorSegmentsChange, pushToDb, buildSnapshot]);
 
   const resynthSegment = useCallback(async (segmentId: string) => {
     if (!sceneId) return;
@@ -835,6 +859,9 @@ export function StoryboardPanel({
     setCurrentlySynthesizingIds(new Set([segmentId]));
     onSynthesizingChange?.(new Set([segmentId]));
     try {
+      // Push current segment state to DB before re-synth
+      await pushToDb(sceneId, buildSnapshot());
+
       const { data, error } = await supabase.functions.invoke("synthesize-scene", {
         body: { scene_id: sceneId, language: isRu ? "ru" : "en", force: true, segment_ids: [segmentId] },
       });
@@ -856,19 +883,19 @@ export function StoryboardPanel({
       onErrorSegmentsChange?.(new Set());
       onSegmented?.(sceneId);
       await new Promise(r => setTimeout(r, 500));
-      await loadAudioStatus(segments.map(s => s.segment_id));
+      await refreshAudioStatusFromDb(segments.map(s => s.segment_id));
     } catch (err: any) {
       console.error("Re-synth failed:", err);
       toast.error(isRu ? "Ошибка ре-синтеза" : "Re-synthesis failed", {
         description: err?.message,
       });
       onErrorSegmentsChange?.(new Set([segmentId]));
-      await loadAudioStatus(segments.map(s => s.segment_id));
+      await refreshAudioStatusFromDb(segments.map(s => s.segment_id));
     }
     setResynthSegId(null);
     setCurrentlySynthesizingIds(new Set());
     onSynthesizingChange?.(new Set());
-  }, [sceneId, isRu, onSegmented, loadAudioStatus, segments, onSynthesizingChange, onErrorSegmentsChange]);
+  }, [sceneId, isRu, onSegmented, refreshAudioStatusFromDb, segments, onSynthesizingChange, onErrorSegmentsChange, pushToDb, buildSnapshot]);
 
   // ─── Detection & Stress ───────────────────────────────────
 
