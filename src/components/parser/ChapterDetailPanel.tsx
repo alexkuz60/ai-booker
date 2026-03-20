@@ -2,12 +2,13 @@ import { useState, useMemo, useCallback, Fragment } from "react";
 import { motion } from "framer-motion";
 import {
   FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock, RefreshCw, Palette, StopCircle,
-  Trash2, Hash, SpellCheck, Footprints, PencilLine
+  Trash2, Hash, SpellCheck, Footprints, PencilLine, Merge, CheckSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -99,9 +100,20 @@ function SceneCards({
 }) {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [editedIndices, setEditedIndices] = useState<Set<number>>(new Set());
+  const [mergeChecked, setMergeChecked] = useState<Set<number>>(new Set());
+  const [mergeMode, setMergeMode] = useState(false);
+
   const toggleExpand = useCallback((idx: number, e: React.MouseEvent) => {
     e.stopPropagation();
     setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      return next;
+    });
+  }, []);
+
+  const toggleMergeCheck = useCallback((idx: number) => {
+    setMergeChecked(prev => {
       const next = new Set(prev);
       if (next.has(idx)) next.delete(idx); else next.add(idx);
       return next;
@@ -115,6 +127,55 @@ function SceneCards({
   }, [scenes]);
 
   const { capture: handleContextMenu, consume, getSelectedText } = useSelectionCapture();
+
+  // ── Merge logic ──
+  const canMerge = useMemo(() => {
+    if (mergeChecked.size < 2) return false;
+    const sorted = [...mergeChecked].sort((a, b) => a - b);
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i] !== sorted[i - 1] + 1) return false;
+    }
+    return true;
+  }, [mergeChecked]);
+
+  const handleMerge = useCallback(() => {
+    if (!canMerge || !onScenesUpdate) return;
+    const sorted = [...mergeChecked].sort((a, b) => a - b);
+    // Check adjacency
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i] !== sorted[i - 1] + 1) {
+        toast.error(t("mergeNotAdjacent", isRu));
+        return;
+      }
+    }
+    const firstIdx = sorted[0];
+    const mergedContent = sorted.map(idx => scenes[idx]?.content || scenes[idx]?.content_preview || "").join("\n\n");
+    const firstScene = scenes[firstIdx];
+    const updated = scenes
+      .filter((_, idx) => !sorted.includes(idx) || idx === firstIdx)
+      .map((sc, idx) => {
+        if (sc === firstScene) {
+          return {
+            ...sc,
+            content: mergedContent,
+            content_preview: mergedContent.slice(0, 200),
+            char_count: mergedContent.length,
+          };
+        }
+        return { ...sc, scene_number: idx + 1, char_count: (sc.content || '').length };
+      })
+      .map((sc, idx) => ({ ...sc, scene_number: idx + 1 }));
+
+    onScenesUpdate(updated, isRu ? `${sorted.length} сцен объединены` : `${sorted.length} scenes merged`);
+    toast.success(t("mergeScenesDone", isRu));
+    setMergeChecked(new Set());
+    setMergeMode(false);
+    setEditedIndices(prev => {
+      const next = new Set(prev);
+      next.add(firstIdx);
+      return next;
+    });
+  }, [canMerge, mergeChecked, scenes, isRu, onScenesUpdate]);
 
   const handleCleanup = useCallback((action: CleanupAction, sceneIndex: number) => {
     const selectedText = getSelectedText();
@@ -162,7 +223,28 @@ function SceneCards({
         <h3 className="text-sm font-semibold text-muted-foreground">
           {scenes.length} {t("scenes", isRu)}
         </h3>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Button
+            variant={mergeMode ? "secondary" : "ghost"} size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => { setMergeMode(m => !m); setMergeChecked(new Set()); }}
+          >
+            <Merge className="h-3 w-3 mr-1" />
+            {t("mergeScenes", isRu)}
+          </Button>
+          {mergeMode && canMerge && (
+            <Button
+              variant="default" size="sm"
+              className="h-6 px-2 text-xs gap-1"
+              onClick={handleMerge}
+            >
+              <CheckSquare className="h-3 w-3" />
+              {t("mergeScenes", isRu)} ({mergeChecked.size})
+            </Button>
+          )}
+          {mergeMode && !canMerge && mergeChecked.size >= 2 && (
+            <span className="text-[10px] text-destructive">{t("mergeNotAdjacent", isRu)}</span>
+          )}
           <Button
             variant="ghost" size="sm"
             className="h-6 px-2 text-xs text-muted-foreground"
@@ -198,9 +280,16 @@ function SceneCards({
         return (
           <ContextMenu key={`${sc.scene_number}-${i}`}>
             <ContextMenuTrigger asChild>
-              <Card onContextMenu={handleContextMenu} className={isEdited ? "border-primary/40" : undefined}>
+              <Card onContextMenu={handleContextMenu} className={`${isEdited ? "border-primary/40" : ""} ${mergeMode && mergeChecked.has(i) ? "ring-2 ring-primary/50" : ""}`}>
                 <CardContent className="py-3 px-4 space-y-2">
                   <div className="flex items-center justify-between">
+                    {mergeMode && (
+                      <Checkbox
+                        checked={mergeChecked.has(i)}
+                        onCheckedChange={() => toggleMergeCheck(i)}
+                        className="mr-2 shrink-0"
+                      />
+                    )}
                     <span className="text-base font-medium flex items-center gap-1.5">
                       {hasMore && (
                         <button

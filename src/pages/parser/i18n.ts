@@ -229,6 +229,10 @@ const texts: Record<string, { ru: string; en: string }> = {
   cleanupFootnoteAuto: { ru: "Авто-сноски", en: "Auto-footnotes" },
   cleanupNoSelection: { ru: "Выделите текст для действия", en: "Select text for action" },
   cleanupLabel: { ru: "Очистка текста", en: "Text cleanup" },
+  mergeScenes: { ru: "Объединить", en: "Merge" },
+  mergeScenesHint: { ru: "Выберите смежные сцены для объединения", en: "Select adjacent scenes to merge" },
+  mergeScenesDone: { ru: "Сцены объединены", en: "Scenes merged" },
+  mergeNotAdjacent: { ru: "Можно объединить только смежные сцены", en: "Can only merge adjacent scenes" },
 };
 
 function normalizeToken(value: string): string {
