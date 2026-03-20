@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
 import { resolveTaskPromptWithOverrides } from "../_shared/taskPrompts.ts";
+import { resolveAiEndpoint, extractProviderFields } from "../_shared/providerRouting.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,64 +19,12 @@ interface ExtractedCharacter {
   manner_hint?: string;
 }
 
-// ── ProxyAPI model mapping ─────────────────────────────────
-const PROXYAPI_MODEL_MAP: Record<string, string> = {
-  'proxyapi/gpt-5': 'openai/gpt-5',
-  'proxyapi/gpt-5-mini': 'openai/gpt-5-mini',
-  'proxyapi/gpt-5.2': 'openai/gpt-5.2',
-  'proxyapi/gpt-4o': 'openai/gpt-4o',
-  'proxyapi/gpt-4o-mini': 'openai/gpt-4o-mini',
-  'proxyapi/claude-sonnet-4': 'anthropic/claude-sonnet-4-20250514',
-  'proxyapi/claude-opus-4': 'anthropic/claude-opus-4-6',
-  'proxyapi/claude-3-5-sonnet': 'anthropic/claude-3-5-sonnet-20241022',
-  'proxyapi/gemini-3-pro-preview': 'gemini/gemini-3-pro-preview',
-  'proxyapi/gemini-3-flash-preview': 'gemini/gemini-3-flash-preview',
-  'proxyapi/gemini-2.5-pro': 'gemini/gemini-2.5-pro',
-  'proxyapi/gemini-2.5-flash': 'gemini/gemini-2.5-flash',
-  'proxyapi/deepseek-chat': 'deepseek/deepseek-chat',
-  'proxyapi/deepseek-reasoner': 'deepseek/deepseek-reasoner',
-};
-
-// ── Provider routing ───────────────────────────────────────
-function getEndpointAndModel(
-  userModel: string,
-  userApiKey: string | null,
-): { endpoint: string; model: string; apiKey: string } {
-  // Detect provider from model prefix
-  if (userModel.startsWith("proxyapi/") && userApiKey) {
-    const realModel = PROXYAPI_MODEL_MAP[userModel] || userModel.replace("proxyapi/", "");
-    return {
-      endpoint: "https://openai.api.proxyapi.ru/v1/chat/completions",
-      model: realModel,
-      apiKey: userApiKey,
-    };
-  }
-
-  if (userModel.startsWith("openrouter/") && userApiKey) {
-    const realModel = userModel.replace("openrouter/", "");
-    return {
-      endpoint: "https://openrouter.ai/api/v1/chat/completions",
-      model: realModel,
-      apiKey: userApiKey,
-    };
-  }
-
-  if (userModel.startsWith("dotpoint/") && userApiKey) {
-    const realModel = userModel.replace("dotpoint/", "");
-    return {
-      endpoint: "https://llms.dotpoin.com/v1/chat/completions",
-      model: realModel,
-      apiKey: userApiKey,
-    };
-  }
-
-  // Lovable AI gateway (admin-only — gated by client)
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  return {
-    endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions",
-    model: userModel || "google/gemini-2.5-flash",
-    apiKey: LOVABLE_API_KEY || "",
-  };
+/** Detect provider label from model prefix */
+function detectProvider(model: string): string {
+  if (model.startsWith("openrouter/")) return "openrouter";
+  if (model.startsWith("proxyapi/")) return "proxyapi";
+  if (model.startsWith("dotpoint/")) return "dotpoint";
+  return "lovable";
 }
 
 /** Check if user has admin role */
@@ -114,6 +63,58 @@ async function buildPrompt(scenes: { scene_number: number; text: string }[], lan
   return { systemPrompt, userPrompt };
 }
 
+// ── Tool schema ─────────────────────────────────────────────
+
+const characterToolSchema = {
+  type: "function",
+  function: {
+    name: "report_characters",
+    description: "Report all characters found in the chapter scenes.",
+    parameters: {
+      type: "object",
+      properties: {
+        characters: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "Primary character name (nominative case)" },
+              aliases: {
+                type: "array",
+                items: { type: "string" },
+                description: "Alternative names, nicknames, diminutives",
+              },
+              gender: { type: "string", enum: ["male", "female", "unknown"] },
+              role: {
+                type: "string",
+                enum: ["speaking", "mentioned", "crowd"],
+                description: "speaking = has direct speech; mentioned = only referenced/quoted by others; crowd = anonymous voice",
+              },
+              scene_numbers: {
+                type: "array",
+                items: { type: "integer" },
+                description: "Scene numbers where the character appears",
+              },
+              age_hint: {
+                type: "string",
+                description: "Optional age hint extracted from context (e.g. 'старик', 'ребёнок', 'elder', 'child'). Especially useful for crowd/anonymous voices.",
+              },
+              manner_hint: {
+                type: "string",
+                description: "Optional speech manner or emotional hint from context (e.g. 'хрипло', 'визгливо', 'gruffly', 'shrilly'). Especially useful for crowd/anonymous voices.",
+              },
+            },
+            required: ["name", "aliases", "gender", "role", "scene_numbers"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["characters"],
+      additionalProperties: false,
+    },
+  },
+};
+
 // ── AI Call ─────────────────────────────────────────────────
 
 async function callAI(
@@ -122,16 +123,13 @@ async function callAI(
   model: string,
   userId: string,
   userApiKey: string | null,
+  openrouterApiKey?: string | null,
 ): Promise<ExtractedCharacter[]> {
-  const { endpoint, model: resolvedModel, apiKey } = getEndpointAndModel(model, userApiKey);
+  const { endpoint, model: resolvedModel, apiKey } = resolveAiEndpoint(model, userApiKey, openrouterApiKey);
 
   if (!apiKey) throw new Error("No API key available for the selected model provider");
 
-  const provider = model.startsWith("openrouter/") ? "openrouter"
-    : model.startsWith("proxyapi/") ? "proxyapi"
-    : model.startsWith("dotpoint/") ? "dotpoint"
-    : "lovable";
-
+  const provider = detectProvider(model);
   const t0 = Date.now();
 
   // Some models (e.g. o1, o3, deepseek-reasoner) don't support temperature
@@ -144,57 +142,7 @@ async function callAI(
       { role: "user", content: userPrompt },
     ],
     ...(supportsTemperature ? { temperature: 0.3 } : {}),
-    tools: [
-      {
-        type: "function",
-        function: {
-          name: "report_characters",
-          description: "Report all characters found in the chapter scenes.",
-          parameters: {
-            type: "object",
-            properties: {
-              characters: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    name: { type: "string", description: "Primary character name (nominative case)" },
-                    aliases: {
-                      type: "array",
-                      items: { type: "string" },
-                      description: "Alternative names, nicknames, diminutives",
-                    },
-                    gender: { type: "string", enum: ["male", "female", "unknown"] },
-                    role: {
-                      type: "string",
-                      enum: ["speaking", "mentioned", "crowd"],
-                      description: "speaking = has direct speech; mentioned = only referenced/quoted by others; crowd = anonymous voice",
-                    },
-                    scene_numbers: {
-                      type: "array",
-                      items: { type: "integer" },
-                      description: "Scene numbers where the character appears",
-                    },
-                    age_hint: {
-                      type: "string",
-                      description: "Optional age hint extracted from context (e.g. 'старик', 'ребёнок', 'elder', 'child'). Especially useful for crowd/anonymous voices.",
-                    },
-                    manner_hint: {
-                      type: "string",
-                      description: "Optional speech manner or emotional hint from context (e.g. 'хрипло', 'визгливо', 'gruffly', 'shrilly'). Especially useful for crowd/anonymous voices.",
-                    },
-                  },
-                  required: ["name", "aliases", "gender", "role", "scene_numbers"],
-                  additionalProperties: false,
-                },
-              },
-            },
-            required: ["characters"],
-            additionalProperties: false,
-          },
-        },
-      },
-    ],
+    tools: [characterToolSchema],
     tool_choice: { type: "function", function: { name: "report_characters" } },
   };
 
@@ -221,7 +169,6 @@ async function callAI(
     const textBody = { ...body };
     delete textBody.tools;
     delete textBody.tool_choice;
-    // Ask for JSON in the system message
     textBody.messages = [
       { role: "system", content: systemPrompt + "\n\nIMPORTANT: Return your answer as a JSON object with a single key \"characters\" containing an array. Do NOT wrap in markdown fences." },
       { role: "user", content: userPrompt },
@@ -278,9 +225,7 @@ async function callAI(
   // Fallback: try to extract from content (text mode or missing tool_calls)
   const content = json.choices?.[0]?.message?.content || "";
   try {
-    // Strip markdown fences
     const cleaned = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-    // Try full object parse first
     const obj = JSON.parse(cleaned);
     if (Array.isArray(obj)) return obj;
     if (obj.characters && Array.isArray(obj.characters)) return obj.characters;
@@ -315,7 +260,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { scenes, lang = "ru", model = "google/gemini-2.5-flash", apiKey = null } = await req.json();
+    const rawBody = await req.json();
+    const { scenes, lang = "ru" } = rawBody;
+    const { model, apiKey, openrouterApiKey } = extractProviderFields(rawBody);
+    const effectiveModel = model || "google/gemini-2.5-flash";
 
     if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
       return new Response(
@@ -325,11 +273,10 @@ Deno.serve(async (req) => {
     }
 
     // Gate Lovable AI to admins only
-    const isLovableRoute = !model.startsWith("openrouter/") && !model.startsWith("proxyapi/") && !model.startsWith("dotpoint/");
+    const isLovableRoute = detectProvider(effectiveModel) === "lovable";
     if (isLovableRoute && !apiKey) {
       const admin = await checkIsAdmin(authHeader);
       if (!admin) {
-        // Try fallback to OpenRouter if user has a key
         return new Response(
           JSON.stringify({ error: "Lovable AI доступен только администраторам. Выберите модель внешнего провайдера." }),
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -338,10 +285,10 @@ Deno.serve(async (req) => {
     }
 
     const { systemPrompt, userPrompt } = await buildPrompt(scenes, lang as "ru" | "en");
-    const characters = await callAI(systemPrompt, userPrompt, model, userId, apiKey);
+    const characters = await callAI(systemPrompt, userPrompt, effectiveModel, userId, apiKey, openrouterApiKey);
 
     return new Response(
-      JSON.stringify({ characters, usedModel: model }),
+      JSON.stringify({ characters, usedModel: effectiveModel }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {

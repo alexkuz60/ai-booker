@@ -676,10 +676,15 @@ export function useChapterAnalysis({
     }
     if (nextPending.length === 0) return;
 
+    // Create a dedicated AbortController for prefetch so stopAnalysis can cancel it
+    const prefetchCtrl = new AbortController();
+    abortRef.current = prefetchCtrl;
     prefetchingRef.current = true;
+
     (async () => {
       for (const pendingIdx of nextPending) {
-        if (abortRef.current?.signal.aborted) break;
+        // Check both the controller and the user flag
+        if (prefetchCtrl.signal.aborted || !userStartedAnalysis.current) break;
         const current = chapterResults.get(pendingIdx);
         if (current?.status === "pending") await analyzeChapter(pendingIdx);
       }

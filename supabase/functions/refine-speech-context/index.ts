@@ -106,8 +106,9 @@ Return JSON (no markdown fences):
     if (!aiRes.ok) {
       const errText = await aiRes.text();
       console.error("AI error:", aiRes.status, errText);
+      const errStatus = aiRes.status === 429 ? 429 : aiRes.status === 402 ? 402 : 502;
       return new Response(JSON.stringify({ error: `AI ${aiRes.status}` }), {
-        status: aiRes.status === 429 ? 429 : 502,
+        status: errStatus,
         headers: { ...CORS, "Content-Type": "application/json" },
       });
     }
