@@ -356,9 +356,14 @@ function SceneCards({
                   }
                   if (i >= scenes.length - 1) return;
                   const currentContent = scenes[i].content || scenes[i].content_preview || "";
+                  // Validate: selection must go to end of scene
+                  if (!currentContent.trimEnd().endsWith(selectedText.trimEnd())) {
+                    toast.warning(isRu ? "Выделение должно доходить до конца сцены" : "Selection must reach the end of the scene");
+                    return;
+                  }
                   const nextContent = scenes[i + 1].content || scenes[i + 1].content_preview || "";
-                  const newCurrent = currentContent.replace(selectedText, "").replace(/\n{3,}/g, "\n\n").trim();
-                  const newNext = selectedText + "\n\n" + nextContent;
+                  const newCurrent = currentContent.slice(0, currentContent.lastIndexOf(selectedText)).replace(/\n{3,}/g, "\n\n").trim();
+                  const newNext = selectedText.trim() + "\n\n" + nextContent;
                   const updated = scenes.map((sc, idx) => {
                     if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length };
                     if (idx === i + 1) return { ...sc, content: newNext, content_preview: newNext.slice(0, 200), char_count: newNext.length };
@@ -384,9 +389,14 @@ function SceneCards({
                   }
                   if (i <= 0) return;
                   const currentContent = scenes[i].content || scenes[i].content_preview || "";
+                  // Validate: selection must start from beginning of scene
+                  if (!currentContent.trimStart().startsWith(selectedText.trimStart())) {
+                    toast.warning(isRu ? "Выделение должно начинаться с начала сцены" : "Selection must start from the beginning of the scene");
+                    return;
+                  }
                   const prevContent = scenes[i - 1].content || scenes[i - 1].content_preview || "";
-                  const newCurrent = currentContent.replace(selectedText, "").replace(/\n{3,}/g, "\n\n").trim();
-                  const newPrev = prevContent + "\n\n" + selectedText;
+                  const newCurrent = currentContent.slice(currentContent.indexOf(selectedText) + selectedText.length).replace(/\n{3,}/g, "\n\n").trim();
+                  const newPrev = prevContent + "\n\n" + selectedText.trim();
                   const updated = scenes.map((sc, idx) => {
                     if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length };
                     if (idx === i - 1) return { ...sc, content: newPrev, content_preview: newPrev.slice(0, 200), char_count: newPrev.length };
