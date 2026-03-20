@@ -590,13 +590,18 @@ export function StoryboardPanel({
     supabase.from("book_scenes").update({ content_dirty: false } as any).eq("id", sceneId).then(() => {});
 
     try {
-      const { data: freshScene } = await supabase
-        .from("book_scenes")
-        .select("content")
-        .eq("id", sceneId)
-        .maybeSingle();
+      let analysisContent = sceneContent;
 
-      const analysisContent = freshScene?.content ?? sceneContent;
+      if (!analysisContent) {
+        const { data: freshScene } = await supabase
+          .from("book_scenes")
+          .select("content")
+          .eq("id", sceneId)
+          .maybeSingle();
+
+        analysisContent = freshScene?.content ?? null;
+      }
+
       if (!analysisContent) {
         toast.error(isRu ? "Текст сцены не найден" : "Scene text not found");
         setAnalyzing(false);

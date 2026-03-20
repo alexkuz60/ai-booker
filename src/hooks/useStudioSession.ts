@@ -143,6 +143,23 @@ export function useStudioSession() {
     const savedIdx = selectedSceneIdx ?? cloudState.selectedSceneIdx;
     const savedTab = sessionStorage.getItem("studio_active_tab") || cloudState.activeTab;
 
+    if (sessionChapter) {
+      setChapter(sessionChapter);
+
+      if (savedIdx !== null && savedIdx >= 0 && savedIdx < sessionChapter.scenes.length) {
+        setSelectedSceneIdx(savedIdx);
+        sessionStorage.setItem("studio_selected_scene_idx", String(savedIdx));
+      }
+
+      if (savedTab) {
+        setActiveTab(savedTab);
+        sessionStorage.setItem("studio_active_tab", savedTab);
+      }
+
+      setRestored(true);
+      return;
+    }
+
     if (!resolvedChapterTitle) {
       setRestored(true);
       return;
