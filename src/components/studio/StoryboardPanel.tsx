@@ -224,132 +224,134 @@ export function StoryboardPanel({
     setAudioStatus(map);
   }, []);
 
-  // Load existing segments from DB
+  // Load segments: OPFS first → DB fallback (seed after AI analysis only)
+  const loadSegmentsFromDb = useCallback(async (sid: string): Promise<Segment[]> => {
+    const { data: segs, error: segErr } = await supabase
+      .from("scene_segments")
+      .select("id, segment_number, segment_type, speaker, metadata")
+      .eq("scene_id", sid)
+      .order("segment_number");
+
+    if (segErr) throw segErr;
+    if (!segs || segs.length === 0) return [];
+
+    const segIds = segs.map((s) => s.id);
+    const [{ data: phrases, error: phErr }, { data: mappings }] = await Promise.all([
+      supabase
+        .from("segment_phrases")
+        .select("id, segment_id, phrase_number, text, metadata")
+        .in("segment_id", segIds)
+        .order("phrase_number"),
+      supabase
+        .from("scene_type_mappings")
+        .select("segment_type, character_id")
+        .eq("scene_id", sid),
+    ]);
+
+    if (phErr) throw phErr;
+
+    const charNameMap = new Map(characters.map(c => [c.id, c.name]));
+    const typeSpeakerMap = new Map<string, string>();
+    let loadedInlineSpeaker: string | null = null;
+    const localMappings: LocalTypeMappingEntry[] = [];
+    if (mappings) {
+      for (const m of mappings) {
+        const name = charNameMap.get(m.character_id);
+        if (name) {
+          typeSpeakerMap.set(m.segment_type, name);
+          localMappings.push({ segmentType: m.segment_type, characterId: m.character_id, characterName: name });
+          if (m.segment_type === "inline_narration") loadedInlineSpeaker = name;
+        }
+      }
+    }
+    typeMappingsRef.current = localMappings;
+    setInlineNarrationSpeaker(loadedInlineSpeaker);
+
+    const phraseMap = new Map<string, Phrase[]>();
+    for (const p of phrases || []) {
+      const list = phraseMap.get(p.segment_id) || [];
+      const phMeta = (p.metadata ?? {}) as Record<string, unknown>;
+      const annotations = Array.isArray(phMeta.annotations) ? phMeta.annotations as PhraseAnnotation[] : undefined;
+      list.push({ phrase_id: p.id, phrase_number: p.phrase_number, text: p.text, annotations });
+      phraseMap.set(p.segment_id, list);
+    }
+
+    const builtSegments = segs.map((s) => {
+      let speaker = s.speaker;
+      if (!speaker && typeSpeakerMap.has(s.segment_type)) {
+        speaker = typeSpeakerMap.get(s.segment_type)!;
+      }
+      const meta = (s.metadata ?? {}) as Record<string, unknown>;
+      const inlineNarr = Array.isArray(meta.inline_narrations) ? meta.inline_narrations as any[] : undefined;
+      const splitSilence = typeof meta.split_silence_ms === "number" ? meta.split_silence_ms : undefined;
+      return {
+        segment_id: s.id,
+        segment_number: s.segment_number,
+        segment_type: s.segment_type,
+        speaker,
+        phrases: phraseMap.get(s.id) || [],
+        inline_narrations: inlineNarr,
+        split_silence_ms: splitSilence,
+      };
+    });
+
+    return builtSegments;
+  }, [characters]);
+
+  /** Apply loaded segments to component state + persist to OPFS */
+  const applySegments = useCallback((builtSegments: Segment[], sid: string) => {
+    setSegments(builtSegments);
+    const inlineIds = new Set(builtSegments.filter(s => s.inline_narrations && s.inline_narrations.length > 0).map(s => s.segment_id));
+    setInlineNarrationSegIds(inlineIds);
+    setStaleAudioSegIds(new Set()); // stale detection is DB-specific, skip for OPFS
+    setLoaded(true);
+    loadAudioStatus(builtSegments.map(s => s.segment_id));
+  }, [loadAudioStatus]);
+
   const loadSegments = useCallback(async (sid: string) => {
     setLoading(true);
     try {
-      const { data: segs, error: segErr } = await supabase
-        .from("scene_segments")
-        .select("id, segment_number, segment_type, speaker, metadata")
-        .eq("scene_id", sid)
-        .order("segment_number");
+      // 1. Try OPFS first
+      if (hasStorage) {
+        const local = await loadFromLocal(sid);
+        if (local && local.segments.length > 0) {
+          console.debug(`[Storyboard] Loaded ${local.segments.length} segments from OPFS`);
+          typeMappingsRef.current = local.typeMappings || [];
+          setInlineNarrationSpeaker(local.inlineNarrationSpeaker);
+          setAudioStatus(new Map(Object.entries(local.audioStatus || {})));
+          applySegments(local.segments, sid);
+          setLoading(false);
+          return;
+        }
+      }
 
-      if (segErr) throw segErr;
-      if (!segs || segs.length === 0) {
+      // 2. Fallback: load from DB (seed after AI analysis)
+      const builtSegments = await loadSegmentsFromDb(sid);
+      if (builtSegments.length === 0) {
         setSegments([]);
         setLoaded(true);
         setLoading(false);
         return;
       }
 
-      const segIds = segs.map((s) => s.id);
-      const [{ data: phrases, error: phErr }, { data: mappings }] = await Promise.all([
-        supabase
-          .from("segment_phrases")
-          .select("id, segment_id, phrase_number, text, metadata")
-          .in("segment_id", segIds)
-          .order("phrase_number"),
-        supabase
-          .from("scene_type_mappings")
-          .select("segment_type, character_id")
-          .eq("scene_id", sid),
-      ]);
+      applySegments(builtSegments, sid);
 
-      if (phErr) throw phErr;
-
-      const charNameMap = new Map(characters.map(c => [c.id, c.name]));
-      const typeSpeakerMap = new Map<string, string>();
-      let loadedInlineSpeaker: string | null = null;
-      if (mappings) {
-        for (const m of mappings) {
-          const name = charNameMap.get(m.character_id);
-          if (name) {
-            typeSpeakerMap.set(m.segment_type, name);
-            if (m.segment_type === "inline_narration") loadedInlineSpeaker = name;
-          }
-        }
+      // 3. Seed OPFS with DB data
+      if (hasStorage) {
+        await persistNow({
+          segments: builtSegments,
+          typeMappings: typeMappingsRef.current,
+          audioStatus,
+          inlineNarrationSpeaker,
+        });
+        console.debug(`[Storyboard] Seeded OPFS from DB: ${builtSegments.length} segments`);
       }
-      setInlineNarrationSpeaker(loadedInlineSpeaker);
-
-      const phraseMap = new Map<string, Phrase[]>();
-      for (const p of phrases || []) {
-        const list = phraseMap.get(p.segment_id) || [];
-        const phMeta = (p.metadata ?? {}) as Record<string, unknown>;
-        const annotations = Array.isArray(phMeta.annotations) ? phMeta.annotations as PhraseAnnotation[] : undefined;
-        list.push({ phrase_id: p.id, phrase_number: p.phrase_number, text: p.text, annotations });
-        phraseMap.set(p.segment_id, list);
-      }
-
-      const needUpdate: string[] = [];
-      const builtSegments = segs.map((s) => {
-        let speaker = s.speaker;
-        if (!speaker && typeSpeakerMap.has(s.segment_type)) {
-          speaker = typeSpeakerMap.get(s.segment_type)!;
-          needUpdate.push(s.id);
-        }
-        const meta = (s.metadata ?? {}) as Record<string, unknown>;
-        const inlineNarr = Array.isArray(meta.inline_narrations) ? meta.inline_narrations as any[] : undefined;
-        const splitSilence = typeof meta.split_silence_ms === "number" ? meta.split_silence_ms : undefined;
-        return {
-          segment_id: s.id,
-          segment_number: s.segment_number,
-          segment_type: s.segment_type,
-          speaker,
-          phrases: phraseMap.get(s.id) || [],
-          inline_narrations: inlineNarr,
-          split_silence_ms: splitSilence,
-        };
-      });
-
-      // Persist auto-applied speakers and ensure character_appearances exist
-      if (needUpdate.length > 0) {
-        for (const [type, name] of typeSpeakerMap) {
-          const ids = builtSegments
-            .filter(s => s.segment_type === type && needUpdate.includes(s.segment_id))
-            .map(s => s.segment_id);
-          if (ids.length > 0) {
-            await supabase.from("scene_segments").update({ speaker: name }).in("id", ids);
-            const charRecord = characters.find(c => c.name === name);
-            if (charRecord && sid) {
-              const { data: existing } = await supabase
-                .from("character_appearances")
-                .select("id, segment_ids")
-                .eq("character_id", charRecord.id)
-                .eq("scene_id", sid)
-                .maybeSingle();
-              if (existing) {
-                const merged = [...new Set([...existing.segment_ids, ...ids])];
-                await supabase.from("character_appearances").update({ segment_ids: merged }).eq("id", existing.id);
-              } else {
-                await supabase.from("character_appearances").upsert(
-                  { character_id: charRecord.id, scene_id: sid, role_in_scene: "speaker", segment_ids: ids },
-                  { onConflict: "character_id,scene_id" }
-                );
-              }
-            }
-          }
-        }
-      }
-
-      setSegments(builtSegments);
-      const inlineIds = new Set(builtSegments.filter(s => s.inline_narrations && s.inline_narrations.length > 0).map(s => s.segment_id));
-      setInlineNarrationSegIds(inlineIds);
-      const staleIds = new Set<string>();
-      for (const s of segs) {
-        const meta = (s.metadata ?? {}) as Record<string, unknown>;
-        if (Array.isArray(meta.inline_narrations_audio) && (meta.inline_narrations_audio as unknown[]).length > 0) {
-          staleIds.add(s.id);
-        }
-      }
-      setStaleAudioSegIds(staleIds);
-      setLoaded(true);
-      loadAudioStatus(builtSegments.map(s => s.segment_id));
     } catch (err) {
       console.error("Failed to load segments:", err);
       toast.error(isRu ? "Ошибка загрузки сегментов" : "Failed to load segments");
     }
     setLoading(false);
-  }, [isRu, characters, loadAudioStatus]);
+  }, [isRu, hasStorage, loadFromLocal, loadSegmentsFromDb, applySegments, persistNow, audioStatus, inlineNarrationSpeaker]);
 
   // ─── Segment Operations ───────────────────────────────────
 
