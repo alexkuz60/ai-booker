@@ -578,6 +578,8 @@ export function StoryboardPanel({
     setStaleAudioSegIds(new Set());
     setMergeChecked(new Set());
     setContentDirty(false);
+    // Clear stale OPFS storyboard so loadSegments falls through to fresh DB data
+    await clearLocal();
     // Clear dirty flag in DB
     supabase.from("book_scenes").update({ content_dirty: false } as any).eq("id", sceneId).then(() => {});
 
@@ -616,7 +618,7 @@ export function StoryboardPanel({
       await loadSegments(sceneId);
     }
     setAnalyzing(false);
-  }, [sceneId, sceneContent, isRu, onSegmented, loadSegments, getModelForRole, userApiKeys]);
+  }, [sceneId, sceneContent, isRu, onSegmented, loadSegments, clearLocal, getModelForRole, userApiKeys]);
 
   // Auto-trigger analysis when scene has no segments and content is available
   useEffect(() => {
