@@ -1303,23 +1303,32 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
           </ScrollArea>
         </div>
 
-        {/* Column 2: Voice Casting Table */}
+        {/* Column 2: Voice Casting Table or Casting Candidates */}
         <div className="flex-1 min-w-0">
-          <div className="p-4 h-full flex flex-col">
-            <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider mb-3">
-              {isRu ? "Голоса" : "Voices"}
-            </h3>
-            <div className="flex-1 min-h-0">
-              <VoiceCastingTable
-                characters={filteredCharacters}
-                isRu={isRu}
-                selectedCharacterId={selectedId}
-                onSelectCharacter={handleSelectCharacter}
-                filterMode={filterMode}
-                sceneCharIds={sceneCharIds}
-              />
+          {castingCandidates ? (
+            <CastingCandidatesPanel
+              characters={castingCandidates}
+              isRu={isRu}
+              onConfirm={handleCastingConfirm}
+              onCancel={handleCastingCancel}
+            />
+          ) : (
+            <div className="p-4 h-full flex flex-col">
+              <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider mb-3">
+                {isRu ? "Голоса" : "Voices"}
+              </h3>
+              <div className="flex-1 min-h-0">
+                <VoiceCastingTable
+                  characters={filteredCharacters}
+                  isRu={isRu}
+                  selectedCharacterId={selectedId}
+                  onSelectCharacter={handleSelectCharacter}
+                  filterMode={filterMode}
+                  sceneCharIds={sceneCharIds}
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
