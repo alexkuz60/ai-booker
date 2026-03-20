@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { getChapterTextFromCache, setChapterTextsCache, hasChapterTextsCache } from "@/lib/chapterTextsCache";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
