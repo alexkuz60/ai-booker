@@ -51,8 +51,9 @@
 - [x] **Матрица «segment_type → TTS mode»** — `SEGMENT_TYPE_TTS_MODIFIERS` в psychotypeVoicePresets.ts: dialogue=полная эмоциональность, inner_thought=тише+медленнее, narrator=нейтрально, lyric=певуче
 
 ### Фаза 3 — Инструкции Рассказчику
-- [ ] **Теги сцены → инструкции** — при открытии сцены `book_scenes.mood + scene_type` конвертируются в TTS-инструкции (темп, тональность) и показываются в карточке Рассказчика
+- [x] **Теги сцены → инструкции** — `MOOD_TTS_INSTRUCTIONS` + `SCENE_TYPE_NARRATOR_HINTS` + `buildSceneTtsContext()` в psychotypeVoicePresets.ts; synthesize-scene применяет mood-based rate/role/instructions к narrator-like сегментам; speech_context из Phase 2 тоже подключен к ProxyAPI instructions
 - [ ] **Редактирование** — пользователь может скорректировать авто-инструкции перед синтезом
+- [ ] **UI отображение** — показ mood-инструкций в карточке Рассказчика в StoryboardPanel
 
 ## Студия / Раскадровка (после завершения Парсера)
 
