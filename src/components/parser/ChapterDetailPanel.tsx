@@ -370,8 +370,27 @@ function SceneCards({
                     return;
                   }
                   const nextContent = scenes[i + 1].content || scenes[i + 1].content_preview || "";
-                  const newCurrent = currentContent.slice(0, currentContent.lastIndexOf(selectedText)).replace(/\n{3,}/g, "\n\n").trim();
-                  const newNext = selectedText.trim() + "\n\n" + nextContent;
+                  // Find split point using normalized matching
+                  const normContent = norm(currentContent);
+                  const normSel = norm(selectedText);
+                  const splitCharIdx = normContent.length - normSel.length;
+                  // Map normalized char index back to original: find position where remaining chars match
+                  let origSplitIdx = 0;
+                  let normIdx = 0;
+                  for (let ci = 0; ci < currentContent.length; ci++) {
+                    if (/\s/.test(currentContent[ci]) && (ci === 0 || /\s/.test(currentContent[ci - 1]))) continue;
+                    if (!(/\s/.test(currentContent[ci]))) normIdx++;
+                    else normIdx++;
+                    // Simplified: just cut from where the selected text approximately starts
+                  }
+                  // Simpler approach: find the selected text with flexible whitespace
+                  const selWords = selectedText.trim().split(/\s+/);
+                  const firstWord = selWords[0];
+                  // Find last occurrence of the first word of selection in content
+                  const searchFrom = currentContent.lastIndexOf(firstWord);
+                  const newCurrent = searchFrom > 0 ? currentContent.slice(0, searchFrom).replace(/\n{3,}/g, "\n\n").trim() : "";
+                  const movedText = searchFrom > 0 ? currentContent.slice(searchFrom).trim() : selectedText.trim();
+                  const newNext = movedText + "\n\n" + nextContent;
                   const updated = scenes.map((sc, idx) => {
                     if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length, dirty: true };
                     if (idx === i + 1) return { ...sc, content: newNext, content_preview: newNext.slice(0, 200), char_count: newNext.length, dirty: true };
@@ -397,14 +416,22 @@ function SceneCards({
                   }
                   if (i <= 0) return;
                   const currentContent = scenes[i].content || scenes[i].content_preview || "";
+                  const norm = (s: string) => s.replace(/\s+/g, " ").trim();
                   // Validate: selection must start from beginning of scene
-                  if (!currentContent.trimStart().startsWith(selectedText.trimStart())) {
+                  if (!norm(currentContent).startsWith(norm(selectedText))) {
                     toast.warning(isRu ? "Выделение должно начинаться с начала сцены" : "Selection must start from the beginning of the scene");
                     return;
                   }
                   const prevContent = scenes[i - 1].content || scenes[i - 1].content_preview || "";
-                  const newCurrent = currentContent.slice(currentContent.indexOf(selectedText) + selectedText.length).replace(/\n{3,}/g, "\n\n").trim();
-                  const newPrev = prevContent + "\n\n" + selectedText.trim();
+                  // Find split point: end of selected text in original content
+                  const selWords = selectedText.trim().split(/\s+/);
+                  const lastWord = selWords[selWords.length - 1];
+                  // Find the end of the last word of selection in original content
+                  const lastWordIdx = currentContent.indexOf(lastWord);
+                  const cutIdx = lastWordIdx >= 0 ? lastWordIdx + lastWord.length : selectedText.length;
+                  const newCurrent = currentContent.slice(cutIdx).replace(/\n{3,}/g, "\n\n").trim();
+                  const movedText = currentContent.slice(0, cutIdx).trim();
+                  const newPrev = prevContent + "\n\n" + movedText;
                   const updated = scenes.map((sc, idx) => {
                     if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length, dirty: true };
                     if (idx === i - 1) return { ...sc, content: newPrev, content_preview: newPrev.slice(0, 200), char_count: newPrev.length, dirty: true };
