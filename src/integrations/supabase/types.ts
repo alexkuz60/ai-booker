@@ -88,8 +88,10 @@ export type Database = {
           gender: string
           id: string
           name: string
+          psycho_tags: string[]
           sort_order: number
           speech_style: string | null
+          speech_tags: string[]
           temperament: string | null
           updated_at: string
           voice_config: Json
@@ -104,8 +106,10 @@ export type Database = {
           gender?: string
           id?: string
           name?: string
+          psycho_tags?: string[]
           sort_order?: number
           speech_style?: string | null
+          speech_tags?: string[]
           temperament?: string | null
           updated_at?: string
           voice_config?: Json
@@ -120,8 +124,10 @@ export type Database = {
           gender?: string
           id?: string
           name?: string
+          psycho_tags?: string[]
           sort_order?: number
           speech_style?: string | null
+          speech_tags?: string[]
           temperament?: string | null
           updated_at?: string
           voice_config?: Json

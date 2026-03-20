@@ -15,6 +15,8 @@ interface CharacterProfile {
   temperament: string;
   speech_style: string;
   description: string;
+  speech_tags?: string[];
+  psycho_tags?: string[];
 }
 
 // ── Helpers ──────────────────────────────────────────────
@@ -49,8 +51,8 @@ function buildPrompt(
     : "";
 
   const systemPrompt = lang === "ru"
-    ? `Ты — литературный аналитик. Проанализируй персонажей книги на основе их реплик и контекста повествования.\n\nДля каждого персонажа определи:\n- aliases: все варианты имени (сокращения, прозвища, обращения)\n- gender: male / female / unknown\n- age_group: child / teen / young / adult / elder / unknown\n- temperament: один из: sanguine (сангвиник), choleric (холерик), melancholic (меланхолик), phlegmatic (флегматик), или смешанный\n- speech_style: краткое описание стиля речи (2-3 предложения)\n- description: психологический портрет персонажа (3-5 предложений)\n\nОтвечай на русском языке в полях description и speech_style.`
-    : `You are a literary analyst. Analyze book characters based on their dialogue and narrative context.\n\nFor each character determine:\n- aliases: all name variations (nicknames, shortened forms, titles)\n- gender: male / female / unknown\n- age_group: child / teen / young / adult / elder / unknown\n- temperament: one of: sanguine, choleric, melancholic, phlegmatic, or mixed\n- speech_style: brief description of speech patterns (2-3 sentences)\n- description: psychological portrait (3-5 sentences)`;
+    ? `Ты — литературный аналитик. Проанализируй персонажей книги на основе их реплик и контекста повествования.\n\nДля каждого персонажа определи:\n- aliases: все варианты имени (сокращения, прозвища, обращения)\n- gender: male / female / unknown\n- age_group: child / teen / young / adult / elder / unknown\n- temperament: один из: sanguine (сангвиник), choleric (холерик), melancholic (меланхолик), phlegmatic (флегматик), или смешанный\n- speech_style: краткое описание стиля речи (2-3 предложения)\n- description: психологический портрет персонажа (3-5 предложений)\n- speech_tags: 2-4 хэштега, описывающих МАНЕРУ РЕЧИ для голосового синтеза (темп, интонация, артикуляция). Примеры: #отрывисто #быстро #нервно #хрипло #тихо #громко #монотонно #певуче #резко #бархатисто #визгливо\n- psycho_tags: 2-4 хэштега, описывающих ПСИХОТИП персонажа для автоподбора голоса. Примеры: #паникер #эгоцентрист #невротик #меланхолик #лидер #интроверт #манипулятор #оптимист #педант #мечтатель\nТеги ОБЯЗАТЕЛЬНО начинаются с # и пишутся на русском.\n\nОтвечай на русском языке в полях description и speech_style.`
+    : `You are a literary analyst. Analyze book characters based on their dialogue and narrative context.\n\nFor each character determine:\n- aliases: all name variations (nicknames, shortened forms, titles)\n- gender: male / female / unknown\n- age_group: child / teen / young / adult / elder / unknown\n- temperament: one of: sanguine, choleric, melancholic, phlegmatic, or mixed\n- speech_style: brief description of speech patterns (2-3 sentences)\n- description: psychological portrait (3-5 sentences)\n- speech_tags: 2-4 hashtags describing SPEECH MANNER for voice synthesis (tempo, intonation, articulation). Examples: #clipped #fast #nervous #raspy #quiet #loud #monotone #melodic #sharp #velvety\n- psycho_tags: 2-4 hashtags describing character PSYCHOTYPE for voice auto-casting. Examples: #panicker #egocentric #neurotic #melancholic #leader #introvert #manipulator #optimist #pedant #dreamer\nTags MUST start with # and be in the same language as the text.`;
 
   return { systemPrompt, userPrompt: `## Characters to profile:\n\n${characterList}${narratorContext}` };
 }
@@ -116,8 +118,10 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
                   temperament: { type: "string" },
                   speech_style: { type: "string" },
                   description: { type: "string" },
+                  speech_tags: { type: "array", items: { type: "string" }, description: "2-4 hashtags describing speech manner for TTS" },
+                  psycho_tags: { type: "array", items: { type: "string" }, description: "2-4 hashtags describing character psychotype" },
                 },
-                required: ["name", "aliases", "gender", "age_group", "temperament", "speech_style", "description"],
+                required: ["name", "aliases", "gender", "age_group", "temperament", "speech_style", "description", "speech_tags", "psycho_tags"],
               },
             },
           },
@@ -128,7 +132,7 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
     tool_choice: { type: "function", function: { name: "save_character_profiles" } },
   };
 
-  const jsonPromptSuffix = `\n\nCRITICAL INSTRUCTION: You MUST respond with ONLY a valid JSON object. No explanations, no markdown fences, no text before or after. The response must start with { and end with }.\nRequired format:\n{"characters": [{"name": "...", "aliases": ["..."], "gender": "male|female|unknown", "age_group": "child|teen|young|adult|elder|unknown", "temperament": "...", "speech_style": "...", "description": "..."}]}`;
+  const jsonPromptSuffix = `\n\nCRITICAL INSTRUCTION: You MUST respond with ONLY a valid JSON object. No explanations, no markdown fences, no text before or after. The response must start with { and end with }.\nRequired format:\n{"characters": [{"name": "...", "aliases": ["..."], "gender": "male|female|unknown", "age_group": "child|teen|young|adult|elder|unknown", "temperament": "...", "speech_style": "...", "description": "...", "speech_tags": ["#tag1", "#tag2"], "psycho_tags": ["#tag1", "#tag2"]}]}\n\nspeech_tags: 2-4 hashtags describing speech MANNER for TTS voice synthesis.\npsycho_tags: 2-4 hashtags describing character PSYCHOTYPE for voice auto-casting.\nTags MUST start with # and be in the same language as the text.`;
   const plainPayload: Record<string, unknown> = {
     model: usedModel,
     messages: [
@@ -504,6 +508,8 @@ Deno.serve(async (req) => {
           temperament: profile.temperament || null,
           speech_style: profile.speech_style || null,
           description: profile.description || null,
+          speech_tags: profile.speech_tags || [],
+          psycho_tags: profile.psycho_tags || [],
           updated_at: new Date().toISOString(),
         })
         .eq("id", char.id);

@@ -414,3 +414,57 @@ Edge-функции получают `model` и `apiKey` от клиента. Л
 - Конфигурация пулов сохраняется в пресетах и `useCloudSettings` (ключ `ai_role_model_pools`)
 
 **Роли с поддержкой пула:** `poolable: true` в `aiRoles.ts` — screenwriter, director, profiler, proofreader, sound-engineer.
+
+---
+
+## 5. Мост Парсер → Студия: психотип и TTS-синтез
+
+### 5.1 Архитектурный контракт
+
+Данные персонажей проходят через три уровня детализации:
+
+1. **Глобальный профиль** (Парсер → OPFS `characters.json` → Push to Server → `book_characters`)
+   - `speech_tags`, `psycho_tags` — генерируются профайлером
+   - `accentuation` (Леонгард), `archetype` (тембровый) — расширенные поля в `profile`
+   - НЕ перезаписываются при уточнении на уровне сцены
+
+2. **Scene-level уточнения** (Студия → `scene_segments.metadata.speech_context`)
+   - Контекстные модификаторы: как персонаж говорит **в данной сцене**
+   - Дополняют, но не заменяют глобальный профиль
+
+3. **TTS-инструкции** (автогенерация из mood/scene_type + психотипа)
+   - Авто-конвертация `mood` + `scene_type` → темп, тональность, громкость
+   - Пользователь может скорректировать перед синтезом
+
+### 5.2 Матрица «Психотип → TTS-пресет»
+
+Конфиг `src/config/psychotypeVoicePresets.ts` (планируется):
+
+```
+{ accentuation, archetype, provider } → {
+  // Yandex: voice, role (emotion), SSML prosody rate/pitch
+  // SaluteSpeech: voice, prosody
+  // ElevenLabs: stability, similarity_boost, style, speed
+  // ProxyAPI/OpenAI: voice, instructions (текстовое описание эмоции)
+}
+```
+
+**Принцип:** Профайлер генерирует перечисляемые значения (`accentuation`, `archetype`), которые служат **ключами** для детерминированного маппинга на параметры TTS-движков. AI не решает за пользователя — предлагает 2-3 альтернативы голосов.
+
+### 5.3 Матрица «segment_type → TTS mode»
+
+| segment_type | Модификация | Обоснование |
+|-------------|-------------|-------------|
+| `dialogue` | Полная эмоциональность, нормальная громкость | Естественная речь |
+| `inner_thought` | −3dB, −10% rate, ElevenLabs: +stability | «Близкий микрофон», интимность |
+| `narrator` | Нейтральная подача, стабильный темп | Авторский голос |
+| `lyric` | +певучесть (ElevenLabs: +style), замедление | Ритмичность стиха |
+| `monologue` | Эмоции персонажа, но ровнее чем dialogue | Длинная речь |
+| `telephone` | HPF 300Hz, −6dB, сжатие динамики | Имитация телефона |
+
+### 5.4 Ключевые файлы (планируемые)
+
+| Файл | Назначение |
+|------|------------|
+| `src/config/psychotypeVoicePresets.ts` | Маппинг психотип → TTS-настройки по провайдерам |
+| `PSYCHOTYPE_TTS_ANALYTICS.md` | Справочник: классификаторы + TTS-приёмы |
