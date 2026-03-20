@@ -528,25 +528,36 @@ export function ChapterNavigator({
               <Timer className="h-3 w-3" />
             )}
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 w-6 p-0"
-            disabled={!onBatchAnalyze}
-            onClick={() => {
-              if (!onBatchAnalyze) return;
-              const unsegmented = chapter.scenes
-                .filter(s => s.id && !segmentedSceneIds?.has(s.id))
-                .map(s => s.id) as string[];
-              const ids = unsegmented.length > 0
-                ? unsegmented
-                : chapter.scenes.map(s => s.id).filter(Boolean) as string[];
-              if (ids.length > 0) onBatchAnalyze(ids);
-            }}
-            title={isRu ? "Раскадровка всех сцен" : "Segment all scenes"}
-          >
-            <Sparkles className="h-3 w-3" />
-          </Button>
+          {(() => {
+            const unsegCount = chapter.scenes.filter(s => s.id && !segmentedSceneIds?.has(s.id)).length;
+            const tip = unsegCount > 0
+              ? (isRu ? `Раскадровка ${unsegCount} несегментированных сцен` : `Segment ${unsegCount} unsegmented scenes`)
+              : (isRu ? "Переанализ всех сцен" : "Re-analyze all scenes");
+            return (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-1 gap-0.5"
+                disabled={!onBatchAnalyze}
+                onClick={() => {
+                  if (!onBatchAnalyze) return;
+                  const unsegmented = chapter.scenes
+                    .filter(s => s.id && !segmentedSceneIds?.has(s.id))
+                    .map(s => s.id) as string[];
+                  const ids = unsegmented.length > 0
+                    ? unsegmented
+                    : chapter.scenes.map(s => s.id).filter(Boolean) as string[];
+                  if (ids.length > 0) onBatchAnalyze(ids);
+                }}
+                title={tip}
+              >
+                <Sparkles className="h-3 w-3" />
+                {unsegCount > 0 && (
+                  <span className="text-[10px] font-mono text-muted-foreground">{unsegCount}</span>
+                )}
+              </Button>
+            );
+          })()}
           <Button
             size="sm"
             variant="ghost"
