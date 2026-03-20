@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
 
     const systemPrompt = (await resolveTaskPromptWithOverrides("screenwriter:segment_scene", lang)) || "You are a literary text analyst.";
 
-    const userPrompt = `Analyze this scene (language: ${lang}). IMPORTANT: segment the ENTIRE text from start to finish, do not skip any part.\n\n${content}`;
+    const userPrompt = `Analyze this scene (language: ${lang}). IMPORTANT: segment the ENTIRE text from start to finish, do not skip any part.\nReturn ONLY a JSON array of segment objects: [{"type":"...","speaker":"...","text":"..."}]\nDo NOT return plain text or explanations.\n\n${content}`;
 
     // Estimate required output tokens: ~1.5x input chars (JSON overhead) / 3 chars per token
     const estimatedOutputTokens = Math.max(4096, Math.ceil((content.length * 1.5) / 3));
