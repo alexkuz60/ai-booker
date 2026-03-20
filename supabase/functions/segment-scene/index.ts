@@ -106,19 +106,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Read content from DB if not provided in body
-    let content = bodyContent;
-    if (!content) {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const svcKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      const svc = createClient(supabaseUrl, svcKey);
-      const { data: sceneRow } = await svc
-        .from("book_scenes")
-        .select("content")
-        .eq("id", scene_id)
-        .maybeSingle();
-      content = sceneRow?.content;
-    }
+    // 🚫 К3: NEVER read content from DB — OPFS is the only source of truth.
+    // Content MUST be provided by the client from local storage.
+    const content = bodyContent;
 
     if (!content) {
       return new Response(
