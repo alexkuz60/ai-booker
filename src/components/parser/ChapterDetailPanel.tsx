@@ -306,13 +306,11 @@ function SceneCards({
                       <span className="text-[10px] text-muted-foreground font-mono ml-1">
                         {sceneDur}
                       </span>
-                      {mergeMode && (
-                        <Checkbox
-                          checked={mergeChecked.has(i)}
-                          onCheckedChange={() => toggleMergeCheck(i)}
-                          className="ml-2 shrink-0"
-                        />
-                      )}
+                      <Checkbox
+                        checked={mergeChecked.has(i)}
+                        onCheckedChange={() => toggleMergeCheck(i)}
+                        className="ml-2 shrink-0"
+                      />
                     </div>
                   </div>
                   {content && (
