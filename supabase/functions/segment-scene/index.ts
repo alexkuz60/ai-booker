@@ -161,13 +161,15 @@ Deno.serve(async (req) => {
     // Helper to call AI and parse segments
     async function callAiForSegments(useJsonFormat: boolean): Promise<{ segments: AISegment[]; usage: any; latency: number }> {
       const start = Date.now();
+      // Some models (e.g. openai/gpt-5-mini, gpt-5) reject non-default temperature
+      const supportsTemperature = !/gpt-5/i.test(resolved.model);
       const bodyObj: Record<string, unknown> = {
         model: resolved.model,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.1,
+        ...(supportsTemperature ? { temperature: 0.1 } : {}),
         ...tokenParam,
       };
       if (useJsonFormat) {
