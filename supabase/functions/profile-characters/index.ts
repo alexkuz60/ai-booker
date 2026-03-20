@@ -170,7 +170,7 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       });
       clearTimeout(timeout);
 
-      console.log(`AI attempt ${attempt}/${MAX_RETRIES}, status=${aiRes.status}`);
+      console.log(`AI attempt ${attempt}/${MAX_RETRIES}, status=${aiRes.status}, endpoint=${resolved.endpoint}, model=${usedModel}`);
 
       if (aiRes.status === 429) {
         lastError = lang === "ru" ? "Превышен лимит запросов" : "Rate limit exceeded";
