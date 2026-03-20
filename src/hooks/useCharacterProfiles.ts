@@ -185,6 +185,7 @@ export function useCharacterProfiles({
       return { profiles: (result?.profiles || []) as Array<{
         name: string; age_group?: string; temperament?: string;
         speech_style?: string; description?: string;
+        speech_tags?: string[]; psycho_tags?: string[];
       }>, usedModel: String(result?.usedModel || modelId) };
     };
 
