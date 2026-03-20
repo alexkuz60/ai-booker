@@ -25,6 +25,10 @@ interface PoolSelectorProps {
   isAdmin: boolean;
   isRu: boolean;
   onChange: (roleId: AiRoleId, modelIds: string[]) => void;
+  /** Controlled open state (for accordion behavior) */
+  open?: boolean;
+  /** Callback when open state changes */
+  onOpenChange?: (open: boolean) => void;
 }
 
 function providerLabel(p: string) {
@@ -42,8 +46,12 @@ export function PoolSelector({
   isAdmin,
   isRu,
   onChange,
+  open: controlledOpen,
+  onOpenChange,
 }: PoolSelectorProps) {
-  const [open, setOpen] = useState(pool.length > 0);
+  const [internalOpen, setInternalOpen] = useState(pool.length > 0);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
 
   // Exclude the primary model from the checkbox list — it's always included
   const grouped = useMemo(() => {
