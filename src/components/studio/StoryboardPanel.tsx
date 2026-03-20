@@ -413,111 +413,82 @@ export function StoryboardPanel({
     }
     setDeleting(true);
     try {
-      const deleteIds = toDelete.map(s => s.segment_id);
-      await supabase.from("segment_phrases").delete().in("segment_id", deleteIds);
-      await supabase.from("segment_audio").delete().in("segment_id", deleteIds);
-      await supabase.from("scene_segments").delete().in("id", deleteIds);
-      const { data: remaining } = await supabase
-        .from("scene_segments")
-        .select("id, segment_number")
-        .eq("scene_id", sceneId)
-        .order("segment_number");
-      if (remaining) {
-        for (let i = 0; i < remaining.length; i++) {
-          if (remaining[i].segment_number !== i + 1) {
-            await supabase.from("scene_segments").update({ segment_number: i + 1 }).eq("id", remaining[i].id);
-          }
-        }
-      }
-      await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
+      const deleteIds = new Set(toDelete.map(s => s.segment_id));
+      const updated = segments
+        .filter(s => !deleteIds.has(s.segment_id))
+        .map((s, i) => ({ ...s, segment_number: i + 1 }));
+
+      setSegments(updated);
       setMergeChecked(new Set());
+      await persistNow(buildSnapshot(updated));
       toast.success(isRu ? `Удалено ${toDelete.length} блок(ов)` : `Deleted ${toDelete.length} segment(s)`);
-      await loadSegments(sceneId);
       onSegmented?.(sceneId);
     } catch (err: any) {
       console.error("Delete segments failed:", err);
       toast.error(isRu ? "Ошибка удаления" : "Delete failed");
     }
     setDeleting(false);
-  }, [sceneId, mergeChecked, segments, isRu, loadSegments, onSegmented]);
+  }, [sceneId, mergeChecked, segments, isRu, persistNow, buildSnapshot, onSegmented]);
 
   const handleSplitAtPhrase = useCallback(async (phraseId: string, textBefore: string, textAfter: string) => {
     if (!sceneId) return;
-    const seg = segments.find(s => s.phrases.some(p => p.phrase_id === phraseId));
-    if (!seg) return;
+    const segIdx = segments.findIndex(s => s.phrases.some(p => p.phrase_id === phraseId));
+    if (segIdx < 0) return;
+    const seg = segments[segIdx];
     const phraseIdx = seg.phrases.findIndex(p => p.phrase_id === phraseId);
     if (phraseIdx < 0) return;
 
     try {
-      const movePhrases = seg.phrases.slice(phraseIdx + 1);
-      await supabase.from("segment_phrases").update({ text: textBefore }).eq("id", phraseId);
+      // Build keeper phrases (up to and including the split point)
+      const keeperPhrases = seg.phrases.slice(0, phraseIdx + 1).map((ph, i) => ({
+        ...ph,
+        text: i === phraseIdx ? textBefore : ph.text,
+        phrase_number: i + 1,
+      }));
 
-      const { data: allSegs } = await supabase
-        .from("scene_segments")
-        .select("id, segment_number")
-        .eq("scene_id", sceneId)
-        .gt("segment_number", seg.segment_number)
-        .order("segment_number", { ascending: false });
-      if (allSegs) {
-        for (const s of allSegs) {
-          await supabase.from("scene_segments").update({ segment_number: s.segment_number + 1 }).eq("id", s.id);
-        }
-      }
+      // Build new segment phrases
+      const newSegId = crypto.randomUUID();
+      const newPhrases = [
+        { phrase_id: crypto.randomUUID(), phrase_number: 1, text: textAfter },
+        ...seg.phrases.slice(phraseIdx + 1).map((ph, i) => ({
+          ...ph, phrase_number: i + 2,
+        })),
+      ];
 
-      const { data: newSeg } = await supabase
-        .from("scene_segments")
-        .insert({
-          scene_id: sceneId,
-          segment_number: seg.segment_number + 1,
-          segment_type: seg.segment_type as any,
-          speaker: seg.speaker,
-          metadata: { split_silence_ms: 1000 },
-        })
-        .select("id")
-        .single();
+      const newSeg: Segment = {
+        segment_id: newSegId,
+        segment_number: seg.segment_number + 1,
+        segment_type: seg.segment_type,
+        speaker: seg.speaker,
+        phrases: newPhrases,
+        split_silence_ms: 1000,
+      };
 
-      if (!newSeg) throw new Error("Failed to create new segment");
+      const updated = [
+        ...segments.slice(0, segIdx),
+        { ...seg, phrases: keeperPhrases },
+        newSeg,
+        ...segments.slice(segIdx + 1),
+      ].map((s, i) => ({ ...s, segment_number: i + 1 }));
 
-      await supabase.from("segment_phrases").insert({
-        segment_id: newSeg.id,
-        phrase_number: 1,
-        text: textAfter,
-      });
-
-      for (let i = 0; i < movePhrases.length; i++) {
-        await supabase.from("segment_phrases")
-          .update({ segment_id: newSeg.id, phrase_number: i + 2 })
-          .eq("id", movePhrases[i].phrase_id);
-      }
-
-      await supabase.from("segment_audio").delete().eq("segment_id", seg.segment_id);
-      await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
-
+      setSegments(updated);
+      await persistNow(buildSnapshot(updated));
       toast.success(isRu ? "Блок разделён" : "Segment split");
-      await loadSegments(sceneId);
       onSegmented?.(sceneId);
     } catch (err: any) {
       console.error("Split failed:", err);
       toast.error(isRu ? "Ошибка разделения" : "Split failed");
     }
-  }, [sceneId, segments, isRu, loadSegments, onSegmented]);
+  }, [sceneId, segments, isRu, persistNow, buildSnapshot, onSegmented]);
 
-  const handleSplitSilenceChange = useCallback(async (segmentId: string, ms: number) => {
-    setSegments(prev => prev.map(s =>
+  const handleSplitSilenceChange = useCallback((segmentId: string, ms: number) => {
+    const updated = segments.map(s =>
       s.segment_id === segmentId ? { ...s, split_silence_ms: ms } : s
-    ));
-    const { data: row } = await supabase
-      .from("scene_segments")
-      .select("metadata")
-      .eq("id", segmentId)
-      .single();
-    const existing = (row?.metadata ?? {}) as Record<string, unknown>;
-    await supabase.from("scene_segments")
-      .update({ metadata: { ...existing, split_silence_ms: ms } })
-      .eq("id", segmentId);
-    if (sceneId) {
-      await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
-      onSegmented?.(sceneId);
+    );
+    setSegments(updated);
+    persist(buildSnapshot(updated));
+    onSegmented?.(sceneId!);
+  }, [sceneId, segments, persist, buildSnapshot, onSegmented]);
     }
   }, [sceneId, onSegmented]);
 
