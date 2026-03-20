@@ -362,8 +362,10 @@ function SceneCards({
                   }
                   if (i >= scenes.length - 1) return;
                   const currentContent = scenes[i].content || scenes[i].content_preview || "";
+                  // Normalize whitespace for comparison (browser selection may differ from stored newlines)
+                  const norm = (s: string) => s.replace(/\s+/g, " ").trim();
                   // Validate: selection must go to end of scene
-                  if (!currentContent.trimEnd().endsWith(selectedText.trimEnd())) {
+                  if (!norm(currentContent).endsWith(norm(selectedText))) {
                     toast.warning(isRu ? "Выделение должно доходить до конца сцены" : "Selection must reach the end of the scene");
                     return;
                   }
