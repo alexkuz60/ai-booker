@@ -140,9 +140,10 @@ function SceneCards({
   const canMerge = mergeChecked.size >= 2 && mergeAdjacent;
 
   const handleMerge = useCallback(() => {
-    if (!canMerge || !onScenesUpdate) return;
+    if (!onScenesUpdate) return;
+    if (mergeChecked.size < 2) return;
     const sorted = [...mergeChecked].sort((a, b) => a - b);
-    // Check adjacency
+    // Validate adjacency
     for (let i = 1; i < sorted.length; i++) {
       if (sorted[i] !== sorted[i - 1] + 1) {
         toast.error(t("mergeNotAdjacent", isRu));
@@ -170,13 +171,12 @@ function SceneCards({
     onScenesUpdate(updated, isRu ? `${sorted.length} сцен объединены` : `${sorted.length} scenes merged`);
     toast.success(t("mergeScenesDone", isRu));
     setMergeChecked(new Set());
-    setMergeMode(false);
     setEditedIndices(prev => {
       const next = new Set(prev);
       next.add(firstIdx);
       return next;
     });
-  }, [canMerge, mergeChecked, scenes, isRu, onScenesUpdate]);
+  }, [mergeChecked, scenes, isRu, onScenesUpdate]);
 
   const handleCleanup = useCallback((action: CleanupAction, sceneIndex: number) => {
     const selectedText = getSelectedText();
