@@ -261,6 +261,8 @@ export function AiRolesTab({ apiKeys, isRu, onModelChanged, bookTitle }: AiRoles
                     isAdmin={isAdmin}
                     isRu={isRu}
                     onChange={setPoolForRole}
+                    open={openPoolRole === role.id}
+                    onOpenChange={(v) => setOpenPoolRole(v ? role.id as AiRoleId : null)}
                   />
                 )}
               </CardContent>
