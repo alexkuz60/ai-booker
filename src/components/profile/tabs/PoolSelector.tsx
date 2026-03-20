@@ -25,6 +25,10 @@ interface PoolSelectorProps {
   isAdmin: boolean;
   isRu: boolean;
   onChange: (roleId: AiRoleId, modelIds: string[]) => void;
+  /** Controlled open state (for accordion behavior) */
+  open?: boolean;
+  /** Callback when open state changes */
+  onOpenChange?: (open: boolean) => void;
 }
 
 function providerLabel(p: string) {
