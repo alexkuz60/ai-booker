@@ -807,8 +807,12 @@ export function StoryboardPanel({
     setCurrentlySynthesizingIds(allIds);
     onSynthesizingChange?.(allIds);
     onErrorSegmentsChange?.(new Set());
-    setSynthProgress(isRu ? "Запуск синтеза…" : "Starting synthesis…");
+    setSynthProgress(isRu ? "Синхронизация с сервером…" : "Syncing to server…");
     try {
+      // Push OPFS → DB before TTS (edge functions read from DB)
+      await pushToDb(sceneId, buildSnapshot());
+      setSynthProgress(isRu ? "Запуск синтеза…" : "Starting synthesis…");
+
       const { data, error } = await supabase.functions.invoke("synthesize-scene", {
         body: { scene_id: sceneId, language: isRu ? "ru" : "en" },
       });
@@ -838,7 +842,7 @@ export function StoryboardPanel({
         );
       }
       onSegmented?.(sceneId);
-      loadAudioStatus(segments.map(s => s.segment_id));
+      refreshAudioStatusFromDb(segments.map(s => s.segment_id));
     } catch (err: any) {
       console.error("Synthesis failed:", err);
       toast.error(isRu ? "Ошибка синтеза" : "Synthesis failed");
@@ -847,7 +851,7 @@ export function StoryboardPanel({
     setCurrentlySynthesizingIds(new Set());
     onSynthesizingChange?.(new Set());
     setSynthProgress("");
-  }, [sceneId, segments, isRu, onSegmented, loadAudioStatus, onSynthesizingChange, onErrorSegmentsChange]);
+  }, [sceneId, segments, isRu, onSegmented, refreshAudioStatusFromDb, onSynthesizingChange, onErrorSegmentsChange, pushToDb, buildSnapshot]);
 
   const resynthSegment = useCallback(async (segmentId: string) => {
     if (!sceneId) return;
