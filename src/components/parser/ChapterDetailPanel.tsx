@@ -128,6 +128,55 @@ function SceneCards({
 
   const { capture: handleContextMenu, consume, getSelectedText } = useSelectionCapture();
 
+  // ── Merge logic ──
+  const canMerge = useMemo(() => {
+    if (mergeChecked.size < 2) return false;
+    const sorted = [...mergeChecked].sort((a, b) => a - b);
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i] !== sorted[i - 1] + 1) return false;
+    }
+    return true;
+  }, [mergeChecked]);
+
+  const handleMerge = useCallback(() => {
+    if (!canMerge || !onScenesUpdate) return;
+    const sorted = [...mergeChecked].sort((a, b) => a - b);
+    // Check adjacency
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i] !== sorted[i - 1] + 1) {
+        toast.error(t("mergeNotAdjacent", isRu));
+        return;
+      }
+    }
+    const firstIdx = sorted[0];
+    const mergedContent = sorted.map(idx => scenes[idx]?.content || scenes[idx]?.content_preview || "").join("\n\n");
+    const firstScene = scenes[firstIdx];
+    const updated = scenes
+      .filter((_, idx) => !sorted.includes(idx) || idx === firstIdx)
+      .map((sc, idx) => {
+        if (sc === firstScene) {
+          return {
+            ...sc,
+            content: mergedContent,
+            content_preview: mergedContent.slice(0, 200),
+            char_count: mergedContent.length,
+          };
+        }
+        return { ...sc, scene_number: idx + 1, char_count: (sc.content || '').length };
+      })
+      .map((sc, idx) => ({ ...sc, scene_number: idx + 1 }));
+
+    onScenesUpdate(updated, isRu ? `${sorted.length} сцен объединены` : `${sorted.length} scenes merged`);
+    toast.success(t("mergeScenesDone", isRu));
+    setMergeChecked(new Set());
+    setMergeMode(false);
+    setEditedIndices(prev => {
+      const next = new Set(prev);
+      next.add(firstIdx);
+      return next;
+    });
+  }, [canMerge, mergeChecked, scenes, isRu, onScenesUpdate]);
+
   const handleCleanup = useCallback((action: CleanupAction, sceneIndex: number) => {
     const selectedText = getSelectedText();
     consume(); // clear after reading
