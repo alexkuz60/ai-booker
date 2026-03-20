@@ -36,6 +36,7 @@ import { useLibrary } from "@/hooks/useLibrary";
 import { useFileUpload } from "@/hooks/useFileUpload";
 import { useBookRestore } from "@/hooks/useBookRestore";
 import { useServerSync } from "@/hooks/useServerSync";
+import { clearChapterTextsCache } from "@/lib/chapterTextsCache";
 
 interface UseBookManagerParams {
   userId: string | undefined;

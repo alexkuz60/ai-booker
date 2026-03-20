@@ -6,6 +6,7 @@
  */
 
 import { useState, useCallback } from "react";
+import { clearChapterTextsCache } from "@/lib/chapterTextsCache";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
