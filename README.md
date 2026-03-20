@@ -14,7 +14,7 @@ AI-Booker is a web application for automated audiobook production in a **radio p
 
 | Feature | Description |
 |---------|-------------|
-| 📖 **Smart Parser** | Upload PDF → automatic TOC extraction → AI scene segmentation with mood/tempo metadata |
+| 📖 **Smart Parser** | Upload PDF → automatic TOC extraction → AI scene segmentation with mood/tempo metadata, scene merging & text redistribution between scenes |
 | 🎭 **Character Profiler** | AI identifies characters, builds psychological profiles, and auto-casts voices |
 | 🎙️ **Multi-Provider TTS** | Yandex SpeechKit, SaluteSpeech (Sber), ElevenLabs, ProxyAPI/OpenAI — 40+ voices with emotional control |
 | 🎬 **Storyboard Editor** | Segment merge/split, silence pauses, inline narration detection, speaker attribution |
