@@ -399,8 +399,8 @@ function SceneCards({
                   const newCurrent = currentContent.slice(currentContent.indexOf(selectedText) + selectedText.length).replace(/\n{3,}/g, "\n\n").trim();
                   const newPrev = prevContent + "\n\n" + selectedText.trim();
                   const updated = scenes.map((sc, idx) => {
-                    if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length };
-                    if (idx === i - 1) return { ...sc, content: newPrev, content_preview: newPrev.slice(0, 200), char_count: newPrev.length };
+                    if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length, dirty: true };
+                    if (idx === i - 1) return { ...sc, content: newPrev, content_preview: newPrev.slice(0, 200), char_count: newPrev.length, dirty: true };
                     return sc;
                   });
                   onScenesUpdate?.(updated, isRu ? `Текст перенесён в сцену ${i}` : `Text moved to scene ${i}`);
