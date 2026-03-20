@@ -162,6 +162,7 @@ function SceneCards({
             content: mergedContent,
             content_preview: mergedContent.slice(0, 200),
             char_count: mergedContent.length,
+            dirty: true,
           };
         }
         return { ...sc, scene_number: idx + 1, char_count: (sc.content || '').length };
@@ -187,11 +188,16 @@ function SceneCards({
     }
     const result = applyCleanup(action, scenes, selectedText, sceneIndex);
     if (result.changeCount > 0 && onScenesUpdate) {
-      // Update char_count for all scenes after cleanup
-      const updatedScenes = result.scenes.map(sc => ({
-        ...sc,
-        char_count: (sc.content || '').length,
-      }));
+      // Update char_count and mark dirty for all modified scenes
+      const updatedScenes = result.scenes.map((sc, idx) => {
+        const originalContent = scenes[idx]?.content ?? scenes[idx]?.content_preview ?? "";
+        const wasModified = sc.content !== originalContent;
+        return {
+          ...sc,
+          char_count: (sc.content || '').length,
+          ...(wasModified ? { dirty: true } : {}),
+        };
+      });
       onScenesUpdate(updatedScenes, result.summary);
       // Mark scene(s) as edited
       setEditedIndices(prev => {
@@ -365,8 +371,8 @@ function SceneCards({
                   const newCurrent = currentContent.slice(0, currentContent.lastIndexOf(selectedText)).replace(/\n{3,}/g, "\n\n").trim();
                   const newNext = selectedText.trim() + "\n\n" + nextContent;
                   const updated = scenes.map((sc, idx) => {
-                    if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length };
-                    if (idx === i + 1) return { ...sc, content: newNext, content_preview: newNext.slice(0, 200), char_count: newNext.length };
+                    if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length, dirty: true };
+                    if (idx === i + 1) return { ...sc, content: newNext, content_preview: newNext.slice(0, 200), char_count: newNext.length, dirty: true };
                     return sc;
                   });
                   onScenesUpdate?.(updated, isRu ? `Текст перенесён в сцену ${i + 2}` : `Text moved to scene ${i + 2}`);
@@ -398,8 +404,8 @@ function SceneCards({
                   const newCurrent = currentContent.slice(currentContent.indexOf(selectedText) + selectedText.length).replace(/\n{3,}/g, "\n\n").trim();
                   const newPrev = prevContent + "\n\n" + selectedText.trim();
                   const updated = scenes.map((sc, idx) => {
-                    if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length };
-                    if (idx === i - 1) return { ...sc, content: newPrev, content_preview: newPrev.slice(0, 200), char_count: newPrev.length };
+                    if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length, dirty: true };
+                    if (idx === i - 1) return { ...sc, content: newPrev, content_preview: newPrev.slice(0, 200), char_count: newPrev.length, dirty: true };
                     return sc;
                   });
                   onScenesUpdate?.(updated, isRu ? `Текст перенесён в сцену ${i}` : `Text moved to scene ${i}`);

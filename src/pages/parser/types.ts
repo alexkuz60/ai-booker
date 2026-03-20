@@ -11,6 +11,8 @@ export interface Scene {
   bpm: number;
   /** Character count of scene content, updated after every edit */
   char_count?: number;
+  /** Scene content was edited in Parser after initial analysis — Studio data may be stale */
+  dirty?: boolean;
 }
 
 export interface Chapter {

@@ -4,7 +4,7 @@ import type { Json, Database } from "@/integrations/supabase/types";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
-import { Loader2, Sparkles, BookOpen, AudioLines, CheckCircle2, XCircle, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck } from "lucide-react";
+import { Loader2, Sparkles, BookOpen, AudioLines, CheckCircle2, XCircle, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck, AlertTriangle } from "lucide-react";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -76,6 +76,7 @@ export function StoryboardPanel({
   const [deleting, setDeleting] = useState(false);
   const [staleAudioSegIds, setStaleAudioSegIds] = useState<Set<string>>(new Set());
   const [cleaningMetadata, setCleaningMetadata] = useState(false);
+  const [contentDirty, setContentDirty] = useState(false);
 
   // Reset merge selection when scene changes
   useEffect(() => { setMergeChecked(new Set()); }, [sceneId]);
@@ -525,7 +526,13 @@ export function StoryboardPanel({
   useEffect(() => {
     setSegments([]);
     setLoaded(false);
-    if (sceneId) loadSegments(sceneId);
+    setContentDirty(false);
+    if (sceneId) {
+      loadSegments(sceneId);
+      // Check if scene was edited in Parser
+      supabase.from("book_scenes").select("content_dirty").eq("id", sceneId).maybeSingle()
+        .then(({ data }) => { if (data?.content_dirty) setContentDirty(true); });
+    }
   }, [sceneId, loadSegments]);
 
   // Realtime subscription for segment_audio changes
@@ -576,6 +583,9 @@ export function StoryboardPanel({
     setInlineNarrationSegIds(new Set());
     setStaleAudioSegIds(new Set());
     setMergeChecked(new Set());
+    setContentDirty(false);
+    // Clear dirty flag in DB
+    supabase.from("book_scenes").update({ content_dirty: false } as any).eq("id", sceneId).then(() => {});
 
     try {
       const { data, error } = await invokeWithFallback({
@@ -1373,6 +1383,26 @@ export function StoryboardPanel({
           </Button>
         </div>
       </div>
+      {contentDirty && segments.length > 0 && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-destructive/10 border-b border-destructive/20 shrink-0">
+          <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+          <span className="text-xs text-destructive">
+            {isRu
+              ? "Контент сцены изменён в Парсере. Рекомендуется переанализировать раскадровку."
+              : "Scene content was edited in Parser. Re-analysis recommended."}
+          </span>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="h-6 px-2 text-xs ml-auto shrink-0"
+            onClick={runAnalysis}
+            disabled={analyzing || !sceneContent}
+          >
+            <RefreshCw className="h-3 w-3 mr-1" />
+            {isRu ? "Переанализ" : "Re-analyze"}
+          </Button>
+        </div>
+      )}
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-3 space-y-2">
           {segments.map((seg) => {
