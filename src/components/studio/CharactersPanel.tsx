@@ -163,6 +163,8 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [profiling, setProfiling] = useState(false);
   const [casting, setCasting] = useState(false);
   const [castingCandidates, setCastingCandidates] = useState<CastingCharacter[] | null>(null);
+  const [refiningSpeech, setRefiningSpeech] = useState(false);
+  const [speechContextMap, setSpeechContextMap] = useState<Map<string, Record<string, unknown>>>(new Map());
 
   // Filter: "all" or "scene"
   const [filterMode, setFilterMode] = useState<"all" | "scene" | "chapter">("chapter");
