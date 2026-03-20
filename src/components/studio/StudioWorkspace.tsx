@@ -40,7 +40,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
   const [activeTab, setActiveTabLocal] = useState(() => externalTab || sessionStorage.getItem("studio_active_tab") || "storyboard");
   const charactersPanelRef = useRef<CharactersPanelHandle | null>(null);
   const [castingExternal, setCastingExternal] = useState(false);
-  const { getModelForRole } = useAiRoles();
+  const { getModelForRole } = useAiRoles(userApiKeys ?? {});
 
   // Sync external tab prop
   useEffect(() => {
