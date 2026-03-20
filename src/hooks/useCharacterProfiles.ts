@@ -143,11 +143,9 @@ export function useCharacterProfiles({
       chars: LocalCharacter[],
       modelId: string,
     ): Promise<{ profiles: Array<{
-      name: string;
-      age_group?: string;
-      temperament?: string;
-      speech_style?: string;
-      description?: string;
+      name: string; age_group?: string; temperament?: string;
+      speech_style?: string; description?: string;
+      speech_tags?: string[]; psycho_tags?: string[];
     }>; usedModel: string }> => {
       if (abort.signal.aborted) throw new Error("aborted");
 
