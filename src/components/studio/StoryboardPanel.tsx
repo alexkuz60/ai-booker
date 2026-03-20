@@ -526,7 +526,13 @@ export function StoryboardPanel({
   useEffect(() => {
     setSegments([]);
     setLoaded(false);
-    if (sceneId) loadSegments(sceneId);
+    setContentDirty(false);
+    if (sceneId) {
+      loadSegments(sceneId);
+      // Check if scene was edited in Parser
+      supabase.from("book_scenes").select("content_dirty").eq("id", sceneId).maybeSingle()
+        .then(({ data }) => { if (data?.content_dirty) setContentDirty(true); });
+    }
   }, [sceneId, loadSegments]);
 
   // Realtime subscription for segment_audio changes
