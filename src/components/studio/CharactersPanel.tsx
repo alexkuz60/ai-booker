@@ -1176,6 +1176,39 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                         </PopoverContent>
                       </Popover>
                     </div>
+                    {/* Speech & Psycho tags */}
+                    {(selectedChar.speech_tags?.length > 0 || selectedChar.psycho_tags?.length > 0) && (
+                      <div className="mt-3 space-y-2">
+                        {selectedChar.speech_tags?.length > 0 && (
+                          <div>
+                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                              {isRu ? "Манера речи" : "Speech manner"}
+                            </span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {selectedChar.speech_tags.map((tag, i) => (
+                                <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 border-sky-500/40 text-sky-400">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {selectedChar.psycho_tags?.length > 0 && (
+                          <div>
+                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                              {isRu ? "Психотип" : "Psychotype"}
+                            </span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {selectedChar.psycho_tags.map((tag, i) => (
+                                <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 border-violet-500/40 text-violet-400">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {selectedChar.speech_style && (
                       <div className="mt-2">
                         <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
