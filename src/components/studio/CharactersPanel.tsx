@@ -162,6 +162,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [profiling, setProfiling] = useState(false);
   const [casting, setCasting] = useState(false);
+  const [castingCandidates, setCastingCandidates] = useState<CastingCharacter[] | null>(null);
 
   // Filter: "all" or "scene"
   const [filterMode, setFilterMode] = useState<"all" | "scene" | "chapter">("chapter");
