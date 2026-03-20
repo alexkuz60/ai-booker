@@ -6,6 +6,7 @@ import { loadStudioChapter, saveStudioChapter, type StudioChapter } from "@/lib/
 
 /**
  * Persisted studio session state — saved to user_settings (cloud) for cross-session restore.
+ * К4: only pointers (IDs, titles, indices, tab name) — NEVER text content.
  */
 interface StudioSessionState {
   bookId: string | null;
@@ -25,6 +26,10 @@ const EMPTY_STATE: StudioSessionState = {
   activeTab: "storyboard",
 };
 
+/**
+ * Restore chapter pointer from OPFS project storage.
+ * К3: NEVER fetches text content — only structural metadata + IDs.
+ */
 async function restoreChapterFromLocal(params: {
   storageAvailable: ReturnType<typeof useProjectStorageContext>["storage"];
   bookId: string | null;
@@ -38,9 +43,7 @@ async function restoreChapterFromLocal(params: {
   const restored = await readStructureFromLocal(storageAvailable);
   if (!restored?.structure) return null;
 
-  if (bookId && restored.structure.bookId !== bookId) {
-    return null;
-  }
+  if (bookId && restored.structure.bookId !== bookId) return null;
 
   const chapterIndexById = chapterId
     ? [...restored.chapterIdMap.entries()].find(([, id]) => id === chapterId)?.[0] ?? null
@@ -57,15 +60,14 @@ async function restoreChapterFromLocal(params: {
   const resolvedChapterId = restored.chapterIdMap.get(chapterIndex) ?? chapterId ?? undefined;
   const tocEntry = restored.structure.toc[chapterIndex];
 
-  if (!chapterScenes || !resolvedChapterId || !tocEntry) {
-    return null;
-  }
+  if (!chapterScenes || !resolvedChapterId || !tocEntry) return null;
 
   return {
     chapterId: resolvedChapterId,
     chapterTitle: tocEntry.title,
     bookTitle: restored.structure.title || bookTitle,
     bookId: restored.structure.bookId || bookId || undefined,
+    // К4: scenes carry only structural metadata — content is read from OPFS on demand.
     scenes: chapterScenes.scenes.map((scene) => ({
       id: scene.id,
       scene_number: scene.scene_number,
@@ -73,16 +75,31 @@ async function restoreChapterFromLocal(params: {
       scene_type: scene.scene_type || "mixed",
       mood: scene.mood || "",
       bpm: scene.bpm || 120,
-      content: scene.content,
-      content_preview: scene.content_preview,
     })),
   };
 }
 
+/** Apply scene index + tab from saved state to session, guarded by scene count. */
+function applySavedUiState(
+  chapter: StudioChapter,
+  savedIdx: number | null,
+  savedTab: string | null,
+  setSelectedSceneIdx: (v: number | null) => void,
+  setActiveTab: (v: string) => void,
+) {
+  if (savedIdx !== null && savedIdx >= 0 && savedIdx < chapter.scenes.length) {
+    setSelectedSceneIdx(savedIdx);
+    sessionStorage.setItem("studio_selected_scene_idx", String(savedIdx));
+  }
+  if (savedTab) {
+    setActiveTab(savedTab);
+    sessionStorage.setItem("studio_active_tab", savedTab);
+  }
+}
+
 /**
- * Manages Studio session: loads from sessionStorage first, falls back to local project + cloud settings.
- * Persists state changes to cloud with debounce.
- * Returns { chapter, restored } — `restored` is true once initial load is complete.
+ * Manages Studio session: loads from sessionStorage first, falls back to OPFS + cloud settings.
+ * К3+К4: only pointers travel through sessionStorage/cloud — text is always read from OPFS.
  */
 export function useStudioSession() {
   const { value: cloudState, update: saveCloudState, loaded: cloudLoaded } =
@@ -100,94 +117,61 @@ export function useStudioSession() {
   const [restored, setRestored] = useState(false);
   const restoredRef = useRef(false);
 
+  // ── One-time restore on mount ─────────────────────────────
   useEffect(() => {
     if (restoredRef.current || !cloudLoaded) return;
     restoredRef.current = true;
 
     const sessionChapter = loadStudioChapter();
-    const sourceChapter = sessionChapter ?? chapter;
-    const resolvedBookId = sourceChapter?.bookId ?? cloudState.bookId;
-    const resolvedChapterId = sourceChapter?.chapterId ?? cloudState.chapterId;
-    const resolvedChapterTitle = sourceChapter?.chapterTitle || cloudState.chapterTitle;
-    const resolvedBookTitle = sourceChapter?.bookTitle || cloudState.bookTitle;
     const savedIdx = selectedSceneIdx ?? cloudState.selectedSceneIdx;
     const savedTab = sessionStorage.getItem("studio_active_tab") || cloudState.activeTab;
 
+    // Fast path: session already has chapter pointer
     if (sessionChapter) {
       setChapter(sessionChapter);
-
-      if (savedIdx !== null && savedIdx >= 0 && savedIdx < sessionChapter.scenes.length) {
-        setSelectedSceneIdx(savedIdx);
-        sessionStorage.setItem("studio_selected_scene_idx", String(savedIdx));
-      }
-
-      if (savedTab) {
-        setActiveTab(savedTab);
-        sessionStorage.setItem("studio_active_tab", savedTab);
-      }
-
+      applySavedUiState(sessionChapter, savedIdx, savedTab, setSelectedSceneIdx, setActiveTab);
       setRestored(true);
       return;
     }
 
+    // Resolve chapter pointer from cloud state
+    const resolvedChapterTitle = cloudState.chapterTitle;
     if (!resolvedChapterTitle) {
       setRestored(true);
       return;
     }
 
+    // Slow path: restore from OPFS
     (async () => {
       try {
         const restoredChapter = await restoreChapterFromLocal({
           storageAvailable: storage,
-          bookId: resolvedBookId,
-          chapterId: resolvedChapterId,
+          bookId: cloudState.bookId,
+          chapterId: cloudState.chapterId,
           chapterTitle: resolvedChapterTitle,
-          bookTitle: resolvedBookTitle,
+          bookTitle: cloudState.bookTitle,
         });
 
         if (restoredChapter) {
           setChapter(restoredChapter);
           saveStudioChapter(restoredChapter);
-
-          if (savedIdx !== null && savedIdx >= 0 && savedIdx < restoredChapter.scenes.length) {
-            setSelectedSceneIdx(savedIdx);
-            sessionStorage.setItem("studio_selected_scene_idx", String(savedIdx));
-          }
-
-          if (savedTab) {
-            setActiveTab(savedTab);
-            sessionStorage.setItem("studio_active_tab", savedTab);
-          }
-          return;
-        }
-
-        if (sourceChapter) {
-          setChapter(sourceChapter);
-          if (savedIdx !== null && savedIdx >= 0 && savedIdx < sourceChapter.scenes.length) {
-            setSelectedSceneIdx(savedIdx);
-            sessionStorage.setItem("studio_selected_scene_idx", String(savedIdx));
-          }
-          if (savedTab) {
-            setActiveTab(savedTab);
-            sessionStorage.setItem("studio_active_tab", savedTab);
-          }
+          applySavedUiState(restoredChapter, savedIdx, savedTab, setSelectedSceneIdx, setActiveTab);
         }
       } catch (err) {
         console.error("[useStudioSession] Failed to restore:", err);
-        if (sourceChapter) {
-          setChapter(sourceChapter);
-        }
       } finally {
         setRestored(true);
       }
     })();
   }, [cloudLoaded, storage]);
 
+  // ── Sync chapter pointer to sessionStorage ────────────────
   useEffect(() => {
     if (!chapter) return;
     saveStudioChapter(chapter);
   }, [chapter]);
 
+  // ── Sync scene index to sessionStorage ────────────────────
   useEffect(() => {
     if (selectedSceneIdx !== null) {
       sessionStorage.setItem("studio_selected_scene_idx", String(selectedSceneIdx));
@@ -196,6 +180,7 @@ export function useStudioSession() {
     }
   }, [selectedSceneIdx]);
 
+  // ── Debounced cloud persistence ───────────────────────────
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const persistToCloud = useCallback(() => {
