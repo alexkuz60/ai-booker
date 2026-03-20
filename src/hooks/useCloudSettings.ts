@@ -69,7 +69,7 @@ export function useCloudSettings<T>(
 
     loadFromDb();
     return () => { cancelled = true; };
-  }, [user?.id, settingKey, cacheKey]);
+  }, [user?.id, settingKey, cacheKey, tsKey]);
 
   /** Immediately persist to DB (no debounce) */
   const flushToDb = useCallback(async (userId: string, newValue: T) => {
