@@ -162,6 +162,7 @@ function SceneCards({
             content: mergedContent,
             content_preview: mergedContent.slice(0, 200),
             char_count: mergedContent.length,
+            dirty: true,
           };
         }
         return { ...sc, scene_number: idx + 1, char_count: (sc.content || '').length };
