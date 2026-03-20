@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { ModelPoolManager, type PoolTask, type PoolStats, logPoolStats } from "@/lib/modelPoolManager";
+import { enrichBodyWithKeys } from "@/lib/invokeWithFallback";
 import { toast } from "sonner";
 
 interface SceneInfo {
@@ -87,12 +88,14 @@ export function BatchSegmentationPanel({
         if (abortRef.current) throw new Error("Aborted");
         updateJob(job.scene.id, { status: "analyzing" });
 
-        const { data, error } = await supabase.functions.invoke("segment-scene", {
-          body: {
+        const baseBody: Record<string, unknown> = {
             scene_id: job.scene.id,
             language: isRu ? "ru" : "en",
             model: modelId,
-          },
+          };
+        const enrichedBody = enrichBodyWithKeys(baseBody, modelId, userApiKeys);
+        const { data, error } = await supabase.functions.invoke("segment-scene", {
+          body: enrichedBody,
         });
         if (error) throw error;
         const count = data?.segments?.length ?? 0;
@@ -137,12 +140,14 @@ export function BatchSegmentationPanel({
         if (!job) break;
         updateJob(job.scene.id, { status: "analyzing" });
         try {
-          const { data, error } = await supabase.functions.invoke("segment-scene", {
-            body: {
+          const baseBody: Record<string, unknown> = {
               scene_id: job.scene.id,
               language: isRu ? "ru" : "en",
               model,
-            },
+            };
+          const enrichedBody = enrichBodyWithKeys(baseBody, model, userApiKeys);
+          const { data, error } = await supabase.functions.invoke("segment-scene", {
+            body: enrichedBody,
           });
           if (error) throw error;
           const count = data?.segments?.length ?? 0;
