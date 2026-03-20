@@ -694,65 +694,23 @@ export function StoryboardPanel({
     toast.success(isRu ? "Аннотация удалена" : "Annotation removed");
   }, [segments, isRu, persist, buildSnapshot]);
 
-  // ─── Character Sync ───────────────────────────────────────
+  // ─── Character Sync (local-only — update typeMappings ref) ──
 
-  const syncSceneCharacters = useCallback(async (updatedSegments: Segment[]) => {
-    if (!sceneId) return;
-    const usedCharIds = new Set<string>();
-
+  const syncTypeMappings = useCallback((updatedSegments: Segment[]) => {
+    // Rebuild typeMappings from current segments + characters
+    const mappings: LocalTypeMappingEntry[] = [];
+    const seen = new Set<string>();
     for (const seg of updatedSegments) {
-      if (seg.speaker) {
+      if (seg.speaker && !seen.has(seg.segment_type)) {
         const charRecord = characters.find(c => c.name === seg.speaker);
-        if (charRecord) usedCharIds.add(charRecord.id);
+        if (charRecord) {
+          mappings.push({ segmentType: seg.segment_type, characterId: charRecord.id, characterName: charRecord.name });
+          seen.add(seg.segment_type);
+        }
       }
     }
-
-    const { data: mappings } = await supabase
-      .from("scene_type_mappings")
-      .select("character_id")
-      .eq("scene_id", sceneId);
-    if (mappings) {
-      for (const m of mappings) usedCharIds.add(m.character_id);
-    }
-
-    const SYSTEM_TYPES: Record<string, string> = {
-      narrator: "рассказчик", epigraph: "рассказчик", lyric: "рассказчик",
-      footnote: "комментатор",
-    };
-    for (const seg of updatedSegments) {
-      const sysName = SYSTEM_TYPES[seg.segment_type];
-      if (sysName) {
-        const sysChar = characters.find(c => c.name.toLowerCase() === sysName);
-        if (sysChar) usedCharIds.add(sysChar.id);
-      }
-    }
-
-    const { data: currentAppearances } = await supabase
-      .from("character_appearances")
-      .select("id, character_id")
-      .eq("scene_id", sceneId);
-
-    if (!currentAppearances) return;
-
-    const staleIds = currentAppearances
-      .filter(a => !usedCharIds.has(a.character_id))
-      .map(a => a.id);
-    if (staleIds.length > 0) {
-      await supabase.from("character_appearances").delete().in("id", staleIds);
-    }
-
-    const existingCharIds = new Set(currentAppearances.map(a => a.character_id));
-    for (const charId of usedCharIds) {
-      if (!existingCharIds.has(charId)) {
-        await supabase.from("character_appearances").upsert(
-          { character_id: charId, scene_id: sceneId, role_in_scene: "speaker", segment_ids: [] },
-          { onConflict: "character_id,scene_id" }
-        );
-      }
-    }
-
-    onSegmented?.(sceneId);
-  }, [sceneId, characters, onSegmented]);
+    typeMappingsRef.current = mappings;
+  }, [characters]);
 
   const PROPAGATE_TYPES = new Set(["narrator", "first_person", "inner_thought", "epigraph", "lyric", "footnote"]);
 
@@ -776,15 +734,6 @@ export function StoryboardPanel({
     );
     setSegments(updatedSegments);
 
-    const { error } = await supabase
-      .from("scene_segments")
-      .update({ segment_type: newType as any })
-      .in("id", affectedIds);
-    if (error) {
-      toast.error(isRu ? "Ошибка сохранения типа" : "Failed to save type");
-      return;
-    }
-
     if (affectedIds.length > 1) {
       const newLabel = isRu ? SEGMENT_CONFIG[newType]?.label_ru : SEGMENT_CONFIG[newType]?.label_en;
       toast.success(
@@ -794,21 +743,10 @@ export function StoryboardPanel({
       );
     }
 
-    if (!sceneId) return;
-
-    if (PROPAGATE_TYPES.has(oldType) && oldType !== newType) {
-      const remainingOfOldType = updatedSegments.filter(s => s.segment_type === oldType);
-      if (remainingOfOldType.length === 0) {
-        await supabase
-          .from("scene_type_mappings")
-          .delete()
-          .eq("scene_id", sceneId)
-          .eq("segment_type", oldType);
-      }
-    }
-
-    await syncSceneCharacters(updatedSegments);
-  }, [isRu, segments, sceneId, characters, syncSceneCharacters]);
+    syncTypeMappings(updatedSegments);
+    persist(buildSnapshot(updatedSegments));
+    onSegmented?.(sceneId!);
+  }, [isRu, segments, sceneId, syncTypeMappings, persist, buildSnapshot, onSegmented]);
 
   const updateSpeaker = useCallback(async (segmentId: string, newSpeaker: string | null) => {
     const targetSeg = segments.find(s => s.segment_id === segmentId);
@@ -824,34 +762,10 @@ export function StoryboardPanel({
     );
     setSegments(updatedSegments);
 
-    const { error } = await supabase
-      .from("scene_segments")
-      .update({ speaker: newSpeaker })
-      .in("id", affectedIds);
+    syncTypeMappings(updatedSegments);
+    persist(buildSnapshot(updatedSegments));
 
-    if (sceneId && shouldPropagate) {
-      const charRecord = newSpeaker ? characters.find(c => c.name === newSpeaker) : null;
-      if (charRecord) {
-        await supabase
-          .from("scene_type_mappings" as any)
-          .upsert(
-            { scene_id: sceneId, segment_type: targetSeg.segment_type, character_id: charRecord.id },
-            { onConflict: "scene_id,segment_type" }
-          );
-      } else {
-        await supabase
-          .from("scene_type_mappings" as any)
-          .delete()
-          .eq("scene_id", sceneId)
-          .eq("segment_type", targetSeg.segment_type);
-      }
-    }
-
-    await syncSceneCharacters(updatedSegments);
-
-    if (error) {
-      toast.error(isRu ? "Ошибка сохранения персонажа" : "Failed to save speaker");
-    } else if (affectedIds.length > 1) {
+    if (affectedIds.length > 1) {
       const typeLabel = isRu
         ? SEGMENT_CONFIG[targetSeg.segment_type]?.label_ru
         : SEGMENT_CONFIG[targetSeg.segment_type]?.label_en;
@@ -861,7 +775,8 @@ export function StoryboardPanel({
           : `"${typeLabel}" → ${newSpeaker || "?"} (${affectedIds.length} seg.)`
       );
     }
-  }, [isRu, segments, sceneId, characters, syncSceneCharacters]);
+    onSegmented?.(sceneId!);
+  }, [isRu, segments, sceneId, syncTypeMappings, persist, buildSnapshot, onSegmented]);
 
   // ─── Synthesis ────────────────────────────────────────────
 
