@@ -118,7 +118,14 @@ export default function Parser() {
     analyzedCount, totalScenes,
     isChapterFullyDone, sendToStudio,
     partGroups, partlessIndices,
-  } = useParserHelpers({ tocEntries, chapterResults, selectedIdx, fileName, bookId: bookId ?? undefined });
+  } = useParserHelpers({
+    tocEntries,
+    chapterResults,
+    selectedIdx,
+    fileName,
+    bookId: bookId ?? undefined,
+    chapterIdMap,
+  });
 
   const localPartsForSave = useMemo(() => {
     const seen = new Set<string>();
