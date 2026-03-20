@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json, Database } from "@/integrations/supabase/types";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
+import { useStoryboardPersistence, type StoryboardSnapshot } from "@/hooks/useStoryboardPersistence";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
 import { Loader2, Sparkles, BookOpen, AudioLines, CheckCircle2, XCircle, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck, AlertTriangle } from "lucide-react";
 import { RoleBadge } from "@/components/ui/RoleBadge";
@@ -24,6 +25,7 @@ import { SEGMENT_CONFIG } from "./storyboard/constants";
 import { EditablePhrase } from "./storyboard/EditablePhrase";
 import { SegmentTypeBadge } from "./storyboard/SegmentTypeBadge";
 import { SpeakerBadge } from "./storyboard/SpeakerBadge";
+import type { LocalTypeMappingEntry } from "@/lib/storyboardSync";
 
 // ─── Main component ─────────────────────────────────────────
 
