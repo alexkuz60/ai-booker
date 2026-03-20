@@ -763,6 +763,73 @@ Deno.serve(async (req) => {
       return false;
     }
 
+    // ── Mood + scene_type → narrator TTS context builder ───────────────
+    // Mirrors buildSceneTtsContext from psychotypeVoicePresets.ts (server-side copy)
+    const MOOD_INSTRUCTIONS: Record<string, { rate: number; role?: string; ru: string; en: string }> = {
+      tense:      { rate: 1.05, ru: "Напряжённо, тревожно", en: "Tense, anxious" },
+      action:     { rate: 1.10, ru: "Динамично, энергично", en: "Dynamic, energetic" },
+      suspense:   { rate: 0.95, ru: "С нагнетанием, паузы", en: "Building tension, pauses" },
+      calm:       { rate: 0.95, ru: "Спокойно, размеренно", en: "Calm, measured" },
+      reflective: { rate: 0.90, ru: "Задумчиво, с паузами", en: "Thoughtful, with pauses" },
+      nostalgic:  { rate: 0.90, role: "good", ru: "С теплотой и ностальгией", en: "With warmth and nostalgia" },
+      sad:        { rate: 0.90, ru: "Грустно, тихо", en: "Sad, quiet" },
+      joyful:     { rate: 1.05, role: "good", ru: "Радостно, бодро", en: "Joyful, cheerful" },
+      romantic:   { rate: 0.95, ru: "Нежно, интимно", en: "Tender, intimate" },
+      angry:      { rate: 1.05, role: "evil", ru: "Резко, жёстко", en: "Sharp, harsh" },
+      dark:       { rate: 0.95, role: "evil", ru: "Мрачно, зловеще", en: "Dark, ominous" },
+      mysterious: { rate: 0.90, ru: "Загадочно, с интригой", en: "Mysterious, intriguing" },
+      epic:       { rate: 0.95, ru: "Эпично, торжественно", en: "Epic, solemn" },
+      ironic:     { rate: 1.0,  ru: "С иронией", en: "With irony" },
+      dramatic:   { rate: 0.95, ru: "Драматично", en: "Dramatic" },
+      humorous:   { rate: 1.05, role: "good", ru: "С юмором, легко", en: "Humorous, light" },
+      horror:     { rate: 0.90, role: "evil", ru: "Пугающе, шёпотом", en: "Frightening, whispered" },
+    };
+
+    const SEGMENT_MODIFIERS: Record<string, { rate: number; ru: string; en: string }> = {
+      inner_thought: { rate: 0.90, ru: "Тихо, задумчиво", en: "Quiet, contemplative" },
+      monologue:     { rate: 0.95, ru: "Как внутренний монолог", en: "As inner monologue" },
+      lyric:         { rate: 0.85, ru: "Певуче, ритмично", en: "Melodic, rhythmic" },
+      epigraph:      { rate: 0.90, ru: "Возвышенно", en: "Elevated" },
+      footnote:      { rate: 1.05, ru: "Быстро, информативно", en: "Quick, informative" },
+    };
+
+    /** Narrator-type segments that should receive mood-based instructions */
+    const NARRATOR_SEGMENT_TYPES = new Set(["narrator", "first_person", "epigraph", "lyric", "inner_thought", "monologue", "footnote"]);
+
+    function getSceneTtsContext(segmentType: string): {
+      rateMultiplier: number;
+      roleHint?: string;
+      instructionText: string;
+    } {
+      const parts: string[] = [];
+      let rate = 1.0;
+      let roleHint: string | undefined;
+
+      // Segment type modifier
+      const segMod = SEGMENT_MODIFIERS[segmentType];
+      if (segMod) {
+        rate *= segMod.rate;
+        parts.push(isRu ? segMod.ru : segMod.en);
+      }
+
+      // Scene mood modifier (only for narrator-like segments)
+      if (NARRATOR_SEGMENT_TYPES.has(segmentType) && sceneMood) {
+        const moodKey = sceneMood.toLowerCase().replace(/\s+/g, "_");
+        const moodPreset = MOOD_INSTRUCTIONS[moodKey];
+        if (moodPreset) {
+          rate *= moodPreset.rate;
+          if (moodPreset.role) roleHint = moodPreset.role;
+          parts.push(isRu ? moodPreset.ru : moodPreset.en);
+        }
+      }
+
+      return {
+        rateMultiplier: Math.round(rate * 1000) / 1000,
+        roleHint,
+        instructionText: parts.join(". "),
+      };
+    }
+
     // Build segment texts (plain) and annotated versions
     const segmentTexts = segments.map(seg => {
       return (phrasesBySegment.get(seg.id) ?? []).map(p => p.text).join(" ");
