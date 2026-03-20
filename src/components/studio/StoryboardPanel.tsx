@@ -569,6 +569,14 @@ export function StoryboardPanel({
   const runAnalysis = useCallback(async () => {
     if (!sceneId || !sceneContent) return;
     setAnalyzing(true);
+
+    // ── Clear stale segments before re-analysis ──
+    setSegments([]);
+    setAudioStatus(new Map());
+    setInlineNarrationSegIds(new Set());
+    setStaleAudioSegIds(new Set());
+    setMergeChecked(new Set());
+
     try {
       const { data, error } = await invokeWithFallback({
         functionName: "segment-scene",
@@ -578,16 +586,23 @@ export function StoryboardPanel({
       });
       if (error) throw error;
       const result = data as any;
-      setSegments(result.segments || []);
+      const newSegments = result.segments || [];
+      setSegments(newSegments);
+      // Reload from DB to get full phrase/metadata state
+      if (newSegments.length > 0) {
+        await loadSegments(sceneId);
+      }
       onSegmented?.(sceneId);
       toast.success(isRu ? "Раскадровка готова" : "Storyboard ready");
     } catch (err: any) {
       const msg = err?.message || err?.context?.body || String(err);
       console.error("Segmentation failed:", msg, err);
       toast.error(`${isRu ? "Ошибка анализа" : "Analysis failed"}: ${msg}`);
+      // Reload whatever is in DB after failed analysis
+      await loadSegments(sceneId);
     }
     setAnalyzing(false);
-  }, [sceneId, sceneContent, isRu, onSegmented]);
+  }, [sceneId, sceneContent, isRu, onSegmented, loadSegments]);
 
   // Auto-trigger analysis when scene has no segments and content is available
   useEffect(() => {
