@@ -160,9 +160,10 @@ const Studio = () => {
 
       if (needIds) {
         const chapterIds = dbChapters.map(c => c.id);
+        // LOCAL-FIRST: fetch only IDs for mapping, never content
         const { data: dbScenes } = await supabase
           .from("book_scenes")
-          .select("id, chapter_id, scene_number, content")
+          .select("id, chapter_id, scene_number")
           .in("chapter_id", chapterIds)
           .order("scene_number");
         if (!dbScenes?.length) return;
