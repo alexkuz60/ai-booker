@@ -357,13 +357,15 @@ const Studio = () => {
   }, [chapter?.scenes.map(s => s.id).join(","), bookId, clipsRefreshToken]);
 
   // LOCAL-FIRST: selected scene text always comes from OPFS, never from browser storage.
+  // К3+К4: scene text comes ONLY from OPFS — no fallback to in-memory chapter or DB.
   useEffect(() => {
     let cancelled = false;
-
     setSceneContent(null);
 
+    if (!selectedScene) return;
+
     (async () => {
-      if (storage && selectedScene) {
+      if (storage) {
         const localScene = await readSceneContentFromLocal(storage, {
           sceneId: selectedScene.id,
           chapterId: chapter?.chapterId,
@@ -374,11 +376,9 @@ const Studio = () => {
         if (!cancelled && localScene?.content) {
           setSceneContent(localScene.content);
         }
-      } else if (selectedScene?.content && !cancelled) {
-        setSceneContent(selectedScene.content);
       }
 
-      if (!selectedScene?.id) return;
+      if (!selectedScene.id) return;
 
       const { data } = await supabase
         .from("book_scenes")
@@ -391,10 +391,8 @@ const Studio = () => {
       }
     })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [storage, chapter?.chapterId, selectedScene?.id, selectedScene?.scene_number, selectedScene?.title, selectedScene?.content]);
+    return () => { cancelled = true; };
+  }, [storage, chapter?.chapterId, selectedScene?.id, selectedScene?.scene_number, selectedScene?.title]);
 
   // Save silenceSec when changed
   const handleSilenceSecChange = useCallback(async (sec: number) => {

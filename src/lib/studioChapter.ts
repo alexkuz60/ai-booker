@@ -27,19 +27,14 @@ const STUDIO_CHAPTER_KEY = "studio-active-chapter";
  * К4: content and content_preview are ALWAYS stripped — OPFS is the only source.
  */
 export function saveStudioChapter(chapter: StudioChapter) {
+  // К4: strip all text content — only pointers (IDs, indices, titles) go to sessionStorage.
   const light: StudioChapter = {
     ...chapter,
     scenes: chapter.scenes.map(({ content, content_preview, ...rest }) => rest),
   };
   try {
     sessionStorage.setItem(STUDIO_CHAPTER_KEY, JSON.stringify(light));
-  } catch {
-    // Still too large — save minimal
-    sessionStorage.removeItem(STUDIO_CHAPTER_KEY);
-    try {
-      sessionStorage.setItem(STUDIO_CHAPTER_KEY, JSON.stringify(light));
-    } catch { /* give up */ }
-  }
+  } catch { /* payload is small (no content), ignore */ }
 }
 
 export function loadStudioChapter(): StudioChapter | null {
