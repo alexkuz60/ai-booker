@@ -1,4 +1,5 @@
 // Shared types and helpers for transferring a chapter from Parser → Studio
+// К4: NEVER store scene text content in sessionStorage — only pointers.
 
 export interface StudioScene {
   id?: string; // DB id from book_scenes
@@ -21,14 +22,11 @@ export interface StudioChapter {
 
 const STUDIO_CHAPTER_KEY = "studio-active-chapter";
 
+/**
+ * Save chapter pointer to sessionStorage.
+ * К4: content and content_preview are ALWAYS stripped — OPFS is the only source.
+ */
 export function saveStudioChapter(chapter: StudioChapter) {
-  const json = JSON.stringify(chapter);
-  try {
-    sessionStorage.setItem(STUDIO_CHAPTER_KEY, json);
-    return;
-  } catch {
-    // sessionStorage full — strip content and retry
-  }
   const light: StudioChapter = {
     ...chapter,
     scenes: chapter.scenes.map(({ content, content_preview, ...rest }) => rest),
@@ -36,9 +34,11 @@ export function saveStudioChapter(chapter: StudioChapter) {
   try {
     sessionStorage.setItem(STUDIO_CHAPTER_KEY, JSON.stringify(light));
   } catch {
-    // still too large — clear and save minimal
+    // Still too large — save minimal
     sessionStorage.removeItem(STUDIO_CHAPTER_KEY);
-    sessionStorage.setItem(STUDIO_CHAPTER_KEY, JSON.stringify(light));
+    try {
+      sessionStorage.setItem(STUDIO_CHAPTER_KEY, JSON.stringify(light));
+    } catch { /* give up */ }
   }
 }
 

@@ -36,6 +36,7 @@ import { useLibrary } from "@/hooks/useLibrary";
 import { useFileUpload } from "@/hooks/useFileUpload";
 import { useBookRestore } from "@/hooks/useBookRestore";
 import { useServerSync } from "@/hooks/useServerSync";
+import { clearChapterTextsCache } from "@/lib/chapterTextsCache";
 
 interface UseBookManagerParams {
   userId: string | undefined;
@@ -211,8 +212,7 @@ export function useBookManager({
         await Promise.all(allProjects.map((name) => OPFSStorage.deleteProject(name)));
       }
       sessionStorage.removeItem(ACTIVE_BOOK_KEY);
-      sessionStorage.removeItem("docx_chapter_texts");
-      sessionStorage.removeItem("docx_html");
+      clearChapterTextsCache();
       setStep("library");
       setBookId(null);
       await library.loadLibrary();
@@ -227,9 +227,8 @@ export function useBookManager({
   const reloadBook = useCallback(async () => {
     if (!bookId) return;
     try {
-      // Clear DOCX session data
-      sessionStorage.removeItem("docx_chapter_texts");
-      sessionStorage.removeItem("docx_html");
+      // К4: clear in-memory docx cache
+      clearChapterTextsCache();
 
       // Clean up local OPFS structure only (keep project.json and source/)
       if (storageBackend === "opfs") {

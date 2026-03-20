@@ -15,8 +15,7 @@ const LOCAL_RESET_KEYS = [
   LAST_PROJECT_KEY,
   "parser-active-book",
   "parser-nav-state",
-  "docx_chapter_texts",
-  "docx_html",
+  // К4: docx_chapter_texts and docx_html removed — now in-memory only
 ];
 
 interface UseProjectStorageReturn {

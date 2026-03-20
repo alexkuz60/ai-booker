@@ -4,6 +4,8 @@
  * IDs are generated locally via crypto.randomUUID().
  */
 
+import { setChapterTextsCache, setDocxHtmlCache, clearChapterTextsCache, getChapterTextFromCache } from "@/lib/chapterTextsCache";
+
 import { useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import {
@@ -93,9 +95,8 @@ export function useFileUpload({
       return;
     }
 
-    // Clear stale session/runtime data from previous uploads to prevent cross-book contamination
-    sessionStorage.removeItem("docx_chapter_texts");
-    sessionStorage.removeItem("docx_html");
+    // К4: Clear stale runtime data from previous uploads to prevent cross-book contamination
+    clearChapterTextsCache();
     sessionStorage.removeItem(ACTIVE_BOOK_KEY);
 
     setBookId(null);
@@ -144,10 +145,9 @@ export function useFileUpload({
           }];
         }
 
-        sessionStorage.setItem("docx_chapter_texts", JSON.stringify(
-          Array.from(extractResult.chapterTexts.entries())
-        ));
-        sessionStorage.setItem("docx_html", extractResult.html);
+        // К4: store in memory only, never in sessionStorage
+        setChapterTextsCache(extractResult.chapterTexts);
+        setDocxHtmlCache(extractResult.html);
       } else {
         const { outline, pdf } = await extractOutline(f);
         setPdfRef(pdf);
@@ -224,20 +224,14 @@ export function useFileUpload({
 
       // For DOCX/FB2: pre-mark chapters with no/minimal content as done
       if (isDocx || isFb2) {
-        try {
-          const raw = sessionStorage.getItem("docx_chapter_texts");
-          if (raw) {
-            const entries: [number, string][] = JSON.parse(raw);
-            const chapterTextMap = new Map(entries);
-            for (let i = 0; i < chapters.length; i++) {
-              const html = chapterTextMap.get(i) || "";
-              const plain = html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
-              if (plain.length < 50) {
-                initRawMap.set(i, { scenes: [], status: "done" });
-              }
-            }
+        // К4: read from in-memory cache, not sessionStorage
+        for (let i = 0; i < chapters.length; i++) {
+          const html = getChapterTextFromCache(i) || "";
+          const plain = html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+          if (plain.length < 50) {
+            initRawMap.set(i, { scenes: [], status: "done" });
           }
-        } catch {}
+        }
       }
 
       const initMap = sanitizeChapterResultsForStructure(chapters, initRawMap);

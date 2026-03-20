@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { getChapterTextFromCache, setChapterTextsCache, hasChapterTextsCache } from "@/lib/chapterTextsCache";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
@@ -172,18 +173,9 @@ export function useChapterAnalysis({
   // ─── Two-stage Chapter Analysis (with resume) ─────────────
   const isFolder = (idx: number): boolean => isFolderNode(tocEntries, idx);
 
-  /** Try to get chapter text from sessionStorage cache */
-  const getChapterTextFromCache = (chapterIdx: number): string | null => {
-    try {
-      const raw = sessionStorage.getItem("docx_chapter_texts");
-      if (!raw) return null;
-      const entries: [number, string][] = JSON.parse(raw);
-      const found = entries.find(([k]) => k === chapterIdx);
-      return found ? found[1] : null;
-    } catch { return null; }
-  };
+  // К4: getChapterTextFromCache imported from chapterTextsCache module
 
-  /** Re-extract chapter texts from OPFS source file and populate sessionStorage cache */
+  /** Re-extract chapter texts from OPFS source file and populate in-memory cache */
   const reExtractChapterTexts = async (): Promise<boolean> => {
     if (!projectStorage) return false;
     const fmt = fileFormat || "docx";
@@ -200,9 +192,8 @@ export function useChapterAnalysis({
         const result = await extractFromDocx(file);
         chapterTexts = result.chapterTexts;
       }
-      sessionStorage.setItem("docx_chapter_texts", JSON.stringify(
-        Array.from(chapterTexts.entries())
-      ));
+      // К4: store in memory only, never in sessionStorage
+      setChapterTextsCache(chapterTexts);
       return true;
     } catch (err) {
       console.warn("[ChapterAnalysis] Failed to re-extract chapter texts:", err);
@@ -213,7 +204,7 @@ export function useChapterAnalysis({
   // B4/B7 fix: text-first mode for DOCX and FB2 (no PDF rendering needed)
   const isTextMode = (): boolean => {
     if (fileFormat === "docx" || fileFormat === "fb2") return true;
-    return sessionStorage.getItem("docx_chapter_texts") !== null;
+    return hasChapterTextsCache();
   };
 
   const analyzeChapter = async (idx: number, mode: "full" | "enrich" | "auto" = "auto") => {

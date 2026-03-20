@@ -206,6 +206,17 @@ PDF outline содержит контейнерные узлы (например
 1. Edge Functions (segment-scene, synthesize-scene) — пишут результат анализа/синтеза
 2. Кнопка «На сервер» (`pushToDb`) — ручной экспорт пользователем
 
+#### К4. 🚫 ЗАПРЕТ: текстовый контент в sessionStorage/localStorage
+
+**НИКОГДА** не хранить текст книги (контент сцен, HTML глав, chapterTexts) в `sessionStorage` или `localStorage`.  
+В session/local storage допустимы **только указатели**: `bookId`, `chapterId`, `sceneId`, `scene_number`, индексы, настройки UI.
+
+**Почему:** sessionStorage ограничен ~5МБ, неизбежно обрезает данные; при восстановлении сессии берётся «мусорный» усечённый текст вместо полного контента из OPFS.
+
+**Решение:** для временного кеша (напр. DOCX chapterTexts) — module-level `Map` в `src/lib/chapterTextsCache.ts`. При cache miss — перечитать из OPFS (`reExtractChapterTexts`).
+
+**Файл:** `src/lib/studioChapter.ts` — `saveStudioChapter()` всегда strip-ит `content`/`content_preview` перед записью в sessionStorage.
+
 ### 1.12 Правила целостности библиотеки (Library Integrity Rules)
 
 > Дата добавления: 2026-03-18. Эти инварианты должны соблюдаться ВСЕМИ операциями с книгами.
