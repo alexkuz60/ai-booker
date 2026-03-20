@@ -19,6 +19,8 @@ interface ProfileResult {
   temperament: string;
   speech_style: string;
   description: string;
+  speech_tags?: string[];
+  psycho_tags?: string[];
 }
 
 function extractBalancedJson(text: string, start: number): string | null {
