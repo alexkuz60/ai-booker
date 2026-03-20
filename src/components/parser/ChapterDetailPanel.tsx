@@ -272,7 +272,7 @@ function SceneCards({
         return (
           <ContextMenu key={`${sc.scene_number}-${i}`}>
             <ContextMenuTrigger asChild>
-              <Card onContextMenu={handleContextMenu} className={`${isEdited ? "border-primary/40" : ""} ${mergeMode && mergeChecked.has(i) ? "ring-2 ring-primary/50" : ""}`}>
+              <Card onContextMenu={handleContextMenu} className={`${isEdited ? "border-primary/40" : ""} ${mergeChecked.has(i) ? "ring-2 ring-primary/50" : ""}`}>
                 <CardContent className="py-3 px-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-base font-medium flex items-center gap-1.5">
