@@ -434,7 +434,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       await loadCharacters();
     } catch (e) {
       console.error("Profiling error:", e);
-      toast.error(e instanceof Error ? e.message : (isRu ? "Ошибка профайлинга" : "Profiling error"));
+      toast.error(e instanceof Error ? e.message : (isRu ? "Ошибка профайлинга" : "Profiling error"), { duration: Infinity, style: { background: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', border: '1px solid', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' } });
     } finally {
       setProfiling(false);
     }
