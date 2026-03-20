@@ -140,12 +140,14 @@ export function BatchSegmentationPanel({
         if (!job) break;
         updateJob(job.scene.id, { status: "analyzing" });
         try {
-          const { data, error } = await supabase.functions.invoke("segment-scene", {
-            body: {
+          const baseBody: Record<string, unknown> = {
               scene_id: job.scene.id,
               language: isRu ? "ru" : "en",
               model,
-            },
+            };
+          const enrichedBody = enrichBodyWithKeys(baseBody, model, userApiKeys);
+          const { data, error } = await supabase.functions.invoke("segment-scene", {
+            body: enrichedBody,
           });
           if (error) throw error;
           const count = data?.segments?.length ?? 0;
