@@ -173,15 +173,9 @@ export function useChapterAnalysis({
   // ─── Two-stage Chapter Analysis (with resume) ─────────────
   const isFolder = (idx: number): boolean => isFolderNode(tocEntries, idx);
 
-  /** Try to get chapter text from sessionStorage cache */
-  const getChapterTextFromCache = (chapterIdx: number): string | null => {
-    try {
-      const raw = sessionStorage.getItem("docx_chapter_texts");
-      if (!raw) return null;
-      const entries: [number, string][] = JSON.parse(raw);
-      const found = entries.find(([k]) => k === chapterIdx);
-      return found ? found[1] : null;
-    } catch { return null; }
+  /** Try to get chapter text from in-memory cache (К4: no sessionStorage) */
+  const getChapterTextCached = (chapterIdx: number): string | null => {
+    return getChapterTextFromCache(chapterIdx);
   };
 
   /** Re-extract chapter texts from OPFS source file and populate sessionStorage cache */
