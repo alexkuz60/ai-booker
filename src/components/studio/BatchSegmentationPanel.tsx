@@ -11,7 +11,7 @@ import { ModelPoolManager, type PoolTask, type PoolStats, logPoolStats } from "@
 import { enrichBodyWithKeys } from "@/lib/invokeWithFallback";
 import { toast } from "sonner";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
-import type { LocalChapterData } from "@/lib/localSync";
+import { readSceneContentFromLocal } from "@/lib/localSceneContent";
 
 interface SceneInfo {
   id: string;
@@ -80,31 +80,23 @@ export function BatchSegmentationPanel({
   }, []);
 
   // OPFS-ONLY: always read authoritative content from local project storage.
-  // Never trust in-memory scene.content (may be stale from sessionStorage).
-  // Never fall back to DB — if OPFS is missing, it's a real error.
+  // Never trust in-memory scene.content/session state. Never fall back to DB.
   const resolveFreshSceneContent = useCallback(async (scene: SceneInfo) => {
-    if (storage) {
-      try {
-        const sceneFiles = await storage.listDir("scenes");
-        for (const file of sceneFiles) {
-          if (!file.startsWith("chapter_") || !file.endsWith(".json")) continue;
-          const localChapter = await storage.readJSON<LocalChapterData>(`scenes/${file}`);
-          const localScene = localChapter?.scenes?.find((item) => item.id === scene.id);
-          if (localScene?.content) {
-            return localScene.content;
-          }
-          if (localScene?.content_preview) {
-            return localScene.content_preview;
-          }
-        }
-      } catch (err) {
-        console.warn("[BatchSegmentationPanel] Failed to read local scene content:", err);
-      }
+    if (!storage) {
+      throw new Error(isRu ? "Локальный проект не открыт" : "Local project is not open");
     }
 
-    // Last resort: use whatever was passed in props (e.g. OPFS not open)
-    return scene.content ?? undefined;
-  }, [storage]);
+    const localScene = await readSceneContentFromLocal(storage, scene.id);
+    if (!localScene?.content) {
+      throw new Error(
+        isRu
+          ? `Сцена #${scene.sceneNumber} не найдена в локальном проекте`
+          : `Scene #${scene.sceneNumber} was not found in the local project`,
+      );
+    }
+
+    return localScene.content;
+  }, [storage, isRu]);
 
   // ── Pool-based batch ──────────────────────────────────────────────────
 
