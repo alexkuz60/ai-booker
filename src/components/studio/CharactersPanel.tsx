@@ -34,6 +34,8 @@ interface BookCharacter {
   };
   color: string | null;
   sort_order: number;
+  speech_tags: string[];
+  psycho_tags: string[];
 }
 
 const GENDER_LABELS: Record<string, { ru: string; en: string }> = {
@@ -160,8 +162,9 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [casting, setCasting] = useState(false);
 
   // Filter: "all" or "scene"
-  const [filterMode, setFilterMode] = useState<"all" | "scene">("all");
+  const [filterMode, setFilterMode] = useState<"all" | "scene" | "chapter">("chapter");
   const [sceneCharIds, setSceneCharIds] = useState<Set<string>>(new Set());
+  const [chapterCharIds, setChapterCharIds] = useState<Set<string>>(new Set());
 
   // Sync with external selectedCharacterId
   useEffect(() => {
@@ -240,7 +243,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
   // ── Load characters from DB ─────────────────────────────
   const loadCharacters = useCallback(async () => {
-    if (!bookId) { setCharacters([]); setSceneCharIds(new Set()); setSegmentCounts(new Map()); return; }
+    if (!bookId) { setCharacters([]); setSceneCharIds(new Set()); setChapterCharIds(new Set()); setSegmentCounts(new Map()); return; }
     setLoading(true);
     try {
       let { data, error } = await supabase
@@ -277,6 +280,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       }
       setSegmentCounts(counts);
 
+      // Scene-level character IDs
       let scIds = new Set<string>();
       if (sceneId && data && data.length > 0) {
         const { data: appearances } = await supabase
@@ -284,21 +288,50 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
           .select("character_id")
           .eq("scene_id", sceneId);
         scIds = new Set(appearances?.map(a => a.character_id) || []);
+      }
+      setSceneCharIds(scIds);
+
+      // Chapter-level character IDs (all scenes in this chapter)
+      let chIds = new Set<string>();
+      if (chapterSceneIds && chapterSceneIds.length > 0 && data && data.length > 0) {
+        for (let i = 0; i < chapterSceneIds.length; i += 200) {
+          const batch = chapterSceneIds.slice(i, i + 200);
+          const { data: apps } = await supabase
+            .from("character_appearances")
+            .select("character_id")
+            .in("scene_id", batch);
+          if (apps) {
+            for (const a of apps) chIds.add(a.character_id);
+          }
+        }
+      }
+      setChapterCharIds(chIds);
+
+      if (scIds.size > 0 && data) {
         const sorted = [
           ...data.filter(c => scIds.has(c.id)),
           ...data.filter(c => !scIds.has(c.id)),
         ];
-        setCharacters(sorted.map(c => ({ ...c, voice_config: (c.voice_config as BookCharacter["voice_config"]) || {} })));
+        setCharacters(sorted.map(c => ({
+          ...c,
+          voice_config: (c.voice_config as BookCharacter["voice_config"]) || {},
+          speech_tags: (c as any).speech_tags || [],
+          psycho_tags: (c as any).psycho_tags || [],
+        })));
       } else {
-        setCharacters((data || []).map(c => ({ ...c, voice_config: (c.voice_config as BookCharacter["voice_config"]) || {} })));
+        setCharacters((data || []).map(c => ({
+          ...c,
+          voice_config: (c.voice_config as BookCharacter["voice_config"]) || {},
+          speech_tags: (c as any).speech_tags || [],
+          psycho_tags: (c as any).psycho_tags || [],
+        })));
       }
-      setSceneCharIds(scIds);
     } catch (e) {
       console.error("Load characters error:", e);
     } finally {
       setLoading(false);
     }
-  }, [bookId, sceneId]);
+  }, [bookId, sceneId, chapterSceneIds]);
 
   useEffect(() => { loadCharacters(); }, [loadCharacters]);
 
@@ -313,6 +346,9 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     if (filterMode === "scene" && sceneId) {
       const sceneChars = characters.filter(c => sceneCharIds.has(c.id));
       list = sceneChars.length > 0 ? sceneChars : characters.filter(c => SYSTEM_NAMES.has(c.name));
+    } else if (filterMode === "chapter") {
+      const chapterChars = characters.filter(c => chapterCharIds.has(c.id) || SYSTEM_NAMES.has(c.name));
+      list = chapterChars.length > 0 ? chapterChars : characters;
     } else {
       list = characters;
     }
@@ -324,7 +360,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       if (aSys && bSys) return a.sort_order - b.sort_order;
       return a.name.localeCompare(b.name);
     });
-  }, [characters, filterMode, sceneCharIds, sceneId, SYSTEM_NAMES]);
+  }, [characters, filterMode, sceneCharIds, chapterCharIds, sceneId, SYSTEM_NAMES]);
 
   // ── Sync voice settings when character selected (for auto-cast only) ─────────
   useEffect(() => {
@@ -774,19 +810,28 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
               <RoleBadge roleId="director" model={getModelForRole("director")} isRu={isRu} size={13} />
             </span>
             <div className="flex items-center gap-1">
-              {/* Filter toggle */}
-              {sceneId && (
-                <Button
-                  variant={filterMode === "scene" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={() => setFilterMode(prev => prev === "all" ? "scene" : "all")}
-                  title={filterMode === "all"
-                    ? (isRu ? "Только из сцены" : "Scene only")
-                    : (isRu ? "Все персонажи" : "All characters")}
-                >
-                  <Filter className={`h-3 w-3 ${filterMode === "scene" ? "text-primary" : ""}`} />
-                </Button>
+              {/* Filter toggle: chapter → scene → all → chapter */}
+              <Button
+                variant={filterMode !== "all" ? "secondary" : "ghost"}
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setFilterMode(prev =>
+                  prev === "chapter" ? (sceneId ? "scene" : "all")
+                    : prev === "scene" ? "all"
+                    : "chapter"
+                )}
+                title={filterMode === "chapter"
+                  ? (isRu ? "Фильтр: глава" : "Filter: chapter")
+                  : filterMode === "scene"
+                    ? (isRu ? "Фильтр: сцена" : "Filter: scene")
+                    : (isRu ? "Фильтр: все" : "Filter: all")}
+              >
+                <Filter className={`h-3 w-3 ${filterMode !== "all" ? "text-primary" : ""}`} />
+              </Button>
+              {filterMode !== "all" && (
+                <span className="text-[9px] text-primary font-medium">
+                  {filterMode === "chapter" ? (isRu ? "гл." : "ch.") : (isRu ? "сц." : "sc.")}
+                </span>
               )}
               {/* Extras toggle for selected character */}
               {selectedId && !multiSelect && (
@@ -919,7 +964,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                       {ch.voice_config?.voice_id && <Volume2 className="h-3 w-3 text-primary/60" />}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                     {ch.gender !== "unknown" && (
                       <span className="text-[10px] text-muted-foreground/60">
                         {ch.gender === "female" ? "♀" : "♂"}
@@ -928,6 +973,11 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                     {ch.temperament && (
                       <span className="text-[10px] text-muted-foreground/50 truncate">
                         {TEMPERAMENT_LABELS[ch.temperament]?.[isRu ? "ru" : "en"] ?? ch.temperament}
+                      </span>
+                    )}
+                    {(ch.psycho_tags?.length > 0 || ch.speech_tags?.length > 0) && (
+                      <span className="text-[10px] text-violet-400/70" title={[...(ch.psycho_tags || []), ...(ch.speech_tags || [])].join(", ")}>
+                        🎭{(ch.psycho_tags?.length ?? 0) + (ch.speech_tags?.length ?? 0)}
                       </span>
                     )}
                   </div>
@@ -1131,6 +1181,39 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                         </PopoverContent>
                       </Popover>
                     </div>
+                    {/* Speech & Psycho tags */}
+                    {(selectedChar.speech_tags?.length > 0 || selectedChar.psycho_tags?.length > 0) && (
+                      <div className="mt-3 space-y-2">
+                        {selectedChar.speech_tags?.length > 0 && (
+                          <div>
+                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                              {isRu ? "Манера речи" : "Speech manner"}
+                            </span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {selectedChar.speech_tags.map((tag, i) => (
+                                <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 border-sky-500/40 text-sky-400">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {selectedChar.psycho_tags?.length > 0 && (
+                          <div>
+                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                              {isRu ? "Психотип" : "Psychotype"}
+                            </span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {selectedChar.psycho_tags.map((tag, i) => (
+                                <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 border-violet-500/40 text-violet-400">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {selectedChar.speech_style && (
                       <div className="mt-2">
                         <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">

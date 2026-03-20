@@ -43,12 +43,12 @@
 - [ ] **Расширить промпт профайлера** — добавить `accentuation` (акцентуация по Леонгарду: гипертим/шизоид/истероид/эпилептоид/депрессив/тревожный/эмотивный/циклоид/застревающий/демонстративный) и `archetype` (тембровый архетип: Мудрец/Герой/Опекун/Трикстер/Любовник/Бунтарь) для автоматического маппинга на голоса TTS-провайдеров
 
 ### Фаза 2 — Студия / Персонажи + Кастинг
-- [ ] **Фильтр по умолчанию = chapter** — CharactersPanel: дефолт `filterMode="chapter"`, toggle «Сцена»/«Глава»/«Все»
-- [ ] **Бейджи speech_tags/psycho_tags** — отображение рядом с temperament в карточке персонажа
+- [x] **Фильтр по умолчанию = chapter** — CharactersPanel: дефолт `filterMode="chapter"`, toggle «Сцена»/«Глава»/«Все»
+- [x] **Бейджи speech_tags/psycho_tags** — отображение рядом с temperament в карточке персонажа + 🎭 счётчик в списке
 - [ ] **Scene-level профайлинг** — кнопка «Уточнить речь» для выбранного персонажа → AI дообогащает `scene_segments.metadata.speech_context` с учётом психотипа + контекста сцены, НЕ перезаписывая глобальный профиль
-- [ ] **Психотип → TTS-пресет** — конфиг `src/config/psychotypeVoicePresets.ts`: маппинг `{ accentuation, archetype, provider }` → конкретные настройки провайдера (Yandex: voice+emotion+SSML prosody, SaluteSpeech: voice+prosody, OpenAI/ProxyAPI: voice+instructions, ElevenLabs: stability/similarity/style). См. PSYCHOTYPE_TTS_ANALYTICS.md
-- [ ] **Авто-кастинг с альтернативами** — AI предлагает 2-3 голоса-кандидата для персонажа на основе psycho_tags/accentuation/archetype, пользователь делает финальный выбор
-- [ ] **Матрица «segment_type → TTS mode»** — дифференцированные настройки: dialogue=полная эмоциональность, inner_thought=тише+медленнее+«близкий микрофон», narrator=нейтральная подача, lyric=певучий ритм
+- [x] **Психотип → TTS-пресет** — конфиг `src/config/psychotypeVoicePresets.ts`: маппинг `{ accentuation, archetype, provider }` → конкретные настройки провайдера + матрица segment_type → TTS mode
+- [x] **Авто-кастинг с альтернативами** — `suggestVoiceCandidates()` в psychotypeVoicePresets.ts предлагает 2-3 голоса-кандидата на основе psycho_tags/accentuation/archetype
+- [x] **Матрица «segment_type → TTS mode»** — `SEGMENT_TYPE_TTS_MODIFIERS` в psychotypeVoicePresets.ts: dialogue=полная эмоциональность, inner_thought=тише+медленнее, narrator=нейтрально, lyric=певуче
 
 ### Фаза 3 — Инструкции Рассказчику
 - [ ] **Теги сцены → инструкции** — при открытии сцены `book_scenes.mood + scene_type` конвертируются в TTS-инструкции (темп, тональность) и показываются в карточке Рассказчика
