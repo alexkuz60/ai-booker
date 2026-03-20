@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { logAiUsage } from "../_shared/logAiUsage.ts";
+import { resolveAiEndpoint, extractProviderFields } from "../_shared/providerRouting.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
