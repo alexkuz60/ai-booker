@@ -301,24 +301,28 @@ const Studio = () => {
     })();
   }, [chapter?.scenes.map(s => s.id).join(","), bookId, clipsRefreshToken]);
 
-  // Load scene content and silenceSec: prefer in-memory, fallback to DB
-  // Load scene content: always prefer DB content over stale session content
+  // Load scene content and silenceSec: local-first, DB only as fallback when local content is absent
   useEffect(() => {
     setSceneContent(null);
     if (!selectedScene) return;
-    // Show in-memory content immediately as placeholder
+
     if (selectedScene.content) {
       setSceneContent(selectedScene.content);
     }
+
     if (!selectedScene.id) return;
+
     (async () => {
-      const { data } = await supabase
+      const needsContentFallback = !selectedScene.content;
+      const query = supabase
         .from("book_scenes")
-        .select("content, silence_sec")
+        .select(needsContentFallback ? "content, silence_sec" : "silence_sec")
         .eq("id", selectedScene.id)
         .maybeSingle();
-      // Always prefer DB content when available (session may be stale)
-      if (data?.content !== undefined) {
+
+      const { data } = await query;
+
+      if (needsContentFallback && data && "content" in data && data.content !== undefined) {
         setSceneContent(data.content);
         setChapter((prev) => {
           if (!prev) return prev;
@@ -336,9 +340,10 @@ const Studio = () => {
           };
         });
       }
+
       if (data?.silence_sec !== undefined) setSilenceSec(data.silence_sec);
     })();
-  }, [selectedScene?.id, setChapter]);
+  }, [selectedScene?.id, selectedScene?.content, setChapter]);
 
   // Save silenceSec when changed
   const handleSilenceSecChange = useCallback(async (sec: number) => {

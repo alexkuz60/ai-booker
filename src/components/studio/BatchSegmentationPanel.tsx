@@ -77,6 +77,10 @@ export function BatchSegmentationPanel({
   }, []);
 
   const resolveFreshSceneContent = useCallback(async (scene: SceneInfo) => {
+    if (scene.content) {
+      return scene.content;
+    }
+
     const { data } = await supabase
       .from("book_scenes")
       .select("content")
