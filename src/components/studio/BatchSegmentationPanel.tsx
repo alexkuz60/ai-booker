@@ -10,6 +10,8 @@ import { useAiRoles } from "@/hooks/useAiRoles";
 import { ModelPoolManager, type PoolTask, type PoolStats, logPoolStats } from "@/lib/modelPoolManager";
 import { enrichBodyWithKeys } from "@/lib/invokeWithFallback";
 import { toast } from "sonner";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import type { LocalChapterData } from "@/lib/localSync";
 
 interface SceneInfo {
   id: string;
@@ -54,6 +56,7 @@ export function BatchSegmentationPanel({
   onClose,
 }: BatchSegmentationPanelProps) {
   const { getModelForRole, getEffectivePool, isPoolEnabled } = useAiRoles(userApiKeys);
+  const { storage } = useProjectStorageContext();
   const [jobs, setJobs] = useState<SceneJob[]>([]);
   const [running, setRunning] = useState(false);
   const [poolStats, setPoolStats] = useState<PoolStats[]>([]);
@@ -81,6 +84,25 @@ export function BatchSegmentationPanel({
       return scene.content;
     }
 
+     if (storage) {
+      try {
+        const sceneFiles = await storage.listDir("scenes");
+        for (const file of sceneFiles) {
+          if (!file.startsWith("chapter_") || !file.endsWith(".json")) continue;
+          const localChapter = await storage.readJSON<LocalChapterData>(`scenes/${file}`);
+          const localScene = localChapter?.scenes?.find((item) => item.id === scene.id);
+          if (localScene?.content) {
+            return localScene.content;
+          }
+          if (localScene?.content_preview) {
+            return localScene.content_preview;
+          }
+        }
+      } catch (err) {
+        console.warn("[BatchSegmentationPanel] Failed to read local scene content:", err);
+      }
+    }
+
     const { data } = await supabase
       .from("book_scenes")
       .select("content")
@@ -88,7 +110,7 @@ export function BatchSegmentationPanel({
       .maybeSingle();
 
     return data?.content ?? scene.content ?? undefined;
-  }, []);
+  }, [storage]);
 
   // ── Pool-based batch ──────────────────────────────────────────────────
 
