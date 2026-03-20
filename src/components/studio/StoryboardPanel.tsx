@@ -365,8 +365,8 @@ export function StoryboardPanel({
         await persistNow({
           segments: builtSegments,
           typeMappings: typeMappingsRef.current,
-          audioStatus,
-          inlineNarrationSpeaker,
+          audioStatus: audioStatusRef.current,
+          inlineNarrationSpeaker: inlineNarrationSpeakerRef.current,
         });
         console.debug(`[Storyboard] Seeded OPFS from DB: ${builtSegments.length} segments`);
       }
@@ -375,7 +375,7 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка загрузки сегментов" : "Failed to load segments");
     }
     setLoading(false);
-  }, [isRu, hasStorage, loadFromLocal, loadSegmentsFromDb, applySegments, persistNow, audioStatus, inlineNarrationSpeaker]);
+  }, [isRu, hasStorage, loadFromLocal, loadSegmentsFromDb, applySegments, persistNow]);
 
   // ─── Segment Operations ───────────────────────────────────
 
