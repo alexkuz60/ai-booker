@@ -186,13 +186,34 @@ export interface VoiceCandidate {
   provider: string;
   voiceId: string;
   voiceName?: string;
+  role?: string;
   score: number; // 0–100, higher = better match
   reason: string;
 }
 
+// Age-based preferences (same heuristic as matchVoice in CharactersPanel)
+const AGE_VOICE_PREFS: Record<string, Record<string, string[]>> = {
+  female: {
+    child:  ["masha", "julia"],
+    teen:   ["masha", "lera"],
+    young:  ["dasha", "lera", "marina"],
+    adult:  ["alena", "jane", "marina"],
+    elder:  ["omazh", "julia"],
+    infant: ["masha"],
+  },
+  male: {
+    child:  ["filipp"],
+    teen:   ["filipp", "anton"],
+    young:  ["anton", "alexander"],
+    adult:  ["kirill", "alexander", "madirus"],
+    elder:  ["zahar", "ermil"],
+    infant: ["filipp"],
+  },
+};
+
 /**
  * Suggest up to `limit` voice candidates based on character psycho profile.
- * This is a heuristic ranking — not a replacement for user choice.
+ * Always returns at least 1 candidate via age/gender fallback.
  */
 export function suggestVoiceCandidates(
   opts: {
@@ -205,39 +226,63 @@ export function suggestVoiceCandidates(
   },
   limit = 3,
 ): VoiceCandidate[] {
-  // Parse psycho_tags for accentuation/archetype hints
   const accentuation = detectAccentuation(opts.psychoTags);
   const archetype = detectArchetype(opts.psychoTags);
-
   const candidates: VoiceCandidate[] = [];
   const g = opts.gender === "female" ? "f" : "m";
+  const seen = new Set<string>();
+
+  const addCandidate = (c: VoiceCandidate) => {
+    const key = `${c.provider}:${c.voiceId}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push(c);
+  };
 
   if (opts.provider === "yandex" || !opts.provider) {
-    const archVoices = archetype ? ARCHETYPE_YANDEX_VOICES[archetype]?.[g] ?? [] : [];
     const role = accentuation ? ACCENTUATION_YANDEX_ROLE[accentuation] : undefined;
-    for (const voiceId of archVoices) {
-      candidates.push({
-        provider: "yandex",
-        voiceId,
-        score: 80,
-        reason: archetype ? `archetype:${archetype}` : "age/gender match",
-      });
-    }
-    if (role) {
-      for (const c of candidates) {
-        if (c.provider === "yandex") c.score += 10; // bonus for having a matching role
+
+    // 1. Archetype-based voices (highest priority)
+    if (archetype) {
+      const archVoices = ARCHETYPE_YANDEX_VOICES[archetype]?.[g] ?? [];
+      for (const voiceId of archVoices) {
+        addCandidate({
+          provider: "yandex", voiceId, role,
+          score: 90, reason: `archetype:${archetype}`,
+        });
       }
+    }
+
+    // 2. Age/gender fallback
+    const gKey = opts.gender === "female" ? "female" : "male";
+    const ageVoices = AGE_VOICE_PREFS[gKey]?.[opts.ageGroup] ?? AGE_VOICE_PREFS[gKey]?.["adult"] ?? [];
+    for (const voiceId of ageVoices) {
+      addCandidate({
+        provider: "yandex", voiceId, role,
+        score: 60, reason: `age:${opts.ageGroup}`,
+      });
     }
   }
 
   if (opts.provider === "proxyapi") {
-    const archVoices = archetype ? ARCHETYPE_PROXYAPI_VOICES[archetype]?.[g] ?? [] : [];
-    for (const voiceId of archVoices) {
-      candidates.push({
-        provider: "proxyapi",
-        voiceId,
-        score: 80,
-        reason: archetype ? `archetype:${archetype}` : "age/gender match",
+    // 1. Archetype voices
+    if (archetype) {
+      const archVoices = ARCHETYPE_PROXYAPI_VOICES[archetype]?.[g] ?? [];
+      for (const voiceId of archVoices) {
+        const instr = accentuation ? ACCENTUATION_INSTRUCTIONS[accentuation] : undefined;
+        addCandidate({
+          provider: "proxyapi", voiceId,
+          score: 90, reason: `archetype:${archetype}`,
+          role: instr?.en,
+        });
+      }
+    }
+    // 2. Gender fallback
+    const fallback = g === "f" ? ["nova", "shimmer", "alloy"] : ["onyx", "echo", "fable"];
+    for (const voiceId of fallback) {
+      addCandidate({
+        provider: "proxyapi", voiceId,
+        score: 50, reason: "gender match",
       });
     }
   }
