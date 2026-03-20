@@ -12,6 +12,7 @@ export interface StudioScene {
 }
 
 export interface StudioChapter {
+  chapterId?: string;
   chapterTitle: string;
   bookTitle: string;
   bookId?: string;

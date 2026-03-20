@@ -8,6 +8,7 @@ import { loadStudioChapter, saveStudioChapter, type StudioChapter } from "@/lib/
  */
 interface StudioSessionState {
   bookId: string | null;
+  chapterId: string | null;
   bookTitle: string;
   chapterTitle: string;
   selectedSceneIdx: number | null;
@@ -16,6 +17,7 @@ interface StudioSessionState {
 
 const EMPTY_STATE: StudioSessionState = {
   bookId: null,
+  chapterId: null,
   bookTitle: "",
   chapterTitle: "",
   selectedSceneIdx: null,
@@ -24,26 +26,52 @@ const EMPTY_STATE: StudioSessionState = {
 
 async function restoreChapterFromDb(params: {
   bookId: string | null;
+  chapterId: string | null;
   chapterTitle: string;
   bookTitle: string;
 }): Promise<StudioChapter | null> {
-  const { bookId, chapterTitle, bookTitle } = params;
+  const { bookId, chapterId, chapterTitle, bookTitle } = params;
 
-  let query = supabase
-    .from("book_chapters")
-    .select("id, title, book_id")
-    .eq("title", chapterTitle);
+  let chapterIds: string[] = [];
+  let chapterRow: { id: string; title: string; book_id: string } | null = null;
 
-  if (bookId) {
-    query = query.eq("book_id", bookId);
+  if (chapterId) {
+    let idQuery = supabase
+      .from("book_chapters")
+      .select("id, title, book_id")
+      .eq("id", chapterId);
+
+    if (bookId) {
+      idQuery = idQuery.eq("book_id", bookId);
+    }
+
+    const { data: chapterById, error: chapterByIdError } = await idQuery.maybeSingle();
+    if (chapterByIdError) return null;
+    if (chapterById) {
+      chapterRow = chapterById;
+      chapterIds = [chapterById.id];
+    }
   }
 
-  const { data: dbChapters, error: chapterError } = await query;
-  if (chapterError || !dbChapters?.length) return null;
+  if (!chapterRow) {
+    let fallbackQuery = supabase
+      .from("book_chapters")
+      .select("id, title, book_id")
+      .eq("title", chapterTitle)
+      .order("chapter_number", { ascending: true })
+      .limit(1);
 
-  const chapterRow = dbChapters[0];
+    if (bookId) {
+      fallbackQuery = fallbackQuery.eq("book_id", bookId);
+    }
+
+    const { data: fallbackChapter, error: fallbackError } = await fallbackQuery.maybeSingle();
+    if (fallbackError || !fallbackChapter) return null;
+    chapterRow = fallbackChapter;
+    chapterIds = [fallbackChapter.id];
+  }
+
   const resolvedBookId = chapterRow.book_id;
-  const chapterIds = dbChapters.map((chapter) => chapter.id);
 
   const { data: dbScenes, error: sceneError } = await supabase
     .from("book_scenes")
@@ -64,6 +92,7 @@ async function restoreChapterFromDb(params: {
   }
 
   return {
+    chapterId: chapterRow.id,
     chapterTitle: chapterRow.title,
     bookTitle: resolvedBookTitle,
     bookId: resolvedBookId,
@@ -108,6 +137,7 @@ export function useStudioSession() {
     const sessionChapter = loadStudioChapter();
     const sourceChapter = sessionChapter ?? chapter;
     const resolvedBookId = sourceChapter?.bookId ?? cloudState.bookId;
+    const resolvedChapterId = sourceChapter?.chapterId ?? cloudState.chapterId;
     const resolvedChapterTitle = sourceChapter?.chapterTitle || cloudState.chapterTitle;
     const resolvedBookTitle = sourceChapter?.bookTitle || cloudState.bookTitle;
     const savedIdx = selectedSceneIdx ?? cloudState.selectedSceneIdx;
@@ -122,6 +152,7 @@ export function useStudioSession() {
       try {
         const restoredChapter = await restoreChapterFromDb({
           bookId: resolvedBookId,
+          chapterId: resolvedChapterId,
           chapterTitle: resolvedChapterTitle,
           bookTitle: resolvedBookTitle,
         });
@@ -189,6 +220,7 @@ export function useStudioSession() {
 
       saveCloudState({
         bookId: currentChapter.bookId || null,
+        chapterId: currentChapter.chapterId || null,
         bookTitle: currentChapter.bookTitle,
         chapterTitle: currentChapter.chapterTitle,
         selectedSceneIdx,
