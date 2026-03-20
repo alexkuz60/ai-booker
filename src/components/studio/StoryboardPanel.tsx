@@ -489,8 +489,8 @@ export function StoryboardPanel({
     persist(buildSnapshot(updated));
     onSegmented?.(sceneId!);
   }, [sceneId, segments, persist, buildSnapshot, onSegmented]);
-    }
-  }, [sceneId, onSegmented]);
+
+
 
   useEffect(() => {
     setSegments([]);
