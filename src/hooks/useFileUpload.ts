@@ -95,9 +95,8 @@ export function useFileUpload({
       return;
     }
 
-    // Clear stale session/runtime data from previous uploads to prevent cross-book contamination
-    sessionStorage.removeItem("docx_chapter_texts");
-    sessionStorage.removeItem("docx_html");
+    // К4: Clear stale runtime data from previous uploads to prevent cross-book contamination
+    clearChapterTextsCache();
     sessionStorage.removeItem(ACTIVE_BOOK_KEY);
 
     setBookId(null);
