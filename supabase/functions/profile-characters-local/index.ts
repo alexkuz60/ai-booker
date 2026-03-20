@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
     const systemPrompt = (await resolveTaskPromptWithOverrides("profiler:profile_characters", lang))
       || "You are a literary analyst. Analyze characters based on text.";
 
-    const jsonSuffix = `\n\nRespond with ONLY a valid JSON: {"characters": [{"name": "...", "age_group": "...", "temperament": "...", "speech_style": "...", "description": "..."}]}`;
+    const jsonSuffix = `\n\nRespond with ONLY a valid JSON: {"characters": [{"name": "...", "age_group": "...", "temperament": "...", "speech_style": "...", "description": "...", "speech_tags": ["#tag1", "#tag2"], "psycho_tags": ["#tag1", "#tag2"]}]}\n\nspeech_tags: 2-4 hashtags describing speech MANNER for TTS voice synthesis (tempo, intonation, articulation). Examples: #отрывисто #быстро #нервно #хрипло #тихо #громко #монотонно #певуче #резко.\npsycho_tags: 2-4 hashtags describing character PSYCHOTYPE for voice auto-casting. Examples: #паникер #эгоцентрист #невротик #меланхолик #лидер #интроверт #манипулятор #оптимист.\nTags MUST start with # and be in the same language as the text.`;
 
     const requestedModel = model || "google/gemini-2.5-flash";
     const resolved = resolveAiEndpoint(requestedModel, apiKey || null);
