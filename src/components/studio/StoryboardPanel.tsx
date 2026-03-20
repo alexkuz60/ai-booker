@@ -660,21 +660,15 @@ export function StoryboardPanel({
   // ─── Phrase CRUD ──────────────────────────────────────────
 
   const savePhrase = useCallback(async (phraseId: string, newText: string) => {
-    const { error } = await supabase
-      .from("segment_phrases")
-      .update({ text: newText })
-      .eq("id", phraseId);
-    if (error) {
-      toast.error(isRu ? "Ошибка сохранения" : "Save failed");
-      return;
-    }
-    setSegments(prev => prev.map(seg => ({
+    const updated = segments.map(seg => ({
       ...seg,
       phrases: seg.phrases.map(ph =>
         ph.phrase_id === phraseId ? { ...ph, text: newText } : ph
       ),
-    })));
-  }, [isRu]);
+    }));
+    setSegments(updated);
+    persist(buildSnapshot(updated));
+  }, [segments, persist, buildSnapshot]);
 
   const addToStressDictionary = useCallback(async (phraseId: string, annotation: PhraseAnnotation) => {
     if (annotation.type !== "stress" || annotation.start === undefined) return;
