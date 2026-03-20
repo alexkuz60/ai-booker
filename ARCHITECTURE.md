@@ -57,6 +57,8 @@
 │   └── characters.json    — LocalCharacter[]
 ├── 📁 scenes/
 │   └── chapter_{id}.json  — { chapterId, scenes[], status }
+├── 📁 storyboard/
+│   └── scene_{id}.json    — LocalStoryboardData (segments, phrases, type mappings, mixer, plugins)
 ├── 📁 audio/
 │   ├── 📁 tts/            — {segmentId}.mp3
 │   ├── 📁 atmosphere/     — атмосферные слои
