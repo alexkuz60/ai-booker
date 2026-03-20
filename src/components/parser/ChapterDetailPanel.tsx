@@ -101,7 +101,6 @@ function SceneCards({
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [editedIndices, setEditedIndices] = useState<Set<number>>(new Set());
   const [mergeChecked, setMergeChecked] = useState<Set<number>>(new Set());
-  const [mergeMode, setMergeMode] = useState(false);
 
   const toggleExpand = useCallback((idx: number, e: React.MouseEvent) => {
     e.stopPropagation();
