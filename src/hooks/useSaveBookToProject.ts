@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
-import { syncStructureToLocal } from "@/lib/localSync";
+import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
 import type {
   ChapterStatus,
   Scene,
@@ -89,7 +89,34 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
    * Handles first-push: creates books row if it doesn't exist yet.
    */
   const saveBook = useCallback(async () => {
-    if (!currentBookId || !localSnapshot) {
+    if (!currentBookId) {
+      toast({
+        title: isRu ? "Нечего сохранять" : "Nothing to save",
+        description: isRu ? "Откройте книгу и начните работу" : "Open a book and start working",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // If no in-memory snapshot provided (e.g. Studio), read from OPFS
+    let snapshot = localSnapshot;
+    if (!snapshot && storage) {
+      try {
+        const fromLocal = await readStructureFromLocal(storage);
+        if (fromLocal?.structure && fromLocal.structure.toc?.length > 0) {
+          snapshot = {
+            toc: fromLocal.structure.toc as TocChapter[],
+            parts: fromLocal.structure.parts || [],
+            chapterIdMap: fromLocal.chapterIdMap,
+            chapterResults: fromLocal.chapterResults,
+          };
+        }
+      } catch (e) {
+        console.warn("[SaveToServer] Failed to read snapshot from OPFS:", e);
+      }
+    }
+
+    if (!snapshot) {
       toast({
         title: isRu ? "Нечего сохранять" : "Nothing to save",
         description: isRu ? "Откройте книгу и начните работу" : "Open a book and start working",
@@ -100,7 +127,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
 
     setSaving(true);
     try {
-      const { toc, parts, chapterIdMap, chapterResults } = localSnapshot;
+      const { toc, parts, chapterIdMap, chapterResults } = snapshot;
 
       if (toc.length === 0) {
         throw new Error(isRu ? "Нет данных для синхронизации" : "No data to sync");
