@@ -155,3 +155,44 @@ function buildFallbackChain(
 
   return chain;
 }
+
+/**
+ * Enrich request body with the appropriate API key for the model's provider prefix.
+ * This ensures the first call already carries the key so the edge function
+ * doesn't fall through to Lovable AI gateway.
+ */
+export function enrichBodyWithKeys(
+  body: Record<string, unknown>,
+  model: string,
+  userApiKeys: Record<string, string>,
+): Record<string, unknown> {
+  // Already has explicit keys — don't override
+  if (body.apiKey || body.user_api_key || body.openrouter_api_key) return body;
+
+  if (model.startsWith("openrouter/") && userApiKeys["openrouter"]) {
+    return {
+      ...body,
+      provider: "openrouter",
+      apiKey: userApiKeys["openrouter"],
+      user_api_key: userApiKeys["openrouter"],
+      openrouter_api_key: userApiKeys["openrouter"],
+    };
+  }
+  if (model.startsWith("proxyapi/") && userApiKeys["proxyapi"]) {
+    return {
+      ...body,
+      provider: "proxyapi",
+      apiKey: userApiKeys["proxyapi"],
+      user_api_key: userApiKeys["proxyapi"],
+    };
+  }
+  if (model.startsWith("dotpoint/") && userApiKeys["dotpoint"]) {
+    return {
+      ...body,
+      provider: "dotpoint",
+      apiKey: userApiKeys["dotpoint"],
+      user_api_key: userApiKeys["dotpoint"],
+    };
+  }
+  return body;
+}
