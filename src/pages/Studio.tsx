@@ -81,6 +81,7 @@ const Studio = () => {
   }, [setActiveTab]);
 
   const handleBatchComplete = useCallback(() => {
+    setBatchSceneIds(null);
     setClipsRefreshToken(t => t + 1);
     setSelectedSceneIndices(new Set());
   }, []);

@@ -77,6 +77,7 @@ export function StoryboardPanel({
   const [staleAudioSegIds, setStaleAudioSegIds] = useState<Set<string>>(new Set());
   const [cleaningMetadata, setCleaningMetadata] = useState(false);
   const [contentDirty, setContentDirty] = useState(false);
+  const autoAnalyzeAttemptedRef = useRef<string | null>(null);
 
   // Reset merge selection when scene changes
   useEffect(() => { setMergeChecked(new Set()); }, [sceneId]);
@@ -527,6 +528,7 @@ export function StoryboardPanel({
     setSegments([]);
     setLoaded(false);
     setContentDirty(false);
+    autoAnalyzeAttemptedRef.current = null;
     if (sceneId) {
       loadSegments(sceneId);
       // Check if scene was edited in Parser
@@ -616,10 +618,17 @@ export function StoryboardPanel({
 
   // Auto-trigger analysis when scene has no segments and content is available
   useEffect(() => {
-    if (loaded && segments.length === 0 && sceneContent && sceneId && !analyzing) {
-      runAnalysis();
+    if (!loaded || loading || analyzing || !sceneContent || !sceneId || segments.length > 0) {
+      return;
     }
-  }, [loaded, segments.length, sceneContent, sceneId]);
+
+    if (autoAnalyzeAttemptedRef.current === sceneId) {
+      return;
+    }
+
+    autoAnalyzeAttemptedRef.current = sceneId;
+    runAnalysis();
+  }, [loaded, loading, analyzing, segments.length, sceneContent, sceneId, runAnalysis]);
 
   // ─── Phrase CRUD ──────────────────────────────────────────
 
