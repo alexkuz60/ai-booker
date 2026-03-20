@@ -187,3 +187,23 @@
   background-size: 40px 100%;
   animation: synth-wave 0.8s linear infinite;
 }
+
+/* ── Sonner toast overrides ── */
+[data-sonner-toaster] [data-sonner-toast] {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 4px 12px hsl(0 0% 0% / 0.4);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-type="error"] {
+  background: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+  border-color: hsl(var(--destructive));
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-type="success"] {
+  background: hsl(160 60% 18%);
+  color: hsl(var(--foreground));
+  border-color: hsl(160 50% 30%);
+}
