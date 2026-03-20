@@ -224,20 +224,14 @@ export function useFileUpload({
 
       // For DOCX/FB2: pre-mark chapters with no/minimal content as done
       if (isDocx || isFb2) {
-        try {
-          const raw = sessionStorage.getItem("docx_chapter_texts");
-          if (raw) {
-            const entries: [number, string][] = JSON.parse(raw);
-            const chapterTextMap = new Map(entries);
-            for (let i = 0; i < chapters.length; i++) {
-              const html = chapterTextMap.get(i) || "";
-              const plain = html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
-              if (plain.length < 50) {
-                initRawMap.set(i, { scenes: [], status: "done" });
-              }
-            }
+        // К4: read from in-memory cache, not sessionStorage
+        for (let i = 0; i < chapters.length; i++) {
+          const html = getChapterTextFromCache(i) || "";
+          const plain = html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+          if (plain.length < 50) {
+            initRawMap.set(i, { scenes: [], status: "done" });
           }
-        } catch {}
+        }
       }
 
       const initMap = sanitizeChapterResultsForStructure(chapters, initRawMap);
