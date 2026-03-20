@@ -145,10 +145,9 @@ export function useFileUpload({
           }];
         }
 
-        sessionStorage.setItem("docx_chapter_texts", JSON.stringify(
-          Array.from(extractResult.chapterTexts.entries())
-        ));
-        sessionStorage.setItem("docx_html", extractResult.html);
+        // К4: store in memory only, never in sessionStorage
+        setChapterTextsCache(extractResult.chapterTexts);
+        setDocxHtmlCache(extractResult.html);
       } else {
         const { outline, pdf } = await extractOutline(f);
         setPdfRef(pdf);
