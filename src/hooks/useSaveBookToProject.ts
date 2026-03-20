@@ -127,7 +127,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
 
     setSaving(true);
     try {
-      const { toc, parts, chapterIdMap, chapterResults } = localSnapshot;
+      const { toc, parts, chapterIdMap, chapterResults } = snapshot;
 
       if (toc.length === 0) {
         throw new Error(isRu ? "Нет данных для синхронизации" : "No data to sync");
