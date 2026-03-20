@@ -402,6 +402,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
       const body: Record<string, unknown> = { book_id: bookId, language: isRu ? "ru" : "en", model: getModelForRole("profiler") };
       if (sceneIdsForIncremental?.length) body.scene_ids = sceneIdsForIncremental;
+      const enrichedBody = enrichBodyWithKeys(body, String(body.model || ""), userApiKeys);
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/profile-characters`,
@@ -412,7 +413,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify(body),
+          body: JSON.stringify(enrichedBody),
         }
       );
 
