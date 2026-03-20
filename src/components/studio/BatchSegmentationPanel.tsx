@@ -90,6 +90,7 @@ export function BatchSegmentationPanel({
 
         const baseBody: Record<string, unknown> = {
             scene_id: job.scene.id,
+            content: job.scene.content ?? undefined,
             language: isRu ? "ru" : "en",
             model: modelId,
           };
@@ -142,6 +143,7 @@ export function BatchSegmentationPanel({
         try {
           const baseBody: Record<string, unknown> = {
               scene_id: job.scene.id,
+              content: job.scene.content ?? undefined,
               language: isRu ? "ru" : "en",
               model,
             };
