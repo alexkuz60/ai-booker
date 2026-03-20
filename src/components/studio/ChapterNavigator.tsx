@@ -207,11 +207,13 @@ export function ChapterNavigator({
   const [playlistDurations, setPlaylistDurations] = useState<Map<string, number>>(new Map());
   // Render status: 'full' | 'partial' | undefined (none)
   const [renderStatus, setRenderStatus] = useState<Map<string, "full" | "partial">>(new Map());
+  // Dirty scenes (edited in Parser, need re-analysis)
+  const [dirtySceneIds, setDirtySceneIds] = useState<Set<string>>(new Set());
   useEffect(() => {
     const sceneIds = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
     if (sceneIds.length === 0) return;
     (async () => {
-      const [{ data: plData }, { data: rnData }] = await Promise.all([
+      const [{ data: plData }, { data: rnData }, { data: dirtyData }] = await Promise.all([
         supabase
           .from("scene_playlists")
           .select("scene_id, total_duration_ms")
@@ -220,6 +222,11 @@ export function ChapterNavigator({
           .from("scene_renders")
           .select("scene_id, voice_path, atmo_path, sfx_path, status")
           .in("scene_id", sceneIds),
+        supabase
+          .from("book_scenes")
+          .select("id, content_dirty")
+          .in("id", sceneIds)
+          .eq("content_dirty", true),
       ]);
       if (plData) {
         const map = new Map<string, number>();
@@ -235,6 +242,9 @@ export function ChapterNavigator({
           else if (paths.length > 0) map.set(r.scene_id, "partial");
         }
         setRenderStatus(map);
+      }
+      if (dirtyData) {
+        setDirtySceneIds(new Set(dirtyData.map(d => d.id)));
       }
     })();
   }, [chapter.scenes.map(s => s.id).join(","), clipsRefreshToken]);
