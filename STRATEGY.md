@@ -187,9 +187,9 @@
 | 1. **Извлечение** | LLM сканирует текст, собирает всех говорящих персонажей и их реплики | Список `{ name, aliases[], replica_count }` |
 | 2. **Профилирование** | Для каждого персонажа LLM определяет характеристики на основе контекста | `{ gender, age_range, temperament, speech_style, language_register }` |
 | 3. **Кластеризация** | Группировка псевдонимов и вариаций имён в единого персонажа | Нормализованный список уникальных персонажей |
-| 4. **Voice Matching** | Подбор голоса из каталога (Yandex SpeechKit / ElevenLabs / ProxyAPI / пользовательские) по профилю | `{ voice_id, confidence, alternatives[] }` |
+| 4. **Voice Matching** | Подбор голоса из каталога (Yandex SpeechKit / ElevenLabs / ProxyAPI / пользовательские) по профилю с учётом psycho_tags, accentuation, archetype | `{ voice_id, confidence, alternatives[] }` |
 | 5. **Превью** | Генерация короткого аудиосэмпла характерной реплики каждого персонажа (Yandex, ElevenLabs или ProxyAPI) | Аудио для подтверждения пользователем |
-| 6. **Авто-кастинг** | Массовое назначение голосов всем персонажам без voice_config по профилю | Пол/возраст → голос, темперамент → роль |
+| 6. **Авто-кастинг** | Массовое назначение голосов всем персонажам без voice_config по профилю | Пол/возраст → голос, темперамент → роль, accentuation/archetype → TTS-пресет |
 
 #### Профиль персонажа (структура данных)
 
@@ -204,29 +204,13 @@ Character {
   temperament: string             // «холерик», «меланхолик», etc.
   speech_style: string            // «грубый, отрывистый, с просторечиями»
   description: string             // краткий профиль от AI
+  speech_tags: string[]           // теги манеры речи для TTS: #отрывисто #быстро #хрипло
+  psycho_tags: string[]           // теги психотипа: #паникер #невротик #интроверт
+  // Расширенные поля (в profile JSON / LocalCharacter):
+  accentuation: string            // акцентуация по Леонгарду: гипертим/шизоид/истероид/эпилептоид/...
+  archetype: string               // тембровый архетип: Мудрец/Герой/Опекун/Трикстер/...
   voice_config: json              // { provider, voice_id, role, speed, pitch, volume }
   color: string                   // цвет для UI-маркировки на таймлайне
-  sort_order: number              // по частоте появления
-}
-```
-
-#### Схема БД
-
-**Таблица `book_characters`** — глобальный реестр персонажей книги:
-
-| Поле | Тип | Описание |
-|------|------|----------|
-| `id` | uuid PK | — |
-| `book_id` | uuid FK → books | Привязка к книге |
-| `name` | text | Основное имя |
-| `aliases` | text[] | Псевдонимы и вариации |
-| `gender` | text | male / female / unknown |
-| `age_group` | text | child / teen / young / adult / elder / unknown |
-| `temperament` | text | sanguine / choleric / melancholic / phlegmatic |
-| `speech_style` | text | Свободное описание стиля речи |
-| `description` | text | Краткий профиль от AI |
-| `voice_config` | jsonb | `{ provider, voice_id, role, speed, pitch, volume }` |
-| `color` | text | Цвет для UI-маркировки |
 | `sort_order` | int | Порядок (по частоте появления) |
 | `created_at` | timestamptz | — |
 | `updated_at` | timestamptz | — |
