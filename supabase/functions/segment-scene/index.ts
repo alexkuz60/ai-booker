@@ -37,6 +37,53 @@ interface AISegment {
   inline_narrations?: InlineNarration[];
 }
 
+function normalizeText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[\u00a0\s]+/g, " ")
+    .replace(/[«»"'„“”()\[\]{}.,!?;:—–-]+/g, "")
+    .trim();
+}
+
+function getCoverageFromSource(sourceNorm: string, segments: AISegment[]): number {
+  if (!sourceNorm) return 0;
+  const combined = normalizeText(segments.map((s) => s.text || "").join(" "));
+  if (!combined) return 0;
+
+  let matched = 0;
+  for (const seg of segments) {
+    const normalizedSeg = normalizeText(seg.text || "");
+    if (!normalizedSeg) continue;
+    if (sourceNorm.includes(normalizedSeg)) {
+      matched += normalizedSeg.length;
+    }
+  }
+
+  return Math.min(1, matched / Math.max(sourceNorm.length, 1));
+}
+
+function buildFallbackSegments(content: string, lang: "ru" | "en"): AISegment[] {
+  const phrases = splitPhrases(content).filter(Boolean);
+  if (phrases.length === 0) {
+    return [{ type: lang === "ru" ? "inner_thought" : "narrator", text: content }];
+  }
+
+  const segments: AISegment[] = [];
+  const chunkSize = 4;
+  for (let i = 0; i < phrases.length; i += chunkSize) {
+    const text = phrases.slice(i, i + chunkSize).join(" ").trim();
+    if (!text) continue;
+    segments.push({
+      type: lang === "ru" && /\b(я|мне|меня|мной|мною|моего|моей|моему|моим|моими|моих|моё|мое|мои)\b/i.test(text)
+        ? "first_person"
+        : "narrator",
+      text,
+    });
+  }
+
+  return segments.length > 0 ? segments : [{ type: "narrator", text: content }];
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
