@@ -243,7 +243,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
   // ── Load characters from DB ─────────────────────────────
   const loadCharacters = useCallback(async () => {
-    if (!bookId) { setCharacters([]); setSceneCharIds(new Set()); setSegmentCounts(new Map()); return; }
+    if (!bookId) { setCharacters([]); setSceneCharIds(new Set()); setChapterCharIds(new Set()); setSegmentCounts(new Map()); return; }
     setLoading(true);
     try {
       let { data, error } = await supabase
@@ -280,6 +280,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       }
       setSegmentCounts(counts);
 
+      // Scene-level character IDs
       let scIds = new Set<string>();
       if (sceneId && data && data.length > 0) {
         const { data: appearances } = await supabase
@@ -287,21 +288,50 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
           .select("character_id")
           .eq("scene_id", sceneId);
         scIds = new Set(appearances?.map(a => a.character_id) || []);
+      }
+      setSceneCharIds(scIds);
+
+      // Chapter-level character IDs (all scenes in this chapter)
+      let chIds = new Set<string>();
+      if (chapterSceneIds && chapterSceneIds.length > 0 && data && data.length > 0) {
+        for (let i = 0; i < chapterSceneIds.length; i += 200) {
+          const batch = chapterSceneIds.slice(i, i + 200);
+          const { data: apps } = await supabase
+            .from("character_appearances")
+            .select("character_id")
+            .in("scene_id", batch);
+          if (apps) {
+            for (const a of apps) chIds.add(a.character_id);
+          }
+        }
+      }
+      setChapterCharIds(chIds);
+
+      if (scIds.size > 0 && data) {
         const sorted = [
           ...data.filter(c => scIds.has(c.id)),
           ...data.filter(c => !scIds.has(c.id)),
         ];
-        setCharacters(sorted.map(c => ({ ...c, voice_config: (c.voice_config as BookCharacter["voice_config"]) || {} })));
+        setCharacters(sorted.map(c => ({
+          ...c,
+          voice_config: (c.voice_config as BookCharacter["voice_config"]) || {},
+          speech_tags: (c as any).speech_tags || [],
+          psycho_tags: (c as any).psycho_tags || [],
+        })));
       } else {
-        setCharacters((data || []).map(c => ({ ...c, voice_config: (c.voice_config as BookCharacter["voice_config"]) || {} })));
+        setCharacters((data || []).map(c => ({
+          ...c,
+          voice_config: (c.voice_config as BookCharacter["voice_config"]) || {},
+          speech_tags: (c as any).speech_tags || [],
+          psycho_tags: (c as any).psycho_tags || [],
+        })));
       }
-      setSceneCharIds(scIds);
     } catch (e) {
       console.error("Load characters error:", e);
     } finally {
       setLoading(false);
     }
-  }, [bookId, sceneId]);
+  }, [bookId, sceneId, chapterSceneIds]);
 
   useEffect(() => { loadCharacters(); }, [loadCharacters]);
 
