@@ -128,7 +128,7 @@ function SceneCards({
   const { capture: handleContextMenu, consume, getSelectedText } = useSelectionCapture();
 
   // ── Merge logic ──
-  const canMerge = useMemo(() => {
+  const mergeAdjacent = useMemo(() => {
     if (mergeChecked.size < 2) return false;
     const sorted = [...mergeChecked].sort((a, b) => a - b);
     for (let i = 1; i < sorted.length; i++) {
@@ -136,6 +136,8 @@ function SceneCards({
     }
     return true;
   }, [mergeChecked]);
+
+  const canMerge = mergeChecked.size >= 2 && mergeAdjacent;
 
   const handleMerge = useCallback(() => {
     if (!canMerge || !onScenesUpdate) return;
