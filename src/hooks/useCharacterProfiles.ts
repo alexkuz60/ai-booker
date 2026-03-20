@@ -255,11 +255,9 @@ export function useCharacterProfiles({
         const manager = new ModelPoolManager(effectivePool, userApiKeys, 3);
         let completedProfiles = 0;
         const tasks: PoolTask<{ profiles: Array<{
-          name: string;
-          age_group?: string;
-          temperament?: string;
-          speech_style?: string;
-          description?: string;
+          name: string; age_group?: string; temperament?: string;
+          speech_style?: string; description?: string;
+          speech_tags?: string[]; psycho_tags?: string[];
         }>; usedModel: string }>[] = batches.map((batch, i) => ({
           id: `batch-${i}`,
           execute: async (modelId: string) => {
