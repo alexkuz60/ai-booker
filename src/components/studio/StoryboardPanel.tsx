@@ -583,6 +583,9 @@ export function StoryboardPanel({
     setInlineNarrationSegIds(new Set());
     setStaleAudioSegIds(new Set());
     setMergeChecked(new Set());
+    setContentDirty(false);
+    // Clear dirty flag in DB
+    supabase.from("book_scenes").update({ content_dirty: false } as any).eq("id", sceneId).then(() => {});
 
     try {
       const { data, error } = await invokeWithFallback({
