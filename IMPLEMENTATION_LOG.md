@@ -678,4 +678,24 @@ Source → EQ (3-band) → Compressor → Limiter → Panner3D → Convolver (IR
 
 ---
 
+## Аудит и рефакторинг (2026-03-20)
+
+### P1: extract-characters — миграция на shared providerRouting ✅
+**Проблема:** Дублированный `PROXYAPI_MODEL_MAP` и inline-роутинг (~40 строк) вместо общего `_shared/providerRouting.ts`.
+**Решение:** Заменён на `resolveAiEndpoint` + `extractProviderFields`. Удалена функция `getEndpointAndModel`. Tool-schema вынесена в константу.
+
+### P3: refine-speech-context — корректная обработка 402 ✅
+**Проблема:** Статус 402 (Payment Required) от AI-провайдера маскировался как 502, что не позволяло клиенту (`invokeWithFallback`) детектировать исчерпание средств и переключить провайдера.
+**Решение:** Добавлен явный маппинг `402 → 402` наряду с существующим `429 → 429`.
+
+### P4: useChapterAnalysis — безопасность prefetch abort ✅
+**Проблема:** Prefetch-цикл использовал `abortRef.current` который мог быть перезаписан другим вызовом `analyzeChapter`, что делало `stopAnalysis` неэффективным для остановки prefetch.
+**Решение:** Prefetch создаёт собственный `AbortController`, сохраняет его в `abortRef`, и дополнительно проверяет `userStartedAnalysis.current` на каждой итерации цикла.
+
+### P2: extractPoolStats — ложное срабатывание ❌
+**Проблема** (предполагаемая): `extractPoolStats` не очищается при переключении в sequential mode.
+**Вердикт:** При проверке кода обнаружено, что `setExtractPoolStats([])` уже вызывается в финальном блоке после обоих режимов. Проблема не подтверждена.
+
+---
+
 **Инструкция для AI:** При обнаружении регрессии или повторяющейся ошибки добавляй запись в этот раздел с датой, описанием и паттерном. Это поможет учиться на ошибках и предотвращать их в будущем. **НИКОГДА** не удаляй runtime guard'ы и тесты контрактов при рефакторинге.
