@@ -22,6 +22,64 @@ const EMPTY_STATE: StudioSessionState = {
   activeTab: "storyboard",
 };
 
+async function restoreChapterFromDb(params: {
+  bookId: string | null;
+  chapterTitle: string;
+  bookTitle: string;
+}): Promise<StudioChapter | null> {
+  const { bookId, chapterTitle, bookTitle } = params;
+
+  let query = supabase
+    .from("book_chapters")
+    .select("id, title, book_id")
+    .eq("title", chapterTitle);
+
+  if (bookId) {
+    query = query.eq("book_id", bookId);
+  }
+
+  const { data: dbChapters, error: chapterError } = await query;
+  if (chapterError || !dbChapters?.length) return null;
+
+  const chapterRow = dbChapters[0];
+  const resolvedBookId = chapterRow.book_id;
+  const chapterIds = dbChapters.map((chapter) => chapter.id);
+
+  const { data: dbScenes, error: sceneError } = await supabase
+    .from("book_scenes")
+    .select("id, scene_number, title, scene_type, mood, bpm, content")
+    .in("chapter_id", chapterIds)
+    .order("scene_number");
+
+  if (sceneError || !dbScenes?.length) return null;
+
+  let resolvedBookTitle = bookTitle;
+  if (!resolvedBookTitle && resolvedBookId) {
+    const { data: bookRow } = await supabase
+      .from("books")
+      .select("title")
+      .eq("id", resolvedBookId)
+      .maybeSingle();
+    resolvedBookTitle = bookRow?.title || "";
+  }
+
+  return {
+    chapterTitle: chapterRow.title,
+    bookTitle: resolvedBookTitle,
+    bookId: resolvedBookId,
+    scenes: dbScenes.map((scene) => ({
+      id: scene.id,
+      scene_number: scene.scene_number,
+      title: scene.title,
+      scene_type: scene.scene_type || "mixed",
+      mood: scene.mood || "",
+      bpm: scene.bpm || 120,
+      content: scene.content || undefined,
+      content_preview: scene.content?.slice(0, 200) || undefined,
+    })),
+  };
+}
+
 /**
  * Manages Studio session: loads from sessionStorage first, falls back to cloud settings.
  * Persists state changes to cloud with debounce.
@@ -47,101 +105,69 @@ export function useStudioSession() {
     if (restoredRef.current || !cloudLoaded) return;
     restoredRef.current = true;
 
-    // If we already have a chapter from sessionStorage — no need to restore
-    if (chapter) {
+    const sessionChapter = loadStudioChapter();
+    const sourceChapter = sessionChapter ?? chapter;
+    const resolvedBookId = sourceChapter?.bookId ?? cloudState.bookId;
+    const resolvedChapterTitle = sourceChapter?.chapterTitle || cloudState.chapterTitle;
+    const resolvedBookTitle = sourceChapter?.bookTitle || cloudState.bookTitle;
+    const savedIdx = selectedSceneIdx ?? cloudState.selectedSceneIdx;
+    const savedTab = sessionStorage.getItem("studio_active_tab") || cloudState.activeTab;
+
+    if (!resolvedChapterTitle) {
       setRestored(true);
       return;
     }
 
-    // No sessionStorage chapter — try to restore from cloud
-    const { bookId, chapterTitle, bookTitle, selectedSceneIdx: savedIdx, activeTab: savedTab } = cloudState;
-    if (!chapterTitle) {
-      setRestored(true);
-      return;
-    }
-
-    // Restore chapter from DB
     (async () => {
       try {
-        // Find chapter by title
-        const query = supabase
-          .from("book_chapters")
-          .select("id, title, book_id")
-          .ilike("title", chapterTitle);
-
-        // If we have bookId, narrow down
-        const { data: dbChapters } = bookId
-          ? await query.eq("book_id", bookId)
-          : await query;
-
-        if (!dbChapters?.length) {
-          setRestored(true);
-          return;
-        }
-
-        const chapterRow = dbChapters[0];
-        const resolvedBookId = chapterRow.book_id;
-
-        // Load scenes for this chapter
-        const chapterIds = dbChapters.map(c => c.id);
-        const { data: dbScenes } = await supabase
-          .from("book_scenes")
-          .select("id, scene_number, title, scene_type, mood, bpm, content")
-          .in("chapter_id", chapterIds)
-          .order("scene_number");
-
-        if (!dbScenes?.length) {
-          setRestored(true);
-          return;
-        }
-
-        // Resolve book title if needed
-        let resolvedBookTitle = bookTitle;
-        if (!resolvedBookTitle && resolvedBookId) {
-          const { data: bookRow } = await supabase
-            .from("books")
-            .select("title")
-            .eq("id", resolvedBookId)
-            .maybeSingle();
-          resolvedBookTitle = bookRow?.title || "";
-        }
-
-        const restoredChapter: StudioChapter = {
-          chapterTitle: chapterRow.title,
-          bookTitle: resolvedBookTitle,
+        const restoredChapter = await restoreChapterFromDb({
           bookId: resolvedBookId,
-          scenes: dbScenes.map(s => ({
-            id: s.id,
-            scene_number: s.scene_number,
-            title: s.title,
-            scene_type: s.scene_type || "mixed",
-            mood: s.mood || "",
-            bpm: s.bpm || 120,
-            content: s.content || undefined,
-            content_preview: s.content?.slice(0, 200) || undefined,
-          })),
-        };
+          chapterTitle: resolvedChapterTitle,
+          bookTitle: resolvedBookTitle,
+        });
 
-        // Save to sessionStorage for fast access
-        saveStudioChapter(restoredChapter);
-        setChapter(restoredChapter);
+        if (restoredChapter) {
+          setChapter(restoredChapter);
+          saveStudioChapter(restoredChapter);
 
-        if (savedIdx !== null && savedIdx >= 0 && savedIdx < dbScenes.length) {
-          setSelectedSceneIdx(savedIdx);
-          sessionStorage.setItem("studio_selected_scene_idx", String(savedIdx));
+          if (savedIdx !== null && savedIdx >= 0 && savedIdx < restoredChapter.scenes.length) {
+            setSelectedSceneIdx(savedIdx);
+            sessionStorage.setItem("studio_selected_scene_idx", String(savedIdx));
+          }
+
+          if (savedTab) {
+            setActiveTab(savedTab);
+            sessionStorage.setItem("studio_active_tab", savedTab);
+          }
+          return;
         }
 
-        if (savedTab) {
-          setActiveTab(savedTab);
-          sessionStorage.setItem("studio_active_tab", savedTab);
+        if (sourceChapter) {
+          setChapter(sourceChapter);
+          if (savedIdx !== null && savedIdx >= 0 && savedIdx < sourceChapter.scenes.length) {
+            setSelectedSceneIdx(savedIdx);
+            sessionStorage.setItem("studio_selected_scene_idx", String(savedIdx));
+          }
+          if (savedTab) {
+            setActiveTab(savedTab);
+            sessionStorage.setItem("studio_active_tab", savedTab);
+          }
         }
       } catch (err) {
         console.error("[useStudioSession] Failed to restore:", err);
+        if (sourceChapter) {
+          setChapter(sourceChapter);
+        }
       } finally {
         setRestored(true);
       }
     })();
   }, [cloudLoaded]);
+
+  useEffect(() => {
+    if (!chapter) return;
+    saveStudioChapter(chapter);
+  }, [chapter]);
 
   // ── Persist scene index to sessionStorage ─────────────────
   useEffect(() => {
