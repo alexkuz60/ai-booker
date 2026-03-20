@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
+import { useStoryboardPersistence } from "@/hooks/useStoryboardPersistence";
 import type {
   ChapterStatus,
   Scene,
