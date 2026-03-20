@@ -207,7 +207,7 @@ export function useChapterAnalysis({
   // B4/B7 fix: text-first mode for DOCX and FB2 (no PDF rendering needed)
   const isTextMode = (): boolean => {
     if (fileFormat === "docx" || fileFormat === "fb2") return true;
-    return sessionStorage.getItem("docx_chapter_texts") !== null;
+    return hasChapterTextsCache();
   };
 
   const analyzeChapter = async (idx: number, mode: "full" | "enrich" | "auto" = "auto") => {

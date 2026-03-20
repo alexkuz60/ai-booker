@@ -226,9 +226,8 @@ export function useBookManager({
   const reloadBook = useCallback(async () => {
     if (!bookId) return;
     try {
-      // Clear DOCX session data
-      sessionStorage.removeItem("docx_chapter_texts");
-      sessionStorage.removeItem("docx_html");
+      // К4: clear in-memory docx cache
+      clearChapterTextsCache();
 
       // Clean up local OPFS structure only (keep project.json and source/)
       if (storageBackend === "opfs") {

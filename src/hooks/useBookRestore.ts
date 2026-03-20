@@ -68,10 +68,7 @@ export function useBookRestore({
   const clearTransientBookState = useCallback(() => {
     updatePdfRef(null);
     updateTotalPages(0);
-    try {
-      sessionStorage.removeItem("docx_chapter_texts");
-      sessionStorage.removeItem("docx_html");
-    } catch {}
+    clearChapterTextsCache();
   }, [updatePdfRef, updateTotalPages]);
 
   const getBookIdFromStorage = useCallback(async (storage: ProjectStorage | null | undefined): Promise<string | null> => {
