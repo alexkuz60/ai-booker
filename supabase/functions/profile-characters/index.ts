@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { logAiUsage } from "../_shared/logAiUsage.ts";
+import { resolveAiEndpoint, extractProviderFields } from "../_shared/providerRouting.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,11 +78,11 @@ function extractBalancedJson(text: string, start: number): string | null {
   return null;
 }
 
-async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en", modelOverride?: string, userId?: string): Promise<CharacterProfile[]> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) throw new Error("AI key not configured");
+async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en", modelOverride?: string, userId?: string, providerApiKey?: string | null, openrouterApiKey?: string | null): Promise<CharacterProfile[]> {
+  const resolved = resolveAiEndpoint(modelOverride || "google/gemini-3-flash-preview", providerApiKey || null, openrouterApiKey);
+  if (!resolved.apiKey) throw new Error("AI key not configured");
 
-  const usedModel = modelOverride || "google/gemini-3-flash-preview";
+  const usedModel = resolved.model;
   // Reasoning models return data in reasoning/reasoning_details, not tool_calls
   const isReasoningModel = usedModel.includes("gpt-5") || usedModel.includes("o3") || usedModel.includes("o4") || usedModel.includes("gemini-2.5-pro");
   const aiStart = Date.now();
@@ -161,9 +162,9 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       const timeout = setTimeout(() => controller.abort(), 120_000);
 
       const currentPayload = useToolsMode ? toolsPayload : plainPayload;
-      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const aiRes = await fetch(resolved.endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${LOVABLE_API_KEY}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${resolved.apiKey}` },
         body: JSON.stringify(currentPayload),
         signal: controller.signal,
       });
@@ -344,7 +345,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { book_id, language, scene_ids, model: clientModel } = await req.json();
+    const reqBody = await req.json();
+    const { book_id, language, scene_ids, model: clientModel } = reqBody;
+    const providerFields = extractProviderFields(reqBody);
     if (!book_id) {
       return new Response(JSON.stringify({ error: "book_id is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -491,7 +494,7 @@ Deno.serve(async (req) => {
     const { systemPrompt, userPrompt } = buildPrompt(
       charsToProfile, speakerDialogues, narratorExcerpts, lang, existingProfiles,
     );
-    const profiles = await callAI(systemPrompt, userPrompt, lang, clientModel, userId);
+    const profiles = await callAI(systemPrompt, userPrompt, lang, clientModel, userId, providerFields.apiKey, providerFields.openrouterApiKey);
 
     // ── Update DB ────────────────────────────────────────
     let updated = 0;

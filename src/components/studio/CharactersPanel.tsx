@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAiRoles } from "@/hooks/useAiRoles";
+import { enrichBodyWithKeys } from "@/lib/invokeWithFallback";
 import { YANDEX_VOICES } from "@/config/yandexVoices";
 import { VoiceCastingTable } from "@/components/studio/VoiceCastingTable";
 import { CastingCandidatesPanel, type CastingCharacter } from "@/components/studio/CastingCandidatesPanel";
@@ -146,6 +147,7 @@ interface CharactersPanelProps {
   selectedCharacterId?: string | null;
   onSelectCharacter?: (characterId: string | null) => void;
   onVoiceSaved?: () => void;
+  userApiKeys?: Record<string, string>;
 }
 
 export interface CharactersPanelHandle {
@@ -155,7 +157,7 @@ export interface CharactersPanelHandle {
   profiling: boolean;
 }
 
-export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanelProps>(function CharactersPanel({ isRu, bookId, sceneId, chapterSceneIds, selectedCharacterId, onSelectCharacter, onVoiceSaved }, ref) {
+export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanelProps>(function CharactersPanel({ isRu, bookId, sceneId, chapterSceneIds, selectedCharacterId, onSelectCharacter, onVoiceSaved, userApiKeys = {} }, ref) {
   const { getModelForRole } = useAiRoles();
   const [characters, setCharacters] = useState<BookCharacter[]>([]);
   const [loading, setLoading] = useState(false);
@@ -400,6 +402,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
       const body: Record<string, unknown> = { book_id: bookId, language: isRu ? "ru" : "en", model: getModelForRole("profiler") };
       if (sceneIdsForIncremental?.length) body.scene_ids = sceneIdsForIncremental;
+      const enrichedBody = enrichBodyWithKeys(body, String(body.model || ""), userApiKeys);
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/profile-characters`,
@@ -410,7 +413,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify(body),
+          body: JSON.stringify(enrichedBody),
         }
       );
 
