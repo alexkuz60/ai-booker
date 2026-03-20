@@ -31,7 +31,7 @@ export function saveStudioChapter(chapter: StudioChapter) {
   }
   const light: StudioChapter = {
     ...chapter,
-    scenes: chapter.scenes.map(({ content, ...rest }) => rest),
+    scenes: chapter.scenes.map(({ content, content_preview, ...rest }) => rest),
   };
   try {
     sessionStorage.setItem(STUDIO_CHAPTER_KEY, JSON.stringify(light));

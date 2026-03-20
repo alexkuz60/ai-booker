@@ -14,6 +14,9 @@ interface StudioWorkspaceProps {
   isRu: boolean;
   selectedSceneId?: string | null;
   selectedSceneContent?: string | null;
+  selectedSceneNumber?: number | null;
+  selectedSceneTitle?: string | null;
+  chapterId?: string | null;
   bookId?: string | null;
   chapterSceneIds?: string[];
   onSegmented?: (sceneId: string) => void;
@@ -36,7 +39,7 @@ interface StudioWorkspaceProps {
   userApiKeys?: Record<string, string>;
 }
 
-export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter, activeTab: externalTab, onTabChange, selectedSegmentId, onSelectSegment, onSynthesizingChange, onErrorSegmentsChange, silenceSec, onSilenceSecChange, onRecalcDone, onVoiceSaved, batchSceneIds, batchScenes, onBatchComplete, onBatchClose, userApiKeys = {} }: StudioWorkspaceProps) {
+export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, selectedSceneNumber, selectedSceneTitle, chapterId, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter, activeTab: externalTab, onTabChange, selectedSegmentId, onSelectSegment, onSynthesizingChange, onErrorSegmentsChange, silenceSec, onSilenceSecChange, onRecalcDone, onVoiceSaved, batchSceneIds, batchScenes, onBatchComplete, onBatchClose, userApiKeys = {} }: StudioWorkspaceProps) {
   const [activeTab, setActiveTabLocal] = useState(() => externalTab || sessionStorage.getItem("studio_active_tab") || "storyboard");
   const charactersPanelRef = useRef<CharactersPanelHandle | null>(null);
   const [castingExternal, setCastingExternal] = useState(false);
@@ -118,6 +121,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
                 isRu={isRu}
                 sceneIds={batchSceneIds!}
                 scenes={batchScenes!}
+                chapterId={chapterId ?? null}
                 bookId={bookId ?? null}
                 userApiKeys={userApiKeys}
                 concurrency={3}
@@ -129,6 +133,9 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, b
               <StoryboardPanel
                 sceneId={selectedSceneId ?? null}
                 sceneContent={selectedSceneContent ?? null}
+                sceneNumber={selectedSceneNumber ?? null}
+                sceneTitle={selectedSceneTitle ?? null}
+                chapterId={chapterId ?? null}
                 isRu={isRu}
                 bookId={bookId ?? null}
                 onSegmented={onSegmented}
