@@ -99,7 +99,17 @@ Deno.serve(async (req) => {
 
     const systemPrompt = (await resolveTaskPromptWithOverrides("screenwriter:segment_scene", lang)) || "You are a literary text analyst.";
 
-    const userPrompt = `Analyze this scene (language: ${lang}):\n\n${content}`;
+    const userPrompt = `Analyze this scene (language: ${lang}). IMPORTANT: segment the ENTIRE text from start to finish, do not skip any part.\n\n${content}`;
+
+    // Estimate required output tokens: ~1.5x input chars (JSON overhead) / 3 chars per token
+    const estimatedOutputTokens = Math.max(4096, Math.ceil((content.length * 1.5) / 3));
+    const maxTokens = Math.min(estimatedOutputTokens, 16384);
+
+    // Use max_completion_tokens for newer models, max_tokens for others
+    const isNewModel = /gpt-5|o1|o3|o4/i.test(resolved.model);
+    const tokenParam = isNewModel
+      ? { max_completion_tokens: maxTokens }
+      : { max_tokens: maxTokens };
 
     const aiRes = await fetch(resolved.endpoint, {
       method: "POST",
@@ -114,6 +124,7 @@ Deno.serve(async (req) => {
           { role: "user", content: userPrompt },
         ],
         temperature: 0.1,
+        ...tokenParam,
       }),
     });
 
