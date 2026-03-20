@@ -120,15 +120,38 @@ const Studio = () => {
     if (!needIds && !needBookId) return;
 
     (async () => {
-      // Always filter by bookId when available to avoid cross-book collisions
-      let query = supabase
-        .from("book_chapters")
-        .select("id, title, book_id")
-        .ilike("title", chapter.chapterTitle);
-      if (currentBookId) {
-        query = query.eq("book_id", currentBookId);
+      let dbChapters: { id: string; title: string; book_id: string }[] | null = null;
+
+      if (chapter.chapterId) {
+        let idQuery = supabase
+          .from("book_chapters")
+          .select("id, title, book_id")
+          .eq("id", chapter.chapterId);
+
+        if (currentBookId) {
+          idQuery = idQuery.eq("book_id", currentBookId);
+        }
+
+        const { data } = await idQuery;
+        dbChapters = data;
       }
-      const { data: dbChapters } = await query;
+
+      if (!dbChapters?.length) {
+        let fallbackQuery = supabase
+          .from("book_chapters")
+          .select("id, title, book_id")
+          .eq("title", chapter.chapterTitle)
+          .order("chapter_number", { ascending: true })
+          .limit(1);
+
+        if (currentBookId) {
+          fallbackQuery = fallbackQuery.eq("book_id", currentBookId);
+        }
+
+        const { data } = await fallbackQuery;
+        dbChapters = data;
+      }
+
       if (!dbChapters?.length) return;
 
       if (needBookId && dbChapters[0]?.book_id) {
@@ -152,7 +175,7 @@ const Studio = () => {
         setChapter(updated);
       }
     })();
-  }, [chapter?.chapterTitle, bookId]);
+  }, [chapter?.chapterId, chapter?.chapterTitle, bookId, chapter, setChapter]);
 
   // Check which scenes already have segments, audio rendered, and stale audio
   useEffect(() => {
@@ -295,10 +318,27 @@ const Studio = () => {
         .eq("id", selectedScene.id)
         .maybeSingle();
       // Always prefer DB content when available (session may be stale)
-      if (data?.content) setSceneContent(data.content);
+      if (data?.content !== undefined) {
+        setSceneContent(data.content);
+        setChapter((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            scenes: prev.scenes.map((scene) => (
+              scene.id === selectedScene.id
+                ? {
+                    ...scene,
+                    content: data.content ?? undefined,
+                    content_preview: data.content?.slice(0, 200) || undefined,
+                  }
+                : scene
+            )),
+          };
+        });
+      }
       if (data?.silence_sec !== undefined) setSilenceSec(data.silence_sec);
     })();
-  }, [selectedScene?.id]);
+  }, [selectedScene?.id, setChapter]);
 
   // Save silenceSec when changed
   const handleSilenceSecChange = useCallback(async (sec: number) => {

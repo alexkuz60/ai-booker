@@ -576,7 +576,7 @@ export function StoryboardPanel({
   // ─── AI Actions ───────────────────────────────────────────
 
   const runAnalysis = useCallback(async () => {
-    if (!sceneId || !sceneContent) return;
+    if (!sceneId) return;
     setAnalyzing(true);
 
     // ── Clear stale segments before re-analysis ──
@@ -590,9 +590,22 @@ export function StoryboardPanel({
     supabase.from("book_scenes").update({ content_dirty: false } as any).eq("id", sceneId).then(() => {});
 
     try {
+      const { data: freshScene } = await supabase
+        .from("book_scenes")
+        .select("content")
+        .eq("id", sceneId)
+        .maybeSingle();
+
+      const analysisContent = freshScene?.content ?? sceneContent;
+      if (!analysisContent) {
+        toast.error(isRu ? "Текст сцены не найден" : "Scene text not found");
+        setAnalyzing(false);
+        return;
+      }
+
       const { data, error } = await invokeWithFallback({
         functionName: "segment-scene",
-        body: { scene_id: sceneId, content: sceneContent, language: isRu ? "ru" : "en", model: getModelForRole("screenwriter") },
+        body: { scene_id: sceneId, content: analysisContent, language: isRu ? "ru" : "en", model: getModelForRole("screenwriter") },
         userApiKeys,
         isRu,
       });
@@ -614,7 +627,7 @@ export function StoryboardPanel({
       await loadSegments(sceneId);
     }
     setAnalyzing(false);
-  }, [sceneId, sceneContent, isRu, onSegmented, loadSegments]);
+  }, [sceneId, sceneContent, isRu, onSegmented, loadSegments, getModelForRole, userApiKeys]);
 
   // Auto-trigger analysis when scene has no segments and content is available
   useEffect(() => {

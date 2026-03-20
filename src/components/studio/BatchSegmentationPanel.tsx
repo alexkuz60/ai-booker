@@ -76,6 +76,16 @@ export function BatchSegmentationPanel({
     setJobs(prev => prev.map(j => j.scene.id === sceneId ? { ...j, ...update } : j));
   }, []);
 
+  const resolveFreshSceneContent = useCallback(async (scene: SceneInfo) => {
+    const { data } = await supabase
+      .from("book_scenes")
+      .select("content")
+      .eq("id", scene.id)
+      .maybeSingle();
+
+    return data?.content ?? scene.content ?? undefined;
+  }, []);
+
   // ── Pool-based batch ──────────────────────────────────────────────────
 
   const runPoolBatch = useCallback(async (pendingJobs: SceneJob[]) => {
@@ -88,9 +98,11 @@ export function BatchSegmentationPanel({
         if (abortRef.current) throw new Error("Aborted");
         updateJob(job.scene.id, { status: "analyzing" });
 
+        const freshContent = await resolveFreshSceneContent(job.scene);
+
         const baseBody: Record<string, unknown> = {
             scene_id: job.scene.id,
-            content: job.scene.content ?? undefined,
+            content: freshContent,
             language: isRu ? "ru" : "en",
             model: modelId,
           };
@@ -126,7 +138,7 @@ export function BatchSegmentationPanel({
     setPoolStats(finalStats);
     logPoolStats(finalStats, "segment_scene", Date.now() - poolStartTime);
     managerRef.current = null;
-  }, [effectivePool, userApiKeys, isRu, updateJob, onSceneSegmented]);
+  }, [effectivePool, userApiKeys, isRu, updateJob, onSceneSegmented, resolveFreshSceneContent]);
 
   // ── Classic fixed-concurrency batch ───────────────────────────────────
 
@@ -141,9 +153,10 @@ export function BatchSegmentationPanel({
         if (!job) break;
         updateJob(job.scene.id, { status: "analyzing" });
         try {
+          const freshContent = await resolveFreshSceneContent(job.scene);
           const baseBody: Record<string, unknown> = {
               scene_id: job.scene.id,
-              content: job.scene.content ?? undefined,
+              content: freshContent,
               language: isRu ? "ru" : "en",
               model,
             };
@@ -166,7 +179,7 @@ export function BatchSegmentationPanel({
       () => worker(),
     );
     await Promise.all(workers);
-  }, [getModelForRole, concurrency, isRu, updateJob, onSceneSegmented]);
+  }, [getModelForRole, concurrency, isRu, updateJob, onSceneSegmented, resolveFreshSceneContent, userApiKeys]);
 
   // ── Orchestrator ──────────────────────────────────────────────────────
 
