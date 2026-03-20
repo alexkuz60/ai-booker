@@ -74,6 +74,8 @@ export function AiRolesTab({ apiKeys, isRu, onModelChanged, bookTitle }: AiRoles
   } = useAiRoles(apiKeys);
 
   const [collapsedProviders, setCollapsedProviders] = useState<Set<string>>(loadCollapsed);
+  // Accordion: only one pool open at a time
+  const [openPoolRole, setOpenPoolRole] = useState<AiRoleId | null>(null);
 
   const toggleProvider = useCallback((provider: string) => {
     setCollapsedProviders(prev => {
