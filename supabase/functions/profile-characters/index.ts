@@ -132,7 +132,7 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
     tool_choice: { type: "function", function: { name: "save_character_profiles" } },
   };
 
-  const jsonPromptSuffix = `\n\nCRITICAL INSTRUCTION: You MUST respond with ONLY a valid JSON object. No explanations, no markdown fences, no text before or after. The response must start with { and end with }.\nRequired format:\n{"characters": [{"name": "...", "aliases": ["..."], "gender": "male|female|unknown", "age_group": "child|teen|young|adult|elder|unknown", "temperament": "...", "speech_style": "...", "description": "..."}]}`;
+  const jsonPromptSuffix = `\n\nCRITICAL INSTRUCTION: You MUST respond with ONLY a valid JSON object. No explanations, no markdown fences, no text before or after. The response must start with { and end with }.\nRequired format:\n{"characters": [{"name": "...", "aliases": ["..."], "gender": "male|female|unknown", "age_group": "child|teen|young|adult|elder|unknown", "temperament": "...", "speech_style": "...", "description": "...", "speech_tags": ["#tag1", "#tag2"], "psycho_tags": ["#tag1", "#tag2"]}]}\n\nspeech_tags: 2-4 hashtags describing speech MANNER for TTS voice synthesis.\npsycho_tags: 2-4 hashtags describing character PSYCHOTYPE for voice auto-casting.\nTags MUST start with # and be in the same language as the text.`;
   const plainPayload: Record<string, unknown> = {
     model: usedModel,
     messages: [
