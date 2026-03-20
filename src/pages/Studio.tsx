@@ -159,14 +159,37 @@ const Studio = () => {
     const ids = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
     if (ids.length === 0) return;
     (async () => {
-      const { data: segData } = await supabase
+      // Step 1: find which scenes have segments (use count per scene to avoid 1000-row limit)
+      const segmentedIds = new Set<string>();
+      const allSegIds: string[] = [];
+
+      // Fetch in chunks to avoid the 1000-row default limit
+      const CHUNK = 500;
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const slice = ids.slice(i, i + CHUNK);
+        const { data: segData } = await supabase
+          .from("scene_segments")
+          .select("id, scene_id, speaker")
+          .in("scene_id", slice)
+          .limit(5000);
+        if (segData?.length) {
+          for (const s of segData) {
+            segmentedIds.add(s.scene_id);
+            allSegIds.push(s.id);
+          }
+        }
+      }
+
+      if (segmentedIds.size === 0) return;
+      setSegmentedSceneIds(segmentedIds);
+
+      // Reuse segData for audio staleness check
+      const { data: segDataFull } = await supabase
         .from("scene_segments")
         .select("id, scene_id, speaker")
-        .in("scene_id", ids);
-
-      if (!segData?.length) return;
-
-      setSegmentedSceneIds(new Set(segData.map(d => d.scene_id)));
+        .in("scene_id", [...segmentedIds])
+        .limit(5000);
+      const segData = segDataFull ?? [];
 
       const segIds = segData.map(s => s.id);
       const { data: audioData } = await supabase
