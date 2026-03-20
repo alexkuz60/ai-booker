@@ -362,34 +362,23 @@ function SceneCards({
                   }
                   if (i >= scenes.length - 1) return;
                   const currentContent = scenes[i].content || scenes[i].content_preview || "";
-                  // Normalize whitespace for comparison (browser selection may differ from stored newlines)
                   const norm = (s: string) => s.replace(/\s+/g, " ").trim();
-                  // Validate: selection must go to end of scene
                   if (!norm(currentContent).endsWith(norm(selectedText))) {
                     toast.warning(isRu ? "Выделение должно доходить до конца сцены" : "Selection must reach the end of the scene");
                     return;
                   }
-                  const nextContent = scenes[i + 1].content || scenes[i + 1].content_preview || "";
-                  // Find split point using normalized matching
-                  const normContent = norm(currentContent);
-                  const normSel = norm(selectedText);
-                  const splitCharIdx = normContent.length - normSel.length;
-                  // Map normalized char index back to original: find position where remaining chars match
-                  let origSplitIdx = 0;
-                  let normIdx = 0;
-                  for (let ci = 0; ci < currentContent.length; ci++) {
-                    if (/\s/.test(currentContent[ci]) && (ci === 0 || /\s/.test(currentContent[ci - 1]))) continue;
-                    if (!(/\s/.test(currentContent[ci]))) normIdx++;
-                    else normIdx++;
-                    // Simplified: just cut from where the selected text approximately starts
+                  // Build regex from selected text words to find split point in original
+                  const selWords = selectedText.trim().split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+                  const pattern = new RegExp(selWords.join("\\s+"));
+                  const match = currentContent.match(pattern);
+                  const splitIdx = match ? currentContent.indexOf(match[0]) : -1;
+                  if (splitIdx < 0) {
+                    toast.error(isRu ? "Не удалось определить границу" : "Could not determine boundary");
+                    return;
                   }
-                  // Simpler approach: find the selected text with flexible whitespace
-                  const selWords = selectedText.trim().split(/\s+/);
-                  const firstWord = selWords[0];
-                  // Find last occurrence of the first word of selection in content
-                  const searchFrom = currentContent.lastIndexOf(firstWord);
-                  const newCurrent = searchFrom > 0 ? currentContent.slice(0, searchFrom).replace(/\n{3,}/g, "\n\n").trim() : "";
-                  const movedText = searchFrom > 0 ? currentContent.slice(searchFrom).trim() : selectedText.trim();
+                  const newCurrent = currentContent.slice(0, splitIdx).replace(/\n{3,}/g, "\n\n").trim();
+                  const movedText = currentContent.slice(splitIdx).trim();
+                  const nextContent = scenes[i + 1].content || scenes[i + 1].content_preview || "";
                   const newNext = movedText + "\n\n" + nextContent;
                   const updated = scenes.map((sc, idx) => {
                     if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length, dirty: true };
@@ -417,20 +406,22 @@ function SceneCards({
                   if (i <= 0) return;
                   const currentContent = scenes[i].content || scenes[i].content_preview || "";
                   const norm = (s: string) => s.replace(/\s+/g, " ").trim();
-                  // Validate: selection must start from beginning of scene
                   if (!norm(currentContent).startsWith(norm(selectedText))) {
                     toast.warning(isRu ? "Выделение должно начинаться с начала сцены" : "Selection must start from the beginning of the scene");
                     return;
                   }
-                  const prevContent = scenes[i - 1].content || scenes[i - 1].content_preview || "";
-                  // Find split point: end of selected text in original content
-                  const selWords = selectedText.trim().split(/\s+/);
-                  const lastWord = selWords[selWords.length - 1];
-                  // Find the end of the last word of selection in original content
-                  const lastWordIdx = currentContent.indexOf(lastWord);
-                  const cutIdx = lastWordIdx >= 0 ? lastWordIdx + lastWord.length : selectedText.length;
-                  const newCurrent = currentContent.slice(cutIdx).replace(/\n{3,}/g, "\n\n").trim();
+                  // Build regex to find end of selected text in original
+                  const selWords = selectedText.trim().split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+                  const pattern = new RegExp(selWords.join("\\s+"));
+                  const match = currentContent.match(pattern);
+                  const cutIdx = match ? currentContent.indexOf(match[0]) + match[0].length : -1;
+                  if (cutIdx < 0) {
+                    toast.error(isRu ? "Не удалось определить границу" : "Could not determine boundary");
+                    return;
+                  }
                   const movedText = currentContent.slice(0, cutIdx).trim();
+                  const newCurrent = currentContent.slice(cutIdx).replace(/\n{3,}/g, "\n\n").trim();
+                  const prevContent = scenes[i - 1].content || scenes[i - 1].content_preview || "";
                   const newPrev = prevContent + "\n\n" + movedText;
                   const updated = scenes.map((sc, idx) => {
                     if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length, dirty: true };
