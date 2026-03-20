@@ -22,6 +22,7 @@ import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { SaveBookButton } from "@/components/SaveBookButton";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import type { LocalChapterData } from "@/lib/localSync";
+import { readSceneContentFromLocal } from "@/lib/localSceneContent";
 
 const Studio = () => {
   const { isRu } = useLanguage();
@@ -181,27 +182,38 @@ const Studio = () => {
     })();
   }, [chapter?.chapterId, chapter?.chapterTitle, bookId, chapter, setChapter]);
 
-  // Hydrate current chapter scene content from local project storage.
-  // Session restore may only contain metadata; Studio analysis must use local text only.
+  // Hydrate chapter scene content from OPFS using robust scene lookup.
+  // This avoids relying on sessionStorage snapshots or a single chapter file path.
   useEffect(() => {
-    if (!storage || !chapter?.chapterId) return;
+    if (!storage || !chapter?.scenes?.length) return;
 
     let cancelled = false;
 
     (async () => {
-      const localChapter = await storage.readJSON<LocalChapterData>(`scenes/chapter_${chapter.chapterId}.json`);
-      if (cancelled || !localChapter?.scenes?.length) return;
+      const resolvedScenes = await Promise.all(
+        chapter.scenes.map(async (scene) => {
+          const localScene = await readSceneContentFromLocal(storage, {
+            sceneId: scene.id,
+            chapterId: chapter.chapterId,
+            sceneNumber: scene.scene_number,
+            title: scene.title,
+          });
 
-      const localById = new Map(localChapter.scenes.filter((scene) => scene.id).map((scene) => [scene.id as string, scene]));
-      const localByNumber = new Map(localChapter.scenes.map((scene) => [scene.scene_number, scene]));
+          return localScene?.content
+            ? { ...scene, content: localScene.content }
+            : scene;
+        }),
+      );
+
+      if (cancelled) return;
 
       setChapter((prev) => {
         if (!prev || prev.chapterId !== chapter.chapterId) return prev;
 
         let changed = false;
-        const scenes = prev.scenes.map((scene) => {
-          const localScene = (scene.id ? localById.get(scene.id) : undefined) ?? localByNumber.get(scene.scene_number);
-          const localContent = localScene?.content ?? localScene?.content_preview;
+        const scenes = prev.scenes.map((scene, index) => {
+          const localScene = resolvedScenes[index];
+          const localContent = localScene?.content;
 
           if (localContent === undefined || localContent === scene.content) {
             return scene;
@@ -218,7 +230,7 @@ const Studio = () => {
     return () => {
       cancelled = true;
     };
-  }, [storage, chapter?.chapterId, setChapter]);
+  }, [storage, chapter?.chapterId, chapter?.scenes.map((scene) => `${scene.id ?? "no-id"}:${scene.scene_number}:${scene.title}`).join("|"), setChapter]);
 
   // Check which scenes already have segments, audio rendered, and stale audio
   useEffect(() => {
@@ -344,32 +356,45 @@ const Studio = () => {
     })();
   }, [chapter?.scenes.map(s => s.id).join(","), bookId, clipsRefreshToken]);
 
-  // LOCAL-FIRST: use local content only. DB used only for metadata (silence_sec).
-  // Content never fetched from server — it comes from Parser → sessionStorage.
+  // LOCAL-FIRST: selected scene text always comes from OPFS, never from browser storage.
   useEffect(() => {
+    let cancelled = false;
+
     setSceneContent(null);
-    if (!selectedScene) return;
 
-    // Use whatever content is already in local state
-    if (selectedScene.content) {
-      setSceneContent(selectedScene.content);
-    }
-
-    if (!selectedScene.id) return;
-
-    // Only fetch metadata (silence_sec) from DB — never content
     (async () => {
+      if (storage && selectedScene) {
+        const localScene = await readSceneContentFromLocal(storage, {
+          sceneId: selectedScene.id,
+          chapterId: chapter?.chapterId,
+          sceneNumber: selectedScene.scene_number,
+          title: selectedScene.title,
+        });
+
+        if (!cancelled && localScene?.content) {
+          setSceneContent(localScene.content);
+        }
+      } else if (selectedScene?.content && !cancelled) {
+        setSceneContent(selectedScene.content);
+      }
+
+      if (!selectedScene?.id) return;
+
       const { data } = await supabase
         .from("book_scenes")
         .select("silence_sec")
         .eq("id", selectedScene.id)
         .maybeSingle();
 
-      if (typeof data?.silence_sec === "number") {
+      if (!cancelled && typeof data?.silence_sec === "number") {
         setSilenceSec(data.silence_sec);
       }
     })();
-  }, [selectedScene?.id, selectedScene?.content]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [storage, chapter?.chapterId, selectedScene?.id, selectedScene?.scene_number, selectedScene?.title, selectedScene?.content]);
 
   // Save silenceSec when changed
   const handleSilenceSecChange = useCallback(async (sec: number) => {
@@ -512,6 +537,9 @@ const Studio = () => {
                 isRu={isRu}
                 selectedSceneId={selectedScene?.id ?? null}
                 selectedSceneContent={sceneContent}
+                  selectedSceneNumber={selectedScene?.scene_number ?? null}
+                  selectedSceneTitle={selectedScene?.title ?? null}
+                  chapterId={chapter?.chapterId ?? null}
                 bookId={bookId}
                 chapterSceneIds={chapterSceneIds}
                 onSegmented={onSegmented}

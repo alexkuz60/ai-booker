@@ -35,6 +35,7 @@ interface BatchSegmentationPanelProps {
   isRu: boolean;
   sceneIds: string[];
   scenes: SceneInfo[];
+  chapterId: string | null;
   bookId: string | null;
   /** User API keys for pool model resolution */
   userApiKeys?: Record<string, string>;
@@ -48,6 +49,7 @@ export function BatchSegmentationPanel({
   isRu,
   sceneIds,
   scenes,
+  chapterId,
   bookId,
   userApiKeys = {},
   concurrency = 3,
@@ -86,7 +88,12 @@ export function BatchSegmentationPanel({
       throw new Error(isRu ? "Локальный проект не открыт" : "Local project is not open");
     }
 
-    const localScene = await readSceneContentFromLocal(storage, scene.id);
+    const localScene = await readSceneContentFromLocal(storage, {
+      sceneId: scene.id,
+      chapterId,
+      sceneNumber: scene.sceneNumber,
+      title: scene.title,
+    });
     if (!localScene?.content) {
       throw new Error(
         isRu
@@ -96,7 +103,7 @@ export function BatchSegmentationPanel({
     }
 
     return localScene.content;
-  }, [storage, isRu]);
+  }, [storage, isRu, chapterId]);
 
   // ── Pool-based batch ──────────────────────────────────────────────────
 

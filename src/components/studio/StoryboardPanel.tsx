@@ -35,6 +35,9 @@ import type { LocalTypeMappingEntry } from "@/lib/storyboardSync";
 export function StoryboardPanel({
   sceneId,
   sceneContent,
+  sceneNumber,
+  sceneTitle,
+  chapterId,
   isRu,
   bookId,
   onSegmented,
@@ -48,6 +51,9 @@ export function StoryboardPanel({
 }: {
   sceneId: string | null;
   sceneContent: string | null;
+  sceneNumber?: number | null;
+  sceneTitle?: string | null;
+  chapterId?: string | null;
   isRu: boolean;
   bookId: string | null;
   onSegmented?: (sceneId: string) => void;
@@ -591,7 +597,12 @@ export function StoryboardPanel({
         return;
       }
 
-      const localScene = await readSceneContentFromLocal(storage, sceneId);
+      const localScene = await readSceneContentFromLocal(storage, {
+        sceneId,
+        chapterId,
+        sceneNumber,
+        title: sceneTitle,
+      });
       const analysisContent = localScene?.content ?? null;
 
       if (!analysisContent) {
@@ -624,7 +635,7 @@ export function StoryboardPanel({
       await loadSegments(sceneId);
     }
     setAnalyzing(false);
-  }, [sceneId, isRu, onSegmented, loadSegments, clearLocal, getModelForRole, userApiKeys, storage]);
+  }, [sceneId, chapterId, sceneNumber, sceneTitle, isRu, onSegmented, loadSegments, clearLocal, getModelForRole, userApiKeys, storage]);
 
   // Auto-trigger analysis when scene has no segments and content is available
   useEffect(() => {
