@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
-import { supabase } from "@/integrations/supabase/client";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { readStructureFromLocal } from "@/lib/localSync";
 import { loadStudioChapter, saveStudioChapter, type StudioChapter } from "@/lib/studioChapter";
 
 /**
@@ -24,100 +25,69 @@ const EMPTY_STATE: StudioSessionState = {
   activeTab: "storyboard",
 };
 
-async function restoreChapterFromDb(params: {
+async function restoreChapterFromLocal(params: {
+  storageAvailable: ReturnType<typeof useProjectStorageContext>["storage"];
   bookId: string | null;
   chapterId: string | null;
   chapterTitle: string;
   bookTitle: string;
 }): Promise<StudioChapter | null> {
-  const { bookId, chapterId, chapterTitle, bookTitle } = params;
+  const { storageAvailable, bookId, chapterId, chapterTitle, bookTitle } = params;
+  if (!storageAvailable) return null;
 
-  let chapterIds: string[] = [];
-  let chapterRow: { id: string; title: string; book_id: string } | null = null;
+  const restored = await readStructureFromLocal(storageAvailable);
+  if (!restored?.structure) return null;
 
-  if (chapterId) {
-    let idQuery = supabase
-      .from("book_chapters")
-      .select("id, title, book_id")
-      .eq("id", chapterId);
-
-    if (bookId) {
-      idQuery = idQuery.eq("book_id", bookId);
-    }
-
-    const { data: chapterById, error: chapterByIdError } = await idQuery.maybeSingle();
-    if (chapterByIdError) return null;
-    if (chapterById) {
-      chapterRow = chapterById;
-      chapterIds = [chapterById.id];
-    }
+  if (bookId && restored.structure.bookId !== bookId) {
+    return null;
   }
 
-  if (!chapterRow) {
-    let fallbackQuery = supabase
-      .from("book_chapters")
-      .select("id, title, book_id")
-      .eq("title", chapterTitle)
-      .order("chapter_number", { ascending: true })
-      .limit(1);
+  const chapterIndexById = chapterId
+    ? [...restored.chapterIdMap.entries()].find(([, id]) => id === chapterId)?.[0] ?? null
+    : null;
 
-    if (bookId) {
-      fallbackQuery = fallbackQuery.eq("book_id", bookId);
-    }
+  const chapterIndexByTitle = chapterTitle
+    ? restored.structure.toc.findIndex((entry, idx) => entry.title === chapterTitle && restored.chapterResults.has(idx))
+    : -1;
 
-    const { data: fallbackChapter, error: fallbackError } = await fallbackQuery.maybeSingle();
-    if (fallbackError || !fallbackChapter) return null;
-    chapterRow = fallbackChapter;
-    chapterIds = [fallbackChapter.id];
-  }
+  const chapterIndex = chapterIndexById ?? (chapterIndexByTitle >= 0 ? chapterIndexByTitle : null);
+  if (chapterIndex === null) return null;
 
-  const resolvedBookId = chapterRow.book_id;
+  const chapterScenes = restored.chapterResults.get(chapterIndex);
+  const resolvedChapterId = restored.chapterIdMap.get(chapterIndex) ?? chapterId ?? undefined;
+  const tocEntry = restored.structure.toc[chapterIndex];
 
-  // LOCAL-FIRST: fetch only metadata (id, title, etc.) — never content.
-  // Content lives in local OPFS and flows through Parser → sessionStorage.
-  const { data: dbScenes, error: sceneError } = await supabase
-    .from("book_scenes")
-    .select("id, scene_number, title, scene_type, mood, bpm")
-    .in("chapter_id", chapterIds)
-    .order("scene_number");
-
-  if (sceneError || !dbScenes?.length) return null;
-
-  let resolvedBookTitle = bookTitle;
-  if (!resolvedBookTitle && resolvedBookId) {
-    const { data: bookRow } = await supabase
-      .from("books")
-      .select("title")
-      .eq("id", resolvedBookId)
-      .maybeSingle();
-    resolvedBookTitle = bookRow?.title || "";
+  if (!chapterScenes || !resolvedChapterId || !tocEntry) {
+    return null;
   }
 
   return {
-    chapterId: chapterRow.id,
-    chapterTitle: chapterRow.title,
-    bookTitle: resolvedBookTitle,
-    bookId: resolvedBookId,
-    scenes: dbScenes.map((scene) => ({
+    chapterId: resolvedChapterId,
+    chapterTitle: tocEntry.title,
+    bookTitle: restored.structure.title || bookTitle,
+    bookId: restored.structure.bookId || bookId || undefined,
+    scenes: chapterScenes.scenes.map((scene) => ({
       id: scene.id,
       scene_number: scene.scene_number,
       title: scene.title,
       scene_type: scene.scene_type || "mixed",
       mood: scene.mood || "",
       bpm: scene.bpm || 120,
-      // No content from DB — content comes from local storage only
+      content: scene.content,
+      content_preview: scene.content_preview,
     })),
   };
 }
 
 /**
- * Manages Studio session: loads from sessionStorage first, falls back to cloud settings.
+ * Manages Studio session: loads from sessionStorage first, falls back to local project + cloud settings.
  * Persists state changes to cloud with debounce.
  * Returns { chapter, restored } — `restored` is true once initial load is complete.
  */
 export function useStudioSession() {
   const { value: cloudState, update: saveCloudState, loaded: cloudLoaded } =
     useCloudSettings<StudioSessionState>("studio_session", EMPTY_STATE);
+  const { storage } = useProjectStorageContext();
 
   const [chapter, setChapter] = useState<StudioChapter | null>(() => loadStudioChapter());
   const [selectedSceneIdx, setSelectedSceneIdx] = useState<number | null>(() => {
@@ -130,7 +100,6 @@ export function useStudioSession() {
   const [restored, setRestored] = useState(false);
   const restoredRef = useRef(false);
 
-  // ── Restore from cloud if sessionStorage is empty ─────────
   useEffect(() => {
     if (restoredRef.current || !cloudLoaded) return;
     restoredRef.current = true;
@@ -168,7 +137,8 @@ export function useStudioSession() {
 
     (async () => {
       try {
-        const restoredChapter = await restoreChapterFromDb({
+        const restoredChapter = await restoreChapterFromLocal({
+          storageAvailable: storage,
           bookId: resolvedBookId,
           chapterId: resolvedChapterId,
           chapterTitle: resolvedChapterTitle,
@@ -211,14 +181,13 @@ export function useStudioSession() {
         setRestored(true);
       }
     })();
-  }, [cloudLoaded]);
+  }, [cloudLoaded, storage]);
 
   useEffect(() => {
     if (!chapter) return;
     saveStudioChapter(chapter);
   }, [chapter]);
 
-  // ── Persist scene index to sessionStorage ─────────────────
   useEffect(() => {
     if (selectedSceneIdx !== null) {
       sessionStorage.setItem("studio_selected_scene_idx", String(selectedSceneIdx));
@@ -227,7 +196,6 @@ export function useStudioSession() {
     }
   }, [selectedSceneIdx]);
 
-  // ── Save state to cloud on changes (debounced via useCloudSettings) ──
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const persistToCloud = useCallback(() => {
@@ -252,7 +220,6 @@ export function useStudioSession() {
     persistToCloud();
   }, [chapter?.chapterTitle, selectedSceneIdx, activeTab, restored]);
 
-  // Cleanup
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
