@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
-import { Users, UsersRound, Volume2, Loader2, Sparkles, User, Filter, Merge, CheckSquare, X, Check, SearchCheck } from "lucide-react";
+import { Users, UsersRound, Volume2, Loader2, Sparkles, User, Filter, Merge, CheckSquare, X, Check, SearchCheck, MessageSquareQuote } from "lucide-react";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -163,6 +163,8 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const [profiling, setProfiling] = useState(false);
   const [casting, setCasting] = useState(false);
   const [castingCandidates, setCastingCandidates] = useState<CastingCharacter[] | null>(null);
+  const [refiningSpeech, setRefiningSpeech] = useState(false);
+  const [speechContextMap, setSpeechContextMap] = useState<Map<string, Record<string, unknown>>>(new Map());
 
   // Filter: "all" or "scene"
   const [filterMode, setFilterMode] = useState<"all" | "scene" | "chapter">("chapter");
@@ -437,6 +439,148 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
   const handleProfile = () => runProfile();
   const handleIncrementalProfile = () => runProfile(chapterSceneIds);
+
+  // ── Refine Speech Context (scene-level) ──────────────
+  const handleRefineSpeech = useCallback(async () => {
+    if (!selectedId || !sceneId) return;
+    const ch = characters.find(c => c.id === selectedId);
+    if (!ch) return;
+
+    setRefiningSpeech(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error(isRu ? "Необходимо авторизоваться" : "Please sign in");
+        return;
+      }
+
+      // Load segments where this character speaks in the current scene
+      const { data: segments } = await supabase
+        .from("scene_segments")
+        .select("id, segment_type, speaker")
+        .eq("scene_id", sceneId)
+        .or(`speaker.eq.${ch.name}${ch.aliases.length > 0 ? `,speaker.in.(${ch.aliases.join(",")})` : ""}`);
+
+      if (!segments?.length) {
+        toast.info(isRu ? `${ch.name} не говорит в этой сцене` : `${ch.name} has no lines in this scene`);
+        return;
+      }
+
+      // Load phrases for those segments
+      const segIds = segments.map(s => s.id);
+      const { data: phrases } = await supabase
+        .from("segment_phrases")
+        .select("segment_id, text, phrase_number")
+        .in("segment_id", segIds)
+        .order("phrase_number");
+
+      const segmentTexts = segments.map(seg => {
+        const segPhrases = (phrases || []).filter(p => p.segment_id === seg.id).sort((a, b) => a.phrase_number - b.phrase_number);
+        return segPhrases.map(p => p.text).join(" ");
+      }).filter(Boolean);
+
+      if (segmentTexts.length === 0) {
+        toast.info(isRu ? "Нет текста для анализа" : "No text to analyze");
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/refine-speech-context`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            scene_id: sceneId,
+            character_name: ch.name,
+            segments_text: segmentTexts,
+            character_profile: {
+              description: ch.description,
+              temperament: ch.temperament,
+              speech_style: ch.speech_style,
+              speech_tags: ch.speech_tags,
+              psycho_tags: ch.psycho_tags,
+            },
+            lang: isRu ? "ru" : "en",
+            model: getModelForRole("profiler"),
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const d = await response.json().catch(() => ({}));
+        throw new Error(d.error || `HTTP ${response.status}`);
+      }
+
+      const result = await response.json();
+      const ctx = result.speech_context;
+
+      // Save speech_context to all segments of this character in this scene
+      for (const seg of segments) {
+        const { data: existing } = await supabase
+          .from("scene_segments")
+          .select("metadata")
+          .eq("id", seg.id)
+          .single();
+
+        const existingMeta = (existing?.metadata as Record<string, unknown>) || {};
+        await supabase
+          .from("scene_segments")
+          .update({
+            metadata: { ...existingMeta, speech_context: { ...ctx, character: ch.name } },
+          })
+          .eq("id", seg.id);
+      }
+
+      // Update local cache
+      setSpeechContextMap(prev => {
+        const next = new Map(prev);
+        next.set(`${selectedId}:${sceneId}`, ctx);
+        return next;
+      });
+
+      toast.success(
+        isRu
+          ? `Речь ${ch.name} уточнена для сцены`
+          : `Speech refined for ${ch.name} in scene`
+      );
+    } catch (e) {
+      console.error("Refine speech error:", e);
+      toast.error(e instanceof Error ? e.message : (isRu ? "Ошибка уточнения речи" : "Speech refinement error"));
+    } finally {
+      setRefiningSpeech(false);
+    }
+  }, [selectedId, sceneId, characters, isRu, getModelForRole]);
+
+  // Load existing speech_context for selected character + scene
+  useEffect(() => {
+    if (!selectedId || !sceneId) return;
+    const ch = characters.find(c => c.id === selectedId);
+    if (!ch) return;
+    const cacheKey = `${selectedId}:${sceneId}`;
+    if (speechContextMap.has(cacheKey)) return;
+
+    (async () => {
+      const { data: segments } = await supabase
+        .from("scene_segments")
+        .select("metadata")
+        .eq("scene_id", sceneId)
+        .or(`speaker.eq.${ch.name}${ch.aliases.length > 0 ? `,speaker.in.(${ch.aliases.join(",")})` : ""}`)
+        .limit(1);
+
+      const meta = segments?.[0]?.metadata as Record<string, unknown> | null;
+      if (meta?.speech_context) {
+        setSpeechContextMap(prev => {
+          const next = new Map(prev);
+          next.set(cacheKey, meta.speech_context as Record<string, unknown>);
+          return next;
+        });
+      }
+    })();
+  }, [selectedId, sceneId, characters]);
 
   // ── Save voice config (only used by auto-cast now) ───────────────────────────
   const handleSave = async () => {
@@ -1290,6 +1434,41 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                         <p className="text-xs text-muted-foreground mt-1">
                           {selectedChar.aliases.join(", ")}
                         </p>
+                      </div>
+                    )}
+                    {/* Scene-level Speech Refinement */}
+                    {sceneId && sceneCharIds.has(selectedChar.id) && (
+                      <div className="mt-4 pt-3 border-t border-border">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                            <MessageSquareQuote className="h-3 w-3" />
+                            {isRu ? "Речь в сцене" : "Speech in Scene"}
+                          </span>
+                          <Button variant="outline" size="sm" className="h-6 px-2 gap-1 text-xs" onClick={handleRefineSpeech} disabled={refiningSpeech || profiling}>
+                            {refiningSpeech ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                            {refiningSpeech ? (isRu ? "Анализ…" : "Analyzing…") : (isRu ? "Уточнить речь" : "Refine Speech")}
+                          </Button>
+                        </div>
+                        {(() => {
+                          const ctx = speechContextMap.get(`${selectedChar.id}:${sceneId}`);
+                          if (!ctx) return (<p className="text-[10px] text-muted-foreground/50 italic">{isRu ? "Нажмите «Уточнить речь» для анализа манеры в этой сцене" : "Click 'Refine Speech' to analyze manner in this scene"}</p>);
+                          return (
+                            <div className="space-y-1.5">
+                              {ctx.emotion && (<div className="flex items-center gap-2"><Badge variant="secondary" className="text-[10px] px-1.5 py-0">{isRu ? "Эмоция" : "Emotion"}</Badge><span className="text-xs text-foreground">{String(ctx.emotion)}</span></div>)}
+                              <div className="flex flex-wrap gap-1.5">
+                                {ctx.tempo && (<Badge variant="outline" className="text-[10px] px-1.5 py-0">⏱ {String(ctx.tempo)}</Badge>)}
+                                {ctx.volume_hint && (<Badge variant="outline" className="text-[10px] px-1.5 py-0">🔊 {String(ctx.volume_hint)}</Badge>)}
+                              </div>
+                              {ctx.manner && (<p className="text-xs text-muted-foreground italic">{String(ctx.manner)}</p>)}
+                              {(ctx.tts_instructions_ru || ctx.tts_instructions_en) && (
+                                <div className="mt-1 p-2 rounded-md bg-muted/30 border border-border">
+                                  <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "TTS инструкции" : "TTS Instructions"}</span>
+                                  <p className="text-[11px] text-foreground/80 mt-0.5">{String(isRu ? (ctx.tts_instructions_ru || ctx.tts_instructions_en) : (ctx.tts_instructions_en || ctx.tts_instructions_ru))}</p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>

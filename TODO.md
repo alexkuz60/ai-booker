@@ -45,7 +45,7 @@
 ### Фаза 2 — Студия / Персонажи + Кастинг
 - [x] **Фильтр по умолчанию = chapter** — CharactersPanel: дефолт `filterMode="chapter"`, toggle «Сцена»/«Глава»/«Все»
 - [x] **Бейджи speech_tags/psycho_tags** — отображение рядом с temperament в карточке персонажа + 🎭 счётчик в списке
-- [ ] **Scene-level профайлинг** — кнопка «Уточнить речь» для выбранного персонажа → AI дообогащает `scene_segments.metadata.speech_context` с учётом психотипа + контекста сцены, НЕ перезаписывая глобальный профиль
+- [x] **Scene-level профайлинг** — кнопка «Уточнить речь» для выбранного персонажа → AI дообогащает `scene_segments.metadata.speech_context` с учётом психотипа + контекста сцены, НЕ перезаписывая глобальный профиль. Edge function `refine-speech-context`, UI в CharactersPanel с отображением emotion/tempo/volume_hint/manner/tts_instructions
 - [x] **Психотип → TTS-пресет** — конфиг `src/config/psychotypeVoicePresets.ts`: маппинг `{ accentuation, archetype, provider }` → конкретные настройки провайдера + матрица segment_type → TTS mode
 - [x] **Авто-кастинг с альтернативами** — `suggestVoiceCandidates()` в psychotypeVoicePresets.ts предлагает 2-3 голоса-кандидата на основе psycho_tags/accentuation/archetype
 - [x] **Матрица «segment_type → TTS mode»** — `SEGMENT_TYPE_TTS_MODIFIERS` в psychotypeVoicePresets.ts: dialogue=полная эмоциональность, inner_thought=тише+медленнее, narrator=нейтрально, lyric=певуче
