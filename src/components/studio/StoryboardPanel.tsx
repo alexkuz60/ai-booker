@@ -634,7 +634,7 @@ export function StoryboardPanel({
       await loadSegments(sceneId);
     }
     setAnalyzing(false);
-  }, [sceneId, sceneContent, isRu, onSegmented, loadSegments, clearLocal, getModelForRole, userApiKeys]);
+  }, [sceneId, sceneContent, isRu, onSegmented, loadSegments, clearLocal, getModelForRole, userApiKeys, storage]);
 
   // Auto-trigger analysis when scene has no segments and content is available
   useEffect(() => {
