@@ -82,7 +82,7 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
   const resolved = resolveAiEndpoint(modelOverride || "google/gemini-3-flash-preview", providerApiKey || null, openrouterApiKey);
   if (!resolved.apiKey) throw new Error("AI key not configured");
 
-  const usedModel = modelOverride || "google/gemini-3-flash-preview";
+  const usedModel = resolved.model;
   // Reasoning models return data in reasoning/reasoning_details, not tool_calls
   const isReasoningModel = usedModel.includes("gpt-5") || usedModel.includes("o3") || usedModel.includes("o4") || usedModel.includes("gemini-2.5-pro");
   const aiStart = Date.now();
