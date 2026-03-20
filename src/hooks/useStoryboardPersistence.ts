@@ -9,14 +9,17 @@
 
 import { useCallback, useRef } from "react";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { supabase } from "@/integrations/supabase/client";
 import {
   saveStoryboardToLocal,
   readStoryboardFromLocal,
   deleteStoryboardFromLocal,
+  listStoryboardedScenes,
   type LocalStoryboardData,
   type LocalTypeMappingEntry,
 } from "@/lib/storyboardSync";
 import type { Segment } from "@/components/studio/storyboard/types";
+import type { Json } from "@/integrations/supabase/types";
 
 export interface StoryboardSnapshot {
   segments: Segment[];
@@ -65,11 +68,116 @@ export function useStoryboardPersistence(sceneId: string | null) {
     await deleteStoryboardFromLocal(storage, sceneId);
   }, [storage, sceneId]);
 
+  /**
+   * Push OPFS storyboard data → Supabase DB (delete-then-insert).
+   * Call before TTS synthesis or from "Save to Server".
+   */
+  const pushToDb = useCallback(async (sid: string, snapshot?: StoryboardSnapshot): Promise<void> => {
+    const data = snapshot
+      ? snapshot
+      : storage
+        ? await readStoryboardFromLocal(storage, sid)
+        : null;
+    if (!data || data.segments.length === 0) return;
+
+    const segments = data.segments;
+    const typeMappings = "typeMappings" in data ? data.typeMappings : (data as LocalStoryboardData).typeMappings;
+
+    // 1. Delete existing segments (cascade deletes phrases)
+    await supabase.from("scene_segments").delete().eq("scene_id", sid);
+
+    // 2. Insert segments
+    const segInserts = segments.map((s) => ({
+      id: s.segment_id,
+      scene_id: sid,
+      segment_number: s.segment_number,
+      segment_type: s.segment_type as any,
+      speaker: s.speaker || null,
+      metadata: {
+        ...(s.inline_narrations ? { inline_narrations: s.inline_narrations } : {}),
+        ...(s.split_silence_ms != null ? { split_silence_ms: s.split_silence_ms } : {}),
+      } as Json,
+    }));
+
+    const { error: segErr } = await supabase.from("scene_segments").insert(segInserts);
+    if (segErr) {
+      console.error("[pushToDb] segment insert error:", segErr);
+      throw segErr;
+    }
+
+    // 3. Insert phrases
+    const phraseInserts: Array<{
+      id: string;
+      segment_id: string;
+      phrase_number: number;
+      text: string;
+      metadata: Json;
+    }> = [];
+    for (const seg of segments) {
+      for (const ph of seg.phrases) {
+        phraseInserts.push({
+          id: ph.phrase_id,
+          segment_id: seg.segment_id,
+          phrase_number: ph.phrase_number,
+          text: ph.text,
+          metadata: (ph.annotations ? { annotations: ph.annotations } : {}) as Json,
+        });
+      }
+    }
+
+    if (phraseInserts.length > 0) {
+      // Batch in chunks of 500
+      for (let i = 0; i < phraseInserts.length; i += 500) {
+        const chunk = phraseInserts.slice(i, i + 500);
+        const { error: phErr } = await supabase.from("segment_phrases").insert(chunk);
+        if (phErr) {
+          console.error("[pushToDb] phrase insert error:", phErr);
+          throw phErr;
+        }
+      }
+    }
+
+    // 4. Replace type mappings
+    await supabase.from("scene_type_mappings").delete().eq("scene_id", sid);
+    if (typeMappings && typeMappings.length > 0) {
+      const mapInserts = typeMappings.map((m) => ({
+        scene_id: sid,
+        segment_type: m.segmentType,
+        character_id: m.characterId,
+      }));
+      const { error: mapErr } = await supabase.from("scene_type_mappings").insert(mapInserts);
+      if (mapErr) console.warn("[pushToDb] type mappings insert:", mapErr);
+    }
+
+    console.debug(`[pushToDb] Synced scene ${sid}: ${segments.length} segments, ${phraseInserts.length} phrases`);
+  }, [storage]);
+
+  /**
+   * Push ALL storyboarded scenes from OPFS → DB.
+   * Used by "Save to Server" button.
+   */
+  const pushAllToDb = useCallback(async (): Promise<number> => {
+    if (!storage) return 0;
+    const sceneIds = await listStoryboardedScenes(storage);
+    let pushed = 0;
+    for (const sid of sceneIds) {
+      try {
+        await pushToDb(sid);
+        pushed++;
+      } catch (err) {
+        console.warn(`[pushAllToDb] Failed for scene ${sid}:`, err);
+      }
+    }
+    return pushed;
+  }, [storage, pushToDb]);
+
   return {
     loadFromLocal,
     persist,
     persistNow,
     clearLocal,
+    pushToDb,
+    pushAllToDb,
     hasStorage: !!storage,
   };
 }
