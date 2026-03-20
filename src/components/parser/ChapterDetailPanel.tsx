@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, Fragment } from "react";
 import { motion } from "framer-motion";
 import {
   FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock, RefreshCw, Palette, StopCircle,
-  Trash2, Hash, SpellCheck, Footprints, PencilLine, Merge
+  Trash2, Hash, SpellCheck, Footprints, PencilLine, Merge, ArrowDownToLine
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -344,6 +344,34 @@ function SceneCards({
               <ContextMenuItem onClick={() => handleCleanup("delete_selected", i)} className="gap-2 text-destructive">
                 <Trash2 className="h-4 w-4" />
                 {isRu ? "Удалить выделенное" : "Delete selected"}
+              </ContextMenuItem>
+              <ContextMenuItem
+                disabled={i >= scenes.length - 1}
+                onClick={() => {
+                  const selectedText = getSelectedText();
+                  consume();
+                  if (!selectedText) {
+                    toast.info(isRu ? "Сначала выделите текст" : "Select text first");
+                    return;
+                  }
+                  if (i >= scenes.length - 1) return;
+                  const currentContent = scenes[i].content || scenes[i].content_preview || "";
+                  const nextContent = scenes[i + 1].content || scenes[i + 1].content_preview || "";
+                  const newCurrent = currentContent.replace(selectedText, "").replace(/\n{3,}/g, "\n\n").trim();
+                  const newNext = selectedText + "\n\n" + nextContent;
+                  const updated = scenes.map((sc, idx) => {
+                    if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length };
+                    if (idx === i + 1) return { ...sc, content: newNext, content_preview: newNext.slice(0, 200), char_count: newNext.length };
+                    return sc;
+                  });
+                  onScenesUpdate?.(updated, isRu ? `Текст перенесён в сцену ${i + 2}` : `Text moved to scene ${i + 2}`);
+                  toast.success(isRu ? `Перенесено в сцену ${i + 2}` : `Moved to scene ${i + 2}`);
+                  setEditedIndices(prev => { const n = new Set(prev); n.add(i); n.add(i + 1); return n; });
+                }}
+                className="gap-2"
+              >
+                <ArrowDownToLine className="h-4 w-4 text-muted-foreground" />
+                {isRu ? "Перенести в следующую сцену" : "Move to next scene"}
               </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem
