@@ -58,7 +58,12 @@
 ├── 📁 scenes/
 │   └── chapter_{id}.json  — { chapterId, scenes[], status }
 ├── 📁 storyboard/
-│   └── scene_{id}.json    — LocalStoryboardData (segments, phrases, type mappings, mixer, plugins)
+│   └── scene_{id}.json    — LocalStoryboardData:
+│       │                     • sceneId, updatedAt
+│       │                     • segments[] (type, speaker, phrases[], annotations, inline_narrations)
+│       │                     • typeMappings[] (segmentType → characterId/Name)
+│       │                     • audioStatus{} (segmentId → status/durationMs)
+│       │                     • inlineNarrationSpeaker
 ├── 📁 audio/
 │   ├── 📁 tts/            — {segmentId}.mp3
 │   ├── 📁 atmosphere/     — атмосферные слои
