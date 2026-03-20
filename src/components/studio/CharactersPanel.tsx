@@ -346,6 +346,9 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     if (filterMode === "scene" && sceneId) {
       const sceneChars = characters.filter(c => sceneCharIds.has(c.id));
       list = sceneChars.length > 0 ? sceneChars : characters.filter(c => SYSTEM_NAMES.has(c.name));
+    } else if (filterMode === "chapter") {
+      const chapterChars = characters.filter(c => chapterCharIds.has(c.id) || SYSTEM_NAMES.has(c.name));
+      list = chapterChars.length > 0 ? chapterChars : characters;
     } else {
       list = characters;
     }
@@ -357,7 +360,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       if (aSys && bSys) return a.sort_order - b.sort_order;
       return a.name.localeCompare(b.name);
     });
-  }, [characters, filterMode, sceneCharIds, sceneId, SYSTEM_NAMES]);
+  }, [characters, filterMode, sceneCharIds, chapterCharIds, sceneId, SYSTEM_NAMES]);
 
   // ── Sync voice settings when character selected (for auto-cast only) ─────────
   useEffect(() => {
