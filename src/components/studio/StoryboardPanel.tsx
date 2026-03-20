@@ -359,9 +359,10 @@ export function StoryboardPanel({
     if (!sceneId || mergeGroups.length === 0) return;
     setMerging(true);
     try {
+      let updated = [...segments];
       for (const group of mergeGroups) {
         const [keeper, ...toMerge] = group;
-        const mergeIds = toMerge.map(s => s.segment_id);
+        const mergeIds = new Set(toMerge.map(s => s.segment_id));
 
         let allPhrases = [...keeper.phrases];
         for (const seg of toMerge) {
@@ -371,57 +372,36 @@ export function StoryboardPanel({
             if (pi === 0 && !startsNewSentence && allPhrases.length > 0) {
               const prev = allPhrases[allPhrases.length - 1];
               const separator = prev.text.endsWith(" ") ? "" : " ";
-              allPhrases[allPhrases.length - 1] = {
-                ...prev,
-                text: prev.text + separator + ph.text,
-              };
-              await supabase.from("segment_phrases").delete().eq("id", ph.phrase_id);
+              allPhrases[allPhrases.length - 1] = { ...prev, text: prev.text + separator + ph.text };
             } else {
               allPhrases.push(ph);
             }
           }
         }
 
-        for (let i = 0; i < allPhrases.length; i++) {
-          const ph = allPhrases[i];
-          const isFromKeeper = keeper.phrases.some(kp => kp.phrase_id === ph.phrase_id);
-          if (isFromKeeper) {
-            await supabase.from("segment_phrases")
-              .update({ phrase_number: i + 1, text: ph.text })
-              .eq("id", ph.phrase_id);
-          } else {
-            await supabase.from("segment_phrases")
-              .update({ segment_id: keeper.segment_id, phrase_number: i + 1 })
-              .eq("id", ph.phrase_id);
-          }
-        }
+        // Renumber phrases
+        allPhrases = allPhrases.map((ph, i) => ({ ...ph, phrase_number: i + 1 }));
 
-        await supabase.from("segment_audio").delete().in("segment_id", mergeIds);
-        await supabase.from("scene_segments").delete().in("id", mergeIds);
+        // Update keeper with merged phrases, remove merged segments
+        updated = updated
+          .map(s => s.segment_id === keeper.segment_id ? { ...s, phrases: allPhrases } : s)
+          .filter(s => !mergeIds.has(s.segment_id));
       }
-      const { data: remaining } = await supabase
-        .from("scene_segments")
-        .select("id, segment_number")
-        .eq("scene_id", sceneId)
-        .order("segment_number");
-      if (remaining) {
-        for (let i = 0; i < remaining.length; i++) {
-          if (remaining[i].segment_number !== i + 1) {
-            await supabase.from("scene_segments").update({ segment_number: i + 1 }).eq("id", remaining[i].id);
-          }
-        }
-      }
-      await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
+
+      // Renumber segments
+      updated = updated.map((s, i) => ({ ...s, segment_number: i + 1 }));
+
+      setSegments(updated);
       setMergeChecked(new Set());
+      await persistNow(buildSnapshot(updated));
       toast.success(isRu ? "Блоки объединены" : "Segments merged");
-      await loadSegments(sceneId);
       onSegmented?.(sceneId);
     } catch (err: any) {
       console.error("Merge failed:", err);
       toast.error(isRu ? "Ошибка объединения" : "Merge failed");
     }
     setMerging(false);
-  }, [sceneId, mergeGroups, isRu, loadSegments, onSegmented]);
+  }, [sceneId, mergeGroups, segments, isRu, persistNow, buildSnapshot, onSegmented]);
 
   const handleDeleteSegments = useCallback(async () => {
     if (!sceneId || mergeChecked.size === 0) return;
