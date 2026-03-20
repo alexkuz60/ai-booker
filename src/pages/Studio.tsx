@@ -112,14 +112,20 @@ const Studio = () => {
   useEffect(() => {
     if (!chapter) return;
     const needIds = chapter.scenes.some(s => !s.id);
+    const currentBookId = bookId || chapter.bookId;
     const needBookId = !bookId;
     if (!needIds && !needBookId) return;
 
     (async () => {
-      const { data: dbChapters } = await supabase
+      // Always filter by bookId when available to avoid cross-book collisions
+      let query = supabase
         .from("book_chapters")
         .select("id, title, book_id")
         .ilike("title", chapter.chapterTitle);
+      if (currentBookId) {
+        query = query.eq("book_id", currentBookId);
+      }
+      const { data: dbChapters } = await query;
       if (!dbChapters?.length) return;
 
       if (needBookId && dbChapters[0]?.book_id) {
@@ -143,7 +149,7 @@ const Studio = () => {
         setChapter(updated);
       }
     })();
-  }, [chapter?.chapterTitle]);
+  }, [chapter?.chapterTitle, bookId]);
 
   // Check which scenes already have segments, audio rendered, and stale audio
   useEffect(() => {
