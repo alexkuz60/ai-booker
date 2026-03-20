@@ -859,6 +859,9 @@ export function StoryboardPanel({
     setCurrentlySynthesizingIds(new Set([segmentId]));
     onSynthesizingChange?.(new Set([segmentId]));
     try {
+      // Push current segment state to DB before re-synth
+      await pushToDb(sceneId, buildSnapshot());
+
       const { data, error } = await supabase.functions.invoke("synthesize-scene", {
         body: { scene_id: sceneId, language: isRu ? "ru" : "en", force: true, segment_ids: [segmentId] },
       });
@@ -880,19 +883,19 @@ export function StoryboardPanel({
       onErrorSegmentsChange?.(new Set());
       onSegmented?.(sceneId);
       await new Promise(r => setTimeout(r, 500));
-      await loadAudioStatus(segments.map(s => s.segment_id));
+      await refreshAudioStatusFromDb(segments.map(s => s.segment_id));
     } catch (err: any) {
       console.error("Re-synth failed:", err);
       toast.error(isRu ? "Ошибка ре-синтеза" : "Re-synthesis failed", {
         description: err?.message,
       });
       onErrorSegmentsChange?.(new Set([segmentId]));
-      await loadAudioStatus(segments.map(s => s.segment_id));
+      await refreshAudioStatusFromDb(segments.map(s => s.segment_id));
     }
     setResynthSegId(null);
     setCurrentlySynthesizingIds(new Set());
     onSynthesizingChange?.(new Set());
-  }, [sceneId, isRu, onSegmented, loadAudioStatus, segments, onSynthesizingChange, onErrorSegmentsChange]);
+  }, [sceneId, isRu, onSegmented, refreshAudioStatusFromDb, segments, onSynthesizingChange, onErrorSegmentsChange, pushToDb, buildSnapshot]);
 
   // ─── Detection & Stress ───────────────────────────────────
 
