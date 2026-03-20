@@ -180,6 +180,98 @@ export const SEGMENT_TYPE_TTS_MODIFIERS: Record<string, SegmentTtsModifier> = {
   remark:        { rateMultiplier: 1.0,  volumeOffsetDb: 0,  instructions: undefined },
 };
 
+// ─── Scene mood → Narrator TTS instructions ─────────────
+// These are applied to narrator/first_person segments to convey the scene atmosphere.
+
+export interface MoodTtsPreset {
+  rateMultiplier: number;
+  roleHint?: string;           // Yandex role hint (if applicable)
+  instructions: { ru: string; en: string };
+}
+
+export const MOOD_TTS_INSTRUCTIONS: Record<string, MoodTtsPreset> = {
+  // Tension / action
+  tense:       { rateMultiplier: 1.05, instructions: { ru: "Напряжённо, тревожно, с нарастающей энергией", en: "Tense, anxious, with rising energy" } },
+  action:      { rateMultiplier: 1.10, instructions: { ru: "Динамично, энергично, быстрый темп повествования", en: "Dynamic, energetic, fast-paced narration" } },
+  suspense:    { rateMultiplier: 0.95, instructions: { ru: "С нагнетанием, паузы между фразами, предчувствие", en: "Building tension, pauses between phrases, foreboding" } },
+  // Calm / reflective
+  calm:        { rateMultiplier: 0.95, instructions: { ru: "Спокойно, размеренно, мягкая интонация", en: "Calm, measured, soft intonation" } },
+  reflective:  { rateMultiplier: 0.90, instructions: { ru: "Задумчиво, медленно, с паузами для осмысления", en: "Thoughtful, slow, with pauses for reflection" } },
+  nostalgic:   { rateMultiplier: 0.90, roleHint: "good", instructions: { ru: "С теплотой и ностальгией, мягкий тон", en: "With warmth and nostalgia, gentle tone" } },
+  // Emotional
+  sad:         { rateMultiplier: 0.90, roleHint: "neutral", instructions: { ru: "Грустно, тихо, нисходящие интонации", en: "Sad, quiet, descending intonations" } },
+  joyful:      { rateMultiplier: 1.05, roleHint: "good", instructions: { ru: "Радостно, бодро, с улыбкой в голосе", en: "Joyful, cheerful, with a smile in the voice" } },
+  romantic:    { rateMultiplier: 0.95, instructions: { ru: "Нежно, интимно, с теплотой", en: "Tender, intimate, warm" } },
+  angry:       { rateMultiplier: 1.05, roleHint: "evil", instructions: { ru: "Резко, жёстко, с внутренней агрессией", en: "Sharp, harsh, with underlying aggression" } },
+  // Atmosphere
+  dark:        { rateMultiplier: 0.95, roleHint: "evil", instructions: { ru: "Мрачно, зловеще, низкий тон", en: "Dark, ominous, low tone" } },
+  mysterious:  { rateMultiplier: 0.90, instructions: { ru: "Загадочно, с интригой, понижая голос", en: "Mysterious, intriguing, lowering the voice" } },
+  epic:        { rateMultiplier: 0.95, instructions: { ru: "Эпично, торжественно, масштабно", en: "Epic, solemn, grand scale" } },
+  ironic:      { rateMultiplier: 1.0,  instructions: { ru: "С иронией и лёгкой усмешкой", en: "With irony and a slight smirk" } },
+  dramatic:    { rateMultiplier: 0.95, instructions: { ru: "Драматично, с эмоциональным накалом", en: "Dramatic, with emotional intensity" } },
+  humorous:    { rateMultiplier: 1.05, roleHint: "good", instructions: { ru: "С юмором, легко, игриво", en: "Humorous, light, playful" } },
+  horror:      { rateMultiplier: 0.90, roleHint: "evil", instructions: { ru: "Пугающе, шёпотом, с жуткими паузами", en: "Frightening, whispered, with eerie pauses" } },
+};
+
+// ─── Scene type → Narrator pace/style hints ─────────────
+
+export const SCENE_TYPE_NARRATOR_HINTS: Record<string, { ru: string; en: string }> = {
+  action:            { ru: "Сцена действия — подчеркни динамику", en: "Action scene — emphasize dynamics" },
+  dialogue:          { ru: "Диалоговая сцена — ровная подача между репликами", en: "Dialogue scene — steady delivery between lines" },
+  description:       { ru: "Описательная сцена — выразительно, с акцентом на образах", en: "Descriptive scene — expressive, focus on imagery" },
+  inner_monologue:   { ru: "Внутренний монолог — интимно, замедленно", en: "Inner monologue — intimate, slowed down" },
+  lyrical_digression:{ ru: "Лирическое отступление — певуче, с паузами", en: "Lyrical digression — melodic, with pauses" },
+  mixed:             { ru: "Смешанная сцена — адаптируй подачу к контексту", en: "Mixed scene — adapt delivery to context" },
+};
+
+/**
+ * Build combined TTS context for a narrator segment based on scene mood + scene_type.
+ * Returns rate multiplier, optional Yandex role override, and combined instruction string.
+ */
+export function buildSceneTtsContext(
+  mood: string | null | undefined,
+  sceneType: string | null | undefined,
+  segmentType: string,
+  lang: "ru" | "en" = "en",
+): {
+  rateMultiplier: number;
+  roleHint?: string;
+  instructions: string;
+} {
+  const parts: string[] = [];
+  let rate = 1.0;
+  let roleHint: string | undefined;
+
+  // 1. Segment type modifier
+  const segMod = SEGMENT_TYPE_TTS_MODIFIERS[segmentType];
+  if (segMod) {
+    rate *= segMod.rateMultiplier;
+    if (segMod.instructions) parts.push(segMod.instructions[lang]);
+  }
+
+  // 2. Scene mood (overrides segment defaults for narrator-like segments)
+  const moodKey = mood?.toLowerCase().replace(/\s+/g, "_");
+  const moodPreset = moodKey ? MOOD_TTS_INSTRUCTIONS[moodKey] : undefined;
+  if (moodPreset) {
+    rate *= moodPreset.rateMultiplier;
+    if (moodPreset.roleHint) roleHint = moodPreset.roleHint;
+    parts.push(moodPreset.instructions[lang]);
+  }
+
+  // 3. Scene type hint (lighter, only for context)
+  const stKey = sceneType?.toLowerCase().replace(/\s+/g, "_");
+  const stHint = stKey ? SCENE_TYPE_NARRATOR_HINTS[stKey] : undefined;
+  if (stHint) {
+    parts.push(stHint[lang]);
+  }
+
+  return {
+    rateMultiplier: Math.round(rate * 1000) / 1000,
+    roleHint,
+    instructions: parts.filter(Boolean).join(". "),
+  };
+}
+
 // ─── Utility: build voice candidates for a character ─────
 
 export interface VoiceCandidate {
