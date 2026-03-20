@@ -40,8 +40,12 @@ export async function invokeWithFallback<T = unknown>(
   const modelField = opts.modelField || "model";
   const originalModel = String(body[modelField] || "");
 
-  // First attempt — original request
-  const firstResult = await supabase.functions.invoke(functionName, { body });
+  // Enrich first call with matching API keys so the edge function
+  // can route to the correct provider without falling back to Lovable AI.
+  const enrichedBody = enrichBodyWithKeys(body, originalModel, userApiKeys);
+
+  // First attempt — original request (now with keys)
+  const firstResult = await supabase.functions.invoke(functionName, { body: enrichedBody });
 
   // Check if we need fallback
   const needsFallback = isRetryableError(firstResult);
