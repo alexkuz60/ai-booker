@@ -961,55 +961,45 @@ export function StoryboardPanel({
     if (!sceneId || staleAudioSegIds.size === 0) return;
     setCleaningMetadata(true);
     try {
-      const ids = [...staleAudioSegIds];
-      const { data: segs } = await supabase
-        .from("scene_segments")
-        .select("id, metadata")
-        .in("id", ids);
-      if (segs) {
-        for (const seg of segs) {
-          const meta = { ...((seg.metadata ?? {}) as Record<string, unknown>) };
-          delete meta.inline_narrations_audio;
-          await supabase.from("scene_segments").update({ metadata: meta as any }).eq("id", seg.id);
-        }
-      }
-      await supabase.from("scene_playlists").delete().eq("scene_id", sceneId);
+      // Remove inline_narrations from segments locally
+      const updated = segments.map(s => {
+        if (!staleAudioSegIds.has(s.segment_id)) return s;
+        return { ...s, inline_narrations: undefined };
+      });
+      setSegments(updated);
       setStaleAudioSegIds(new Set());
+      await persistNow(buildSnapshot(updated));
       if (onSegmented) onSegmented(sceneId);
       toast.success(
         isRu
-          ? `Очищено ${ids.length} устаревших аудио-вставок`
-          : `Cleared ${ids.length} stale audio metadata entries`
+          ? `Очищено ${staleAudioSegIds.size} устаревших аудио-вставок`
+          : `Cleared ${staleAudioSegIds.size} stale audio metadata entries`
       );
     } catch (err) {
       console.error("Cleanup failed:", err);
       toast.error(isRu ? "Ошибка очистки" : "Cleanup failed");
     }
     setCleaningMetadata(false);
-  }, [sceneId, staleAudioSegIds, isRu, onSegmented]);
+  }, [sceneId, staleAudioSegIds, segments, isRu, onSegmented, persistNow, buildSnapshot]);
 
   const updateInlineNarrationSpeaker = useCallback(async (newSpeaker: string | null) => {
     if (!sceneId) return;
     setInlineNarrationSpeaker(newSpeaker);
+
+    // Update typeMappings locally
     const charRecord = newSpeaker ? characters.find(c => c.name === newSpeaker) : null;
     if (charRecord) {
-      await supabase
-        .from("scene_type_mappings" as any)
-        .upsert(
-          { scene_id: sceneId, segment_type: "inline_narration", character_id: charRecord.id },
-          { onConflict: "scene_id,segment_type" }
-        );
+      typeMappingsRef.current = [
+        ...typeMappingsRef.current.filter(m => m.segmentType !== "inline_narration"),
+        { segmentType: "inline_narration", characterId: charRecord.id, characterName: charRecord.name },
+      ];
       toast.success(isRu ? `Голос вставок → ${newSpeaker}` : `Narration voice → ${newSpeaker}`);
     } else {
-      await supabase
-        .from("scene_type_mappings" as any)
-        .delete()
-        .eq("scene_id", sceneId)
-        .eq("segment_type", "inline_narration");
+      typeMappingsRef.current = typeMappingsRef.current.filter(m => m.segmentType !== "inline_narration");
       toast.success(isRu ? "Голос вставок сброшен" : "Narration voice reset");
     }
-    await syncSceneCharacters(segments);
-  }, [sceneId, characters, isRu, segments, syncSceneCharacters]);
+    persist(buildSnapshot(undefined, undefined, newSpeaker));
+  }, [sceneId, characters, isRu, persist, buildSnapshot]);
 
   // ─── Render ───────────────────────────────────────────────
 
