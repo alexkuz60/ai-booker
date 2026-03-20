@@ -216,9 +216,10 @@ export function StoryboardPanel({
     })();
   }, [bookId, storage]);
 
-  // Load audio status for segments
-  const loadAudioStatus = useCallback(async (segIds: string[]) => {
-    if (segIds.length === 0) { setAudioStatus(new Map()); return; }
+  // Load audio status: from OPFS snapshot (already loaded by loadSegments).
+  // This DB-based loader is kept only for post-synthesis refresh.
+  const refreshAudioStatusFromDb = useCallback(async (segIds: string[]) => {
+    if (segIds.length === 0) return;
     const { data } = await supabase
       .from("segment_audio")
       .select("segment_id, status, duration_ms, created_at")
@@ -239,7 +240,9 @@ export function StoryboardPanel({
       }
     }
     setAudioStatus(map);
-  }, []);
+    // Persist updated audio status to OPFS
+    persist(buildSnapshot(undefined, map));
+  }, [persist, buildSnapshot]);
 
   // Load segments: OPFS first → DB fallback (seed after AI analysis only)
   const loadSegmentsFromDb = useCallback(async (sid: string): Promise<Segment[]> => {
