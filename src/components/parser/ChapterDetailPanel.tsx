@@ -347,9 +347,47 @@ function SceneCards({
                 {t("cleanupFootnoteLink", isRu)}
               </ContextMenuItem>
               <ContextMenuSeparator />
-              <ContextMenuItem onClick={() => handleCleanup("delete_selected", i)} className="gap-2 text-destructive">
-                <Trash2 className="h-4 w-4" />
-                {isRu ? "Удалить выделенное" : "Delete selected"}
+              <ContextMenuItem
+                disabled={i <= 0}
+                onClick={() => {
+                  const selectedText = getSelectedText();
+                  consume();
+                  if (!selectedText) {
+                    toast.info(isRu ? "Сначала выделите текст" : "Select text first");
+                    return;
+                  }
+                  if (i <= 0) return;
+                  const currentContent = scenes[i].content || scenes[i].content_preview || "";
+                  const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+                  if (!norm(currentContent).startsWith(norm(selectedText))) {
+                    toast.warning(isRu ? "Выделение должно начинаться с начала сцены" : "Selection must start from the beginning of the scene");
+                    return;
+                  }
+                  const selWords = selectedText.trim().split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+                  const pattern = new RegExp(selWords.join("\\s+"));
+                  const match = currentContent.match(pattern);
+                  const cutIdx = match ? currentContent.indexOf(match[0]) + match[0].length : -1;
+                  if (cutIdx < 0) {
+                    toast.error(isRu ? "Не удалось определить границу" : "Could not determine boundary");
+                    return;
+                  }
+                  const movedText = currentContent.slice(0, cutIdx).trim();
+                  const newCurrent = currentContent.slice(cutIdx).replace(/\n{3,}/g, "\n\n").trim();
+                  const prevContent = scenes[i - 1].content || scenes[i - 1].content_preview || "";
+                  const newPrev = prevContent + "\n\n" + movedText;
+                  const updated = scenes.map((sc, idx) => {
+                    if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length, dirty: true };
+                    if (idx === i - 1) return { ...sc, content: newPrev, content_preview: newPrev.slice(0, 200), char_count: newPrev.length, dirty: true };
+                    return sc;
+                  });
+                  onScenesUpdate?.(updated, isRu ? `Текст перенесён в сцену ${i}` : `Text moved to scene ${i}`);
+                  toast.success(isRu ? `Перенесено в сцену ${i}` : `Moved to scene ${i}`);
+                  setEditedIndices(prev => { const n = new Set(prev); n.add(i); n.add(i - 1); return n; });
+                }}
+                className="gap-2"
+              >
+                <ArrowUpToLine className="h-4 w-4 text-muted-foreground" />
+                {isRu ? "Перенести в предыдущую сцену" : "Move to previous scene"}
               </ContextMenuItem>
               <ContextMenuItem
                 disabled={i >= scenes.length - 1}
@@ -367,7 +405,6 @@ function SceneCards({
                     toast.warning(isRu ? "Выделение должно доходить до конца сцены" : "Selection must reach the end of the scene");
                     return;
                   }
-                  // Build regex from selected text words to find split point in original
                   const selWords = selectedText.trim().split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
                   const pattern = new RegExp(selWords.join("\\s+"));
                   const match = currentContent.match(pattern);
@@ -394,48 +431,9 @@ function SceneCards({
                 <ArrowDownToLine className="h-4 w-4 text-muted-foreground" />
                 {isRu ? "Перенести в следующую сцену" : "Move to next scene"}
               </ContextMenuItem>
-              <ContextMenuItem
-                disabled={i <= 0}
-                onClick={() => {
-                  const selectedText = getSelectedText();
-                  consume();
-                  if (!selectedText) {
-                    toast.info(isRu ? "Сначала выделите текст" : "Select text first");
-                    return;
-                  }
-                  if (i <= 0) return;
-                  const currentContent = scenes[i].content || scenes[i].content_preview || "";
-                  const norm = (s: string) => s.replace(/\s+/g, " ").trim();
-                  if (!norm(currentContent).startsWith(norm(selectedText))) {
-                    toast.warning(isRu ? "Выделение должно начинаться с начала сцены" : "Selection must start from the beginning of the scene");
-                    return;
-                  }
-                  // Build regex to find end of selected text in original
-                  const selWords = selectedText.trim().split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-                  const pattern = new RegExp(selWords.join("\\s+"));
-                  const match = currentContent.match(pattern);
-                  const cutIdx = match ? currentContent.indexOf(match[0]) + match[0].length : -1;
-                  if (cutIdx < 0) {
-                    toast.error(isRu ? "Не удалось определить границу" : "Could not determine boundary");
-                    return;
-                  }
-                  const movedText = currentContent.slice(0, cutIdx).trim();
-                  const newCurrent = currentContent.slice(cutIdx).replace(/\n{3,}/g, "\n\n").trim();
-                  const prevContent = scenes[i - 1].content || scenes[i - 1].content_preview || "";
-                  const newPrev = prevContent + "\n\n" + movedText;
-                  const updated = scenes.map((sc, idx) => {
-                    if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length, dirty: true };
-                    if (idx === i - 1) return { ...sc, content: newPrev, content_preview: newPrev.slice(0, 200), char_count: newPrev.length, dirty: true };
-                    return sc;
-                  });
-                  onScenesUpdate?.(updated, isRu ? `Текст перенесён в сцену ${i}` : `Text moved to scene ${i}`);
-                  toast.success(isRu ? `Перенесено в сцену ${i}` : `Moved to scene ${i}`);
-                  setEditedIndices(prev => { const n = new Set(prev); n.add(i); n.add(i - 1); return n; });
-                }}
-                className="gap-2"
-              >
-                <ArrowUpToLine className="h-4 w-4 text-muted-foreground" />
-                {isRu ? "Перенести в предыдущую сцену" : "Move to previous scene"}
+              <ContextMenuItem onClick={() => handleCleanup("delete_selected", i)} className="gap-2 text-destructive">
+                <Trash2 className="h-4 w-4" />
+                {isRu ? "Удалить выделенное" : "Delete selected"}
               </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem
