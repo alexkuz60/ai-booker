@@ -173,10 +173,7 @@ export function useChapterAnalysis({
   // ─── Two-stage Chapter Analysis (with resume) ─────────────
   const isFolder = (idx: number): boolean => isFolderNode(tocEntries, idx);
 
-  /** Try to get chapter text from in-memory cache (К4: no sessionStorage) */
-  const getChapterTextCached = (chapterIdx: number): string | null => {
-    return getChapterTextFromCache(chapterIdx);
-  };
+  // К4: getChapterTextFromCache imported from chapterTextsCache module
 
   /** Re-extract chapter texts from OPFS source file and populate in-memory cache */
   const reExtractChapterTexts = async (): Promise<boolean> => {
