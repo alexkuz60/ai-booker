@@ -264,6 +264,8 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
             temperament: c.profile?.temperament || null,
             speech_style: c.profile?.speech_style || null,
             description: c.profile?.description || null,
+            speech_tags: c.profile?.speech_tags || [],
+            psycho_tags: c.profile?.psycho_tags || [],
           }));
 
           const { error: charErr } = await supabase.from("book_characters").insert(charInserts);
