@@ -626,6 +626,7 @@ export function ChapterNavigator({
                    const isActual = !!actualSec;
                    const sceneRender = scene.id ? renderStatus.get(scene.id) : undefined;
                    const isMultiSelected = selectedSceneIndices?.has(idx);
+                   const isDirty = dirtySceneIds.has(scene.id || "");
 
                   const durationColor = isStale
                     ? "text-yellow-500"
