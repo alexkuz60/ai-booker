@@ -320,7 +320,7 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Verify user owns this scene
+    // Verify user owns this scene (scene may not exist in DB yet in local-first mode)
     const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -330,11 +330,31 @@ Deno.serve(async (req) => {
       .eq("id", scene_id)
       .maybeSingle();
 
-    if (sceneErr || !sceneCheck) {
+    const sceneExistsInDb = !sceneErr && !!sceneCheck;
+
+    // If scene exists in DB but user can't access it → deny
+    if (!sceneExistsInDb && !bodyContent) {
       return new Response(
         JSON.stringify({ error: "Scene not found or access denied" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // If scene doesn't exist in DB (local-first), return AI result without persisting
+    if (!sceneExistsInDb) {
+      const lightResult = segments.map((seg: AISegment, i: number) => ({
+        segment_number: i + 1,
+        segment_type: SEGMENT_TYPES.includes(seg.type as SegmentType) ? seg.type : "narrator",
+        speaker: seg.speaker || null,
+        phrases: splitPhrases(seg.text, lang).map((t: string, j: number) => ({
+          phrase_number: j + 1,
+          text: t,
+        })),
+        inline_narrations: seg.inline_narrations,
+      }));
+      return new Response(JSON.stringify({ segments: lightResult }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Delete existing segments for this scene
