@@ -578,6 +578,8 @@ export function StoryboardPanel({
     setStaleAudioSegIds(new Set());
     setMergeChecked(new Set());
     setContentDirty(false);
+    // Clear stale OPFS storyboard so loadSegments falls through to fresh DB data
+    await clearLocal();
     // Clear dirty flag in DB
     supabase.from("book_scenes").update({ content_dirty: false } as any).eq("id", sceneId).then(() => {});
 
