@@ -916,7 +916,9 @@ Deno.serve(async (req) => {
       const annotSuffix = segmentHasAnnotations[i]
         ? JSON.stringify((phrasesBySegment.get(seg.id) ?? []).map(p => p.annotations))
         : "";
-      const textHashForCache = hashText(text + annotSuffix);
+      // Include mood in hash so mood changes trigger re-synthesis for narrator segments
+      const moodSuffix = NARRATOR_SEGMENT_TYPES.has(seg.segment_type) ? `|mood:${sceneMood}|st:${sceneType}` : "";
+      const textHashForCache = hashText(text + annotSuffix + moodSuffix);
       const cached = existingAudioMap.get(seg.id);
       if (cached && !forceResynthesize && !voiceConfigChanged(voiceConfig, cached.voice_config, textHashForCache)) {
         // Also check that the text hasn't changed by verifying the file still exists
