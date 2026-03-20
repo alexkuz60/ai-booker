@@ -51,8 +51,11 @@ export function useCloudSettings<T>(
           .maybeSingle();
 
         if (cancelled) return;
-        // Only apply DB value if we haven't made local changes since mount
-        if (!error && data && !locallyDirtyRef.current) {
+        // Skip DB overwrite if local changes exist OR a recent write is pending (Sheet close/reopen race)
+        const recentWrite = (() => {
+          try { const ts = localStorage.getItem(tsKey); return ts ? Date.now() - Number(ts) < 2000 : false; } catch { return false; }
+        })();
+        if (!error && data && !locallyDirtyRef.current && !recentWrite) {
           const dbValue = data.setting_value as T;
           setValue(dbValue);
           try { localStorage.setItem(cacheKey, JSON.stringify(dbValue)); } catch {}
