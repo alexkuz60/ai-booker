@@ -373,6 +373,34 @@ function SceneCards({
                 <ArrowDownToLine className="h-4 w-4 text-muted-foreground" />
                 {isRu ? "Перенести в следующую сцену" : "Move to next scene"}
               </ContextMenuItem>
+              <ContextMenuItem
+                disabled={i <= 0}
+                onClick={() => {
+                  const selectedText = getSelectedText();
+                  consume();
+                  if (!selectedText) {
+                    toast.info(isRu ? "Сначала выделите текст" : "Select text first");
+                    return;
+                  }
+                  if (i <= 0) return;
+                  const currentContent = scenes[i].content || scenes[i].content_preview || "";
+                  const prevContent = scenes[i - 1].content || scenes[i - 1].content_preview || "";
+                  const newCurrent = currentContent.replace(selectedText, "").replace(/\n{3,}/g, "\n\n").trim();
+                  const newPrev = prevContent + "\n\n" + selectedText;
+                  const updated = scenes.map((sc, idx) => {
+                    if (idx === i) return { ...sc, content: newCurrent, content_preview: newCurrent.slice(0, 200), char_count: newCurrent.length };
+                    if (idx === i - 1) return { ...sc, content: newPrev, content_preview: newPrev.slice(0, 200), char_count: newPrev.length };
+                    return sc;
+                  });
+                  onScenesUpdate?.(updated, isRu ? `Текст перенесён в сцену ${i}` : `Text moved to scene ${i}`);
+                  toast.success(isRu ? `Перенесено в сцену ${i}` : `Moved to scene ${i}`);
+                  setEditedIndices(prev => { const n = new Set(prev); n.add(i); n.add(i - 1); return n; });
+                }}
+                className="gap-2"
+              >
+                <ArrowUpToLine className="h-4 w-4 text-muted-foreground" />
+                {isRu ? "Перенести в предыдущую сцену" : "Move to previous scene"}
+              </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem
                 onClick={() => {
