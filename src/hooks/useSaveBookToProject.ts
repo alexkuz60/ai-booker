@@ -82,6 +82,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
   const { toast } = useToast();
   const { user } = useAuth();
   const { storage, openProject, backend, meta, downloadProjectAsZip, importProjectFromZip } = useProjectStorageContext();
+  const { pushAllToDb } = useStoryboardPersistence(null);
   const [saving, setSaving] = useState(false);
 
   /**
