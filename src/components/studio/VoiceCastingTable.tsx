@@ -37,7 +37,7 @@ interface VoiceCastingTableProps {
   isRu: boolean;
   selectedCharacterId?: string | null;
   onSelectCharacter?: (id: string | null) => void;
-  filterMode?: "all" | "scene";
+  filterMode?: "all" | "scene" | "chapter";
   sceneCharIds?: Set<string>;
 }
 
