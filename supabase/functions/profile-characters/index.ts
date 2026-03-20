@@ -78,9 +78,9 @@ function extractBalancedJson(text: string, start: number): string | null {
   return null;
 }
 
-async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en", modelOverride?: string, userId?: string): Promise<CharacterProfile[]> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) throw new Error("AI key not configured");
+async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en", modelOverride?: string, userId?: string, providerApiKey?: string | null, openrouterApiKey?: string | null): Promise<CharacterProfile[]> {
+  const resolved = resolveAiEndpoint(modelOverride || "google/gemini-3-flash-preview", providerApiKey || null, openrouterApiKey);
+  if (!resolved.apiKey) throw new Error("AI key not configured");
 
   const usedModel = modelOverride || "google/gemini-3-flash-preview";
   // Reasoning models return data in reasoning/reasoning_details, not tool_calls
