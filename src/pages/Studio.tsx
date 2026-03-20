@@ -99,7 +99,9 @@ const Studio = () => {
   const chapterEstimate = useMemo(() => chapter ? estimateChapterDuration(chapter) : null, [chapter]);
   const sceneEstimate = useMemo(() => {
     if (!chapter || selectedSceneIdx === null) return null;
-    return estimateSceneDuration(chapter.scenes[selectedSceneIdx]);
+    const scene = chapter.scenes[selectedSceneIdx];
+    if (!scene) return null;
+    return estimateSceneDuration(scene);
   }, [chapter, selectedSceneIdx]);
 
   // Playlist durations received from ChapterNavigator (single source of truth)
