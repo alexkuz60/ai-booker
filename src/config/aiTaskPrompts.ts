@@ -184,6 +184,9 @@ Each segment must have:
 - "text": the exact text of the segment (preserve original wording)
 - "inline_narrations": array (optional, for dialogue/monologue only) — narrator insertions embedded within a character's speech
 
+CRITICAL — COMPLETENESS:
+You MUST segment the ENTIRE scene text from the very first word to the very last word. Every sentence must appear in exactly one segment. Do NOT skip, summarize, or truncate any part of the text. The concatenation of all segment "text" fields must reproduce the full original scene. If the scene is long, produce as many segments as needed.
+
 Rules:
 - "narrator" = third-person narration, descriptions, action
 - "first_person" = narration from a character's perspective (I/me)

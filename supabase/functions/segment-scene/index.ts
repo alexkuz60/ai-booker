@@ -99,7 +99,17 @@ Deno.serve(async (req) => {
 
     const systemPrompt = (await resolveTaskPromptWithOverrides("screenwriter:segment_scene", lang)) || "You are a literary text analyst.";
 
-    const userPrompt = `Analyze this scene (language: ${lang}):\n\n${content}`;
+    const userPrompt = `Analyze this scene (language: ${lang}). IMPORTANT: segment the ENTIRE text from start to finish, do not skip any part.\n\n${content}`;
+
+    // Estimate required output tokens: ~1.5x input chars (JSON overhead) / 3 chars per token
+    const estimatedOutputTokens = Math.max(4096, Math.ceil((content.length * 1.5) / 3));
+    const maxTokens = Math.min(estimatedOutputTokens, 16384);
+
+    // Use max_completion_tokens for newer models, max_tokens for others
+    const isNewModel = /gpt-5|o1|o3|o4/i.test(resolved.model);
+    const tokenParam = isNewModel
+      ? { max_completion_tokens: maxTokens }
+      : { max_tokens: maxTokens };
 
     const aiRes = await fetch(resolved.endpoint, {
       method: "POST",
@@ -114,6 +124,7 @@ Deno.serve(async (req) => {
           { role: "user", content: userPrompt },
         ],
         temperature: 0.1,
+        ...tokenParam,
       }),
     });
 
@@ -148,6 +159,20 @@ Deno.serve(async (req) => {
       }
       return new Response(
         JSON.stringify({ error: "AI returned an unstructured response. Please retry." }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ── Coverage validation: ensure segments cover most of the original text ──
+    const segmentTextTotal = segments.reduce((sum, s) => sum + (s.text?.length || 0), 0);
+    const coverageRatio = segmentTextTotal / content.length;
+    if (coverageRatio < 0.5) {
+      console.warn(`Low coverage: ${Math.round(coverageRatio * 100)}% (${segmentTextTotal}/${content.length} chars). Segments: ${segments.length}`);
+      if (userId) {
+        logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "error", latencyMs: aiLatency, tokensInput: usage?.prompt_tokens, tokensOutput: usage?.completion_tokens, errorMessage: `Low coverage: ${Math.round(coverageRatio * 100)}%` });
+      }
+      return new Response(
+        JSON.stringify({ error: lang === "ru" ? "AI вернул неполную раскадровку (покрыто менее 50% текста). Попробуйте ещё раз." : "AI returned incomplete segmentation (less than 50% coverage). Please retry." }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
