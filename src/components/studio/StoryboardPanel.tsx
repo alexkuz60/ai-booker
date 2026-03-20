@@ -81,6 +81,18 @@ export function StoryboardPanel({
   const [cleaningMetadata, setCleaningMetadata] = useState(false);
   const [contentDirty, setContentDirty] = useState(false);
   const autoAnalyzeAttemptedRef = useRef<string | null>(null);
+  const typeMappingsRef = useRef<LocalTypeMappingEntry[]>([]);
+
+  /** Build a snapshot for OPFS persistence */
+  const buildSnapshot = useCallback(
+    (segs?: Segment[], audio?: Map<string, { status: string; durationMs: number }>, speaker?: string | null): StoryboardSnapshot => ({
+      segments: segs ?? segments,
+      typeMappings: typeMappingsRef.current,
+      audioStatus: audio ?? audioStatus,
+      inlineNarrationSpeaker: speaker !== undefined ? speaker : inlineNarrationSpeaker,
+    }),
+    [segments, audioStatus, inlineNarrationSpeaker],
+  );
 
   // Reset merge selection when scene changes
   useEffect(() => { setMergeChecked(new Set()); }, [sceneId]);
