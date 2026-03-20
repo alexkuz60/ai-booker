@@ -580,7 +580,7 @@ export function StoryboardPanel({
     try {
       const { data, error } = await invokeWithFallback({
         functionName: "segment-scene",
-        body: { scene_id: sceneId, language: isRu ? "ru" : "en", model: getModelForRole("screenwriter") },
+        body: { scene_id: sceneId, content: sceneContent, language: isRu ? "ru" : "en", model: getModelForRole("screenwriter") },
         userApiKeys,
         isRu,
       });
