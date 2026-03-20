@@ -211,8 +211,7 @@ export function useBookManager({
         await Promise.all(allProjects.map((name) => OPFSStorage.deleteProject(name)));
       }
       sessionStorage.removeItem(ACTIVE_BOOK_KEY);
-      sessionStorage.removeItem("docx_chapter_texts");
-      sessionStorage.removeItem("docx_html");
+      clearChapterTextsCache();
       setStep("library");
       setBookId(null);
       await library.loadLibrary();
