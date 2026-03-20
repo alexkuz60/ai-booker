@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { YANDEX_VOICES } from "@/config/yandexVoices";
 import { VoiceCastingTable } from "@/components/studio/VoiceCastingTable";
+import { CastingCandidatesPanel, type CastingCharacter } from "@/components/studio/CastingCandidatesPanel";
+import { suggestVoiceCandidates, ACCENTUATION_YANDEX_ROLE, detectAccentuation, type VoiceCandidate } from "@/config/psychotypeVoicePresets";
 
 // ─── Types ──────────────────────────────────────────────
 
