@@ -111,13 +111,10 @@ Deno.serve(async (req) => {
       ? { max_completion_tokens: maxTokens }
       : { max_tokens: maxTokens };
 
-    const aiRes = await fetch(resolved.endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${resolved.apiKey}`,
-      },
-      body: JSON.stringify({
+    // Helper to call AI and parse segments
+    async function callAiForSegments(useJsonFormat: boolean): Promise<{ segments: AISegment[]; usage: any; latency: number }> {
+      const start = Date.now();
+      const bodyObj: Record<string, unknown> = {
         model: resolved.model,
         messages: [
           { role: "system", content: systemPrompt },
@@ -125,42 +122,98 @@ Deno.serve(async (req) => {
         ],
         temperature: 0.1,
         ...tokenParam,
-      }),
-    });
-
-    const aiLatency = Date.now() - aiStart;
-
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      console.error("AI gateway error:", aiRes.status, errText);
-      if (userId) {
-        logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "error", latencyMs: aiLatency, errorMessage: `AI error: ${aiRes.status}` });
+      };
+      if (useJsonFormat) {
+        bodyObj.response_format = { type: "json_object" };
       }
-      // Pass through 402/429 so client can cascade to next provider
-      const statusCode = (aiRes.status === 402 || aiRes.status === 429) ? aiRes.status : 502;
-      return new Response(
-        JSON.stringify({ error: `AI error: ${aiRes.status}` }),
-        { status: statusCode, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+
+      const res = await fetch(resolved.endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${resolved.apiKey}`,
+        },
+        body: JSON.stringify(bodyObj),
+      });
+
+      const lat = Date.now() - start;
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error("AI gateway error:", res.status, errText);
+        if (userId) {
+          logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "error", latencyMs: lat, errorMessage: `AI error: ${res.status}` });
+        }
+        const statusCode = (res.status === 402 || res.status === 429) ? res.status : 502;
+        throw Object.assign(new Error(`AI error: ${res.status}`), { statusCode });
+      }
+
+      const data = await res.json();
+      let raw = data.choices?.[0]?.message?.content || "";
+      raw = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+
+      // Try to extract JSON array from the response
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        // Try to find a JSON array in the text
+        const arrMatch = raw.match(/\[[\s\S]*\]/);
+        if (arrMatch) {
+          parsed = JSON.parse(arrMatch[0]);
+        } else {
+          // Try to find { "segments": [...] } wrapper
+          const objMatch = raw.match(/\{[\s\S]*"segments"\s*:\s*\[[\s\S]*\][\s\S]*\}/);
+          if (objMatch) {
+            const obj = JSON.parse(objMatch[0]);
+            parsed = obj.segments;
+          } else {
+            throw new Error("Unparseable");
+          }
+        }
+      }
+
+      // Handle { segments: [...] } wrapper
+      const segs = Array.isArray(parsed) ? parsed : (parsed as any)?.segments;
+      if (!Array.isArray(segs)) throw new Error("Unparseable");
+
+      return { segments: segs, usage: data.usage, latency: lat };
     }
 
-    const aiData = await aiRes.json();
-    const usage = aiData.usage;
-    let raw = aiData.choices?.[0]?.message?.content || "";
-    raw = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-
     let segments: AISegment[];
+    let usage: any;
+    let aiLatency: number;
+
     try {
-      segments = JSON.parse(raw);
-    } catch {
-      console.error("Failed to parse AI response:", raw);
-      if (userId) {
-        logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "error", latencyMs: aiLatency, tokensInput: usage?.prompt_tokens, tokensOutput: usage?.completion_tokens, errorMessage: "Unparseable AI response" });
+      // First attempt: with response_format json
+      const r = await callAiForSegments(true);
+      segments = r.segments; usage = r.usage; aiLatency = r.latency;
+    } catch (e: any) {
+      if (e.statusCode === 402 || e.statusCode === 429) {
+        return new Response(JSON.stringify({ error: e.message }), {
+          status: e.statusCode, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-      return new Response(
-        JSON.stringify({ error: "AI returned an unstructured response. Please retry." }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      // Retry without response_format (some models don't support it)
+      console.warn("First attempt failed, retrying without response_format:", e.message);
+      try {
+        const r = await callAiForSegments(false);
+        segments = r.segments; usage = r.usage; aiLatency = r.latency;
+      } catch (e2: any) {
+        if (e2.statusCode) {
+          return new Response(JSON.stringify({ error: e2.message }), {
+            status: e2.statusCode, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        console.error("Both AI attempts failed:", e2.message);
+        if (userId) {
+          logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "error", latencyMs: Date.now() - aiStart, errorMessage: "Unparseable AI response" });
+        }
+        return new Response(
+          JSON.stringify({ error: "AI returned an unstructured response. Please retry." }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // ── Coverage validation: ensure segments cover most of the original text ──
