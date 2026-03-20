@@ -84,6 +84,10 @@ export function StoryboardPanel({
   const [contentDirty, setContentDirty] = useState(false);
   const autoAnalyzeAttemptedRef = useRef<string | null>(null);
   const typeMappingsRef = useRef<LocalTypeMappingEntry[]>([]);
+  const audioStatusRef = useRef(audioStatus);
+  audioStatusRef.current = audioStatus;
+  const inlineNarrationSpeakerRef = useRef(inlineNarrationSpeaker);
+  inlineNarrationSpeakerRef.current = inlineNarrationSpeaker;
 
   /** Build a snapshot for OPFS persistence */
   const buildSnapshot = useCallback(
@@ -361,8 +365,8 @@ export function StoryboardPanel({
         await persistNow({
           segments: builtSegments,
           typeMappings: typeMappingsRef.current,
-          audioStatus,
-          inlineNarrationSpeaker,
+          audioStatus: audioStatusRef.current,
+          inlineNarrationSpeaker: inlineNarrationSpeakerRef.current,
         });
         console.debug(`[Storyboard] Seeded OPFS from DB: ${builtSegments.length} segments`);
       }
@@ -371,7 +375,7 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка загрузки сегментов" : "Failed to load segments");
     }
     setLoading(false);
-  }, [isRu, hasStorage, loadFromLocal, loadSegmentsFromDb, applySegments, persistNow, audioStatus, inlineNarrationSpeaker]);
+  }, [isRu, hasStorage, loadFromLocal, loadSegmentsFromDb, applySegments, persistNow]);
 
   // ─── Segment Operations ───────────────────────────────────
 
