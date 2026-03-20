@@ -667,10 +667,16 @@ Deno.serve(async (req) => {
     const speakerNames = [...new Set(segments.map(s => s.speaker).filter(Boolean))];
     const voiceConfigMap = new Map<string, Record<string, unknown>>();
 
-    if (speakerNames.length > 0) {
+    // Load scene metadata (mood, scene_type) for narrator TTS instructions
+    let sceneMood: string | null = null;
+    let sceneType: string | null = null;
+
+    if (speakerNames.length > 0 || true) {
       const { data: sceneData } = await supabase
-        .from("book_scenes").select("chapter_id").eq("id", scene_id).single();
+        .from("book_scenes").select("chapter_id, mood, scene_type").eq("id", scene_id).single();
       if (sceneData) {
+        sceneMood = sceneData.mood;
+        sceneType = sceneData.scene_type;
         const { data: chapterData } = await supabase
           .from("book_chapters").select("book_id").eq("id", sceneData.chapter_id).single();
         if (chapterData) {
