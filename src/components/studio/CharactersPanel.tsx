@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAiRoles } from "@/hooks/useAiRoles";
+import { enrichBodyWithKeys } from "@/lib/invokeWithFallback";
 import { YANDEX_VOICES } from "@/config/yandexVoices";
 import { VoiceCastingTable } from "@/components/studio/VoiceCastingTable";
 import { CastingCandidatesPanel, type CastingCharacter } from "@/components/studio/CastingCandidatesPanel";
