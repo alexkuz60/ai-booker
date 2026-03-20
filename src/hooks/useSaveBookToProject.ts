@@ -394,6 +394,9 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       if (savedProfileCount > 0) {
         descParts.push(`${savedProfileCount} ${isRu ? "профилей" : "profiles"}`);
       }
+      if (savedStoryboardCount > 0) {
+        descParts.push(`${savedStoryboardCount} ${isRu ? "раскадровок" : "storyboards"}`);
+      }
       toast({
         title: isRu ? "Синхронизировано с сервером" : "Synced to server",
         description: descParts.join(", "),
