@@ -34,6 +34,8 @@ interface BookCharacter {
   };
   color: string | null;
   sort_order: number;
+  speech_tags: string[];
+  psycho_tags: string[];
 }
 
 const GENDER_LABELS: Record<string, { ru: string; en: string }> = {
