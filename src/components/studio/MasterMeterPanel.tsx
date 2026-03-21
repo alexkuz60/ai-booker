@@ -176,8 +176,15 @@ function PeakReadout({ peakDb }: { peakDb: number }) {
 function PeakMeterSection() {
   const engine = getAudioEngine();
   const [peaks, setPeaks] = useState({ peakL: -Infinity, peakR: -Infinity });
+  const [isPlaying, setIsPlaying] = useState(engine.state === "playing");
+
+  useEffect(() => engine.subscribe((s) => setIsPlaying(s.state === "playing")), [engine]);
 
   useEffect(() => {
+    if (!isPlaying) {
+      setPeaks({ peakL: -Infinity, peakR: -Infinity });
+      return;
+    }
     let raf: number;
     const tick = () => {
       const m = engine.getMasterMeter();
@@ -186,7 +193,7 @@ function PeakMeterSection() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [engine]);
+  }, [engine, isPlaying]);
 
   return (
     <div className="flex flex-col gap-0">
