@@ -204,6 +204,11 @@ export function useChapterAnalysis({
   // B4/B7 fix: text-first mode for DOCX and FB2 (no PDF rendering needed)
   const isTextMode = (): boolean => {
     if (fileFormat === "docx" || fileFormat === "fb2") return true;
+    // Fallback: detect from fileName when fileFormat metadata is missing
+    if (fileName) {
+      const ext = fileName.split('.').pop()?.toLowerCase();
+      if (ext === "docx" || ext === "doc" || ext === "fb2") return true;
+    }
     return hasChapterTextsCache();
   };
 
@@ -221,7 +226,9 @@ export function useChapterAnalysis({
         activePdf = await ensurePdfLoaded();
       }
       if (!activePdf) {
-        toast.error(isRu ? "PDF не загружен. Перезагрузите книгу для анализа." : "PDF not loaded. Reload the book to analyze.");
+        toast.error(isRu
+          ? "Исходный файл не загружен. Перезагрузите книгу для анализа."
+          : "Source file not loaded. Reload the book to analyze.");
         return;
       }
     }
