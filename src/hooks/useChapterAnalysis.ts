@@ -180,7 +180,14 @@ export function useChapterAnalysis({
   /** Re-extract chapter texts from OPFS source file and populate in-memory cache */
   const reExtractChapterTexts = async (): Promise<boolean> => {
     if (!projectStorage) return false;
-    const fmt = fileFormat || "docx";
+    // Detect format: explicit metadata → fileName extension → fallback to docx
+    let fmt = fileFormat || null;
+    if (!fmt && fileName) {
+      const ext = fileName.split('.').pop()?.toLowerCase();
+      if (ext === "fb2") fmt = "fb2";
+      else if (ext === "docx" || ext === "doc") fmt = "docx";
+    }
+    if (!fmt) fmt = "docx";
     const sourcePath = getSourcePath(fmt);
     try {
       const blob = await projectStorage.readBlob(sourcePath);
