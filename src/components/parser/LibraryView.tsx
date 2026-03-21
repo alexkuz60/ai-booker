@@ -278,3 +278,6 @@ function LibraryViewInner({
     </motion.div>
   );
 }
+
+const LibraryView = memo(LibraryViewInner);
+export default LibraryView;
