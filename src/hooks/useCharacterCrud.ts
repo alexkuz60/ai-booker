@@ -1,12 +1,13 @@
 /**
  * CRUD operations for local-first character management.
  * Handles rename, gender, aliases, delete, merge, add + persistence.
+ * Now works with CharacterIndex (new format) stored in characters/index.json.
  */
 
 import { useCallback } from "react";
 import type { ProjectStorage } from "@/lib/projectStorage";
-import type { LocalCharacter, CharacterAppearance } from "@/pages/parser/types";
-import { saveCharactersToLocal } from "@/lib/localSync";
+import type { CharacterIndex, CharacterAppearance } from "@/pages/parser/types";
+import { saveCharacterIndex } from "@/lib/localCharacters";
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -14,12 +15,12 @@ function generateId(): string {
 
 export function useCharacterCrud(
   storage: ProjectStorage | null,
-  characters: LocalCharacter[],
-  setCharacters: React.Dispatch<React.SetStateAction<LocalCharacter[]>>,
+  characters: CharacterIndex[],
+  setCharacters: React.Dispatch<React.SetStateAction<CharacterIndex[]>>,
 ) {
-  const persist = useCallback(async (chars: LocalCharacter[]) => {
+  const persist = useCallback(async (chars: CharacterIndex[]) => {
     if (!storage) return;
-    await saveCharactersToLocal(storage, chars);
+    await saveCharacterIndex(storage, chars);
   }, [storage]);
 
   const renameCharacter = useCallback(async (id: string, newName: string) => {
@@ -74,10 +75,13 @@ export function useCharacterCrud(
         }
       }
 
-      const merged: LocalCharacter = {
+      const merged: CharacterIndex = {
         ...target,
         aliases: Array.from(allAliases),
-        gender: target.gender || source.gender,
+        gender: target.gender !== "unknown" ? target.gender : source.gender,
+        description: target.description || source.description,
+        temperament: target.temperament || source.temperament,
+        voice_config: target.voice_config?.voice_id ? target.voice_config : source.voice_config,
         appearances: Array.from(appMap.values()),
         sceneCount: Array.from(appMap.values()).reduce((sum, a) => sum + a.sceneNumbers.length, 0),
       };
@@ -89,12 +93,18 @@ export function useCharacterCrud(
   }, [persist, setCharacters]);
 
   const addCharacter = useCallback(async (name: string) => {
-    const newChar: LocalCharacter = {
+    const newChar: CharacterIndex = {
       id: generateId(),
       name,
       aliases: [],
+      gender: "unknown",
+      age_group: "unknown",
+      sort_order: 0,
+      speech_tags: [],
+      psycho_tags: [],
       appearances: [],
       sceneCount: 0,
+      voice_config: {},
     };
     setCharacters(prev => {
       const next = [...prev, newChar];
