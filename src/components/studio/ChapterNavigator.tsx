@@ -166,6 +166,7 @@ export function ChapterNavigator({
   renderedSceneIds,
   fullyRenderedSceneIds,
   staleAudioSceneIds,
+  clearedDirtySceneIds,
   onBatchResynthDone,
   clipsRefreshToken,
   bookId,
@@ -182,6 +183,7 @@ export function ChapterNavigator({
   renderedSceneIds?: Set<string>;
   fullyRenderedSceneIds?: Set<string>;
   staleAudioSceneIds?: Set<string>;
+  clearedDirtySceneIds?: Set<string>;
   onBatchResynthDone?: () => void;
   clipsRefreshToken?: number;
   bookId?: string | null;
@@ -243,11 +245,13 @@ export function ChapterNavigator({
         }
         setRenderStatus(map);
       }
-      if (dirtyData) {
-        setDirtySceneIds(new Set(dirtyData.map(d => d.id)));
+      const nextDirtyIds = new Set((dirtyData ?? []).map(d => d.id));
+      for (const clearedId of clearedDirtySceneIds ?? []) {
+        nextDirtyIds.delete(clearedId);
       }
+      setDirtySceneIds(nextDirtyIds);
     })();
-  }, [chapter.scenes.map(s => s.id).join(","), clipsRefreshToken]);
+  }, [chapter.scenes.map(s => s.id).join(","), clipsRefreshToken, clearedDirtySceneIds]);
 
   const staleCount = staleAudioSceneIds?.size ?? 0;
   const lastClickedIdxRef = useRef<number | null>(null);
