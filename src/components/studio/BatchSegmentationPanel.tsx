@@ -104,6 +104,14 @@ export function BatchSegmentationPanel({
       );
     }
 
+    if (localScene.content.trim().length < 50) {
+      throw new Error(
+        isRu
+          ? `Сцена #${scene.sceneNumber}: текст слишком короткий (${localScene.content.trim().length} зн.)`
+          : `Scene #${scene.sceneNumber}: text too short (${localScene.content.trim().length} chars)`,
+      );
+    }
+
     return localScene.content;
   }, [storage, isRu, chapterId]);
 
