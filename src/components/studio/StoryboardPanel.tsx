@@ -487,7 +487,7 @@ export function StoryboardPanel({
     typeMappingsRef.current = [];
     setInlineNarrationSpeaker(null);
     await clearLocal();
-    supabase.from("book_scenes").update({ content_dirty: false } as any).eq("id", sceneId).then(() => {});
+    // K3: content_dirty flag will be synced to DB only via pushToDb/Save to Server
 
     try {
       if (!storage) {
