@@ -399,7 +399,7 @@ export function ChapterNavigator({
     }
     setScanning(true);
     try {
-      const report = await scanBookForStaleAudio(bookId);
+      const report = await scanBookForStaleAudio(bookId, projectStorage);
       setStaleReport(report);
       if (report.staleSegments.length === 0) {
         toast.success(isRu ? "Все аудио актуальны — устаревших нет" : "All audio up to date — no stale segments");
