@@ -38,8 +38,8 @@
 > Психотип-TTS стратегия: accentuation (Леонгард) + archetype (тембровый) → матрица маппинга на провайдеров. См. PSYCHOTYPE_TTS_ANALYTICS.md.
 
 ### Фаза 1 — Данные и миграция
-- [ ] **Миграция БД** — `ALTER TABLE book_characters ADD COLUMN speech_tags text[] DEFAULT '{}', psycho_tags text[] DEFAULT '{}'`
-- [ ] **Мост useSaveBookToProject** — маппинг `LocalCharacter.profile.speech_tags/psycho_tags` → новые колонки при Push to Server
+- [x] **Миграция БД** — `speech_tags`/`psycho_tags` уже в `book_characters` (DB backup only, K4)
+- [x] **Мост useSaveBookToProject** — читает `CharacterIndex` из `characters/index.json`, пушит все поля (speech_tags, psycho_tags, voice_config, sort_order, color) в `book_characters`
 - [ ] **Edge-функция profile-characters** — добавить генерацию speech_tags/psycho_tags аналогично profile-characters-local
 - [ ] **Расширить промпт профайлера** — добавить `accentuation` (акцентуация по Леонгарду: гипертим/шизоид/истероид/эпилептоид/депрессив/тревожный/эмотивный/циклоид/застревающий/демонстративный) и `archetype` (тембровый архетип: Мудрец/Герой/Опекун/Трикстер/Любовник/Бунтарь) для автоматического маппинга на голоса TTS-провайдеров
 
