@@ -28,7 +28,7 @@ interface LibraryViewProps {
   onDeleteServerBook?: (bookId: string) => void;
 }
 
-export default function LibraryView({
+function LibraryViewInner({
   isRu, books, loadingLibrary, onUpload, onOpen, onDelete, onClearAll, onRename,
   serverBooks = [], loadingServerBooks = false, onOpenServerBook, onDeleteServerBook,
 }: LibraryViewProps) {
