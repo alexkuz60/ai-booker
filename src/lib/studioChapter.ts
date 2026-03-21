@@ -10,6 +10,8 @@ export interface StudioScene {
   bpm: number;
   content_preview?: string;
   content?: string;
+  /** Cached character count — survives K4 content stripping for duration estimates */
+  char_count?: number;
 }
 
 export interface StudioChapter {
