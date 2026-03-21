@@ -132,8 +132,19 @@ export function BatchSegmentationPanel({
           body: enrichedBody,
         });
         if (error) throw error;
-        const count = data?.segments?.length ?? 0;
-        return { sceneId: job.scene.id, count };
+        const newSegments: Segment[] = data?.segments ?? [];
+        // Persist to OPFS so StoryboardPanel can read it
+        if (storage) {
+          await saveStoryboardToLocal(storage, job.scene.id, {
+            segments: newSegments,
+            typeMappings: [],
+            audioStatus: new Map(),
+            inlineNarrationSpeaker: null,
+          });
+        }
+        // Clear content_dirty — analysis was just done on fresh content
+        supabase.from("book_scenes").update({ content_dirty: false }).eq("id", job.scene.id);
+        return { sceneId: job.scene.id, count: newSegments.length };
       },
     }));
 
