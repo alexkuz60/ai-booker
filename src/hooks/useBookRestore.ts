@@ -542,43 +542,11 @@ export function useBookRestore({
       }
     }
 
-    let filePath: string | null = null;
-    const bookInState = books.find(b => b.id === bookId);
-    if (bookInState?.file_path) {
-      filePath = bookInState.file_path;
-    } else {
-      try {
-        const { data } = await supabase
-          .from("books")
-          .select("file_path")
-          .eq("id", bookId)
-          .maybeSingle();
-        filePath = data?.file_path || null;
-      } catch (err) {
-        console.warn("[EnsurePDF] DB lookup failed:", err);
-      }
-    }
-
-    if (!filePath) {
-      console.warn("[EnsurePDF] No file_path found for book", bookId);
-      return null;
-    }
-
-    try {
-      console.log("[EnsurePDF] Downloading from server");
-      const { data: blob } = await supabase.storage.from("book-uploads").download(filePath);
-      if (!blob) return null;
-      const pdf = await loadPdf(await blob.arrayBuffer());
-
-      if (storage?.isReady) {
-        storage.writeBlob(getSourcePath("pdf"), blob).catch(() => {});
-      }
-      return pdf;
-    } catch (err) {
-      console.warn("[EnsurePDF] Server download failed:", err);
-      return null;
-    }
-  }, [pdfRef, bookId, books, resolveLocalStorageForBook, fileName, updatePdfRef, updateTotalPages]);
+    // К3: No server fallback — PDF must be in OPFS.
+    // If missing, user should re-download the book from library or re-upload the file.
+    console.warn("[EnsurePDF] PDF not found in local project. Re-download from library or re-upload.");
+    return null;
+  }, [pdfRef, bookId, resolveLocalStorageForBook, fileName, updatePdfRef, updateTotalPages]);
 
   return {
     pdfRef,

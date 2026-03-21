@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { getChapterTextFromCache, setChapterTextsCache, hasChapterTextsCache } from "@/lib/chapterTextsCache";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client"; // used only for auth token in edge function calls
 import { getModelRegistryEntry } from "@/config/modelRegistry";
 import { extractTextByPageRange } from "@/lib/pdf-extract";
 import { extractFromDocx, stripHtml } from "@/lib/docx-extract";
@@ -265,22 +265,18 @@ export function useChapterAnalysis({
     let scenes: Scene[] = existingResult?.scenes || [];
     const wasFullyDone = existingResult?.status === 'done' && scenes.length > 0 && scenes.every(sc => !needsEnrichment(sc));
 
-    // Determine effective mode
-    if (mode === "enrich" && wasFullyDone && existingChId) {
+    // Determine effective mode — К3: all resets are local-only, no DB writes
+    if (mode === "enrich" && wasFullyDone) {
       // Reset metadata to pending so enrichment re-runs
       addLog(isRu ? "🔄 Сброс метаданных сцен для переобогащения..." : "🔄 Resetting scene metadata for re-enrichment...");
       for (const sc of scenes) {
         sc.scene_type = 'pending';
         sc.mood = '';
         sc.bpm = 0;
-        if (sc.id) {
-          await supabase.from('book_scenes').update({ scene_type: null, mood: null, bpm: null }).eq('id', sc.id);
-        }
       }
       // scenes stay intact, skip to stage 2
-    } else if (wasFullyDone && existingChId && mode !== "enrich") {
+    } else if (wasFullyDone && mode !== "enrich") {
       addLog(t("logClearing", isRu));
-      await supabase.from('book_scenes').delete().eq('chapter_id', existingChId);
       scenes = [];
     }
 
@@ -302,11 +298,6 @@ export function useChapterAnalysis({
       // ─── STAGE 1: Boundary detection ───
       if (!hasExistingScenes) {
         addLog(`${t("logExtracting", isRu)} «${entry.title}»...`);
-
-        // Always clear server scenes before stage-1 insert to prevent duplicate drift
-        if (existingChId) {
-          await supabase.from('book_scenes').delete().eq('chapter_id', existingChId);
-        }
 
         let text: string;
 
@@ -524,14 +515,9 @@ export function useChapterAnalysis({
         }
 
         addLog(t("logSaving", isRu));
-        if (existingChId) {
-          for (const sc of scenes) {
-            const { data: scRow } = await supabase.from('book_scenes').insert({
-              chapter_id: existingChId, scene_number: sc.scene_number, title: sc.title,
-              content: sc.content || '', scene_type: null, mood: null, bpm: null,
-            }).select('id').single();
-            if (scRow) sc.id = scRow.id;
-          }
+        // К3: Generate scene IDs locally — no DB writes during analysis
+        for (const sc of scenes) {
+          if (!sc.id) sc.id = crypto.randomUUID();
         }
 
         setChapterResults(prev => {
@@ -573,11 +559,7 @@ export function useChapterAnalysis({
             addLog(`  ${t("logEnrichFailed", isRu)}: ${enrichErr.message}. ${t("logDefaults", isRu)}`);
           }
 
-          if (sc.id) {
-            await supabase.from('book_scenes').update({
-              scene_type: sc.scene_type, mood: sc.mood, bpm: sc.bpm,
-            }).eq('id', sc.id);
-          }
+          // К3: metadata stored locally only — pushed to server by user action
 
           addLog(`  ${t("logSceneDone", isRu)} ${scIdx + 1}: ${sc.scene_type} / ${sc.mood} / ${sc.bpm} BPM`);
 
