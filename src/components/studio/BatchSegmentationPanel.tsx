@@ -12,6 +12,8 @@ import { enrichBodyWithKeys } from "@/lib/invokeWithFallback";
 import { toast } from "sonner";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { readSceneContentFromLocal } from "@/lib/localSceneContent";
+import { saveStoryboardToLocal } from "@/lib/storyboardSync";
+import type { Segment } from "@/components/studio/storyboard/types";
 
 interface SceneInfo {
   id: string;
@@ -130,8 +132,19 @@ export function BatchSegmentationPanel({
           body: enrichedBody,
         });
         if (error) throw error;
-        const count = data?.segments?.length ?? 0;
-        return { sceneId: job.scene.id, count };
+        const newSegments: Segment[] = data?.segments ?? [];
+        // Persist to OPFS so StoryboardPanel can read it
+        if (storage) {
+          await saveStoryboardToLocal(storage, job.scene.id, {
+            segments: newSegments,
+            typeMappings: [],
+            audioStatus: new Map(),
+            inlineNarrationSpeaker: null,
+          });
+        }
+        // Clear content_dirty — analysis was just done on fresh content
+        supabase.from("book_scenes").update({ content_dirty: false }).eq("id", job.scene.id);
+        return { sceneId: job.scene.id, count: newSegments.length };
       },
     }));
 
@@ -184,7 +197,19 @@ export function BatchSegmentationPanel({
             body: enrichedBody,
           });
           if (error) throw error;
-          const count = data?.segments?.length ?? 0;
+          const newSegments: Segment[] = data?.segments ?? [];
+          // Persist to OPFS so StoryboardPanel can read it
+          if (storage) {
+            await saveStoryboardToLocal(storage, job.scene.id, {
+              segments: newSegments,
+              typeMappings: [],
+              audioStatus: new Map(),
+              inlineNarrationSpeaker: null,
+            });
+          }
+          // Clear content_dirty — analysis was just done on fresh content
+          supabase.from("book_scenes").update({ content_dirty: false }).eq("id", job.scene.id);
+          const count = newSegments.length;
           updateJob(job.scene.id, { status: "done", segmentCount: count });
           onSceneSegmented?.(job.scene.id);
         } catch (err: any) {
