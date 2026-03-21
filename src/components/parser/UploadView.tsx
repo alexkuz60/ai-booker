@@ -15,6 +15,8 @@ interface UploadViewProps {
   storageBackend?: StorageBackend;
   /** Called with project name when user clicks "Select file" */
   onCreateWithFile?: (projectName: string) => void;
+  /** Called when user cancels (goes back to library) */
+  onCancel?: () => void;
 }
 
 export default function UploadView({
