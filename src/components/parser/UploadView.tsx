@@ -115,6 +115,13 @@ export default function UploadView({
                 </span>
               </div>
             )}
+
+            {/* Cancel button */}
+            {onCancel && (
+              <Button variant="ghost" size="sm" onClick={onCancel} className="text-muted-foreground">
+                {isRu ? "Отмена" : "Cancel"}
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
