@@ -699,7 +699,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     setVoice(newVoiceId);
     setRole(newRole);
     setDirty(true);
-    await localChars.updateCharacter(charId, { gender: g });
+    await localChars.updateCharacter(charId, { gender: g as "male" | "female" | "unknown" });
     toast.success(isRu ? "Пол сохранён" : "Gender saved");
   }, [characters, localChars, isRu, role]);
 
