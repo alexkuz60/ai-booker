@@ -14,7 +14,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { t } from "@/pages/parser/i18n";
 import { NAV_WIDTH_KEY, NAV_STATE_KEY } from "@/pages/parser/types";
-import type { Scene, ChapterStatus, TocChapter } from "@/pages/parser/types";
+import type { Scene, ChapterStatus, TocChapter, BookRecord } from "@/pages/parser/types";
 import type { AiRoleId } from "@/config/aiRoles";
 import { useToast } from "@/hooks/use-toast";
 import { useChapterAnalysis } from "@/hooks/useChapterAnalysis";
