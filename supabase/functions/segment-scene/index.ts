@@ -308,7 +308,6 @@ Deno.serve(async (req) => {
     // ── K3: NEVER persist to DB from edge function ─────
     // All DB writes happen via client-side pushToDb() before TTS or "Save to Server".
     // Return light result with client-generated IDs.
-    const lang = language === "ru" ? "ru" : "en";
     const lightResult = segments.map((seg: AISegment, i: number) => ({
       segment_id: crypto.randomUUID(),
       segment_number: i + 1,
