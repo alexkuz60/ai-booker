@@ -197,7 +197,12 @@ Deno.serve(async (req) => {
         // Try to find a JSON array in the text
         const arrMatch = raw.match(/\[[\s\S]*\]/);
         if (arrMatch) {
-          parsed = JSON.parse(arrMatch[0]);
+          try {
+            parsed = JSON.parse(arrMatch[0]);
+          } catch {
+            console.error("Failed to parse extracted array, raw (first 500 chars):", raw.slice(0, 500));
+            throw new Error("Unparseable");
+          }
         } else {
           // Try to find { "segments": [...] } wrapper
           const objMatch = raw.match(/\{[\s\S]*"segments"\s*:\s*\[[\s\S]*\][\s\S]*\}/);
@@ -205,6 +210,7 @@ Deno.serve(async (req) => {
             const obj = JSON.parse(objMatch[0]);
             parsed = obj.segments;
           } else {
+            console.error("No JSON structure found in AI response, raw (first 500 chars):", raw.slice(0, 500));
             throw new Error("Unparseable");
           }
         }
@@ -212,7 +218,10 @@ Deno.serve(async (req) => {
 
       // Handle { segments: [...] } wrapper
       const segs = Array.isArray(parsed) ? parsed : (parsed as any)?.segments;
-      if (!Array.isArray(segs)) throw new Error("Unparseable");
+      if (!Array.isArray(segs)) {
+        console.error("Parsed result is not an array, type:", typeof parsed, "keys:", parsed && typeof parsed === 'object' ? Object.keys(parsed as object) : 'N/A');
+        throw new Error("Unparseable");
+      }
 
       return { segments: segs, usage: data.usage, latency: lat };
     }
