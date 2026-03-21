@@ -46,6 +46,7 @@ export default function Parser() {
   const [aiRolesOpen, setAiRolesOpen] = useState(false);
   const [parserTab, setParserTab] = useState<"structure" | "characters">("structure");
   const [pendingProjectName, setPendingProjectName] = useState<string | null>(null);
+  const [showReloadConfirm, setShowReloadConfirm] = useState(false);
   const {
     backend: storageBackend,
     createProject,
