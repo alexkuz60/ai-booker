@@ -56,8 +56,33 @@ function DbScale() {
 function LargeMeterSingleChannel({ channel, peakDb }: { channel: "L" | "R"; peakDb: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engine = getAudioEngine();
+  const [isPlaying, setIsPlaying] = useState(engine.state === "playing");
+
+  useEffect(() => engine.subscribe((s) => setIsPlaying(s.state === "playing")), [engine]);
 
   useEffect(() => {
+    if (!isPlaying) {
+      // Draw empty meter once
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          const dpr = window.devicePixelRatio || 1;
+          const w = canvas.clientWidth;
+          const h = canvas.clientHeight;
+          if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
+          }
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.clearRect(0, 0, w, h);
+          ctx.fillStyle = "hsla(0, 0%, 50%, 0.08)";
+          ctx.fillRect(0, 0, w, h);
+        }
+      }
+      return;
+    }
+
     let raf: number;
     const draw = () => {
       const meter = engine.getMasterMeter();
@@ -121,7 +146,7 @@ function LargeMeterSingleChannel({ channel, peakDb }: { channel: "L" | "R"; peak
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [engine, channel]);
+  }, [engine, channel, isPlaying]);
 
   return <canvas ref={canvasRef} className="w-full h-full" />;
 }
