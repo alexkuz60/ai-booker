@@ -1154,7 +1154,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
               </h3>
               <div className="flex-1 min-h-0">
                 <VoiceCastingTable
-                  characters={filteredCharacters}
+                  characters={filteredCharacters as any}
                   isRu={isRu}
                   selectedCharacterId={selectedId}
                   onSelectCharacter={handleSelectCharacter}
