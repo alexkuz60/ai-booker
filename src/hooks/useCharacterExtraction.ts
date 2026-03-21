@@ -92,7 +92,6 @@ export function useCharacterExtraction({
         });
       }
     }
-    }
     if (needSystemInsert.length > 0) {
       currentChars = [...currentChars, ...needSystemInsert];
       setCharacters(currentChars);
