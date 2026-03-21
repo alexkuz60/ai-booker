@@ -194,36 +194,20 @@ export function StoryboardPanel({
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [selectedSegmentId]);
 
-  // Load characters: OPFS first (names/aliases), then enrich with DB voice configs
+  // Load characters from OPFS (LOCAL-FIRST: K4 contract)
   const { storage } = useProjectStorageContext();
   useEffect(() => {
     if (!bookId) { setCharacters([]); return; }
     (async () => {
-      // Try OPFS names first
-      let charMap = new Map<string, CharacterOption>();
-      if (storage) {
-        const localChars = await readCharactersFromLocal(storage);
-        for (const c of localChars) {
-          charMap.set(c.name.toLowerCase(), { id: c.id, name: c.name, color: undefined, voiceConfig: {} });
-        }
-      }
-      // Enrich with DB voice_config (required for TTS provider detection)
-      const { data } = await supabase
-        .from("book_characters")
-        .select("id, name, color, voice_config")
-        .eq("book_id", bookId)
-        .order("sort_order");
-      if (data) {
-        for (const c of data) {
-          charMap.set(c.name.toLowerCase(), {
-            id: c.id,
-            name: c.name,
-            color: c.color,
-            voiceConfig: (c.voice_config || {}) as Record<string, unknown>,
-          });
-        }
-      }
-      setCharacters(Array.from(charMap.values()));
+      if (!storage) { setCharacters([]); return; }
+      const { readCharacterIndex } = await import("@/lib/localCharacters");
+      const localChars = await readCharacterIndex(storage);
+      setCharacters(localChars.map(c => ({
+        id: c.id,
+        name: c.name,
+        color: c.color ?? undefined,
+        voiceConfig: (c.voice_config || {}) as Record<string, unknown>,
+      })));
     })();
   }, [bookId, storage]);
 
