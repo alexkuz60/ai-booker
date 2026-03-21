@@ -380,11 +380,6 @@ export default function Parser() {
     return () => setPageHeader({});
   }, [isRu, step, fileName, setPageHeader]);
 
-  // Sync headerRight changes without triggering effect deps cycle
-  useEffect(() => {
-    setPageHeader(prev => ({ ...prev, headerRight }));
-  }, [headerRight, setPageHeader]);
-
   // Persist nav state to sessionStorage
   useEffect(() => {
     try {
