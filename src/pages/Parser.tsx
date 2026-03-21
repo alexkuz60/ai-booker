@@ -300,7 +300,7 @@ export default function Parser() {
         {step === "workspace" && (
           <Button
             variant="ghost" size="sm"
-            onClick={reloadBook}
+            onClick={() => setShowReloadConfirm(true)}
             className="gap-1.5 text-xs"
             title={isRu ? "Перезагрузить книгу (загрузить другую версию файла)" : "Reload book (upload different file version)"}
           >
