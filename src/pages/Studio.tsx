@@ -57,6 +57,7 @@ const Studio = () => {
   const [renderedSceneIds, setRenderedSceneIds] = useState<Set<string>>(new Set());
   const [fullyRenderedSceneIds, setFullyRenderedSceneIds] = useState<Set<string>>(new Set());
   const [staleAudioSceneIds, setStaleAudioSceneIds] = useState<Set<string>>(new Set());
+  const [clearedDirtySceneIds, setClearedDirtySceneIds] = useState<Set<string>>(new Set());
   const [bookId, setBookId] = useState<string | null>(chapter?.bookId ?? null);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [silenceSec, setSilenceSec] = useState<number>(2);
@@ -405,6 +406,7 @@ const Studio = () => {
 
   const onSegmented = useCallback((sceneId: string) => {
     setSegmentedSceneIds(prev => new Set(prev).add(sceneId));
+    setClearedDirtySceneIds(prev => new Set(prev).add(sceneId));
     // Always refresh clips when segmentation/synthesis completes
     setClipsRefreshToken(t => t + 1);
   }, []);
@@ -515,6 +517,7 @@ const Studio = () => {
                   renderedSceneIds={renderedSceneIds}
                   fullyRenderedSceneIds={fullyRenderedSceneIds}
                   staleAudioSceneIds={staleAudioSceneIds}
+                  clearedDirtySceneIds={clearedDirtySceneIds}
                   onBatchResynthDone={() => setClipsRefreshToken(t => t + 1)}
                   clipsRefreshToken={clipsRefreshToken}
                   bookId={bookId}
