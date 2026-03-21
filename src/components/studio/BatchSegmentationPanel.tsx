@@ -151,7 +151,7 @@ export function BatchSegmentationPanel({
           });
         }
         // Clear content_dirty — analysis was just done on fresh content
-        supabase.from("book_scenes").update({ content_dirty: false }).eq("id", job.scene.id);
+        await supabase.from("book_scenes").update({ content_dirty: false }).eq("id", job.scene.id);
         return { sceneId: job.scene.id, count: newSegments.length };
       },
     }));
