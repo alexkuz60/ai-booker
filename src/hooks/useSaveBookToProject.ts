@@ -5,6 +5,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
 import { useStoryboardPersistence } from "@/hooks/useStoryboardPersistence";
+import { readCharacterIndex } from "@/lib/localCharacters";
+import type { CharacterIndex } from "@/pages/parser/types";
 import type {
   ChapterStatus,
   Scene,
@@ -20,8 +22,6 @@ import {
   sanitizeChapterResultsForStructure,
 } from "@/lib/tocStructure";
 import { findSourceBlob } from "@/lib/fileFormatUtils";
-import { readCharactersFromLocal } from "@/lib/localSync";
-import type { LocalCharacter } from "@/pages/parser/types";
 
 export interface LocalBookSnapshot {
   toc: TocChapter[];
@@ -281,30 +281,33 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       let savedCharCount = 0;
       let savedProfileCount = 0;
       if (storage) {
-        const localChars = await readCharactersFromLocal(storage);
+        const localChars = await readCharacterIndex(storage);
         if (localChars.length > 0) {
           // Delete existing characters for this book, then insert fresh
           await supabase.from("book_characters").delete().eq("book_id", currentBookId);
 
-          const charInserts = localChars.map((c: LocalCharacter) => ({
+          const charInserts = localChars.map((c: CharacterIndex) => ({
             book_id: currentBookId,
             name: c.name,
             aliases: c.aliases || [],
             gender: c.gender || "unknown",
-            age_group: c.profile?.age_group || "unknown",
-            temperament: c.profile?.temperament || null,
-            speech_style: c.profile?.speech_style || null,
-            description: c.profile?.description || null,
-            speech_tags: c.profile?.speech_tags || [],
-            psycho_tags: c.profile?.psycho_tags || [],
+            age_group: c.age_group || "unknown",
+            temperament: c.temperament || null,
+            speech_style: c.speech_style || null,
+            description: c.description || null,
+            speech_tags: c.speech_tags || [],
+            psycho_tags: c.psycho_tags || [],
+            sort_order: c.sort_order || 0,
+            color: c.color || null,
+            voice_config: JSON.parse(JSON.stringify(c.voice_config || {})),
           }));
 
           const { error: charErr } = await supabase.from("book_characters").insert(charInserts);
           if (charErr) console.warn("[SaveToServer] characters insert:", charErr);
           else {
             savedCharCount = charInserts.length;
-            savedProfileCount = localChars.filter(c => c.profile?.description).length;
-            console.log(`[SaveToServer] Saved ${savedCharCount} characters, ${savedProfileCount} profiles`);
+            savedProfileCount = localChars.filter(c => c.description).length;
+            console.log(`[SaveToServer] Saved ${savedCharCount} characters (K4), ${savedProfileCount} profiles`);
           }
         }
       }
