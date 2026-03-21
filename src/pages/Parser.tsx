@@ -14,7 +14,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { t } from "@/pages/parser/i18n";
 import { NAV_WIDTH_KEY, NAV_STATE_KEY } from "@/pages/parser/types";
-import type { Scene, ChapterStatus, TocChapter } from "@/pages/parser/types";
+import type { Scene, ChapterStatus, TocChapter, BookRecord } from "@/pages/parser/types";
 import type { AiRoleId } from "@/config/aiRoles";
 import { useToast } from "@/hooks/use-toast";
 import { useChapterAnalysis } from "@/hooks/useChapterAnalysis";
@@ -246,6 +246,10 @@ export default function Parser() {
     setStep("upload");
   }, [handleReset, setStep]);
 
+  const openServerBook = useCallback((book: BookRecord) => {
+    openSavedBook(book, { skipTimestampCheck: true });
+  }, [openSavedBook]);
+
   useEffect(() => {
     if (!new URLSearchParams(location.search).has("resetLocal")) return;
 
@@ -361,14 +365,20 @@ export default function Parser() {
     return navButtons;
   }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook, reloadLibrary, saveBook, savingBook, bookId, startNewProject]);
 
+  // Use ref for headerRight to avoid re-render cycle:
+  // headerRight is a ReactNode — new JSX ref on every useMemo recompute.
+  // Putting it in effect deps causes: effect → context update → re-render → new headerRight → effect → ∞
+  const headerRightRef = useRef(headerRight);
+  headerRightRef.current = headerRight;
+
   useEffect(() => {
     const title = t("parserTitle", isRu);
     const subtitle = step === "workspace" && fileName
       ? fileName.replace(/\.(pdf|docx?|fb2)$/i, '')
       : t("parserSubtitle", isRu);
-    setPageHeader({ title, subtitle, headerRight });
+    setPageHeader({ title, subtitle, headerRight: headerRightRef.current });
     return () => setPageHeader({});
-  }, [isRu, step, fileName, headerRight, setPageHeader]);
+  }, [isRu, step, fileName, setPageHeader]);
 
   // Persist nav state to sessionStorage
   useEffect(() => {
@@ -495,7 +505,7 @@ export default function Parser() {
               onUpload={startNewProject} onOpen={openSavedBook} onDelete={deleteBook}
               onClearAll={clearAllProjects} onRename={renameBook}
               serverBooks={serverBooks} loadingServerBooks={loadingServerBooks}
-              onOpenServerBook={(book) => openSavedBook(book, { skipTimestampCheck: true })} onDeleteServerBook={deleteServerBook}
+              onOpenServerBook={openServerBook} onDeleteServerBook={deleteServerBook}
             />
           )}
           {step === "upload" && (
