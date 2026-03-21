@@ -344,7 +344,7 @@ export function useChapterAnalysis({
             }
           }
           text = chapterHtml ? stripHtml(chapterHtml) : "";
-          const detectedFmt = fileFormat || (fileName ? detectFormatFromName(fileName) : null);
+          const detectedFmt = fileFormat || (fileName ? detectFileFormat(fileName) : null);
           const formatLabel = detectedFmt === "fb2" ? "FB2" : "DOCX";
           addLog(isRu ? `📄 Источник: ${formatLabel}` : `📄 Source: ${formatLabel}`);
         } else {
