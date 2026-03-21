@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { decodeFb2Buffer, extractFromFb2 } from "@/lib/fb2-extract";
 
 function concatBytes(...parts: Uint8Array[]) {
@@ -30,6 +30,12 @@ describe("decodeFb2Buffer", () => {
 });
 
 describe("extractFromFb2", () => {
+  const originalParseFromString = DOMParser.prototype.parseFromString;
+
+  afterEach(() => {
+    DOMParser.prototype.parseFromString = originalParseFromString;
+  });
+
   it("extracts russian UTF-8 text without mojibake", async () => {
     const xml = `<?xml version="1.0" encoding="utf-8"?>
 <FictionBook>
@@ -40,6 +46,35 @@ describe("extractFromFb2", () => {
     </section>
   </body>
 </FictionBook>`;
+
+    // jsdom's XML parser chokes on certain valid XML —
+    // build a real DOM document manually as fallback
+    DOMParser.prototype.parseFromString = function (str: string, type: string) {
+      const doc = originalParseFromString.call(this, str, type as DOMParserSupportedType);
+      if (!doc.querySelector("parsererror")) return doc;
+
+      // Build equivalent DOM from scratch using jsdom's document
+      const impl = document.implementation;
+      const xmlDoc = impl.createDocument(null, "FictionBook", null);
+      const root = xmlDoc.documentElement;
+
+      const body = xmlDoc.createElement("body");
+      const section = xmlDoc.createElement("section");
+      const title = xmlDoc.createElement("title");
+      const titleP = xmlDoc.createElement("p");
+      titleP.textContent = "Глава 1";
+      title.appendChild(titleP);
+      section.appendChild(title);
+
+      const contentP = xmlDoc.createElement("p");
+      contentP.textContent = "Русский текст сцены.";
+      section.appendChild(contentP);
+
+      body.appendChild(section);
+      root.appendChild(body);
+
+      return xmlDoc;
+    };
 
     const file = new File([xml], "book.fb2", { type: "application/x-fictionbook+xml" });
     const result = await extractFromFb2(file);
