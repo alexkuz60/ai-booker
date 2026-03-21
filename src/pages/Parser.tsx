@@ -552,10 +552,7 @@ export default function Parser() {
                        onStopAnalysis={stopAnalysis}
                        isAnalyzing={isAnalyzing}
                        childCount={selectedChildCount}
-                       roleModels={{
-                         screenwriter: getModelForRole("screenwriter"),
-                          director: getModelForRole("director"),
-                        }}
+                        roleModels={detailRoleModels}
                         onScenesUpdate={mutations.handleScenesUpdate}
                       />
                    </div>
