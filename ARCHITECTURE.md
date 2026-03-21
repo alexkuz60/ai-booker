@@ -54,7 +54,10 @@
 ├── 📁 structure/
 │   ├── toc.json           — LocalBookStructure (bookId, title, fileName, parts[], toc[])
 │   ├── chapters.json      — маппинг index → chapterId
-│   └── characters.json    — LocalCharacter[]
+│   └── characters.json    — LocalCharacter[] (legacy, backward-compat копия characters/index.json)
+├── 📁 characters/          — ★ НОВАЯ ПАПКА: полный реестр персонажей книги
+│   ├── index.json         — CharacterIndex[] (пол, возраст, типаж, манера речи, voice_config, теги)
+│   └── scene_{id}.json    — SceneCharacterMap (кто в сцене: speakers[], typeMappings[])
 ├── 📁 scenes/
 │   └── chapter_{id}.json  — { chapterId, scenes[], status }
 ├── 📁 storyboard/
@@ -70,6 +73,30 @@
 │   └── 📁 renders/        — финальные рендеры сцен
 └── 📁 montage/
 ```
+
+#### Папка `characters/` — детали
+
+| Файл | Тип | Назначение |
+|------|-----|------------|
+| `index.json` | `CharacterIndex[]` | Полный реестр на уровне книги: id, name, aliases, gender, age_group, temperament, speech_style, description, speech_tags, psycho_tags, sort_order, color, voice_config, appearances, sceneCount |
+| `scene_{id}.json` | `SceneCharacterMap` | Привязка персонажей к сцене: speakers (characterId, role_in_scene, segment_ids), typeMappings (segmentType → characterId) |
+
+**Жизненный цикл:**
+- **Парсер → Извлечение**: `useCharacterExtraction` создаёт записи в `index.json` (имя, пол, алиасы, appearances)
+- **Парсер → Профилирование**: `useCharacterProfiles` обогащает `index.json` (temperament, speech_tags, psycho_tags, description)
+- **Студия → Раскадровка**: `upsertSpeakersFromSegments()` добавляет новых спикеров в `index.json` + создаёт `scene_{id}.json`
+- **Студия → Кастинг**: `useLocalCharacters.updateCharacter()` записывает voice_config в `index.json`
+- **Push to Server**: `useSaveBookToProject` читает `characters/index.json` → upsert в `book_characters`
+
+**Миграция:** при открытии проекта, если `characters/index.json` отсутствует, но есть `structure/characters.json` — автомиграция через `migrateLocalCharacter()`.
+
+**Ключевые файлы кода:**
+
+| Файл | Назначение |
+|------|------------|
+| `src/lib/localCharacters.ts` | CRUD: `readCharacterIndex`, `saveCharacterIndex`, `readSceneCharacterMap`, `saveSceneCharacterMap`, `upsertSpeakersFromSegments`, `buildNameLookup`, `findCharacterByNameOrAlias` |
+| `src/hooks/useLocalCharacters.ts` | React-хук для Студии: characters[], sceneCharIds, chapterCharIds, segmentCounts, nameLookup, updateCharacter, mergeCharacters |
+| `src/pages/parser/types.ts` | Типы: `CharacterIndex`, `SceneCharacterMap`, `CharacterVoiceConfig`, `LocalCharacter` (legacy) |
 
 ### 1.6 Ключевые файлы кода
 
