@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, useRef, type ReactNode } from "react";
 
 interface PageHeaderState {
   title?: string;
@@ -16,9 +16,17 @@ const Ctx = createContext<PageHeaderCtx>({
 
 export function PageHeaderProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PageHeaderState>({});
-  const setPageHeader = useCallback((s: PageHeaderState) => setState(s), []);
 
-  // Memoize context value to prevent unnecessary consumer re-renders
+  // Compare before setting to avoid unnecessary re-renders
+  const setPageHeader = useCallback((s: PageHeaderState) => {
+    setState(prev => {
+      if (prev.title === s.title && prev.subtitle === s.subtitle && prev.headerRight === s.headerRight) {
+        return prev; // same values — skip re-render
+      }
+      return s;
+    });
+  }, []);
+
   const value = useMemo(
     () => ({ ...state, setPageHeader }),
     [state, setPageHeader],
