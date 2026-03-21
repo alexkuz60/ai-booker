@@ -25,13 +25,12 @@ export type ProfileMode = "fresh" | "continue" | "selective";
 interface UseCharacterProfilesParams {
   tocEntries: TocChapter[];
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
-  characters: LocalCharacter[];
-  setCharacters: React.Dispatch<React.SetStateAction<LocalCharacter[]>>;
-  persist: (chars: LocalCharacter[]) => Promise<void>;
+  characters: CharacterIndex[];
+  setCharacters: React.Dispatch<React.SetStateAction<CharacterIndex[]>>;
+  persist: (chars: CharacterIndex[]) => Promise<void>;
   profilerModel: string;
   userApiKeys: Record<string, string>;
   isRu: boolean;
-  /** Effective pool for the profiler role (from useAiRoles.getEffectivePool) */
   effectivePool?: string[];
 }
 
