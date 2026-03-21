@@ -15,6 +15,8 @@ interface UploadViewProps {
   storageBackend?: StorageBackend;
   /** Called with project name when user clicks "Select file" */
   onCreateWithFile?: (projectName: string) => void;
+  /** Called when user cancels (goes back to library) */
+  onCancel?: () => void;
 }
 
 export default function UploadView({
@@ -23,6 +25,7 @@ export default function UploadView({
   onFileSelect,
   storageBackend = "none",
   onCreateWithFile,
+  onCancel,
 }: UploadViewProps) {
   const hasLocalStorage = storageBackend !== "none";
   const [projectName, setProjectName] = useState("");
@@ -112,17 +115,17 @@ export default function UploadView({
                 </span>
               </div>
             )}
+
+            {/* Cancel button */}
+            {onCancel && (
+              <Button variant="ghost" size="sm" onClick={onCancel} className="text-muted-foreground">
+                {isRu ? "Отмена" : "Cancel"}
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".pdf,.docx,.doc,.fb2"
-        className="hidden"
-        onChange={onFileSelect}
-      />
     </motion.div>
   );
 }

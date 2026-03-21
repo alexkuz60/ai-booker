@@ -258,8 +258,7 @@ export function useBookManager({
       setPdfRef(null);
       setFile(null);
       setChapterResults(new Map());
-      setStep("upload");
-      toast.info(isRu ? "Выберите новый файл для перезагрузки книги" : "Select a new file to reload the book");
+      // Don't change step — caller decides (confirmation dialog or upload view)
     } catch (err) {
       console.error("Failed to reload book:", err);
       toast.error(isRu ? "Не удалось очистить данные книги" : "Failed to clear book data");

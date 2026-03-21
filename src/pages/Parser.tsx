@@ -46,6 +46,7 @@ export default function Parser() {
   const [aiRolesOpen, setAiRolesOpen] = useState(false);
   const [parserTab, setParserTab] = useState<"structure" | "characters">("structure");
   const [pendingProjectName, setPendingProjectName] = useState<string | null>(null);
+  const [showReloadConfirm, setShowReloadConfirm] = useState(false);
   const {
     backend: storageBackend,
     createProject,
@@ -299,7 +300,7 @@ export default function Parser() {
         {step === "workspace" && (
           <Button
             variant="ghost" size="sm"
-            onClick={reloadBook}
+            onClick={() => setShowReloadConfirm(true)}
             className="gap-1.5 text-xs"
             title={isRu ? "Перезагрузить книгу (загрузить другую версию файла)" : "Reload book (upload different file version)"}
           >
@@ -465,6 +466,14 @@ export default function Parser() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col h-full">
+      {/* Hidden file input always in DOM for reload from workspace */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.docx,.doc,.fb2"
+        className="hidden"
+        onChange={handleFileSelect}
+      />
       <div className="flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
           {step === "library" && (
@@ -483,6 +492,7 @@ export default function Parser() {
               onFileSelect={handleFileSelect}
               storageBackend={storageBackend}
               onCreateWithFile={(name) => setPendingProjectName(name)}
+              onCancel={handleReset}
             />
           )}
           {step === "extracting_toc" && (
@@ -660,6 +670,32 @@ export default function Parser() {
             </AlertDialogCancel>
             <AlertDialogAction onClick={acceptServerVersion}>
               {isRu ? "Загрузить с сервера" : "Load from server"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Reload Book Confirmation Dialog ── */}
+      <AlertDialog open={showReloadConfirm} onOpenChange={setShowReloadConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isRu ? "Перезагрузить файл книги?" : "Reload book file?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isRu
+                ? "Текущая структура и результаты анализа будут сброшены. Выберите новый файл для повторного разбора."
+                : "Current structure and analysis results will be reset. Select a new file to re-parse."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              setShowReloadConfirm(false);
+              await reloadBook();
+              fileInputRef.current?.click();
+            }}>
+              {isRu ? "Выбрать файл" : "Select file"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
