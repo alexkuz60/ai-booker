@@ -216,14 +216,13 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     }
   }, [userId, loadLocalLibrary]);
 
-  // Load server books (filtered to exclude already-local books)
+  // Load server books — NO filtering, show all for cleanup/audit
   const loadServerBooks = useCallback(async () => {
     if (!userId) { setServerBooks([]); return; }
     setLoadingServerBooks(true);
     try {
       const fromServer = await loadLibraryFromServer();
-      const localIds = new Set(Array.from(localProjectNamesByBookId.keys()));
-      setServerBooks(fromServer.filter((book) => !localIds.has(book.id)));
+      setServerBooks(fromServer);
     } catch (err) {
       console.warn("[Library] Server books fetch failed:", err);
       setServerBooks([]);
@@ -232,7 +231,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     } finally {
       setLoadingServerBooks(false);
     }
-  }, [userId, loadLibraryFromServer, localProjectNamesByBookId]);
+  }, [userId, loadLibraryFromServer]);
 
   // Auto-load when on library step
   useEffect(() => {

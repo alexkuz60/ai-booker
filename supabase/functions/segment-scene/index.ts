@@ -1,6 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
 import { splitPhrases } from "../_shared/splitPhrases.ts";
-import { extractCharacters } from "../_shared/extractCharacters.ts";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
 import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
 import { resolveTaskPromptWithOverrides } from "../_shared/taskPrompts.ts";
@@ -307,145 +305,24 @@ Deno.serve(async (req) => {
       logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "success", latencyMs: aiLatency, tokensInput: usage?.prompt_tokens, tokensOutput: usage?.completion_tokens });
     }
 
-    // ── Save to DB ───────────────────────────────────────
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // ── K3: NEVER persist to DB from edge function ─────
+    // All DB writes happen via client-side pushToDb() before TTS or "Save to Server".
+    // Return light result with client-generated IDs.
+    const lang = language === "ru" ? "ru" : "en";
+    const lightResult = segments.map((seg: AISegment, i: number) => ({
+      segment_id: crypto.randomUUID(),
+      segment_number: i + 1,
+      segment_type: SEGMENT_TYPES.includes(seg.type as SegmentType) ? seg.type : "narrator",
+      speaker: seg.speaker || null,
+      phrases: splitPhrases(seg.text, lang).map((t: string, j: number) => ({
+        phrase_id: crypto.randomUUID(),
+        phrase_number: j + 1,
+        text: t,
+      })),
+      inline_narrations: seg.inline_narrations,
+    }));
 
-    // Verify user owns this scene (scene may not exist in DB yet in local-first mode)
-    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: sceneCheck, error: sceneErr } = await userClient
-      .from("book_scenes")
-      .select("id")
-      .eq("id", scene_id)
-      .maybeSingle();
-
-    const sceneExistsInDb = !sceneErr && !!sceneCheck;
-
-    // If scene exists in DB but user can't access it → deny
-    if (!sceneExistsInDb && !bodyContent) {
-      return new Response(
-        JSON.stringify({ error: "Scene not found or access denied" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // If scene doesn't exist in DB (local-first), return AI result without persisting
-    if (!sceneExistsInDb) {
-      const lightResult = segments.map((seg: AISegment, i: number) => ({
-        segment_number: i + 1,
-        segment_type: SEGMENT_TYPES.includes(seg.type as SegmentType) ? seg.type : "narrator",
-        speaker: seg.speaker || null,
-        phrases: splitPhrases(seg.text, lang).map((t: string, j: number) => ({
-          phrase_number: j + 1,
-          text: t,
-        })),
-        inline_narrations: seg.inline_narrations,
-      }));
-      return new Response(JSON.stringify({ segments: lightResult }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Delete existing segments for this scene
-    await supabase.from("segment_phrases").delete().in(
-      "segment_id",
-      (await supabase.from("scene_segments").select("id").eq("scene_id", scene_id)).data?.map(
-        (s: { id: string }) => s.id
-      ) || []
-    );
-    await supabase.from("scene_segments").delete().eq("scene_id", scene_id);
-    await supabase.from("character_appearances").delete().eq("scene_id", scene_id);
-
-    // Insert segments and phrases
-    const result: Array<{
-      segment_id: string;
-      segment_number: number;
-      segment_type: string;
-      speaker: string | null;
-      phrases: Array<{ phrase_id: string; phrase_number: number; text: string }>;
-      inline_narrations?: InlineNarration[];
-    }> = [];
-
-    for (let i = 0; i < segments.length; i++) {
-      const seg = segments[i];
-      const segType = SEGMENT_TYPES.includes(seg.type as SegmentType) ? seg.type : "narrator";
-
-      const metadata: Record<string, unknown> = {};
-      if (seg.inline_narrations && seg.inline_narrations.length > 0) {
-        metadata.inline_narrations = seg.inline_narrations;
-      }
-      // Mark lyric segments for special TTS handling
-      if (segType === "lyric") {
-        metadata.is_verse = true;
-      }
-
-      const { data: inserted, error: segErr } = await supabase
-        .from("scene_segments")
-        .insert({
-          scene_id,
-          segment_number: i + 1,
-          segment_type: segType,
-          speaker: seg.speaker || null,
-          metadata: Object.keys(metadata).length > 0 ? metadata : null,
-        })
-        .select("id")
-        .single();
-
-      if (segErr || !inserted) {
-        console.error("Failed to insert segment:", segErr);
-        continue;
-      }
-
-      const phrases = splitPhrases(seg.text);
-      // For lyric segments, auto-annotate each phrase with "slow" spanning full text
-      const phraseRows = phrases.map((text, j) => {
-        const row: { segment_id: string; phrase_number: number; text: string; metadata?: Record<string, unknown> } = {
-          segment_id: inserted.id,
-          phrase_number: j + 1,
-          text,
-        };
-        if (segType === "lyric") {
-          row.metadata = {
-            annotations: [
-              { type: "slow", start: 0, end: text.length, rate: 0.9 },
-            ],
-          };
-        }
-        return row;
-      });
-
-      const { data: insertedPhrases, error: pErr } = await supabase
-        .from("segment_phrases")
-        .insert(phraseRows)
-        .select("id, phrase_number, text");
-
-      if (pErr) console.error("Failed to insert phrases:", pErr);
-
-      result.push({
-        segment_id: inserted.id,
-        segment_number: i + 1,
-        segment_type: segType,
-        speaker: seg.speaker || null,
-        phrases: (insertedPhrases || []).map((p) => ({
-          phrase_id: p.id,
-          phrase_number: p.phrase_number,
-          text: p.text,
-        })),
-        inline_narrations: seg.inline_narrations,
-      });
-    }
-
-    // ── Extract characters (non-fatal) ──
-    try {
-      await extractCharacters(supabase, scene_id, result);
-    } catch (charErr) {
-      console.error("Character extraction error (non-fatal):", charErr);
-    }
-
-    return new Response(JSON.stringify({ segments: result }), {
+    return new Response(JSON.stringify({ segments: lightResult }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
