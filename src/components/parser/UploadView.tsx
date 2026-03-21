@@ -25,6 +25,7 @@ export default function UploadView({
   onFileSelect,
   storageBackend = "none",
   onCreateWithFile,
+  onCancel,
 }: UploadViewProps) {
   const hasLocalStorage = storageBackend !== "none";
   const [projectName, setProjectName] = useState("");
