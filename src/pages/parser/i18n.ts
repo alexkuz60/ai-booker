@@ -216,7 +216,7 @@ const texts: Record<string, { ru: string; en: string }> = {
   errTimeout: { ru: "Модель не ответила вовремя (превышен таймаут). Попробуйте снова или выберите более быструю модель.", en: "Model did not respond in time (timeout). Try again or pick a faster model." },
   errNoStructure: { ru: "ИИ не вернул структурированный ответ. Попробуйте другую модель.", en: "AI did not return structured output. Try a different model." },
   errNoApiKey: { ru: "API-ключ не настроен. Добавьте ключ в профиле.", en: "API key not configured. Add a key in your profile." },
-  errNetwork: { ru: "Ошибка сети. Проверьте подключение к интернету.", en: "Network error. Check your internet connection." },
+  errNetwork: { ru: "Ошибка сети после нескольких попыток. Проверьте подключение и попробуйте снова.", en: "Network error after retries. Check connection and try again." },
   errGeneric: { ru: "Ошибка анализа", en: "Analysis error" },
   errChapterFailed: { ru: "Не удалось проанализировать главу", en: "Failed to analyze chapter" },
 
