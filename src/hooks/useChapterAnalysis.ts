@@ -6,7 +6,7 @@ import { getModelRegistryEntry } from "@/config/modelRegistry";
 import { extractTextByPageRange } from "@/lib/pdf-extract";
 import { extractFromDocx, stripHtml } from "@/lib/docx-extract";
 import { extractFromFb2 } from "@/lib/fb2-extract";
-import { getSourcePath } from "@/lib/fileFormatUtils";
+import { getSourcePath, detectFileFormat } from "@/lib/fileFormatUtils";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import { t } from "@/pages/parser/i18n";
 
@@ -344,7 +344,8 @@ export function useChapterAnalysis({
             }
           }
           text = chapterHtml ? stripHtml(chapterHtml) : "";
-          const formatLabel = fileFormat === "fb2" ? "FB2" : "DOCX";
+          const detectedFmt = fileFormat || (fileName ? detectFileFormat(fileName) : null);
+          const formatLabel = detectedFmt === "fb2" ? "FB2" : "DOCX";
           addLog(isRu ? `📄 Источник: ${formatLabel}` : `📄 Source: ${formatLabel}`);
         } else {
           // ── PDF path: extract text by page range ──
