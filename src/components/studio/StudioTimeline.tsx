@@ -88,6 +88,7 @@ export function StudioTimeline({
   onSceneRendered,
 }: StudioTimelineProps) {
   const { user } = useAuth();
+  const { storage } = useProjectStorageContext();
 
   // ── Scene render state ────────────────────────────────────
   const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
