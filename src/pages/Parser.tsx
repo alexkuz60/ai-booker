@@ -365,14 +365,25 @@ export default function Parser() {
     return navButtons;
   }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook, reloadLibrary, saveBook, savingBook, bookId, startNewProject]);
 
+  // Use ref for headerRight to avoid re-render cycle:
+  // headerRight is a ReactNode — new JSX ref on every useMemo recompute.
+  // Putting it in effect deps causes: effect → context update → re-render → new headerRight → effect → ∞
+  const headerRightRef = useRef(headerRight);
+  headerRightRef.current = headerRight;
+
   useEffect(() => {
     const title = t("parserTitle", isRu);
     const subtitle = step === "workspace" && fileName
       ? fileName.replace(/\.(pdf|docx?|fb2)$/i, '')
       : t("parserSubtitle", isRu);
-    setPageHeader({ title, subtitle, headerRight });
+    setPageHeader({ title, subtitle, headerRight: headerRightRef.current });
     return () => setPageHeader({});
-  }, [isRu, step, fileName, headerRight, setPageHeader]);
+  }, [isRu, step, fileName, setPageHeader]);
+
+  // Sync headerRight changes without triggering effect deps cycle
+  useEffect(() => {
+    setPageHeader(prev => ({ ...prev, headerRight }));
+  }, [headerRight, setPageHeader]);
 
   // Persist nav state to sessionStorage
   useEffect(() => {
