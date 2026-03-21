@@ -209,7 +209,7 @@ export function StudioTimeline({
       if (sceneMap?.typeMappings) {
         const sceneTypeMappings = new Map<string, string>();
         for (const m of sceneMap.typeMappings) {
-          sceneTypeMappings.set(m.segment_type, m.character_id);
+          sceneTypeMappings.set(m.segmentType, m.characterId);
         }
         tm.set(contextSceneIds[0], sceneTypeMappings);
       }
