@@ -55,8 +55,12 @@ export function useStoryboardPersistence(sceneId: string | null) {
    * Persist immediately (no debounce) — use after AI analysis or merge/split.
    */
   const persistNow = useCallback(async (snapshot: StoryboardSnapshot) => {
-    if (!storage || !sceneId) return;
+    if (!storage || !sceneId) {
+      console.warn(`[StoryboardPersist] persistNow skipped: storage=${!!storage} sceneId=${sceneId}`);
+      return;
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    console.debug(`[StoryboardPersist] persistNow → sceneId=${sceneId}, segments=${snapshot.segments.length}`);
     await saveStoryboardToLocal(storage, sceneId, snapshot);
   }, [storage, sceneId]);
 
