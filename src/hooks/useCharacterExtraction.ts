@@ -12,7 +12,7 @@ import { invokeWithFallback } from "@/lib/invokeWithFallback";
 import { useToast } from "@/hooks/use-toast";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
 import { ModelPoolManager, type PoolTask, type PoolStats, logPoolStats } from "@/lib/modelPoolManager";
-import type { Scene, ChapterStatus, TocChapter, LocalCharacter, CharacterAppearance, CharacterRole } from "@/pages/parser/types";
+import type { Scene, ChapterStatus, TocChapter, CharacterIndex, CharacterAppearance, CharacterRole } from "@/pages/parser/types";
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -21,9 +21,9 @@ function generateId(): string {
 interface UseCharacterExtractionParams {
   tocEntries: TocChapter[];
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
-  characters: LocalCharacter[];
-  setCharacters: React.Dispatch<React.SetStateAction<LocalCharacter[]>>;
-  persist: (chars: LocalCharacter[]) => Promise<void>;
+  characters: CharacterIndex[];
+  setCharacters: React.Dispatch<React.SetStateAction<CharacterIndex[]>>;
+  persist: (chars: CharacterIndex[]) => Promise<void>;
   profilerModel: string;
   userApiKeys: Record<string, string>;
   isRu: boolean;
