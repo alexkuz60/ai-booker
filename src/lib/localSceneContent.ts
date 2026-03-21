@@ -56,7 +56,9 @@ export async function readSceneContentFromLocal(
     try {
       const localChapter = await storage.readJSON<LocalChapterData>(`scenes/chapter_${lookup.chapterId}.json`);
       const localScene = getSceneContent(localChapter, lookup);
-      const content = localScene?.content ?? localScene?.content_preview;
+      // Never fall back to content_preview — it's a 200-char truncation
+      // that would produce garbage AI segmentation results.
+      const content = localScene?.content;
 
       if (localChapter && localScene && content?.trim()) {
         return {
