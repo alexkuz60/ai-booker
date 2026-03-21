@@ -50,12 +50,12 @@
 
 | Шаг | Описание | Статус | Детали |
 |-----|----------|--------|--------|
-| **1** | Таблицы `book_characters` + `character_appearances` с RLS | ✅ | Миграция, UNIQUE(book_id, name), каскадное удаление |
-| **2** | Извлечение speakers при сегментации | ✅ | Edge Function `segment-scene` → upsert в `book_characters` + `character_appearances` |
-| **3** | CharactersPanel с реестром из БД | ✅ | Загрузка по bookId, настройка голоса (табы Yandex/ElevenLabs/ProxyAPI), сохранение voice_config, кредиты ElevenLabs |
-| **4** | AI-профайлинг | ✅ | `profile-characters` Edge Function: пол, возраст, темперамент, стиль, алиасы, инкрементальное обновление |
+| **1** | Local-first реестр `characters/index.json` + `characters/scene_{id}.json` | ✅ | Миграция с DB на OPFS, backward-compat `structure/characters.json` |
+| **2** | Извлечение speakers при сегментации | ✅ | `upsertSpeakersFromSegments()` → запись в `characters/index.json` + `scene_{id}.json` |
+| **3** | CharactersPanel на `useLocalCharacters` | ✅ | Все CRUD-операции (кастинг, слияние, профилирование, дубликаты) через OPFS |
+| **4** | AI-профайлинг | ✅ | `profile-characters-local` Edge Function: пол, возраст, темперамент, стиль, алиасы |
 | **5** | Авто-кастинг голосов | ✅ | Автоподбор Yandex-голосов по профилю, автоназначение ролей по темпераменту |
-| **6** | Автоочистка дубликатов | ✅ | Объединение по имени/алиасам с переносом character_appearances |
+| **6** | Push to Server (K4) | ✅ | `useSaveBookToProject` читает `characters/index.json` → upsert `book_characters` с voice_config, sort_order, color |
 
 #### Архитектурные решения
 - **Реестр голосов Yandex** вынесен в `src/config/yandexVoices.ts` (рефакторинг CharactersPanel)
