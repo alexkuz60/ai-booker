@@ -50,7 +50,10 @@ interface BookStaleReport {
   providerBreakdown: Map<string, number>; // provider -> count
 }
 
-async function scanBookForStaleAudio(bookId: string): Promise<BookStaleReport> {
+async function scanBookForStaleAudio(
+  bookId: string,
+  storage?: import("@/lib/projectStorage").ProjectStorage | null,
+): Promise<BookStaleReport> {
   const report: BookStaleReport = {
     staleSegments: [],
     totalAudioSegments: 0,
@@ -58,21 +61,38 @@ async function scanBookForStaleAudio(bookId: string): Promise<BookStaleReport> {
     providerBreakdown: new Map(),
   };
 
-  // Load all characters with voice configs
-  const { data: chars } = await supabase
-    .from("book_characters")
-    .select("name, aliases, voice_config")
-    .eq("book_id", bookId);
-  if (!chars?.length) return report;
-
+  // ── Build character voice map from local index (K4) ──
   const charVoiceMap = new Map<string, Record<string, unknown>>();
-  for (const c of chars) {
-    const vc = (c.voice_config || {}) as Record<string, unknown>;
-    charVoiceMap.set((c.name || "").toLowerCase(), vc);
-    for (const a of (c.aliases || [])) {
-      charVoiceMap.set((a as string).toLowerCase(), vc);
+
+  if (storage) {
+    const { readCharacterIndex } = await import("@/lib/localCharacters");
+    const chars = await readCharacterIndex(storage);
+    for (const c of chars) {
+      const vc = (c.voice_config || {}) as Record<string, unknown>;
+      charVoiceMap.set(c.name.toLowerCase(), vc);
+      for (const alias of c.aliases) {
+        if (alias) charVoiceMap.set(alias.toLowerCase(), vc);
+      }
     }
   }
+
+  // Fallback to DB only if no local data (backwards compat during migration)
+  if (charVoiceMap.size === 0) {
+    const { data: chars } = await supabase
+      .from("book_characters")
+      .select("name, aliases, voice_config")
+      .eq("book_id", bookId);
+    if (!chars?.length) return report;
+    for (const c of chars) {
+      const vc = (c.voice_config || {}) as Record<string, unknown>;
+      charVoiceMap.set((c.name || "").toLowerCase(), vc);
+      for (const a of (c.aliases || [])) {
+        charVoiceMap.set((a as string).toLowerCase(), vc);
+      }
+    }
+  }
+
+  if (charVoiceMap.size === 0) return report;
 
   // Load all chapters -> scenes -> segments -> audio for the book
   const { data: chapters } = await supabase
@@ -90,7 +110,6 @@ async function scanBookForStaleAudio(bookId: string): Promise<BookStaleReport> {
 
   const sceneIds = scenes.map(s => s.id);
 
-  // Load all segments for these scenes
   const { data: segments } = await supabase
     .from("scene_segments")
     .select("id, scene_id, speaker")
@@ -99,7 +118,6 @@ async function scanBookForStaleAudio(bookId: string): Promise<BookStaleReport> {
 
   const segIds = segments.map(s => s.id);
 
-  // Load all ready audio
   const { data: audioData } = await supabase
     .from("segment_audio")
     .select("segment_id, voice_config, status")

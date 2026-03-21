@@ -5,6 +5,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
 import { useStoryboardPersistence } from "@/hooks/useStoryboardPersistence";
+import { readCharacterIndex } from "@/lib/localCharacters";
+import type { CharacterIndex } from "@/pages/parser/types";
 import type {
   ChapterStatus,
   Scene,
