@@ -68,7 +68,7 @@ export function useCharacterExtraction({
     ];
 
     let currentChars = mode === "fresh" ? characters.filter(c => c.role === "system") : characters;
-    const needSystemInsert: LocalCharacter[] = [];
+    const needSystemInsert: CharacterIndex[] = [];
     for (const sys of SYSTEM_CHARS) {
       const exists = currentChars.some(c =>
         c.name.toLowerCase() === sys.name.toLowerCase() ||
@@ -82,10 +82,16 @@ export function useCharacterExtraction({
           aliases: isRu ? [sys.nameEn] : [sys.name],
           gender: "unknown",
           role: sys.role,
+          age_group: "unknown",
+          sort_order: sys.role === "system" ? -2 : 0,
+          speech_tags: [],
+          psycho_tags: [],
           appearances: [],
           sceneCount: 0,
+          voice_config: {},
         });
       }
+    }
     }
     if (needSystemInsert.length > 0) {
       currentChars = [...currentChars, ...needSystemInsert];
