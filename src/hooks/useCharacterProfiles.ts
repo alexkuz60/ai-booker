@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
 import { ModelPoolManager, type PoolTask, type PoolStats, logPoolStats } from "@/lib/modelPoolManager";
-import type { Scene, ChapterStatus, TocChapter, LocalCharacter, CharacterProfile } from "@/pages/parser/types";
+import type { Scene, ChapterStatus, TocChapter, CharacterIndex, CharacterProfile } from "@/pages/parser/types";
 
 export type ProfileMode = "fresh" | "continue" | "selective";
 
