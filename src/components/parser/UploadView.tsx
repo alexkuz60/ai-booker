@@ -125,13 +125,6 @@ export default function UploadView({
         </Card>
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".pdf,.docx,.doc,.fb2"
-        className="hidden"
-        onChange={onFileSelect}
-      />
     </motion.div>
   );
 }
