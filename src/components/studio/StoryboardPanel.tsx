@@ -537,6 +537,11 @@ export function StoryboardPanel({
         });
       }
 
+      // Clear content_dirty in DB — analysis was just done on fresh content
+      supabase.from("book_scenes").update({ content_dirty: false }).eq("id", sceneId).then(() => {
+        console.debug(`[Storyboard] Cleared content_dirty for scene ${sceneId}`);
+      });
+
       onSegmented?.(sceneId);
       toast.success(isRu ? "Раскадровка готова" : "Storyboard ready");
     } catch (err: any) {

@@ -12,6 +12,8 @@ import { enrichBodyWithKeys } from "@/lib/invokeWithFallback";
 import { toast } from "sonner";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { readSceneContentFromLocal } from "@/lib/localSceneContent";
+import { saveStoryboardToLocal } from "@/lib/storyboardSync";
+import type { Segment } from "@/components/studio/storyboard/types";
 
 interface SceneInfo {
   id: string;
