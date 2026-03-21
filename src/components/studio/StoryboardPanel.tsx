@@ -561,19 +561,7 @@ export function StoryboardPanel({
     setAnalyzing(false);
   }, [sceneId, chapterId, sceneNumber, sceneTitle, isRu, onSegmented, clearLocal, getModelForRole, userApiKeys, storage, hasStorage, loadFromLocal, persistNow, applySegments]);
 
-  // Auto-trigger analysis when scene has no segments and content is available
-  useEffect(() => {
-    if (!loaded || loading || analyzing || !sceneContent || !sceneId || segments.length > 0) {
-      return;
-    }
-
-    if (autoAnalyzeAttemptedRef.current === sceneId) {
-      return;
-    }
-
-    autoAnalyzeAttemptedRef.current = sceneId;
-    runAnalysis();
-  }, [loaded, loading, analyzing, segments.length, sceneContent, sceneId, runAnalysis]);
+  // Auto-analysis removed: user starts segmentation manually via per-scene or batch buttons.
 
   // ─── Phrase CRUD ──────────────────────────────────────────
 
