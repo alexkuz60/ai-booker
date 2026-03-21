@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { useProjectStorage } from "@/hooks/useProjectStorage";
 
 type ProjectStorageContextValue = ReturnType<typeof useProjectStorage>;
@@ -7,7 +7,32 @@ const ProjectStorageContext = createContext<ProjectStorageContextValue | null>(n
 
 export function ProjectStorageProvider({ children }: { children: ReactNode }) {
   const value = useProjectStorage();
-  return <ProjectStorageContext.Provider value={value}>{children}</ProjectStorageContext.Provider>;
+
+  // Memoize context value to prevent cascading re-renders when parent re-renders
+  // but none of the storage values actually changed.
+  const stable = useMemo(
+    () => value,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      value.storage,
+      value.meta,
+      value.backend,
+      value.initialized,
+      value.isOpen,
+      value.loading,
+      value.createProject,
+      value.openProject,
+      value.openProjectByName,
+      value.importProjectFromZip,
+      value.downloadProjectAsZip,
+      value.closeProject,
+      value.hardResetLocalData,
+      value.saveSourceFile,
+      value.readSourceFile,
+    ],
+  );
+
+  return <ProjectStorageContext.Provider value={stable}>{children}</ProjectStorageContext.Provider>;
 }
 
 export function useProjectStorageContext() {

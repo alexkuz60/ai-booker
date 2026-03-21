@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from "react";
 
 interface PageHeaderState {
   title?: string;
@@ -17,7 +17,14 @@ const Ctx = createContext<PageHeaderCtx>({
 export function PageHeaderProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PageHeaderState>({});
   const setPageHeader = useCallback((s: PageHeaderState) => setState(s), []);
-  return <Ctx.Provider value={{ ...state, setPageHeader }}>{children}</Ctx.Provider>;
+
+  // Memoize context value to prevent unnecessary consumer re-renders
+  const value = useMemo(
+    () => ({ ...state, setPageHeader }),
+    [state, setPageHeader],
+  );
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 export function usePageHeader() {
