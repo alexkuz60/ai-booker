@@ -214,8 +214,8 @@ export function useBookRestore({
       console.log(`[LocalRestore] Restored from local: ${structure.toc.length} chapters, ${localResults.size} results`);
       toast.success(
         isRu
-          ? `Книга «${structure.title}» восстановлена из локального проекта`
-          : `Book "${structure.title}" restored from local project`
+          ? `Книга «${structure.title}» загружена`
+          : `Book "${structure.title}" loaded`
       );
       return true;
     } catch (err) {
