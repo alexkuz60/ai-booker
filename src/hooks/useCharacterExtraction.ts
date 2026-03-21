@@ -152,27 +152,27 @@ export function useCharacterExtraction({
       extractedBy?: string;
     }>();
 
-    // Build intermediate LocalCharacter[] snapshot from allResults merged with existing
-    const buildSnapshot = (): LocalCharacter[] => {
+    // Build intermediate CharacterIndex[] snapshot from allResults merged with existing
+    const buildSnapshot = (): CharacterIndex[] => {
       const baseChars = mode === "fresh" ? currentChars : characters;
-      const existingByName = new Map<string, LocalCharacter>();
+      const existingByName = new Map<string, CharacterIndex>();
       for (const ch of baseChars) {
         existingByName.set(ch.name.toLowerCase(), ch);
         for (const alias of ch.aliases) existingByName.set(alias.toLowerCase(), ch);
       }
 
-      const snapshot: LocalCharacter[] = [...baseChars];
+      const snapshot: CharacterIndex[] = [...baseChars];
       const usedIds = new Set(baseChars.map(c => c.id));
 
       for (const [key, data] of allResults) {
         const existing = existingByName.get(key)
-          || data.aliases.reduce<LocalCharacter | undefined>(
+          || data.aliases.reduce<CharacterIndex | undefined>(
             (found, a) => found || existingByName.get(a.toLowerCase()), undefined);
 
         if (existing) {
           existing.appearances = data.appearances;
           existing.sceneCount = data.sceneCount;
-          if ((!existing.gender || existing.gender === "unknown") && data.gender !== "unknown") {
+          if (existing.gender === "unknown" && data.gender !== "unknown") {
             existing.gender = data.gender;
           }
           if (!existing.age_hint && data.age_hint) existing.age_hint = data.age_hint;
@@ -184,17 +184,22 @@ export function useCharacterExtraction({
           allAliases.delete(existing.name);
           existing.aliases = Array.from(allAliases);
         } else {
-          const newChar: LocalCharacter = {
+          const newChar: CharacterIndex = {
             id: generateId(),
             name: data.name,
             aliases: data.aliases,
             gender: data.gender,
             role: data.role,
+            age_group: "unknown",
+            sort_order: 0,
+            speech_tags: [],
+            psycho_tags: [],
             age_hint: data.age_hint,
             manner_hint: data.manner_hint,
             appearances: data.appearances,
             sceneCount: data.sceneCount,
             extractedBy: data.extractedBy,
+            voice_config: {},
           };
           snapshot.push(newChar);
           usedIds.add(newChar.id);
