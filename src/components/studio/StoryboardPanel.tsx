@@ -479,7 +479,7 @@ export function StoryboardPanel({
     if (!sceneId) return;
     setAnalyzing(true);
 
-    const previousLocal = hasStorage ? await loadFromLocal(sceneId) : null;
+    // K3: Do NOT save previousLocal for restore — stale data must never survive a re-analysis attempt
 
     setSegments([]);
     setAudioStatus(new Map());
