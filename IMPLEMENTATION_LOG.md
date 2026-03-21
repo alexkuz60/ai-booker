@@ -58,16 +58,17 @@
 | **6** | Push to Server (K4) | ✅ | `useSaveBookToProject` читает `characters/index.json` → upsert `book_characters` с voice_config, sort_order, color |
 
 #### Архитектурные решения
-- **Реестр голосов Yandex** вынесен в `src/config/yandexVoices.ts` (рефакторинг CharactersPanel)
+- **Local-first (K4):** `characters/index.json` — единственный источник правды в runtime. DB (`book_characters`) — только backup при Push to Server
+- **Реестр голосов Yandex** вынесен в `src/config/yandexVoices.ts`
 - **Реестр голосов ElevenLabs** вынесен в `src/config/elevenlabsVoices.ts` (18 голосов, мультиязычные)
-- **Реестр голосов ProxyAPI** вынесен в `src/config/proxyapiVoices.ts` (12 голосов: 9 базовых + 3 расширенных для gpt-4o-mini-tts; 3 модели с поддержкой инструкций)
-- **Мульти-провайдер UI** — табы Yandex/ElevenLabs/ProxyAPI в панели персонажей, каждый со своими параметрами
+- **Реестр голосов ProxyAPI** вынесен в `src/config/proxyapiVoices.ts` (12 голосов: 9 базовых + 3 расширенных)
+- **Мульти-провайдер UI** — табы Yandex/ElevenLabs/ProxyAPI в панели персонажей
 - **Кредиты ElevenLabs** — Edge Function `elevenlabs-credits` + прогресс-бар в UI
-- **Приоритет пользовательских ключей** — Edge Functions `elevenlabs-tts`/`elevenlabs-credits` сначала проверяют RPC `get_my_api_keys`, затем системный ключ
-- **bookId** передаётся сквозь цепочку: Parser → sessionStorage → Studio → StudioWorkspace → CharactersPanel
-- **Инкрементальный подход** выбран вместо полного сканирования: персонажи накапливаются по мере работы со сценами
-- **Системные персонажи** (Рассказчик, Комментатор) — sort_order: 0, бейджи спикера скрыты в раскадровке
-- **Синхронизация character_appearances** — при ручной смене/удалении спикера в раскадровке автоматически обновляется граф появлений
+- **Приоритет пользовательских ключей** — Edge Functions сначала проверяют RPC `get_my_api_keys`, затем системный ключ
+- **Хук `useLocalCharacters`** — единый React-хук для Студии: characters[], sceneCharIds, chapterCharIds, segmentCounts, nameLookup, updateCharacter, mergeCharacters
+- **Инкрементальный подход** — персонажи накапливаются по мере работы со сценами через `upsertSpeakersFromSegments()`
+- **Системные персонажи** (Рассказчик, Комментатор) — sort_order < 0, бейджи спикера скрыты в раскадровке
+- **Staleness check** — `scanBookForStaleAudio()` читает voice_config из `characters/index.json` (OPFS), сравнивает с `segment_audio.voice_config` (DB)
 
 #### Выводы по модулю 1.2
 - **Пробелы СПРЗ:** Не предусмотрена таблица связей "персонаж ↔ сцена", не описан инкрементальный подход, системные персонажи
