@@ -559,11 +559,7 @@ export function useChapterAnalysis({
             addLog(`  ${t("logEnrichFailed", isRu)}: ${enrichErr.message}. ${t("logDefaults", isRu)}`);
           }
 
-          if (sc.id) {
-            await supabase.from('book_scenes').update({
-              scene_type: sc.scene_type, mood: sc.mood, bpm: sc.bpm,
-            }).eq('id', sc.id);
-          }
+          // К3: metadata stored locally only — pushed to server by user action
 
           addLog(`  ${t("logSceneDone", isRu)} ${scIdx + 1}: ${sc.scene_type} / ${sc.mood} / ${sc.bpm} BPM`);
 
