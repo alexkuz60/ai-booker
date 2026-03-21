@@ -36,6 +36,9 @@ import { SaveBookButton } from "@/components/SaveBookButton";
 import ParserCharactersPanel from "@/components/parser/ParserCharactersPanel";
 
 export default function Parser() {
+  const renderCount = useRef(0);
+  renderCount.current++;
+  if (renderCount.current % 50 === 0) console.warn("[Parser] render #", renderCount.current);
   const { user } = useAuth();
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
