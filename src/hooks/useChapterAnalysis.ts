@@ -515,14 +515,9 @@ export function useChapterAnalysis({
         }
 
         addLog(t("logSaving", isRu));
-        if (existingChId) {
-          for (const sc of scenes) {
-            const { data: scRow } = await supabase.from('book_scenes').insert({
-              chapter_id: existingChId, scene_number: sc.scene_number, title: sc.title,
-              content: sc.content || '', scene_type: null, mood: null, bpm: null,
-            }).select('id').single();
-            if (scRow) sc.id = scRow.id;
-          }
+        // К3: Generate scene IDs locally — no DB writes during analysis
+        for (const sc of scenes) {
+          if (!sc.id) sc.id = crypto.randomUUID();
         }
 
         setChapterResults(prev => {
