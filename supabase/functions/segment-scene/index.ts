@@ -1,6 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
 import { splitPhrases } from "../_shared/splitPhrases.ts";
-import { extractCharacters } from "../_shared/extractCharacters.ts";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
 import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
 import { resolveTaskPromptWithOverrides } from "../_shared/taskPrompts.ts";
