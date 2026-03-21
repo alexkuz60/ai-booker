@@ -466,6 +466,14 @@ export default function Parser() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col h-full">
+      {/* Hidden file input always in DOM for reload from workspace */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.docx,.doc,.fb2"
+        className="hidden"
+        onChange={handleFileSelect}
+      />
       <div className="flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
           {step === "library" && (
