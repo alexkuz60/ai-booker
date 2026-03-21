@@ -78,7 +78,7 @@ export function useCharacterProfiles({
     mode: ProfileMode = "selective",
   ) => {
     // Determine which characters to profile based on mode
-    let charsToProfile: LocalCharacter[];
+    let charsToProfile: CharacterIndex[];
 
     if (mode === "fresh") {
       // All non-system characters, clear their profiles first
