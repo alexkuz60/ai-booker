@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { getAudioEngine } from "@/lib/audioEngine";
 
 function dbToLinear(db: number): number {
@@ -11,8 +11,39 @@ export function TimelineMasterMeter() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engine = getAudioEngine();
   const meterRef = useRef({ levelL: -60, levelR: -60 });
+  const [isPlaying, setIsPlaying] = useState(engine.state === "playing");
+
+  // Subscribe to engine state changes
+  useEffect(() => {
+    return engine.subscribe((snap) => {
+      setIsPlaying(snap.state === "playing");
+    });
+  }, [engine]);
 
   useEffect(() => {
+    if (!isPlaying) {
+      // Draw one empty frame and stop
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          const dpr = window.devicePixelRatio || 1;
+          const w = canvas.clientWidth;
+          const h = canvas.clientHeight;
+          if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
+            ctx.scale(dpr, dpr);
+          }
+          ctx.clearRect(0, 0, w, h);
+          // Draw silent background
+          ctx.fillStyle = "hsla(0,0%,50%,0.15)";
+          ctx.fillRect(0, 0, w, h);
+        }
+      }
+      return;
+    }
+
     let raf: number;
     const draw = () => {
       meterRef.current = engine.getMasterMeter();
@@ -57,7 +88,7 @@ export function TimelineMasterMeter() {
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [engine]);
+  }, [engine, isPlaying]);
 
   return (
     <canvas
