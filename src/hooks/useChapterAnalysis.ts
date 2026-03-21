@@ -32,13 +32,15 @@ interface UseChapterAnalysisParams {
   ensurePdfLoaded?: () => Promise<any>;
   /** Persisted file format from project.json (B4/B7 fix) */
   fileFormat?: "pdf" | "docx" | "fb2" | null;
+  /** File name for format detection fallback */
+  fileName?: string;
   /** Local project storage for re-extracting chapter texts */
   projectStorage?: ProjectStorage | null;
 }
 
 export function useChapterAnalysis({
   isRu, pdfRef, userId, bookId, userApiKeys, getModelForRole,
-  tocEntries, chapterIdMap, chapterResults, setChapterResults, onChapterResultsMutated, ensurePdfLoaded, fileFormat, projectStorage,
+  tocEntries, chapterIdMap, chapterResults, setChapterResults, onChapterResultsMutated, ensurePdfLoaded, fileFormat, fileName, projectStorage,
 }: UseChapterAnalysisParams) {
   const [analysisLog, setAnalysisLog] = useState<string[]>([]);
   const analysisTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
