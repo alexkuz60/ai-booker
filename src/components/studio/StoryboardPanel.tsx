@@ -479,7 +479,7 @@ export function StoryboardPanel({
     if (!sceneId) return;
     setAnalyzing(true);
 
-    const previousLocal = hasStorage ? await loadFromLocal(sceneId) : null;
+    // K3: Do NOT save previousLocal for restore — stale data must never survive a re-analysis attempt
 
     setSegments([]);
     setAudioStatus(new Map());
@@ -543,21 +543,9 @@ export function StoryboardPanel({
       const msg = err?.message || err?.context?.body || String(err);
       console.error("Segmentation failed:", msg, err);
 
-      if (previousLocal && hasStorage) {
-        await persistNow({
-          segments: previousLocal.segments,
-          typeMappings: previousLocal.typeMappings,
-          audioStatus: new Map(Object.entries(previousLocal.audioStatus || {})),
-          inlineNarrationSpeaker: previousLocal.inlineNarrationSpeaker,
-        });
-        typeMappingsRef.current = previousLocal.typeMappings || [];
-        setInlineNarrationSpeaker(previousLocal.inlineNarrationSpeaker);
-        setAudioStatus(new Map(Object.entries(previousLocal.audioStatus || {})));
-        applySegments(previousLocal.segments);
-      } else {
-        setSegments([]);
-        setLoaded(true);
-      }
+      // K3: On failure, do NOT restore old storyboard — leave empty to prevent stale data resurrection
+      setSegments([]);
+      setLoaded(true);
 
       toast.error(`${isRu ? "Ошибка анализа" : "Analysis failed"}: ${msg}`);
     }
