@@ -665,6 +665,32 @@ export default function Parser() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── Reload Book Confirmation Dialog ── */}
+      <AlertDialog open={showReloadConfirm} onOpenChange={setShowReloadConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isRu ? "Перезагрузить файл книги?" : "Reload book file?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isRu
+                ? "Текущая структура и результаты анализа будут сброшены. Выберите новый файл для повторного разбора."
+                : "Current structure and analysis results will be reset. Select a new file to re-parse."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              setShowReloadConfirm(false);
+              await reloadBook();
+              fileInputRef.current?.click();
+            }}>
+              {isRu ? "Выбрать файл" : "Select file"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 }

@@ -78,6 +78,12 @@ export default function UploadView({
               </div>
             )}
 
+            {/* Cancel button */}
+            {onCancel && (
+              <Button variant="ghost" size="sm" onClick={onCancel} className="text-muted-foreground">
+                {isRu ? "Отмена" : "Cancel"}
+              </Button>
+            )}
             {/* File upload section */}
             <div className="w-full border border-border rounded-lg p-4 flex flex-col items-center gap-3 bg-muted/30">
               <Upload className="h-5 w-5 text-muted-foreground" />
