@@ -32,13 +32,15 @@ interface UseChapterAnalysisParams {
   ensurePdfLoaded?: () => Promise<any>;
   /** Persisted file format from project.json (B4/B7 fix) */
   fileFormat?: "pdf" | "docx" | "fb2" | null;
+  /** File name for format detection fallback */
+  fileName?: string;
   /** Local project storage for re-extracting chapter texts */
   projectStorage?: ProjectStorage | null;
 }
 
 export function useChapterAnalysis({
   isRu, pdfRef, userId, bookId, userApiKeys, getModelForRole,
-  tocEntries, chapterIdMap, chapterResults, setChapterResults, onChapterResultsMutated, ensurePdfLoaded, fileFormat, projectStorage,
+  tocEntries, chapterIdMap, chapterResults, setChapterResults, onChapterResultsMutated, ensurePdfLoaded, fileFormat, fileName, projectStorage,
 }: UseChapterAnalysisParams) {
   const [analysisLog, setAnalysisLog] = useState<string[]>([]);
   const analysisTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -178,7 +180,14 @@ export function useChapterAnalysis({
   /** Re-extract chapter texts from OPFS source file and populate in-memory cache */
   const reExtractChapterTexts = async (): Promise<boolean> => {
     if (!projectStorage) return false;
-    const fmt = fileFormat || "docx";
+    // Detect format: explicit metadata → fileName extension → fallback to docx
+    let fmt = fileFormat || null;
+    if (!fmt && fileName) {
+      const ext = fileName.split('.').pop()?.toLowerCase();
+      if (ext === "fb2") fmt = "fb2";
+      else if (ext === "docx" || ext === "doc") fmt = "docx";
+    }
+    if (!fmt) fmt = "docx";
     const sourcePath = getSourcePath(fmt);
     try {
       const blob = await projectStorage.readBlob(sourcePath);
@@ -204,6 +213,11 @@ export function useChapterAnalysis({
   // B4/B7 fix: text-first mode for DOCX and FB2 (no PDF rendering needed)
   const isTextMode = (): boolean => {
     if (fileFormat === "docx" || fileFormat === "fb2") return true;
+    // Fallback: detect from fileName when fileFormat metadata is missing
+    if (fileName) {
+      const ext = fileName.split('.').pop()?.toLowerCase();
+      if (ext === "docx" || ext === "doc" || ext === "fb2") return true;
+    }
     return hasChapterTextsCache();
   };
 
@@ -221,7 +235,9 @@ export function useChapterAnalysis({
         activePdf = await ensurePdfLoaded();
       }
       if (!activePdf) {
-        toast.error(isRu ? "PDF не загружен. Перезагрузите книгу для анализа." : "PDF not loaded. Reload the book to analyze.");
+        toast.error(isRu
+          ? "Исходный файл не загружен. Перезагрузите книгу для анализа."
+          : "Source file not loaded. Reload the book to analyze.");
         return;
       }
     }
