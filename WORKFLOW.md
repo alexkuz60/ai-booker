@@ -39,7 +39,7 @@
 ### DOCX:
 1. Извлекает заголовки из Heading-стилей (H1-H6) через `mammoth.js`.
 2. Regex-фоллбэк для документов без стилей.
-3. Контент сохраняется в `sessionStorage` для последующего анализа.
+3. Контент кэшируется в module-level `Map` (`chapterTextsCache.ts`) для последующего анализа. ⚠️ Не в sessionStorage (контракт К4).
 
 ### FB2:
 1. Парсит XML-структуру `<section>/<title>`.
