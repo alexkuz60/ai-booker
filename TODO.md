@@ -5,6 +5,15 @@
 
 ---
 
+## Производительность / Оптимизация
+
+- [x] **Устранение каскадных ре-рендеров в Парсере** — мемоизация LibraryView, стабилизация ProjectStorageContext и PageHeaderProvider, shallow-compare в setPageHeader. CPU idle → ~0%
+- [x] **Устранение каскадных ре-рендеров в Студии** — обёртка headerRight в useMemo, стабилизация зависимостей useEffect для setPageHeader. CPU idle снижен с ~25% до ~15%
+- [x] **Остановка RAF-циклов метров в idle** — TimelineMasterMeter, LargeMeterSingleChannel, PeakMeterSection, SpectrumAnalyzer подписаны на engine.state; RAF запускается только при playing, в idle рисуется один статичный кадр. CPU idle снижен с ~15% до ~5%
+- [ ] **Финальная оптимизация метров/спектра** — вернуться после завершения аудио-функционала: проверить throttle частоты обновления при воспроизведении (30fps вместо 60fps для метров), убедиться что SpectrumAnalyzer полностью останавливает analyser node в idle
+
+---
+
 ## Парсер (Фаза 1 — Активная)
 
 - [ ] **Доделать структурирование книги** — семантическая разбивка на сцены (Сценарист Stage 1), правка сцен каждой главы
