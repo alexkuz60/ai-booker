@@ -71,9 +71,9 @@
 - **Staleness check** — `scanBookForStaleAudio()` читает voice_config из `characters/index.json` (OPFS), сравнивает с `segment_audio.voice_config` (DB)
 
 #### Выводы по модулю 1.2
-- **Пробелы СПРЗ:** Не предусмотрена таблица связей "персонаж ↔ сцена", не описан инкрементальный подход, системные персонажи
+- **Пробелы СПРЗ:** Не предусмотрена local-first архитектура для персонажей, не описан инкрементальный подход, системные персонажи
 - **Сильные стороны СПРЗ:** Точная структура профиля персонажа, pipeline из 5 шагов
-- **Что добавлено сверх плана:** `character_appearances`, инкрементальное извлечение, multi-provider voice_config (Yandex + ElevenLabs + ProxyAPI), системные персонажи, автоочистка дубликатов, авто-кастинг, консистентность по алиасам
+- **Что добавлено сверх плана:** Local-first хранение (K4), `useLocalCharacters` хук, `upsertSpeakersFromSegments()`, multi-provider voice_config, системные персонажи, авто-кастинг, staleness check из OPFS
 
 ### 1.3. Модуль "Synthesis Pipeline" (Движок синтеза)
 
