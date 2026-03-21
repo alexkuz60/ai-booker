@@ -469,27 +469,56 @@ export function SpectrumAnalyzer() {
   const rmsHoldRef = useRef(DB_MIN);
   const rmsHoldTimeRef = useRef(0);
 
+  // Only run the live RAF loop when audio is playing (or static data available)
+  const [isPlaying, setIsPlaying] = useState(getAudioEngine().state === "playing");
+  useEffect(() => getAudioEngine().subscribe((s) => setIsPlaying(s.state === "playing")), []);
+
   useEffect(() => {
+    // Static snapshot mode — draw once and stop
+    if (staticData) {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          drawStaticSpectrum(canvas, ctx, staticData, modeRef.current);
+          const cBin = cursorBinRef.current;
+          if (cBin !== null) {
+            const sw = canvas.clientWidth;
+            const sh = canvas.clientHeight;
+            const usable = staticData.bins.length;
+            drawCursorMarker(ctx, sw, sh, cBin, usable, usable * 2, 44100, staticData.bins, -80, 0);
+          }
+        }
+      }
+      return;
+    }
+
+    // Not playing and no static data — draw empty dark background once
+    if (!isPlaying) {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          const dpr = window.devicePixelRatio || 1;
+          const w = canvas.clientWidth;
+          const h = canvas.clientHeight;
+          if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
+          }
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.fillStyle = "hsla(0, 0%, 5%, 0.95)";
+          ctx.fillRect(0, 0, w, h);
+        }
+      }
+      return;
+    }
+
     let raf: number;
     const draw = () => {
       const canvas = canvasRef.current;
       if (!canvas) { raf = requestAnimationFrame(draw); return; }
       const ctx = canvas.getContext("2d");
-
-      // If static data available, render it and stop animation loop
-      const sd = staticDataRef.current;
-      if (sd) {
-        drawStaticSpectrum(canvas, ctx!, sd, modeRef.current);
-        // Draw cursor on static spectrum
-        const cBin = cursorBinRef.current;
-        if (cBin !== null) {
-          const sw = canvas.clientWidth;
-          const sh = canvas.clientHeight;
-          const usable = sd.bins.length;
-          drawCursorMarker(ctx!, sw, sh, cBin, usable, usable * 2, 44100, sd.bins, -80, 0);
-        }
-        return; // Don't request next frame — static snapshot
-      }
       if (!ctx) { raf = requestAnimationFrame(draw); return; }
 
       const dpr = window.devicePixelRatio || 1;
@@ -693,7 +722,7 @@ export function SpectrumAnalyzer() {
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [staticData, cursorBin]);
+  }, [staticData, cursorBin, isPlaying]);
 
   return (
     <div className="flex flex-col gap-1 h-full">
