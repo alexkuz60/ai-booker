@@ -47,17 +47,15 @@ describe("extractFromFb2", () => {
   </body>
 </FictionBook>`;
 
-    // jsdom's DOMParser may fail on certain XML — patch to use text/html fallback
+    // jsdom's DOMParser sometimes emits parsererror for valid XML —
+    // patch to strip the processing instruction and retry
     DOMParser.prototype.parseFromString = function (str: string, type: string) {
-      // First try original
-      const doc = originalParseFromString.call(this, str, type as DOMParserSupportedType);
-      if (!doc.querySelector("parsererror")) return doc;
-
-      // Fallback: parse as text/html and return the document
-      const htmlDoc = originalParseFromString.call(this, str, "text/html");
-      // Remove any parsererror that text/html might inject
-      htmlDoc.querySelectorAll("parsererror").forEach((el) => el.remove());
-      return htmlDoc;
+      let doc = originalParseFromString.call(this, str, type as DOMParserSupportedType);
+      if (doc.querySelector("parsererror") && type === "application/xml") {
+        const stripped = str.replace(/<\?xml[^?]*\?>\s*/, "");
+        doc = originalParseFromString.call(this, stripped, "application/xml");
+      }
+      return doc;
     };
 
     const file = new File([xml], "book.fb2", { type: "application/x-fictionbook+xml" });
