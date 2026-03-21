@@ -264,12 +264,14 @@ export function StoryboardPanel({
   }, []);
 
   const loadSegments = useCallback(async (sid: string) => {
+    console.debug(`[Storyboard] loadSegments called for sceneId=${sid}, hasStorage=${hasStorage}`);
     setLoading(true);
     try {
       if (hasStorage) {
         const local = await loadFromLocal(sid);
         if (local && local.segments.length > 0) {
-          console.debug(`[Storyboard] Loaded ${local.segments.length} segments from OPFS`);
+          const firstPhrase = local.segments[0]?.phrases?.[0]?.text?.slice(0, 80) || "(empty)";
+          console.debug(`[Storyboard] Loaded ${local.segments.length} segments from OPFS, first phrase: "${firstPhrase}"`);
           typeMappingsRef.current = local.typeMappings || [];
           setInlineNarrationSpeaker(local.inlineNarrationSpeaker);
           setAudioStatus(new Map(Object.entries(local.audioStatus || {})));
@@ -277,6 +279,7 @@ export function StoryboardPanel({
           setLoading(false);
           return;
         }
+        console.debug(`[Storyboard] No OPFS data for sceneId=${sid} — showing empty state`);
       }
 
       typeMappingsRef.current = [];

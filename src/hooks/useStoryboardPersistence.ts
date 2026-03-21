@@ -55,8 +55,12 @@ export function useStoryboardPersistence(sceneId: string | null) {
    * Persist immediately (no debounce) — use after AI analysis or merge/split.
    */
   const persistNow = useCallback(async (snapshot: StoryboardSnapshot) => {
-    if (!storage || !sceneId) return;
+    if (!storage || !sceneId) {
+      console.warn(`[StoryboardPersist] persistNow skipped: storage=${!!storage} sceneId=${sceneId}`);
+      return;
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    console.debug(`[StoryboardPersist] persistNow → sceneId=${sceneId}, segments=${snapshot.segments.length}`);
     await saveStoryboardToLocal(storage, sceneId, snapshot);
   }, [storage, sceneId]);
 
@@ -64,7 +68,11 @@ export function useStoryboardPersistence(sceneId: string | null) {
    * Delete storyboard file — use before re-analysis.
    */
   const clearLocal = useCallback(async () => {
-    if (!storage || !sceneId) return;
+    if (!storage || !sceneId) {
+      console.warn(`[StoryboardPersist] clearLocal skipped: storage=${!!storage} sceneId=${sceneId}`);
+      return;
+    }
+    console.debug(`[StoryboardPersist] clearLocal → sceneId=${sceneId}`);
     await deleteStoryboardFromLocal(storage, sceneId);
   }, [storage, sceneId]);
 
