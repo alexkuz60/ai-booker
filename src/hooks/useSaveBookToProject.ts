@@ -299,7 +299,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
             psycho_tags: c.psycho_tags || [],
             sort_order: c.sort_order || 0,
             color: c.color || null,
-            voice_config: (c.voice_config || {}) as Record<string, unknown>,
+            voice_config: JSON.parse(JSON.stringify(c.voice_config || {})),
           }));
 
           const { error: charErr } = await supabase.from("book_characters").insert(charInserts);
