@@ -36,43 +36,44 @@
 
 | Параметр | План СПРЗ | Реализация | Расхождение |
 |----------|-----------|------------|-------------|
-| **Хранение персонажей** | `Character { id, book_id, name, aliases[], ... }` | Таблица `book_characters` с RLS через JOIN на `books.user_id` | ✅ Совпадает, расширено полями `color`, `sort_order` |
-| **Связь "персонаж ↔ сцена"** | Не описана в СПРЗ | Таблица `character_appearances` (character_id, scene_id, role_in_scene, segment_ids[]) | 🆕 Не предусмотрено СПРЗ — необходимо для графа появлений и будущего видеопроизводства |
-| **Извлечение персонажей** | Отдельный LLM-проход по всей книге | **Инкрементально:** при сегментации сцены (`segment-scene`) speakers автоматически upsert в реестр | ⚠️ Гибридный подход: быстрое извлечение при сегментации + глубокий профайлинг позже |
-| **Голосовые настройки** | `voice_id, voice_settings: json` | `voice_config: jsonb` — `{ provider, voice_id, role, speed, pitch, volume }` + ElevenLabs: `{ stability, similarity_boost, style, speed }` + ProxyAPI: `{ model, voice, instructions, speed }` | ✅ Расширено: мульти-провайдер (Yandex + ElevenLabs + ProxyAPI) с табовым UI |
-| **UI персонажей** | Карточки с аватаром, Voice Audition, Bulk Assign | Список в Студии с настройкой голоса (табы Yandex/ElevenLabs/ProxyAPI), предпрослушивание, кредиты ElevenLabs, сохранение в БД | ⚠️ MVP-реализация; карточки, аватары и Bulk Assign — следующий этап |
+| **Хранение персонажей** | `Character { id, book_id, name, aliases[], ... }` | **Local-first (K4):** `characters/index.json` в OPFS — единственный источник правды в runtime. `book_characters` (DB) — только backup при Push to Server | ⚠️ Значительный сдвиг: DB больше не является primary source |
+| **Связь "персонаж ↔ сцена"** | Не описана в СПРЗ | **Local-first (K4):** `characters/scene_{id}.json` в OPFS. `character_appearances` (DB) — backup при Push | ⚠️ Миграция с DB на OPFS |
+| **Извлечение персонажей** | Отдельный LLM-проход по всей книге | **Инкрементально:** `upsertSpeakersFromSegments()` при сегментации в Студии + `useCharacterExtraction` в Парсере → запись в `characters/index.json` | ⚠️ Гибридный подход: быстрое извлечение при сегментации + глубокий профайлинг позже |
+| **Голосовые настройки** | `voice_id, voice_settings: json` | `voice_config` в `CharacterIndex` (OPFS) — `{ provider, voice_id, role, speed, pitch, volume }` + ElevenLabs/ProxyAPI параметры. Сохраняется через `useLocalCharacters.updateCharacter()` | ✅ Расширено: мульти-провайдер, local-first persistence |
+| **UI персонажей** | Карточки с аватаром, Voice Audition, Bulk Assign | `CharactersPanel` в Студии использует `useLocalCharacters` хук — все операции (кастинг, профилирование, слияние, дубликаты) работают с OPFS | ✅ Полностью local-first |
 | **Кластеризация алиасов** | LLM группирует псевдонимы | Реализовано: AI-профайлинг определяет алиасы, автоочистка дубликатов по совпадению имён/алиасов | ✅ Реализовано |
 | **Voice Matching** | Автоподбор голоса по профилю | Авто-кастинг: пол/возраст → голос, темперамент → роль. Избегание дублирования голосов одного пола | ✅ Реализовано |
-| **Системные персонажи** | Не описаны | «Рассказчик» и «Комментатор» — глобальные сущности книги с автопривязкой к типам блоков | 🆕 Не предусмотрено СПРЗ |
-| **Консистентность** | Не описана | Новые спикеры при сегментации сопоставляются с существующими по имени/алиасам (регистронезависимо) | 🆕 Предотвращает дублирование |
+| **Системные персонажи** | Не описаны | «Рассказчик» и «Комментатор» — глобальные в `characters/index.json`, автопривязка через `upsertSpeakersFromSegments()` | 🆕 Не предусмотрено СПРЗ |
+| **Консистентность** | Не описана | `buildNameLookup()` + `findCharacterByNameOrAlias()` — регистронезависимый поиск по имени/алиасам | 🆕 Предотвращает дублирование |
 
 #### Реализованные шаги
 
 | Шаг | Описание | Статус | Детали |
 |-----|----------|--------|--------|
-| **1** | Таблицы `book_characters` + `character_appearances` с RLS | ✅ | Миграция, UNIQUE(book_id, name), каскадное удаление |
-| **2** | Извлечение speakers при сегментации | ✅ | Edge Function `segment-scene` → upsert в `book_characters` + `character_appearances` |
-| **3** | CharactersPanel с реестром из БД | ✅ | Загрузка по bookId, настройка голоса (табы Yandex/ElevenLabs/ProxyAPI), сохранение voice_config, кредиты ElevenLabs |
-| **4** | AI-профайлинг | ✅ | `profile-characters` Edge Function: пол, возраст, темперамент, стиль, алиасы, инкрементальное обновление |
+| **1** | Local-first реестр `characters/index.json` + `characters/scene_{id}.json` | ✅ | Миграция с DB на OPFS, backward-compat `structure/characters.json` |
+| **2** | Извлечение speakers при сегментации | ✅ | `upsertSpeakersFromSegments()` → запись в `characters/index.json` + `scene_{id}.json` |
+| **3** | CharactersPanel на `useLocalCharacters` | ✅ | Все CRUD-операции (кастинг, слияние, профилирование, дубликаты) через OPFS |
+| **4** | AI-профайлинг | ✅ | `profile-characters-local` Edge Function: пол, возраст, темперамент, стиль, алиасы |
 | **5** | Авто-кастинг голосов | ✅ | Автоподбор Yandex-голосов по профилю, автоназначение ролей по темпераменту |
-| **6** | Автоочистка дубликатов | ✅ | Объединение по имени/алиасам с переносом character_appearances |
+| **6** | Push to Server (K4) | ✅ | `useSaveBookToProject` читает `characters/index.json` → upsert `book_characters` с voice_config, sort_order, color |
 
 #### Архитектурные решения
-- **Реестр голосов Yandex** вынесен в `src/config/yandexVoices.ts` (рефакторинг CharactersPanel)
+- **Local-first (K4):** `characters/index.json` — единственный источник правды в runtime. DB (`book_characters`) — только backup при Push to Server
+- **Реестр голосов Yandex** вынесен в `src/config/yandexVoices.ts`
 - **Реестр голосов ElevenLabs** вынесен в `src/config/elevenlabsVoices.ts` (18 голосов, мультиязычные)
-- **Реестр голосов ProxyAPI** вынесен в `src/config/proxyapiVoices.ts` (12 голосов: 9 базовых + 3 расширенных для gpt-4o-mini-tts; 3 модели с поддержкой инструкций)
-- **Мульти-провайдер UI** — табы Yandex/ElevenLabs/ProxyAPI в панели персонажей, каждый со своими параметрами
+- **Реестр голосов ProxyAPI** вынесен в `src/config/proxyapiVoices.ts` (12 голосов: 9 базовых + 3 расширенных)
+- **Мульти-провайдер UI** — табы Yandex/ElevenLabs/ProxyAPI в панели персонажей
 - **Кредиты ElevenLabs** — Edge Function `elevenlabs-credits` + прогресс-бар в UI
-- **Приоритет пользовательских ключей** — Edge Functions `elevenlabs-tts`/`elevenlabs-credits` сначала проверяют RPC `get_my_api_keys`, затем системный ключ
-- **bookId** передаётся сквозь цепочку: Parser → sessionStorage → Studio → StudioWorkspace → CharactersPanel
-- **Инкрементальный подход** выбран вместо полного сканирования: персонажи накапливаются по мере работы со сценами
-- **Системные персонажи** (Рассказчик, Комментатор) — sort_order: 0, бейджи спикера скрыты в раскадровке
-- **Синхронизация character_appearances** — при ручной смене/удалении спикера в раскадровке автоматически обновляется граф появлений
+- **Приоритет пользовательских ключей** — Edge Functions сначала проверяют RPC `get_my_api_keys`, затем системный ключ
+- **Хук `useLocalCharacters`** — единый React-хук для Студии: characters[], sceneCharIds, chapterCharIds, segmentCounts, nameLookup, updateCharacter, mergeCharacters
+- **Инкрементальный подход** — персонажи накапливаются по мере работы со сценами через `upsertSpeakersFromSegments()`
+- **Системные персонажи** (Рассказчик, Комментатор) — sort_order < 0, бейджи спикера скрыты в раскадровке
+- **Staleness check** — `scanBookForStaleAudio()` читает voice_config из `characters/index.json` (OPFS), сравнивает с `segment_audio.voice_config` (DB)
 
 #### Выводы по модулю 1.2
-- **Пробелы СПРЗ:** Не предусмотрена таблица связей "персонаж ↔ сцена", не описан инкрементальный подход, системные персонажи
+- **Пробелы СПРЗ:** Не предусмотрена local-first архитектура для персонажей, не описан инкрементальный подход, системные персонажи
 - **Сильные стороны СПРЗ:** Точная структура профиля персонажа, pipeline из 5 шагов
-- **Что добавлено сверх плана:** `character_appearances`, инкрементальное извлечение, multi-provider voice_config (Yandex + ElevenLabs + ProxyAPI), системные персонажи, автоочистка дубликатов, авто-кастинг, консистентность по алиасам
+- **Что добавлено сверх плана:** Local-first хранение (K4), `useLocalCharacters` хук, `upsertSpeakersFromSegments()`, multi-provider voice_config, системные персонажи, авто-кастинг, staleness check из OPFS
 
 ### 1.3. Модуль "Synthesis Pipeline" (Движок синтеза)
 
@@ -100,11 +101,11 @@
 | Параметр | План СПРЗ | Реализация | Расхождение |
 |----------|-----------|------------|-------------|
 | **Раскадровка ↔ Таймлайн** | Не описана | Двусторонняя: двойной клик по клипу ↔ выделение сегмента | 🆕 |
-| **Персонажи ↔ Раскадровка** | Не описана | Смена спикера → обновление character_appearances → дорожка на таймлайне | 🆕 |
+| **Персонажи ↔ Раскадровка** | Не описана | Смена спикера → обновление `characters/scene_{id}.json` (K4) → дорожка на таймлайне | 🆕 |
 | **Навигатор ↔ Синтез** | Не описан | Иконки готовности (🎬/🔈/🔊/⚠️), пакетный ре-синтез | 🆕 |
-| **Сессия Студии** | Не описана | Восстановление из sessionStorage + облачный fallback (user_settings) | 🆕 |
+| **Сессия Студии** | Не описана | Восстановление из OPFS через `useStudioSession` (указатели в sessionStorage + cloud user_settings) | 🆕 |
 | **Пропагация типов** | Не описана | narrator↔first_person: смена типа одного блока → все блоки того же типа в сцене меняются автоматически | 🆕 |
-| **Очистка пустых треков** | Не описана | После пропагации типов syncSceneCharacters удаляет персонажей без сегментов → трек исчезает | 🆕 |
+| **Очистка пустых треков** | Не описана | После пропагации типов — перестройка `characters/scene_{id}.json` → персонажи без сегментов удаляются | 🆕 |
 
 #### Выводы по модулю 1.4
 - **Ключевой вывод:** Синхронизация между модулями — самая трудоёмкая часть, не предусмотренная СПРЗ. Требует чёткой архитектуры потоков данных.
