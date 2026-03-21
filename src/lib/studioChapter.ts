@@ -30,9 +30,13 @@ const STUDIO_CHAPTER_KEY = "studio-active-chapter";
  */
 export function saveStudioChapter(chapter: StudioChapter) {
   // К4: strip all text content — only pointers (IDs, indices, titles) go to sessionStorage.
+  // Preserve char_count so duration estimates work before OPFS hydration completes.
   const light: StudioChapter = {
     ...chapter,
-    scenes: chapter.scenes.map(({ content, content_preview, ...rest }) => rest),
+    scenes: chapter.scenes.map(({ content, content_preview, ...rest }) => ({
+      ...rest,
+      char_count: content?.length ?? rest.char_count,
+    })),
   };
   try {
     sessionStorage.setItem(STUDIO_CHAPTER_KEY, JSON.stringify(light));

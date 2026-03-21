@@ -40,7 +40,7 @@ export function estimateChapterDuration(chapter: StudioChapter, charsPerSec?: nu
 }
 
 export function estimateSceneDuration(scene: StudioScene, charsPerSec?: number, speed?: number) {
-  const chars = scene.content?.length ?? 0;
+  const chars = scene.content?.length ?? scene.char_count ?? 0;
   const sec = estimateDurationSec(chars, charsPerSec, speed);
   return { chars, sec, formatted: formatDuration(sec) };
 }
