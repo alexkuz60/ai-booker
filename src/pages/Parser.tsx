@@ -535,12 +535,7 @@ export default function Parser() {
                     onOpenPdf={handleOpenPdf}
                     onRenamePart={mutations.renamePart}
                     onMergeEntries={mutations.mergeEntries}
-                     roleModels={{
-                      screenwriter: getModelForRole("screenwriter"),
-                      director: getModelForRole("director"),
-                      translator: getModelForRole("translator"),
-                      proofreader: getModelForRole("proofreader"),
-                    }}
+                     roleModels={navRoleModels}
                     onBatchAnalyze={batchAnalyzeAll}
                     onStopAnalysis={stopAnalysis}
                     isAnalyzing={isAnalyzing}
