@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { useTimelineClips, type TimelineClip, type TypeMappingsByScene } from "@/hooks/useTimelineClips";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { TrackMixerStrip } from "./TrackMixerStrip";
@@ -88,6 +89,7 @@ export function StudioTimeline({
   onSceneRendered,
 }: StudioTimelineProps) {
   const { user } = useAuth();
+  const { storage } = useProjectStorageContext();
 
   // ── Scene render state ────────────────────────────────────
   const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
@@ -180,7 +182,7 @@ export function StudioTimeline({
     saveFades((prev) => ({ ...prev, [clipId]: { fadeInSec, fadeOutSec } }));
   }, [saveFades]);
 
-  // ── Character tracks ──────────────────────────────────────
+  // ── Character tracks (LOCAL-FIRST from OPFS) ──────────────
   const [charTracks, setCharTracks] = useState<TimelineTrackData[]>([]);
   const [speakerToCharId, setSpeakerToCharId] = useState<Map<string, string>>(new Map());
   const [typeMappings, setTypeMappings] = useState<TypeMappingsByScene>(new Map());
@@ -193,46 +195,56 @@ export function StudioTimeline({
     }
 
     (async () => {
-      const [{ data: appearances }, { data: rawMappings }] = await Promise.all([
-        supabase.from("character_appearances").select("character_id").in("scene_id", contextSceneIds),
-        supabase.from("scene_type_mappings").select("scene_id, segment_type, character_id").in("scene_id", contextSceneIds),
+      if (!storage) return;
+
+      // Read scene character map from OPFS
+      const { readSceneCharacterMap, readCharacterIndex } = await import("@/lib/localCharacters");
+      const [sceneMap, allChars] = await Promise.all([
+        readSceneCharacterMap(storage, contextSceneIds[0]),
+        readCharacterIndex(storage),
       ]);
 
+      // Build type mappings from OPFS scene map
       const tm: TypeMappingsByScene = new Map();
-      if (rawMappings) {
-        for (const m of rawMappings) {
-          let sceneMap = tm.get(m.scene_id);
-          if (!sceneMap) { sceneMap = new Map(); tm.set(m.scene_id, sceneMap); }
-          sceneMap.set(m.segment_type, m.character_id);
+      if (sceneMap?.typeMappings) {
+        const sceneTypeMappings = new Map<string, string>();
+        for (const m of sceneMap.typeMappings) {
+          sceneTypeMappings.set(m.segmentType, m.characterId);
         }
+        tm.set(contextSceneIds[0], sceneTypeMappings);
       }
       setTypeMappings(tm);
 
+      // Character IDs from scene map speakers
       const charIdSet = new Set<string>();
-      if (appearances) for (const a of appearances) charIdSet.add(a.character_id);
-      if (rawMappings) for (const m of rawMappings) charIdSet.add(m.character_id);
+      if (sceneMap?.speakers) {
+        for (const s of sceneMap.speakers) charIdSet.add(s.characterId);
+      }
 
       if (charIdSet.size === 0) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
 
-      const { data: chars } = await supabase
-        .from("book_characters")
-        .select("id, name, color, sort_order, aliases")
-        .in("id", [...charIdSet])
-        .order("sort_order");
-
-      if (!chars?.length) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
+      // Filter only chars appearing in this scene
+      const sceneChars = allChars.filter(c => charIdSet.has(c.id));
+      if (sceneChars.length === 0) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
 
       const nameMap = new Map<string, string>();
-      for (const c of chars) {
+      for (const c of sceneChars) {
         nameMap.set(c.name.toLowerCase(), c.id);
         for (const alias of (c.aliases ?? [])) {
           if (alias) nameMap.set(alias.toLowerCase(), c.id);
         }
       }
+      // Also add ALL characters' names for fallback matching
+      for (const c of allChars) {
+        if (!nameMap.has(c.name.toLowerCase())) nameMap.set(c.name.toLowerCase(), c.id);
+        for (const alias of (c.aliases ?? [])) {
+          if (alias && !nameMap.has(alias.toLowerCase())) nameMap.set(alias.toLowerCase(), c.id);
+        }
+      }
       setSpeakerToCharId(nameMap);
 
       setCharTracks(
-        chars.map((c, i) => ({
+        sceneChars.map((c, i) => ({
           id: `char-${c.id}`,
           label: c.name,
           color: c.color || NARRATOR_COLORS[i % NARRATOR_COLORS.length],
@@ -240,7 +252,7 @@ export function StudioTimeline({
         }))
       );
     })();
-  }, [bookId, sceneId, clipsRefreshToken]);
+  }, [bookId, sceneId, clipsRefreshToken, storage]);
 
   // ── Real clips from segments ──────────────────────────────
   const { clips: timelineClips, sceneBoundaries } = useTimelineClips(contextSceneIds, speakerToCharId, clipsRefreshToken, typeMappings);

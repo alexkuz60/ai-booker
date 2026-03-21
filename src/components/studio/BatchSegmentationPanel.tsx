@@ -233,75 +233,26 @@ export function BatchSegmentationPanel({
     await Promise.all(workers);
   }, [getModelForRole, concurrency, isRu, updateJob, onSceneSegmented, resolveFreshSceneContent, userApiKeys]);
 
-  // ── Extract characters from segmentation results ──────────────────────
+  // ── Extract characters from segmentation results (LOCAL-FIRST) ──────
 
   const extractSpeakers = useCallback(async (completedJobs: SceneJob[]) => {
     if (!bookId || !storage) return;
     const doneIds = completedJobs.filter(j => j.status === "done").map(j => j.scene.id);
     if (doneIds.length === 0) return;
 
-    // Collect unique speakers from OPFS storyboard data
-    const speakers = new Set<string>();
+    const { readCharacterIndex, upsertSpeakersFromSegments } = await import("@/lib/localCharacters");
+    let currentIndex = await readCharacterIndex(storage);
+
     for (const sid of doneIds) {
       try {
         const data = await storage.readJSON<{ segments: Segment[] }>(`storyboard/scene_${sid}.json`);
         if (data?.segments) {
-          for (const seg of data.segments) {
-            if (seg.speaker?.trim() && ["dialogue", "monologue", "first_person", "telephone"].includes(seg.segment_type)) {
-              speakers.add(seg.speaker.trim());
-            }
-          }
+          currentIndex = await upsertSpeakersFromSegments(storage, sid, data.segments, currentIndex);
         }
       } catch { /* skip */ }
     }
-    if (speakers.size === 0) return;
 
-    // Load existing characters for this book
-    const { data: existing } = await supabase
-      .from("book_characters")
-      .select("id, name, aliases")
-      .eq("book_id", bookId);
-    const existingNames = new Set<string>();
-    for (const c of existing || []) {
-      existingNames.add(c.name.toLowerCase());
-      for (const a of c.aliases || []) existingNames.add((a as string).toLowerCase());
-    }
-
-    // Insert new characters
-    const toInsert = [...speakers].filter(name => !existingNames.has(name.toLowerCase()));
-    if (toInsert.length === 0) return;
-
-    const { error } = await supabase
-      .from("book_characters")
-      .insert(toInsert.map(name => ({ book_id: bookId, name })));
-    if (error) {
-      console.warn("[BatchSegmentation] Failed to insert characters:", error);
-    } else {
-      console.debug(`[BatchSegmentation] Inserted ${toInsert.length} new characters: ${toInsert.join(", ")}`);
-    }
-
-    // Also ensure system characters exist (Narrator/Commentator)
-    const SYSTEM_CHARS = [
-      { names: ["Рассказчик", "Narrator"], types: ["narrator", "epigraph", "lyric"], sort_order: -2, desc: "Third-person narration voice" },
-      { names: ["Комментатор", "Commentator"], types: ["footnote"], sort_order: -1, desc: "Footnote and commentary voice" },
-    ];
-    for (const sys of SYSTEM_CHARS) {
-      const hasSystemType = doneIds.some(sid => {
-        // Quick check: we already loaded storyboard data above
-        return true; // always ensure system chars exist
-      });
-      const sysExists = (existing || []).some(c =>
-        sys.names.some(n => n.toLowerCase() === c.name.toLowerCase())
-      );
-      if (!sysExists) {
-        await supabase.from("book_characters").insert({
-          book_id: bookId,
-          name: sys.names[0],
-          sort_order: sys.sort_order,
-          description: sys.desc,
-        });
-      }
-    }
+    console.debug(`[BatchSegmentation] Local character index updated: ${currentIndex.length} characters`);
   }, [bookId, storage]);
 
   // ── Orchestrator ──────────────────────────────────────────────────────

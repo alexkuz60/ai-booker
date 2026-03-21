@@ -3,7 +3,6 @@ import { Users, UsersRound, Volume2, Loader2, Sparkles, User, Filter, Merge, Che
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,32 +13,15 @@ import { YANDEX_VOICES } from "@/config/yandexVoices";
 import { VoiceCastingTable } from "@/components/studio/VoiceCastingTable";
 import { CastingCandidatesPanel, type CastingCharacter } from "@/components/studio/CastingCandidatesPanel";
 import { suggestVoiceCandidates, ACCENTUATION_YANDEX_ROLE, detectAccentuation, type VoiceCandidate } from "@/config/psychotypeVoicePresets";
+import { useLocalCharacters } from "@/hooks/useLocalCharacters";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { readSceneContentFromLocal } from "@/lib/localSceneContent";
+import type { CharacterIndex } from "@/pages/parser/types";
 
 // ─── Types ──────────────────────────────────────────────
 
-interface BookCharacter {
-  id: string;
-  name: string;
-  aliases: string[];
-  gender: string;
-  age_group: string;
-  temperament: string | null;
-  speech_style: string | null;
-  description: string | null;
-  voice_config: {
-    provider?: string;
-    voice_id?: string;
-    role?: string;
-    speed?: number;
-    pitch?: number;
-    volume?: number;
-    is_extra?: boolean;
-  };
-  color: string | null;
-  sort_order: number;
-  speech_tags: string[];
-  psycho_tags: string[];
-}
+// BookCharacter is now derived from CharacterIndex for Studio UI
+type BookCharacter = CharacterIndex;
 
 const GENDER_LABELS: Record<string, { ru: string; en: string }> = {
   male: { ru: "Мужской ♂", en: "Male ♂" },
@@ -79,36 +61,25 @@ const TEMPERAMENT_LABELS: Record<string, { ru: string; en: string }> = {
   mixed: { ru: "Смешанный", en: "Mixed" },
 };
 
-// ─── Component ───────────────────────────────────────────
-
 // ─── Voice Auto-Matching ─────────────────────────────────
 
-/** Pick best Yandex voice for a character based on gender & age_group */
 function matchVoice(gender: string, ageGroup: string): string {
-  // Filter by gender first
   const genderVoices = gender !== "unknown"
     ? YANDEX_VOICES.filter(v => v.gender === gender)
     : YANDEX_VOICES;
 
   if (genderVoices.length === 0) return "marina";
 
-  // Age-based preferences (heuristic mapping to specific voices)
   const agePrefs: Record<string, Record<string, string[]>> = {
     female: {
-      child:  ["masha", "julia"],
-      teen:   ["masha", "lera"],
-      young:  ["dasha", "lera", "marina"],
-      adult:  ["alena", "jane", "marina"],
-      elder:  ["omazh", "julia"],
-      infant: ["masha"],
+      child: ["masha", "julia"], teen: ["masha", "lera"],
+      young: ["dasha", "lera", "marina"], adult: ["alena", "jane", "marina"],
+      elder: ["omazh", "julia"], infant: ["masha"],
     },
     male: {
-      child:  ["filipp"],
-      teen:   ["filipp", "anton"],
-      young:  ["anton", "alexander"],
-      adult:  ["kirill", "alexander", "madirus"],
-      elder:  ["zahar", "ermil"],
-      infant: ["filipp"],
+      child: ["filipp"], teen: ["filipp", "anton"],
+      young: ["anton", "alexander"], adult: ["kirill", "alexander", "madirus"],
+      elder: ["zahar", "ermil"], infant: ["filipp"],
     },
   };
 
@@ -122,22 +93,23 @@ function matchVoice(gender: string, ageGroup: string): string {
   return genderVoices[0].id;
 }
 
-/** Pick a default role based on temperament */
 function matchRole(voiceId: string, temperament: string | null): string {
   const v = YANDEX_VOICES.find(x => x.id === voiceId);
   if (!v?.roles || v.roles.length <= 1) return "neutral";
-  
+
   const tempRoleMap: Record<string, string[]> = {
     sanguine: ["good", "friendly"],
     choleric: ["strict", "evil"],
     melancholic: ["neutral", "whisper"],
     phlegmatic: ["neutral", "friendly"],
   };
-  
+
   const preferred = tempRoleMap[temperament ?? ""] ?? [];
   const found = preferred.find(r => v.roles!.includes(r));
   return found ?? "neutral";
 }
+
+// ─── Component ───────────────────────────────────────────
 
 interface CharactersPanelProps {
   isRu: boolean;
@@ -159,19 +131,23 @@ export interface CharactersPanelHandle {
 
 export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanelProps>(function CharactersPanel({ isRu, bookId, sceneId, chapterSceneIds, selectedCharacterId, onSelectCharacter, onVoiceSaved, userApiKeys = {} }, ref) {
   const { getModelForRole } = useAiRoles();
-  const [characters, setCharacters] = useState<BookCharacter[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { storage } = useProjectStorageContext();
+
+  // ── LOCAL-FIRST: useLocalCharacters is the single source of truth ──
+  const localChars = useLocalCharacters(storage, bookId ?? null, sceneId, chapterSceneIds);
+  const characters = localChars.characters;
+  const loading = localChars.loading;
+  const sceneCharIds = localChars.sceneCharIds;
+  const chapterCharIds = localChars.chapterCharIds;
+  const segmentCounts = localChars.segmentCounts;
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [profiling, setProfiling] = useState(false);
   const [casting, setCasting] = useState(false);
   const [castingCandidates, setCastingCandidates] = useState<CastingCharacter[] | null>(null);
   const [refiningSpeech, setRefiningSpeech] = useState(false);
   const [speechContextMap, setSpeechContextMap] = useState<Map<string, Record<string, unknown>>>(new Map());
-
-  // Filter: "all" or "scene"
   const [filterMode, setFilterMode] = useState<"all" | "scene" | "chapter">("chapter");
-  const [sceneCharIds, setSceneCharIds] = useState<Set<string>>(new Set());
-  const [chapterCharIds, setChapterCharIds] = useState<Set<string>>(new Set());
 
   // Sync with external selectedCharacterId
   useEffect(() => {
@@ -185,24 +161,20 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     onSelectCharacter?.(id);
   }, [onSelectCharacter]);
 
-  // Segment counts per character (for "extras" detection)
-  const [segmentCounts, setSegmentCounts] = useState<Map<string, number>>(new Map());
-
   // Multi-select & merge
   const [multiSelect, setMultiSelect] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [merging, setMerging] = useState(false);
 
-   const [dirty, setDirty] = useState(false);
-   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-   // Keep voice/role for auto-cast matching only (not UI-editable here)
-   const [voice, setVoice] = useState("marina");
-   const [role, setRole] = useState("neutral");
-   const [speed, setSpeed] = useState(1.0);
-   const [pitch, setPitch] = useState(0);
-   const [volume, setVolume] = useState(0);
-   const [voiceProvider, setVoiceProvider] = useState<"yandex" | "elevenlabs" | "proxyapi" | "salutespeech">("yandex");
+  const [voice, setVoice] = useState("marina");
+  const [role, setRole] = useState("neutral");
+  const [speed, setSpeed] = useState(1.0);
+  const [pitch, setPitch] = useState(0);
+  const [volume, setVolume] = useState(0);
+  const [voiceProvider, setVoiceProvider] = useState<"yandex" | "elevenlabs" | "proxyapi" | "salutespeech">("yandex");
 
   const selectedVoice = YANDEX_VOICES.find(v => v.id === voice);
   const availableRoles = selectedVoice?.roles ?? ["neutral"];
@@ -217,132 +189,15 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
   const toggleExtra = useCallback(async (charId: string) => {
     const newVal = !isExtra(charId);
-    // Update local state immediately
-    setCharacters(prev => prev.map(c =>
-      c.id === charId ? { ...c, voice_config: { ...c.voice_config, is_extra: newVal } } : c
-    ));
-    // Persist to DB
     const ch = characters.find(c => c.id === charId);
     if (ch) {
-      await supabase
-        .from("book_characters")
-        .update({ voice_config: { ...ch.voice_config, is_extra: newVal }, updated_at: new Date().toISOString() })
-        .eq("id", charId);
+      await localChars.updateCharacter(charId, {
+        voice_config: { ...ch.voice_config, is_extra: newVal },
+      });
     }
-  }, [isExtra, characters]);
+  }, [isExtra, characters, localChars]);
 
-  // ── Ensure system characters exist ──────────────────────
-  const ensureSystemCharacters = useCallback(async (bookId: string, existing: string[]) => {
-    const systemDefs = [
-      { name: isRu ? "Рассказчик" : "Narrator", nameAlt: isRu ? "Narrator" : "Рассказчик", sort_order: -2, description: isRu ? "Голос повествования от третьего лица" : "Third-person narration voice" },
-      { name: isRu ? "Комментатор" : "Commentator", nameAlt: isRu ? "Commentator" : "Комментатор", sort_order: -1, description: isRu ? "Озвучивание сносок и комментариев" : "Footnote and commentary voice" },
-    ];
-    const toCreate = systemDefs.filter(d => !existing.includes(d.name) && !existing.includes(d.nameAlt));
-    if (toCreate.length === 0) return false;
-    await supabase.from("book_characters").insert(
-      toCreate.map(d => ({
-        book_id: bookId, name: d.name, gender: "male", age_group: "adult",
-        description: d.description, sort_order: d.sort_order, voice_config: { provider: "yandex" },
-      }))
-    );
-    return true;
-  }, [isRu]);
-
-  // ── Load characters from DB ─────────────────────────────
-  const loadCharacters = useCallback(async () => {
-    if (!bookId) { setCharacters([]); setSceneCharIds(new Set()); setChapterCharIds(new Set()); setSegmentCounts(new Map()); return; }
-    setLoading(true);
-    try {
-      let { data, error } = await supabase
-        .from("book_characters")
-        .select("*")
-        .eq("book_id", bookId)
-        .order("sort_order");
-      if (error) throw error;
-
-      // Auto-create system characters if missing
-      const names = (data || []).map(c => c.name);
-      const created = await ensureSystemCharacters(bookId, names);
-      if (created) {
-        const res = await supabase.from("book_characters").select("*").eq("book_id", bookId).order("sort_order");
-        data = res.data;
-      }
-
-      // Load all appearances to count total segments per character
-      const charIds = (data || []).map(c => c.id);
-      const counts = new Map<string, number>();
-      if (charIds.length > 0) {
-        for (let i = 0; i < charIds.length; i += 200) {
-          const batch = charIds.slice(i, i + 200);
-          const { data: apps } = await supabase
-            .from("character_appearances")
-            .select("character_id, segment_ids")
-            .in("character_id", batch);
-          if (apps) {
-            for (const a of apps) {
-              counts.set(a.character_id, (counts.get(a.character_id) ?? 0) + (a.segment_ids?.length ?? 0));
-            }
-          }
-        }
-      }
-      setSegmentCounts(counts);
-
-      // Scene-level character IDs
-      let scIds = new Set<string>();
-      if (sceneId && data && data.length > 0) {
-        const { data: appearances } = await supabase
-          .from("character_appearances")
-          .select("character_id")
-          .eq("scene_id", sceneId);
-        scIds = new Set(appearances?.map(a => a.character_id) || []);
-      }
-      setSceneCharIds(scIds);
-
-      // Chapter-level character IDs (all scenes in this chapter)
-      let chIds = new Set<string>();
-      if (chapterSceneIds && chapterSceneIds.length > 0 && data && data.length > 0) {
-        for (let i = 0; i < chapterSceneIds.length; i += 200) {
-          const batch = chapterSceneIds.slice(i, i + 200);
-          const { data: apps } = await supabase
-            .from("character_appearances")
-            .select("character_id")
-            .in("scene_id", batch);
-          if (apps) {
-            for (const a of apps) chIds.add(a.character_id);
-          }
-        }
-      }
-      setChapterCharIds(chIds);
-
-      if (scIds.size > 0 && data) {
-        const sorted = [
-          ...data.filter(c => scIds.has(c.id)),
-          ...data.filter(c => !scIds.has(c.id)),
-        ];
-        setCharacters(sorted.map(c => ({
-          ...c,
-          voice_config: (c.voice_config as BookCharacter["voice_config"]) || {},
-          speech_tags: (c as any).speech_tags || [],
-          psycho_tags: (c as any).psycho_tags || [],
-        })));
-      } else {
-        setCharacters((data || []).map(c => ({
-          ...c,
-          voice_config: (c.voice_config as BookCharacter["voice_config"]) || {},
-          speech_tags: (c as any).speech_tags || [],
-          psycho_tags: (c as any).psycho_tags || [],
-        })));
-      }
-    } catch (e) {
-      console.error("Load characters error:", e);
-    } finally {
-      setLoading(false);
-    }
-  }, [bookId, sceneId, chapterSceneIds]);
-
-  useEffect(() => { loadCharacters(); }, [loadCharacters]);
-
-  // System character names (Narrator / Commentator)
+  // System character names
   const SYSTEM_NAMES = useMemo(() => new Set([
     "Рассказчик", "Narrator", "Комментатор", "Commentator",
   ]), []);
@@ -359,26 +214,25 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     } else {
       list = characters;
     }
-    // System characters first (by sort_order), then alphabetical
     return [...list].sort((a, b) => {
       const aSys = SYSTEM_NAMES.has(a.name);
       const bSys = SYSTEM_NAMES.has(b.name);
       if (aSys !== bSys) return aSys ? -1 : 1;
-      if (aSys && bSys) return a.sort_order - b.sort_order;
+      if (aSys && bSys) return (a.sort_order ?? 0) - (b.sort_order ?? 0);
       return a.name.localeCompare(b.name);
     });
   }, [characters, filterMode, sceneCharIds, chapterCharIds, sceneId, SYSTEM_NAMES]);
 
-  // ── Sync voice settings when character selected (for auto-cast only) ─────────
+  // Sync voice settings when character selected
   useEffect(() => {
     if (!selectedChar) return;
-    const vc = selectedChar.voice_config;
+    const vc = selectedChar.voice_config || {};
     const provider = (vc.provider as string) || "yandex";
     setVoiceProvider(provider === "elevenlabs" ? "elevenlabs" : provider === "proxyapi" ? "proxyapi" : provider === "salutespeech" ? "salutespeech" : "yandex");
     let voiceId = vc.voice_id || "marina";
     const savedVoice = YANDEX_VOICES.find(v => v.id === voiceId);
     if (savedVoice && selectedChar.gender !== "unknown" && savedVoice.gender !== selectedChar.gender) {
-      voiceId = matchVoice(selectedChar.gender, selectedChar.age_group);
+      voiceId = matchVoice(selectedChar.gender, selectedChar.age_group || "adult");
     }
     setVoice(voiceId);
     const currentVoice = YANDEX_VOICES.find(v => v.id === voiceId);
@@ -389,7 +243,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     setDirty(false);
   }, [selectedId]);
 
-  // ── AI Profiling (full or incremental) ───────────────
+  // ── AI Profiling ───────────────
   const runProfile = async (sceneIdsForIncremental?: string[]) => {
     if (!bookId) return;
     setProfiling(true);
@@ -431,7 +285,8 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
           ? `Профайлинг завершён: ${result.profiled} из ${result.total}${skippedMsg}`
           : `Profiling complete: ${result.profiled} of ${result.total}${skippedMsg}`
       );
-      await loadCharacters();
+      // Reload from OPFS (profiling edge function should update DB, we sync back)
+      await localChars.reload();
     } catch (e) {
       console.error("Profiling error:", e);
       toast.error(e instanceof Error ? e.message : (isRu ? "Ошибка профайлинга" : "Profiling error"), { duration: Infinity, style: { background: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', border: '1px solid', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' } });
@@ -443,7 +298,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const handleProfile = () => runProfile();
   const handleIncrementalProfile = () => runProfile(chapterSceneIds);
 
-  // ── Refine Speech Context (scene-level) ──────────────
+  // ── Refine Speech Context (scene-level, reads from OPFS storyboard) ──
   const handleRefineSpeech = useCallback(async () => {
     if (!selectedId || !sceneId) return;
     const ch = characters.find(c => c.id === selectedId);
@@ -457,30 +312,31 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         return;
       }
 
-      // Load segments where this character speaks in the current scene
-      const { data: segments } = await supabase
-        .from("scene_segments")
-        .select("id, segment_type, speaker")
-        .eq("scene_id", sceneId)
-        .or(`speaker.eq.${ch.name}${ch.aliases.length > 0 ? `,speaker.in.(${ch.aliases.join(",")})` : ""}`);
+      // Load segments from OPFS storyboard
+      if (!storage) {
+        toast.error(isRu ? "Локальный проект не открыт" : "Local project not open");
+        return;
+      }
+      const storyboard = await storage.readJSON<{ segments: Array<{ segment_id: string; segment_type: string; speaker?: string | null; phrases?: Array<{ text: string }> }> }>(`storyboard/scene_${sceneId}.json`);
+      if (!storyboard?.segments?.length) {
+        toast.info(isRu ? "Нет данных раскадровки" : "No storyboard data");
+        return;
+      }
 
-      if (!segments?.length) {
+      // Filter segments where this character speaks
+      const charNames = new Set([ch.name.toLowerCase(), ...ch.aliases.map(a => a.toLowerCase())]);
+      const charSegments = storyboard.segments.filter(s =>
+        s.speaker && charNames.has(s.speaker.toLowerCase())
+      );
+
+      if (charSegments.length === 0) {
         toast.info(isRu ? `${ch.name} не говорит в этой сцене` : `${ch.name} has no lines in this scene`);
         return;
       }
 
-      // Load phrases for those segments
-      const segIds = segments.map(s => s.id);
-      const { data: phrases } = await supabase
-        .from("segment_phrases")
-        .select("segment_id, text, phrase_number")
-        .in("segment_id", segIds)
-        .order("phrase_number");
-
-      const segmentTexts = segments.map(seg => {
-        const segPhrases = (phrases || []).filter(p => p.segment_id === seg.id).sort((a, b) => a.phrase_number - b.phrase_number);
-        return segPhrases.map(p => p.text).join(" ");
-      }).filter(Boolean);
+      const segmentTexts = charSegments.map(seg =>
+        (seg.phrases || []).map(p => p.text).join(" ")
+      ).filter(Boolean);
 
       if (segmentTexts.length === 0) {
         toast.info(isRu ? "Нет текста для анализа" : "No text to analyze");
@@ -521,24 +377,18 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       const result = await response.json();
       const ctx = result.speech_context;
 
-      // Save speech_context to all segments of this character in this scene
-      for (const seg of segments) {
-        const { data: existing } = await supabase
-          .from("scene_segments")
-          .select("metadata")
-          .eq("id", seg.id)
-          .single();
+      // Save speech_context to OPFS storyboard metadata
+      const updatedSegments = storyboard.segments.map(seg => {
+        if (seg.speaker && charNames.has(seg.speaker.toLowerCase())) {
+          return {
+            ...seg,
+            metadata: { ...(seg as any).metadata, speech_context: { ...ctx, character: ch.name } },
+          };
+        }
+        return seg;
+      });
+      await storage.writeJSON(`storyboard/scene_${sceneId}.json`, { ...storyboard, segments: updatedSegments });
 
-        const existingMeta = (existing?.metadata as Record<string, unknown>) || {};
-        await supabase
-          .from("scene_segments")
-          .update({
-            metadata: { ...existingMeta, speech_context: { ...ctx, character: ch.name } },
-          })
-          .eq("id", seg.id);
-      }
-
-      // Update local cache
       setSpeechContextMap(prev => {
         const next = new Map(prev);
         next.set(`${selectedId}:${sceneId}`, ctx);
@@ -556,25 +406,22 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     } finally {
       setRefiningSpeech(false);
     }
-  }, [selectedId, sceneId, characters, isRu, getModelForRole]);
+  }, [selectedId, sceneId, characters, isRu, getModelForRole, storage]);
 
-  // Load existing speech_context for selected character + scene
+  // Load existing speech_context from OPFS storyboard
   useEffect(() => {
-    if (!selectedId || !sceneId) return;
+    if (!selectedId || !sceneId || !storage) return;
     const ch = characters.find(c => c.id === selectedId);
     if (!ch) return;
     const cacheKey = `${selectedId}:${sceneId}`;
     if (speechContextMap.has(cacheKey)) return;
 
     (async () => {
-      const { data: segments } = await supabase
-        .from("scene_segments")
-        .select("metadata")
-        .eq("scene_id", sceneId)
-        .or(`speaker.eq.${ch.name}${ch.aliases.length > 0 ? `,speaker.in.(${ch.aliases.join(",")})` : ""}`)
-        .limit(1);
-
-      const meta = segments?.[0]?.metadata as Record<string, unknown> | null;
+      const storyboard = await storage.readJSON<{ segments: Array<{ speaker?: string | null; metadata?: Record<string, unknown> }> }>(`storyboard/scene_${sceneId}.json`);
+      if (!storyboard?.segments) return;
+      const charNames = new Set([ch.name.toLowerCase(), ...ch.aliases.map(a => a.toLowerCase())]);
+      const seg = storyboard.segments.find(s => s.speaker && charNames.has(s.speaker.toLowerCase()));
+      const meta = seg?.metadata;
       if (meta?.speech_context) {
         setSpeechContextMap(prev => {
           const next = new Map(prev);
@@ -583,16 +430,16 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         });
       }
     })();
-  }, [selectedId, sceneId, characters]);
+  }, [selectedId, sceneId, characters, storage]);
 
-  // ── Save voice config (only used by auto-cast now) ───────────────────────────
+  // ── Save voice config (LOCAL-FIRST) ───────────────────────────
   const handleSave = async () => {
     if (!selectedId) return;
     setSaving(true);
     try {
       const currentChar = characters.find(c => c.id === selectedId);
       const voiceConfig = {
-        provider: "yandex",
+        provider: "yandex" as const,
         voice_id: voice,
         role: role !== "neutral" ? role : undefined,
         speed,
@@ -600,15 +447,8 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         volume: volume !== 0 ? volume : undefined,
         is_extra: currentChar?.voice_config?.is_extra,
       };
-      const { error } = await supabase
-        .from("book_characters")
-        .update({ voice_config: voiceConfig, updated_at: new Date().toISOString() })
-        .eq("id", selectedId);
-      if (error) throw error;
+      await localChars.updateCharacter(selectedId, { voice_config: voiceConfig });
       setDirty(false);
-      setCharacters(prev => prev.map(c =>
-        c.id === selectedId ? { ...c, voice_config: voiceConfig } : c
-      ));
       onVoiceSaved?.();
       toast.success(isRu ? "Голос сохранён" : "Voice saved");
     } catch {
@@ -618,75 +458,60 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     }
   };
 
-  // ── Auto-cast voices — show candidates panel for user choice ──
+  // ── Auto-cast voices ──
   const handleAutoCast = async () => {
     if (characters.length === 0) return;
 
-    // Only cast characters that don't have a voice yet
     const toCast = characters.filter(ch => !ch.voice_config?.voice_id);
     if (toCast.length === 0) {
       toast.info(isRu ? "Все персонажи уже озвучены" : "All characters already have voices");
       return;
     }
 
-    // Build candidates for each character
     const castChars: CastingCharacter[] = [];
     for (const ch of toCast) {
-      if (isExtra(ch.id)) {
-        // Extras get random voices — no UI needed, auto-assign
-        continue;
-      }
+      if (isExtra(ch.id)) continue;
       const candidates = suggestVoiceCandidates({
         gender: ch.gender,
-        ageGroup: ch.age_group,
+        ageGroup: ch.age_group || "adult",
         temperament: ch.temperament,
         speechTags: ch.speech_tags || [],
         psychoTags: ch.psycho_tags || [],
-        provider: "yandex", // default provider
+        provider: "yandex",
       }, 3);
       if (candidates.length > 0) {
         castChars.push({
-          id: ch.id,
-          name: ch.name,
-          gender: ch.gender,
-          ageGroup: ch.age_group,
-          temperament: ch.temperament,
+          id: ch.id, name: ch.name, gender: ch.gender,
+          ageGroup: ch.age_group || "adult", temperament: ch.temperament,
           candidates,
         });
       }
     }
 
-    // Auto-assign extras immediately
+    // Auto-assign extras
     const extras = toCast.filter(ch => isExtra(ch.id));
+    for (const ch of extras) {
+      const pool = YANDEX_VOICES;
+      const randomVoice = pool[Math.floor(Math.random() * pool.length)] || YANDEX_VOICES[0];
+      const roles = randomVoice.roles ?? ["neutral"];
+      const roleId = roles[Math.floor(Math.random() * roles.length)];
+      const vc = {
+        provider: "yandex" as const,
+        voice_id: randomVoice.id,
+        role: roleId !== "neutral" ? roleId : undefined,
+        speed: 1.0,
+        is_extra: true as const,
+      };
+      await localChars.updateCharacter(ch.id, { voice_config: vc });
+    }
     if (extras.length > 0) {
-      for (const ch of extras) {
-        const pool = YANDEX_VOICES;
-        const randomVoice = pool[Math.floor(Math.random() * pool.length)] || YANDEX_VOICES[0];
-        const roles = randomVoice.roles ?? ["neutral"];
-        const roleId = roles[Math.floor(Math.random() * roles.length)];
-        const vc: BookCharacter["voice_config"] = {
-          provider: "yandex",
-          voice_id: randomVoice.id,
-          role: roleId !== "neutral" ? roleId : undefined,
-          speed: 1.0,
-          is_extra: true,
-        };
-        await supabase
-          .from("book_characters")
-          .update({ voice_config: vc, updated_at: new Date().toISOString() })
-          .eq("id", ch.id);
-        setCharacters(prev => prev.map(c => c.id === ch.id ? { ...c, voice_config: vc } : c));
-      }
-      if (extras.length > 0) {
-        toast.success(
-          isRu
-            ? `Массовка: ${extras.length} голосов назначено автоматически`
-            : `Extras: ${extras.length} voices auto-assigned`
-        );
-      }
+      toast.success(
+        isRu
+          ? `Массовка: ${extras.length} голосов назначено автоматически`
+          : `Extras: ${extras.length} voices auto-assigned`
+      );
     }
 
-    // Show candidates panel for non-extras
     if (castChars.length > 0) {
       setCastingCandidates(castChars);
     }
@@ -697,13 +522,6 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     setCasting(true);
     setCastingCandidates(null);
     try {
-      const usedVoices = new Set<string>();
-      for (const ch of characters) {
-        if (ch.voice_config?.voice_id) usedVoices.add(ch.voice_config.voice_id);
-      }
-
-      const updates: { id: string; voice_config: BookCharacter["voice_config"]; gender?: string }[] = [];
-
       for (const [charId, candidate] of picks) {
         const ch = characters.find(c => c.id === charId);
         if (!ch) continue;
@@ -713,49 +531,28 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         const roleId = candidate.role
           || (accentuation ? ACCENTUATION_YANDEX_ROLE[accentuation] : undefined)
           || matchRole(voiceId, ch.temperament);
-        usedVoices.add(voiceId);
 
         const chosenVoice = YANDEX_VOICES.find(v => v.id === voiceId);
         const syncedGender = chosenVoice ? chosenVoice.gender : ch.gender;
 
-        const vc: BookCharacter["voice_config"] = {
+        const vc = {
           provider: candidate.provider,
           voice_id: voiceId,
           role: roleId !== "neutral" ? roleId : undefined,
           speed: 1.0,
           is_extra: ch.voice_config?.is_extra,
         };
-        updates.push({ id: ch.id, voice_config: vc, gender: syncedGender });
+        await localChars.updateCharacter(charId, { voice_config: vc, gender: syncedGender });
       }
 
-      // Batch save to DB
-      for (const u of updates) {
-        const updateData: Record<string, unknown> = {
-          voice_config: u.voice_config,
-          updated_at: new Date().toISOString(),
-        };
-        if (u.gender) updateData.gender = u.gender;
-        await supabase
-          .from("book_characters")
-          .update(updateData)
-          .eq("id", u.id);
-      }
-
-      // Update local state
-      setCharacters(prev => prev.map(c => {
-        const u = updates.find(x => x.id === c.id);
-        return u ? { ...c, voice_config: u.voice_config, gender: u.gender ?? c.gender } : c;
-      }));
-
-      // Sync current selection
       if (selectedId) {
-        const u = updates.find(x => x.id === selectedId);
-        if (u) {
-          setVoice(u.voice_config.voice_id || "marina");
-          setRole(u.voice_config.role || "neutral");
-          setSpeed(u.voice_config.speed ?? 1.0);
-          setPitch(u.voice_config.pitch ?? 0);
-          setVolume(u.voice_config.volume ?? 0);
+        const pick = picks.get(selectedId);
+        if (pick) {
+          setVoice(pick.voiceId);
+          setRole(pick.role || "neutral");
+          setSpeed(1.0);
+          setPitch(0);
+          setVolume(0);
           setDirty(false);
         }
       }
@@ -763,8 +560,8 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       onVoiceSaved?.();
       toast.success(
         isRu
-          ? `Голоса подобраны для ${updates.length} персонажей`
-          : `Voices matched for ${updates.length} characters`
+          ? `Голоса подобраны для ${picks.size} персонажей`
+          : `Voices matched for ${picks.size} characters`
       );
     } catch (e) {
       console.error("Auto-cast error:", e);
@@ -780,7 +577,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
   useImperativeHandle(ref, () => ({ autoCast: handleAutoCast, incrementalProfile: handleIncrementalProfile, casting, profiling }), [characters, selectedId, casting, profiling, chapterSceneIds]);
 
-  // ── Merge characters ────────────────────────────────────
+  // ── Merge characters (LOCAL-FIRST) ────────────────────────────
   const handleMerge = async () => {
     if (selectedIds.size < 2) {
       toast.warning(isRu ? "Выберите минимум 2 персонажа" : "Select at least 2 characters");
@@ -788,62 +585,16 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     }
     setMerging(true);
     try {
-      // Order: first selected in list order becomes primary
-      const ordered = characters.filter(c => selectedIds.has(c.id));
-      const primary = ordered[0];
-      const others = ordered.slice(1);
-
-      // Collect aliases: primary aliases + other names + other aliases
-      const newAliases = [
-        ...primary.aliases,
-        ...others.flatMap(c => [c.name, ...c.aliases]),
-      ].filter((v, i, a) => a.indexOf(v) === i && v !== primary.name);
-
-      // Update primary character
-      const { error: updateErr } = await supabase
-        .from("book_characters")
-        .update({ aliases: newAliases, updated_at: new Date().toISOString() })
-        .eq("id", primary.id);
-      if (updateErr) throw updateErr;
-
-      // Update character_appearances: reassign merged characters' appearances to primary
-      for (const other of others) {
-        const { data: appearances } = await supabase
-          .from("character_appearances")
-          .select("*")
-          .eq("character_id", other.id);
-        if (appearances?.length) {
-          for (const app of appearances) {
-            // Check if primary already has an appearance in this scene
-            const { data: existing } = await supabase
-              .from("character_appearances")
-              .select("id, segment_ids")
-              .eq("character_id", primary.id)
-              .eq("scene_id", app.scene_id)
-              .maybeSingle();
-            if (existing) {
-              // Merge segment_ids
-              const mergedSegments = [...new Set([...existing.segment_ids, ...app.segment_ids])];
-              await supabase.from("character_appearances").update({ segment_ids: mergedSegments }).eq("id", existing.id);
-              await supabase.from("character_appearances").delete().eq("id", app.id);
-            } else {
-              await supabase.from("character_appearances").update({ character_id: primary.id }).eq("id", app.id);
-            }
-          }
-        }
-        // Delete the merged character
-        await supabase.from("book_characters").delete().eq("id", other.id);
-      }
-
+      const ids = [...selectedIds];
+      await localChars.mergeCharacters(ids);
       toast.success(
         isRu
-          ? `${others.length} персонаж(ей) объединено с "${primary.name}"`
-          : `${others.length} character(s) merged into "${primary.name}"`
+          ? `${ids.length - 1} персонаж(ей) объединено`
+          : `${ids.length - 1} character(s) merged`
       );
       setMultiSelect(false);
       setSelectedIds(new Set());
-      setSelectedId(primary.id);
-      await loadCharacters();
+      setSelectedId(ids[0]);
     } catch (e) {
       console.error("Merge error:", e);
       toast.error(isRu ? "Ошибка объединения" : "Merge error");
@@ -865,15 +616,14 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     });
   };
 
-  // ── Auto-clean duplicates ──────────────────────────────
+  // ── Auto-clean duplicates (LOCAL-FIRST) ──────────────────────
   const [cleaningDupes, setCleaningDupes] = useState(false);
 
   const handleAutoCleanDuplicates = useCallback(async () => {
     if (characters.length < 2) return;
     setCleaningDupes(true);
     try {
-      // Build name→character index (lowercase)
-      const nameMap = new Map<string, BookCharacter[]>();
+      const nameMap = new Map<string, CharacterIndex[]>();
       for (const ch of characters) {
         const names = [ch.name, ...ch.aliases].map(n => n.toLowerCase().trim()).filter(Boolean);
         for (const n of names) {
@@ -883,27 +633,22 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         }
       }
 
-      // Find duplicate groups using union-find
+      // Union-find for duplicate groups
       const parentMap = new Map<string, string>();
       const find = (id: string): string => {
         if (!parentMap.has(id)) parentMap.set(id, id);
         if (parentMap.get(id) !== id) parentMap.set(id, find(parentMap.get(id)!));
         return parentMap.get(id)!;
       };
-      const union = (a: string, b: string) => {
-        parentMap.set(find(a), find(b));
-      };
+      const union = (a: string, b: string) => { parentMap.set(find(a), find(b)); };
 
       for (const [, group] of nameMap) {
         if (group.length > 1) {
-          for (let i = 1; i < group.length; i++) {
-            union(group[0].id, group[i].id);
-          }
+          for (let i = 1; i < group.length; i++) union(group[0].id, group[i].id);
         }
       }
 
-      // Collect groups of size > 1
-      const groups = new Map<string, BookCharacter[]>();
+      const groups = new Map<string, CharacterIndex[]>();
       for (const ch of characters) {
         const root = find(ch.id);
         const arr = groups.get(root) || [];
@@ -919,9 +664,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       }
 
       let totalMerged = 0;
-
       for (const group of dupeGroups) {
-        // Pick primary: prefer system chars, then highest segment count, then first by sort_order
         const sorted = [...group].sort((a, b) => {
           const aSystem = SYSTEM_NAMES.has(a.name) ? 1 : 0;
           const bSystem = SYSTEM_NAMES.has(b.name) ? 1 : 0;
@@ -929,62 +672,10 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
           const aCount = segmentCounts.get(a.id) ?? 0;
           const bCount = segmentCounts.get(b.id) ?? 0;
           if (aCount !== bCount) return bCount - aCount;
-          return a.sort_order - b.sort_order;
+          return (a.sort_order ?? 0) - (b.sort_order ?? 0);
         });
-
-        const primary = sorted[0];
-        const others = sorted.slice(1);
-
-        // Collect aliases
-        const newAliases = [
-          ...primary.aliases,
-          ...others.flatMap(c => [c.name, ...c.aliases]),
-        ].filter((v, i, a) => a.indexOf(v) === i && v.toLowerCase() !== primary.name.toLowerCase());
-
-        // Update primary
-        await supabase
-          .from("book_characters")
-          .update({ aliases: newAliases, updated_at: new Date().toISOString() })
-          .eq("id", primary.id);
-
-        // Reassign appearances and delete others
-        for (const other of others) {
-          const { data: appearances } = await supabase
-            .from("character_appearances")
-            .select("*")
-            .eq("character_id", other.id);
-          if (appearances?.length) {
-            for (const app of appearances) {
-              const { data: existing } = await supabase
-                .from("character_appearances")
-                .select("id, segment_ids")
-                .eq("character_id", primary.id)
-                .eq("scene_id", app.scene_id)
-                .maybeSingle();
-              if (existing) {
-                const mergedSegments = [...new Set([...existing.segment_ids, ...app.segment_ids])];
-                await supabase.from("character_appearances").update({ segment_ids: mergedSegments }).eq("id", existing.id);
-                await supabase.from("character_appearances").delete().eq("id", app.id);
-              } else {
-                await supabase.from("character_appearances").update({ character_id: primary.id }).eq("id", app.id);
-              }
-            }
-          }
-          // Update scene_segments speaker references
-          await supabase
-            .from("scene_segments")
-            .update({ speaker: primary.name })
-            .eq("speaker", other.name);
-          // Also update for aliases of the other character
-          for (const alias of other.aliases) {
-            await supabase
-              .from("scene_segments")
-              .update({ speaker: primary.name })
-              .eq("speaker", alias);
-          }
-          await supabase.from("book_characters").delete().eq("id", other.id);
-          totalMerged++;
-        }
+        await localChars.mergeCharacters(sorted.map(c => c.id));
+        totalMerged += sorted.length - 1;
       }
 
       toast.success(
@@ -992,16 +683,37 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
           ? `Объединено ${totalMerged} дубликат(ов) в ${dupeGroups.length} группах`
           : `Merged ${totalMerged} duplicate(s) in ${dupeGroups.length} groups`
       );
-      await loadCharacters();
     } catch (e) {
       console.error("Auto-clean duplicates error:", e);
       toast.error(isRu ? "Ошибка очистки дубликатов" : "Duplicate cleanup error");
     } finally {
       setCleaningDupes(false);
     }
-  }, [characters, segmentCounts, SYSTEM_NAMES, isRu, loadCharacters]);
+  }, [characters, segmentCounts, SYSTEM_NAMES, isRu, localChars]);
 
-  // Voice editing is now on the Narrators page
+  // ── Gender/Age/Temperament update (LOCAL-FIRST) ──
+  const handleGenderChange = useCallback(async (charId: string, g: string) => {
+    const newVoiceId = matchVoice(g, characters.find(c => c.id === charId)?.age_group || "adult");
+    const newVoice = YANDEX_VOICES.find(x => x.id === newVoiceId);
+    const newRole = newVoice ? matchRole(newVoiceId, characters.find(c => c.id === charId)?.temperament ?? null) : role;
+    setVoice(newVoiceId);
+    setRole(newRole);
+    setDirty(true);
+    await localChars.updateCharacter(charId, { gender: g as "male" | "female" | "unknown" });
+    toast.success(isRu ? "Пол сохранён" : "Gender saved");
+  }, [characters, localChars, isRu, role]);
+
+  const handleAgeChange = useCallback(async (charId: string, age: string) => {
+    await localChars.updateCharacter(charId, { age_group: age });
+    toast.success(isRu ? "Возраст сохранён" : "Age saved");
+  }, [localChars, isRu]);
+
+  const handleTemperamentChange = useCallback(async (charId: string, t: string) => {
+    await localChars.updateCharacter(charId, { temperament: t });
+    toast.success(isRu ? "Темперамент сохранён" : "Temperament saved");
+  }, [localChars, isRu]);
+
+  // ─── UI ───────────────────────────────────────────────
 
   return (
     <div className="h-full flex">
@@ -1015,7 +727,6 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
               <RoleBadge roleId="director" model={getModelForRole("director")} isRu={isRu} size={13} />
             </span>
             <div className="flex items-center gap-1">
-              {/* Filter toggle: chapter → scene → all → chapter */}
               <Button
                 variant={filterMode !== "all" ? "secondary" : "ghost"}
                 size="icon"
@@ -1038,7 +749,6 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                   {filterMode === "chapter" ? (isRu ? "гл." : "ch.") : (isRu ? "сц." : "sc.")}
                 </span>
               )}
-              {/* Extras toggle for selected character */}
               {selectedId && !multiSelect && (
                 <Button
                   variant={isExtra(selectedId) ? "secondary" : "ghost"}
@@ -1052,7 +762,6 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                   <UsersRound className={`h-3 w-3 ${isExtra(selectedId) ? "text-primary" : ""}`} />
                 </Button>
               )}
-              {/* Multi-select toggle */}
               {characters.length > 1 && (
                 <Button
                   variant={multiSelect ? "secondary" : "ghost"}
@@ -1071,7 +780,6 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
               )}
             </div>
           </div>
-          {/* Merge button (shown in multi-select mode) */}
           {multiSelect && (
             <Button
               variant="outline"
@@ -1180,7 +888,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                         {TEMPERAMENT_LABELS[ch.temperament]?.[isRu ? "ru" : "en"] ?? ch.temperament}
                       </span>
                     )}
-                    {(ch.psycho_tags?.length > 0 || ch.speech_tags?.length > 0) && (
+                    {((ch.psycho_tags?.length ?? 0) > 0 || (ch.speech_tags?.length ?? 0) > 0) && (
                       <span className="text-[10px] text-violet-400/70" title={[...(ch.psycho_tags || []), ...(ch.speech_tags || [])].join(", ")}>
                         🎭{(ch.psycho_tags?.length ?? 0) + (ch.speech_tags?.length ?? 0)}
                       </span>
@@ -1257,30 +965,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                                     ? "bg-accent text-accent-foreground"
                                     : "hover:bg-muted text-foreground"
                                 }`}
-                                onClick={async () => {
-                                  const charId = selectedChar.id;
-                                  // Re-match voice to new gender
-                                  const newVoiceId = matchVoice(g, selectedChar.age_group);
-                                  const newVoice = YANDEX_VOICES.find(x => x.id === newVoiceId);
-                                  const newRole = newVoice ? matchRole(newVoiceId, selectedChar.temperament) : role;
-                                  setVoice(newVoiceId);
-                                  setRole(newRole);
-                                  setCharacters(prev => prev.map(c =>
-                                    c.id === charId ? { ...c, gender: g } : c
-                                  ));
-                                  setDirty(true);
-                                  try {
-                                    const { error } = await supabase
-                                      .from("book_characters")
-                                      .update({ gender: g, updated_at: new Date().toISOString() })
-                                      .eq("id", charId);
-                                    if (error) throw error;
-                                    toast.success(isRu ? "Пол сохранён" : "Gender saved");
-                                  } catch {
-                                    toast.error(isRu ? "Ошибка сохранения" : "Save error");
-                                    loadCharacters();
-                                  }
-                                }}
+                                onClick={() => handleGenderChange(selectedChar.id, g)}
                               >
                                 {GENDER_LABELS[g]?.[isRu ? "ru" : "en"]}
                               </button>
@@ -1294,11 +979,11 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                             <Badge
                               variant="outline"
                               className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
-                                selectedChar.age_group === "unknown" ? "border-dashed border-warning text-warning" : ""
+                                (selectedChar.age_group || "unknown") === "unknown" ? "border-dashed border-warning text-warning" : ""
                               }`}
                             >
-                              {getAgeLabel(selectedChar.age_group, selectedChar.gender, isRu)}
-                              {selectedChar.age_group === "unknown" && " ▾"}
+                              {getAgeLabel(selectedChar.age_group || "unknown", selectedChar.gender, isRu)}
+                              {(selectedChar.age_group || "unknown") === "unknown" && " ▾"}
                             </Badge>
                           </button>
                         </PopoverTrigger>
@@ -1312,23 +997,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                                     ? "bg-accent text-accent-foreground"
                                     : "hover:bg-muted text-foreground"
                                 }`}
-                                onClick={async () => {
-                                  const charId = selectedChar.id;
-                                  setCharacters(prev => prev.map(c =>
-                                    c.id === charId ? { ...c, age_group: age } : c
-                                  ));
-                                  try {
-                                    const { error } = await supabase
-                                      .from("book_characters")
-                                      .update({ age_group: age, updated_at: new Date().toISOString() })
-                                      .eq("id", charId);
-                                    if (error) throw error;
-                                    toast.success(isRu ? "Возраст сохранён" : "Age saved");
-                                  } catch {
-                                    toast.error(isRu ? "Ошибка сохранения" : "Save error");
-                                    loadCharacters();
-                                  }
-                                }}
+                                onClick={() => handleAgeChange(selectedChar.id, age)}
                               >
                                 {getAgeLabel(age, selectedChar.gender, isRu)}
                               </button>
@@ -1361,23 +1030,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                                     ? "bg-accent text-accent-foreground"
                                     : "hover:bg-muted text-foreground"
                                 }`}
-                                onClick={async () => {
-                                  const charId = selectedChar.id;
-                                  setCharacters(prev => prev.map(c =>
-                                    c.id === charId ? { ...c, temperament: t } : c
-                                  ));
-                                  try {
-                                    const { error } = await supabase
-                                      .from("book_characters")
-                                      .update({ temperament: t, updated_at: new Date().toISOString() })
-                                      .eq("id", charId);
-                                    if (error) throw error;
-                                    toast.success(isRu ? "Темперамент сохранён" : "Temperament saved");
-                                  } catch {
-                                    toast.error(isRu ? "Ошибка сохранения" : "Save error");
-                                    loadCharacters();
-                                  }
-                                }}
+                                onClick={() => handleTemperamentChange(selectedChar.id, t)}
                               >
                                 {TEMPERAMENT_LABELS[t]?.[isRu ? "ru" : "en"]}
                               </button>
@@ -1387,15 +1040,15 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                       </Popover>
                     </div>
                     {/* Speech & Psycho tags */}
-                    {(selectedChar.speech_tags?.length > 0 || selectedChar.psycho_tags?.length > 0) && (
+                    {((selectedChar.speech_tags?.length ?? 0) > 0 || (selectedChar.psycho_tags?.length ?? 0) > 0) && (
                       <div className="mt-3 space-y-2">
-                        {selectedChar.speech_tags?.length > 0 && (
+                        {(selectedChar.speech_tags?.length ?? 0) > 0 && (
                           <div>
                             <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                               {isRu ? "Манера речи" : "Speech manner"}
                             </span>
                             <div className="flex flex-wrap gap-1 mt-1">
-                              {selectedChar.speech_tags.map((tag, i) => (
+                              {selectedChar.speech_tags!.map((tag, i) => (
                                 <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 border-sky-500/40 text-sky-400">
                                   {tag}
                                 </Badge>
@@ -1403,13 +1056,13 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                             </div>
                           </div>
                         )}
-                        {selectedChar.psycho_tags?.length > 0 && (
+                        {(selectedChar.psycho_tags?.length ?? 0) > 0 && (
                           <div>
                             <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                               {isRu ? "Психотип" : "Psychotype"}
                             </span>
                             <div className="flex flex-wrap gap-1 mt-1">
-                              {selectedChar.psycho_tags.map((tag, i) => (
+                              {selectedChar.psycho_tags!.map((tag, i) => (
                                 <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 border-violet-500/40 text-violet-400">
                                   {tag}
                                 </Badge>
@@ -1501,7 +1154,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
               </h3>
               <div className="flex-1 min-h-0">
                 <VoiceCastingTable
-                  characters={filteredCharacters}
+                  characters={filteredCharacters as any}
                   isRu={isRu}
                   selectedCharacterId={selectedId}
                   onSelectCharacter={handleSelectCharacter}
