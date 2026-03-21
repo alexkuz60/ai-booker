@@ -301,7 +301,7 @@ export default function Parser() {
             variant="ghost" size="sm"
             onClick={reloadBook}
             className="gap-1.5 text-xs"
-            title={isRu ? "Перезагрузить книгу (загрузить другую версию PDF)" : "Reload book (upload different PDF version)"}
+            title={isRu ? "Перезагрузить книгу (загрузить другую версию файла)" : "Reload book (upload different file version)"}
           >
             <RefreshCw className="h-3.5 w-3.5" />
             {isRu ? "Перезагрузить" : "Reload"}

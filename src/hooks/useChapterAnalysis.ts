@@ -53,34 +53,49 @@ export function useChapterAnalysis({
     onChapterResultsMutated?.();
   };
 
-  // ─── Helper: call edge function (with Lovable→OpenRouter fallback on 402) ──
+  // ─── Helper: call edge function with retry for transient network errors ──
   const callParseFunctionRaw = async (body: Record<string, unknown>): Promise<Response> => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
     const session = (await supabase.auth.getSession()).data.session;
-    const abortCtrl = new AbortController();
-    const timeoutId = setTimeout(() => abortCtrl.abort(), 180_000);
 
-    try {
-      const resp = await fetch(`${supabaseUrl}/functions/v1/parse-book-structure`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || supabaseKey}`,
-          'apikey': supabaseKey,
-        },
-        body: JSON.stringify(body),
-        signal: abortCtrl.signal,
-      });
-      clearTimeout(timeoutId);
-      return resp;
-    } catch (fetchErr: any) {
-      clearTimeout(timeoutId);
-      if (fetchErr.name === 'AbortError') {
-        throw new Error(t("logTimeout", isRu));
+    const MAX_RETRIES = 2;
+    let lastErr: any = null;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const abortCtrl = new AbortController();
+      const timeoutId = setTimeout(() => abortCtrl.abort(), 180_000);
+
+      try {
+        const resp = await fetch(`${supabaseUrl}/functions/v1/parse-book-structure`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token || supabaseKey}`,
+            'apikey': supabaseKey,
+          },
+          body: JSON.stringify(body),
+          signal: abortCtrl.signal,
+        });
+        clearTimeout(timeoutId);
+        return resp;
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        if (fetchErr.name === 'AbortError') {
+          throw new Error(t("logTimeout", isRu));
+        }
+        lastErr = fetchErr;
+        // Retry on transient network errors
+        const isNetworkError = /network|fetch|econnrefused|econnreset|failed to fetch/i.test(fetchErr.message || '');
+        if (isNetworkError && attempt < MAX_RETRIES) {
+          console.warn(`[Analysis] Network error on attempt ${attempt + 1}, retrying in ${(attempt + 1) * 2}s...`, fetchErr.message);
+          await new Promise(r => setTimeout(r, (attempt + 1) * 2000));
+          continue;
+        }
+        throw fetchErr;
       }
-      throw fetchErr;
     }
+    throw lastErr;
   };
 
   /** Build a fallback chain: Lovable → OpenRouter → ProxyAPI → DotPoint */
