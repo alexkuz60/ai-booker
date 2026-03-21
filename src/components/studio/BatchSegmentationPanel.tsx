@@ -216,7 +216,7 @@ export function BatchSegmentationPanel({
             });
           }
           // Clear content_dirty — analysis was just done on fresh content
-          supabase.from("book_scenes").update({ content_dirty: false }).eq("id", job.scene.id);
+          await supabase.from("book_scenes").update({ content_dirty: false }).eq("id", job.scene.id);
           const count = newSegments.length;
           updateJob(job.scene.id, { status: "done", segmentCount: count });
           onSceneSegmented?.(job.scene.id);
