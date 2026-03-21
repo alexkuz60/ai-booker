@@ -139,7 +139,7 @@ export function useCharacterProfiles({
 
     // ── Invoke profiling for a batch of characters with a specific model ──
     const invokeProfile = async (
-      chars: LocalCharacter[],
+      chars: CharacterIndex[],
       modelId: string,
     ): Promise<{ profiles: Array<{
       name: string; age_group?: string; temperament?: string;
