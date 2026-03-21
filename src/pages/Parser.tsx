@@ -246,6 +246,10 @@ export default function Parser() {
     setStep("upload");
   }, [handleReset, setStep]);
 
+  const openServerBook = useCallback((book: BookRecord) => {
+    openSavedBook(book, { skipTimestampCheck: true });
+  }, [openSavedBook]);
+
   useEffect(() => {
     if (!new URLSearchParams(location.search).has("resetLocal")) return;
 
