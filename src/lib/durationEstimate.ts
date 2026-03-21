@@ -10,7 +10,7 @@ const DEFAULT_CHARS_PER_SEC = 14;
 const DEFAULT_SPEED = 1.0;
 
 export function countChars(scenes: StudioScene[]): number {
-  return scenes.reduce((sum, s) => sum + (s.content?.length ?? 0), 0);
+  return scenes.reduce((sum, s) => sum + (s.content?.length ?? s.char_count ?? 0), 0);
 }
 
 export function estimateDurationSec(
