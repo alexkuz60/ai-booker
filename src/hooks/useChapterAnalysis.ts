@@ -344,7 +344,8 @@ export function useChapterAnalysis({
             }
           }
           text = chapterHtml ? stripHtml(chapterHtml) : "";
-          const formatLabel = fileFormat === "fb2" ? "FB2" : "DOCX";
+          const detectedFmt = fileFormat || (fileName ? detectFormatFromName(fileName) : null);
+          const formatLabel = detectedFmt === "fb2" ? "FB2" : "DOCX";
           addLog(isRu ? `📄 Источник: ${formatLabel}` : `📄 Source: ${formatLabel}`);
         } else {
           // ── PDF path: extract text by page range ──
