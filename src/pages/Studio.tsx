@@ -437,7 +437,7 @@ const Studio = () => {
   const actualSceneDurationMs = selectedScene?.id ? playlistDurations.get(selectedScene.id) : undefined;
   const actualSceneSec = actualSceneDurationMs && actualSceneDurationMs > 0 ? actualSceneDurationMs / 1000 : null;
 
-  const headerRight = (
+  const headerRight = useMemo(() => (
     <div className="flex items-center gap-3 text-sm font-body">
       {chapterEstimate && chapterEstimate.chars > 0 && (
         <>
@@ -478,12 +478,12 @@ const Studio = () => {
       <SaveBookButton isRu={isRu} onClick={saveBook} loading={savingBook} disabled={!bookId} showDownloadZip={isProjectOpen} onDownloadZip={downloadZip} showImportZip={!isProjectOpen} onImportZip={importZip} />
       <AiRolesButton isRu={isRu} apiKeys={userApiKeys} bookTitle={chapter?.bookTitle} />
     </div>
-  );
+  ), [isRu, chapterEstimate, sceneEstimate, actualChapterDurationSec, actualSceneSec, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, userApiKeys, chapter?.bookTitle]);
 
   useEffect(() => {
     setPageHeader({ title: studioTitle, subtitle: studioSubtitle, headerRight });
     return () => setPageHeader({});
-  }, [studioTitle, studioSubtitle, chapterEstimate?.formatted, sceneEstimate?.formatted, actualChapterDurationSec, actualSceneSec, clipsRefreshToken, saveBook, savingBook, bookId]);
+  }, [studioTitle, studioSubtitle, headerRight, setPageHeader]);
 
   // Show loading while restoring session
   if (!restored) {
