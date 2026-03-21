@@ -68,7 +68,11 @@ export function useStoryboardPersistence(sceneId: string | null) {
    * Delete storyboard file — use before re-analysis.
    */
   const clearLocal = useCallback(async () => {
-    if (!storage || !sceneId) return;
+    if (!storage || !sceneId) {
+      console.warn(`[StoryboardPersist] clearLocal skipped: storage=${!!storage} sceneId=${sceneId}`);
+      return;
+    }
+    console.debug(`[StoryboardPersist] clearLocal → sceneId=${sceneId}`);
     await deleteStoryboardFromLocal(storage, sceneId);
   }, [storage, sceneId]);
 
