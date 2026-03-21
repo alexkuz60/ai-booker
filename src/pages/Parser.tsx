@@ -484,6 +484,7 @@ export default function Parser() {
               onFileSelect={handleFileSelect}
               storageBackend={storageBackend}
               onCreateWithFile={(name) => setPendingProjectName(name)}
+              onCancel={handleReset}
             />
           )}
           {step === "extracting_toc" && (
