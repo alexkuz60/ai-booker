@@ -162,6 +162,76 @@ export interface CharacterProfile {
 
 export type CharacterRole = "speaking" | "mentioned" | "crowd" | "system";
 
+// ─── Voice config stored alongside character ─────────────────
+export interface CharacterVoiceConfig {
+  provider?: string;
+  voice_id?: string;
+  role?: string;
+  speed?: number;
+  pitch?: number;
+  volume?: number;
+  is_extra?: boolean;
+  model?: string;
+  instructions?: string;
+  stability?: number;
+  similarity_boost?: number;
+  style?: number;
+}
+
+/**
+ * Full character record stored in characters/index.json.
+ * Superset of the old LocalCharacter — adds voice_config, sort_order, color, age_group, etc.
+ */
+export interface CharacterIndex {
+  id: string;
+  name: string;
+  aliases: string[];
+  gender: "male" | "female" | "unknown";
+  role?: CharacterRole;
+  age_group: string;                  // adult | child | elder | teen | unknown
+  temperament?: string | null;
+  speech_style?: string | null;
+  description?: string | null;
+  speech_tags: string[];
+  psycho_tags: string[];
+  sort_order: number;
+  color?: string | null;
+  /** Contextual age hint extracted from text (e.g. "старик", "ребёнок") */
+  age_hint?: string;
+  /** Contextual manner/emotion hint from text (e.g. "хрипло", "визгливо") */
+  manner_hint?: string;
+  /** AI model that extracted this character */
+  extractedBy?: string;
+  /** Whether this character's name/alias was confirmed in the actual scene text */
+  textConfirmed?: boolean;
+  /** Psychological profile (merged into top-level fields but kept for compat) */
+  profile?: CharacterProfile;
+  /** Per-chapter appearances (Parser provenance) */
+  appearances: CharacterAppearance[];
+  /** Number of scenes the character appears in */
+  sceneCount: number;
+  /** TTS voice config (Studio provenance) */
+  voice_config: CharacterVoiceConfig;
+}
+
+/** Per-scene character map: characters/scene_{id}.json */
+export interface SceneCharacterMap {
+  sceneId: string;
+  updatedAt: string;
+  speakers: Array<{
+    characterId: string;
+    role_in_scene: "speaker" | "system" | "mentioned";
+    segment_ids: string[];
+  }>;
+  typeMappings: Array<{
+    segmentType: string;
+    characterId: string;
+  }>;
+}
+
+/**
+ * @deprecated Use CharacterIndex instead. Kept for migration compatibility.
+ */
 export interface LocalCharacter {
   id: string;
   name: string;
