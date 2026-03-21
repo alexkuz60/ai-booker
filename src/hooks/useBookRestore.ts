@@ -546,7 +546,7 @@ export function useBookRestore({
     // If missing, user should re-download the book from library or re-upload the file.
     console.warn("[EnsurePDF] PDF not found in local project. Re-download from library or re-upload.");
     return null;
-  }, [pdfRef, bookId, books, resolveLocalStorageForBook, fileName, updatePdfRef, updateTotalPages]);
+  }, [pdfRef, bookId, resolveLocalStorageForBook, fileName, updatePdfRef, updateTotalPages]);
 
   return {
     pdfRef,
