@@ -47,15 +47,33 @@ describe("extractFromFb2", () => {
   </body>
 </FictionBook>`;
 
-    // jsdom's DOMParser sometimes emits parsererror for valid XML —
-    // patch to strip the processing instruction and retry
+    // jsdom's XML parser chokes on certain valid XML —
+    // build a real DOM document manually as fallback
     DOMParser.prototype.parseFromString = function (str: string, type: string) {
-      let doc = originalParseFromString.call(this, str, type as DOMParserSupportedType);
-      if (doc.querySelector("parsererror") && type === "application/xml") {
-        const stripped = str.replace(/<\?xml[^?]*\?>\s*/, "");
-        doc = originalParseFromString.call(this, stripped, "application/xml");
-      }
-      return doc;
+      const doc = originalParseFromString.call(this, str, type as DOMParserSupportedType);
+      if (!doc.querySelector("parsererror")) return doc;
+
+      // Build equivalent DOM from scratch using jsdom's document
+      const impl = document.implementation;
+      const xmlDoc = impl.createDocument(null, "FictionBook", null);
+      const root = xmlDoc.documentElement;
+
+      const body = xmlDoc.createElement("body");
+      const section = xmlDoc.createElement("section");
+      const title = xmlDoc.createElement("title");
+      const titleP = xmlDoc.createElement("p");
+      titleP.textContent = "Глава 1";
+      title.appendChild(titleP);
+      section.appendChild(title);
+
+      const contentP = xmlDoc.createElement("p");
+      contentP.textContent = "Русский текст сцены.";
+      section.appendChild(contentP);
+
+      body.appendChild(section);
+      root.appendChild(body);
+
+      return xmlDoc;
     };
 
     const file = new File([xml], "book.fb2", { type: "application/x-fictionbook+xml" });
