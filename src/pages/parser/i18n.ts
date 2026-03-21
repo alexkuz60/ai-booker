@@ -196,7 +196,7 @@ const texts: Record<string, { ru: string; en: string }> = {
   logScenesWord: { ru: "сцен", en: "scenes" },
   logSceneItem: { ru: "📍 Сцена", en: "📍 Scene" },
   logCharsAbbr: { ru: "зн.", en: "chars" },
-  logSaving: { ru: "💾 Сохранение структуры в базу данных...", en: "💾 Saving structure to database..." },
+  logSaving: { ru: "💾 Сохранение структуры в проект...", en: "💾 Saving structure to project..." },
   logResuming: { ru: "📍 Найдено сохранённых сцен, продолжаем обогащение...", en: "📍 Found saved scenes, resuming enrichment..." },
   logStage2: { ru: "🧠 Этап 2: Обогащение", en: "🧠 Stage 2: Enriching" },
   logOfScenes: { ru: "из", en: "of" },
