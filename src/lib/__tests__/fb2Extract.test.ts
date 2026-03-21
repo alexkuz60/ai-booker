@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { decodeFb2Buffer, extractFromFb2 } from "@/lib/fb2-extract";
 
 function concatBytes(...parts: Uint8Array[]) {
