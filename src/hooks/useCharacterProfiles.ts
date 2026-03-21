@@ -18,20 +18,19 @@ import { useToast } from "@/hooks/use-toast";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
 import { ModelPoolManager, type PoolTask, type PoolStats, logPoolStats } from "@/lib/modelPoolManager";
-import type { Scene, ChapterStatus, TocChapter, LocalCharacter, CharacterProfile } from "@/pages/parser/types";
+import type { Scene, ChapterStatus, TocChapter, CharacterIndex, CharacterProfile } from "@/pages/parser/types";
 
 export type ProfileMode = "fresh" | "continue" | "selective";
 
 interface UseCharacterProfilesParams {
   tocEntries: TocChapter[];
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
-  characters: LocalCharacter[];
-  setCharacters: React.Dispatch<React.SetStateAction<LocalCharacter[]>>;
-  persist: (chars: LocalCharacter[]) => Promise<void>;
+  characters: CharacterIndex[];
+  setCharacters: React.Dispatch<React.SetStateAction<CharacterIndex[]>>;
+  persist: (chars: CharacterIndex[]) => Promise<void>;
   profilerModel: string;
   userApiKeys: Record<string, string>;
   isRu: boolean;
-  /** Effective pool for the profiler role (from useAiRoles.getEffectivePool) */
   effectivePool?: string[];
 }
 
@@ -78,7 +77,7 @@ export function useCharacterProfiles({
     mode: ProfileMode = "selective",
   ) => {
     // Determine which characters to profile based on mode
-    let charsToProfile: LocalCharacter[];
+    let charsToProfile: CharacterIndex[];
 
     if (mode === "fresh") {
       // All non-system characters, clear their profiles first
@@ -140,7 +139,7 @@ export function useCharacterProfiles({
 
     // ── Invoke profiling for a batch of characters with a specific model ──
     const invokeProfile = async (
-      chars: LocalCharacter[],
+      chars: CharacterIndex[],
       modelId: string,
     ): Promise<{ profiles: Array<{
       name: string; age_group?: string; temperament?: string;

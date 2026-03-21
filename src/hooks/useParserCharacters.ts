@@ -6,8 +6,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import type { ProjectStorage } from "@/lib/projectStorage";
-import type { Scene, ChapterStatus, TocChapter, LocalCharacter } from "@/pages/parser/types";
-import { readCharactersFromLocal } from "@/lib/localSync";
+import type { Scene, ChapterStatus, TocChapter, CharacterIndex } from "@/pages/parser/types";
+import { readCharacterIndex } from "@/lib/localCharacters";
 import { useCharacterCrud } from "@/hooks/useCharacterCrud";
 import { useCharacterExtraction } from "@/hooks/useCharacterExtraction";
 import { useCharacterProfiles } from "@/hooks/useCharacterProfiles";
@@ -36,16 +36,15 @@ export function useParserCharacters({
   isRu = true,
   effectivePool,
 }: UseParserCharactersParams) {
-  const [characters, setCharacters] = useState<LocalCharacter[]>([]);
+  const [characters, setCharacters] = useState<CharacterIndex[]>([]);
   const [loading, setLoading] = useState(false);
   const loadedBookRef = useRef<string | null>(null);
 
   // Clear characters immediately when bookId changes (prevents stale data from previous book)
   useEffect(() => {
     if (!bookId || bookId === loadedBookRef.current) return;
-    // bookId changed — clear old data right away
     setCharacters([]);
-    loadedBookRef.current = null; // force reload
+    loadedBookRef.current = null;
   }, [bookId]);
 
   // Load characters from local storage when book/storage are ready
@@ -55,7 +54,7 @@ export function useParserCharacters({
     loadedBookRef.current = bookId;
     (async () => {
       setLoading(true);
-      const loaded = await readCharactersFromLocal(storage);
+      const loaded = await readCharacterIndex(storage);
       setCharacters(loaded);
       setLoading(false);
     })();
