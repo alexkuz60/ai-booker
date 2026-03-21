@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, memo } from "react";
 import { motion } from "framer-motion";
 import { Upload, BookOpen, Library, Trash2, FolderOpen, Clock, Loader2, Eraser, Pencil, Check, X, Cloud, Download, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ interface LibraryViewProps {
   onDeleteServerBook?: (bookId: string) => void;
 }
 
-export default function LibraryView({
+function LibraryViewInner({
   isRu, books, loadingLibrary, onUpload, onOpen, onDelete, onClearAll, onRename,
   serverBooks = [], loadingServerBooks = false, onOpenServerBook, onDeleteServerBook,
 }: LibraryViewProps) {
@@ -278,3 +278,6 @@ export default function LibraryView({
     </motion.div>
   );
 }
+
+const LibraryView = memo(LibraryViewInner);
+export default LibraryView;

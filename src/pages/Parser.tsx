@@ -464,6 +464,19 @@ export default function Parser() {
     }
   }, [tocEntries, navRestoredFromStorage]);
 
+  // ── Memoized role model maps to prevent child re-renders ──
+  const navRoleModels = useMemo(() => ({
+    screenwriter: getModelForRole("screenwriter"),
+    director: getModelForRole("director"),
+    translator: getModelForRole("translator"),
+    proofreader: getModelForRole("proofreader"),
+  }), [getModelForRole]);
+
+  const detailRoleModels = useMemo(() => ({
+    screenwriter: getModelForRole("screenwriter"),
+    director: getModelForRole("director"),
+  }), [getModelForRole]);
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col h-full">
       {/* Hidden file input always in DOM for reload from workspace */}
@@ -522,12 +535,7 @@ export default function Parser() {
                     onOpenPdf={handleOpenPdf}
                     onRenamePart={mutations.renamePart}
                     onMergeEntries={mutations.mergeEntries}
-                     roleModels={{
-                      screenwriter: getModelForRole("screenwriter"),
-                      director: getModelForRole("director"),
-                      translator: getModelForRole("translator"),
-                      proofreader: getModelForRole("proofreader"),
-                    }}
+                     roleModels={navRoleModels}
                     onBatchAnalyze={batchAnalyzeAll}
                     onStopAnalysis={stopAnalysis}
                     isAnalyzing={isAnalyzing}
@@ -544,10 +552,7 @@ export default function Parser() {
                        onStopAnalysis={stopAnalysis}
                        isAnalyzing={isAnalyzing}
                        childCount={selectedChildCount}
-                       roleModels={{
-                         screenwriter: getModelForRole("screenwriter"),
-                          director: getModelForRole("director"),
-                        }}
+                        roleModels={detailRoleModels}
                         onScenesUpdate={mutations.handleScenesUpdate}
                       />
                    </div>

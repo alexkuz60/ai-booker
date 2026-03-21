@@ -11,7 +11,7 @@ export function useUserApiKeys() {
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
     supabase
       .from("profiles")
       .select("api_keys")
@@ -20,7 +20,7 @@ export function useUserApiKeys() {
       .then(({ data }) => {
         if (data?.api_keys) setApiKeys(data.api_keys as Record<string, string>);
       });
-  }, [user]);
+  }, [user?.id]);
 
   return apiKeys;
 }
