@@ -200,7 +200,7 @@ const Studio = () => {
           });
 
           return localScene?.content
-            ? { ...scene, content: localScene.content }
+            ? { ...scene, content: localScene.content, char_count: localScene.content.length }
             : scene;
         }),
       );
