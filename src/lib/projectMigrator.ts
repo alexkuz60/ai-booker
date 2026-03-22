@@ -170,7 +170,7 @@ export async function migrateV1toV2(storage: ProjectStorage): Promise<void> {
   try {
     const meta = await storage.readJSON<Record<string, unknown>>("project.json");
     if (meta) {
-      meta.layoutVersion = V2_MARKer;
+      meta.layoutVersion = V2_MARKER;
       meta.updatedAt = new Date().toISOString();
       await storage.writeJSON("project.json", meta);
     }
