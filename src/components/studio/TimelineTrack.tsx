@@ -29,7 +29,7 @@ interface TimelineTrackProps {
   /** Available audio files for insert (atmosphere/sfx tracks) */
   storageAtmosphere?: StorageAudioFile[];
   storageSfx?: StorageAudioFile[];
-  onInsertAudio?: (file: StorageAudioFile, atSec: number) => void;
+  onInsertAudio?: (file: StorageAudioFile, atSec: number, layerType: "ambience" | "sfx") => void;
   isRu?: boolean;
 }
 
