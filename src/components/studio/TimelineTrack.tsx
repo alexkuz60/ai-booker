@@ -271,7 +271,7 @@ export function TimelineTrack({
     const getInsertSec = () => Math.max(0, clickXRef.current / (zoom * 4));
 
     return (
-      <ContextMenu>
+      <ContextMenu onOpenChange={(open) => { if (!open) stopAudioPreview(); }}>
         <ContextMenuTrigger asChild>
           {trackContent}
         </ContextMenuTrigger>
@@ -290,14 +290,12 @@ export function TimelineTrack({
               </ContextMenuSubTrigger>
               <ContextMenuSubContent className="max-h-64 overflow-y-auto w-56">
                 {atmoFiles.map(f => (
-                  <ContextMenuItem
+                  <PreviewableMenuItem
                     key={f.path}
-                    onClick={() => onInsertAudio!(f, getInsertSec())}
-                    className="text-xs"
-                  >
-                    <Waves className="h-3 w-3 mr-2 shrink-0 text-muted-foreground" />
-                    <span className="truncate">{displayName(f.name)}</span>
-                  </ContextMenuItem>
+                    file={f}
+                    icon={<Waves className="h-3 w-3 mr-2 shrink-0 text-muted-foreground" />}
+                    onSelect={() => onInsertAudio!(f, getInsertSec())}
+                  />
                 ))}
               </ContextMenuSubContent>
             </ContextMenuSub>
@@ -312,14 +310,12 @@ export function TimelineTrack({
               </ContextMenuSubTrigger>
               <ContextMenuSubContent className="max-h-64 overflow-y-auto w-56">
                 {sfxFiles.map(f => (
-                  <ContextMenuItem
+                  <PreviewableMenuItem
                     key={f.path}
-                    onClick={() => onInsertAudio!(f, getInsertSec())}
-                    className="text-xs"
-                  >
-                    <Music className="h-3 w-3 mr-2 shrink-0 text-muted-foreground" />
-                    <span className="truncate">{displayName(f.name)}</span>
-                  </ContextMenuItem>
+                    file={f}
+                    icon={<Music className="h-3 w-3 mr-2 shrink-0 text-muted-foreground" />}
+                    onSelect={() => onInsertAudio!(f, getInsertSec())}
+                  />
                 ))}
               </ContextMenuSubContent>
             </ContextMenuSub>
