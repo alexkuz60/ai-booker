@@ -7,6 +7,7 @@ import type { ProjectStorage } from "@/lib/projectStorage";
 import type { Segment, Phrase, CharacterOption } from "@/components/studio/storyboard/types";
 import type { PhraseAnnotation, TtsProvider } from "@/components/studio/phraseAnnotations";
 import { touchProjectUpdatedAt } from "@/lib/projectActivity";
+import { paths } from "@/lib/projectPaths";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ export async function saveStoryboardToLocal(
       audioStatus: Object.fromEntries(data.audioStatus),
       inlineNarrationSpeaker: data.inlineNarrationSpeaker,
     };
-    await storage.writeJSON(`storyboard/scene_${sceneId}.json`, payload);
+    await storage.writeJSON(paths.storyboard(sceneId), payload);
     await touchProjectUpdatedAt(storage);
     console.debug(`[StoryboardSync] Saved scene ${sceneId}: ${data.segments.length} segments`);
   } catch (err) {
@@ -70,7 +71,7 @@ export async function readStoryboardFromLocal(
   sceneId: string,
 ): Promise<LocalStoryboardData | null> {
   try {
-    return await storage.readJSON<LocalStoryboardData>(`storyboard/scene_${sceneId}.json`);
+    return await storage.readJSON<LocalStoryboardData>(paths.storyboard(sceneId));
   } catch {
     return null;
   }
@@ -83,7 +84,7 @@ export async function deleteStoryboardFromLocal(
   sceneId: string,
 ): Promise<void> {
   try {
-    await storage.delete(`storyboard/scene_${sceneId}.json`);
+    await storage.delete(paths.storyboard(sceneId));
     await touchProjectUpdatedAt(storage);
   } catch {
     // non-critical
@@ -96,10 +97,14 @@ export async function listStoryboardedScenes(
   storage: ProjectStorage,
 ): Promise<string[]> {
   try {
-    const files = await storage.listDir("storyboard");
+    const dir = paths.storyboardDir();
+    const files = await storage.listDir(dir);
     return files
-      .filter((f) => f.startsWith("scene_") && f.endsWith(".json"))
-      .map((f) => f.replace(/^scene_/, "").replace(/\.json$/, ""));
+      .filter((f) => {
+        const sid = paths.sceneIdFromStoryboardFile(f);
+        return sid !== null;
+      })
+      .map((f) => paths.sceneIdFromStoryboardFile(f)!);
   } catch {
     return [];
   }

@@ -12,6 +12,7 @@ import type {
   CharacterVoiceConfig,
 } from "@/pages/parser/types";
 import { touchProjectUpdatedAt } from "@/lib/projectActivity";
+import { paths } from "@/lib/projectPaths";
 
 // ─── Read / Write helpers ────────────────────────────────────
 
@@ -20,11 +21,11 @@ export async function readCharacterIndex(
 ): Promise<CharacterIndex[]> {
   try {
     // Try new location first
-    const data = await storage.readJSON<CharacterIndex[]>("characters/index.json");
+    const data = await storage.readJSON<CharacterIndex[]>(paths.characterIndex());
     if (data && data.length > 0) return data;
 
     // Migrate from legacy format
-    const legacy = await storage.readJSON<LocalCharacter[]>("structure/characters.json");
+    const legacy = await storage.readJSON<LocalCharacter[]>(paths.structureCharactersLegacy());
     if (legacy && legacy.length > 0) {
       const migrated = legacy.map(migrateLocalCharacter);
       await saveCharacterIndex(storage, migrated);
@@ -43,10 +44,10 @@ export async function saveCharacterIndex(
   characters: CharacterIndex[],
 ): Promise<void> {
   try {
-    await storage.writeJSON("characters/index.json", characters);
+    await storage.writeJSON(paths.characterIndex(), characters);
     // Also write legacy format for backward compatibility with Parser hooks
     const legacy = characters.map(toLegacyCharacter);
-    await storage.writeJSON("structure/characters.json", legacy);
+    await storage.writeJSON(paths.structureCharactersLegacy(), legacy);
     await touchProjectUpdatedAt(storage);
     console.debug(`[localCharacters] Saved ${characters.length} characters`);
   } catch (err) {
@@ -59,7 +60,7 @@ export async function readSceneCharacterMap(
   sceneId: string,
 ): Promise<SceneCharacterMap | null> {
   try {
-    return await storage.readJSON<SceneCharacterMap>(`characters/scene_${sceneId}.json`);
+    return await storage.readJSON<SceneCharacterMap>(paths.sceneCharacterMap(sceneId));
   } catch {
     return null;
   }
@@ -70,7 +71,7 @@ export async function saveSceneCharacterMap(
   map: SceneCharacterMap,
 ): Promise<void> {
   try {
-    await storage.writeJSON(`characters/scene_${map.sceneId}.json`, map);
+    await storage.writeJSON(paths.sceneCharacterMap(map.sceneId), map);
     await touchProjectUpdatedAt(storage);
   } catch (err) {
     console.warn("[localCharacters] Failed to save scene character map:", err);
@@ -84,7 +85,9 @@ export async function listSceneCharacterMaps(
   storage: ProjectStorage,
 ): Promise<string[]> {
   try {
-    const files = await storage.listDir("characters");
+    const dir = paths.characterDir();
+    if (!dir) return []; // V2: need different approach
+    const files = await storage.listDir(dir);
     return files.filter(f => f.startsWith("scene_") && f.endsWith(".json"));
   } catch {
     return [];
@@ -119,231 +122,4 @@ export async function getChapterCharacterIds(
   });
   await Promise.all(reads);
   return ids;
-}
-
-/**
- * Count total segment appearances per character across all scenes.
- */
-export async function countSegmentAppearances(
-  storage: ProjectStorage,
-): Promise<Map<string, number>> {
-  const counts = new Map<string, number>();
-  const files = await listSceneCharacterMaps(storage);
-  const reads = files.map(async (f) => {
-    try {
-      const map = await storage.readJSON<SceneCharacterMap>(`characters/${f}`);
-      if (map) {
-        for (const s of map.speakers) {
-          counts.set(s.characterId, (counts.get(s.characterId) ?? 0) + s.segment_ids.length);
-        }
-      }
-    } catch { /* skip */ }
-  });
-  await Promise.all(reads);
-  return counts;
-}
-
-// ─── Character lookup helpers ────────────────────────────────
-
-export function buildNameLookup(
-  characters: CharacterIndex[],
-): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const c of characters) {
-    map.set(c.name.toLowerCase(), c.id);
-    for (const alias of c.aliases) {
-      if (alias) map.set(alias.toLowerCase(), c.id);
-    }
-  }
-  return map;
-}
-
-export function findCharacterByNameOrAlias(
-  characters: CharacterIndex[],
-  name: string,
-): CharacterIndex | undefined {
-  const lower = name.toLowerCase();
-  return characters.find(c =>
-    c.name.toLowerCase() === lower ||
-    c.aliases.some(a => a.toLowerCase() === lower)
-  );
-}
-
-// ─── Migration: LocalCharacter → CharacterIndex ──────────────
-
-export function migrateLocalCharacter(c: LocalCharacter): CharacterIndex {
-  return {
-    id: c.id,
-    name: c.name,
-    aliases: c.aliases || [],
-    gender: c.gender || "unknown",
-    role: c.role,
-    age_group: c.profile?.age_group || "unknown",
-    temperament: c.profile?.temperament || null,
-    speech_style: c.profile?.speech_style || null,
-    description: c.profile?.description || null,
-    speech_tags: c.profile?.speech_tags || [],
-    psycho_tags: c.profile?.psycho_tags || [],
-    sort_order: 0,
-    color: null,
-    age_hint: c.age_hint,
-    manner_hint: c.manner_hint,
-    extractedBy: c.extractedBy,
-    textConfirmed: c.textConfirmed,
-    profile: c.profile,
-    appearances: c.appearances || [],
-    sceneCount: c.sceneCount || 0,
-    voice_config: {},
-  };
-}
-
-/**
- * Convert CharacterIndex back to legacy LocalCharacter for backward compat.
- */
-export function toLegacyCharacter(c: CharacterIndex): LocalCharacter {
-  return {
-    id: c.id,
-    name: c.name,
-    aliases: c.aliases,
-    gender: c.gender,
-    role: c.role,
-    age_hint: c.age_hint,
-    manner_hint: c.manner_hint,
-    appearances: c.appearances || [],
-    sceneCount: c.sceneCount || 0,
-    extractedBy: c.extractedBy,
-    textConfirmed: c.textConfirmed,
-    profile: c.profile || {
-      age_group: c.age_group,
-      temperament: c.temperament || undefined,
-      speech_style: c.speech_style || undefined,
-      description: c.description || undefined,
-      speech_tags: c.speech_tags,
-      psycho_tags: c.psycho_tags,
-    },
-  };
-}
-
-// ─── Upsert speakers from storyboard segments ────────────────
-
-interface SegmentLike {
-  segment_id?: string;
-  segment_type: string;
-  speaker?: string | null;
-}
-
-const SPEAKING_TYPES = new Set(["dialogue", "monologue", "first_person", "telephone"]);
-const SYSTEM_DEFS = [
-  { names: ["Рассказчик", "Narrator"], types: ["narrator", "epigraph", "lyric"], sort_order: -2, desc: "Third-person narration voice" },
-  { names: ["Комментатор", "Commentator"], types: ["footnote"], sort_order: -1, desc: "Footnote and commentary voice" },
-];
-
-/**
- * After segmentation: upsert new speakers into index + build scene map.
- */
-export async function upsertSpeakersFromSegments(
-  storage: ProjectStorage,
-  sceneId: string,
-  segments: SegmentLike[],
-  existingIndex: CharacterIndex[],
-): Promise<CharacterIndex[]> {
-  const updatedIndex = [...existingIndex];
-
-  // Collect ALL segments with an explicit speaker name.
-  // Previously only SPEAKING_TYPES were collected, so reassigning a narrator
-  // segment to a character (e.g. "Шарик") was silently ignored.
-  const speakerSegments = new Map<string, string[]>();
-  for (const seg of segments) {
-    if (seg.speaker?.trim()) {
-      const name = seg.speaker.trim();
-      const ids = speakerSegments.get(name) || [];
-      if (seg.segment_id) ids.push(seg.segment_id);
-      speakerSegments.set(name, ids);
-    }
-  }
-
-  // Ensure speakers exist in index
-  for (const [name] of speakerSegments) {
-    if (!findCharacterByNameOrAlias(updatedIndex, name)) {
-      updatedIndex.push({
-        id: crypto.randomUUID(),
-        name,
-        aliases: [],
-        gender: "unknown",
-        age_group: "unknown",
-        sort_order: 0,
-        speech_tags: [],
-        psycho_tags: [],
-        appearances: [],
-        sceneCount: 0,
-        voice_config: {},
-      });
-    }
-  }
-
-  // Ensure system characters exist
-  for (const sys of SYSTEM_DEFS) {
-    const hasType = segments.some(seg => sys.types.includes(seg.segment_type));
-    if (!hasType) continue;
-    const exists = updatedIndex.some(c =>
-      sys.names.some(n => n.toLowerCase() === c.name.toLowerCase())
-    );
-    if (!exists) {
-      updatedIndex.push({
-        id: crypto.randomUUID(),
-        name: sys.names[0],
-        aliases: [],
-        gender: "male",
-        age_group: "adult",
-        sort_order: sys.sort_order,
-        description: sys.desc,
-        speech_tags: [],
-        psycho_tags: [],
-        appearances: [],
-        sceneCount: 0,
-        voice_config: {},
-      });
-    }
-  }
-
-  // Build scene character map
-  const nameLookup = buildNameLookup(updatedIndex);
-  const speakers: SceneCharacterMap["speakers"] = [];
-
-  for (const [name, segIds] of speakerSegments) {
-    const charId = nameLookup.get(name.toLowerCase());
-    if (charId) {
-      speakers.push({ characterId: charId, role_in_scene: "speaker", segment_ids: segIds });
-    }
-  }
-
-  // System character scene mappings
-  for (const sys of SYSTEM_DEFS) {
-    const matchingSegIds = segments
-      .filter(seg => sys.types.includes(seg.segment_type))
-      .map(seg => seg.segment_id)
-      .filter(Boolean) as string[];
-    if (matchingSegIds.length === 0) continue;
-    const sysChar = updatedIndex.find(c =>
-      sys.names.some(n => n.toLowerCase() === c.name.toLowerCase())
-    );
-    if (sysChar) {
-      speakers.push({ characterId: sysChar.id, role_in_scene: "system", segment_ids: matchingSegIds });
-    }
-  }
-
-  const sceneMap: SceneCharacterMap = {
-    sceneId,
-    updatedAt: new Date().toISOString(),
-    speakers,
-    typeMappings: [],
-  };
-
-  // Persist both
-  await Promise.all([
-    saveCharacterIndex(storage, updatedIndex),
-    saveSceneCharacterMap(storage, sceneMap),
-  ]);
-
-  return updatedIndex;
 }

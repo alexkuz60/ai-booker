@@ -1,5 +1,11 @@
+/**
+ * Helpers to fetch a scene's full text content from a local project storage backend.
+ * Prefers exact chapter file when possible, falls back to scanning all scenes.
+ */
+
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { LocalChapterData } from "@/lib/localSync";
+import { paths } from "@/lib/projectPaths";
 
 export interface LocalSceneContentResult {
   chapterId: string;
@@ -15,36 +21,44 @@ export interface LocalSceneLookup {
   title?: string | null;
 }
 
-function normalizeTitle(value: string | null | undefined) {
-  return (value || "").trim().toLowerCase();
+// ─── Matching utilities ──────────────────────────────────────
+
+function normalizeTitle(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
 }
 
-function getSceneContent(localChapter: LocalChapterData | null, lookup: LocalSceneLookup) {
+function getSceneContent(
+  localChapter: LocalChapterData | null,
+  lookup: LocalSceneLookup,
+): (LocalChapterData["scenes"][number] & { scene_number: number }) | null {
   if (!localChapter?.scenes?.length) return null;
 
-  const normalizedTitle = normalizeTitle(lookup.title);
-
-  return localChapter.scenes.find((scene) => {
-    if (lookup.sceneId && scene.id === lookup.sceneId) return true;
-
-    if (lookup.sceneNumber !== null && lookup.sceneNumber !== undefined && scene.scene_number === lookup.sceneNumber) {
-      if (!normalizedTitle) return true;
-      return normalizeTitle(scene.title) === normalizedTitle;
+  for (const scene of localChapter.scenes) {
+    // Match by sceneId
+    if (lookup.sceneId && (scene as any).id === lookup.sceneId) {
+      return { ...scene, scene_number: (scene as any).scene_number ?? 1 };
     }
-
-    if (normalizedTitle) {
-      return normalizeTitle(scene.title) === normalizedTitle;
+    // Match by sceneNumber + title
+    if (
+      lookup.sceneNumber != null &&
+      (scene as any).scene_number === lookup.sceneNumber &&
+      (!lookup.title || normalizeTitle((scene as any).title) === normalizeTitle(lookup.title))
+    ) {
+      return { ...scene, scene_number: (scene as any).scene_number ?? 1 };
     }
-
-    return false;
-  }) || null;
+    // Match by title only
+    if (lookup.title && normalizeTitle((scene as any).title) === normalizeTitle(lookup.title)) {
+      return { ...scene, scene_number: (scene as any).scene_number ?? 1 };
+    }
+  }
+  return null;
 }
 
 function toLookup(sceneIdOrLookup: string | LocalSceneLookup): LocalSceneLookup {
-  return typeof sceneIdOrLookup === "string"
-    ? { sceneId: sceneIdOrLookup }
-    : sceneIdOrLookup;
+  return typeof sceneIdOrLookup === "string" ? { sceneId: sceneIdOrLookup } : sceneIdOrLookup;
 }
+
+// ─── Main API ────────────────────────────────────────────────
 
 export async function readSceneContentFromLocal(
   storage: ProjectStorage,
@@ -54,10 +68,10 @@ export async function readSceneContentFromLocal(
 
   if (lookup.chapterId) {
     try {
-      const localChapter = await storage.readJSON<LocalChapterData>(`scenes/chapter_${lookup.chapterId}.json`);
+      const localChapter = await storage.readJSON<LocalChapterData>(
+        paths.chapterContent(lookup.chapterId),
+      );
       const localScene = getSceneContent(localChapter, lookup);
-      // Never fall back to content_preview — it's a 200-char truncation
-      // that would produce garbage AI segmentation results.
       const content = localScene?.content;
 
       if (localChapter && localScene && content?.trim()) {
@@ -69,18 +83,18 @@ export async function readSceneContentFromLocal(
         };
       }
     } catch {
-      // Exact chapter file may be absent for aggregated/folder chapters — fall through to full scan.
+      // Exact chapter file may be absent — fall through to full scan.
     }
   }
 
-  const sceneFiles = await storage.listDir("scenes");
+  const contentDir = paths.chapterContentDir();
+  const sceneFiles = await storage.listDir(contentDir);
 
   for (const file of sceneFiles) {
-    if (!file.startsWith("chapter_") || !file.endsWith(".json")) continue;
+    if (!paths.isChapterContentFile(file)) continue;
 
-    const localChapter = await storage.readJSON<LocalChapterData>(`scenes/${file}`);
+    const localChapter = await storage.readJSON<LocalChapterData>(`${contentDir}/${file}`);
     const localScene = getSceneContent(localChapter, lookup);
-    // Never fall back to content_preview — truncated text breaks AI analysis
     const content = localScene?.content;
 
     if (!localChapter || !localScene || !content?.trim()) continue;
