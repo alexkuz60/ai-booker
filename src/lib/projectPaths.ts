@@ -8,7 +8,7 @@
  * Layout is detected per-project (v1 projects auto-migrate to v2 on open).
  */
 
-import { resolveChapterId } from "@/lib/sceneIndex";
+import { resolveChapterId, getCachedSceneIndex } from "@/lib/sceneIndex";
 
 export type LayoutVersion = "v1" | "v2";
 
