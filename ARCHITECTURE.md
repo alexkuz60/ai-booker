@@ -77,21 +77,21 @@
 - **Атомарное удаление**: удаление главы = удаление одной директории рекурсивно
 - **Самодокументирующийся ZIP**: при экспорте структура папок читаема без парсинга ID
 
-#### Папка `characters/` — детали
+#### Реестр персонажей — детали
 
 | Файл | Тип | Назначение |
 |------|-----|------------|
-| `index.json` | `CharacterIndex[]` | Полный реестр на уровне книги: id, name, aliases, gender, age_group, temperament, speech_style, description, speech_tags, psycho_tags, sort_order, color, voice_config, appearances, sceneCount |
-| `scene_{id}.json` | `SceneCharacterMap` | Привязка персонажей к сцене: speakers (characterId, role_in_scene, segment_ids), typeMappings (segmentType → characterId) |
+| `characters.json` (корень проекта) | `CharacterIndex[]` | Полный реестр на уровне книги: id, name, aliases, gender, age_group, temperament, speech_style, description, speech_tags, psycho_tags, sort_order, color, voice_config, appearances, sceneCount |
+| `chapters/{chapterId}/scenes/{sceneId}/characters.json` | `SceneCharacterMap` | Привязка персонажей к сцене: speakers (characterId, role_in_scene, segment_ids), typeMappings (segmentType → characterId) |
 
 **Жизненный цикл:**
-- **Парсер → Извлечение**: `useCharacterExtraction` создаёт записи в `index.json` (имя, пол, алиасы, appearances)
-- **Парсер → Профилирование**: `useCharacterProfiles` обогащает `index.json` (temperament, speech_tags, psycho_tags, description)
-- **Студия → Раскадровка**: `upsertSpeakersFromSegments()` добавляет новых спикеров в `index.json` + создаёт `scene_{id}.json`
-- **Студия → Кастинг**: `useLocalCharacters.updateCharacter()` записывает voice_config в `index.json`
-- **Push to Server**: `useSaveBookToProject` читает `characters/index.json` → upsert в `book_characters`
+- **Парсер → Извлечение**: `useCharacterExtraction` создаёт записи в `characters.json` (имя, пол, алиасы, appearances)
+- **Парсер → Профилирование**: `useCharacterProfiles` обогащает `characters.json` (temperament, speech_tags, psycho_tags, description)
+- **Студия → Раскадровка**: `upsertSpeakersFromSegments()` добавляет новых спикеров в `characters.json` + создаёт `chapters/{cid}/scenes/{sid}/characters.json`
+- **Студия → Кастинг**: `useLocalCharacters.updateCharacter()` записывает voice_config в `characters.json`
+- **Push to Server**: `useSaveBookToProject` читает `characters.json` → upsert в `book_characters`
 
-**Миграция:** при открытии проекта, если `characters/index.json` отсутствует, но есть `structure/characters.json` — автомиграция через `migrateLocalCharacter()`.
+**Миграция:** при открытии проекта, если `characters.json` отсутствует, но есть `characters/index.json` (V1) — автомиграция через `ensureV2Layout()`.
 
 **Ключевые файлы кода:**
 
