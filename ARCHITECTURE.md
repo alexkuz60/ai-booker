@@ -106,6 +106,10 @@
 | Файл | Назначение |
 |------|------------|
 | `src/lib/projectStorage.ts` | Интерфейс `ProjectStorage` + классы `LocalFSStorage`, `OPFSStorage` |
+| `src/lib/projectPaths.ts` | **Централизованный резолвер путей** — V1/V2 адаптация, все пути через `paths.*` |
+| `src/lib/sceneIndex.ts` | **Индекс сцен** — sceneId→chapterId маппинг, dirty-маркеры, storyboarded/characterMapped |
+| `src/lib/contentHash.ts` | **FNV-1a 32-bit хеш** — контроль целостности контента сцен |
+| `src/lib/projectMigrator.ts` | **V1→V2 миграция** — автоматическая при открытии проекта (`ensureV2Layout`) |
 | `src/hooks/useProjectStorage.ts` | React-хук: create / open / close / import / export проекта |
 | `src/hooks/useProjectStorageContext.tsx` | React Context + Provider для глобального доступа |
 | `src/lib/localSync.ts` | `syncStructureToLocal()` / `readStructureFromLocal()` — запись/чтение структуры |
