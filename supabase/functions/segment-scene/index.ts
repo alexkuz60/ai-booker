@@ -202,18 +202,38 @@ Deno.serve(async (req) => {
           try {
             parsed = JSON.parse(arrMatch[0]);
           } catch {
-            console.error("Failed to parse extracted array, raw (first 500 chars):", raw.slice(0, 500));
-            throw new Error("Unparseable");
+            // Attempt to repair truncated JSON array
+            const repaired = repairTruncatedJsonArray(arrMatch[0]);
+            if (repaired) {
+              console.warn("Repaired truncated JSON array, recovered segments");
+              parsed = repaired;
+            } else {
+              console.error("Failed to parse extracted array, raw (first 500 chars):", raw.slice(0, 500));
+              throw new Error("Unparseable");
+            }
           }
         } else {
-          // Try to find { "segments": [...] } wrapper
-          const objMatch = raw.match(/\{[\s\S]*"segments"\s*:\s*\[[\s\S]*\][\s\S]*\}/);
-          if (objMatch) {
-            const obj = JSON.parse(objMatch[0]);
-            parsed = obj.segments;
+          // Maybe the entire response is a truncated array (no closing ])
+          const truncMatch = raw.match(/\[[\s\S]*/);
+          if (truncMatch) {
+            const repaired = repairTruncatedJsonArray(truncMatch[0]);
+            if (repaired) {
+              console.warn("Repaired truncated JSON (no closing bracket), recovered segments");
+              parsed = repaired;
+            } else {
+              console.error("No parseable JSON in AI response, raw (first 500 chars):", raw.slice(0, 500));
+              throw new Error("Unparseable");
+            }
           } else {
-            console.error("No JSON structure found in AI response, raw (first 500 chars):", raw.slice(0, 500));
-            throw new Error("Unparseable");
+            // Try to find { "segments": [...] } wrapper
+            const objMatch = raw.match(/\{[\s\S]*"segments"\s*:\s*\[[\s\S]*\][\s\S]*\}/);
+            if (objMatch) {
+              const obj = JSON.parse(objMatch[0]);
+              parsed = obj.segments;
+            } else {
+              console.error("No JSON structure found in AI response, raw (first 500 chars):", raw.slice(0, 500));
+              throw new Error("Unparseable");
+            }
           }
         }
       }
