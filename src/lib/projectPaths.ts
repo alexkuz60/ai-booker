@@ -26,9 +26,14 @@ export function setActiveLayout(v: LayoutVersion): void {
 // ─── Helper: resolve chapterId for V2 paths ─────────────────
 
 function requireChapterId(sceneId: string, provided?: string): string {
-  const cid = provided ?? resolveChapterId(sceneId);
+  if (provided) return provided;
+  const cid = resolveChapterId(sceneId);
   if (!cid) {
-    console.warn(`[projectPaths] Cannot resolve chapterId for scene ${sceneId}, falling back to flat path`);
+    console.error(
+      `[projectPaths] ❌ Cannot resolve chapterId for scene ${sceneId}! ` +
+      `Scene index has ${Object.keys(getCachedSceneIndex()?.entries ?? {}).length} entries. ` +
+      `This will cause data loss — writes will be skipped.`
+    );
   }
   return cid ?? "__unresolved__";
 }
