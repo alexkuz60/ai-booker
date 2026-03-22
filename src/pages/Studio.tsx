@@ -561,6 +561,7 @@ const Studio = () => {
                 onBatchComplete={handleBatchComplete}
                 onBatchClose={handleBatchClose}
                 userApiKeys={userApiKeys}
+                clipsRefreshToken={clipsRefreshToken}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
