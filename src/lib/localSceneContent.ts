@@ -5,7 +5,8 @@
 
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { LocalChapterData } from "@/lib/localSync";
-import { paths } from "@/lib/projectPaths";
+import { paths, getActiveLayout } from "@/lib/projectPaths";
+import { resolveChapterId } from "@/lib/sceneIndex";
 
 export interface LocalSceneContentResult {
   chapterId: string;
@@ -66,10 +67,16 @@ export async function readSceneContentFromLocal(
 ): Promise<LocalSceneContentResult | null> {
   const lookup = toLookup(sceneIdOrLookup);
 
-  if (lookup.chapterId) {
+  // Try to resolve chapterId from scene index if not provided
+  const effectiveChapterId =
+    lookup.chapterId ??
+    (lookup.sceneId ? resolveChapterId(lookup.sceneId) : undefined) ??
+    null;
+
+  if (effectiveChapterId) {
     try {
       const localChapter = await storage.readJSON<LocalChapterData>(
-        paths.chapterContent(lookup.chapterId),
+        paths.chapterContent(effectiveChapterId),
       );
       const localScene = getSceneContent(localChapter, lookup);
       const content = localScene?.content;
@@ -87,24 +94,49 @@ export async function readSceneContentFromLocal(
     }
   }
 
-  const contentDir = paths.chapterContentDir();
-  const sceneFiles = await storage.listDir(contentDir);
+  // Full scan fallback
+  const isV2 = getActiveLayout() === "v2";
 
-  for (const file of sceneFiles) {
-    if (!paths.isChapterContentFile(file)) continue;
+  if (isV2) {
+    // V2: scan chapters/ directories
+    const chapterDirs = await storage.listDir("chapters").catch(() => []);
+    for (const chapterId of chapterDirs) {
+      const localChapter = await storage.readJSON<LocalChapterData>(
+        `chapters/${chapterId}/content.json`,
+      );
+      const localScene = getSceneContent(localChapter, lookup);
+      const content = localScene?.content;
 
-    const localChapter = await storage.readJSON<LocalChapterData>(`${contentDir}/${file}`);
-    const localScene = getSceneContent(localChapter, lookup);
-    const content = localScene?.content;
+      if (!localChapter || !localScene || !content?.trim()) continue;
 
-    if (!localChapter || !localScene || !content?.trim()) continue;
+      return {
+        chapterId: localChapter.chapterId,
+        sceneNumber: localScene.scene_number,
+        title: localScene.title,
+        content,
+      };
+    }
+  } else {
+    // V1: scan scenes/ directory
+    const contentDir = paths.chapterContentDir();
+    const sceneFiles = await storage.listDir(contentDir);
 
-    return {
-      chapterId: localChapter.chapterId,
-      sceneNumber: localScene.scene_number,
-      title: localScene.title,
-      content,
-    };
+    for (const file of sceneFiles) {
+      if (!paths.isChapterContentFile(file)) continue;
+
+      const localChapter = await storage.readJSON<LocalChapterData>(`${contentDir}/${file}`);
+      const localScene = getSceneContent(localChapter, lookup);
+      const content = localScene?.content;
+
+      if (!localChapter || !localScene || !content?.trim()) continue;
+
+      return {
+        chapterId: localChapter.chapterId,
+        sceneNumber: localScene.scene_number,
+        title: localScene.title,
+        content,
+      };
+    }
   }
 
   return null;

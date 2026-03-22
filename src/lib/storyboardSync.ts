@@ -1,13 +1,15 @@
 /**
  * Local-first persistence for storyboard data (segments, phrases, type mappings).
- * Each scene's storyboard lives in `storyboard/scene_{id}.json` inside ProjectStorage.
+ * V1: storyboard/scene_{id}.json
+ * V2: chapters/{chapterId}/scenes/{sceneId}/storyboard.json
  */
 
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { Segment, Phrase, CharacterOption } from "@/components/studio/storyboard/types";
 import type { PhraseAnnotation, TtsProvider } from "@/components/studio/phraseAnnotations";
 import { touchProjectUpdatedAt } from "@/lib/projectActivity";
-import { paths } from "@/lib/projectPaths";
+import { paths, getActiveLayout } from "@/lib/projectPaths";
+import { markStoryboarded, unmarkStoryboarded, getCachedSceneIndex } from "@/lib/sceneIndex";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -33,6 +35,8 @@ export interface LocalStoryboardData {
   audioStatus: Record<string, LocalAudioStatus>;
   /** speaker for inline narration segments */
   inlineNarrationSpeaker: string | null;
+  /** Content hash at time of analysis (for dirty detection) */
+  contentHash?: number;
 }
 
 // ─── Write ──────────────────────────────────────────────────
@@ -45,6 +49,7 @@ export async function saveStoryboardToLocal(
     typeMappings: LocalTypeMappingEntry[];
     audioStatus: Map<string, { status: string; durationMs: number }>;
     inlineNarrationSpeaker: string | null;
+    contentHash?: number;
   },
 ): Promise<void> {
   try {
@@ -55,8 +60,10 @@ export async function saveStoryboardToLocal(
       typeMappings: data.typeMappings,
       audioStatus: Object.fromEntries(data.audioStatus),
       inlineNarrationSpeaker: data.inlineNarrationSpeaker,
+      contentHash: data.contentHash,
     };
     await storage.writeJSON(paths.storyboard(sceneId), payload);
+    await markStoryboarded(storage, sceneId);
     await touchProjectUpdatedAt(storage);
     console.debug(`[StoryboardSync] Saved scene ${sceneId}: ${data.segments.length} segments`);
   } catch (err) {
@@ -85,6 +92,7 @@ export async function deleteStoryboardFromLocal(
 ): Promise<void> {
   try {
     await storage.delete(paths.storyboard(sceneId));
+    await unmarkStoryboarded(storage, sceneId);
     await touchProjectUpdatedAt(storage);
   } catch {
     // non-critical
@@ -96,6 +104,13 @@ export async function deleteStoryboardFromLocal(
 export async function listStoryboardedScenes(
   storage: ProjectStorage,
 ): Promise<string[]> {
+  // V2: use scene index for O(1) lookup
+  const index = getCachedSceneIndex();
+  if (index && getActiveLayout() === "v2") {
+    return [...index.storyboarded];
+  }
+
+  // V1 fallback: scan directory
   try {
     const dir = paths.storyboardDir();
     const files = await storage.listDir(dir);

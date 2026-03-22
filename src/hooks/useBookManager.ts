@@ -238,8 +238,10 @@ export function useBookManager({
           for (const name of projectNames) {
             try {
               const store = await OPFSStorage.openOrCreate(name);
+              // Clean up structure + content (V2: chapters/, V1: scenes/)
               const structFiles = await store.listDir("structure").catch(() => []);
               for (const f of structFiles) await store.delete(`structure/${f}`).catch(() => {});
+              try { await store.delete("chapters"); } catch {} // V2 nested
               const contentDir = paths.chapterContentDir();
               const sceneFiles = await store.listDir(contentDir).catch(() => []);
               for (const f of sceneFiles) await store.delete(`${contentDir}/${f}`).catch(() => {});

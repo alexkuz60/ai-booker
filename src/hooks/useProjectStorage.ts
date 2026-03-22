@@ -11,6 +11,7 @@ import {
 import { downloadBlob } from "@/lib/projectZip";
 import { paths } from "@/lib/projectPaths";
 import { findSourceBlob, getMimeType, detectFileFormat } from "@/lib/fileFormatUtils";
+import { ensureV2Layout } from "@/lib/projectMigrator";
 
 const LAST_PROJECT_KEY = "booker_last_project";
 const LOCAL_RESET_KEYS = [
@@ -91,7 +92,8 @@ export function useProjectStorage(): UseProjectStorageReturn {
         language,
       };
 
-      await store.writeJSON("project.json", projectMeta);
+      await store.writeJSON("project.json", { ...projectMeta, layoutVersion: 2 });
+      await ensureV2Layout(store);
       setStorage(store);
       setMeta(projectMeta);
 
@@ -300,6 +302,9 @@ export function useProjectStorage(): UseProjectStorageReturn {
         const store = await OPFSStorage.openOrCreate(name);
         const projectMeta = await store.readJSON<ProjectMeta>("project.json");
         if (!projectMeta) return;
+
+        // Migrate V1 → V2 if needed and load scene index
+        await ensureV2Layout(store);
 
         if (!cancelled) {
           setStorage(store);
