@@ -165,6 +165,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, s
               onSelectCharacter={onSelectCharacter}
               onVoiceSaved={onVoiceSaved}
               userApiKeys={userApiKeys}
+              refreshToken={clipsRefreshToken}
             />
           </div>
         </TabsContent>
