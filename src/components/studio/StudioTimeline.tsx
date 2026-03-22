@@ -93,14 +93,61 @@ export function StudioTimeline({
   const { storage } = useProjectStorageContext();
   const storageAudio = useStorageAudioList(user?.id);
 
+  // Local refresh counter to re-fetch clips after insert
+  const [localRefresh, setLocalRefresh] = useState(0);
+  const combinedRefreshToken = clipsRefreshToken + localRefresh;
+
   // Handler for inserting audio from storage into atmosphere/sfx track
-  const handleInsertAudio = useCallback((file: StorageAudioFile, atSec: number) => {
-    toast.info(
-      isRu ? `Вставка: ${file.name} @ ${atSec.toFixed(1)}s` : `Insert: ${file.name} @ ${atSec.toFixed(1)}s`,
-      { description: isRu ? "Функция вставки в разработке" : "Insert functionality in development" },
+  const handleInsertAudio = useCallback(async (file: StorageAudioFile, _atSec: number) => {
+    if (!sceneId || !user) {
+      toast.error(isRu ? "Нет активной сцены" : "No active scene");
+      return;
+    }
+
+    const layerType = file.category === "sfx" ? "sfx" : "ambience";
+
+    // Get audio duration by decoding a signed URL
+    let durationMs = 10_000; // fallback 10s
+    try {
+      const { data: urlData } = await supabase.storage
+        .from("user-media")
+        .createSignedUrl(file.path, 120);
+      if (urlData?.signedUrl) {
+        const resp = await fetch(urlData.signedUrl);
+        const buf = await resp.arrayBuffer();
+        const ctx = new AudioContext();
+        const decoded = await ctx.decodeAudioData(buf);
+        durationMs = Math.round(decoded.duration * 1000);
+        ctx.close();
+      }
+    } catch {
+      // use fallback duration
+    }
+
+    const { error } = await supabase.from("scene_atmospheres").insert({
+      scene_id: sceneId,
+      layer_type: layerType,
+      audio_path: file.path,
+      duration_ms: durationMs,
+      volume: 0.5,
+      fade_in_ms: layerType === "sfx" ? 0 : 500,
+      fade_out_ms: layerType === "sfx" ? 0 : 1000,
+      prompt_used: file.name,
+    });
+
+    if (error) {
+      toast.error(isRu ? "Ошибка вставки" : "Insert error", { description: error.message });
+      return;
+    }
+
+    toast.success(
+      isRu ? `Добавлено: ${file.name}` : `Added: ${file.name}`,
+      { description: isRu ? `${layerType} · ${(durationMs / 1000).toFixed(1)}s` : `${layerType} · ${(durationMs / 1000).toFixed(1)}s` },
     );
-    // TODO: create scene_atmospheres row or OPFS clip entry
-  }, [isRu]);
+
+    // Trigger timeline clip refresh
+    setLocalRefresh(prev => prev + 1);
+  }, [sceneId, user, isRu]);
 
   // ── Scene render state ────────────────────────────────────
   const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
