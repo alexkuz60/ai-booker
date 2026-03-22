@@ -48,6 +48,7 @@ export function useLocalCharacters(
   bookId: string | null,
   sceneId?: string | null,
   chapterSceneIds?: string[],
+  refreshToken: number = 0,
 ): UseLocalCharactersReturn {
   const [characters, setCharacters] = useState<CharacterIndex[]>([]);
   const [loading, setLoading] = useState(false);
