@@ -12,6 +12,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { useStorageAudioList, type StorageAudioFile } from "@/hooks/useStorageAudioList";
 import { useTimelineClips, type TimelineClip, type TypeMappingsByScene } from "@/hooks/useTimelineClips";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { TrackMixerStrip } from "./TrackMixerStrip";
@@ -90,6 +91,16 @@ export function StudioTimeline({
 }: StudioTimelineProps) {
   const { user } = useAuth();
   const { storage } = useProjectStorageContext();
+  const storageAudio = useStorageAudioList(user?.id);
+
+  // Handler for inserting audio from storage into atmosphere/sfx track
+  const handleInsertAudio = useCallback((file: StorageAudioFile, atSec: number) => {
+    toast.info(
+      isRu ? `Вставка: ${file.name} @ ${atSec.toFixed(1)}s` : `Insert: ${file.name} @ ${atSec.toFixed(1)}s`,
+      { description: isRu ? "Функция вставки в разработке" : "Insert functionality in development" },
+    );
+    // TODO: create scene_atmospheres row or OPFS clip entry
+  }, [isRu]);
 
   // ── Scene render state ────────────────────────────────────
   const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
@@ -792,6 +803,10 @@ export function StudioTimeline({
                     errorSegmentIds={errorSegmentIds}
                     onSetFade={handleSetFade}
                     clipFades={clipFades}
+                    storageAtmosphere={storageAudio.atmosphere}
+                    storageSfx={storageAudio.sfx}
+                    onInsertAudio={handleInsertAudio}
+                    isRu={isRu}
                   />
                 ))}
                 <Playhead positionSec={player.positionSec} zoom={zoom} />
