@@ -285,9 +285,14 @@ export function StoryboardPanel({
     setMerging(true);
     try {
       let updated = [...segments];
+      const allMergedIds = new Set<string>();
+      const keeperIds = new Set<string>();
+
       for (const group of mergeGroups) {
         const [keeper, ...toMerge] = group;
         const mergeIds = new Set(toMerge.map(s => s.segment_id));
+        for (const id of mergeIds) allMergedIds.add(id);
+        keeperIds.add(keeper.segment_id);
 
         let allPhrases = [...keeper.phrases];
         for (const seg of toMerge) {
@@ -313,9 +318,22 @@ export function StoryboardPanel({
 
       updated = updated.map((s, i) => ({ ...s, segment_number: i + 1 }));
 
+      // Update audioStatus: remove merged IDs, mark keepers as stale (text changed)
+      const newAudioStatus = new Map(audioStatusRef.current);
+      for (const id of allMergedIds) newAudioStatus.delete(id);
+      for (const id of keeperIds) newAudioStatus.delete(id); // text changed, old audio is stale
+      setAudioStatus(newAudioStatus);
+
+      // Mark keepers as stale so UI shows re-synth needed
+      setStaleAudioSegIds(prev => {
+        const next = new Set(prev);
+        for (const id of keeperIds) next.add(id);
+        return next;
+      });
+
       setSegments(updated);
       setMergeChecked(new Set());
-      await persistNow(buildSnapshot(updated));
+      await persistNow(buildSnapshot(updated, newAudioStatus));
       // Studio edit is newer than Parser — clear dirty flag
       if (contentDirty) {
         setContentDirty(false);
