@@ -793,6 +793,10 @@ export function StudioTimeline({
                     errorSegmentIds={errorSegmentIds}
                     onSetFade={handleSetFade}
                     clipFades={clipFades}
+                    storageAtmosphere={storageAudio.atmosphere}
+                    storageSfx={storageAudio.sfx}
+                    onInsertAudio={handleInsertAudio}
+                    isRu={isRu}
                   />
                 ))}
                 <Playhead positionSec={player.positionSec} zoom={zoom} />
