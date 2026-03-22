@@ -246,10 +246,12 @@ export async function upsertSpeakersFromSegments(
 ): Promise<CharacterIndex[]> {
   const updatedIndex = [...existingIndex];
 
-  // Collect speakers from dialogue-like segments
+  // Collect ALL segments with an explicit speaker name.
+  // Previously only SPEAKING_TYPES were collected, so reassigning a narrator
+  // segment to a character (e.g. "Шарик") was silently ignored.
   const speakerSegments = new Map<string, string[]>();
   for (const seg of segments) {
-    if (seg.speaker?.trim() && SPEAKING_TYPES.has(seg.segment_type)) {
+    if (seg.speaker?.trim()) {
       const name = seg.speaker.trim();
       const ids = speakerSegments.get(name) || [];
       if (seg.segment_id) ids.push(seg.segment_id);
