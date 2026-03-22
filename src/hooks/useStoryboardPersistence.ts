@@ -102,7 +102,7 @@ export function useStoryboardPersistence(sceneId: string | null, chapterId?: str
     const data = snapshot
       ? snapshot
       : storage
-        ? await readStoryboardFromLocal(storage, sid)
+        ? await readStoryboardFromLocal(storage, sid, chapterId ?? undefined)
         : null;
     if (!data || data.segments.length === 0) return;
 
