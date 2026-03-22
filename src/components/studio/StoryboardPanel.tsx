@@ -316,6 +316,11 @@ export function StoryboardPanel({
       setSegments(updated);
       setMergeChecked(new Set());
       await persistNow(buildSnapshot(updated));
+      // Studio edit is newer than Parser — clear dirty flag
+      if (contentDirty) {
+        setContentDirty(false);
+        supabase.from("book_scenes").update({ content_dirty: false }).eq("id", sceneId);
+      }
       toast.success(isRu ? "Блоки объединены" : "Segments merged");
       onSegmented?.(sceneId);
     } catch (err: any) {
