@@ -22,16 +22,11 @@ export function getSourcePath(format: FileFormat): string {
 export async function findSourceBlob(
   storage: { readBlob: (path: string) => Promise<Blob | null> },
 ): Promise<{ blob: Blob; format: FileFormat } | null> {
-  // Try PDF first (most common), then DOCX, then FB2
-  const pdfBlob = await storage.readBlob("source/book.pdf");
-  if (pdfBlob) return { blob: pdfBlob, format: "pdf" };
-
-  const docxBlob = await storage.readBlob("source/book.docx");
-  if (docxBlob) return { blob: docxBlob, format: "docx" };
-
-  const fb2Blob = await storage.readBlob("source/book.fb2");
-  if (fb2Blob) return { blob: fb2Blob, format: "fb2" };
-
+  const formats: FileFormat[] = ["pdf", "docx", "fb2"];
+  for (const fmt of formats) {
+    const blob = await storage.readBlob(paths.sourceFile(fmt));
+    if (blob) return { blob, format: fmt };
+  }
   return null;
 }
 
