@@ -294,7 +294,7 @@ export function TimelineTrack({
                     key={f.path}
                     file={f}
                     icon={<Waves className="h-3 w-3 mr-2 shrink-0 text-muted-foreground" />}
-                    onSelect={() => onInsertAudio!(f, getInsertSec())}
+                    onSelect={() => onInsertAudio!(f, getInsertSec(), "ambience")}
                   />
                 ))}
               </ContextMenuSubContent>
