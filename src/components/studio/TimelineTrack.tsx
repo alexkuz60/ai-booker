@@ -13,6 +13,7 @@ import {
   ContextMenuLabel,
 } from "@/components/ui/context-menu";
 import { Music, Waves } from "lucide-react";
+import { PreviewableMenuItem, stopAudioPreview } from "./PreviewableMenuItem";
 
 interface TimelineTrackProps {
   track: TimelineTrackData;
