@@ -82,6 +82,45 @@ function buildFallbackSegments(content: string, lang: "ru" | "en"): AISegment[] 
   return segments.length > 0 ? segments : [{ type: "narrator", text: content }];
 }
 
+/**
+ * Repair a truncated JSON array by finding the last complete object and closing the array.
+ * Returns parsed array or null if repair fails.
+ */
+function repairTruncatedJsonArray(raw: string): AISegment[] | null {
+  // Find positions of all complete "}" that close a top-level object in the array
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  let lastCompleteObjectEnd = -1;
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+
+    if (ch === '[' || ch === '{') depth++;
+    else if (ch === ']' || ch === '}') {
+      depth--;
+      // depth=1 means we just closed a top-level object inside the array
+      if (depth === 1 && ch === '}') {
+        lastCompleteObjectEnd = i;
+      }
+    }
+  }
+
+  if (lastCompleteObjectEnd < 0) return null;
+
+  // Slice up to and including the last complete object, close the array
+  const repaired = raw.slice(0, lastCompleteObjectEnd + 1) + "]";
+  try {
+    const parsed = JSON.parse(repaired);
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+  } catch { /* still broken */ }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
