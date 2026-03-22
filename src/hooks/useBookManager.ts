@@ -239,15 +239,16 @@ export function useBookManager({
               const store = await OPFSStorage.openOrCreate(name);
               const structFiles = await store.listDir("structure").catch(() => []);
               for (const f of structFiles) await store.delete(`structure/${f}`).catch(() => {});
-              const sceneFiles = await store.listDir("scenes").catch(() => []);
-              for (const f of sceneFiles) await store.delete(`scenes/${f}`).catch(() => {});
+              const contentDir = paths.chapterContentDir();
+              const sceneFiles = await store.listDir(contentDir).catch(() => []);
+              for (const f of sceneFiles) await store.delete(`${contentDir}/${f}`).catch(() => {});
             } catch {}
           }
         }
       } else if (projectStorage?.isReady) {
         try {
-          await projectStorage.writeJSON("structure/toc.json", []);
-          await projectStorage.writeJSON("structure/characters.json", []);
+          await projectStorage.writeJSON(paths.structureToc(), []);
+          await projectStorage.writeJSON(paths.structureCharactersLegacy(), []);
         } catch {}
       }
 
