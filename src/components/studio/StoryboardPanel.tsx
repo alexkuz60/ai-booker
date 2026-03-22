@@ -986,6 +986,19 @@ export function StoryboardPanel({
     setCleaningMetadata(false);
   }, [sceneId, staleAudioSegIds, segments, isRu, onSegmented, persistNow, buildSnapshot]);
 
+  const removeInlineNarration = useCallback((segmentId: string, narrationIdx: number) => {
+    if (!sceneId) return;
+    const updated = segments.map(s => {
+      if (s.segment_id !== segmentId || !s.inline_narrations) return s;
+      const remaining = s.inline_narrations.filter((_, i) => i !== narrationIdx);
+      return { ...s, inline_narrations: remaining.length > 0 ? remaining : undefined };
+    });
+    setSegments(updated);
+    persist(buildSnapshot(updated));
+    onSegmented?.(sceneId);
+    toast.success(isRu ? "Вставка удалена" : "Narration removed");
+  }, [sceneId, segments, isRu, persist, buildSnapshot, onSegmented]);
+
   const updateInlineNarrationSpeaker = useCallback(async (newSpeaker: string | null) => {
     if (!sceneId) return;
     setInlineNarrationSpeaker(newSpeaker);
