@@ -12,6 +12,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { useStorageAudioList, type StorageAudioFile } from "@/hooks/useStorageAudioList";
 import { useTimelineClips, type TimelineClip, type TypeMappingsByScene } from "@/hooks/useTimelineClips";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { TrackMixerStrip } from "./TrackMixerStrip";
