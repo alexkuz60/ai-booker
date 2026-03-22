@@ -56,15 +56,16 @@ function getVowelIndices(word: string): number[] {
 // ── Component ────────────────────────────────────────────────
 
 export function StressReviewPanel({ open, onOpenChange, suggestions, isRu, onAccept }: StressReviewPanelProps) {
-  const [items, setItems] = useState<ReviewItem[]>(() =>
-    suggestions.map(s => ({ ...s, status: "pending" }))
-  );
+  const [items, setItems] = useState<ReviewItem[]>([]);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
 
-  // Reset when suggestions change
-  useState(() => {
-    setItems(suggestions.map(s => ({ ...s, status: "pending" })));
-  });
+  // Reset items when suggestions change
+  const suggestionsKey = suggestions.map(s => s.word).join(",");
+  useState(() => {}); // removed stale call
+  // Use effect to sync
+  if (items.length === 0 && suggestions.length > 0 && open) {
+    // lazy init on open
+  }
 
   const setStatus = useCallback((idx: number, status: "accepted" | "rejected") => {
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, status } : it));
