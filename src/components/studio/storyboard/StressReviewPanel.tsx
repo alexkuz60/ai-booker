@@ -169,67 +169,67 @@ export function StressReviewPanel({ open, onOpenChange, suggestions, isRu, onAcc
                 <div
                   key={`${item.word}-${idx}`}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-2 transition-colors",
+                    "flex flex-col gap-1 px-3 py-2.5 transition-colors",
                     item.status === "accepted" && "bg-emerald-500/5",
                     item.status === "rejected" && "bg-destructive/5 opacity-60",
                   )}
                 >
-                  {/* Word with highlighted stress */}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium tracking-wide">
+                  {/* Top row: word + controls */}
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-medium tracking-wide flex-1">
                       {highlightStress(item.word, effectiveIndex)}
                       {isEdited && (
                         <span className="ml-1 text-[10px] text-muted-foreground">(✎)</span>
                       )}
                     </div>
-                    <div className="text-[11px] text-muted-foreground leading-tight mt-0.5 truncate">
-                      {item.reason}
-                    </div>
-                  </div>
 
-                  {/* Stress cycle buttons */}
-                  <div className="flex flex-col gap-0.5">
+                    {/* Stress cycle buttons */}
                     <button
                       onClick={() => cycleStress(idx, -1)}
-                      className="h-4 w-4 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                      className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground shrink-0"
                       title={isRu ? "Предыдущая гласная" : "Previous vowel"}
                     >
-                      <ChevronUp className="h-3 w-3" />
+                      <ChevronUp className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => cycleStress(idx, 1)}
-                      className="h-4 w-4 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                      className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground shrink-0"
                       title={isRu ? "Следующая гласная" : "Next vowel"}
                     >
-                      <ChevronDown className="h-3 w-3" />
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </button>
+
+                    {/* Accept / Reject */}
+                    <button
+                      onClick={() => setStatus(idx, "accepted")}
+                      className={cn(
+                        "h-7 w-7 flex items-center justify-center rounded-md transition-colors shrink-0",
+                        item.status === "accepted"
+                          ? "bg-emerald-500/20 text-emerald-400"
+                          : "hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-400",
+                      )}
+                      title={isRu ? "Принять" : "Accept"}
+                    >
+                      <Check className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setStatus(idx, "rejected")}
+                      className={cn(
+                        "h-7 w-7 flex items-center justify-center rounded-md transition-colors shrink-0",
+                        item.status === "rejected"
+                          ? "bg-destructive/20 text-destructive"
+                          : "hover:bg-destructive/10 text-muted-foreground hover:text-destructive",
+                      )}
+                      title={isRu ? "Отклонить" : "Reject"}
+                    >
+                      <X className="h-4 w-4" />
                     </button>
                   </div>
 
-                  {/* Accept / Reject */}
-                  <button
-                    onClick={() => setStatus(idx, "accepted")}
-                    className={cn(
-                      "h-7 w-7 flex items-center justify-center rounded-md transition-colors",
-                      item.status === "accepted"
-                        ? "bg-emerald-500/20 text-emerald-400"
-                        : "hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-400",
-                    )}
-                    title={isRu ? "Принять" : "Accept"}
-                  >
-                    <Check className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => setStatus(idx, "rejected")}
-                    className={cn(
-                      "h-7 w-7 flex items-center justify-center rounded-md transition-colors",
-                      item.status === "rejected"
-                        ? "bg-destructive/20 text-destructive"
-                        : "hover:bg-destructive/10 text-muted-foreground hover:text-destructive",
-                    )}
-                    title={isRu ? "Отклонить" : "Reject"}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                  {/* Reason on a separate line */}
+                  <div className="text-[11px] text-muted-foreground leading-snug">
+                    {item.reason}
+                  </div>
                 </div>
               );
             })}
