@@ -44,35 +44,38 @@
 
 Автодетект: `detectStorageBackend()` → `"fs-access"` | `"opfs"` | `"none"`.
 
-### 1.5 Структура папки проекта
+### 1.5 Структура папки проекта (V2 — иерархическая)
+
+> V1 (плоская) структура устарела. Проекты автоматически мигрируются на V2 при первом открытии (`ensureV2Layout`).
 
 ```
 📁 BookTitle/
-├── project.json           — ProjectMeta (version, bookId, title, userId, language, fileFormat)
+├── project.json           — ProjectMeta (version, bookId, title, userId, language, fileFormat, layoutVersion: 2)
+├── scene_index.json       — SceneIndexData: sceneId→chapterId маппинг, хеши контента, маркеры storyboarded/characterMapped
+├── characters.json        — CharacterIndex[] (глобальный реестр персонажей книги)
 ├── 📁 source/
 │   └── book.{pdf|docx|fb2} — исходный файл (ТОЛЬКО ЛОКАЛЬНО)
 ├── 📁 structure/
 │   ├── toc.json           — LocalBookStructure (bookId, title, fileName, parts[], toc[])
-│   ├── chapters.json      — маппинг index → chapterId
-│   └── characters.json    — LocalCharacter[] (legacy, backward-compat копия characters/index.json)
-├── 📁 characters/          — ★ НОВАЯ ПАПКА: полный реестр персонажей книги
-│   ├── index.json         — CharacterIndex[] (пол, возраст, типаж, манера речи, voice_config, теги)
-│   └── scene_{id}.json    — SceneCharacterMap (кто в сцене: speakers[], typeMappings[])
-├── 📁 scenes/
-│   └── chapter_{id}.json  — { chapterId, scenes[], status }
-├── 📁 storyboard/
-│   └── scene_{id}.json    — LocalStoryboardData:
-│       │                     • sceneId, updatedAt
-│       │                     • segments[] (type, speaker, phrases[], annotations, inline_narrations)
-│       │                     • typeMappings[] (segmentType → characterId/Name)
-│       │                     • audioStatus{} (segmentId → status/durationMs)
-│       │                     • inlineNarrationSpeaker
-├── 📁 audio/
-│   ├── 📁 tts/            — {segmentId}.mp3
-│   ├── 📁 atmosphere/     — атмосферные слои
-│   └── 📁 renders/        — финальные рендеры сцен
+│   └── chapters.json      — маппинг index → chapterId
+├── 📁 chapters/
+│   └── 📁 {chapterId}/
+│       ├── content.json   — { chapterId, scenes[], status } (бывш. scenes/chapter_{id}.json)
+│       └── 📁 scenes/
+│           └── 📁 {sceneId}/
+│               ├── storyboard.json — LocalStoryboardData (segments, typeMappings, audioStatus, contentHash)
+│               ├── characters.json — SceneCharacterMap (speakers, typeMappings)
+│               └── 📁 audio/
+│                   ├── 📁 tts/        — {segmentId}.mp3
+│                   ├── 📁 atmosphere/ — атмосферные слои
+│                   └── 📁 renders/    — финальные рендеры сцен
 └── 📁 montage/
 ```
+
+**Преимущества V2 перед V1:**
+- **Структурная изоляция**: данные сцены физически вложены в папку главы → невозможно случайно обратиться к данным чужой главы
+- **Атомарное удаление**: удаление главы = удаление одной директории рекурсивно
+- **Самодокументирующийся ZIP**: при экспорте структура папок читаема без парсинга ID
 
 #### Папка `characters/` — детали
 
