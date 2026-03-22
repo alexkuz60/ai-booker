@@ -8,7 +8,7 @@ import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { useStoryboardPersistence, type StoryboardSnapshot } from "@/hooks/useStoryboardPersistence";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
 import { readSceneContentFromLocal } from "@/lib/localSceneContent";
-import { Loader2, Sparkles, BookOpen, AudioLines, CheckCircle2, XCircle, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck, AlertTriangle } from "lucide-react";
+import { Loader2, Sparkles, BookOpen, AudioLines, CheckCircle2, XCircle, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck, AlertTriangle, X } from "lucide-react";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -986,6 +986,19 @@ export function StoryboardPanel({
     setCleaningMetadata(false);
   }, [sceneId, staleAudioSegIds, segments, isRu, onSegmented, persistNow, buildSnapshot]);
 
+  const removeInlineNarration = useCallback((segmentId: string, narrationIdx: number) => {
+    if (!sceneId) return;
+    const updated = segments.map(s => {
+      if (s.segment_id !== segmentId || !s.inline_narrations) return s;
+      const remaining = s.inline_narrations.filter((_, i) => i !== narrationIdx);
+      return { ...s, inline_narrations: remaining.length > 0 ? remaining : undefined };
+    });
+    setSegments(updated);
+    persist(buildSnapshot(updated));
+    onSegmented?.(sceneId);
+    toast.success(isRu ? "Вставка удалена" : "Narration removed");
+  }, [sceneId, segments, isRu, persist, buildSnapshot, onSegmented]);
+
   const updateInlineNarrationSpeaker = useCallback(async (newSpeaker: string | null) => {
     if (!sceneId) return;
     setInlineNarrationSpeaker(newSpeaker);
@@ -1403,13 +1416,20 @@ export function StoryboardPanel({
                       />
                     </div>
                     {seg.inline_narrations.map((n, idx) => (
-                      <div key={idx} className="text-sm font-body flex items-start gap-1 leading-relaxed">
+                      <div key={idx} className="text-sm font-body flex items-start gap-1 leading-relaxed group/narr">
                         <BookOpen className="h-3 w-3 mt-1 shrink-0 text-yellow-400/70" />
                         <span className="text-muted-foreground/60 shrink-0">
                           {isRu ? "после" : "after"} «{n.insert_after.slice(0, 20)}{n.insert_after.length > 20 ? "…" : ""}»
                         </span>
                         <span className="text-muted-foreground/60">→</span>
                         <span className="text-yellow-300/70">«{n.text}»</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeInlineNarration(seg.segment_id, idx); }}
+                          className="shrink-0 mt-0.5 opacity-0 group-hover/narr:opacity-100 transition-opacity text-destructive/60 hover:text-destructive"
+                          title={isRu ? "Удалить вставку" : "Remove narration"}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
                       </div>
                     ))}
                   </div>
