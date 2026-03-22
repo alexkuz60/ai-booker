@@ -9,6 +9,7 @@ import {
   OPFSStorage,
 } from "@/lib/projectStorage";
 import { downloadBlob } from "@/lib/projectZip";
+import { getProjectActivityMs } from "@/lib/projectActivity";
 
 const LAST_PROJECT_KEY = "booker_last_project";
 const LOCAL_RESET_KEYS = [
@@ -296,15 +297,55 @@ export function useProjectStorage(): UseProjectStorageReturn {
         const saved = localStorage.getItem(LAST_PROJECT_KEY);
         if (!saved) return;
 
-        const { name, backend: savedBackend } = JSON.parse(saved);
+        const { name, backend: savedBackend, bookId } = JSON.parse(saved);
         if (savedBackend !== "opfs" || !name) return;
 
-        const store = await OPFSStorage.openOrCreate(name);
-        const projectMeta = await store.readJSON<ProjectMeta>("project.json");
+        let chosen: { store: ProjectStorage; meta: ProjectMeta; name: string } | null = null;
 
-        if (!cancelled && projectMeta) {
-          setStorage(store);
-          setMeta(projectMeta);
+        if (bookId) {
+          const projectNames = await OPFSStorage.listProjects();
+          const ranked = (await Promise.all(projectNames.map(async (projectName) => {
+            try {
+              const store = await OPFSStorage.openOrCreate(projectName);
+              const projectMeta = await store.readJSON<ProjectMeta>("project.json");
+              if (!projectMeta || projectMeta.bookId !== bookId) return null;
+              return {
+                name: projectName,
+                store,
+                meta: projectMeta,
+                activityMs: await getProjectActivityMs(store),
+              };
+            } catch {
+              return null;
+            }
+          })))
+            .filter((candidate): candidate is NonNullable<typeof candidate> => !!candidate)
+            .sort((a, b) => b.activityMs - a.activityMs);
+
+          const freshest = ranked[0];
+          if (freshest) {
+            chosen = { store: freshest.store, meta: freshest.meta, name: freshest.name };
+          }
+        }
+
+        if (!chosen) {
+          const store = await OPFSStorage.openOrCreate(name);
+          const projectMeta = await store.readJSON<ProjectMeta>("project.json");
+          if (projectMeta) {
+            chosen = { store, meta: projectMeta, name };
+          }
+        }
+
+        if (!cancelled && chosen) {
+          setStorage(chosen.store);
+          setMeta(chosen.meta);
+          try {
+            localStorage.setItem(LAST_PROJECT_KEY, JSON.stringify({
+              name: chosen.name,
+              backend,
+              bookId: chosen.meta.bookId,
+            }));
+          } catch {}
         }
       } catch {
         // ignore bootstrap errors, app can still work without restored project

@@ -6,6 +6,7 @@
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { Segment, Phrase, CharacterOption } from "@/components/studio/storyboard/types";
 import type { PhraseAnnotation, TtsProvider } from "@/components/studio/phraseAnnotations";
+import { touchProjectUpdatedAt } from "@/lib/projectActivity";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -55,6 +56,7 @@ export async function saveStoryboardToLocal(
       inlineNarrationSpeaker: data.inlineNarrationSpeaker,
     };
     await storage.writeJSON(`storyboard/scene_${sceneId}.json`, payload);
+    await touchProjectUpdatedAt(storage);
     console.debug(`[StoryboardSync] Saved scene ${sceneId}: ${data.segments.length} segments`);
   } catch (err) {
     console.warn("[StoryboardSync] Failed to save:", err);
@@ -82,6 +84,7 @@ export async function deleteStoryboardFromLocal(
 ): Promise<void> {
   try {
     await storage.delete(`storyboard/scene_${sceneId}.json`);
+    await touchProjectUpdatedAt(storage);
   } catch {
     // non-critical
   }

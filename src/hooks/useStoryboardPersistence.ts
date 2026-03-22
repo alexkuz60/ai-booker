@@ -7,7 +7,7 @@
  * - Provide `pushToDb()` for explicit "before-TTS" sync
  */
 
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -31,6 +31,7 @@ export interface StoryboardSnapshot {
 export function useStoryboardPersistence(sceneId: string | null) {
   const { storage } = useProjectStorageContext();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestSnapshotRef = useRef<StoryboardSnapshot | null>(null);
 
   /**
    * Read storyboard from OPFS. Returns null if not found.
@@ -45,9 +46,12 @@ export function useStoryboardPersistence(sceneId: string | null) {
    */
   const persist = useCallback((snapshot: StoryboardSnapshot) => {
     if (!storage || !sceneId) return;
+    latestSnapshotRef.current = snapshot;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      saveStoryboardToLocal(storage, sceneId, snapshot);
+      const latest = latestSnapshotRef.current;
+      if (!latest) return;
+      void saveStoryboardToLocal(storage, sceneId, latest);
     }, 200);
   }, [storage, sceneId]);
 
@@ -59,9 +63,23 @@ export function useStoryboardPersistence(sceneId: string | null) {
       console.warn(`[StoryboardPersist] persistNow skipped: storage=${!!storage} sceneId=${sceneId}`);
       return;
     }
+    latestSnapshotRef.current = snapshot;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     console.debug(`[StoryboardPersist] persistNow → sceneId=${sceneId}, segments=${snapshot.segments.length}`);
     await saveStoryboardToLocal(storage, sceneId, snapshot);
+  }, [storage, sceneId]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      const latest = latestSnapshotRef.current;
+      if (storage && sceneId && latest) {
+        void saveStoryboardToLocal(storage, sceneId, latest);
+      }
+    };
   }, [storage, sceneId]);
 
   /**

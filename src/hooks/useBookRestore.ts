@@ -20,6 +20,7 @@ import { syncStructureToLocal, readStructureFromLocal, saveCharactersToLocal } f
 import type { LocalCharacter } from "@/pages/parser/types";
 import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 import { detectFileFormat, getSourcePath, stripFileExtension, type FileFormat } from "@/lib/fileFormatUtils";
+import { getProjectActivityMs } from "@/lib/projectActivity";
 
 interface UseBookRestoreParams {
   userId: string | undefined;
@@ -93,23 +94,41 @@ export function useBookRestore({
     if (storageBackend === "opfs") {
       const projectNames = localProjectNamesByBookId.get(targetBookId);
       if (projectNames?.length) {
-        const projectName = projectNames[0];
         try {
+          const ranked = (await Promise.all(projectNames.map(async (projectName) => {
+            try {
+              const store = await OPFSStorage.openOrCreate(projectName);
+              return {
+                projectName,
+                store,
+                activityMs: await getProjectActivityMs(store),
+              };
+            } catch (err) {
+              console.warn("[BookRestore] Failed to inspect OPFS project:", projectName, err);
+              return null;
+            }
+          })))
+            .filter((candidate): candidate is NonNullable<typeof candidate> => !!candidate)
+            .sort((a, b) => b.activityMs - a.activityMs);
+
+          const freshest = ranked[0];
+          if (!freshest) return null;
+
           if (activate && openProjectByName) {
-            const activated = await openProjectByName(projectName);
+            const activated = await openProjectByName(freshest.projectName);
             if (activated?.isReady) {
-              console.debug("[BookRestore] Activated OPFS project:", projectName, targetBookId);
+              console.debug("[BookRestore] Activated freshest OPFS project:", freshest.projectName, targetBookId);
               return activated;
             }
           }
 
-          const direct = await OPFSStorage.openOrCreate(projectName);
+          const direct = freshest.store;
           if (direct.isReady) {
-            console.debug("[BookRestore] Opened OPFS project directly:", projectName, targetBookId);
+            console.debug("[BookRestore] Opened freshest OPFS project directly:", freshest.projectName, targetBookId);
             return direct;
           }
         } catch (err) {
-          console.warn("[BookRestore] Failed to open OPFS project:", projectName, err);
+          console.warn("[BookRestore] Failed to open freshest OPFS project for book:", targetBookId, err);
         }
       }
     }
