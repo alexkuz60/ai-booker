@@ -303,6 +303,9 @@ export function useProjectStorage(): UseProjectStorageReturn {
         const projectMeta = await store.readJSON<ProjectMeta>("project.json");
         if (!projectMeta) return;
 
+        // Migrate V1 → V2 if needed and load scene index
+        await ensureV2Layout(store);
+
         if (!cancelled) {
           setStorage(store);
           setMeta(projectMeta);
