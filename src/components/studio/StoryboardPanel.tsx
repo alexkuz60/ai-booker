@@ -736,8 +736,26 @@ export function StoryboardPanel({
           : `"${typeLabel}" → ${newSpeaker || "?"} (${affectedIds.length} seg.)`
       );
     }
+
+    // Sync characters: upsert new speaker into index + scene map, then reload
+    if (storage && sceneId) {
+      try {
+        const { readCharacterIndex, upsertSpeakersFromSegments } = await import("@/lib/localCharacters");
+        const currentIndex = await readCharacterIndex(storage);
+        const updatedIndex = await upsertSpeakersFromSegments(storage, sceneId, updatedSegments, currentIndex);
+        setCharacters(updatedIndex.map(c => ({
+          id: c.id,
+          name: c.name,
+          color: c.color ?? undefined,
+          voiceConfig: (c.voice_config || {}) as Record<string, unknown>,
+        })));
+      } catch (err) {
+        console.warn("[StoryboardPanel] Character sync after speaker update failed:", err);
+      }
+    }
+
     onSegmented?.(sceneId!);
-  }, [isRu, segments, sceneId, syncTypeMappings, persist, buildSnapshot, onSegmented]);
+  }, [isRu, segments, sceneId, storage, syncTypeMappings, persist, buildSnapshot, onSegmented]);
 
   // ─── Synthesis ────────────────────────────────────────────
 
