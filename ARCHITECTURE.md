@@ -206,7 +206,75 @@ interface ProjectStorage {
 
 **browserId:** уникальный идентификатор среды (localStorage), гарантирует что проверка выполняется однократно для данного окружения.
 
-### 1.11 Критические контракты
+### 1.11 Индекс сцен и контроль целостности (V2)
+
+#### scene_index.json — быстрая навигация
+
+Файл `scene_index.json` в корне проекта обеспечивает O(1) навигацию по сценам без рекурсивного обхода папок:
+
+```typescript
+interface SceneIndexData {
+  version: 2;
+  updatedAt: string;
+  entries: Record<string, {  // sceneId → ...
+    chapterId: string;        // для V2-путей
+    chapterIndex: number;
+    sceneNumber: number;
+    contentHash: number;      // FNV-1a 32-bit хеш контента
+  }>;
+  storyboarded: string[];     // sceneId[] с данными раскадровки
+  characterMapped: string[];  // sceneId[] с маппингом персонажей
+}
+```
+
+**Использование:**
+- `resolveChapterId(sceneId)` — in-memory O(1) резолвинг для `projectPaths.ts`
+- `isStoryboarded(sceneId)` — без IO-операций
+- `isSceneDirty(sceneId, storyboardHash)` — сравнение хешей для dirty-маркера
+
+#### contentHash — FNV-1a 32-bit
+
+Каждая сцена при записи в `chapters/{cid}/content.json` получает хеш контента (`fnv1a32`). При открытии раскадровки сравнивается хеш из `scene_index.json` и `storyboard.json.contentHash`. Расхождение → dirty-маркер в UI → рекомендация переанализировать.
+
+**Файлы:**
+| Файл | Назначение |
+|------|------------|
+| `src/lib/sceneIndex.ts` | CRUD индекса, in-memory кэш, dirty-проверки |
+| `src/lib/contentHash.ts` | FNV-1a 32-bit хеш-функция |
+
+#### projectPaths — централизованный резолвер путей
+
+**Все обращения к файлам OPFS ОБЯЗАНЫ** использовать `paths.*` из `src/lib/projectPaths.ts`. Запрещено хардкодить пути в коде.
+
+```typescript
+import { paths } from "@/lib/projectPaths";
+
+// Правильно:
+await storage.readJSON(paths.storyboard(sceneId));
+await storage.readJSON(paths.chapterContent(chapterId));
+await storage.readJSON(paths.characterIndex());
+
+// ЗАПРЕЩЕНО:
+await storage.readJSON(`storyboard/scene_${sceneId}.json`);
+```
+
+Резолвер автоматически адаптирует пути к активному layout (V1/V2). V2 пути включают chapterId, который резолвится из scene_index через `resolveChapterId()`.
+
+### 1.12 Миграция V1 → V2
+
+Автоматическая миграция выполняется в `ensureV2Layout()` при загрузке проекта:
+
+1. Определяется версия layout (`detectLayoutVersion`)
+2. Для V1: читаются `scenes/chapter_*.json` → строится маппинг sceneId→chapterId
+3. Файлы перемещаются в V2-иерархию: `chapters/{cid}/content.json`, `chapters/{cid}/scenes/{sid}/storyboard.json`, etc.
+4. Создаётся `scene_index.json` с хешами контента
+5. `characters/index.json` → `characters.json` (корень)
+6. `project.json.layoutVersion` = 2
+7. Старые V1 директории (`scenes/`, `storyboard/`) удаляются
+
+**Файл:** `src/lib/projectMigrator.ts`
+
+### 1.13 Критические контракты
 
 #### К1. resolvePageRange — диапазон страниц глав
 
