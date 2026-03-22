@@ -28,7 +28,7 @@ export interface StoryboardSnapshot {
   inlineNarrationSpeaker: string | null;
 }
 
-export function useStoryboardPersistence(sceneId: string | null) {
+export function useStoryboardPersistence(sceneId: string | null, chapterId?: string | null) {
   const { storage } = useProjectStorageContext();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestSnapshotRef = useRef<StoryboardSnapshot | null>(null);
@@ -38,8 +38,8 @@ export function useStoryboardPersistence(sceneId: string | null) {
    */
   const loadFromLocal = useCallback(async (sid: string): Promise<LocalStoryboardData | null> => {
     if (!storage) return null;
-    return readStoryboardFromLocal(storage, sid);
-  }, [storage]);
+    return readStoryboardFromLocal(storage, sid, chapterId ?? undefined);
+  }, [storage, chapterId]);
 
   /**
    * Persist current storyboard state to OPFS (debounced 200ms).
@@ -51,9 +51,9 @@ export function useStoryboardPersistence(sceneId: string | null) {
     debounceRef.current = setTimeout(() => {
       const latest = latestSnapshotRef.current;
       if (!latest) return;
-      void saveStoryboardToLocal(storage, sceneId, latest);
+      void saveStoryboardToLocal(storage, sceneId, latest, chapterId ?? undefined);
     }, 200);
-  }, [storage, sceneId]);
+  }, [storage, sceneId, chapterId]);
 
   /**
    * Persist immediately (no debounce) — use after AI analysis or merge/split.

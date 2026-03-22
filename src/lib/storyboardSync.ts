@@ -101,9 +101,12 @@ export async function readStoryboardFromLocal(
 export async function deleteStoryboardFromLocal(
   storage: ProjectStorage,
   sceneId: string,
+  chapterId?: string,
 ): Promise<void> {
   try {
-    await storage.delete(paths.storyboard(sceneId));
+    const filePath = paths.storyboard(sceneId, chapterId);
+    if (filePath.includes("__unresolved__")) return;
+    await storage.delete(filePath);
     await unmarkStoryboarded(storage, sceneId);
     await touchProjectUpdatedAt(storage);
   } catch {
