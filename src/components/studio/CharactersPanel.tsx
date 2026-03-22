@@ -419,7 +419,8 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     if (speechContextMap.has(cacheKey)) return;
 
     (async () => {
-      const storyboard = await storage.readJSON<{ segments: Array<{ speaker?: string | null; metadata?: Record<string, unknown> }> }>(`storyboard/scene_${sceneId}.json`);
+      const { paths } = await import("@/lib/projectPaths");
+      const storyboard = await storage.readJSON<{ segments: Array<{ speaker?: string | null; metadata?: Record<string, unknown> }> }>(paths.storyboard(sceneId));
       if (!storyboard?.segments) return;
       const charNames = new Set([ch.name.toLowerCase(), ...ch.aliases.map(a => a.toLowerCase())]);
       const seg = storyboard.segments.find(s => s.speaker && charNames.has(s.speaker.toLowerCase()));

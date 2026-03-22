@@ -245,7 +245,8 @@ export function BatchSegmentationPanel({
 
     for (const sid of doneIds) {
       try {
-        const data = await storage.readJSON<{ segments: Segment[] }>(`storyboard/scene_${sid}.json`);
+        const { paths } = await import("@/lib/projectPaths");
+        const data = await storage.readJSON<{ segments: Segment[] }>(paths.storyboard(sid));
         if (data?.segments) {
           currentIndex = await upsertSpeakersFromSegments(storage, sid, data.segments, currentIndex);
         }
