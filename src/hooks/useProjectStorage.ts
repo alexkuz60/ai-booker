@@ -297,53 +297,21 @@ export function useProjectStorage(): UseProjectStorageReturn {
         const saved = localStorage.getItem(LAST_PROJECT_KEY);
         if (!saved) return;
 
-        const { name, backend: savedBackend, bookId } = JSON.parse(saved);
+        const { name, backend: savedBackend } = JSON.parse(saved);
         if (savedBackend !== "opfs" || !name) return;
 
-        let chosen: { store: ProjectStorage; meta: ProjectMeta; name: string } | null = null;
+        const store = await OPFSStorage.openOrCreate(name);
+        const projectMeta = await store.readJSON<ProjectMeta>("project.json");
+        if (!projectMeta) return;
 
-        if (bookId) {
-          const projectNames = await OPFSStorage.listProjects();
-          const ranked = (await Promise.all(projectNames.map(async (projectName) => {
-            try {
-              const store = await OPFSStorage.openOrCreate(projectName);
-              const projectMeta = await store.readJSON<ProjectMeta>("project.json");
-              if (!projectMeta || projectMeta.bookId !== bookId) return null;
-              return {
-                name: projectName,
-                store,
-                meta: projectMeta,
-                activityMs: await getProjectActivityMs(store),
-              };
-            } catch {
-              return null;
-            }
-          })))
-            .filter((candidate): candidate is NonNullable<typeof candidate> => !!candidate)
-            .sort((a, b) => b.activityMs - a.activityMs);
-
-          const freshest = ranked[0];
-          if (freshest) {
-            chosen = { store: freshest.store, meta: freshest.meta, name: freshest.name };
-          }
-        }
-
-        if (!chosen) {
-          const store = await OPFSStorage.openOrCreate(name);
-          const projectMeta = await store.readJSON<ProjectMeta>("project.json");
-          if (projectMeta) {
-            chosen = { store, meta: projectMeta, name };
-          }
-        }
-
-        if (!cancelled && chosen) {
-          setStorage(chosen.store);
-          setMeta(chosen.meta);
+        if (!cancelled) {
+          setStorage(store);
+          setMeta(projectMeta);
           try {
             localStorage.setItem(LAST_PROJECT_KEY, JSON.stringify({
-              name: chosen.name,
+              name,
               backend,
-              bookId: chosen.meta.bookId,
+              bookId: projectMeta.bookId,
             }));
           } catch {}
         }
