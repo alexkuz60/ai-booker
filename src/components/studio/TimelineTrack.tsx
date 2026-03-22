@@ -29,7 +29,7 @@ interface TimelineTrackProps {
   /** Available audio files for insert (atmosphere/sfx tracks) */
   storageAtmosphere?: StorageAudioFile[];
   storageSfx?: StorageAudioFile[];
-  onInsertAudio?: (file: StorageAudioFile, atSec: number) => void;
+  onInsertAudio?: (file: StorageAudioFile, atSec: number, layerType: "ambience" | "sfx") => void;
   isRu?: boolean;
 }
 
@@ -294,7 +294,7 @@ export function TimelineTrack({
                     key={f.path}
                     file={f}
                     icon={<Waves className="h-3 w-3 mr-2 shrink-0 text-muted-foreground" />}
-                    onSelect={() => onInsertAudio!(f, getInsertSec())}
+                    onSelect={() => onInsertAudio!(f, getInsertSec(), "ambience")}
                   />
                 ))}
               </ContextMenuSubContent>
@@ -314,7 +314,7 @@ export function TimelineTrack({
                     key={f.path}
                     file={f}
                     icon={<Music className="h-3 w-3 mr-2 shrink-0 text-muted-foreground" />}
-                    onSelect={() => onInsertAudio!(f, getInsertSec())}
+                    onSelect={() => onInsertAudio!(f, getInsertSec(), "sfx")}
                   />
                 ))}
               </ContextMenuSubContent>

@@ -98,13 +98,11 @@ export function StudioTimeline({
   const combinedRefreshToken = clipsRefreshToken + localRefresh;
 
   // Handler for inserting audio from storage into atmosphere/sfx track
-  const handleInsertAudio = useCallback(async (file: StorageAudioFile, _atSec: number) => {
+  const handleInsertAudio = useCallback(async (file: StorageAudioFile, _atSec: number, layerType: "ambience" | "sfx" = "ambience") => {
     if (!sceneId || !user) {
       toast.error(isRu ? "Нет активной сцены" : "No active scene");
       return;
     }
-
-    const layerType = file.category === "sfx" ? "sfx" : "ambience";
 
     // Get audio duration by decoding a signed URL
     let durationMs = 10_000; // fallback 10s

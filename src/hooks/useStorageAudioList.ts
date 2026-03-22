@@ -8,6 +8,8 @@ export interface StorageAudioFile {
   size: number;
 }
 
+export type InsertLayerType = "ambience" | "sfx";
+
 const CATEGORIES = ["atmosphere", "sfx"] as const;
 
 /**
