@@ -9,7 +9,6 @@ import {
   OPFSStorage,
 } from "@/lib/projectStorage";
 import { downloadBlob } from "@/lib/projectZip";
-import { getProjectActivityMs } from "@/lib/projectActivity";
 
 const LAST_PROJECT_KEY = "booker_last_project";
 const LOCAL_RESET_KEYS = [
