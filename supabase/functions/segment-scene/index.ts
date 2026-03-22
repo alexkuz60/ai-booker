@@ -138,9 +138,9 @@ Deno.serve(async (req) => {
       ? `Сегментируй следующую сцену. ВАЖНО: разбей ВЕСЬ текст от начала до конца на отдельные блоки по типу (диалог, повествование, мысли, монолог и т.д.). Определи говорящего для каждой реплики. НЕ сливай текст в один блок.\nВерни ТОЛЬКО JSON-массив объектов: [{"type":"...","speaker":"...","text":"...","inline_narrations":[]}]\nБез markdown, без пояснений.\n\n${content}`
       : `Segment the following scene. IMPORTANT: split the ENTIRE text from start to finish into separate blocks by type (dialogue, narration, thoughts, monologue, etc.). Identify the speaker for each spoken line. Do NOT merge text into a single block.\nReturn ONLY a JSON array of segment objects: [{"type":"...","speaker":"...","text":"...","inline_narrations":[]}]\nNo markdown, no explanations.\n\n${content}`;
 
-    // Estimate required output tokens: ~1.5x input chars (JSON overhead) / 3 chars per token
-    const estimatedOutputTokens = Math.max(4096, Math.ceil((content.length * 1.5) / 3));
-    const maxTokens = Math.min(estimatedOutputTokens, 16384);
+    // Estimate required output tokens: ~2x input chars (JSON overhead) / 3 chars per token
+    const estimatedOutputTokens = Math.max(8192, Math.ceil((content.length * 2) / 3));
+    const maxTokens = Math.min(estimatedOutputTokens, 65536);
 
     // Use max_completion_tokens for newer models, max_tokens for others
     const isNewModel = /gpt-5|o1|o3|o4/i.test(resolved.model);
