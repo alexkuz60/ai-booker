@@ -65,9 +65,9 @@ export function useStoryboardPersistence(sceneId: string | null, chapterId?: str
     }
     latestSnapshotRef.current = snapshot;
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    console.debug(`[StoryboardPersist] persistNow → sceneId=${sceneId}, segments=${snapshot.segments.length}`);
-    await saveStoryboardToLocal(storage, sceneId, snapshot);
-  }, [storage, sceneId]);
+    console.debug(`[StoryboardPersist] persistNow → sceneId=${sceneId}, chapterId=${chapterId}, segments=${snapshot.segments.length}`);
+    await saveStoryboardToLocal(storage, sceneId, snapshot, chapterId ?? undefined);
+  }, [storage, sceneId, chapterId]);
 
   useEffect(() => {
     return () => {
@@ -77,10 +77,10 @@ export function useStoryboardPersistence(sceneId: string | null, chapterId?: str
       }
       const latest = latestSnapshotRef.current;
       if (storage && sceneId && latest) {
-        void saveStoryboardToLocal(storage, sceneId, latest);
+        void saveStoryboardToLocal(storage, sceneId, latest, chapterId ?? undefined);
       }
     };
-  }, [storage, sceneId]);
+  }, [storage, sceneId, chapterId]);
 
   /**
    * Delete storyboard file — use before re-analysis.
@@ -91,8 +91,8 @@ export function useStoryboardPersistence(sceneId: string | null, chapterId?: str
       return;
     }
     console.debug(`[StoryboardPersist] clearLocal → sceneId=${sceneId}`);
-    await deleteStoryboardFromLocal(storage, sceneId);
-  }, [storage, sceneId]);
+    await deleteStoryboardFromLocal(storage, sceneId, chapterId ?? undefined);
+  }, [storage, sceneId, chapterId]);
 
   /**
    * Push OPFS storyboard data → Supabase DB (delete-then-insert).
