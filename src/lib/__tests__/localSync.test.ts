@@ -1,7 +1,10 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { TocChapter, Scene } from "@/pages/parser/types";
+import { setActiveLayout } from "@/lib/projectPaths";
+
+beforeEach(() => { setActiveLayout("v1"); });
 
 /** Minimal in-memory mock of ProjectStorage */
 function createMockStorage(): ProjectStorage & { _data: Record<string, unknown> } {
