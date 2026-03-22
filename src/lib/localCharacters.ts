@@ -12,6 +12,7 @@ import type {
   CharacterVoiceConfig,
 } from "@/pages/parser/types";
 import { touchProjectUpdatedAt } from "@/lib/projectActivity";
+import { paths } from "@/lib/projectPaths";
 
 // ─── Read / Write helpers ────────────────────────────────────
 
@@ -20,11 +21,11 @@ export async function readCharacterIndex(
 ): Promise<CharacterIndex[]> {
   try {
     // Try new location first
-    const data = await storage.readJSON<CharacterIndex[]>("characters/index.json");
+    const data = await storage.readJSON<CharacterIndex[]>(paths.characterIndex());
     if (data && data.length > 0) return data;
 
     // Migrate from legacy format
-    const legacy = await storage.readJSON<LocalCharacter[]>("structure/characters.json");
+    const legacy = await storage.readJSON<LocalCharacter[]>(paths.structureCharactersLegacy());
     if (legacy && legacy.length > 0) {
       const migrated = legacy.map(migrateLocalCharacter);
       await saveCharacterIndex(storage, migrated);
@@ -43,10 +44,10 @@ export async function saveCharacterIndex(
   characters: CharacterIndex[],
 ): Promise<void> {
   try {
-    await storage.writeJSON("characters/index.json", characters);
+    await storage.writeJSON(paths.characterIndex(), characters);
     // Also write legacy format for backward compatibility with Parser hooks
     const legacy = characters.map(toLegacyCharacter);
-    await storage.writeJSON("structure/characters.json", legacy);
+    await storage.writeJSON(paths.structureCharactersLegacy(), legacy);
     await touchProjectUpdatedAt(storage);
     console.debug(`[localCharacters] Saved ${characters.length} characters`);
   } catch (err) {
@@ -59,7 +60,7 @@ export async function readSceneCharacterMap(
   sceneId: string,
 ): Promise<SceneCharacterMap | null> {
   try {
-    return await storage.readJSON<SceneCharacterMap>(`characters/scene_${sceneId}.json`);
+    return await storage.readJSON<SceneCharacterMap>(paths.sceneCharacterMap(sceneId));
   } catch {
     return null;
   }
@@ -70,7 +71,7 @@ export async function saveSceneCharacterMap(
   map: SceneCharacterMap,
 ): Promise<void> {
   try {
-    await storage.writeJSON(`characters/scene_${map.sceneId}.json`, map);
+    await storage.writeJSON(paths.sceneCharacterMap(map.sceneId), map);
     await touchProjectUpdatedAt(storage);
   } catch (err) {
     console.warn("[localCharacters] Failed to save scene character map:", err);
@@ -84,7 +85,9 @@ export async function listSceneCharacterMaps(
   storage: ProjectStorage,
 ): Promise<string[]> {
   try {
-    const files = await storage.listDir("characters");
+    const dir = paths.characterDir();
+    if (!dir) return [];
+    const files = await storage.listDir(dir);
     return files.filter(f => f.startsWith("scene_") && f.endsWith(".json"));
   } catch {
     return [];
@@ -129,9 +132,11 @@ export async function countSegmentAppearances(
 ): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
   const files = await listSceneCharacterMaps(storage);
+  const dir = paths.characterDir();
+  if (!dir) return counts;
   const reads = files.map(async (f) => {
     try {
-      const map = await storage.readJSON<SceneCharacterMap>(`characters/${f}`);
+      const map = await storage.readJSON<SceneCharacterMap>(`${dir}/${f}`);
       if (map) {
         for (const s of map.speakers) {
           counts.set(s.characterId, (counts.get(s.characterId) ?? 0) + s.segment_ids.length);
@@ -250,8 +255,6 @@ export async function upsertSpeakersFromSegments(
   const updatedIndex = [...existingIndex];
 
   // Collect ALL segments with an explicit speaker name.
-  // Previously only SPEAKING_TYPES were collected, so reassigning a narrator
-  // segment to a character (e.g. "Шарик") was silently ignored.
   const speakerSegments = new Map<string, string[]>();
   for (const seg of segments) {
     if (seg.speaker?.trim()) {

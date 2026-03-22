@@ -10,6 +10,7 @@ import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
 import type { LocalBookStructure } from "@/lib/localSync";
 import { detectFileFormat } from "@/lib/fileFormatUtils";
 import { getProjectActivityMs } from "@/lib/projectActivity";
+import { paths } from "@/lib/projectPaths";
 
 type LocalLibraryCandidate = {
   record: BookRecord;
@@ -281,17 +282,17 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     for (const projectName of projectNames) {
       try {
         const store = await OPFSStorage.openOrCreate(projectName);
-        const meta = await store.readJSON<Record<string, unknown>>("project.json");
+        const meta = await store.readJSON<Record<string, unknown>>(paths.projectMeta());
         if (meta) {
           meta.title = newTitle;
           meta.updatedAt = new Date().toISOString();
-          await store.writeJSON("project.json", meta);
+          await store.writeJSON(paths.projectMeta(), meta);
         }
         // Also update toc.json title
-        const toc = await store.readJSON<Record<string, unknown>>("structure/toc.json").catch(() => null);
+        const toc = await store.readJSON<Record<string, unknown>>(paths.structureToc()).catch(() => null);
         if (toc) {
           toc.title = newTitle;
-          await store.writeJSON("structure/toc.json", toc);
+          await store.writeJSON(paths.structureToc(), toc);
         }
       } catch (err) {
         console.warn("[Library] Rename failed for project:", projectName, err);

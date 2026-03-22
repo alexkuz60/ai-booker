@@ -13,6 +13,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { t } from "@/pages/parser/i18n";
+import { paths } from "@/lib/projectPaths";
 import type { Scene, TocChapter, Step, ChapterStatus, BookRecord } from "@/pages/parser/types";
 import { ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
@@ -239,15 +240,16 @@ export function useBookManager({
               const store = await OPFSStorage.openOrCreate(name);
               const structFiles = await store.listDir("structure").catch(() => []);
               for (const f of structFiles) await store.delete(`structure/${f}`).catch(() => {});
-              const sceneFiles = await store.listDir("scenes").catch(() => []);
-              for (const f of sceneFiles) await store.delete(`scenes/${f}`).catch(() => {});
+              const contentDir = paths.chapterContentDir();
+              const sceneFiles = await store.listDir(contentDir).catch(() => []);
+              for (const f of sceneFiles) await store.delete(`${contentDir}/${f}`).catch(() => {});
             } catch {}
           }
         }
       } else if (projectStorage?.isReady) {
         try {
-          await projectStorage.writeJSON("structure/toc.json", []);
-          await projectStorage.writeJSON("structure/characters.json", []);
+          await projectStorage.writeJSON(paths.structureToc(), []);
+          await projectStorage.writeJSON(paths.structureCharactersLegacy(), []);
         } catch {}
       }
 

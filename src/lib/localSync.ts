@@ -10,6 +10,7 @@ import {
   isFolderNode,
   sanitizeChapterResultsForStructure,
 } from "@/lib/tocStructure";
+import { paths } from "@/lib/projectPaths";
 
 export interface LocalBookStructure {
   bookId: string;
@@ -66,14 +67,14 @@ export async function syncStructureToLocal(
       parts: data.parts,
       toc: data.toc,
     };
-    await storage.writeJSON("structure/toc.json", structure);
+    await storage.writeJSON(paths.structureToc(), structure);
 
     // 1b. Also update project.json updatedAt so sync-check works
     try {
-      const projectMeta = await storage.readJSON<Record<string, unknown>>("project.json");
+      const projectMeta = await storage.readJSON<Record<string, unknown>>(paths.projectMeta());
       if (projectMeta) {
         projectMeta.updatedAt = structure.updatedAt;
-        await storage.writeJSON("project.json", projectMeta);
+        await storage.writeJSON(paths.projectMeta(), projectMeta);
       }
     } catch {
       // non-critical — project.json may not exist yet
@@ -84,21 +85,22 @@ export async function syncStructureToLocal(
     data.chapterIdMap.forEach((id, idx) => {
       chapterMap[String(idx)] = id;
     });
-    await storage.writeJSON("structure/chapters.json", chapterMap);
+    await storage.writeJSON(paths.structureChapters(), chapterMap);
 
     // 3. Per-chapter scene data (leaf-only)
     const sanitizedResults = sanitizeChapterResultsForStructure(data.toc, data.chapterResults);
     const leafChapterIds = new Set(getLeafChapterIds(data.toc, data.chapterIdMap));
 
     // Cleanup stale scene files from old structure (folders/removed chapters)
-    const existingSceneFiles = await storage.listDir("scenes").catch(() => []);
+    const contentDir = paths.chapterContentDir();
+    const existingSceneFiles = await storage.listDir(contentDir).catch(() => []);
     const staleSceneDeletes = existingSceneFiles
       .filter((f) => {
-        const m = f.match(/^chapter_(.+)\.json$/);
-        if (!m) return false;
-        return !leafChapterIds.has(m[1]);
+        const cid = paths.chapterIdFromFileName(f);
+        if (!cid) return false;
+        return !leafChapterIds.has(cid);
       })
-      .map((f) => storage.delete(`scenes/${f}`).catch(() => undefined));
+      .map((f) => storage.delete(`${contentDir}/${f}`).catch(() => undefined));
 
     const sceneWrites: Promise<void>[] = [];
     sanitizedResults.forEach((result, idx) => {
@@ -111,7 +113,7 @@ export async function syncStructureToLocal(
         scenes: result.scenes,
         status: result.status,
       };
-      sceneWrites.push(storage.writeJSON(`scenes/chapter_${chapterId}.json`, chapterData));
+      sceneWrites.push(storage.writeJSON(paths.chapterContent(chapterId), chapterData));
     });
 
     await Promise.all([...staleSceneDeletes, ...sceneWrites]);
@@ -133,11 +135,11 @@ export async function readStructureFromLocal(
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
 } | null> {
   try {
-    const structure = await storage.readJSON<LocalBookStructure>("structure/toc.json");
+    const structure = await storage.readJSON<LocalBookStructure>(paths.structureToc());
     if (!structure) return null;
 
     // Chapter ID map
-    const chapterMapRaw = await storage.readJSON<Record<string, string>>("structure/chapters.json");
+    const chapterMapRaw = await storage.readJSON<Record<string, string>>(paths.structureChapters());
     const chapterIdMap = new Map<number, string>();
     if (chapterMapRaw) {
       Object.entries(chapterMapRaw).forEach(([idx, id]) => {
@@ -147,11 +149,12 @@ export async function readStructureFromLocal(
 
     // Per-chapter results (ignore folder-scene files from legacy saves)
     const chapterResults = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
-    const sceneFiles = await storage.listDir("scenes");
+    const contentDir = paths.chapterContentDir();
+    const sceneFiles = await storage.listDir(contentDir);
     const reads = sceneFiles
-      .filter((f) => f.startsWith("chapter_") && f.endsWith(".json"))
+      .filter((f) => paths.isChapterContentFile(f))
       .map(async (f) => {
-        const data = await storage.readJSON<LocalChapterData>(`scenes/${f}`);
+        const data = await storage.readJSON<LocalChapterData>(`${contentDir}/${f}`);
         if (!data) return;
 
         if (Number.isNaN(data.chapterIndex) || isFolderNode(structure.toc, data.chapterIndex)) {
@@ -180,7 +183,7 @@ export async function saveCharactersToLocal(
   characters: LocalCharacter[],
 ): Promise<void> {
   try {
-    await storage.writeJSON("structure/characters.json", characters);
+    await storage.writeJSON(paths.structureCharactersLegacy(), characters);
     console.debug(`[LocalSync] Characters saved: ${characters.length}`);
   } catch (err) {
     console.warn("[LocalSync] Failed to save characters:", err);
@@ -191,7 +194,7 @@ export async function readCharactersFromLocal(
   storage: ProjectStorage,
 ): Promise<LocalCharacter[]> {
   try {
-    const data = await storage.readJSON<LocalCharacter[]>("structure/characters.json");
+    const data = await storage.readJSON<LocalCharacter[]>(paths.structureCharactersLegacy());
     return data || [];
   } catch {
     return [];

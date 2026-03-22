@@ -9,6 +9,8 @@ import {
   OPFSStorage,
 } from "@/lib/projectStorage";
 import { downloadBlob } from "@/lib/projectZip";
+import { paths } from "@/lib/projectPaths";
+import { findSourceBlob, getMimeType, detectFileFormat } from "@/lib/fileFormatUtils";
 
 const LAST_PROJECT_KEY = "booker_last_project";
 const LOCAL_RESET_KEYS = [
@@ -264,19 +266,15 @@ export function useProjectStorage(): UseProjectStorageReturn {
 
   const saveSourceFile = useCallback(async (file: File) => {
     if (!storage) throw new Error("No project open");
-    const isDocx = /\.docx?$/i.test(file.name);
-    const path = isDocx ? "source/book.docx" : "source/book.pdf";
-    await storage.writeBlob(path, file);
+    const format = detectFileFormat(file.name);
+    await storage.writeBlob(paths.sourceFile(format), file);
   }, [storage]);
 
   const readSourceFile = useCallback(async (): Promise<File | null> => {
     if (!storage) return null;
-    // Try PDF first, then DOCX
-    const pdfBlob = await storage.readBlob("source/book.pdf");
-    if (pdfBlob) return new File([pdfBlob], "book.pdf", { type: "application/pdf" });
-    const docxBlob = await storage.readBlob("source/book.docx");
-    if (docxBlob) return new File([docxBlob], "book.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
-    return null;
+    const found = await findSourceBlob(storage);
+    if (!found) return null;
+    return new File([found.blob], `book.${found.format}`, { type: getMimeType(found.format) });
   }, [storage]);
 
   // ── Auto-restore OPFS project on mount ──────────────────
