@@ -328,7 +328,7 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка объединения" : "Merge failed");
     }
     setMerging(false);
-  }, [sceneId, mergeGroups, segments, isRu, persistNow, buildSnapshot, onSegmented]);
+  }, [sceneId, mergeGroups, segments, isRu, persistNow, buildSnapshot, onSegmented, contentDirty]);
 
   const handleDeleteSegments = useCallback(async () => {
     if (!sceneId || mergeChecked.size === 0) return;
