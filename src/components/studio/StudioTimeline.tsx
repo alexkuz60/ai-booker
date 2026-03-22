@@ -102,6 +102,7 @@ export function StudioTimeline({
     // TODO: create scene_atmospheres row or OPFS clip entry
   }, [isRu]);
 
+  // ── Scene render state ────────────────────────────────────
   const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
   const isRendering = renderProgress !== null && renderProgress.phase !== "done" && renderProgress.phase !== "error";
 
