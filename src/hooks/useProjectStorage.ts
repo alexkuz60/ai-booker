@@ -319,7 +319,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
               return null;
             }
           })))
-            .filter((candidate): candidate is { store: ProjectStorage; meta: ProjectMeta; name: string; activityMs: number } => !!candidate)
+            .filter((candidate): candidate is NonNullable<typeof candidate> => !!candidate)
             .sort((a, b) => b.activityMs - a.activityMs);
 
           const freshest = ranked[0];
