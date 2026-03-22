@@ -104,6 +104,21 @@ export function StudioTimeline({
       return;
     }
 
+    // Verify scene exists in DB (local-first: may not be synced yet)
+    const { data: sceneRow } = await supabase
+      .from("book_scenes")
+      .select("id")
+      .eq("id", sceneId)
+      .maybeSingle();
+
+    if (!sceneRow) {
+      toast.error(
+        isRu ? "Сцена не синхронизирована" : "Scene not synced",
+        { description: isRu ? "Сначала сохраните книгу на сервер" : "Push the book to server first" },
+      );
+      return;
+    }
+
     // Get audio duration by decoding a signed URL
     let durationMs = 10_000; // fallback 10s
     try {
