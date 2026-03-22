@@ -48,6 +48,7 @@ export function useLocalCharacters(
   bookId: string | null,
   sceneId?: string | null,
   chapterSceneIds?: string[],
+  refreshToken: number = 0,
 ): UseLocalCharactersReturn {
   const [characters, setCharacters] = useState<CharacterIndex[]>([]);
   const [loading, setLoading] = useState(false);
@@ -82,7 +83,7 @@ export function useLocalCharacters(
     }
   }, [storage, bookId]);
 
-  // Load on mount / bookId change
+  // Load on mount / bookId change / refreshToken change
   useEffect(() => {
     if (bookId !== loadedBookRef.current) {
       setCharacters([]);
@@ -90,7 +91,7 @@ export function useLocalCharacters(
       setChapterCharIds(new Set());
     }
     reload();
-  }, [reload, bookId]);
+  }, [reload, bookId, refreshToken]);
 
   // Load scene-level character IDs
   useEffect(() => {

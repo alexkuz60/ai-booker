@@ -37,9 +37,11 @@ interface StudioWorkspaceProps {
   onBatchComplete?: () => void;
   onBatchClose?: () => void;
   userApiKeys?: Record<string, string>;
+  /** Token to force character list refresh (e.g. after speaker rename or segmentation) */
+  clipsRefreshToken?: number;
 }
 
-export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, selectedSceneNumber, selectedSceneTitle, chapterId, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter, activeTab: externalTab, onTabChange, selectedSegmentId, onSelectSegment, onSynthesizingChange, onErrorSegmentsChange, silenceSec, onSilenceSecChange, onRecalcDone, onVoiceSaved, batchSceneIds, batchScenes, onBatchComplete, onBatchClose, userApiKeys = {} }: StudioWorkspaceProps) {
+export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, selectedSceneNumber, selectedSceneTitle, chapterId, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter, activeTab: externalTab, onTabChange, selectedSegmentId, onSelectSegment, onSynthesizingChange, onErrorSegmentsChange, silenceSec, onSilenceSecChange, onRecalcDone, onVoiceSaved, batchSceneIds, batchScenes, onBatchComplete, onBatchClose, userApiKeys = {}, clipsRefreshToken = 0 }: StudioWorkspaceProps) {
   const [activeTab, setActiveTabLocal] = useState(() => externalTab || sessionStorage.getItem("studio_active_tab") || "storyboard");
   const charactersPanelRef = useRef<CharactersPanelHandle | null>(null);
   const [castingExternal, setCastingExternal] = useState(false);
@@ -163,6 +165,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, s
               onSelectCharacter={onSelectCharacter}
               onVoiceSaved={onVoiceSaved}
               userApiKeys={userApiKeys}
+              refreshToken={clipsRefreshToken}
             />
           </div>
         </TabsContent>
