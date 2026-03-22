@@ -389,7 +389,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         }
         return seg;
       });
-      await storage.writeJSON(`storyboard/scene_${sceneId}.json`, { ...storyboard, segments: updatedSegments });
+      await storage.writeJSON(paths.storyboard(sceneId), { ...storyboard, segments: updatedSegments });
 
       setSpeechContextMap(prev => {
         const next = new Map(prev);
