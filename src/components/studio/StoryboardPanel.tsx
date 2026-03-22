@@ -28,6 +28,7 @@ import { SEGMENT_CONFIG } from "./storyboard/constants";
 import { EditablePhrase } from "./storyboard/EditablePhrase";
 import { SegmentTypeBadge } from "./storyboard/SegmentTypeBadge";
 import { SpeakerBadge } from "./storyboard/SpeakerBadge";
+import { StressReviewPanel, type StressSuggestion } from "./storyboard/StressReviewPanel";
 import type { LocalTypeMappingEntry } from "@/lib/storyboardSync";
 
 // ─── Main component ─────────────────────────────────────────
