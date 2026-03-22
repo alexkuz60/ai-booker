@@ -318,7 +318,8 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         toast.error(isRu ? "Локальный проект не открыт" : "Local project not open");
         return;
       }
-      const storyboard = await storage.readJSON<{ segments: Array<{ segment_id: string; segment_type: string; speaker?: string | null; phrases?: Array<{ text: string }> }> }>(`storyboard/scene_${sceneId}.json`);
+      const { paths } = await import("@/lib/projectPaths");
+      const storyboard = await storage.readJSON<{ segments: Array<{ segment_id: string; segment_type: string; speaker?: string | null; phrases?: Array<{ text: string }> }> }>(paths.storyboard(sceneId));
       if (!storyboard?.segments?.length) {
         toast.info(isRu ? "Нет данных раскадровки" : "No storyboard data");
         return;
