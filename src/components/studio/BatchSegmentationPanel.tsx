@@ -213,7 +213,7 @@ export function BatchSegmentationPanel({
               typeMappings: [],
               audioStatus: new Map(),
               inlineNarrationSpeaker: null,
-            });
+            }, chapterId ?? undefined);
           }
           // Clear content_dirty — analysis was just done on fresh content
           await supabase.from("book_scenes").update({ content_dirty: false }).eq("id", job.scene.id);
