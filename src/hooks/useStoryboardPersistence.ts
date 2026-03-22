@@ -176,7 +176,7 @@ export function useStoryboardPersistence(sceneId: string | null, chapterId?: str
     }
 
     console.debug(`[pushToDb] Synced scene ${sid}: ${segments.length} segments, ${phraseInserts.length} phrases`);
-  }, [storage]);
+  }, [storage, chapterId]);
 
   /**
    * Push ALL storyboarded scenes from OPFS → DB.
