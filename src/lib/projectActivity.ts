@@ -1,4 +1,10 @@
+/**
+ * projectActivity — track freshness of a project in OPFS.
+ */
+
 import type { ProjectStorage } from "@/lib/projectStorage";
+import { paths, getActiveLayout } from "@/lib/projectPaths";
+import { getCachedSceneIndex } from "@/lib/sceneIndex";
 
 interface TimestampedRecord {
   updatedAt?: string | null;
@@ -25,26 +31,37 @@ export async function getProjectActivityMs(storage: ProjectStorage): Promise<num
 
   latest = Math.max(
     latest,
-    await readUpdatedAt(storage, "project.json"),
-    await readUpdatedAt(storage, "structure/toc.json"),
+    await readUpdatedAt(storage, paths.projectMeta()),
+    await readUpdatedAt(storage, paths.structureToc()),
   );
 
-  const [storyboardFiles, characterFiles] = await Promise.all([
-    storage.listDir("storyboard").catch(() => [] as string[]),
-    storage.listDir("characters").catch(() => [] as string[]),
-  ]);
+  if (getActiveLayout() === "v2") {
+    // V2: sample a few storyboard files from scene index
+    const index = getCachedSceneIndex();
+    if (index) {
+      const sampleIds = index.storyboarded.slice(0, 5);
+      const timestamps = await Promise.all(
+        sampleIds.map(sid => readUpdatedAt(storage, paths.storyboard(sid))),
+      );
+      for (const ts of timestamps) latest = Math.max(latest, ts);
+    }
+  } else {
+    // V1: scan flat directories
+    const [storyboardFiles, characterFiles] = await Promise.all([
+      storage.listDir("storyboard").catch(() => [] as string[]),
+      storage.listDir("characters").catch(() => [] as string[]),
+    ]);
 
-  const nestedTimestamps = await Promise.all([
-    ...storyboardFiles
-      .filter((file) => file.startsWith("scene_") && file.endsWith(".json"))
-      .map((file) => readUpdatedAt(storage, `storyboard/${file}`)),
-    ...characterFiles
-      .filter((file) => file.startsWith("scene_") && file.endsWith(".json"))
-      .map((file) => readUpdatedAt(storage, `characters/${file}`)),
-  ]);
+    const nestedTimestamps = await Promise.all([
+      ...storyboardFiles
+        .filter((file) => file.startsWith("scene_") && file.endsWith(".json"))
+        .map((file) => readUpdatedAt(storage, `storyboard/${file}`)),
+      ...characterFiles
+        .filter((file) => file.startsWith("scene_") && file.endsWith(".json"))
+        .map((file) => readUpdatedAt(storage, `characters/${file}`)),
+    ]);
 
-  for (const ts of nestedTimestamps) {
-    latest = Math.max(latest, ts);
+    for (const ts of nestedTimestamps) latest = Math.max(latest, ts);
   }
 
   return latest;
@@ -52,9 +69,9 @@ export async function getProjectActivityMs(storage: ProjectStorage): Promise<num
 
 export async function touchProjectUpdatedAt(storage: ProjectStorage): Promise<void> {
   try {
-    const projectMeta = await storage.readJSON<Record<string, unknown>>("project.json");
+    const projectMeta = await storage.readJSON<Record<string, unknown>>(paths.projectMeta());
     if (!projectMeta) return;
-    await storage.writeJSON("project.json", {
+    await storage.writeJSON(paths.projectMeta(), {
       ...projectMeta,
       updatedAt: new Date().toISOString(),
     });
