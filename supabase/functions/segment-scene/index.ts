@@ -82,6 +82,45 @@ function buildFallbackSegments(content: string, lang: "ru" | "en"): AISegment[] 
   return segments.length > 0 ? segments : [{ type: "narrator", text: content }];
 }
 
+/**
+ * Repair a truncated JSON array by finding the last complete object and closing the array.
+ * Returns parsed array or null if repair fails.
+ */
+function repairTruncatedJsonArray(raw: string): AISegment[] | null {
+  // Find positions of all complete "}" that close a top-level object in the array
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  let lastCompleteObjectEnd = -1;
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+
+    if (ch === '[' || ch === '{') depth++;
+    else if (ch === ']' || ch === '}') {
+      depth--;
+      // depth=1 means we just closed a top-level object inside the array
+      if (depth === 1 && ch === '}') {
+        lastCompleteObjectEnd = i;
+      }
+    }
+  }
+
+  if (lastCompleteObjectEnd < 0) return null;
+
+  // Slice up to and including the last complete object, close the array
+  const repaired = raw.slice(0, lastCompleteObjectEnd + 1) + "]";
+  try {
+    const parsed = JSON.parse(repaired);
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+  } catch { /* still broken */ }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -138,9 +177,9 @@ Deno.serve(async (req) => {
       ? `Сегментируй следующую сцену. ВАЖНО: разбей ВЕСЬ текст от начала до конца на отдельные блоки по типу (диалог, повествование, мысли, монолог и т.д.). Определи говорящего для каждой реплики. НЕ сливай текст в один блок.\nВерни ТОЛЬКО JSON-массив объектов: [{"type":"...","speaker":"...","text":"...","inline_narrations":[]}]\nБез markdown, без пояснений.\n\n${content}`
       : `Segment the following scene. IMPORTANT: split the ENTIRE text from start to finish into separate blocks by type (dialogue, narration, thoughts, monologue, etc.). Identify the speaker for each spoken line. Do NOT merge text into a single block.\nReturn ONLY a JSON array of segment objects: [{"type":"...","speaker":"...","text":"...","inline_narrations":[]}]\nNo markdown, no explanations.\n\n${content}`;
 
-    // Estimate required output tokens: ~1.5x input chars (JSON overhead) / 3 chars per token
-    const estimatedOutputTokens = Math.max(4096, Math.ceil((content.length * 1.5) / 3));
-    const maxTokens = Math.min(estimatedOutputTokens, 16384);
+    // Estimate required output tokens: ~2x input chars (JSON overhead) / 3 chars per token
+    const estimatedOutputTokens = Math.max(8192, Math.ceil((content.length * 2) / 3));
+    const maxTokens = Math.min(estimatedOutputTokens, 65536);
 
     // Use max_completion_tokens for newer models, max_tokens for others
     const isNewModel = /gpt-5|o1|o3|o4/i.test(resolved.model);
@@ -202,18 +241,38 @@ Deno.serve(async (req) => {
           try {
             parsed = JSON.parse(arrMatch[0]);
           } catch {
-            console.error("Failed to parse extracted array, raw (first 500 chars):", raw.slice(0, 500));
-            throw new Error("Unparseable");
+            // Attempt to repair truncated JSON array
+            const repaired = repairTruncatedJsonArray(arrMatch[0]);
+            if (repaired) {
+              console.warn("Repaired truncated JSON array, recovered segments");
+              parsed = repaired;
+            } else {
+              console.error("Failed to parse extracted array, raw (first 500 chars):", raw.slice(0, 500));
+              throw new Error("Unparseable");
+            }
           }
         } else {
-          // Try to find { "segments": [...] } wrapper
-          const objMatch = raw.match(/\{[\s\S]*"segments"\s*:\s*\[[\s\S]*\][\s\S]*\}/);
-          if (objMatch) {
-            const obj = JSON.parse(objMatch[0]);
-            parsed = obj.segments;
+          // Maybe the entire response is a truncated array (no closing ])
+          const truncMatch = raw.match(/\[[\s\S]*/);
+          if (truncMatch) {
+            const repaired = repairTruncatedJsonArray(truncMatch[0]);
+            if (repaired) {
+              console.warn("Repaired truncated JSON (no closing bracket), recovered segments");
+              parsed = repaired;
+            } else {
+              console.error("No parseable JSON in AI response, raw (first 500 chars):", raw.slice(0, 500));
+              throw new Error("Unparseable");
+            }
           } else {
-            console.error("No JSON structure found in AI response, raw (first 500 chars):", raw.slice(0, 500));
-            throw new Error("Unparseable");
+            // Try to find { "segments": [...] } wrapper
+            const objMatch = raw.match(/\{[\s\S]*"segments"\s*:\s*\[[\s\S]*\][\s\S]*\}/);
+            if (objMatch) {
+              const obj = JSON.parse(objMatch[0]);
+              parsed = obj.segments;
+            } else {
+              console.error("No JSON structure found in AI response, raw (first 500 chars):", raw.slice(0, 500));
+              throw new Error("Unparseable");
+            }
           }
         }
       }
