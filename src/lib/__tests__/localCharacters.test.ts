@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { CharacterIndex, SceneCharacterMap, LocalCharacter } from "@/pages/parser/types";
 import {
@@ -16,6 +16,12 @@ import {
   upsertSpeakersFromSegments,
   listSceneCharacterMaps,
 } from "@/lib/localCharacters";
+import { setActiveLayout } from "@/lib/projectPaths";
+
+// Force V1 layout for tests (mock storage uses flat paths)
+beforeEach(() => {
+  setActiveLayout("v1");
+});
 
 // ─── In-memory ProjectStorage mock ──────────────────────────
 
