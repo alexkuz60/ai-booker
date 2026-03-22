@@ -10,6 +10,7 @@ import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
 import type { LocalBookStructure } from "@/lib/localSync";
 import { detectFileFormat } from "@/lib/fileFormatUtils";
 import { getProjectActivityMs } from "@/lib/projectActivity";
+import { paths } from "@/lib/projectPaths";
 
 type LocalLibraryCandidate = {
   record: BookRecord;

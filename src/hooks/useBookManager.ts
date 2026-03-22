@@ -13,6 +13,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { t } from "@/pages/parser/i18n";
+import { paths } from "@/lib/projectPaths";
 import type { Scene, TocChapter, Step, ChapterStatus, BookRecord } from "@/pages/parser/types";
 import { ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
