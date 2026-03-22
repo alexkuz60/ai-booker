@@ -179,10 +179,10 @@ interface ProjectStorage {
 
 | Триггер | Что записывается | Куда |
 |---------|------------------|------|
-| `handleFileSelect` (загрузка файла) | project.json + toc.json + chapters.json + source/book.{ext} | Local |
-| Анализ главы завершён | `scenes/chapter_{id}.json` | Local |
+| `handleFileSelect` (загрузка файла) | project.json + toc.json + chapters.json + source/book.{ext} + scene_index.json | Local |
+| Анализ главы завершён | `chapters/{chapterId}/content.json` + scene_index.json (хеши контента) | Local |
 | Ручная правка TOC (уровень, заголовок, страница) | toc.json + chapters.json | Local |
-| Удаление/слияние глав | toc.json + удаление stale scenes/ | Local |
+| Удаление/слияние глав | toc.json + удаление директории chapters/{chapterId}/ | Local |
 | `openSavedBook` | Восстановление state из local (сервер = фоллбек) | React state |
 | Кнопка «На сервер» | chapters + scenes + parts | Supabase |
 
