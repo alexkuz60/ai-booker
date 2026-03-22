@@ -1462,6 +1462,14 @@ export function StoryboardPanel({
           })}
         </div>
       </ScrollArea>
+
+      <StressReviewPanel
+        open={stressReviewOpen}
+        onOpenChange={setStressReviewOpen}
+        suggestions={stressSuggestions}
+        isRu={isRu}
+        onAccept={handleStressReviewAccept}
+      />
     </div>
   );
 }
