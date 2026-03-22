@@ -359,7 +359,7 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка удаления" : "Delete failed");
     }
     setDeleting(false);
-  }, [sceneId, mergeChecked, segments, isRu, persistNow, buildSnapshot, onSegmented]);
+  }, [sceneId, mergeChecked, segments, isRu, persistNow, buildSnapshot, onSegmented, contentDirty]);
 
   const handleSplitAtPhrase = useCallback(async (phraseId: string, textBefore: string, textAfter: string) => {
     if (!sceneId) return;
