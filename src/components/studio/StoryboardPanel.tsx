@@ -316,6 +316,11 @@ export function StoryboardPanel({
       setSegments(updated);
       setMergeChecked(new Set());
       await persistNow(buildSnapshot(updated));
+      // Studio edit is newer than Parser — clear dirty flag
+      if (contentDirty) {
+        setContentDirty(false);
+        supabase.from("book_scenes").update({ content_dirty: false }).eq("id", sceneId);
+      }
       toast.success(isRu ? "Блоки объединены" : "Segments merged");
       onSegmented?.(sceneId);
     } catch (err: any) {
@@ -323,7 +328,7 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка объединения" : "Merge failed");
     }
     setMerging(false);
-  }, [sceneId, mergeGroups, segments, isRu, persistNow, buildSnapshot, onSegmented]);
+  }, [sceneId, mergeGroups, segments, isRu, persistNow, buildSnapshot, onSegmented, contentDirty]);
 
   const handleDeleteSegments = useCallback(async () => {
     if (!sceneId || mergeChecked.size === 0) return;
@@ -343,6 +348,10 @@ export function StoryboardPanel({
       setSegments(updated);
       setMergeChecked(new Set());
       await persistNow(buildSnapshot(updated));
+      if (contentDirty) {
+        setContentDirty(false);
+        supabase.from("book_scenes").update({ content_dirty: false }).eq("id", sceneId);
+      }
       toast.success(isRu ? `Удалено ${toDelete.length} блок(ов)` : `Deleted ${toDelete.length} segment(s)`);
       onSegmented?.(sceneId);
     } catch (err: any) {
@@ -350,7 +359,7 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка удаления" : "Delete failed");
     }
     setDeleting(false);
-  }, [sceneId, mergeChecked, segments, isRu, persistNow, buildSnapshot, onSegmented]);
+  }, [sceneId, mergeChecked, segments, isRu, persistNow, buildSnapshot, onSegmented, contentDirty]);
 
   const handleSplitAtPhrase = useCallback(async (phraseId: string, textBefore: string, textAfter: string) => {
     if (!sceneId) return;
@@ -393,13 +402,17 @@ export function StoryboardPanel({
 
       setSegments(updated);
       await persistNow(buildSnapshot(updated));
+      if (contentDirty) {
+        setContentDirty(false);
+        supabase.from("book_scenes").update({ content_dirty: false }).eq("id", sceneId);
+      }
       toast.success(isRu ? "Блок разделён" : "Segment split");
       onSegmented?.(sceneId);
     } catch (err: any) {
       console.error("Split failed:", err);
       toast.error(isRu ? "Ошибка разделения" : "Split failed");
     }
-  }, [sceneId, segments, isRu, persistNow, buildSnapshot, onSegmented]);
+  }, [sceneId, segments, isRu, persistNow, buildSnapshot, onSegmented, contentDirty]);
 
   const handleSplitSilenceChange = useCallback((segmentId: string, ms: number) => {
     const updated = segments.map(s =>
