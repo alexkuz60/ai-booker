@@ -313,7 +313,7 @@ export function StudioTimeline({
   }, [bookId, sceneId, clipsRefreshToken, storage]);
 
   // ── Real clips from segments ──────────────────────────────
-  const { clips: timelineClips, sceneBoundaries } = useTimelineClips(contextSceneIds, speakerToCharId, clipsRefreshToken, typeMappings);
+  const { clips: timelineClips, sceneBoundaries } = useTimelineClips(contextSceneIds, speakerToCharId, combinedRefreshToken, typeMappings);
 
   // ── Audio player ──────────────────────────────────────────
   const player = useTimelinePlayer(timelineClips);
