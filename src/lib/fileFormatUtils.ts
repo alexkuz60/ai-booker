@@ -3,6 +3,8 @@
  * Prevents hardcoding "source/book.pdf" across the codebase.
  */
 
+import { paths } from "@/lib/projectPaths";
+
 export type FileFormat = "pdf" | "docx" | "fb2";
 
 /** Detect format from file name */
