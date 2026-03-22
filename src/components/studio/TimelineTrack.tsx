@@ -1,5 +1,6 @@
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 import type { TimelineTrackData } from "./StudioTimeline";
+import type { StorageAudioFile } from "@/hooks/useStorageAudioList";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -11,6 +12,7 @@ import {
   ContextMenuSeparator,
   ContextMenuLabel,
 } from "@/components/ui/context-menu";
+import { Music, Waves } from "lucide-react";
 
 interface TimelineTrackProps {
   track: TimelineTrackData;
@@ -23,6 +25,11 @@ interface TimelineTrackProps {
   errorSegmentIds?: Set<string>;
   onSetFade?: (clipId: string, fadeInSec: number, fadeOutSec: number) => void;
   clipFades?: Map<string, { fadeInSec: number; fadeOutSec: number }>;
+  /** Available audio files for insert (atmosphere/sfx tracks) */
+  storageAtmosphere?: StorageAudioFile[];
+  storageSfx?: StorageAudioFile[];
+  onInsertAudio?: (file: StorageAudioFile, atSec: number) => void;
+  isRu?: boolean;
 }
 
 const FADE_OPTIONS = [
@@ -79,6 +86,12 @@ function FadeOverlay({
   );
 }
 
+/** Truncate filename for display */
+function displayName(name: string, maxLen = 28): string {
+  const base = name.replace(/\.[^.]+$/, "");
+  return base.length > maxLen ? base.slice(0, maxLen) + "…" : base;
+}
+
 export function TimelineTrack({
   track,
   zoom,
@@ -90,8 +103,17 @@ export function TimelineTrack({
   errorSegmentIds,
   onSetFade,
   clipFades,
+  storageAtmosphere,
+  storageSfx,
+  onInsertAudio,
+  isRu,
 }: TimelineTrackProps) {
   const showFades = zoom >= 2; // 200%+
+  const isInsertableTrack = track.type === "atmosphere" || track.type === "sfx";
+  const hasInsertMenu = isInsertableTrack && onInsertAudio && ((storageAtmosphere?.length ?? 0) > 0 || (storageSfx?.length ?? 0) > 0);
+
+  // Track right-click position to compute insert time
+  const clickXRef = { current: 0 };
 
   const clips = realClips && realClips.length > 0
     ? realClips.map(c => {
@@ -112,8 +134,17 @@ export function TimelineTrack({
       })
     : [];
 
-  return (
-    <div className="flex h-10 border-b border-border/50 relative" style={{ width: `${duration * zoom * 4}px` }}>
+  const trackContent = (
+    <div
+      className="flex h-10 border-b border-border/50 relative"
+      style={{ width: `${duration * zoom * 4}px` }}
+      onContextMenu={(e) => {
+        if (isInsertableTrack) {
+          const rect = e.currentTarget.getBoundingClientRect();
+          clickXRef.current = e.clientX - rect.left;
+        }
+      }}
+    >
       {clips.filter(c => c.start < c.end).map((clip, i) => {
         const widthPx = (clip.end - clip.start) * zoom * 4;
         const isSelected = selectedSegmentId && clip.id === selectedSegmentId;
@@ -231,4 +262,77 @@ export function TimelineTrack({
       })}
     </div>
   );
+
+  // Wrap the whole track with a context menu for atmosphere/sfx tracks
+  if (hasInsertMenu) {
+    const atmoFiles = storageAtmosphere ?? [];
+    const sfxFiles = storageSfx ?? [];
+    const getInsertSec = () => Math.max(0, clickXRef.current / (zoom * 4));
+
+    return (
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          {trackContent}
+        </ContextMenuTrigger>
+        <ContextMenuContent className="w-56">
+          <ContextMenuLabel className="text-xs">
+            {isRu ? "Вставить аудио" : "Insert audio"}
+          </ContextMenuLabel>
+          <ContextMenuSeparator />
+
+          {atmoFiles.length > 0 && (
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>
+                <Waves className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                {isRu ? "Атмосфера" : "Atmosphere"}
+                <span className="ml-auto text-[10px] text-muted-foreground">{atmoFiles.length}</span>
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="max-h-64 overflow-y-auto w-56">
+                {atmoFiles.map(f => (
+                  <ContextMenuItem
+                    key={f.path}
+                    onClick={() => onInsertAudio!(f, getInsertSec())}
+                    className="text-xs"
+                  >
+                    <Waves className="h-3 w-3 mr-2 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{displayName(f.name)}</span>
+                  </ContextMenuItem>
+                ))}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          )}
+
+          {sfxFiles.length > 0 && (
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>
+                <Music className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                {isRu ? "Эффекты" : "SFX"}
+                <span className="ml-auto text-[10px] text-muted-foreground">{sfxFiles.length}</span>
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="max-h-64 overflow-y-auto w-56">
+                {sfxFiles.map(f => (
+                  <ContextMenuItem
+                    key={f.path}
+                    onClick={() => onInsertAudio!(f, getInsertSec())}
+                    className="text-xs"
+                  >
+                    <Music className="h-3 w-3 mr-2 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{displayName(f.name)}</span>
+                  </ContextMenuItem>
+                ))}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          )}
+
+          {atmoFiles.length === 0 && sfxFiles.length === 0 && (
+            <ContextMenuItem disabled className="text-xs text-muted-foreground">
+              {isRu ? "Нет доступных файлов" : "No files available"}
+            </ContextMenuItem>
+          )}
+        </ContextMenuContent>
+      </ContextMenu>
+    );
+  }
+
+  return trackContent;
 }
