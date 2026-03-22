@@ -82,9 +82,15 @@ export async function saveStoryboardToLocal(
 export async function readStoryboardFromLocal(
   storage: ProjectStorage,
   sceneId: string,
+  chapterId?: string,
 ): Promise<LocalStoryboardData | null> {
   try {
-    return await storage.readJSON<LocalStoryboardData>(paths.storyboard(sceneId));
+    const filePath = paths.storyboard(sceneId, chapterId);
+    if (filePath.includes("__unresolved__")) {
+      console.warn(`[StoryboardSync] Cannot read storyboard: chapterId unresolved for scene ${sceneId}`);
+      return null;
+    }
+    return await storage.readJSON<LocalStoryboardData>(filePath);
   } catch {
     return null;
   }
