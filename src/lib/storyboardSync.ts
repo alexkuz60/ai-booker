@@ -51,6 +51,7 @@ export async function saveStoryboardToLocal(
     inlineNarrationSpeaker: string | null;
     contentHash?: number;
   },
+  chapterId?: string,
 ): Promise<void> {
   try {
     const payload: LocalStoryboardData = {
@@ -62,10 +63,15 @@ export async function saveStoryboardToLocal(
       inlineNarrationSpeaker: data.inlineNarrationSpeaker,
       contentHash: data.contentHash,
     };
-    await storage.writeJSON(paths.storyboard(sceneId), payload);
+    const filePath = paths.storyboard(sceneId, chapterId);
+    if (filePath.includes("__unresolved__")) {
+      console.error(`[StoryboardSync] REFUSING to save to unresolved path for scene ${sceneId}. ChapterId missing.`);
+      return;
+    }
+    await storage.writeJSON(filePath, payload);
     await markStoryboarded(storage, sceneId);
     await touchProjectUpdatedAt(storage);
-    console.debug(`[StoryboardSync] Saved scene ${sceneId}: ${data.segments.length} segments`);
+    console.debug(`[StoryboardSync] Saved scene ${sceneId} → ${filePath}: ${data.segments.length} segments`);
   } catch (err) {
     console.warn("[StoryboardSync] Failed to save:", err);
   }
