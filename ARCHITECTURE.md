@@ -235,7 +235,7 @@ PDF outline содержит контейнерные узлы (например
 - `segment_audio` — для статуса аудио и путей к файлам
 - `scene_playlists` — для длительностей
 
-> **Примечание (K4):** `book_characters` в runtime НЕ читается. Голосовые конфигурации, профили и связи персонажей берутся из `characters/index.json` и `characters/scene_{id}.json` (OPFS). `book_characters` — только backup при Push to Server.
+> **Примечание (K4):** `book_characters` в runtime НЕ читается. Голосовые конфигурации, профили и связи персонажей берутся из `characters.json` (корень проекта) и `chapters/{cid}/scenes/{sid}/characters.json` (OPFS). `book_characters` — только backup при Push to Server.
 
 **БД используется для записи контента ТОЛЬКО:**
 1. Edge Functions (segment-scene, synthesize-scene) — пишут результат анализа/синтеза
