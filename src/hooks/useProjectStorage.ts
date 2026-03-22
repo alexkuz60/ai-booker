@@ -151,6 +151,9 @@ export function useProjectStorage(): UseProjectStorageReturn {
     if (!projectName) return null;
 
     if (storage?.projectName === projectName && meta) {
+      // Project already open — but ensure scene index is in memory
+      // (could have been lost due to HMR or module reload)
+      await ensureV2Layout(storage);
       return storage;
     }
 
@@ -165,6 +168,9 @@ export function useProjectStorage(): UseProjectStorageReturn {
       if (!projectMeta) {
         throw new Error("Not a valid Booker project (project.json not found)");
       }
+
+      // Migrate V1→V2 if needed AND load scene index into memory
+      await ensureV2Layout(store);
 
       setStorage(store);
       setMeta(projectMeta);

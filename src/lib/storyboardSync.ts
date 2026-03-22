@@ -51,6 +51,7 @@ export async function saveStoryboardToLocal(
     inlineNarrationSpeaker: string | null;
     contentHash?: number;
   },
+  chapterId?: string,
 ): Promise<void> {
   try {
     const payload: LocalStoryboardData = {
@@ -62,10 +63,15 @@ export async function saveStoryboardToLocal(
       inlineNarrationSpeaker: data.inlineNarrationSpeaker,
       contentHash: data.contentHash,
     };
-    await storage.writeJSON(paths.storyboard(sceneId), payload);
+    const filePath = paths.storyboard(sceneId, chapterId);
+    if (filePath.includes("__unresolved__")) {
+      console.error(`[StoryboardSync] REFUSING to save to unresolved path for scene ${sceneId}. ChapterId missing.`);
+      return;
+    }
+    await storage.writeJSON(filePath, payload);
     await markStoryboarded(storage, sceneId);
     await touchProjectUpdatedAt(storage);
-    console.debug(`[StoryboardSync] Saved scene ${sceneId}: ${data.segments.length} segments`);
+    console.debug(`[StoryboardSync] Saved scene ${sceneId} → ${filePath}: ${data.segments.length} segments`);
   } catch (err) {
     console.warn("[StoryboardSync] Failed to save:", err);
   }
@@ -76,9 +82,15 @@ export async function saveStoryboardToLocal(
 export async function readStoryboardFromLocal(
   storage: ProjectStorage,
   sceneId: string,
+  chapterId?: string,
 ): Promise<LocalStoryboardData | null> {
   try {
-    return await storage.readJSON<LocalStoryboardData>(paths.storyboard(sceneId));
+    const filePath = paths.storyboard(sceneId, chapterId);
+    if (filePath.includes("__unresolved__")) {
+      console.warn(`[StoryboardSync] Cannot read storyboard: chapterId unresolved for scene ${sceneId}`);
+      return null;
+    }
+    return await storage.readJSON<LocalStoryboardData>(filePath);
   } catch {
     return null;
   }
@@ -89,9 +101,12 @@ export async function readStoryboardFromLocal(
 export async function deleteStoryboardFromLocal(
   storage: ProjectStorage,
   sceneId: string,
+  chapterId?: string,
 ): Promise<void> {
   try {
-    await storage.delete(paths.storyboard(sceneId));
+    const filePath = paths.storyboard(sceneId, chapterId);
+    if (filePath.includes("__unresolved__")) return;
+    await storage.delete(filePath);
     await unmarkStoryboarded(storage, sceneId);
     await touchProjectUpdatedAt(storage);
   } catch {
