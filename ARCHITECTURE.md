@@ -320,7 +320,7 @@ PDF outline содержит контейнерные узлы (например
 
 **Файл:** `src/lib/studioChapter.ts` — `saveStudioChapter()` всегда strip-ит `content`/`content_preview` перед записью в sessionStorage.
 
-### 1.12 Правила целостности библиотеки (Library Integrity Rules)
+### 1.14 Правила целостности библиотеки (Library Integrity Rules)
 
 > Дата добавления: 2026-03-18. Эти инварианты должны соблюдаться ВСЕМИ операциями с книгами.
 
