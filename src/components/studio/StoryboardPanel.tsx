@@ -28,6 +28,7 @@ import { SEGMENT_CONFIG } from "./storyboard/constants";
 import { EditablePhrase } from "./storyboard/EditablePhrase";
 import { SegmentTypeBadge } from "./storyboard/SegmentTypeBadge";
 import { SpeakerBadge } from "./storyboard/SpeakerBadge";
+import { StressReviewPanel, type StressSuggestion } from "./storyboard/StressReviewPanel";
 import type { LocalTypeMappingEntry } from "@/lib/storyboardSync";
 
 // ─── Main component ─────────────────────────────────────────
@@ -89,6 +90,8 @@ export function StoryboardPanel({
   const [staleAudioSegIds, setStaleAudioSegIds] = useState<Set<string>>(new Set());
   const [cleaningMetadata, setCleaningMetadata] = useState(false);
   const [contentDirty, setContentDirty] = useState(false);
+  const [stressReviewOpen, setStressReviewOpen] = useState(false);
+  const [stressSuggestions, setStressSuggestions] = useState<StressSuggestion[]>([]);
   const autoAnalyzeAttemptedRef = useRef<string | null>(null);
   const typeMappingsRef = useRef<LocalTypeMappingEntry[]>([]);
   const audioStatusRef = useRef(audioStatus);
@@ -910,36 +913,34 @@ export function StoryboardPanel({
     if (!sceneId) return;
     setCorrectingStress(true);
     try {
-      const { data, error } = await invokeWithFallback({
-        functionName: "correct-stress",
-        body: { scene_id: sceneId, mode, model: getModelForRole("screenwriter") },
-        userApiKeys,
-        isRu,
-      });
-      if (error) throw error;
-
       if (mode === "suggest") {
+        // Push to DB first so edge function can read phrases
+        await pushToDb(sceneId, buildSnapshot());
+        const { data, error } = await invokeWithFallback({
+          functionName: "correct-stress",
+          body: { scene_id: sceneId, mode: "suggest", model: getModelForRole("proofreader") },
+          userApiKeys,
+          isRu,
+        });
+        if (error) throw error;
         const result = data as any;
-        const suggestions = result.suggestions as Array<{ word: string; stressed_index: number; reason: string }>;
+        const suggestions = result.suggestions as StressSuggestion[];
         if (!suggestions?.length) {
           toast.info(isRu ? "Неоднозначных ударений не найдено" : "No ambiguous stress found");
-          return;
-        }
-        const userId = (await supabase.auth.getUser()).data.user?.id;
-        if (userId) {
-          for (const s of suggestions) {
-            await supabase.from("stress_dictionary" as any).upsert(
-              { user_id: userId, word: s.word.toLowerCase(), stressed_index: s.stressed_index, context: s.reason },
-              { onConflict: "user_id,word,stressed_index" }
-            );
-          }
-          toast.success(
-            isRu
-              ? `Найдено ${suggestions.length} слов, добавлены в словарь. Запустите «Применить» для расстановки.`
-              : `Found ${suggestions.length} words, added to dictionary. Run "Apply" to set stress marks.`
-          );
+        } else {
+          setStressSuggestions(suggestions);
+          setStressReviewOpen(true);
         }
       } else {
+        // Push to DB first so edge function can read phrases
+        await pushToDb(sceneId, buildSnapshot());
+        const { data, error } = await invokeWithFallback({
+          functionName: "correct-stress",
+          body: { scene_id: sceneId, mode: "correct", model: getModelForRole("proofreader") },
+          userApiKeys,
+          isRu,
+        });
+        if (error) throw error;
         const result = data as any;
         if (result.applied > 0) {
           toast.success(
@@ -957,7 +958,29 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка коррекции ударений" : "Stress correction failed");
     }
     setCorrectingStress(false);
-  }, [sceneId, isRu, loadSegments]);
+  }, [sceneId, isRu, loadSegments, pushToDb, buildSnapshot, getModelForRole, userApiKeys]);
+
+  const handleStressReviewAccept = useCallback(async (accepted: StressSuggestion[]) => {
+    if (accepted.length === 0) return;
+    try {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      if (!userId) return;
+      for (const s of accepted) {
+        await supabase.from("stress_dictionary" as any).upsert(
+          { user_id: userId, word: s.word.toLowerCase(), stressed_index: s.stressed_index, context: s.reason },
+          { onConflict: "user_id,word,stressed_index" }
+        );
+      }
+      toast.success(
+        isRu
+          ? `${accepted.length} слов добавлено в словарь. Нажмите «Применить» для расстановки.`
+          : `${accepted.length} words added to dictionary. Click "Apply" to set stress marks.`
+      );
+    } catch (err) {
+      console.error("Failed to save stress dictionary:", err);
+      toast.error(isRu ? "Ошибка сохранения словаря" : "Failed to save dictionary");
+    }
+  }, [isRu]);
 
   // ─── Cleanup ──────────────────────────────────────────────
 
@@ -1439,6 +1462,14 @@ export function StoryboardPanel({
           })}
         </div>
       </ScrollArea>
+
+      <StressReviewPanel
+        open={stressReviewOpen}
+        onOpenChange={setStressReviewOpen}
+        suggestions={stressSuggestions}
+        isRu={isRu}
+        onAccept={handleStressReviewAccept}
+      />
     </div>
   );
 }
