@@ -176,8 +176,9 @@ const SCREENWRITER_SEGMENT_SCENE: TaskPromptDefinition = {
   descriptionRu: "Разбиение текста сцены на типизированные блоки (диалог, рассказчик, мысли...)",
   descriptionEn: "Split scene text into typed blocks (dialogue, narrator, thoughts...)",
   edgeFunction: "segment-scene",
-  isMultilang: false,
-  prompt: `You are a literary text analyst. Given a scene text, split it into structural segments.
+  isMultilang: true,
+  prompt: `You are a literary text analyst preparing text for audiobook production. Given a scene text, split it into structural segments so each segment can be voiced by a different actor or in a different style.
+
 Each segment must have:
 - "type": one of epigraph, narrator, first_person, inner_thought, dialogue, monologue, lyric, footnote, telephone
 - "speaker": string or null (required for dialogue/monologue/first_person, null for others)
@@ -187,18 +188,24 @@ Each segment must have:
 CRITICAL — COMPLETENESS:
 You MUST segment the ENTIRE scene text from the very first word to the very last word. Every sentence must appear in exactly one segment. Do NOT skip, summarize, or truncate any part of the text. The concatenation of all segment "text" fields must reproduce the full original scene. If the scene is long, produce as many segments as needed.
 
-Rules:
-- "narrator" = third-person narration, descriptions, action
-- "first_person" = narration from a character's perspective (I/me)
-- "inner_thought" = character's internal thoughts, reflections
+CRITICAL — GRANULARITY:
+Do NOT merge the entire scene into one big "narrator" block. Analyze the text carefully and identify EVERY change of voice, speaker, or narrative mode. A typical literary scene with dialogue should produce 10-50+ segments. If you return fewer than 5 segments for a scene with dialogue, you are almost certainly wrong.
+
+Type classification rules:
+- "narrator" = third-person narration, descriptions, action, scene-setting
+- "first_person" = narration from a character's perspective using first-person pronouns (I/me/my)
+- "inner_thought" = character's internal thoughts, reflections, stream of consciousness
 - "dialogue" = spoken lines in a conversation (when multiple characters speak in sequence); set "speaker" to the character name
 - "monologue" = a single standalone spoken line (direct speech) NOT part of a back-and-forth exchange; set "speaker" to the character name. Use this when a character speaks once and the scene continues with narration, not another character's reply
-- "lyric" = songs, poems, verses, rhymed text, recitations. IMPORTANT: detect poetry even when embedded in prose — if a passage has verse structure (line breaks with rhythm/rhyme, stanza grouping, or meter), classify it as "lyric". Songs sung by characters are also "lyric" with "speaker" set to the singer. Preserve original line breaks in the "text" field for poetry.
+- "lyric" = songs, poems, verses, rhymed text, recitations. IMPORTANT: detect poetry even when embedded in prose — if a passage has verse structure (line breaks with rhythm/rhyme, stanza grouping, or meter), classify it as "lyric". Songs sung by characters are also "lyric" with "speaker" set to the singer. Preserve original line breaks.
 - "epigraph" = epigraphs, quotes at the start
 - "footnote" = footnotes, author comments. Text marked with [сн. N]...[/сн.] is footnote content.
 - "telephone" = phone conversations
 - Inline sound markers like [gunshot] should remain in the text as-is
-- Footnote reference markers [сн.→ N] MUST be preserved exactly as-is in the text. They mark where a footnote is referenced in the body text. Do NOT remove, alter, or split them.
+- Footnote reference markers [сн.→ N] MUST be preserved exactly as-is in the text.
+
+IMPORTANT — Speaker identification:
+When a character speaks, you MUST identify WHO is speaking by analyzing the surrounding context (narrator attribution, dialogue tags like "said John", "крикнул Петя"). Set "speaker" to the character's name in nominative case.
 
 IMPORTANT — Inline narrator detection:
 When dialogue contains embedded narrator commentary (author words between dashes/commas), extract them as inline_narrations.
@@ -219,6 +226,55 @@ If there are multiple narrator insertions in one line, list them all in the arra
 If dialogue has no narrator insertions, omit inline_narrations or set to [].
 
 Return ONLY a JSON array of segments. No markdown, no explanation.`,
+  promptRu: `Ты — литературный аналитик, подготавливающий текст для производства аудиокниги. Тебе дан текст сцены. Разбей его на структурные сегменты так, чтобы каждый сегмент мог быть озвучен отдельным актёром или в отдельном стиле.
+
+Каждый сегмент должен содержать:
+- "type": один из epigraph, narrator, first_person, inner_thought, dialogue, monologue, lyric, footnote, telephone
+- "speaker": строка или null (обязательно для dialogue/monologue/first_person, null для остальных)
+- "text": точный текст сегмента (сохраняй оригинальную формулировку)
+- "inline_narrations": массив (опционально, только для dialogue/monologue) — вставки рассказчика внутри реплики персонажа
+
+КРИТИЧЕСКИ ВАЖНО — ПОЛНОТА:
+Ты ОБЯЗАН сегментировать ВЕСЬ текст сцены от первого слова до последнего. Каждое предложение должно быть ровно в одном сегменте. НЕ пропускай, НЕ сокращай, НЕ обрезай никакую часть текста. Конкатенация всех полей "text" должна воспроизвести полный оригинальный текст. Если сцена длинная — создавай столько сегментов, сколько нужно.
+
+КРИТИЧЕСКИ ВАЖНО — ДЕТАЛИЗАЦИЯ:
+НЕ сливай всю сцену в один блок "narrator". Тщательно анализируй текст и выявляй КАЖДУЮ смену голоса, говорящего или режима повествования. Типичная литературная сцена с диалогами должна дать 10-50+ сегментов. Если ты возвращаешь менее 5 сегментов для сцены с диалогом — ты почти наверняка ошибаешься.
+
+Правила классификации типов:
+- "narrator" = повествование от третьего лица, описания, действия, обстановка
+- "first_person" = повествование от первого лица (я, мне, мой)
+- "inner_thought" = внутренние мысли персонажа, размышления, поток сознания
+- "dialogue" = произнесённые реплики в разговоре (когда несколько персонажей говорят по очереди); "speaker" = имя персонажа
+- "monologue" = одиночная реплика прямой речи, НЕ являющаяся частью диалога; "speaker" = имя персонажа. Используй, когда персонаж произносит одну фразу и сцена продолжается повествованием
+- "lyric" = песни, стихи, рифмованный текст, декламации. ВАЖНО: распознавай поэзию даже внутри прозы. Песни персонажей тоже "lyric" со "speaker" = певец. Сохраняй оригинальные переносы строк.
+- "epigraph" = эпиграфы, цитаты в начале
+- "footnote" = сноски, комментарии автора. Текст в [сн. N]...[/сн.] — содержимое сноски.
+- "telephone" = телефонные разговоры
+- Маркеры звуков типа [выстрел] оставляй в тексте как есть
+- Маркеры ссылок на сноски [сн.→ N] ОБЯЗАТЕЛЬНО сохраняй без изменений.
+
+ВАЖНО — Определение говорящего:
+Когда персонаж говорит, ты ОБЯЗАН определить КТО говорит, анализируя контекст (авторская ремарка, слова-атрибуции: «сказал Петя», «крикнула Маша»). Указывай "speaker" в именительном падеже.
+
+ВАЖНО — Вставки рассказчика в реплику:
+Когда в диалоге присутствует авторская ремарка (слова автора между тире/запятыми), извлекай их в inline_narrations.
+Пример: «Родя, — тихо позвал он, — ты только не умирай, а?»
+Результат:
+{
+  "type": "dialogue",
+  "speaker": "Разумихин",
+  "text": "Родя, ты только не умирай, а?",
+  "inline_narrations": [
+    { "text": "тихо позвал он", "insert_after": "Родя," }
+  ]
+}
+
+Поле "text" содержит ТОЛЬКО слова персонажа (без авторских ремарок).
+"insert_after" = последний фрагмент речи перед ремаркой.
+Если ремарок несколько — перечисли все в массиве.
+Если ремарок нет — inline_narrations опускай или [].
+
+Верни ТОЛЬКО JSON-массив сегментов. Без markdown, без пояснений.`,
 };
 
 // ─── Profiler prompts ──────────────────────────────────────────────
