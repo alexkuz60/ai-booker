@@ -412,7 +412,7 @@ export function StoryboardPanel({
       console.error("Split failed:", err);
       toast.error(isRu ? "Ошибка разделения" : "Split failed");
     }
-  }, [sceneId, segments, isRu, persistNow, buildSnapshot, onSegmented]);
+  }, [sceneId, segments, isRu, persistNow, buildSnapshot, onSegmented, contentDirty]);
 
   const handleSplitSilenceChange = useCallback((segmentId: string, ms: number) => {
     const updated = segments.map(s =>
