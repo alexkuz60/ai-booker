@@ -528,29 +528,15 @@ export function StoryboardPanel({
 
       onSegmented?.(sceneId);
 
-      // Extract speakers as characters
-      if (bookId && newSegments.length > 0) {
-        const speakers = new Set<string>();
-        for (const seg of newSegments) {
-          if (seg.speaker?.trim() && ["dialogue", "monologue", "first_person", "telephone"].includes(seg.segment_type)) {
-            speakers.add(seg.speaker.trim());
-          }
-        }
-        if (speakers.size > 0) {
-          const { data: existing } = await supabase
-            .from("book_characters")
-            .select("id, name, aliases")
-            .eq("book_id", bookId);
-          const existingNames = new Set<string>();
-          for (const c of existing || []) {
-            existingNames.add(c.name.toLowerCase());
-            for (const a of c.aliases || []) existingNames.add((a as string).toLowerCase());
-          }
-          const toInsert = [...speakers].filter(name => !existingNames.has(name.toLowerCase()));
-          if (toInsert.length > 0) {
-            await supabase.from("book_characters").insert(toInsert.map(name => ({ book_id: bookId, name })));
-            console.debug(`[Storyboard] Inserted ${toInsert.length} new characters: ${toInsert.join(", ")}`);
-          }
+      // Extract speakers as local characters (K4: OPFS is source of truth)
+      if (storage && newSegments.length > 0) {
+        try {
+          const { readCharacterIndex, upsertSpeakersFromSegments } = await import("@/lib/localCharacters");
+          const currentIndex = await readCharacterIndex(storage);
+          await upsertSpeakersFromSegments(storage, sceneId, newSegments, currentIndex);
+          console.debug(`[Storyboard] Upserted speakers to local character index`);
+        } catch (e) {
+          console.warn("[Storyboard] Failed to upsert local speakers:", e);
         }
       }
 
