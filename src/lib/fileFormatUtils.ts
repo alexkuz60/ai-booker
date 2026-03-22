@@ -15,8 +15,7 @@ export function detectFileFormat(fileName: string): FileFormat {
 
 /** Get the local storage path for the source file */
 export function getSourcePath(format: FileFormat): string {
-  if (format === "fb2") return "source/book.fb2";
-  return format === "docx" ? "source/book.docx" : "source/book.pdf";
+  return paths.sourceFile(format);
 }
 
 /** Try to find the source file in local storage, checking all formats */
