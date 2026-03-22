@@ -402,6 +402,10 @@ export function StoryboardPanel({
 
       setSegments(updated);
       await persistNow(buildSnapshot(updated));
+      if (contentDirty) {
+        setContentDirty(false);
+        supabase.from("book_scenes").update({ content_dirty: false }).eq("id", sceneId);
+      }
       toast.success(isRu ? "Блок разделён" : "Segment split");
       onSegmented?.(sceneId);
     } catch (err: any) {
