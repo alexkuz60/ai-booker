@@ -2,7 +2,7 @@
 
 > Единый справочник кодовой архитектуры проекта.  
 > Цель: дать ИИ-ассистенту (и разработчику) однозначное понимание, где хранятся данные, как они перемещаются и какие файлы за что отвечают — без необходимости искать истину по разным документам.  
-> Актуальная дата: 2026-03-21.
+> Актуальная дата: 2026-03-22.
 
 ---
 
@@ -44,51 +44,54 @@
 
 Автодетект: `detectStorageBackend()` → `"fs-access"` | `"opfs"` | `"none"`.
 
-### 1.5 Структура папки проекта
+### 1.5 Структура папки проекта (V2 — иерархическая)
+
+> V1 (плоская) структура устарела. Проекты автоматически мигрируются на V2 при первом открытии (`ensureV2Layout`).
 
 ```
 📁 BookTitle/
-├── project.json           — ProjectMeta (version, bookId, title, userId, language, fileFormat)
+├── project.json           — ProjectMeta (version, bookId, title, userId, language, fileFormat, layoutVersion: 2)
+├── scene_index.json       — SceneIndexData: sceneId→chapterId маппинг, хеши контента, маркеры storyboarded/characterMapped
+├── characters.json        — CharacterIndex[] (глобальный реестр персонажей книги)
 ├── 📁 source/
 │   └── book.{pdf|docx|fb2} — исходный файл (ТОЛЬКО ЛОКАЛЬНО)
 ├── 📁 structure/
 │   ├── toc.json           — LocalBookStructure (bookId, title, fileName, parts[], toc[])
-│   ├── chapters.json      — маппинг index → chapterId
-│   └── characters.json    — LocalCharacter[] (legacy, backward-compat копия characters/index.json)
-├── 📁 characters/          — ★ НОВАЯ ПАПКА: полный реестр персонажей книги
-│   ├── index.json         — CharacterIndex[] (пол, возраст, типаж, манера речи, voice_config, теги)
-│   └── scene_{id}.json    — SceneCharacterMap (кто в сцене: speakers[], typeMappings[])
-├── 📁 scenes/
-│   └── chapter_{id}.json  — { chapterId, scenes[], status }
-├── 📁 storyboard/
-│   └── scene_{id}.json    — LocalStoryboardData:
-│       │                     • sceneId, updatedAt
-│       │                     • segments[] (type, speaker, phrases[], annotations, inline_narrations)
-│       │                     • typeMappings[] (segmentType → characterId/Name)
-│       │                     • audioStatus{} (segmentId → status/durationMs)
-│       │                     • inlineNarrationSpeaker
-├── 📁 audio/
-│   ├── 📁 tts/            — {segmentId}.mp3
-│   ├── 📁 atmosphere/     — атмосферные слои
-│   └── 📁 renders/        — финальные рендеры сцен
+│   └── chapters.json      — маппинг index → chapterId
+├── 📁 chapters/
+│   └── 📁 {chapterId}/
+│       ├── content.json   — { chapterId, scenes[], status } (бывш. scenes/chapter_{id}.json)
+│       └── 📁 scenes/
+│           └── 📁 {sceneId}/
+│               ├── storyboard.json — LocalStoryboardData (segments, typeMappings, audioStatus, contentHash)
+│               ├── characters.json — SceneCharacterMap (speakers, typeMappings)
+│               └── 📁 audio/
+│                   ├── 📁 tts/        — {segmentId}.mp3
+│                   ├── 📁 atmosphere/ — атмосферные слои
+│                   └── 📁 renders/    — финальные рендеры сцен
 └── 📁 montage/
 ```
 
-#### Папка `characters/` — детали
+**Преимущества V2 перед V1:**
+- **Структурная изоляция**: данные сцены физически вложены в папку главы → невозможно случайно обратиться к данным чужой главы
+- **Атомарное удаление**: удаление главы = удаление одной директории рекурсивно
+- **Самодокументирующийся ZIP**: при экспорте структура папок читаема без парсинга ID
+
+#### Реестр персонажей — детали
 
 | Файл | Тип | Назначение |
 |------|-----|------------|
-| `index.json` | `CharacterIndex[]` | Полный реестр на уровне книги: id, name, aliases, gender, age_group, temperament, speech_style, description, speech_tags, psycho_tags, sort_order, color, voice_config, appearances, sceneCount |
-| `scene_{id}.json` | `SceneCharacterMap` | Привязка персонажей к сцене: speakers (characterId, role_in_scene, segment_ids), typeMappings (segmentType → characterId) |
+| `characters.json` (корень проекта) | `CharacterIndex[]` | Полный реестр на уровне книги: id, name, aliases, gender, age_group, temperament, speech_style, description, speech_tags, psycho_tags, sort_order, color, voice_config, appearances, sceneCount |
+| `chapters/{chapterId}/scenes/{sceneId}/characters.json` | `SceneCharacterMap` | Привязка персонажей к сцене: speakers (characterId, role_in_scene, segment_ids), typeMappings (segmentType → characterId) |
 
 **Жизненный цикл:**
-- **Парсер → Извлечение**: `useCharacterExtraction` создаёт записи в `index.json` (имя, пол, алиасы, appearances)
-- **Парсер → Профилирование**: `useCharacterProfiles` обогащает `index.json` (temperament, speech_tags, psycho_tags, description)
-- **Студия → Раскадровка**: `upsertSpeakersFromSegments()` добавляет новых спикеров в `index.json` + создаёт `scene_{id}.json`
-- **Студия → Кастинг**: `useLocalCharacters.updateCharacter()` записывает voice_config в `index.json`
-- **Push to Server**: `useSaveBookToProject` читает `characters/index.json` → upsert в `book_characters`
+- **Парсер → Извлечение**: `useCharacterExtraction` создаёт записи в `characters.json` (имя, пол, алиасы, appearances)
+- **Парсер → Профилирование**: `useCharacterProfiles` обогащает `characters.json` (temperament, speech_tags, psycho_tags, description)
+- **Студия → Раскадровка**: `upsertSpeakersFromSegments()` добавляет новых спикеров в `characters.json` + создаёт `chapters/{cid}/scenes/{sid}/characters.json`
+- **Студия → Кастинг**: `useLocalCharacters.updateCharacter()` записывает voice_config в `characters.json`
+- **Push to Server**: `useSaveBookToProject` читает `characters.json` → upsert в `book_characters`
 
-**Миграция:** при открытии проекта, если `characters/index.json` отсутствует, но есть `structure/characters.json` — автомиграция через `migrateLocalCharacter()`.
+**Миграция:** при открытии проекта, если `characters.json` отсутствует, но есть `characters/index.json` (V1) — автомиграция через `ensureV2Layout()`.
 
 **Ключевые файлы кода:**
 
@@ -103,6 +106,10 @@
 | Файл | Назначение |
 |------|------------|
 | `src/lib/projectStorage.ts` | Интерфейс `ProjectStorage` + классы `LocalFSStorage`, `OPFSStorage` |
+| `src/lib/projectPaths.ts` | **Централизованный резолвер путей** — V1/V2 адаптация, все пути через `paths.*` |
+| `src/lib/sceneIndex.ts` | **Индекс сцен** — sceneId→chapterId маппинг, dirty-маркеры, storyboarded/characterMapped |
+| `src/lib/contentHash.ts` | **FNV-1a 32-bit хеш** — контроль целостности контента сцен |
+| `src/lib/projectMigrator.ts` | **V1→V2 миграция** — автоматическая при открытии проекта (`ensureV2Layout`) |
 | `src/hooks/useProjectStorage.ts` | React-хук: create / open / close / import / export проекта |
 | `src/hooks/useProjectStorageContext.tsx` | React Context + Provider для глобального доступа |
 | `src/lib/localSync.ts` | `syncStructureToLocal()` / `readStructureFromLocal()` — запись/чтение структуры |
@@ -172,10 +179,10 @@ interface ProjectStorage {
 
 | Триггер | Что записывается | Куда |
 |---------|------------------|------|
-| `handleFileSelect` (загрузка файла) | project.json + toc.json + chapters.json + source/book.{ext} | Local |
-| Анализ главы завершён | `scenes/chapter_{id}.json` | Local |
+| `handleFileSelect` (загрузка файла) | project.json + toc.json + chapters.json + source/book.{ext} + scene_index.json | Local |
+| Анализ главы завершён | `chapters/{chapterId}/content.json` + scene_index.json (хеши контента) | Local |
 | Ручная правка TOC (уровень, заголовок, страница) | toc.json + chapters.json | Local |
-| Удаление/слияние глав | toc.json + удаление stale scenes/ | Local |
+| Удаление/слияние глав | toc.json + удаление директории chapters/{chapterId}/ | Local |
 | `openSavedBook` | Восстановление state из local (сервер = фоллбек) | React state |
 | Кнопка «На сервер» | chapters + scenes + parts | Supabase |
 
@@ -199,7 +206,75 @@ interface ProjectStorage {
 
 **browserId:** уникальный идентификатор среды (localStorage), гарантирует что проверка выполняется однократно для данного окружения.
 
-### 1.11 Критические контракты
+### 1.11 Индекс сцен и контроль целостности (V2)
+
+#### scene_index.json — быстрая навигация
+
+Файл `scene_index.json` в корне проекта обеспечивает O(1) навигацию по сценам без рекурсивного обхода папок:
+
+```typescript
+interface SceneIndexData {
+  version: 2;
+  updatedAt: string;
+  entries: Record<string, {  // sceneId → ...
+    chapterId: string;        // для V2-путей
+    chapterIndex: number;
+    sceneNumber: number;
+    contentHash: number;      // FNV-1a 32-bit хеш контента
+  }>;
+  storyboarded: string[];     // sceneId[] с данными раскадровки
+  characterMapped: string[];  // sceneId[] с маппингом персонажей
+}
+```
+
+**Использование:**
+- `resolveChapterId(sceneId)` — in-memory O(1) резолвинг для `projectPaths.ts`
+- `isStoryboarded(sceneId)` — без IO-операций
+- `isSceneDirty(sceneId, storyboardHash)` — сравнение хешей для dirty-маркера
+
+#### contentHash — FNV-1a 32-bit
+
+Каждая сцена при записи в `chapters/{cid}/content.json` получает хеш контента (`fnv1a32`). При открытии раскадровки сравнивается хеш из `scene_index.json` и `storyboard.json.contentHash`. Расхождение → dirty-маркер в UI → рекомендация переанализировать.
+
+**Файлы:**
+| Файл | Назначение |
+|------|------------|
+| `src/lib/sceneIndex.ts` | CRUD индекса, in-memory кэш, dirty-проверки |
+| `src/lib/contentHash.ts` | FNV-1a 32-bit хеш-функция |
+
+#### projectPaths — централизованный резолвер путей
+
+**Все обращения к файлам OPFS ОБЯЗАНЫ** использовать `paths.*` из `src/lib/projectPaths.ts`. Запрещено хардкодить пути в коде.
+
+```typescript
+import { paths } from "@/lib/projectPaths";
+
+// Правильно:
+await storage.readJSON(paths.storyboard(sceneId));
+await storage.readJSON(paths.chapterContent(chapterId));
+await storage.readJSON(paths.characterIndex());
+
+// ЗАПРЕЩЕНО:
+await storage.readJSON(`storyboard/scene_${sceneId}.json`);
+```
+
+Резолвер автоматически адаптирует пути к активному layout (V1/V2). V2 пути включают chapterId, который резолвится из scene_index через `resolveChapterId()`.
+
+### 1.12 Миграция V1 → V2
+
+Автоматическая миграция выполняется в `ensureV2Layout()` при загрузке проекта:
+
+1. Определяется версия layout (`detectLayoutVersion`)
+2. Для V1: читаются `scenes/chapter_*.json` → строится маппинг sceneId→chapterId
+3. Файлы перемещаются в V2-иерархию: `chapters/{cid}/content.json`, `chapters/{cid}/scenes/{sid}/storyboard.json`, etc.
+4. Создаётся `scene_index.json` с хешами контента
+5. `characters/index.json` → `characters.json` (корень)
+6. `project.json.layoutVersion` = 2
+7. Старые V1 директории (`scenes/`, `storyboard/`) удаляются
+
+**Файл:** `src/lib/projectMigrator.ts`
+
+### 1.13 Критические контракты
 
 #### К1. resolvePageRange — диапазон страниц глав
 
@@ -228,7 +303,7 @@ PDF outline содержит контейнерные узлы (например
 - `segment_audio` — для статуса аудио и путей к файлам
 - `scene_playlists` — для длительностей
 
-> **Примечание (K4):** `book_characters` в runtime НЕ читается. Голосовые конфигурации, профили и связи персонажей берутся из `characters/index.json` и `characters/scene_{id}.json` (OPFS). `book_characters` — только backup при Push to Server.
+> **Примечание (K4):** `book_characters` в runtime НЕ читается. Голосовые конфигурации, профили и связи персонажей берутся из `characters.json` (корень проекта) и `chapters/{cid}/scenes/{sid}/characters.json` (OPFS). `book_characters` — только backup при Push to Server.
 
 **БД используется для записи контента ТОЛЬКО:**
 1. Edge Functions (segment-scene, synthesize-scene) — пишут результат анализа/синтеза
@@ -245,7 +320,7 @@ PDF outline содержит контейнерные узлы (например
 
 **Файл:** `src/lib/studioChapter.ts` — `saveStudioChapter()` всегда strip-ит `content`/`content_preview` перед записью в sessionStorage.
 
-### 1.12 Правила целостности библиотеки (Library Integrity Rules)
+### 1.14 Правила целостности библиотеки (Library Integrity Rules)
 
 > Дата добавления: 2026-03-18. Эти инварианты должны соблюдаться ВСЕМИ операциями с книгами.
 
@@ -304,7 +379,7 @@ assert(storedBookId === targetBookId, "bookId mismatch — aborting write");
 `openSavedBook` и `restoreFromLocal` — **read-only** по отношению к Supabase.  
 Единственная допустимая DB-запись — при ручном нажатии «На сервер» (`saveBook`).
 
-### 1.13 Ограничения
+### 1.15 Ограничения
 
 - **OPFS** не даёт пользователю видеть файлы в проводнике — это ограничение API, не баг. ZIP-экспорт решает проблему.
 - **FS Access API** — права сбрасываются при перезапуске браузера, потребуется re-pick папки.
