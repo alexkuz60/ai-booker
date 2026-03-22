@@ -1,6 +1,8 @@
 /**
  * Local-first character persistence layer.
- * Reads/writes characters/index.json and characters/scene_{id}.json.
+ * V1: characters/index.json + characters/scene_{id}.json
+ * V2: characters.json (root) + chapters/{chapterId}/scenes/{sceneId}/characters.json
+ *
  * Handles migration from legacy structure/characters.json (LocalCharacter[]).
  */
 
@@ -12,7 +14,8 @@ import type {
   CharacterVoiceConfig,
 } from "@/pages/parser/types";
 import { touchProjectUpdatedAt } from "@/lib/projectActivity";
-import { paths } from "@/lib/projectPaths";
+import { paths, getActiveLayout } from "@/lib/projectPaths";
+import { markCharacterMapped, getCachedSceneIndex } from "@/lib/sceneIndex";
 
 // ─── Read / Write helpers ────────────────────────────────────
 
@@ -72,6 +75,7 @@ export async function saveSceneCharacterMap(
 ): Promise<void> {
   try {
     await storage.writeJSON(paths.sceneCharacterMap(map.sceneId), map);
+    await markCharacterMapped(storage, map.sceneId);
     await touchProjectUpdatedAt(storage);
   } catch (err) {
     console.warn("[localCharacters] Failed to save scene character map:", err);
@@ -84,6 +88,13 @@ export async function saveSceneCharacterMap(
 export async function listSceneCharacterMaps(
   storage: ProjectStorage,
 ): Promise<string[]> {
+  // V2: use scene index
+  const index = getCachedSceneIndex();
+  if (index && getActiveLayout() === "v2") {
+    return index.characterMapped.map(sid => `scene_${sid}.json`);
+  }
+
+  // V1: scan directory
   try {
     const dir = paths.characterDir();
     if (!dir) return [];
@@ -131,20 +142,41 @@ export async function countSegmentAppearances(
   storage: ProjectStorage,
 ): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
-  const files = await listSceneCharacterMaps(storage);
-  const dir = paths.characterDir();
-  if (!dir) return counts;
-  const reads = files.map(async (f) => {
-    try {
-      const map = await storage.readJSON<SceneCharacterMap>(`${dir}/${f}`);
-      if (map) {
-        for (const s of map.speakers) {
-          counts.set(s.characterId, (counts.get(s.characterId) ?? 0) + s.segment_ids.length);
+  const index = getCachedSceneIndex();
+
+  if (index && getActiveLayout() === "v2") {
+    // V2: read from nested paths
+    const reads = index.characterMapped.map(async (sceneId) => {
+      try {
+        const map = await storage.readJSON<SceneCharacterMap>(
+          paths.sceneCharacterMap(sceneId),
+        );
+        if (map) {
+          for (const s of map.speakers) {
+            counts.set(s.characterId, (counts.get(s.characterId) ?? 0) + s.segment_ids.length);
+          }
         }
-      }
-    } catch { /* skip */ }
-  });
-  await Promise.all(reads);
+      } catch { /* skip */ }
+    });
+    await Promise.all(reads);
+  } else {
+    // V1: use flat directory
+    const files = await listSceneCharacterMaps(storage);
+    const dir = paths.characterDir();
+    if (!dir) return counts;
+    const reads = files.map(async (f) => {
+      try {
+        const map = await storage.readJSON<SceneCharacterMap>(`${dir}/${f}`);
+        if (map) {
+          for (const s of map.speakers) {
+            counts.set(s.characterId, (counts.get(s.characterId) ?? 0) + s.segment_ids.length);
+          }
+        }
+      } catch { /* skip */ }
+    });
+    await Promise.all(reads);
+  }
+
   return counts;
 }
 
