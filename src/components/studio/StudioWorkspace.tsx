@@ -37,6 +37,8 @@ interface StudioWorkspaceProps {
   onBatchComplete?: () => void;
   onBatchClose?: () => void;
   userApiKeys?: Record<string, string>;
+  /** Token to force character list refresh (e.g. after speaker rename or segmentation) */
+  clipsRefreshToken?: number;
 }
 
 export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, selectedSceneNumber, selectedSceneTitle, chapterId, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter, activeTab: externalTab, onTabChange, selectedSegmentId, onSelectSegment, onSynthesizingChange, onErrorSegmentsChange, silenceSec, onSilenceSecChange, onRecalcDone, onVoiceSaved, batchSceneIds, batchScenes, onBatchComplete, onBatchClose, userApiKeys = {} }: StudioWorkspaceProps) {

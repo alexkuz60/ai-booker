@@ -120,6 +120,7 @@ interface CharactersPanelProps {
   onSelectCharacter?: (characterId: string | null) => void;
   onVoiceSaved?: () => void;
   userApiKeys?: Record<string, string>;
+  refreshToken?: number;
 }
 
 export interface CharactersPanelHandle {
@@ -129,12 +130,12 @@ export interface CharactersPanelHandle {
   profiling: boolean;
 }
 
-export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanelProps>(function CharactersPanel({ isRu, bookId, sceneId, chapterSceneIds, selectedCharacterId, onSelectCharacter, onVoiceSaved, userApiKeys = {} }, ref) {
+export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanelProps>(function CharactersPanel({ isRu, bookId, sceneId, chapterSceneIds, selectedCharacterId, onSelectCharacter, onVoiceSaved, userApiKeys = {}, refreshToken = 0 }, ref) {
   const { getModelForRole } = useAiRoles();
   const { storage } = useProjectStorageContext();
 
   // ── LOCAL-FIRST: useLocalCharacters is the single source of truth ──
-  const localChars = useLocalCharacters(storage, bookId ?? null, sceneId, chapterSceneIds);
+  const localChars = useLocalCharacters(storage, bookId ?? null, sceneId, chapterSceneIds, refreshToken);
   const characters = localChars.characters;
   const loading = localChars.loading;
   const sceneCharIds = localChars.sceneCharIds;
