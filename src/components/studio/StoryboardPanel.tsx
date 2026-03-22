@@ -348,6 +348,10 @@ export function StoryboardPanel({
       setSegments(updated);
       setMergeChecked(new Set());
       await persistNow(buildSnapshot(updated));
+      if (contentDirty) {
+        setContentDirty(false);
+        supabase.from("book_scenes").update({ content_dirty: false }).eq("id", sceneId);
+      }
       toast.success(isRu ? `Удалено ${toDelete.length} блок(ов)` : `Deleted ${toDelete.length} segment(s)`);
       onSegmented?.(sceneId);
     } catch (err: any) {
