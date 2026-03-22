@@ -9,6 +9,7 @@ import type { BookRecord } from "@/pages/parser/types";
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
 import type { LocalBookStructure } from "@/lib/localSync";
 import { detectFileFormat } from "@/lib/fileFormatUtils";
+import { getProjectActivityMs } from "@/lib/projectActivity";
 
 type LocalLibraryCandidate = {
   record: BookRecord;
@@ -55,7 +56,10 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     const resolvedTitle = meta?.title || structure?.title || storage.projectName;
     const resolvedFormat = meta?.fileFormat || detectFileFormat(structure?.fileName || resolvedTitle);
     const resolvedFileName = structure?.fileName || `${resolvedTitle}.${resolvedFormat}`;
-    const resolvedCreatedAt = meta?.updatedAt || structure?.updatedAt || meta?.createdAt || new Date(0).toISOString();
+    const activityMs = await getProjectActivityMs(storage);
+    const resolvedUpdatedAt = activityMs > 0
+      ? new Date(activityMs).toISOString()
+      : meta?.updatedAt || structure?.updatedAt || meta?.createdAt || new Date(0).toISOString();
     const dedupeKey = `book:${resolvedId}`;
 
     return {
@@ -65,7 +69,8 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
         file_name: resolvedFileName,
         file_path: null,
         status: "local",
-        created_at: resolvedCreatedAt,
+        created_at: resolvedUpdatedAt,
+        updated_at: resolvedUpdatedAt,
         chapter_count: 0,
         scene_count: 0,
         file_format: resolvedFormat as "pdf" | "docx" | "fb2",

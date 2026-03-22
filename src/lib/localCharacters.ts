@@ -11,6 +11,7 @@ import type {
   LocalCharacter,
   CharacterVoiceConfig,
 } from "@/pages/parser/types";
+import { touchProjectUpdatedAt } from "@/lib/projectActivity";
 
 // ─── Read / Write helpers ────────────────────────────────────
 
@@ -46,6 +47,7 @@ export async function saveCharacterIndex(
     // Also write legacy format for backward compatibility with Parser hooks
     const legacy = characters.map(toLegacyCharacter);
     await storage.writeJSON("structure/characters.json", legacy);
+    await touchProjectUpdatedAt(storage);
     console.debug(`[localCharacters] Saved ${characters.length} characters`);
   } catch (err) {
     console.warn("[localCharacters] Failed to save characters:", err);
@@ -69,6 +71,7 @@ export async function saveSceneCharacterMap(
 ): Promise<void> {
   try {
     await storage.writeJSON(`characters/scene_${map.sceneId}.json`, map);
+    await touchProjectUpdatedAt(storage);
   } catch (err) {
     console.warn("[localCharacters] Failed to save scene character map:", err);
   }
