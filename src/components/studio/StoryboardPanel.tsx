@@ -90,6 +90,8 @@ export function StoryboardPanel({
   const [staleAudioSegIds, setStaleAudioSegIds] = useState<Set<string>>(new Set());
   const [cleaningMetadata, setCleaningMetadata] = useState(false);
   const [contentDirty, setContentDirty] = useState(false);
+  const [stressReviewOpen, setStressReviewOpen] = useState(false);
+  const [stressSuggestions, setStressSuggestions] = useState<StressSuggestion[]>([]);
   const autoAnalyzeAttemptedRef = useRef<string | null>(null);
   const typeMappingsRef = useRef<LocalTypeMappingEntry[]>([]);
   const audioStatusRef = useRef(audioStatus);
