@@ -318,7 +318,8 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         toast.error(isRu ? "Локальный проект не открыт" : "Local project not open");
         return;
       }
-      const storyboard = await storage.readJSON<{ segments: Array<{ segment_id: string; segment_type: string; speaker?: string | null; phrases?: Array<{ text: string }> }> }>(`storyboard/scene_${sceneId}.json`);
+      const { paths } = await import("@/lib/projectPaths");
+      const storyboard = await storage.readJSON<{ segments: Array<{ segment_id: string; segment_type: string; speaker?: string | null; phrases?: Array<{ text: string }> }> }>(paths.storyboard(sceneId));
       if (!storyboard?.segments?.length) {
         toast.info(isRu ? "Нет данных раскадровки" : "No storyboard data");
         return;
@@ -388,7 +389,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         }
         return seg;
       });
-      await storage.writeJSON(`storyboard/scene_${sceneId}.json`, { ...storyboard, segments: updatedSegments });
+      await storage.writeJSON(paths.storyboard(sceneId), { ...storyboard, segments: updatedSegments });
 
       setSpeechContextMap(prev => {
         const next = new Map(prev);
@@ -418,7 +419,8 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     if (speechContextMap.has(cacheKey)) return;
 
     (async () => {
-      const storyboard = await storage.readJSON<{ segments: Array<{ speaker?: string | null; metadata?: Record<string, unknown> }> }>(`storyboard/scene_${sceneId}.json`);
+      const { paths } = await import("@/lib/projectPaths");
+      const storyboard = await storage.readJSON<{ segments: Array<{ speaker?: string | null; metadata?: Record<string, unknown> }> }>(paths.storyboard(sceneId));
       if (!storyboard?.segments) return;
       const charNames = new Set([ch.name.toLowerCase(), ...ch.aliases.map(a => a.toLowerCase())]);
       const seg = storyboard.segments.find(s => s.speaker && charNames.has(s.speaker.toLowerCase()));
