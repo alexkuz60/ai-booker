@@ -98,7 +98,7 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       { role: "user", content: userPrompt },
     ],
     temperature: 0.3,
-    ...(useMaxCompletionTokens ? { max_completion_tokens: 4096 } : { max_tokens: 4096 }),
+    ...(useMaxCompletionTokens ? { max_completion_tokens: 16384 } : { max_tokens: 16384 }),
     tools: [{
       type: "function",
       function: {
