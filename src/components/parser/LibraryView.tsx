@@ -238,7 +238,7 @@ function LibraryViewInner({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleRestoreClick(book)}
+                        onClick={() => onOpenServerBook?.(book)}
                         className="gap-1.5 text-xs"
                       >
                         <Download className="h-3 w-3" />
