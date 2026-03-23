@@ -9,7 +9,7 @@ import type { Segment, Phrase, CharacterOption } from "@/components/studio/story
 import type { PhraseAnnotation, TtsProvider } from "@/components/studio/phraseAnnotations";
 import { touchProjectUpdatedAt } from "@/lib/projectActivity";
 import { paths, getActiveLayout } from "@/lib/projectPaths";
-import { markStoryboarded, unmarkStoryboarded, getCachedSceneIndex } from "@/lib/sceneIndex";
+import { markStoryboarded, unmarkStoryboarded, getCachedSceneIndex, readSceneIndex } from "@/lib/sceneIndex";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -39,6 +39,23 @@ export interface LocalStoryboardData {
   contentHash?: number;
 }
 
+async function resolveStoryboardPath(
+  storage: ProjectStorage,
+  sceneId: string,
+  chapterId?: string,
+): Promise<string | null> {
+  let filePath = paths.storyboard(sceneId, chapterId);
+  if (!filePath.includes("__unresolved__")) return filePath;
+
+  if (getActiveLayout() === "v2") {
+    await readSceneIndex(storage);
+    filePath = paths.storyboard(sceneId, chapterId);
+    if (!filePath.includes("__unresolved__")) return filePath;
+  }
+
+  return null;
+}
+
 // ─── Write ──────────────────────────────────────────────────
 
 export async function saveStoryboardToLocal(
@@ -63,8 +80,8 @@ export async function saveStoryboardToLocal(
       inlineNarrationSpeaker: data.inlineNarrationSpeaker,
       contentHash: data.contentHash,
     };
-    const filePath = paths.storyboard(sceneId, chapterId);
-    if (filePath.includes("__unresolved__")) {
+    const filePath = await resolveStoryboardPath(storage, sceneId, chapterId);
+    if (!filePath) {
       console.error(`[StoryboardSync] REFUSING to save to unresolved path for scene ${sceneId}. ChapterId missing.`);
       return;
     }
@@ -85,8 +102,8 @@ export async function readStoryboardFromLocal(
   chapterId?: string,
 ): Promise<LocalStoryboardData | null> {
   try {
-    const filePath = paths.storyboard(sceneId, chapterId);
-    if (filePath.includes("__unresolved__")) {
+    const filePath = await resolveStoryboardPath(storage, sceneId, chapterId);
+    if (!filePath) {
       console.warn(`[StoryboardSync] Cannot read storyboard: chapterId unresolved for scene ${sceneId}`);
       return null;
     }
@@ -104,8 +121,8 @@ export async function deleteStoryboardFromLocal(
   chapterId?: string,
 ): Promise<void> {
   try {
-    const filePath = paths.storyboard(sceneId, chapterId);
-    if (filePath.includes("__unresolved__")) return;
+    const filePath = await resolveStoryboardPath(storage, sceneId, chapterId);
+    if (!filePath) return;
     await storage.delete(filePath);
     await unmarkStoryboarded(storage, sceneId);
     await touchProjectUpdatedAt(storage);
@@ -119,13 +136,11 @@ export async function deleteStoryboardFromLocal(
 export async function listStoryboardedScenes(
   storage: ProjectStorage,
 ): Promise<string[]> {
-  // V2: use scene index for O(1) lookup
-  const index = getCachedSceneIndex();
-  if (index && getActiveLayout() === "v2") {
-    return [...index.storyboarded];
+  if (getActiveLayout() === "v2") {
+    const index = getCachedSceneIndex() ?? await readSceneIndex(storage);
+    return index ? [...index.storyboarded] : [];
   }
 
-  // V1 fallback: scan directory
   try {
     const dir = paths.storyboardDir();
     const files = await storage.listDir(dir);
