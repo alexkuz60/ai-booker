@@ -450,6 +450,7 @@ export function useBookRestore({
         });
 
         // ── Load characters from server (full CharacterIndex format) ──
+        let restoredChars: CharacterIndex[] = [];
         try {
           const { data: serverChars } = await supabase
             .from("book_characters")
@@ -458,7 +459,7 @@ export function useBookRestore({
             .order("sort_order");
 
           if (serverChars && serverChars.length > 0) {
-            const restoredChars: CharacterIndex[] = serverChars.map(sc => ({
+            restoredChars = serverChars.map(sc => ({
               id: sc.id,
               name: sc.name,
               aliases: sc.aliases || [],
