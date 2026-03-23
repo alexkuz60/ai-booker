@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
 import type { BookRecord } from "@/pages/parser/types";
 import { wipeProjectBrowserState } from "@/lib/projectCleanup";
+import type { SyncProgressCallback } from "@/components/SyncProgressDialog";
 
 const BROWSER_ID_KEY = "booker_browser_id";
 const SERVER_SYNC_PREFIX = "booker_server_sync_checked";
@@ -35,7 +36,7 @@ interface UseServerSyncParams {
   loadBookFromServerById: (bookId: string) => Promise<BookRecord | null>;
   /** Ref-based: updated by orchestrator after openSavedBook is created */
   openSavedBookRef: React.MutableRefObject<
-    ((book: BookRecord, options?: { skipTimestampCheck?: boolean }) => Promise<void>) | undefined
+    ((book: BookRecord, options?: { skipTimestampCheck?: boolean }, _c?: any, _s?: any, onProgress?: SyncProgressCallback) => Promise<void>) | undefined
   >;
 }
 
@@ -134,20 +135,20 @@ export function useServerSync({
 
   const dismissServerNewer = useCallback(() => setServerNewerBookId(null), []);
 
-  const acceptServerVersion = useCallback(async () => {
+  /**
+   * Accept server version with optional progress reporting.
+   * When onProgress is provided, the caller manages the SyncProgressDialog.
+   */
+  const acceptServerVersion = useCallback(async (onProgress?: SyncProgressCallback) => {
     if (!serverNewerBookId) return;
     const targetBookId = serverNewerBookId;
     setServerNewerBookId(null);
 
-    // Wipe-and-Deploy: full cleanup of OPFS + browser state
-    const projectNames = localProjectNamesByBookId.get(targetBookId) || [];
-    await wipeProjectBrowserState(targetBookId, projectNames);
-
     const book = await loadBookFromServerById(targetBookId);
     if (book) {
-      await openSavedBookRef.current?.(book, { skipTimestampCheck: true });
+      await openSavedBookRef.current?.(book, { skipTimestampCheck: true }, undefined, undefined, onProgress);
     }
-  }, [serverNewerBookId, loadBookFromServerById, localProjectNamesByBookId, openSavedBookRef]);
+  }, [serverNewerBookId, loadBookFromServerById, openSavedBookRef]);
 
   return {
     serverNewerBookId,
