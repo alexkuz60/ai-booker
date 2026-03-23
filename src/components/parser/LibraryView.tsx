@@ -275,16 +275,6 @@ function LibraryViewInner({
           </>
         )}
       </div>
-
-      <SyncProgressDialog
-        isRu={isRu}
-        open={restoreDialogOpen}
-        onOpenChange={setRestoreDialogOpen}
-        onConfirm={handleRestoreConfirm}
-        steps={restoreSteps}
-        phase={restorePhase}
-        errorMessage={restoreError}
-      />
     </motion.div>
   );
 }
