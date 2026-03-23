@@ -261,6 +261,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       if (sceneInserts.length > 0) {
         const { error } = await supabase.from("book_scenes").insert(sceneInserts);
         if (error) console.warn("[SaveToServer] scenes insert:", error);
+        else console.log(`[SaveToServer] Inserted ${sceneInserts.length} scenes`);
       }
 
       // ── 3. Replace parts ──
