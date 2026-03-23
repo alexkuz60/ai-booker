@@ -42,6 +42,42 @@ function LibraryViewInner({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
+  // Restore progress dialog state
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
+  const [restoreSteps, setRestoreSteps] = useState<SyncStep[]>([]);
+  const [restorePhase, setRestorePhase] = useState<"confirm" | "running" | "done" | "error">("confirm");
+  const [restoreError, setRestoreError] = useState<string>();
+  const [restoreTargetBook, setRestoreTargetBook] = useState<BookRecord | null>(null);
+
+  const handleRestoreClick = useCallback((book: BookRecord) => {
+    setRestoreTargetBook(book);
+    setRestoreSteps(buildRestoreSteps(isRu));
+    setRestorePhase("confirm");
+    setRestoreError(undefined);
+    setRestoreDialogOpen(true);
+  }, [isRu]);
+
+  const handleRestoreProgress: SyncProgressCallback = useCallback(
+    (stepId, status, detail) => {
+      setRestoreSteps(prev =>
+        prev.map(s => s.id === stepId ? { ...s, status, detail: detail ?? s.detail } : s),
+      );
+    },
+    [],
+  );
+
+  const handleRestoreConfirm = useCallback(async () => {
+    if (!restoreTargetBook || !onOpenServerBook) return;
+    setRestorePhase("running");
+    try {
+      await onOpenServerBook(restoreTargetBook, handleRestoreProgress);
+      setRestorePhase("done");
+    } catch (e) {
+      setRestoreError(e instanceof Error ? e.message : String(e));
+      setRestorePhase("error");
+    }
+  }, [restoreTargetBook, onOpenServerBook, handleRestoreProgress]);
+
   const startRename = (book: BookRecord) => {
     setEditingId(book.id);
     setEditValue(book.title);
