@@ -1,8 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import type { SyncProgressCallback } from "@/components/SyncProgressDialog";
 import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
 import { useStoryboardPersistence } from "@/hooks/useStoryboardPersistence";
 import { readCharacterIndex } from "@/lib/localCharacters";
@@ -84,13 +85,15 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
   const { storage, openProject, backend, meta, downloadProjectAsZip, importProjectFromZip } = useProjectStorageContext();
   const { pushAllToDb } = useStoryboardPersistence(null);
   const [saving, setSaving] = useState(false);
+  const progressRef = useRef<SyncProgressCallback | null>(null);
 
   /**
    * SAVE = push local state → server (Supabase DB + Storage).
    * Used for cross-device sync / backup.
    * Handles first-push: creates books row if it doesn't exist yet.
    */
-  const saveBook = useCallback(async () => {
+  const saveBook = useCallback(async (onProgress?: SyncProgressCallback) => {
+    const report = onProgress || progressRef.current || (() => {});
     if (!currentBookId) {
       toast({
         title: isRu ? "Нечего сохранять" : "Nothing to save",
@@ -128,6 +131,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
     }
 
     setSaving(true);
+    report("verify", "running");
     try {
       const { toc, parts, chapterIdMap, chapterResults } = snapshot;
 
@@ -152,7 +156,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         }
       }
 
+      report("verify", "done");
+
       // ── 0. Ensure books row exists (first-push from OPFS-only workflow) ──
+      report("book_row", "running");
       const { data: existingBook } = await supabase
         .from("books")
         .select("id")
@@ -185,7 +192,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         console.log("[SaveToServer] Created books row for first push:", currentBookId);
       }
 
+      report("book_row", "done");
+
       // ── 1. Delete all existing chapters, then insert fresh ones ──
+      report("chapters", "running");
       const { count: deletedChaptersCount } = await supabase
         .from("book_chapters")
         .delete({ count: "exact" })
@@ -221,8 +231,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         if (error) console.warn("[SaveToServer] chapters insert:", error);
         else console.log(`[SaveToServer] Inserted ${chapterUpserts.length} chapters`);
       }
+      report("chapters", "done", `${chapterUpserts.length}`);
 
       // ── 2. Insert scenes for leaf chapters only ──
+      report("scenes", "running");
       const normalizedResults = sanitizeChapterResultsForStructure(toc, chapterResults);
       const leafIndices = getLeafIndices(toc);
 
@@ -263,8 +275,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         if (error) console.warn("[SaveToServer] scenes insert:", error);
         else console.log(`[SaveToServer] Inserted ${sceneInserts.length} scenes`);
       }
+      report("scenes", "done", `${sceneInserts.length}`);
 
       // ── 3. Replace parts ──
+      report("parts", "running");
       const { count: deletedPartsCount } = await supabase
         .from("book_parts")
         .delete({ count: "exact" })
@@ -285,8 +299,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         }
       }
       console.log(`[SaveToServer] Parts: del ${deletedPartsCount ?? "?"} → ins ${parts.length}`);
+      report("parts", parts.length > 0 ? "done" : "skipped", `${parts.length}`);
 
       // ── 4. Sync characters to book_characters ──
+      report("characters", "running");
       let savedCharCount = 0;
       let savedProfileCount = 0;
       if (storage) {
@@ -325,8 +341,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
           }
         }
       }
+      report("characters", savedCharCount > 0 ? "done" : "skipped", savedCharCount > 0 ? `${savedCharCount}` : undefined);
 
       // ── 4b. Push storyboard data (segments/phrases/mappings) to DB ──
+      report("storyboard", "running");
       let savedStoryboardCount = 0;
       try {
         savedStoryboardCount = await pushAllToDb();
@@ -336,8 +354,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       } catch (e) {
         console.warn("[SaveToServer] Storyboard push failed:", e);
       }
+      report("storyboard", savedStoryboardCount > 0 ? "done" : "skipped", savedStoryboardCount > 0 ? `${savedStoryboardCount}` : undefined);
 
       // ── 5. Upload source file to server if not already there ──
+      report("source_file", "running");
       if (storage) {
         const sourceResult = await findSourceBlob(storage);
         if (sourceResult) {
@@ -365,8 +385,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
           }
         }
       }
+      report("source_file", "done");
 
       // ── 6. Update local project.json ──
+      report("finalize", "running");
       // LIR-3 + LIR-4: read title/meta from storage, not stale React context
       if (storage) {
         const nowIso = new Date().toISOString();
@@ -414,6 +436,8 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       if (savedStoryboardCount > 0) {
         descParts.push(`${savedStoryboardCount} ${isRu ? "раскадровок" : "storyboards"}`);
       }
+      report("finalize", "done");
+
       toast({
         title: isRu ? "Синхронизировано с сервером" : "Synced to server",
         description: descParts.join(", "),
