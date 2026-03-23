@@ -20,8 +20,9 @@ import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
 import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 import { detectFileFormat, getSourcePath, stripFileExtension, type FileFormat } from "@/lib/fileFormatUtils";
 import { getProjectActivityMs } from "@/lib/projectActivity";
-import { saveCharacterIndex } from "@/lib/localCharacters";
+import { saveCharacterIndex, saveSceneCharacterMap } from "@/lib/localCharacters";
 import { saveStoryboardToLocal, type LocalTypeMappingEntry } from "@/lib/storyboardSync";
+import type { SceneCharacterMap } from "@/pages/parser/types";
 import { wipeProjectBrowserState } from "@/lib/projectCleanup";
 
 interface UseBookRestoreParams {
@@ -449,6 +450,7 @@ export function useBookRestore({
         });
 
         // ── Load characters from server (full CharacterIndex format) ──
+        let restoredChars: CharacterIndex[] = [];
         try {
           const { data: serverChars } = await supabase
             .from("book_characters")
@@ -457,7 +459,7 @@ export function useBookRestore({
             .order("sort_order");
 
           if (serverChars && serverChars.length > 0) {
-            const restoredChars: CharacterIndex[] = serverChars.map(sc => ({
+            restoredChars = serverChars.map(sc => ({
               id: sc.id,
               name: sc.name,
               aliases: sc.aliases || [],
@@ -588,6 +590,49 @@ export function useBookRestore({
                 restoredCount++;
               }
               await Promise.all(writes);
+
+              // ── Build scene character maps from restored segments + characters ──
+              if (restoredChars && restoredChars.length > 0) {
+                const charByName = new Map<string, string>();
+                for (const c of restoredChars) {
+                  charByName.set(c.name.toLowerCase(), c.id);
+                  for (const alias of (c.aliases || [])) {
+                    if (alias) charByName.set(alias.toLowerCase(), c.id);
+                  }
+                }
+
+                const sceneMapWrites: Promise<void>[] = [];
+                for (const [sid, segs] of segmentsByScene) {
+                  const speakerMap = new Map<string, { characterId: string; segIds: string[] }>();
+                  for (const seg of segs) {
+                    if (!seg.speaker) continue;
+                    const cid = charByName.get(seg.speaker.toLowerCase());
+                    if (!cid) continue;
+                    const entry = speakerMap.get(cid) || { characterId: cid, segIds: [] };
+                    entry.segIds.push(seg.id);
+                    speakerMap.set(cid, entry);
+                  }
+
+                  const sceneMappings = mappingsByScene.get(sid) || [];
+                  const sceneCharMap: SceneCharacterMap = {
+                    sceneId: sid,
+                    updatedAt: new Date().toISOString(),
+                    speakers: Array.from(speakerMap.values()).map(e => ({
+                      characterId: e.characterId,
+                      role_in_scene: "speaker" as const,
+                      segment_ids: e.segIds,
+                    })),
+                    typeMappings: sceneMappings.map(m => ({
+                      segmentType: m.segment_type,
+                      characterId: m.character_id,
+                    })),
+                  };
+                  sceneMapWrites.push(saveSceneCharacterMap(targetStorage, sceneCharMap));
+                }
+                await Promise.all(sceneMapWrites);
+                console.log(`[OpenBook] ✅ Built ${sceneMapWrites.length} scene character maps`);
+              }
+
               if (restoredCount > 0) {
                 console.log(`[OpenBook] ✅ Restored ${restoredCount} storyboards (${allPhrases.length} phrases, ${(serverMappings || []).length} type mappings) from server`);
               } else {
