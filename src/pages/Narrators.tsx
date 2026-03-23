@@ -140,6 +140,7 @@ function getVoiceDisplayName(provider: string | undefined, voiceId: string | und
 const Narrators = () => {
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
+  const { storage: projectStorage, meta: projectMeta } = useProjectStorageContext();
 
   // Book & character selection
   const [books, setBooks] = useState<BookOption[]>([]);
