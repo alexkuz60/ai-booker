@@ -217,3 +217,19 @@ export function buildSyncSteps(isRu: boolean): SyncStep[] {
     { id: "finalize", label: isRu ? "Завершение" : "Finalizing", status: "pending" },
   ];
 }
+
+/** Build initial steps for server restore (Wipe-and-Deploy) */
+export function buildRestoreSteps(isRu: boolean): SyncStep[] {
+  return [
+    { id: "wipe", label: isRu ? "Очистка локальных данных" : "Clearing local data", status: "pending" },
+    { id: "fetch_structure", label: isRu ? "Загрузка структуры" : "Fetching structure", status: "pending" },
+    { id: "parse_pdf", label: isRu ? "Обработка файла" : "Processing file", status: "pending" },
+    { id: "build_toc", label: isRu ? "Построение оглавления" : "Building TOC", status: "pending" },
+    { id: "write_local", label: isRu ? "Запись в хранилище" : "Writing to storage", status: "pending" },
+    { id: "characters", label: isRu ? "Персонажи" : "Characters", status: "pending" },
+    { id: "storyboards", label: isRu ? "Раскадровка сцен" : "Scene storyboards", status: "pending" },
+    { id: "scene_maps", label: isRu ? "Карты персонажей сцен" : "Scene character maps", status: "pending" },
+    { id: "source_file", label: isRu ? "Сохранение файла" : "Saving source file", status: "pending" },
+    { id: "finalize", label: isRu ? "Завершение" : "Finalizing", status: "pending" },
+  ];
+}
