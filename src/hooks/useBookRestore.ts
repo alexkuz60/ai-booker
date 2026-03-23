@@ -414,11 +414,20 @@ export function useBookRestore({
       setChapterIdMap(newChapterIdMap);
 
       const allChapterIds = chapters.map(c => c.id);
-      const { data: allScenes } = await supabase
-        .from("book_scenes")
-        .select("id, chapter_id, scene_number, title, content, scene_type, mood, bpm")
-        .in("chapter_id", allChapterIds)
-        .order("scene_number");
+      // Batch scene fetching to avoid Supabase 1000-row limit
+      const allScenes: Array<{
+        id: string; chapter_id: string; scene_number: number; title: string;
+        content: string | null; scene_type: string | null; mood: string | null; bpm: number | null;
+      }> = [];
+      for (let i = 0; i < allChapterIds.length; i += 100) {
+        const chunk = allChapterIds.slice(i, i + 100);
+        const { data } = await supabase
+          .from("book_scenes")
+          .select("id, chapter_id, scene_number, title, content, scene_type, mood, bpm")
+          .in("chapter_id", chunk)
+          .order("scene_number");
+        if (data) allScenes.push(...data);
+      }
 
       const scenesByChapter = new Map<string, Scene[]>();
       for (const s of (allScenes || [])) {
