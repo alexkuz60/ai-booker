@@ -1,4 +1,4 @@
-import { useState, useMemo, memo } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 import { motion } from "framer-motion";
 import { Upload, BookOpen, Library, Trash2, FolderOpen, Clock, Loader2, Eraser, Pencil, Check, X, Cloud, Download, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { t } from "@/pages/parser/i18n";
 import type { BookRecord } from "@/pages/parser/types";
+import {
+  SyncProgressDialog,
+  buildRestoreSteps,
+  type SyncStep,
+  type SyncProgressCallback,
+} from "@/components/SyncProgressDialog";
 
 interface LibraryViewProps {
   isRu: boolean;
