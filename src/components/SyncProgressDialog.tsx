@@ -207,6 +207,7 @@ export function buildSyncSteps(isRu: boolean): SyncStep[] {
     { id: "characters", label: isRu ? "Персонажи" : "Characters", status: "pending" },
     { id: "storyboard", label: isRu ? "Раскадровка сцен" : "Scene storyboards", status: "pending" },
     { id: "source_file", label: isRu ? "Исходный файл" : "Source file", status: "pending" },
+    { id: "browser_state", label: isRu ? "Состояние браузера" : "Browser state", status: "pending" },
     { id: "finalize", label: isRu ? "Завершение" : "Finalizing", status: "pending" },
   ];
 }
