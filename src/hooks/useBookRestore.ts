@@ -535,9 +535,9 @@ export function useBookRestore({
               if (data) serverSegments.push(...data);
             }
 
-            console.log(`[OpenBook] Fetched ${serverSegments?.length ?? 0} segments from server${segFetchErr ? ` (error: ${segFetchErr.message})` : ""}`);
+            console.log(`[OpenBook] Fetched ${serverSegments.length} segments from server${segFetchErr ? ` (error: ${segFetchErr.message})` : ""}`);
 
-            if (serverSegments && serverSegments.length > 0) {
+            if (serverSegments.length > 0) {
               // Fetch all phrases for these segments
               const segmentIds = serverSegments.map(s => s.id);
               const allPhrases: Array<{ id: string; segment_id: string; phrase_number: number; text: string; metadata: any }> = [];
