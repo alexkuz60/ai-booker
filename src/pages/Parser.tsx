@@ -543,7 +543,7 @@ export default function Parser() {
               onUpload={startNewProject} onOpen={openSavedBook} onDelete={deleteBook}
               onClearAll={clearAllProjects} onRename={renameBook}
               serverBooks={serverBooks} loadingServerBooks={loadingServerBooks}
-              onOpenServerBook={openServerBook} onDeleteServerBook={deleteServerBook}
+              onOpenServerBook={handleRestoreClick} onDeleteServerBook={deleteServerBook}
             />
           )}
           {step === "upload" && (
