@@ -271,9 +271,12 @@ export function useBookRestore({
           }
           return;
         }
-        return;
+        // Local copy exists but restore failed — fall through to Wipe-and-Deploy
+        console.warn(`[OpenBook] Local copy found for ${book.id} but restore failed, falling through to server deploy`);
+      } else {
+        // No local copy — fall through to Wipe-and-Deploy from server
+        console.log(`[OpenBook] No local copy for ${book.id}, deploying from server`);
       }
-      return;
     }
     console.log(`[OpenBook] skipTimestampCheck=true → forcing Wipe-and-Deploy for book ${book.id}`);
 
@@ -411,14 +414,23 @@ export function useBookRestore({
       setChapterIdMap(newChapterIdMap);
 
       const allChapterIds = chapters.map(c => c.id);
-      const { data: allScenes } = await supabase
-        .from("book_scenes")
-        .select("id, chapter_id, scene_number, title, content, scene_type, mood, bpm")
-        .in("chapter_id", allChapterIds)
-        .order("scene_number");
+      // Batch scene fetching to avoid Supabase 1000-row limit
+      const allScenes: Array<{
+        id: string; chapter_id: string; scene_number: number; title: string;
+        content: string | null; scene_type: string | null; mood: string | null; bpm: number | null;
+      }> = [];
+      for (let i = 0; i < allChapterIds.length; i += 100) {
+        const chunk = allChapterIds.slice(i, i + 100);
+        const { data } = await supabase
+          .from("book_scenes")
+          .select("id, chapter_id, scene_number, title, content, scene_type, mood, bpm")
+          .in("chapter_id", chunk)
+          .order("scene_number");
+        if (data) allScenes.push(...data);
+      }
 
       const scenesByChapter = new Map<string, Scene[]>();
-      for (const s of (allScenes || [])) {
+      for (const s of allScenes) {
         const list = scenesByChapter.get(s.chapter_id) || [];
         list.push({
           id: s.id,
@@ -442,7 +454,7 @@ export function useBookRestore({
       });
       const initMap = sanitizeChapterResultsForStructure(normalizedToc, initRawMap);
       setChapterResults(initMap);
-      report("build_toc", "done", `${normalizedToc.length} ${isRu ? "глав" : "ch"}, ${(allScenes || []).length} ${isRu ? "сцен" : "sc"}`);
+      report("build_toc", "done", `${normalizedToc.length} ${isRu ? "глав" : "ch"}, ${allScenes.length} ${isRu ? "сцен" : "sc"}`);
       setStep("workspace");
 
       report("write_local", "running");
@@ -503,19 +515,29 @@ export function useBookRestore({
         // ── Restore storyboard data (segments + phrases + type_mappings) from server ──
         report("storyboards", "running");
         try {
-          const allSceneIds = (allScenes || []).map(s => s.id);
+          const allSceneIds = allScenes.map(s => s.id);
           console.log(`[OpenBook] Restoring storyboards for ${allSceneIds.length} scenes...`);
           if (allSceneIds.length > 0) {
-            // Fetch segments for all scenes (batched)
-            const { data: serverSegments, error: segFetchErr } = await supabase
-              .from("scene_segments")
-              .select("id, scene_id, segment_number, segment_type, speaker, metadata")
-              .in("scene_id", allSceneIds)
-              .order("segment_number");
+            // Fetch segments for all scenes — chunked to avoid 1000-row limit
+            const serverSegments: Array<{
+              id: string; scene_id: string; segment_number: number;
+              segment_type: string; speaker: string | null; metadata: any;
+            }> = [];
+            let segFetchErr: any = null;
+            for (let i = 0; i < allSceneIds.length; i += 500) {
+              const chunk = allSceneIds.slice(i, i + 500);
+              const { data, error } = await supabase
+                .from("scene_segments")
+                .select("id, scene_id, segment_number, segment_type, speaker, metadata")
+                .in("scene_id", chunk)
+                .order("segment_number");
+              if (error) segFetchErr = error;
+              if (data) serverSegments.push(...data);
+            }
 
-            console.log(`[OpenBook] Fetched ${serverSegments?.length ?? 0} segments from server${segFetchErr ? ` (error: ${segFetchErr.message})` : ""}`);
+            console.log(`[OpenBook] Fetched ${serverSegments.length} segments from server${segFetchErr ? ` (error: ${segFetchErr.message})` : ""}`);
 
-            if (serverSegments && serverSegments.length > 0) {
+            if (serverSegments.length > 0) {
               // Fetch all phrases for these segments
               const segmentIds = serverSegments.map(s => s.id);
               const allPhrases: Array<{ id: string; segment_id: string; phrase_number: number; text: string; metadata: any }> = [];
@@ -530,11 +552,16 @@ export function useBookRestore({
                 if (phrases) allPhrases.push(...phrases);
               }
 
-              // Fetch type mappings
-              const { data: serverMappings } = await supabase
-                .from("scene_type_mappings")
-                .select("scene_id, segment_type, character_id")
-                .in("scene_id", allSceneIds);
+              // Fetch type mappings — chunked
+              const serverMappings: Array<{ scene_id: string; segment_type: string; character_id: string }> = [];
+              for (let i = 0; i < allSceneIds.length; i += 500) {
+                const chunk = allSceneIds.slice(i, i + 500);
+                const { data } = await supabase
+                  .from("scene_type_mappings")
+                  .select("scene_id, segment_type, character_id")
+                  .in("scene_id", chunk);
+                if (data) serverMappings.push(...data);
+              }
 
               // Group phrases by segment
               const phrasesBySegment = new Map<string, typeof allPhrases>();
@@ -554,7 +581,7 @@ export function useBookRestore({
 
               // Group mappings by scene
               const mappingsByScene = new Map<string, Array<{ segment_type: string; character_id: string }>>();
-              for (const m of (serverMappings || [])) {
+              for (const m of serverMappings) {
                 const list = mappingsByScene.get(m.scene_id) || [];
                 list.push({ segment_type: m.segment_type, character_id: m.character_id });
                 mappingsByScene.set(m.scene_id, list);
@@ -562,7 +589,7 @@ export function useBookRestore({
 
               // Build scene→chapterId lookup from loaded data
               const sceneToChapter = new Map<string, string>();
-              for (const s of (allScenes || [])) {
+              for (const s of allScenes) {
                 sceneToChapter.set(s.id, s.chapter_id);
               }
 
@@ -655,7 +682,7 @@ export function useBookRestore({
               }
 
               if (restoredCount > 0) {
-                console.log(`[OpenBook] ✅ Restored ${restoredCount} storyboards (${allPhrases.length} phrases, ${(serverMappings || []).length} type mappings) from server`);
+                console.log(`[OpenBook] ✅ Restored ${restoredCount} storyboards (${allPhrases.length} phrases, ${serverMappings.length} type mappings) from server`);
               } else {
                 console.warn(`[OpenBook] ⚠️ Segments found (${serverSegments.length}) but 0 storyboards written — check sceneToChapter mapping`);
               }

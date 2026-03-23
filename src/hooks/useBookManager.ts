@@ -126,8 +126,14 @@ export function useBookManager({
     _setServerNewerBookId?: any,
     onProgress?: import("@/components/SyncProgressDialog").SyncProgressCallback,
   ) => {
-    await restore.openSavedBook(book, options, undefined, undefined, onProgress);
-  }, [restore.openSavedBook]);
+    await restore.openSavedBook(
+      book,
+      options,
+      serverSync.checkServerNewer,
+      serverSync.setServerNewerBookId,
+      onProgress,
+    );
+  }, [restore.openSavedBook, serverSync.checkServerNewer, serverSync.setServerNewerBookId]);
 
   // Keep ref in sync
   openSavedBookRef.current = openSavedBook;
