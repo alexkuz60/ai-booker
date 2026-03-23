@@ -574,7 +574,29 @@ const Narrators = () => {
                         {isRu ? "Профайл" : "Profile"}
                       </TooltipContent>
                     </Tooltip>
-                    {(ch.voice_config as any)?.voice_id && <Volume2 className="h-3 w-3 text-primary/60 shrink-0" />}
+                    {(ch.voice_config as any)?.voice_id && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // Quick preview: select this char and trigger preview
+                              setSelectedId(ch.id);
+                              setTimeout(() => {
+                                const previewBtn = document.querySelector('[data-preview-btn]') as HTMLButtonElement | null;
+                                previewBtn?.click();
+                              }, 100);
+                            }}
+                            className="shrink-0 p-0.5 rounded transition-colors text-primary/60 hover:text-primary"
+                          >
+                            <Volume2 className="h-3 w-3" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="text-xs">
+                          {isRu ? "Прослушать" : "Preview"}
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                   </div>
                 );
               })}
