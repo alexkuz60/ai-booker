@@ -293,7 +293,11 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         const localChars = await readCharacterIndex(storage);
         if (localChars.length > 0) {
           // Delete existing characters for this book, then insert fresh
-          await supabase.from("book_characters").delete().eq("book_id", currentBookId);
+          const { count: deletedCharsCount } = await supabase
+            .from("book_characters")
+            .delete({ count: "exact" })
+            .eq("book_id", currentBookId);
+          console.log(`[SaveToServer] Deleted ${deletedCharsCount ?? "?"} characters`);
 
           const charInserts = localChars.map((c: CharacterIndex) => ({
             id: c.id, // Preserve original UUID for FK integrity (scene_type_mappings)
