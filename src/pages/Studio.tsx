@@ -239,11 +239,22 @@ const Studio = () => {
     const ids = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
     if (ids.length === 0) return;
     (async () => {
-      // Step 1: find which scenes have segments (use count per scene to avoid 1000-row limit)
+      // Step 1: find which scenes have segments
+      // LOCAL-FIRST: also check OPFS scene_index.storyboarded
       const segmentedIds = new Set<string>();
       const allSegIds: string[] = [];
 
-      // Fetch in chunks to avoid the 1000-row default limit
+      // Check OPFS scene index first (local-first source of truth)
+      const { getCachedSceneIndex } = await import("@/lib/sceneIndex");
+      const sceneIndex = getCachedSceneIndex();
+      if (sceneIndex?.storyboarded) {
+        const idSet = new Set(ids);
+        for (const sid of sceneIndex.storyboarded) {
+          if (idSet.has(sid)) segmentedIds.add(sid);
+        }
+      }
+
+      // Also check DB for segments (needed for audio staleness check)
       const CHUNK = 500;
       for (let i = 0; i < ids.length; i += CHUNK) {
         const slice = ids.slice(i, i + CHUNK);

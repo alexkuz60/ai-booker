@@ -287,6 +287,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
           await supabase.from("book_characters").delete().eq("book_id", currentBookId);
 
           const charInserts = localChars.map((c: CharacterIndex) => ({
+            id: c.id, // Preserve original UUID for FK integrity (scene_type_mappings)
             book_id: currentBookId,
             name: c.name,
             aliases: c.aliases || [],
