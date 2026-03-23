@@ -271,9 +271,12 @@ export function useBookRestore({
           }
           return;
         }
-        return;
+        // Local copy exists but restore failed — fall through to Wipe-and-Deploy
+        console.warn(`[OpenBook] Local copy found for ${book.id} but restore failed, falling through to server deploy`);
+      } else {
+        // No local copy — fall through to Wipe-and-Deploy from server
+        console.log(`[OpenBook] No local copy for ${book.id}, deploying from server`);
       }
-      return;
     }
     console.log(`[OpenBook] skipTimestampCheck=true → forcing Wipe-and-Deploy for book ${book.id}`);
 
