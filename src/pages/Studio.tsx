@@ -23,6 +23,7 @@ import { SaveBookButton } from "@/components/SaveBookButton";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import type { LocalChapterData } from "@/lib/localSync";
 import { readSceneContentFromLocal } from "@/lib/localSceneContent";
+import { getCachedSceneIndex } from "@/lib/sceneIndex";
 
 const Studio = () => {
   const { isRu } = useLanguage();
@@ -239,7 +240,6 @@ const Studio = () => {
     const ids = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
     if (ids.length === 0) return;
 
-    const { getCachedSceneIndex } = require("@/lib/sceneIndex") as typeof import("@/lib/sceneIndex");
     const sceneIndex = getCachedSceneIndex();
     if (!sceneIndex?.storyboarded?.length) {
       setSegmentedSceneIds(new Set());
