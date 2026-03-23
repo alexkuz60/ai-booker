@@ -588,8 +588,12 @@ export function useBookRestore({
               }
               await Promise.all(writes);
               if (restoredCount > 0) {
-                console.log(`[OpenBook] Restored ${restoredCount} storyboards from server`);
+                console.log(`[OpenBook] ✅ Restored ${restoredCount} storyboards (${allPhrases.length} phrases, ${(serverMappings || []).length} type mappings) from server`);
+              } else {
+                console.warn(`[OpenBook] ⚠️ Segments found (${serverSegments.length}) but 0 storyboards written — check sceneToChapter mapping`);
               }
+            } else {
+              console.log(`[OpenBook] No storyboard segments found on server for ${allSceneIds.length} scenes`);
             }
           }
         } catch (storyErr) {
