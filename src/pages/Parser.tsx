@@ -252,9 +252,41 @@ export default function Parser() {
     setStep("upload");
   }, [handleReset, setStep]);
 
-  const openServerBook = useCallback((book: BookRecord, onProgress?: import("@/components/SyncProgressDialog").SyncProgressCallback) => {
-    return openSavedBook(book, { skipTimestampCheck: true }, undefined, undefined, onProgress);
-  }, [openSavedBook]);
+  // ── Restore-from-server progress dialog (lives here to survive step changes) ──
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
+  const [restoreSteps, setRestoreSteps] = useState<SyncStep[]>([]);
+  const [restorePhase, setRestorePhase] = useState<"confirm" | "running" | "done" | "error">("confirm");
+  const [restoreError, setRestoreError] = useState<string>();
+  const [restoreTargetBook, setRestoreTargetBook] = useState<BookRecord | null>(null);
+
+  const handleRestoreClick = useCallback((book: BookRecord) => {
+    setRestoreTargetBook(book);
+    setRestoreSteps(buildRestoreSteps(isRu));
+    setRestorePhase("confirm");
+    setRestoreError(undefined);
+    setRestoreDialogOpen(true);
+  }, [isRu]);
+
+  const handleRestoreProgress: SyncProgressCallback = useCallback(
+    (stepId, status, detail) => {
+      setRestoreSteps(prev =>
+        prev.map(s => s.id === stepId ? { ...s, status, detail: detail ?? s.detail } : s),
+      );
+    },
+    [],
+  );
+
+  const handleRestoreConfirm = useCallback(async () => {
+    if (!restoreTargetBook) return;
+    setRestorePhase("running");
+    try {
+      await openSavedBook(restoreTargetBook, { skipTimestampCheck: true }, undefined, undefined, handleRestoreProgress);
+      setRestorePhase("done");
+    } catch (e) {
+      setRestoreError(e instanceof Error ? e.message : String(e));
+      setRestorePhase("error");
+    }
+  }, [restoreTargetBook, openSavedBook, handleRestoreProgress]);
 
   useEffect(() => {
     if (!new URLSearchParams(location.search).has("resetLocal")) return;
