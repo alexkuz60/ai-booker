@@ -104,8 +104,6 @@ export function SyncProgressDialog({
         <AlertDialogContent
           className="max-w-md"
           onEscapeKeyDown={isLocked ? (e) => e.preventDefault() : undefined}
-          onPointerDownOutside={isLocked ? (e) => e.preventDefault() : undefined}
-          onInteractOutside={isLocked ? (e) => e.preventDefault() : undefined}
         >
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
