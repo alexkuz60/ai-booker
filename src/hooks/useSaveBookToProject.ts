@@ -354,8 +354,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       } catch (e) {
         console.warn("[SaveToServer] Storyboard push failed:", e);
       }
+      report("storyboard", savedStoryboardCount > 0 ? "done" : "skipped", savedStoryboardCount > 0 ? `${savedStoryboardCount}` : undefined);
 
       // ── 5. Upload source file to server if not already there ──
+      report("source_file", "running");
       if (storage) {
         const sourceResult = await findSourceBlob(storage);
         if (sourceResult) {
