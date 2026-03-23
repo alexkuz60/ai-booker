@@ -156,7 +156,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         }
       }
 
+      report("verify", "done");
+
       // ── 0. Ensure books row exists (first-push from OPFS-only workflow) ──
+      report("book_row", "running");
       const { data: existingBook } = await supabase
         .from("books")
         .select("id")
