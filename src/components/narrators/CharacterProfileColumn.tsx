@@ -4,7 +4,7 @@
  * Mirrors the profile view from ParserCharactersPanel.
  */
 
-import { X, Brain } from "lucide-react";
+import { Brain } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
