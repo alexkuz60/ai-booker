@@ -502,7 +502,7 @@ const Narrators = () => {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex h-[calc(100vh-3rem)] min-h-0 overflow-hidden">
       {/* Column 1: Book + Character list */}
-      <div className="w-56 shrink-0 border-r border-border flex flex-col">
+      <div className="w-72 shrink-0 border-r border-border flex flex-col">
         <div className="p-3 border-b border-border space-y-2">
           <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
             {isRu ? "Книга" : "Book"}
