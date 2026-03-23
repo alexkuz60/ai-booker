@@ -7,7 +7,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { Scene, ChapterStatus, TocChapter, CharacterIndex } from "@/pages/parser/types";
-import { readCharacterIndex } from "@/lib/localCharacters";
+import { readCharacterIndex, rebuildAppearancesFromLocal } from "@/lib/localCharacters";
 import { useCharacterCrud } from "@/hooks/useCharacterCrud";
 import { useCharacterExtraction } from "@/hooks/useCharacterExtraction";
 import { useCharacterProfiles } from "@/hooks/useCharacterProfiles";
