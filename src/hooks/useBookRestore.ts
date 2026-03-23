@@ -581,7 +581,7 @@ export function useBookRestore({
 
               // Group mappings by scene
               const mappingsByScene = new Map<string, Array<{ segment_type: string; character_id: string }>>();
-              for (const m of (serverMappings || [])) {
+              for (const m of serverMappings) {
                 const list = mappingsByScene.get(m.scene_id) || [];
                 list.push({ segment_type: m.segment_type, character_id: m.character_id });
                 mappingsByScene.set(m.scene_id, list);
