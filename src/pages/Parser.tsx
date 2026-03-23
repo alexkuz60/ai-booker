@@ -721,7 +721,19 @@ export default function Parser() {
             <AlertDialogCancel>
               {isRu ? "Оставить локальную" : "Keep local"}
             </AlertDialogCancel>
-            <AlertDialogAction onClick={acceptServerVersion}>
+            <AlertDialogAction onClick={() => {
+              dismissServerNewer();
+              setRestoreSteps(buildRestoreSteps(isRu));
+              setRestorePhase("running");
+              setRestoreError(undefined);
+              setRestoreDialogOpen(true);
+              acceptServerVersion(handleRestoreProgress).then(() => {
+                setRestorePhase("done");
+              }).catch((e) => {
+                setRestoreError(e instanceof Error ? e.message : String(e));
+                setRestorePhase("error");
+              });
+            }}>
               {isRu ? "Загрузить с сервера" : "Load from server"}
             </AlertDialogAction>
           </AlertDialogFooter>
