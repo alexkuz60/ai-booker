@@ -87,7 +87,7 @@
 - [x] **Модульная декомпозиция Парсера** — хуки `useLibrary`, `useFileUpload`, `useBookRestore`, `useServerSync`, `useTocMutations`
 - [x] **Каскадный fallback провайдеров** — `invokeWithFallback.ts` + `providerRouting.ts` для 402/429 автопереключения
 - [x] **Унифицированный провайдер-роутинг** — `_shared/providerRouting.ts` для всех Edge Functions (включая extract-characters после P1-рефакторинга)
-- [x] **Local-First архитектура** — OPFS/FS Access как primary source of truth, DB sync только по кнопке
+- [x] **Local-Only архитектура** — OPFS/FS Access как единственный source of truth, DB — только backup по кнопке «На сервер», восстановление — Wipe-and-Deploy
 - [x] **Библиотека из OPFS** — project.json → список проектов, fallback на toc.json
 - [x] **Аварийный сброс** — `?resetLocal=1` для полной очистки OPFS
 - [x] **Объединить «Загрузить PDF» и «Новый проект»** — единый UploadView с именем проекта
