@@ -685,6 +685,8 @@ export function useBookRestore({
             await targetStorage.writeJSON("project.json", projMeta);
           }
         } catch {}
+        report("source_file", "done");
+        report("finalize", "done");
       }
 
       const pdfStatus = restoredPdf
