@@ -158,23 +158,36 @@ interface ProjectStorage {
 ├─────────────────────────────────────────────────────────────────┤
 │  3. СЕРВЕРНАЯ СИНХРОНИЗАЦИЯ (Manual-push)                        │
 │     Кнопка «На сервер» → upsert chapters/scenes в Supabase     │
+│     + UI-состояние (user_settings: studio session, mixer, etc.) │
 │     Обновляет books.updated_at = NOW()                          │
 │     Паттерн: leaf-only delete-then-insert для сцен              │
 │     Это ЕДИНСТВЕННЫЙ момент, когда серверный таймстамп меняется │
 ├─────────────────────────────────────────────────────────────────┤
-│  4. ОТКРЫТИЕ КНИГИ                                              │
+│  4. ОТКРЫТИЕ ЛОКАЛЬНОЙ КНИГИ                                    │
 │     Библиотека: читает ТОЛЬКО project.json из каждого проекта   │
-│     При выборе локальной книги:                                 │
-│       a) Открывать ТОЛЬКО локальный ProjectStorage              │
-│       b) НЕ делать авто-fallback на сервер                      │
-│     При выборе книги из серверной секции:                       │
-│       c) Явно скачать серверную копию в OPFS по действию user   │
-│     Таймстампы сервера — только визуальный ориентир/напоминание │
+│     При выборе: ТОЛЬКО локальный ProjectStorage                 │
+│     НЕ делать авто-fallback на сервер                           │
 │     Затем: toc.json → scenes/ → characters.json → source/       │
 ├─────────────────────────────────────────────────────────────────┤
-│  5. НОВОЕ УСТРОЙСТВО (New Workstation Flow)                     │
-│     Книга есть на сервере, но не в OPFS →                       │
-│     кнопка «Загрузить с сервера» в библиотеке (⏳ планируется)  │
+│  5. ВОССТАНОВЛЕНИЕ С СЕРВЕРА (Wipe-and-Deploy)                  │
+│     Книга есть на сервере, нужно развернуть на этом устройстве: │
+│     a) ПОЛНОЕ УДАЛЕНИЕ локальной OPFS-папки проекта             │
+│     b) ОЧИСТКА browser state: sessionStorage ключей,            │
+│        localStorage ключей (heartbeat, sync-check, nav-state),  │
+│        in-memory кэшей (sceneIndex, chapterTextsCache)          │
+│     c) Создание чистого OPFS-проекта                            │
+│     d) Запись ВСЕХ данных с сервера в OPFS:                     │
+│        - structure (TOC, chapters, parts)                       │
+│        - characters.json (полный реестр с UUID)                 │
+│        - chapters/{cid}/content.json (сцены + контент)          │
+│        - chapters/{cid}/scenes/{sid}/storyboard.json            │
+│        - scene_index.json (с storyboarded/characterMapped)      │
+│     e) Восстановление UI-состояния из user_settings:            │
+│        - studio session (activeTab, selectedSceneIdx)           │
+│        - mixer/plugin configs                                   │
+│     f) Только после полного развертывания — установка проекта   │
+│        как активного в React state                              │
+│     ЗАПРЕЩЕНО: инкрементальный мерж, частичная замена файлов    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
