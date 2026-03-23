@@ -667,6 +667,7 @@ export function useBookRestore({
           console.warn("[OpenBook] Failed to restore storyboards from server:", storyErr);
         }
 
+        report("source_file", "running");
         if (pdfBlob) {
           const sourcePath = getSourcePath(bookFormat);
           try {
