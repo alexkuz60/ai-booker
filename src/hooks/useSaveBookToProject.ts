@@ -387,8 +387,8 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       }
       report("source_file", "done");
 
-      // ── 6. Update local project.json ──
-      report("finalize", "running");
+      // ── 6. Update local project.json (browser state) ──
+      report("browser_state", "running");
       // LIR-3 + LIR-4: read title/meta from storage, not stale React context
       if (storage) {
         const nowIso = new Date().toISOString();
@@ -414,8 +414,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
           await storage.writeJSON("project.json", nextMeta);
         }
       }
+      report("browser_state", "done");
 
       // ── 7. Update books.updated_at so other devices can detect newer version ──
+      report("finalize", "running");
       const serverNow = new Date().toISOString();
       await supabase
         .from("books")
