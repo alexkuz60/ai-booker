@@ -1,8 +1,8 @@
 /**
  * useBookRestore — restores books from OPFS or server.
  * restoreFromLocal: reads from OPFS ProjectStorage.
- * openSavedBook: local-first, falls back to server for "New Workstation Flow".
- * ensurePdfLoaded: lazy-loads PDF proxy from local or server.
+ * openSavedBook: local-only — tries OPFS first; deploys from server via Wipe-and-Deploy.
+ * ensurePdfLoaded: lazy-loads PDF proxy from local project.
  */
 
 import { useState, useCallback } from "react";
@@ -22,6 +22,7 @@ import { detectFileFormat, getSourcePath, stripFileExtension, type FileFormat } 
 import { getProjectActivityMs } from "@/lib/projectActivity";
 import { saveCharacterIndex } from "@/lib/localCharacters";
 import { saveStoryboardToLocal, type LocalTypeMappingEntry } from "@/lib/storyboardSync";
+import { wipeProjectBrowserState } from "@/lib/projectCleanup";
 
 interface UseBookRestoreParams {
   userId: string | undefined;
@@ -269,6 +270,11 @@ export function useBookRestore({
     } else if (!options?.skipTimestampCheck) {
       return;
     }
+
+    // ── Wipe-and-Deploy: clean slate before server restore ──
+    // Step 1-2: Wipe OPFS project + browser state
+    const existingProjects = localProjectNamesByBookId.get(book.id) || [];
+    await wipeProjectBrowserState(book.id, existingProjects);
 
     clearTransientBookState();
     setStep("extracting_toc");

@@ -7,6 +7,7 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
 import type { BookRecord } from "@/pages/parser/types";
+import { wipeProjectBrowserState } from "@/lib/projectCleanup";
 
 const BROWSER_ID_KEY = "booker_browser_id";
 const SERVER_SYNC_PREFIX = "booker_server_sync_checked";
@@ -138,23 +139,15 @@ export function useServerSync({
     const targetBookId = serverNewerBookId;
     setServerNewerBookId(null);
 
-    if (storageBackend === "opfs") {
-      const projectNames = localProjectNamesByBookId.get(targetBookId) || [];
-      for (const pn of projectNames) {
-        try {
-          await OPFSStorage.deleteProject(pn);
-          console.log(`[AcceptServer] Deleted local OPFS project: ${pn}`);
-        } catch (err) {
-          console.warn(`[AcceptServer] Failed to delete OPFS project ${pn}:`, err);
-        }
-      }
-    }
+    // Wipe-and-Deploy: full cleanup of OPFS + browser state
+    const projectNames = localProjectNamesByBookId.get(targetBookId) || [];
+    await wipeProjectBrowserState(targetBookId, projectNames);
 
     const book = await loadBookFromServerById(targetBookId);
     if (book) {
       await openSavedBookRef.current?.(book, { skipTimestampCheck: true });
     }
-  }, [serverNewerBookId, loadBookFromServerById, storageBackend, localProjectNamesByBookId, openSavedBookRef]);
+  }, [serverNewerBookId, loadBookFromServerById, localProjectNamesByBookId, openSavedBookRef]);
 
   return {
     serverNewerBookId,
