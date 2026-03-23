@@ -186,8 +186,11 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       }
 
       // ── 1. Delete all existing chapters, then insert fresh ones ──
-      // This handles both updates and structural changes (renames, deletes, merges)
-      await supabase.from("book_chapters").delete().eq("book_id", currentBookId);
+      const { count: deletedChaptersCount } = await supabase
+        .from("book_chapters")
+        .delete({ count: "exact" })
+        .eq("book_id", currentBookId);
+      console.log(`[SaveToServer] Deleted ${deletedChaptersCount ?? "?"} chapters (cascade: scenes, segments, phrases)`);
 
       const chapterUpserts: Array<{
         id: string;
@@ -216,6 +219,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       if (chapterUpserts.length > 0) {
         const { error } = await supabase.from("book_chapters").insert(chapterUpserts);
         if (error) console.warn("[SaveToServer] chapters insert:", error);
+        else console.log(`[SaveToServer] Inserted ${chapterUpserts.length} chapters`);
       }
 
       // ── 2. Insert scenes for leaf chapters only ──
