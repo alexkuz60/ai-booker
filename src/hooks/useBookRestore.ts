@@ -13,14 +13,15 @@ import {
   flattenTocWithRanges, type TocEntry,
 } from "@/lib/pdf-extract";
 import { t } from "@/pages/parser/i18n";
-import type { Scene, TocChapter, Step, ChapterStatus, BookRecord } from "@/pages/parser/types";
+import type { Scene, TocChapter, Step, ChapterStatus, BookRecord, CharacterIndex } from "@/pages/parser/types";
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
-import { syncStructureToLocal, readStructureFromLocal, saveCharactersToLocal } from "@/lib/localSync";
-import type { LocalCharacter } from "@/pages/parser/types";
+import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
 import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 import { detectFileFormat, getSourcePath, stripFileExtension, type FileFormat } from "@/lib/fileFormatUtils";
 import { getProjectActivityMs } from "@/lib/projectActivity";
+import { saveCharacterIndex } from "@/lib/localCharacters";
+import { saveStoryboardToLocal, type LocalTypeMappingEntry } from "@/lib/storyboardSync";
 
 interface UseBookRestoreParams {
   userId: string | undefined;
