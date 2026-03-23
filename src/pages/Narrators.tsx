@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Volume2, Loader2, Play, Square, Save, RotateCcw } from "lucide-react";
+import { Volume2, Loader2, Play, Square, Save, RotateCcw, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -20,6 +21,8 @@ import { PROXYAPI_TTS_VOICES, PROXYAPI_TTS_MODELS, getVoicesForModel } from "@/c
 import { ElevenLabsCreditsWidget } from "@/components/studio/ElevenLabsCreditsWidget";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { SaveBookButton } from "@/components/SaveBookButton";
+import { CharacterProfileColumn, type CharacterProfileData } from "@/components/narrators/CharacterProfileColumn";
+import { cn } from "@/lib/utils";
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -29,12 +32,34 @@ interface BookCharacter {
   gender: string;
   age_group: string;
   temperament: string | null;
+  description: string | null;
+  speech_style: string | null;
+  speech_tags: string[];
+  psycho_tags: string[];
+  aliases: string[];
   voice_config: Record<string, unknown>;
 }
 
 interface BookOption {
   id: string;
   title: string;
+}
+
+interface AppearanceRow {
+  character_id: string;
+  scene_id: string;
+}
+
+interface ChapterRow {
+  id: string;
+  title: string;
+  chapter_number: number;
+}
+
+interface SceneRow {
+  id: string;
+  chapter_id: string;
+  scene_number: number;
 }
 
 // ─── Voice matching helpers ─────────────────────────────
@@ -75,6 +100,39 @@ function matchRole(voiceId: string, temperament: string | null): string {
   return found ?? "neutral";
 }
 
+// ─── Voice name helpers ─────────────────────────────────
+
+const PROVIDER_LABELS: Record<string, string> = {
+  yandex: "Yandex",
+  salutespeech: "Salute",
+  elevenlabs: "ElevenLabs",
+  proxyapi: "OpenAI",
+};
+
+function getVoiceDisplayName(provider: string | undefined, voiceId: string | undefined, isRu: boolean): string {
+  if (!voiceId) return "—";
+  switch (provider) {
+    case "yandex": {
+      const v = YANDEX_VOICES.find(x => x.id === voiceId);
+      return v ? (isRu ? v.name.ru : v.name.en) : voiceId;
+    }
+    case "salutespeech": {
+      const v = SALUTESPEECH_VOICES.find(x => x.id === voiceId);
+      return v ? (isRu ? v.name.ru : v.name.en) : voiceId;
+    }
+    case "elevenlabs": {
+      const v = ELEVENLABS_VOICES.find(x => x.id === voiceId);
+      return v?.name ?? voiceId;
+    }
+    case "proxyapi": {
+      const v = PROXYAPI_TTS_VOICES.find(x => x.id === voiceId);
+      return v?.name ?? voiceId;
+    }
+    default:
+      return voiceId;
+  }
+}
+
 // ─── Component ──────────────────────────────────────────────
 
 const Narrators = () => {
@@ -86,7 +144,11 @@ const Narrators = () => {
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [characters, setCharacters] = useState<BookCharacter[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [profileViewId, setProfileViewId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Appearances data
+  const [appearances, setAppearances] = useState<Map<string, { chapterIdx: number; chapterTitle: string; sceneNumbers: number[] }[]>>(new Map());
 
   // Voice state — Yandex
   const [voice, setVoice] = useState("marina");
@@ -132,6 +194,18 @@ const Narrators = () => {
     currentBookId: selectedBookId,
   });
 
+  // Current voice label for header
+  const currentVoiceLabel = useMemo(() => {
+    if (!selectedChar) return "";
+    const vc = selectedChar.voice_config;
+    const provider = (vc.provider as string) || "yandex";
+    const voiceId = (vc.voice_id as string) || "";
+    if (!voiceId) return "";
+    const provLabel = PROVIDER_LABELS[provider] ?? provider;
+    const voiceName = getVoiceDisplayName(provider, voiceId, isRu);
+    return `${provLabel} — ${voiceName}`;
+  }, [selectedChar, isRu]);
+
   const headerRight = useMemo(
     () => (
       <SaveBookButton
@@ -172,20 +246,82 @@ const Narrators = () => {
     })();
   }, []);
 
-  // Load characters for selected book
+  // Load characters + appearances for selected book
   const loadCharacters = useCallback(async () => {
-    if (!selectedBookId) { setCharacters([]); return; }
+    if (!selectedBookId) { setCharacters([]); setAppearances(new Map()); return; }
     setLoading(true);
     try {
       const { data } = await supabase
         .from("book_characters")
-        .select("id, name, gender, age_group, temperament, voice_config")
+        .select("id, name, gender, age_group, temperament, description, speech_style, speech_tags, psycho_tags, aliases, voice_config")
         .eq("book_id", selectedBookId)
         .order("sort_order");
-      setCharacters((data || []).map(c => ({
+      const chars: BookCharacter[] = (data || []).map(c => ({
         ...c,
         voice_config: (c.voice_config as Record<string, unknown>) || {},
-      })));
+      }));
+      setCharacters(chars);
+
+      // Load appearances
+      if (chars.length > 0) {
+        const charIds = chars.map(c => c.id);
+        const { data: appData } = await supabase
+          .from("character_appearances")
+          .select("character_id, scene_id")
+          .in("character_id", charIds);
+
+        // Load chapters + scenes for mapping
+        const { data: chapters } = await supabase
+          .from("book_chapters")
+          .select("id, title, chapter_number")
+          .eq("book_id", selectedBookId)
+          .order("chapter_number");
+
+        const chapterIds = (chapters || []).map(ch => ch.id);
+        let scenes: SceneRow[] = [];
+        if (chapterIds.length > 0) {
+          const { data: sceneData } = await supabase
+            .from("book_scenes")
+            .select("id, chapter_id, scene_number")
+            .in("chapter_id", chapterIds);
+          scenes = sceneData || [];
+        }
+
+        // Build scene -> chapter mapping
+        const sceneToChapter = new Map<string, { chapterIdx: number; chapterTitle: string; sceneNumber: number }>();
+        for (const [idx, ch] of (chapters || []).entries()) {
+          const chScenes = scenes.filter(s => s.chapter_id === ch.id);
+          for (const s of chScenes) {
+            sceneToChapter.set(s.id, { chapterIdx: idx, chapterTitle: ch.title, sceneNumber: s.scene_number });
+          }
+        }
+
+        // Build per-character appearances
+        const appMap = new Map<string, { chapterIdx: number; chapterTitle: string; sceneNumbers: number[] }[]>();
+        const perChar = new Map<string, Map<number, { title: string; scenes: Set<number> }>>();
+
+        for (const row of (appData || [])) {
+          const info = sceneToChapter.get(row.scene_id);
+          if (!info) continue;
+          if (!perChar.has(row.character_id)) perChar.set(row.character_id, new Map());
+          const chMap = perChar.get(row.character_id)!;
+          if (!chMap.has(info.chapterIdx)) chMap.set(info.chapterIdx, { title: info.chapterTitle, scenes: new Set() });
+          chMap.get(info.chapterIdx)!.scenes.add(info.sceneNumber);
+        }
+
+        for (const [charId, chMap] of perChar) {
+          const apps = Array.from(chMap.entries())
+            .sort(([a], [b]) => a - b)
+            .map(([chapterIdx, { title, scenes }]) => ({
+              chapterIdx,
+              chapterTitle: title,
+              sceneNumbers: Array.from(scenes).sort((a, b) => a - b),
+            }));
+          appMap.set(charId, apps);
+        }
+
+        setAppearances(appMap);
+      }
     } finally {
       setLoading(false);
     }
@@ -347,15 +483,31 @@ const Narrators = () => {
     if (newVoice?.roles && !newVoice.roles.includes(role)) setRole(newVoice.roles[0] || "neutral");
   };
 
+  // Profile data for profile column
+  const profileChar = profileViewId ? characters.find(c => c.id === profileViewId) : null;
+  const profileData: CharacterProfileData | null = profileChar ? {
+    id: profileChar.id,
+    name: profileChar.name,
+    gender: profileChar.gender,
+    age_group: profileChar.age_group,
+    temperament: profileChar.temperament,
+    description: profileChar.description,
+    speech_style: profileChar.speech_style,
+    speech_tags: profileChar.speech_tags || [],
+    psycho_tags: profileChar.psycho_tags || [],
+    aliases: profileChar.aliases || [],
+    appearances: appearances.get(profileChar.id) || [],
+  } : null;
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex h-[calc(100vh-3rem)] min-h-0 overflow-hidden">
-      {/* Left: Book + Character list */}
-      <div className="w-64 shrink-0 border-r border-border flex flex-col">
+      {/* Column 1: Book + Character list */}
+      <div className="w-56 shrink-0 border-r border-border flex flex-col">
         <div className="p-3 border-b border-border space-y-2">
           <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
             {isRu ? "Книга" : "Book"}
           </label>
-          <Select value={selectedBookId ?? ""} onValueChange={v => { setSelectedBookId(v); setSelectedId(null); }}>
+          <Select value={selectedBookId ?? ""} onValueChange={v => { setSelectedBookId(v); setSelectedId(null); setProfileViewId(null); }}>
             <SelectTrigger className="bg-secondary border-border text-xs h-8">
               <SelectValue placeholder={isRu ? "Выберите книгу" : "Select book"} />
             </SelectTrigger>
@@ -376,43 +528,89 @@ const Narrators = () => {
             </div>
           ) : (
             <div className="p-1 space-y-0.5">
-              {characters.map(ch => (
-                <button
-                  key={ch.id}
-                  onClick={() => setSelectedId(selectedId === ch.id ? null : ch.id)}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                    selectedId === ch.id
-                      ? "bg-accent/15 text-accent-foreground"
-                      : "text-muted-foreground hover:bg-muted/50"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="truncate font-medium">{ch.name}</span>
+              {characters.map(ch => {
+                const isSelected = selectedId === ch.id;
+                const hasProfile = !!ch.description;
+                const isProfileOpen = profileViewId === ch.id;
+                return (
+                  <div
+                    key={ch.id}
+                    className={cn(
+                      "w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1.5 group cursor-pointer",
+                      isSelected
+                        ? "bg-accent/15 text-accent-foreground"
+                        : "text-muted-foreground hover:bg-muted/50"
+                    )}
+                    onClick={() => setSelectedId(isSelected ? null : ch.id)}
+                  >
+                    <span className="truncate font-medium flex-1 text-xs">{ch.name}</span>
                     {ch.gender !== "unknown" && (
                       <span className="text-[10px] text-muted-foreground/60">
                         {ch.gender === "female" ? "♀" : "♂"}
                       </span>
                     )}
+                    {/* Brain icon for profile */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setProfileViewId(isProfileOpen ? null : ch.id);
+                            if (!isSelected) setSelectedId(ch.id);
+                          }}
+                          className={cn(
+                            "shrink-0 p-0.5 rounded transition-colors",
+                            isProfileOpen
+                              ? "text-primary"
+                              : hasProfile
+                                ? "text-primary/40 hover:text-primary opacity-0 group-hover:opacity-100"
+                                : "text-muted-foreground/20 hover:text-muted-foreground/40 opacity-0 group-hover:opacity-100"
+                          )}
+                        >
+                          <Brain className="h-3 w-3" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="text-xs">
+                        {isRu ? "Профайл" : "Profile"}
+                      </TooltipContent>
+                    </Tooltip>
                     {(ch.voice_config as any)?.voice_id && <Volume2 className="h-3 w-3 text-primary/60 shrink-0" />}
                   </div>
-                </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </ScrollArea>
       </div>
 
-      {/* Right: Voice editor */}
+      {/* Column 2: Profile (shown when profileViewId is set) */}
+      {profileData && (
+        <div className="w-72 shrink-0 border-r border-border bg-muted/10">
+          <CharacterProfileColumn
+            character={profileData}
+            isRu={isRu}
+            onClose={() => setProfileViewId(null)}
+          />
+        </div>
+      )}
+
+      {/* Column 3: Voice editor */}
       <div className="flex-1 min-w-0">
         <ScrollArea className="h-full">
           <div className="p-6 max-w-2xl space-y-6">
             {selectedChar ? (
               <>
-                <div className="flex items-center gap-3">
+                {/* Header: Name + current voice label */}
+                <div className="flex items-center gap-3 flex-wrap">
                   <h2 className="text-lg font-display font-semibold text-foreground">{selectedChar.name}</h2>
                   {selectedChar.gender !== "unknown" && (
                     <Badge variant="outline" className="text-xs">
                       {selectedChar.gender === "female" ? "♀" : "♂"}
+                    </Badge>
+                  )}
+                  {currentVoiceLabel && (
+                    <Badge variant="secondary" className="text-xs font-mono">
+                      {currentVoiceLabel}
                     </Badge>
                   )}
                 </div>
