@@ -501,24 +501,8 @@ const Narrators = () => {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex h-[calc(100vh-3rem)] min-h-0 overflow-hidden">
-      {/* Column 1: Book + Character list */}
-      <div className="w-72 shrink-0 border-r border-border flex flex-col">
-        <div className="p-3 border-b border-border space-y-2">
-          <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-            {isRu ? "Книга" : "Book"}
-          </label>
-          <Select value={selectedBookId ?? ""} onValueChange={v => { setSelectedBookId(v); setSelectedId(null); setProfileViewId(null); }}>
-            <SelectTrigger className="bg-secondary border-border text-xs h-8">
-              <SelectValue placeholder={isRu ? "Выберите книгу" : "Select book"} />
-            </SelectTrigger>
-            <SelectContent className="bg-card border-border">
-              {books.map(b => (
-                <SelectItem key={b.id} value={b.id} className="text-xs">{b.title}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
+      {/* Column 1: Character list (20%) */}
+      <div className="border-r border-border flex flex-col" style={{ width: '20%', minWidth: 0 }}>
         <ScrollArea className="flex-1">
           {loading ? (
             <div className="p-4 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
