@@ -69,10 +69,10 @@ async function fetchChunked<T>(
   const results: T[] = [];
   for (let i = 0; i < filterIds.length; i += chunkSize) {
     const chunk = filterIds.slice(i, i + chunkSize);
-    let q = (supabase.from(table) as any).select(select).in(filterCol, chunk);
+    let q = supabase.from(table as any).select(select).in(filterCol, chunk);
     if (order) q = q.order(order);
     const { data } = await q;
-    if (data) results.push(...data);
+    if (data) results.push(...(data as T[]));
   }
   return results;
 }
