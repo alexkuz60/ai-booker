@@ -9,9 +9,11 @@
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type {
   CharacterIndex,
+  CharacterAppearance,
   SceneCharacterMap,
   LocalCharacter,
   CharacterVoiceConfig,
+  TocChapter,
 } from "@/pages/parser/types";
 import { touchProjectUpdatedAt } from "@/lib/projectActivity";
 import { paths, getActiveLayout } from "@/lib/projectPaths";
