@@ -131,6 +131,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
     }
 
     setSaving(true);
+    report("verify", "running");
     try {
       const { toc, parts, chapterIdMap, chapterResults } = snapshot;
 
