@@ -225,7 +225,7 @@ export function useBookManager({
         const allProjects = await OPFSStorage.listProjects();
         await Promise.all(allProjects.map((name) => OPFSStorage.deleteProject(name)));
       }
-      wipeAllBrowserState();
+      await wipeAllBrowserState();
       setStep("library");
       setBookId(null);
       await library.loadLibrary();
