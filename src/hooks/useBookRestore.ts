@@ -442,6 +442,7 @@ export function useBookRestore({
       });
       const initMap = sanitizeChapterResultsForStructure(normalizedToc, initRawMap);
       setChapterResults(initMap);
+      report("build_toc", "done", `${normalizedToc.length} ${isRu ? "глав" : "ch"}, ${(allScenes || []).length} ${isRu ? "сцен" : "sc"}`);
       setStep("workspace");
 
       const targetStorage = await ensureWritableLocalStorage(
