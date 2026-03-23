@@ -271,6 +271,11 @@ export function useBookRestore({
       return;
     }
 
+    // ── Wipe-and-Deploy: clean slate before server restore ──
+    // Step 1-2: Wipe OPFS project + browser state
+    const existingProjects = localProjectNamesByBookId.get(book.id) || [];
+    await wipeProjectBrowserState(book.id, existingProjects);
+
     clearTransientBookState();
     setStep("extracting_toc");
     setFileName(book.file_name);
