@@ -36,27 +36,6 @@ function LibraryViewInner({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
-  const handleRestoreProgress: SyncProgressCallback = useCallback(
-    (stepId, status, detail) => {
-      setRestoreSteps(prev =>
-        prev.map(s => s.id === stepId ? { ...s, status, detail: detail ?? s.detail } : s),
-      );
-    },
-    [],
-  );
-
-  const handleRestoreConfirm = useCallback(async () => {
-    if (!restoreTargetBook || !onOpenServerBook) return;
-    setRestorePhase("running");
-    try {
-      await onOpenServerBook(restoreTargetBook, handleRestoreProgress);
-      setRestorePhase("done");
-    } catch (e) {
-      setRestoreError(e instanceof Error ? e.message : String(e));
-      setRestorePhase("error");
-    }
-  }, [restoreTargetBook, onOpenServerBook, handleRestoreProgress]);
-
   const startRename = (book: BookRecord) => {
     setEditingId(book.id);
     setEditValue(book.title);
