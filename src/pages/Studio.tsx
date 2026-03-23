@@ -233,57 +233,48 @@ const Studio = () => {
     };
   }, [storage, chapter?.chapterId, chapter?.scenes.map((scene) => `${scene.id ?? "no-id"}:${scene.scene_number}:${scene.title}`).join("|"), setChapter]);
 
-  // Check which scenes already have segments, audio rendered, and stale audio
+  // LOCAL-ONLY: segmented scene IDs come exclusively from OPFS scene_index
+  useEffect(() => {
+    if (!chapter) return;
+    const ids = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
+    if (ids.length === 0) return;
+
+    const { getCachedSceneIndex } = require("@/lib/sceneIndex") as typeof import("@/lib/sceneIndex");
+    const sceneIndex = getCachedSceneIndex();
+    if (!sceneIndex?.storyboarded?.length) {
+      setSegmentedSceneIds(new Set());
+      return;
+    }
+    const idSet = new Set(ids);
+    const localSegmented = new Set<string>();
+    for (const sid of sceneIndex.storyboarded) {
+      if (idSet.has(sid)) localSegmented.add(sid);
+    }
+    setSegmentedSceneIds(localSegmented);
+  }, [chapter?.scenes.map(s => s.id).join(","), clipsRefreshToken]);
+
+  // DB-first: audio render status & staleness (segment_audio is DB-first)
   useEffect(() => {
     if (!chapter) return;
     const ids = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
     if (ids.length === 0) return;
     (async () => {
-      // Step 1: find which scenes have segments
-      // LOCAL-FIRST: also check OPFS scene_index.storyboarded
-      const segmentedIds = new Set<string>();
-      const allSegIds: string[] = [];
-
-      // Check OPFS scene index first (local-first source of truth)
-      const { getCachedSceneIndex } = await import("@/lib/sceneIndex");
-      const sceneIndex = getCachedSceneIndex();
-      if (sceneIndex?.storyboarded) {
-        const idSet = new Set(ids);
-        for (const sid of sceneIndex.storyboarded) {
-          if (idSet.has(sid)) segmentedIds.add(sid);
-        }
-      }
-
-      // Also check DB for segments (needed for audio staleness check)
+      // Fetch segments from DB (segment_audio is DB-first, so we need segment IDs)
       const CHUNK = 500;
+      let segData: { id: string; scene_id: string; speaker: string | null }[] = [];
       for (let i = 0; i < ids.length; i += CHUNK) {
         const slice = ids.slice(i, i + CHUNK);
-        const { data: segData } = await supabase
+        const { data } = await supabase
           .from("scene_segments")
           .select("id, scene_id, speaker")
           .in("scene_id", slice)
           .limit(5000);
-        if (segData?.length) {
-          for (const s of segData) {
-            segmentedIds.add(s.scene_id);
-            allSegIds.push(s.id);
-          }
-        }
+        if (data?.length) segData.push(...data);
       }
 
-      if (segmentedIds.size === 0) return;
-      setSegmentedSceneIds(segmentedIds);
-
-      // Reuse segData for audio staleness check
-      const { data: segDataFull } = await supabase
-        .from("scene_segments")
-        .select("id, scene_id, speaker")
-        .in("scene_id", [...segmentedIds])
-        .limit(5000);
-      const segData = segDataFull ?? [];
+      if (segData.length === 0) return;
 
       const segIds = segData.map(s => s.id);
-      // Fetch audio in chunks to avoid 1000-row limit
       let audioData: { segment_id: string; voice_config: unknown }[] = [];
       for (let i = 0; i < segIds.length; i += CHUNK) {
         const slice = segIds.slice(i, i + CHUNK);
@@ -296,26 +287,25 @@ const Studio = () => {
         if (data?.length) audioData.push(...data);
       }
 
-      // Load current character voice configs for staleness check
-      const currentBookId = bookId ?? chapter.bookId;
+      // LOCAL-ONLY: character voice configs from OPFS via readCharacterIndex
       let charVoiceMap = new Map<string, Record<string, unknown>>();
-      if (currentBookId) {
-        const { data: chars } = await supabase
-          .from("book_characters")
-          .select("name, aliases, voice_config")
-          .eq("book_id", currentBookId);
-        if (chars) {
+      if (storage?.isReady) {
+        try {
+          const { readCharacterIndex } = await import("@/lib/localCharacters");
+          const chars = await readCharacterIndex(storage);
           for (const c of chars) {
             const vc = (c.voice_config || {}) as Record<string, unknown>;
             charVoiceMap.set((c.name || "").toLowerCase(), vc);
             for (const a of (c.aliases || [])) {
-              charVoiceMap.set((a as string).toLowerCase(), vc);
+              charVoiceMap.set(a.toLowerCase(), vc);
             }
           }
+        } catch (err) {
+          console.warn("[Studio] Failed to read local character index for staleness check:", err);
         }
       }
 
-      if (audioData?.length) {
+      if (audioData.length > 0) {
         const segToScene = new Map(segData.map(s => [s.id, s.scene_id]));
         const segToSpeaker = new Map(segData.map(s => [s.id, s.speaker]));
         const rendered = new Set<string>();
@@ -330,21 +320,17 @@ const Studio = () => {
           if (sceneId) {
             rendered.add(sceneId);
             audioCountByScene.set(sceneId, (audioCountByScene.get(sceneId) ?? 0) + 1);
-            // Check staleness: compare saved voice_config with current character voice_config
             const speaker = segToSpeaker.get(a.segment_id);
             if (speaker && charVoiceMap.size > 0) {
               const currentVc = charVoiceMap.get(speaker.toLowerCase());
-              // Only compare if character has an explicitly configured voice
               if (currentVc && currentVc.voice) {
                 const savedVc = (a.voice_config || {}) as Record<string, unknown>;
                 const keys = ["voice", "role", "speed", "pitchShift", "volume"];
                 const changed = keys.some(k => {
                   const cur = currentVc[k];
                   const sav = savedVc[k];
-                  // Normalize: treat undefined/null/"" as equivalent empty
                   const curStr = (cur !== undefined && cur !== null && cur !== "") ? String(cur) : "";
                   const savStr = (sav !== undefined && sav !== null && sav !== "") ? String(sav) : "";
-                  // For numeric fields, compare numerically to avoid "1" vs "1.0" issues
                   if (k === "speed" || k === "pitchShift" || k === "volume") {
                     const curNum = curStr ? Number(curStr) : -999;
                     const savNum = savStr ? Number(savStr) : -999;
@@ -366,7 +352,7 @@ const Studio = () => {
         setFullyRenderedSceneIds(fully);
       }
     })();
-  }, [chapter?.scenes.map(s => s.id).join(","), bookId, clipsRefreshToken]);
+  }, [chapter?.scenes.map(s => s.id).join(","), bookId, clipsRefreshToken, storage]);
 
   // LOCAL-FIRST: selected scene text always comes from OPFS, never from browser storage.
   // К3+К4: scene text comes ONLY from OPFS — no fallback to in-memory chapter or DB.
