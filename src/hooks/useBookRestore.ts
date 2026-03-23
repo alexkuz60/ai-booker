@@ -441,36 +441,150 @@ export function useBookRestore({
           chapterResults: initMap,
         });
 
-        // ── Load characters from server and save to local ──
+        // ── Load characters from server (full CharacterIndex format) ──
         try {
           const { data: serverChars } = await supabase
             .from("book_characters")
-            .select("name, aliases, gender, age_group, temperament, speech_style, description")
+            .select("id, name, aliases, gender, age_group, temperament, speech_style, description, speech_tags, psycho_tags, sort_order, color, voice_config")
             .eq("book_id", book.id)
             .order("sort_order");
 
           if (serverChars && serverChars.length > 0) {
-            const localChars: LocalCharacter[] = serverChars.map(sc => ({
-              id: crypto.randomUUID(),
+            const restoredChars: CharacterIndex[] = serverChars.map(sc => ({
+              id: sc.id,
               name: sc.name,
               aliases: sc.aliases || [],
               gender: (sc.gender as "male" | "female" | "unknown") || "unknown",
+              age_group: sc.age_group || "unknown",
+              temperament: sc.temperament || null,
+              speech_style: sc.speech_style || null,
+              description: sc.description || null,
+              speech_tags: sc.speech_tags || [],
+              psycho_tags: sc.psycho_tags || [],
+              sort_order: sc.sort_order || 0,
+              color: sc.color || null,
+              voice_config: (sc.voice_config as Record<string, unknown>) || {},
               appearances: [],
               sceneCount: 0,
-              profile: (sc.age_group !== "unknown" || sc.temperament || sc.speech_style || sc.description)
-                ? {
-                    age_group: sc.age_group !== "unknown" ? sc.age_group : undefined,
-                    temperament: sc.temperament || undefined,
-                    speech_style: sc.speech_style || undefined,
-                    description: sc.description || undefined,
-                  }
-                : undefined,
             }));
-            await saveCharactersToLocal(targetStorage, localChars);
-            console.log(`[OpenBook] Restored ${localChars.length} characters from server`);
+            await saveCharacterIndex(targetStorage, restoredChars);
+            console.log(`[OpenBook] Restored ${restoredChars.length} characters (full CharacterIndex) from server`);
           }
         } catch (charErr) {
           console.warn("[OpenBook] Failed to restore characters from server:", charErr);
+        }
+
+        // ── Restore storyboard data (segments + phrases + type_mappings) from server ──
+        try {
+          const allSceneIds = (allScenes || []).map(s => s.id);
+          if (allSceneIds.length > 0) {
+            // Fetch segments for all scenes (batched)
+            const { data: serverSegments } = await supabase
+              .from("scene_segments")
+              .select("id, scene_id, segment_number, segment_type, speaker, metadata")
+              .in("scene_id", allSceneIds)
+              .order("segment_number");
+
+            if (serverSegments && serverSegments.length > 0) {
+              // Fetch all phrases for these segments
+              const segmentIds = serverSegments.map(s => s.id);
+              const allPhrases: Array<{ id: string; segment_id: string; phrase_number: number; text: string; metadata: any }> = [];
+              // Batch in chunks of 500 to avoid query limits
+              for (let i = 0; i < segmentIds.length; i += 500) {
+                const chunk = segmentIds.slice(i, i + 500);
+                const { data: phrases } = await supabase
+                  .from("segment_phrases")
+                  .select("id, segment_id, phrase_number, text, metadata")
+                  .in("segment_id", chunk)
+                  .order("phrase_number");
+                if (phrases) allPhrases.push(...phrases);
+              }
+
+              // Fetch type mappings
+              const { data: serverMappings } = await supabase
+                .from("scene_type_mappings")
+                .select("scene_id, segment_type, character_id")
+                .in("scene_id", allSceneIds);
+
+              // Group phrases by segment
+              const phrasesBySegment = new Map<string, typeof allPhrases>();
+              for (const ph of allPhrases) {
+                const list = phrasesBySegment.get(ph.segment_id) || [];
+                list.push(ph);
+                phrasesBySegment.set(ph.segment_id, list);
+              }
+
+              // Group segments by scene
+              const segmentsByScene = new Map<string, typeof serverSegments>();
+              for (const seg of serverSegments) {
+                const list = segmentsByScene.get(seg.scene_id) || [];
+                list.push(seg);
+                segmentsByScene.set(seg.scene_id, list);
+              }
+
+              // Group mappings by scene
+              const mappingsByScene = new Map<string, Array<{ segment_type: string; character_id: string }>>();
+              for (const m of (serverMappings || [])) {
+                const list = mappingsByScene.get(m.scene_id) || [];
+                list.push({ segment_type: m.segment_type, character_id: m.character_id });
+                mappingsByScene.set(m.scene_id, list);
+              }
+
+              // Build scene→chapterId lookup from loaded data
+              const sceneToChapter = new Map<string, string>();
+              for (const s of (allScenes || [])) {
+                sceneToChapter.set(s.id, s.chapter_id);
+              }
+
+              // Write storyboard.json for each scene that has segments
+              let restoredCount = 0;
+              const writes: Promise<void>[] = [];
+              for (const [sceneId, segs] of segmentsByScene) {
+                const chId = sceneToChapter.get(sceneId);
+                const segments = segs.map(seg => {
+                  const meta = (seg.metadata as Record<string, any>) || {};
+                  const phrases = (phrasesBySegment.get(seg.id) || []).map(ph => ({
+                    phrase_id: ph.id,
+                    phrase_number: ph.phrase_number,
+                    text: ph.text,
+                    annotations: (ph.metadata as any)?.annotations || undefined,
+                  }));
+                  return {
+                    segment_id: seg.id,
+                    segment_number: seg.segment_number,
+                    segment_type: seg.segment_type,
+                    speaker: seg.speaker || null,
+                    phrases,
+                    inline_narrations: meta.inline_narrations || undefined,
+                    split_silence_ms: meta.split_silence_ms ?? undefined,
+                  };
+                });
+
+                const sceneMappings = mappingsByScene.get(sceneId) || [];
+                const typeMappings: LocalTypeMappingEntry[] = sceneMappings.map(m => ({
+                  segmentType: m.segment_type,
+                  characterId: m.character_id,
+                  characterName: "",
+                }));
+
+                writes.push(
+                  saveStoryboardToLocal(targetStorage, sceneId, {
+                    segments,
+                    typeMappings,
+                    audioStatus: new Map(),
+                    inlineNarrationSpeaker: null,
+                  }, chId)
+                );
+                restoredCount++;
+              }
+              await Promise.all(writes);
+              if (restoredCount > 0) {
+                console.log(`[OpenBook] Restored ${restoredCount} storyboards from server`);
+              }
+            }
+          }
+        } catch (storyErr) {
+          console.warn("[OpenBook] Failed to restore storyboards from server:", storyErr);
         }
 
         if (pdfBlob) {
