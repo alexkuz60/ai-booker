@@ -553,10 +553,16 @@ export function useBookRestore({
               }
 
               // Fetch type mappings
-              const { data: serverMappings } = await supabase
-                .from("scene_type_mappings")
-                .select("scene_id, segment_type, character_id")
-                .in("scene_id", allSceneIds);
+              // Fetch type mappings — chunked
+              const serverMappings: Array<{ scene_id: string; segment_type: string; character_id: string }> = [];
+              for (let i = 0; i < allSceneIds.length; i += 500) {
+                const chunk = allSceneIds.slice(i, i + 500);
+                const { data } = await supabase
+                  .from("scene_type_mappings")
+                  .select("scene_id, segment_type, character_id")
+                  .in("scene_id", chunk);
+                if (data) serverMappings.push(...data);
+              }
 
               // Group phrases by segment
               const phrasesBySegment = new Map<string, typeof allPhrases>();
