@@ -169,7 +169,10 @@ export function useStoryboardPersistence(sceneId: string | null, chapterId?: str
     }
 
     // 4. Replace type mappings
-    await supabase.from("scene_type_mappings").delete().eq("scene_id", sid);
+    const { count: deletedMapCount } = await supabase
+      .from("scene_type_mappings")
+      .delete({ count: "exact" })
+      .eq("scene_id", sid);
     if (typeMappings && typeMappings.length > 0) {
       const mapInserts = typeMappings.map((m) => ({
         scene_id: sid,
@@ -180,7 +183,7 @@ export function useStoryboardPersistence(sceneId: string | null, chapterId?: str
       if (mapErr) console.warn("[pushToDb] type mappings insert:", mapErr);
     }
 
-    console.debug(`[pushToDb] Synced scene ${sid}: ${segments.length} segments, ${phraseInserts.length} phrases`);
+    console.log(`[pushToDb] ✅ Scene ${sid}: del ${deletedSegCount ?? "?"}seg/${deletedMapCount ?? "?"}map → ins ${segments.length}seg/${phraseInserts.length}phr/${(typeMappings || []).length}map`);
   }, [storage, chapterId]);
 
   /**
