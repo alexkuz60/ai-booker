@@ -498,8 +498,10 @@ export function useBookRestore({
         } catch (charErr) {
           console.warn("[OpenBook] Failed to restore characters from server:", charErr);
         }
+        report("characters", restoredChars.length > 0 ? "done" : "skipped", restoredChars.length > 0 ? `${restoredChars.length}` : undefined);
 
         // ── Restore storyboard data (segments + phrases + type_mappings) from server ──
+        report("storyboards", "running");
         try {
           const allSceneIds = (allScenes || []).map(s => s.id);
           console.log(`[OpenBook] Restoring storyboards for ${allSceneIds.length} scenes...`);
