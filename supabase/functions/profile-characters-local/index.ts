@@ -156,15 +156,31 @@ Deno.serve(async (req) => {
       body: buildBody(true),
     });
 
-    // Retry without temperature on 400 (some models reject it)
-    if (aiRes.status === 400 && !skipTemp) {
+    // Retry on 400: first without temperature, then with reduced max_tokens
+    if (aiRes.status === 400) {
       const errBody = await aiRes.text();
-      console.warn(`[profile-characters-local] 400 with temperature, retrying without. Model: ${usedModel}, body: ${errBody.slice(0, 300)}`);
-      aiRes = await fetch(resolved.endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${resolved.apiKey}` },
-        body: buildBody(false),
-      });
+      console.warn(`[profile-characters-local] 400, retrying. Model: ${usedModel}, body: ${errBody.slice(0, 300)}`);
+
+      // If error mentions max_tokens, reduce it
+      const isTokenError = /max_tokens|max_completion_tokens/i.test(errBody);
+      if (isTokenError) {
+        const reducedBody = JSON.stringify({
+          model: usedModel,
+          messages: JSON.parse(buildBody(false)).messages,
+          ...(useMaxCompletionTokens ? { max_completion_tokens: 8192 } : { max_tokens: 8192 }),
+        });
+        aiRes = await fetch(resolved.endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${resolved.apiKey}` },
+          body: reducedBody,
+        });
+      } else if (!skipTemp) {
+        aiRes = await fetch(resolved.endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${resolved.apiKey}` },
+          body: buildBody(false),
+        });
+      }
     }
 
     if (aiRes.status === 429) {
