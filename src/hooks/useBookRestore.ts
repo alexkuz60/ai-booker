@@ -430,7 +430,7 @@ export function useBookRestore({
       }
 
       const scenesByChapter = new Map<string, Scene[]>();
-      for (const s of (allScenes || [])) {
+      for (const s of allScenes) {
         const list = scenesByChapter.get(s.chapter_id) || [];
         list.push({
           id: s.id,
