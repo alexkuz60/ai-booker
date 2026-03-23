@@ -9,9 +9,11 @@
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type {
   CharacterIndex,
+  CharacterAppearance,
   SceneCharacterMap,
   LocalCharacter,
   CharacterVoiceConfig,
+  TocChapter,
 } from "@/pages/parser/types";
 import { touchProjectUpdatedAt } from "@/lib/projectActivity";
 import { paths, getActiveLayout } from "@/lib/projectPaths";
@@ -180,7 +182,78 @@ export async function countSegmentAppearances(
   return counts;
 }
 
-// ─── Character lookup helpers ────────────────────────────────
+/**
+ * Rebuild appearances for characters from scene index + scene character maps.
+ * Used when characters loaded from OPFS/server have empty appearances.
+ * Returns updated characters with populated appearances + sceneCount.
+ */
+export async function rebuildAppearancesFromLocal(
+  storage: ProjectStorage,
+  characters: CharacterIndex[],
+): Promise<CharacterIndex[]> {
+  const index = getCachedSceneIndex();
+  if (!index) return characters;
+
+  // Load TOC for chapter titles
+  let tocTitles: string[] = [];
+  try {
+    const toc = await storage.readJSON<TocChapter[]>(paths.structureToc());
+    if (toc) tocTitles = toc.map(t => t.title);
+  } catch { /* ignore */ }
+
+  // Build: characterId → Map<chapterIdx, Set<sceneNumber>>
+  const charAppMap = new Map<string, Map<number, Set<number>>>();
+  const charSceneCount = new Map<string, number>();
+
+  // Read all character-mapped scenes
+  const mappedSceneIds = index.characterMapped || [];
+  const reads = mappedSceneIds.map(async (sceneId) => {
+    const entry = index.entries[sceneId];
+    if (!entry) return;
+
+    try {
+      const map = await storage.readJSON<SceneCharacterMap>(
+        paths.sceneCharacterMap(sceneId),
+      );
+      if (!map) return;
+
+      for (const s of map.speakers) {
+        charSceneCount.set(s.characterId, (charSceneCount.get(s.characterId) || 0) + 1);
+
+        let chapterMap = charAppMap.get(s.characterId);
+        if (!chapterMap) {
+          chapterMap = new Map();
+          charAppMap.set(s.characterId, chapterMap);
+        }
+        let scenes = chapterMap.get(entry.chapterIndex);
+        if (!scenes) {
+          scenes = new Set();
+          chapterMap.set(entry.chapterIndex, scenes);
+        }
+        scenes.add(entry.sceneNumber);
+      }
+    } catch { /* skip */ }
+  });
+  await Promise.all(reads);
+
+  // Apply to characters
+  return characters.map(c => {
+    const chapterMap = charAppMap.get(c.id);
+    if (!chapterMap) return { ...c, appearances: [], sceneCount: charSceneCount.get(c.id) || 0 };
+
+    const appearances: CharacterAppearance[] = [];
+    for (const [chIdx, sceneNums] of Array.from(chapterMap.entries()).sort((a, b) => a[0] - b[0])) {
+      appearances.push({
+        chapterIdx: chIdx,
+        chapterTitle: tocTitles[chIdx] || `Chapter ${chIdx + 1}`,
+        sceneNumbers: Array.from(sceneNums).sort((a, b) => a - b),
+      });
+    }
+    return { ...c, appearances, sceneCount: charSceneCount.get(c.id) || 0 };
+  });
+}
+
+
 
 export function buildNameLookup(
   characters: CharacterIndex[],

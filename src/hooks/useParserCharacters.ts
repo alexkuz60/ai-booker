@@ -7,7 +7,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { Scene, ChapterStatus, TocChapter, CharacterIndex } from "@/pages/parser/types";
-import { readCharacterIndex } from "@/lib/localCharacters";
+import { readCharacterIndex, rebuildAppearancesFromLocal } from "@/lib/localCharacters";
 import { useCharacterCrud } from "@/hooks/useCharacterCrud";
 import { useCharacterExtraction } from "@/hooks/useCharacterExtraction";
 import { useCharacterProfiles } from "@/hooks/useCharacterProfiles";
@@ -54,7 +54,13 @@ export function useParserCharacters({
     loadedBookRef.current = bookId;
     (async () => {
       setLoading(true);
-      const loaded = await readCharacterIndex(storage);
+      let loaded = await readCharacterIndex(storage);
+      // Rebuild appearances if all are empty (e.g. restored from server before fix)
+      const hasAnyAppearances = loaded.some(c => c.appearances?.length > 0);
+      if (loaded.length > 0 && !hasAnyAppearances) {
+        console.debug("[useParserCharacters] Rebuilding empty appearances from local scene data");
+        loaded = await rebuildAppearancesFromLocal(storage, loaded);
+      }
       setCharacters(loaded);
       setLoading(false);
     })();
