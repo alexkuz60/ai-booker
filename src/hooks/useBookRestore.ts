@@ -462,8 +462,10 @@ export function useBookRestore({
           chapterIdMap: newChapterIdMap,
           chapterResults: initMap,
         });
+        report("write_local", "done");
 
         // ── Load characters from server (full CharacterIndex format) ──
+        report("characters", "running");
         let restoredChars: CharacterIndex[] = [];
         try {
           const { data: serverChars } = await supabase
