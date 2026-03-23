@@ -18,9 +18,36 @@
 
 - [ ] **Доделать структурирование книги** — семантическая разбивка на сцены (Сценарист Stage 1), правка сцен каждой главы
 - [ ] **Инлайн-правка контента сцен** — пользовательское редактирование + гибридные алгоритмы очистки
-- [ ] **Кнопка «Загрузить с сервера»** — New Workstation Flow: список книг из БД → восстановление в OPFS
+- [ ] **Кнопка «Загрузить с сервера»** — New Workstation Flow: список книг из БД → Wipe-and-Deploy в OPFS
 
-## Сохранение и защита данных (Фаза 2)
+## Wipe-and-Deploy: Local-Only восстановление (Фаза 2)
+
+> Стратегия: при развертывании серверной копии — полное удаление локального проекта и browser state, затем чистая запись с сервера.
+
+### Код: изменения в восстановлении (`useBookRestore.openSavedBook`)
+- [ ] **Wipe OPFS перед записью** — `OPFSStorage.deleteProject(projectName)` ДО создания нового проекта, а не после записи; гарантирует отсутствие «призрачных» файлов
+- [ ] **Очистка browser state** — перед развертыванием:
+  - `sessionStorage`: удалить `studio-active-chapter`, `parser-nav-state`, `parser-active-book`
+  - `localStorage`: удалить `booker_last_project`, `booker_server_sync_checked:*` для этого bookId
+  - in-memory: `setCachedSceneIndex(null)`, `clearChapterTextsCache()`
+- [ ] **Восстановление UI state** — после развертывания данных загрузить из `user_settings` (Supabase):
+  - `studio_session` (activeTab, selectedSceneIdx, chapterId)
+  - mixer/plugin configs для сцен текущей главы
+- [ ] **Атомарная активация** — React state (setStorage, setMeta) устанавливается ТОЛЬКО после полного завершения записи всех данных в OPFS
+
+### Код: изменения в `acceptServerVersion` (`useServerSync`)
+- [ ] **Делегирование Wipe-and-Deploy** — `acceptServerVersion` уже удаляет OPFS-папку; убедиться что browser state тоже очищается (сейчас нет)
+
+### Код: изменения в Push to Server (`useSaveBookToProject.saveBook`)
+- [ ] **Сохранение UI state при Push** — при «На сервер» дополнительно сохранять:
+  - текущий `studio_session` из `user_settings` (уже сохраняется через useCloudSettings)
+  - mixer/plugin configs (уже сохраняются через useCloudSettings)
+  - Верифицировать: все ли UI-настройки попадают в `user_settings` при Push
+
+### Код: утилита `wipeProjectBrowserState(bookId: string)`
+- [ ] **Создать утилиту** — в `src/lib/projectCleanup.ts`: централизованная очистка всех browser-кэшей и in-memory state для проекта книги. Используется в `openSavedBook`, `acceptServerVersion`, `hardResetLocalData`
+
+## Сохранение и защита данных
 
 - [ ] **Сохранение/правка/чистка результатов в локале** — стандартизация записи и чтения из ProjectStorage
 - [ ] **Защита результатов при изменении кода** — миграции данных локального хранилища
