@@ -589,7 +589,7 @@ export function useBookRestore({
 
               // Build scene→chapterId lookup from loaded data
               const sceneToChapter = new Map<string, string>();
-              for (const s of (allScenes || [])) {
+              for (const s of allScenes) {
                 sceneToChapter.set(s.id, s.chapter_id);
               }
 
