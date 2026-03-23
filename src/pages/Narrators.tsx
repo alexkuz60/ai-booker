@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Volume2, Loader2, Play, Square, Save, RotateCcw, Brain, Drama } from "lucide-react";
+import { Volume2, Loader2, Play, Square, Save, RotateCcw, Brain } from "lucide-react";
+import { TheaterMasks } from "@/components/icons/TheaterMasks";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
