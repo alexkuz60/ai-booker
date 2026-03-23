@@ -23,6 +23,12 @@ import { useParserHelpers } from "@/hooks/useParserHelpers";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { useImperativeSave } from "@/hooks/useImperativeSave";
+import {
+  SyncProgressDialog,
+  buildRestoreSteps,
+  type SyncStep,
+  type SyncProgressCallback,
+} from "@/components/SyncProgressDialog";
 import { useParserCharacters } from "@/hooks/useParserCharacters";
 import { useTocMutations } from "@/hooks/useTocMutations";
 
