@@ -253,23 +253,24 @@ export function useBookRestore({
   ) => {
     if (!userId) return;
 
-    const canTryLocal = !!(await resolveLocalStorageForBook(book.id));
-    if (canTryLocal) {
-      const restored = await restoreFromLocal(book.id);
-      if (restored) {
-        if (!options?.skipTimestampCheck && checkServerNewer && setServerNewerBookId) {
-          const isNewer = await checkServerNewer(book.id);
-          if (isNewer) setServerNewerBookId(book.id);
+    // When skipTimestampCheck is true, the user explicitly requested "load from server"
+    // → skip local restore entirely and go straight to Wipe-and-Deploy
+    if (!options?.skipTimestampCheck) {
+      const canTryLocal = !!(await resolveLocalStorageForBook(book.id));
+      if (canTryLocal) {
+        const restored = await restoreFromLocal(book.id);
+        if (restored) {
+          if (checkServerNewer && setServerNewerBookId) {
+            const isNewer = await checkServerNewer(book.id);
+            if (isNewer) setServerNewerBookId(book.id);
+          }
+          return;
         }
         return;
       }
-
-      if (!options?.skipTimestampCheck) {
-        return;
-      }
-    } else if (!options?.skipTimestampCheck) {
       return;
     }
+    console.log(`[OpenBook] skipTimestampCheck=true → forcing Wipe-and-Deploy for book ${book.id}`);
 
     // ── Wipe-and-Deploy: clean slate before server restore ──
     // Step 1-2: Wipe OPFS project + browser state
