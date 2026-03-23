@@ -483,13 +483,16 @@ export function useBookRestore({
         // ── Restore storyboard data (segments + phrases + type_mappings) from server ──
         try {
           const allSceneIds = (allScenes || []).map(s => s.id);
+          console.log(`[OpenBook] Restoring storyboards for ${allSceneIds.length} scenes...`);
           if (allSceneIds.length > 0) {
             // Fetch segments for all scenes (batched)
-            const { data: serverSegments } = await supabase
+            const { data: serverSegments, error: segFetchErr } = await supabase
               .from("scene_segments")
               .select("id, scene_id, segment_number, segment_type, speaker, metadata")
               .in("scene_id", allSceneIds)
               .order("segment_number");
+
+            console.log(`[OpenBook] Fetched ${serverSegments?.length ?? 0} segments from server${segFetchErr ? ` (error: ${segFetchErr.message})` : ""}`);
 
             if (serverSegments && serverSegments.length > 0) {
               // Fetch all phrases for these segments
