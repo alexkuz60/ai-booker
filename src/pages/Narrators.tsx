@@ -504,6 +504,7 @@ const Narrators = () => {
       {/* Column 1: Character list (20%) */}
       <div className="border-r border-border flex flex-col" style={{ width: '20%', minWidth: 0 }}>
         <div className="px-4 py-2.5 border-b border-border flex items-center gap-2 shrink-0">
+          <Drama className="h-4 w-4 text-muted-foreground" />
           <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider">
             {isRu ? "Персонажи" : "Characters"}
           </h3>
