@@ -30,7 +30,7 @@ interface LibraryViewProps {
   onRename?: (bookId: string, newTitle: string) => void;
   serverBooks?: BookRecord[];
   loadingServerBooks?: boolean;
-  onOpenServerBook?: (book: BookRecord) => void;
+  onOpenServerBook?: (book: BookRecord, onProgress?: SyncProgressCallback) => void;
   onDeleteServerBook?: (bookId: string) => void;
 }
 
