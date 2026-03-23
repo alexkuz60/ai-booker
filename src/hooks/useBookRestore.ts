@@ -370,7 +370,9 @@ export function useBookRestore({
       } else if (isBookDocx) {
         console.log("[OpenBook] DOCX book — no PDF proxy needed");
       }
+      report("parse_pdf", isBookDocx ? "skipped" : (restoredPdf ? "done" : "skipped"));
 
+      report("build_toc", "running");
       updatePdfRef(restoredPdf);
       updateTotalPages(restoredTotalPages);
 
