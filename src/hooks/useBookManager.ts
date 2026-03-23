@@ -38,6 +38,7 @@ import { useFileUpload } from "@/hooks/useFileUpload";
 import { useBookRestore } from "@/hooks/useBookRestore";
 import { useServerSync } from "@/hooks/useServerSync";
 import { clearChapterTextsCache } from "@/lib/chapterTextsCache";
+import { wipeAllBrowserState } from "@/lib/projectCleanup";
 
 interface UseBookManagerParams {
   userId: string | undefined;
@@ -224,8 +225,7 @@ export function useBookManager({
         const allProjects = await OPFSStorage.listProjects();
         await Promise.all(allProjects.map((name) => OPFSStorage.deleteProject(name)));
       }
-      sessionStorage.removeItem(ACTIVE_BOOK_KEY);
-      clearChapterTextsCache();
+      await wipeAllBrowserState();
       setStep("library");
       setBookId(null);
       await library.loadLibrary();
