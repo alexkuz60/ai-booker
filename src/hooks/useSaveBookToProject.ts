@@ -341,8 +341,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
           }
         }
       }
+      report("characters", savedCharCount > 0 ? "done" : "skipped", savedCharCount > 0 ? `${savedCharCount}` : undefined);
 
       // ── 4b. Push storyboard data (segments/phrases/mappings) to DB ──
+      report("storyboard", "running");
       let savedStoryboardCount = 0;
       try {
         savedStoryboardCount = await pushAllToDb();
