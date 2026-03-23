@@ -85,6 +85,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
   const { storage, openProject, backend, meta, downloadProjectAsZip, importProjectFromZip } = useProjectStorageContext();
   const { pushAllToDb } = useStoryboardPersistence(null);
   const [saving, setSaving] = useState(false);
+  const progressRef = useRef<SyncProgressCallback | null>(null);
 
   /**
    * SAVE = push local state → server (Supabase DB + Storage).
