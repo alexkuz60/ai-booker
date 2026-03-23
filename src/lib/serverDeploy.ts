@@ -299,7 +299,7 @@ export async function deployFromServer({
   });
   report("write_local", "done");
 
-  // ── 6. Characters ─────────────────────────────────────────
+  // ── 6. Characters + appearances ─────────────────────────────
   report("characters", "running");
   let restoredChars: CharacterIndex[] = [];
   try {
@@ -312,26 +312,90 @@ export async function deployFromServer({
       .order("sort_order");
 
     if (serverChars && serverChars.length > 0) {
-      restoredChars = serverChars.map((sc) => ({
-        id: sc.id,
-        name: sc.name,
-        aliases: sc.aliases || [],
-        gender: (sc.gender as "male" | "female" | "unknown") || "unknown",
-        age_group: sc.age_group || "unknown",
-        temperament: sc.temperament || null,
-        speech_style: sc.speech_style || null,
-        description: sc.description || null,
-        speech_tags: sc.speech_tags || [],
-        psycho_tags: sc.psycho_tags || [],
-        sort_order: sc.sort_order || 0,
-        color: sc.color || null,
-        voice_config: (sc.voice_config as Record<string, unknown>) || {},
-        appearances: [],
-        sceneCount: 0,
-      }));
+      // Build reverse map: scene_id → { chapterIdx, chapterTitle }
+      const sceneToChapter = new Map<string, { chapterIdx: number; chapterTitle: string }>();
+      for (const [idx, ch] of chapters.entries()) {
+        const scenesForCh = scenesByChapter.get(ch.id) || [];
+        for (const s of scenesForCh) {
+          sceneToChapter.set(s.id, { chapterIdx: idx, chapterTitle: ch.title });
+        }
+      }
+
+      // Fetch character_appearances to rebuild appearances list
+      const charIds = serverChars.map(c => c.id);
+      type RawAppearance = {
+        character_id: string;
+        scene_id: string;
+        role_in_scene: string;
+      };
+      const serverAppearances = await fetchChunked<RawAppearance>(
+        "character_appearances",
+        "character_id, scene_id, role_in_scene",
+        "character_id",
+        charIds,
+        500,
+      );
+
+      // Group appearances by character_id → Map<chapterIdx, Set<sceneNumber>>
+      const charAppMap = new Map<string, Map<number, { title: string; sceneNumbers: Set<number> }>>();
+      const charSceneCount = new Map<string, number>();
+      for (const app of serverAppearances) {
+        const chInfo = sceneToChapter.get(app.scene_id);
+        if (!chInfo) continue;
+
+        // Count unique scenes per character
+        charSceneCount.set(app.character_id, (charSceneCount.get(app.character_id) || 0) + 1);
+
+        let chapterMap = charAppMap.get(app.character_id);
+        if (!chapterMap) {
+          chapterMap = new Map();
+          charAppMap.set(app.character_id, chapterMap);
+        }
+        let chEntry = chapterMap.get(chInfo.chapterIdx);
+        if (!chEntry) {
+          chEntry = { title: chInfo.chapterTitle, sceneNumbers: new Set() };
+          chapterMap.set(chInfo.chapterIdx, chEntry);
+        }
+        // Find scene_number from raw scenes
+        const rawScenes = scenesByChapter.get(chapters[chInfo.chapterIdx]?.id || "") || [];
+        const matchScene = rawScenes.find(s => s.id === app.scene_id);
+        if (matchScene) chEntry.sceneNumbers.add(matchScene.scene_number);
+      }
+
+      restoredChars = serverChars.map((sc) => {
+        const chapterMap = charAppMap.get(sc.id);
+        const appearances: CharacterAppearance[] = [];
+        if (chapterMap) {
+          for (const [chIdx, entry] of Array.from(chapterMap.entries()).sort((a, b) => a[0] - b[0])) {
+            appearances.push({
+              chapterIdx: chIdx,
+              chapterTitle: entry.title,
+              sceneNumbers: Array.from(entry.sceneNumbers).sort((a, b) => a - b),
+            });
+          }
+        }
+
+        return {
+          id: sc.id,
+          name: sc.name,
+          aliases: sc.aliases || [],
+          gender: (sc.gender as "male" | "female" | "unknown") || "unknown",
+          age_group: sc.age_group || "unknown",
+          temperament: sc.temperament || null,
+          speech_style: sc.speech_style || null,
+          description: sc.description || null,
+          speech_tags: sc.speech_tags || [],
+          psycho_tags: sc.psycho_tags || [],
+          sort_order: sc.sort_order || 0,
+          color: sc.color || null,
+          voice_config: (sc.voice_config as Record<string, unknown>) || {},
+          appearances,
+          sceneCount: charSceneCount.get(sc.id) || 0,
+        };
+      });
       await saveCharacterIndex(storage, restoredChars);
       console.log(
-        `[Deploy] Restored ${restoredChars.length} characters from server`,
+        `[Deploy] Restored ${restoredChars.length} characters with ${serverAppearances.length} appearances`,
       );
     }
   } catch (err) {
