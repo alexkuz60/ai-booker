@@ -5,6 +5,8 @@
  * ensurePdfLoaded: lazy-loads PDF proxy from local project.
  */
 
+import type { SyncProgressCallback } from "@/components/SyncProgressDialog";
+
 import { useState, useCallback } from "react";
 import { clearChapterTextsCache } from "@/lib/chapterTextsCache";
 import { toast } from "sonner";
