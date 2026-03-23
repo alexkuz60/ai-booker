@@ -54,7 +54,13 @@ export function useParserCharacters({
     loadedBookRef.current = bookId;
     (async () => {
       setLoading(true);
-      const loaded = await readCharacterIndex(storage);
+      let loaded = await readCharacterIndex(storage);
+      // Rebuild appearances if all are empty (e.g. restored from server before fix)
+      const hasAnyAppearances = loaded.some(c => c.appearances?.length > 0);
+      if (loaded.length > 0 && !hasAnyAppearances) {
+        console.debug("[useParserCharacters] Rebuilding empty appearances from local scene data");
+        loaded = await rebuildAppearancesFromLocal(storage, loaded);
+      }
       setCharacters(loaded);
       setLoading(false);
     })();
