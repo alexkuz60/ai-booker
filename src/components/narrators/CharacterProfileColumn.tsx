@@ -4,7 +4,7 @@
  * Mirrors the profile view from ParserCharactersPanel.
  */
 
-import { X, Brain } from "lucide-react";
+import { Brain } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -49,7 +49,7 @@ export interface CharacterProfileData {
 interface CharacterProfileColumnProps {
   character: CharacterProfileData;
   isRu: boolean;
-  onClose: () => void;
+  onClose?: () => void;
 }
 
 export function CharacterProfileColumn({ character, isRu, onClose }: CharacterProfileColumnProps) {
@@ -61,12 +61,6 @@ export function CharacterProfileColumn({ character, isRu, onClose }: CharacterPr
         <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider flex-1">
           {isRu ? "Профайл" : "Profile"}
         </h3>
-        <button
-          onClick={onClose}
-          className="text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
       </div>
 
       <ScrollArea className="flex-1 min-h-0">

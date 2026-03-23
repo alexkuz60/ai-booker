@@ -501,24 +501,8 @@ const Narrators = () => {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex h-[calc(100vh-3rem)] min-h-0 overflow-hidden">
-      {/* Column 1: Book + Character list */}
-      <div className="w-72 shrink-0 border-r border-border flex flex-col">
-        <div className="p-3 border-b border-border space-y-2">
-          <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-            {isRu ? "Книга" : "Book"}
-          </label>
-          <Select value={selectedBookId ?? ""} onValueChange={v => { setSelectedBookId(v); setSelectedId(null); setProfileViewId(null); }}>
-            <SelectTrigger className="bg-secondary border-border text-xs h-8">
-              <SelectValue placeholder={isRu ? "Выберите книгу" : "Select book"} />
-            </SelectTrigger>
-            <SelectContent className="bg-card border-border">
-              {books.map(b => (
-                <SelectItem key={b.id} value={b.id} className="text-xs">{b.title}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
+      {/* Column 1: Character list (20%) */}
+      <div className="border-r border-border flex flex-col" style={{ width: '20%', minWidth: 0 }}>
         <ScrollArea className="flex-1">
           {loading ? (
             <div className="p-4 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
@@ -605,19 +589,26 @@ const Narrators = () => {
         </ScrollArea>
       </div>
 
-      {/* Column 2: Profile (shown when profileViewId is set) */}
-      {profileData && (
-        <div className="w-72 shrink-0 border-r border-border bg-muted/10">
+      {/* Column 2: Profile (always visible, 30%) */}
+      <div className="border-r border-border bg-muted/10" style={{ width: '30%', minWidth: 0 }}>
+        {profileData ? (
           <CharacterProfileColumn
             character={profileData}
             isRu={isRu}
             onClose={() => setProfileViewId(null)}
           />
-        </div>
-      )}
+        ) : (
+          <div className="flex items-center justify-center h-full text-muted-foreground">
+            <div className="text-center space-y-2 p-4">
+              <Brain className="h-8 w-8 mx-auto text-muted-foreground/30" />
+              <p className="text-xs">{isRu ? "Нажмите 🧠 у персонажа для просмотра профайла" : "Click 🧠 on a character to view profile"}</p>
+            </div>
+          </div>
+        )}
+      </div>
 
-      {/* Column 3: Voice editor */}
-      <div className="flex-1 min-w-0">
+      {/* Column 3: Voice editor (50%) */}
+      <div className="min-w-0" style={{ width: '50%' }}>
         <ScrollArea className="h-full">
           <div className="p-6 max-w-2xl space-y-6">
             {selectedChar ? (
