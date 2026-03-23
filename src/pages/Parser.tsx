@@ -753,6 +753,16 @@ export default function Parser() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <SyncProgressDialog
+        isRu={isRu}
+        open={restoreDialogOpen}
+        onOpenChange={setRestoreDialogOpen}
+        onConfirm={handleRestoreConfirm}
+        steps={restoreSteps}
+        phase={restorePhase}
+        errorMessage={restoreError}
+      />
     </motion.div>
   );
 }
