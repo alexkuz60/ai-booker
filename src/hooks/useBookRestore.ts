@@ -253,7 +253,9 @@ export function useBookRestore({
     options?: { skipTimestampCheck?: boolean },
     checkServerNewer?: (bookId: string) => Promise<boolean>,
     setServerNewerBookId?: (bookId: string | null) => void,
+    onProgress?: SyncProgressCallback,
   ) => {
+    const report = onProgress || (() => {});
     if (!userId) return;
 
     // When skipTimestampCheck is true, the user explicitly requested "load from server"
