@@ -38,6 +38,7 @@ import { useFileUpload } from "@/hooks/useFileUpload";
 import { useBookRestore } from "@/hooks/useBookRestore";
 import { useServerSync } from "@/hooks/useServerSync";
 import { clearChapterTextsCache } from "@/lib/chapterTextsCache";
+import { wipeAllBrowserState } from "@/lib/projectCleanup";
 
 interface UseBookManagerParams {
   userId: string | undefined;
