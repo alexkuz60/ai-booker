@@ -238,6 +238,29 @@ interface ProjectStorage {
 
 **browserId:** уникальный идентификатор среды (localStorage), гарантирует что проверка выполняется однократно для данного окружения.
 
+**Батчинг запросов (`fetchChunked`):**
+
+Supabase ограничивает `.in()` запросы ~1000 строками. Для больших книг (сотни сцен, тысячи сегментов/фраз) используется generic-хелпер `fetchChunked<T>()` из `serverDeploy.ts`:
+
+```typescript
+async function fetchChunked<T>(
+  table: string,        // имя таблицы
+  select: string,       // SELECT-выражение
+  filterCol: string,    // столбец для .in()
+  filterIds: string[],  // массив ID (может быть >1000)
+  chunkSize: number,    // размер порции (100–500)
+  order?: string,       // опциональная сортировка
+): Promise<T[]>
+```
+
+Порядок батчинга при deploy:
+1. `book_scenes` — chunks по 100 `chapter_id`
+2. `scene_segments` — chunks по 500 `scene_id`
+3. `segment_phrases` — chunks по 500 `segment_id`
+4. `scene_type_mappings` — chunks по 500 `scene_id`
+
+Результаты каждого уровня агрегируются в `Map<parentId, child[]>` для O(1) группировки при записи в OPFS.
+
 ### 1.11 Индекс сцен и контроль целостности (V2)
 
 #### scene_index.json — быстрая навигация
