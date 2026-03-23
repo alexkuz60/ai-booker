@@ -92,7 +92,8 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
    * Used for cross-device sync / backup.
    * Handles first-push: creates books row if it doesn't exist yet.
    */
-  const saveBook = useCallback(async () => {
+  const saveBook = useCallback(async (onProgress?: SyncProgressCallback) => {
+    const report = onProgress || progressRef.current || (() => {});
     if (!currentBookId) {
       toast({
         title: isRu ? "Нечего сохранять" : "Nothing to save",
