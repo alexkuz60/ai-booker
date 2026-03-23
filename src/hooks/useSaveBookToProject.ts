@@ -231,8 +231,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         if (error) console.warn("[SaveToServer] chapters insert:", error);
         else console.log(`[SaveToServer] Inserted ${chapterUpserts.length} chapters`);
       }
+      report("chapters", "done", `${chapterUpserts.length}`);
 
       // ── 2. Insert scenes for leaf chapters only ──
+      report("scenes", "running");
       const normalizedResults = sanitizeChapterResultsForStructure(toc, chapterResults);
       const leafIndices = getLeafIndices(toc);
 
