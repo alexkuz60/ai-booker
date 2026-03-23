@@ -192,7 +192,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         console.log("[SaveToServer] Created books row for first push:", currentBookId);
       }
 
+      report("book_row", "done");
+
       // ── 1. Delete all existing chapters, then insert fresh ones ──
+      report("chapters", "running");
       const { count: deletedChaptersCount } = await supabase
         .from("book_chapters")
         .delete({ count: "exact" })
