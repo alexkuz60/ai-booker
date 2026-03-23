@@ -650,6 +650,7 @@ export function useBookRestore({
                   sceneMapWrites.push(saveSceneCharacterMap(targetStorage, sceneCharMap));
                 }
                 await Promise.all(sceneMapWrites);
+                report("scene_maps", "done", `${sceneMapWrites.length}`);
                 console.log(`[OpenBook] ✅ Built ${sceneMapWrites.length} scene character maps`);
               }
 
