@@ -279,6 +279,7 @@ export function useBookRestore({
 
     // ── Wipe-and-Deploy: clean slate before server restore ──
     // Step 1-2: Wipe OPFS project + browser state
+    report("wipe", "running");
     const existingProjects = localProjectNamesByBookId.get(book.id) || [];
     await wipeProjectBrowserState(book.id, existingProjects);
 
@@ -287,8 +288,10 @@ export function useBookRestore({
     setFileName(book.file_name);
     setBookId(book.id);
     sessionStorage.setItem(ACTIVE_BOOK_KEY, book.id);
+    report("wipe", "done");
 
     try {
+      report("fetch_structure", "running");
       const [partsRes, chaptersRes, pdfBlob] = await Promise.all([
         supabase.from("book_parts").select("id, part_number, title").eq("book_id", book.id).order("part_number"),
         supabase.from("book_chapters").select("id, chapter_number, title, scene_type, mood, bpm, part_id, level, start_page, end_page").eq("book_id", book.id).order("chapter_number"),
