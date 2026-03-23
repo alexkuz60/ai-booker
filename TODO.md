@@ -98,6 +98,15 @@
 - [ ] **Ж. Реестр AI-ролей ↔ Edge Functions** — заполнять маппинг роль → функция → промпт по мере реализации фич
 - [ ] **UI для inline-нарротаций** — дать пользователю контроль над интонационными пометками
 
+### Рефакторинг (завершён 2026-03-23)
+
+- [x] **Декомпозиция useBookRestore** — из монолитного хука (~800 строк) вынесены `serverDeploy.ts` (data pipeline) и `localProjectResolver.ts` (резолвинг проектов). Хук теперь ~290 строк — тонкий оркестратор
+- [x] **Батчинг запросов к Supabase** — `fetchChunked()` в `serverDeploy.ts` для сцен, сегментов и фраз (chunks 100-500), обход лимита 1000 строк
+- [x] **Фикс broken sync detection** — `useBookManager` корректно передаёт `checkServerNewer` и `setServerNewerBookId` в `openSavedBook`
+- [x] **Фикс silent failure при отсутствии локальной копии** — автоматический fallback на Wipe-and-Deploy с сервера
+- [x] **Progress UI для acceptServerVersion** — `SyncProgressDialog` теперь отображается при принятии серверной версии
+- [x] **Консолидация очистки** — `wipeAllBrowserState()` из `projectCleanup.ts` используется в `useBookManager.clearAllProjects`
+
 ## Выполненные задачи (архив)
 
 - [x] **Поддержка форматов DOC/DOCX** — загрузка через Mammoth.js с TOC из Heading-стилей + regex-фоллбэк
