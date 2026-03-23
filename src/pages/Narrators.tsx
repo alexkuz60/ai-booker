@@ -589,19 +589,26 @@ const Narrators = () => {
         </ScrollArea>
       </div>
 
-      {/* Column 2: Profile (shown when profileViewId is set) */}
-      {profileData && (
-        <div className="w-72 shrink-0 border-r border-border bg-muted/10">
+      {/* Column 2: Profile (always visible, 30%) */}
+      <div className="border-r border-border bg-muted/10" style={{ width: '30%', minWidth: 0 }}>
+        {profileData ? (
           <CharacterProfileColumn
             character={profileData}
             isRu={isRu}
             onClose={() => setProfileViewId(null)}
           />
-        </div>
-      )}
+        ) : (
+          <div className="flex items-center justify-center h-full text-muted-foreground">
+            <div className="text-center space-y-2 p-4">
+              <Brain className="h-8 w-8 mx-auto text-muted-foreground/30" />
+              <p className="text-xs">{isRu ? "Нажмите 🧠 у персонажа для просмотра профайла" : "Click 🧠 on a character to view profile"}</p>
+            </div>
+          </div>
+        )}
+      </div>
 
-      {/* Column 3: Voice editor */}
-      <div className="flex-1 min-w-0">
+      {/* Column 3: Voice editor (50%) */}
+      <div className="min-w-0" style={{ width: '50%' }}>
         <ScrollArea className="h-full">
           <div className="p-6 max-w-2xl space-y-6">
             {selectedChar ? (
