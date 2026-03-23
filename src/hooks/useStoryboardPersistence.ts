@@ -110,7 +110,11 @@ export function useStoryboardPersistence(sceneId: string | null, chapterId?: str
     const typeMappings = "typeMappings" in data ? data.typeMappings : (data as LocalStoryboardData).typeMappings;
 
     // 1. Delete existing segments (cascade deletes phrases)
-    await supabase.from("scene_segments").delete().eq("scene_id", sid);
+    const { count: deletedSegCount } = await supabase
+      .from("scene_segments")
+      .delete({ count: "exact" })
+      .eq("scene_id", sid);
+    console.log(`[pushToDb] Deleted ${deletedSegCount ?? "?"} segments for scene ${sid}`);
 
     // 2. Insert segments
     const segInserts = segments.map((s) => ({
@@ -130,6 +134,7 @@ export function useStoryboardPersistence(sceneId: string | null, chapterId?: str
       console.error("[pushToDb] segment insert error:", segErr);
       throw segErr;
     }
+    console.log(`[pushToDb] Inserted ${segInserts.length} segments for scene ${sid}`);
 
     // 3. Insert phrases
     const phraseInserts: Array<{
@@ -164,7 +169,10 @@ export function useStoryboardPersistence(sceneId: string | null, chapterId?: str
     }
 
     // 4. Replace type mappings
-    await supabase.from("scene_type_mappings").delete().eq("scene_id", sid);
+    const { count: deletedMapCount } = await supabase
+      .from("scene_type_mappings")
+      .delete({ count: "exact" })
+      .eq("scene_id", sid);
     if (typeMappings && typeMappings.length > 0) {
       const mapInserts = typeMappings.map((m) => ({
         scene_id: sid,
@@ -175,7 +183,7 @@ export function useStoryboardPersistence(sceneId: string | null, chapterId?: str
       if (mapErr) console.warn("[pushToDb] type mappings insert:", mapErr);
     }
 
-    console.debug(`[pushToDb] Synced scene ${sid}: ${segments.length} segments, ${phraseInserts.length} phrases`);
+    console.log(`[pushToDb] ✅ Scene ${sid}: del ${deletedSegCount ?? "?"}seg/${deletedMapCount ?? "?"}map → ins ${segments.length}seg/${phraseInserts.length}phr/${(typeMappings || []).length}map`);
   }, [storage, chapterId]);
 
   /**

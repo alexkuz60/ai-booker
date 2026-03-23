@@ -186,8 +186,11 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       }
 
       // ── 1. Delete all existing chapters, then insert fresh ones ──
-      // This handles both updates and structural changes (renames, deletes, merges)
-      await supabase.from("book_chapters").delete().eq("book_id", currentBookId);
+      const { count: deletedChaptersCount } = await supabase
+        .from("book_chapters")
+        .delete({ count: "exact" })
+        .eq("book_id", currentBookId);
+      console.log(`[SaveToServer] Deleted ${deletedChaptersCount ?? "?"} chapters (cascade: scenes, segments, phrases)`);
 
       const chapterUpserts: Array<{
         id: string;
@@ -216,6 +219,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       if (chapterUpserts.length > 0) {
         const { error } = await supabase.from("book_chapters").insert(chapterUpserts);
         if (error) console.warn("[SaveToServer] chapters insert:", error);
+        else console.log(`[SaveToServer] Inserted ${chapterUpserts.length} chapters`);
       }
 
       // ── 2. Insert scenes for leaf chapters only ──
@@ -257,10 +261,14 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       if (sceneInserts.length > 0) {
         const { error } = await supabase.from("book_scenes").insert(sceneInserts);
         if (error) console.warn("[SaveToServer] scenes insert:", error);
+        else console.log(`[SaveToServer] Inserted ${sceneInserts.length} scenes`);
       }
 
       // ── 3. Replace parts ──
-      await supabase.from("book_parts").delete().eq("book_id", currentBookId);
+      const { count: deletedPartsCount } = await supabase
+        .from("book_parts")
+        .delete({ count: "exact" })
+        .eq("book_id", currentBookId);
       if (parts.length > 0) {
         const partInserts = parts
           .filter((p) => p.id)
@@ -276,6 +284,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
           if (error) console.warn("[SaveToServer] parts insert:", error);
         }
       }
+      console.log(`[SaveToServer] Parts: del ${deletedPartsCount ?? "?"} → ins ${parts.length}`);
 
       // ── 4. Sync characters to book_characters ──
       let savedCharCount = 0;
@@ -284,7 +293,11 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         const localChars = await readCharacterIndex(storage);
         if (localChars.length > 0) {
           // Delete existing characters for this book, then insert fresh
-          await supabase.from("book_characters").delete().eq("book_id", currentBookId);
+          const { count: deletedCharsCount } = await supabase
+            .from("book_characters")
+            .delete({ count: "exact" })
+            .eq("book_id", currentBookId);
+          console.log(`[SaveToServer] Deleted ${deletedCharsCount ?? "?"} characters`);
 
           const charInserts = localChars.map((c: CharacterIndex) => ({
             id: c.id, // Preserve original UUID for FK integrity (scene_type_mappings)
