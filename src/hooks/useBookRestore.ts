@@ -1,8 +1,8 @@
 /**
  * useBookRestore — restores books from OPFS or server.
  * restoreFromLocal: reads from OPFS ProjectStorage.
- * openSavedBook: local-first, falls back to server for "New Workstation Flow".
- * ensurePdfLoaded: lazy-loads PDF proxy from local or server.
+ * openSavedBook: local-only — tries OPFS first; deploys from server via Wipe-and-Deploy.
+ * ensurePdfLoaded: lazy-loads PDF proxy from local project.
  */
 
 import { useState, useCallback } from "react";
