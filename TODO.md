@@ -112,7 +112,7 @@
 - [x] **Поддержка форматов DOC/DOCX** — загрузка через Mammoth.js с TOC из Heading-стилей + regex-фоллбэк
 - [x] **Поддержка формата FB2** — парсинг XML-структуры, извлечение TOC из `<section>/<title>`
 - [x] **Формат-агностическая обработка** — `fileFormatUtils.ts` с единым API для PDF/DOCX/FB2
-- [x] **Модульная декомпозиция Парсера** — хуки `useLibrary`, `useFileUpload`, `useBookRestore`, `useServerSync`, `useTocMutations`
+- [x] **Модульная декомпозиция Парсера** — хуки `useLibrary`, `useFileUpload`, `useBookRestore` (тонкий оркестратор), `useServerSync`, `useTocMutations` + модули `serverDeploy.ts`, `localProjectResolver.ts`
 - [x] **Каскадный fallback провайдеров** — `invokeWithFallback.ts` + `providerRouting.ts` для 402/429 автопереключения
 - [x] **Унифицированный провайдер-роутинг** — `_shared/providerRouting.ts` для всех Edge Functions (включая extract-characters после P1-рефакторинга)
 - [x] **Local-Only архитектура** — OPFS/FS Access как единственный source of truth, DB — только backup по кнопке «На сервер», восстановление — Wipe-and-Deploy
