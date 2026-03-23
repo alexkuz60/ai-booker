@@ -299,8 +299,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         }
       }
       console.log(`[SaveToServer] Parts: del ${deletedPartsCount ?? "?"} → ins ${parts.length}`);
+      report("parts", parts.length > 0 ? "done" : "skipped", `${parts.length}`);
 
       // ── 4. Sync characters to book_characters ──
+      report("characters", "running");
       let savedCharCount = 0;
       let savedProfileCount = 0;
       if (storage) {
