@@ -49,7 +49,7 @@ export interface CharacterProfileData {
 interface CharacterProfileColumnProps {
   character: CharacterProfileData;
   isRu: boolean;
-  onClose: () => void;
+  onClose?: () => void;
 }
 
 export function CharacterProfileColumn({ character, isRu, onClose }: CharacterProfileColumnProps) {
