@@ -275,8 +275,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         if (error) console.warn("[SaveToServer] scenes insert:", error);
         else console.log(`[SaveToServer] Inserted ${sceneInserts.length} scenes`);
       }
+      report("scenes", "done", `${sceneInserts.length}`);
 
       // ── 3. Replace parts ──
+      report("parts", "running");
       const { count: deletedPartsCount } = await supabase
         .from("book_parts")
         .delete({ count: "exact" })
