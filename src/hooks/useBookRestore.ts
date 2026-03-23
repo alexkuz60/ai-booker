@@ -589,6 +589,49 @@ export function useBookRestore({
                 restoredCount++;
               }
               await Promise.all(writes);
+
+              // ── Build scene character maps from restored segments + characters ──
+              if (restoredChars && restoredChars.length > 0) {
+                const charByName = new Map<string, string>();
+                for (const c of restoredChars) {
+                  charByName.set(c.name.toLowerCase(), c.id);
+                  for (const alias of (c.aliases || [])) {
+                    if (alias) charByName.set(alias.toLowerCase(), c.id);
+                  }
+                }
+
+                const sceneMapWrites: Promise<void>[] = [];
+                for (const [sid, segs] of segmentsByScene) {
+                  const speakerMap = new Map<string, { characterId: string; segIds: string[] }>();
+                  for (const seg of segs) {
+                    if (!seg.speaker) continue;
+                    const cid = charByName.get(seg.speaker.toLowerCase());
+                    if (!cid) continue;
+                    const entry = speakerMap.get(cid) || { characterId: cid, segIds: [] };
+                    entry.segIds.push(seg.id);
+                    speakerMap.set(cid, entry);
+                  }
+
+                  const sceneMappings = mappingsByScene.get(sid) || [];
+                  const sceneCharMap: SceneCharacterMap = {
+                    sceneId: sid,
+                    updatedAt: new Date().toISOString(),
+                    speakers: Array.from(speakerMap.values()).map(e => ({
+                      characterId: e.characterId,
+                      role_in_scene: "speaker" as const,
+                      segment_ids: e.segIds,
+                    })),
+                    typeMappings: sceneMappings.map(m => ({
+                      segmentType: m.segment_type,
+                      characterId: m.character_id,
+                    })),
+                  };
+                  sceneMapWrites.push(saveSceneCharacterMap(targetStorage, sceneCharMap));
+                }
+                await Promise.all(sceneMapWrites);
+                console.log(`[OpenBook] ✅ Built ${sceneMapWrites.length} scene character maps`);
+              }
+
               if (restoredCount > 0) {
                 console.log(`[OpenBook] ✅ Restored ${restoredCount} storyboards (${allPhrases.length} phrases, ${(serverMappings || []).length} type mappings) from server`);
               } else {
