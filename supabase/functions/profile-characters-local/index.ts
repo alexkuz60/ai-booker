@@ -134,6 +134,11 @@ Deno.serve(async (req) => {
     // Models that require max_completion_tokens instead of max_tokens
     const useMaxCompletionTokens = /gpt-5|o1|o3|o4/.test(usedModel);
 
+    // Cap max tokens based on model capability
+    const LOW_TOKEN_MODELS = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "claude-3-haiku", "claude-3-sonnet"];
+    const isLowTokenModel = LOW_TOKEN_MODELS.some(m => usedModel.includes(m));
+    const maxTokens = isLowTokenModel ? 16384 : 65536;
+
     const buildBody = (includeTemp: boolean) => JSON.stringify({
       model: usedModel,
       messages: [
@@ -141,7 +146,7 @@ Deno.serve(async (req) => {
         { role: "user", content: `## Characters to profile:\n\n${charBlocks}\n\nRespond with ONLY the JSON object.` },
       ],
       ...(includeTemp && !skipTemp ? { temperature: 0.3 } : {}),
-      ...(useMaxCompletionTokens ? { max_completion_tokens: 65536 } : { max_tokens: 65536 }),
+      ...(useMaxCompletionTokens ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
     });
 
     const aiStart = Date.now();
