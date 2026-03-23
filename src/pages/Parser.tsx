@@ -246,8 +246,8 @@ export default function Parser() {
     setStep("upload");
   }, [handleReset, setStep]);
 
-  const openServerBook = useCallback((book: BookRecord) => {
-    openSavedBook(book, { skipTimestampCheck: true });
+  const openServerBook = useCallback((book: BookRecord, onProgress?: import("@/components/SyncProgressDialog").SyncProgressCallback) => {
+    return openSavedBook(book, { skipTimestampCheck: true }, undefined, undefined, onProgress);
   }, [openSavedBook]);
 
   useEffect(() => {

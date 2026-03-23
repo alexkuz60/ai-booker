@@ -119,8 +119,14 @@ export function useBookManager({
   });
 
   // ── Wrap openSavedBook to inject sync dependencies ─────────
-  const openSavedBook = useCallback(async (book: BookRecord, options?: { skipTimestampCheck?: boolean }) => {
-    await restore.openSavedBook(book, options);
+  const openSavedBook = useCallback(async (
+    book: BookRecord,
+    options?: { skipTimestampCheck?: boolean },
+    _checkServerNewer?: any,
+    _setServerNewerBookId?: any,
+    onProgress?: import("@/components/SyncProgressDialog").SyncProgressCallback,
+  ) => {
+    await restore.openSavedBook(book, options, undefined, undefined, onProgress);
   }, [restore.openSavedBook]);
 
   // Keep ref in sync

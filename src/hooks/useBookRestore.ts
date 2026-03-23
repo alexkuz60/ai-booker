@@ -5,6 +5,8 @@
  * ensurePdfLoaded: lazy-loads PDF proxy from local project.
  */
 
+import type { SyncProgressCallback } from "@/components/SyncProgressDialog";
+
 import { useState, useCallback } from "react";
 import { clearChapterTextsCache } from "@/lib/chapterTextsCache";
 import { toast } from "sonner";
@@ -251,7 +253,9 @@ export function useBookRestore({
     options?: { skipTimestampCheck?: boolean },
     checkServerNewer?: (bookId: string) => Promise<boolean>,
     setServerNewerBookId?: (bookId: string | null) => void,
+    onProgress?: SyncProgressCallback,
   ) => {
+    const report = onProgress || (() => {});
     if (!userId) return;
 
     // When skipTimestampCheck is true, the user explicitly requested "load from server"
@@ -275,6 +279,7 @@ export function useBookRestore({
 
     // ── Wipe-and-Deploy: clean slate before server restore ──
     // Step 1-2: Wipe OPFS project + browser state
+    report("wipe", "running");
     const existingProjects = localProjectNamesByBookId.get(book.id) || [];
     await wipeProjectBrowserState(book.id, existingProjects);
 
@@ -283,8 +288,10 @@ export function useBookRestore({
     setFileName(book.file_name);
     setBookId(book.id);
     sessionStorage.setItem(ACTIVE_BOOK_KEY, book.id);
+    report("wipe", "done");
 
     try {
+      report("fetch_structure", "running");
       const [partsRes, chaptersRes, pdfBlob] = await Promise.all([
         supabase.from("book_parts").select("id, part_number, title").eq("book_id", book.id).order("part_number"),
         supabase.from("book_chapters").select("id, chapter_number, title, scene_type, mood, bpm, part_id, level, start_page, end_page").eq("book_id", book.id).order("chapter_number"),
@@ -299,12 +306,15 @@ export function useBookRestore({
       if (chapters.length === 0) {
         toast.info(t("noChaptersFound", isRu));
         setStep("upload");
+        report("fetch_structure", "error", isRu ? "Нет глав" : "No chapters");
         return;
       }
+      report("fetch_structure", "done", `${chapters.length}`);
 
       const bookFormat = detectFileFormat(book.file_name);
       const isBookDocx = bookFormat === "docx";
 
+      report("parse_pdf", "running");
       let restoredPdf: any = null;
       let restoredTotalPages = 0;
       let tocFromPdf: { startPage: number; endPage: number; level: number }[] = [];
@@ -360,7 +370,9 @@ export function useBookRestore({
       } else if (isBookDocx) {
         console.log("[OpenBook] DOCX book — no PDF proxy needed");
       }
+      report("parse_pdf", isBookDocx ? "skipped" : (restoredPdf ? "done" : "skipped"));
 
+      report("build_toc", "running");
       updatePdfRef(restoredPdf);
       updateTotalPages(restoredTotalPages);
 
@@ -430,8 +442,10 @@ export function useBookRestore({
       });
       const initMap = sanitizeChapterResultsForStructure(normalizedToc, initRawMap);
       setChapterResults(initMap);
+      report("build_toc", "done", `${normalizedToc.length} ${isRu ? "глав" : "ch"}, ${(allScenes || []).length} ${isRu ? "сцен" : "sc"}`);
       setStep("workspace");
 
+      report("write_local", "running");
       const targetStorage = await ensureWritableLocalStorage(
         book.id,
         book.title || stripFileExtension(book.file_name),
@@ -448,8 +462,10 @@ export function useBookRestore({
           chapterIdMap: newChapterIdMap,
           chapterResults: initMap,
         });
+        report("write_local", "done");
 
         // ── Load characters from server (full CharacterIndex format) ──
+        report("characters", "running");
         let restoredChars: CharacterIndex[] = [];
         try {
           const { data: serverChars } = await supabase
@@ -482,8 +498,10 @@ export function useBookRestore({
         } catch (charErr) {
           console.warn("[OpenBook] Failed to restore characters from server:", charErr);
         }
+        report("characters", restoredChars.length > 0 ? "done" : "skipped", restoredChars.length > 0 ? `${restoredChars.length}` : undefined);
 
         // ── Restore storyboard data (segments + phrases + type_mappings) from server ──
+        report("storyboards", "running");
         try {
           const allSceneIds = (allScenes || []).map(s => s.id);
           console.log(`[OpenBook] Restoring storyboards for ${allSceneIds.length} scenes...`);
@@ -590,8 +608,10 @@ export function useBookRestore({
                 restoredCount++;
               }
               await Promise.all(writes);
+              report("storyboards", restoredCount > 0 ? "done" : "skipped", restoredCount > 0 ? `${restoredCount}` : undefined);
 
               // ── Build scene character maps from restored segments + characters ──
+              report("scene_maps", "running");
               if (restoredChars && restoredChars.length > 0) {
                 const charByName = new Map<string, string>();
                 for (const c of restoredChars) {
@@ -630,6 +650,7 @@ export function useBookRestore({
                   sceneMapWrites.push(saveSceneCharacterMap(targetStorage, sceneCharMap));
                 }
                 await Promise.all(sceneMapWrites);
+                report("scene_maps", "done", `${sceneMapWrites.length}`);
                 console.log(`[OpenBook] ✅ Built ${sceneMapWrites.length} scene character maps`);
               }
 
@@ -646,6 +667,7 @@ export function useBookRestore({
           console.warn("[OpenBook] Failed to restore storyboards from server:", storyErr);
         }
 
+        report("source_file", "running");
         if (pdfBlob) {
           const sourcePath = getSourcePath(bookFormat);
           try {
@@ -663,6 +685,8 @@ export function useBookRestore({
             await targetStorage.writeJSON("project.json", projMeta);
           }
         } catch {}
+        report("source_file", "done");
+        report("finalize", "done");
       }
 
       const pdfStatus = restoredPdf

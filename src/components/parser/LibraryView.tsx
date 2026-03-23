@@ -1,4 +1,4 @@
-import { useState, useMemo, memo } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 import { motion } from "framer-motion";
 import { Upload, BookOpen, Library, Trash2, FolderOpen, Clock, Loader2, Eraser, Pencil, Check, X, Cloud, Download, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { t } from "@/pages/parser/i18n";
 import type { BookRecord } from "@/pages/parser/types";
+import {
+  SyncProgressDialog,
+  buildRestoreSteps,
+  type SyncStep,
+  type SyncProgressCallback,
+} from "@/components/SyncProgressDialog";
 
 interface LibraryViewProps {
   isRu: boolean;
@@ -24,7 +30,7 @@ interface LibraryViewProps {
   onRename?: (bookId: string, newTitle: string) => void;
   serverBooks?: BookRecord[];
   loadingServerBooks?: boolean;
-  onOpenServerBook?: (book: BookRecord) => void;
+  onOpenServerBook?: (book: BookRecord, onProgress?: SyncProgressCallback) => void;
   onDeleteServerBook?: (bookId: string) => void;
 }
 
@@ -35,6 +41,42 @@ function LibraryViewInner({
   const syncedBookIds = useMemo(() => new Set(serverBooks.map(b => b.id)), [serverBooks]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+
+  // Restore progress dialog state
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
+  const [restoreSteps, setRestoreSteps] = useState<SyncStep[]>([]);
+  const [restorePhase, setRestorePhase] = useState<"confirm" | "running" | "done" | "error">("confirm");
+  const [restoreError, setRestoreError] = useState<string>();
+  const [restoreTargetBook, setRestoreTargetBook] = useState<BookRecord | null>(null);
+
+  const handleRestoreClick = useCallback((book: BookRecord) => {
+    setRestoreTargetBook(book);
+    setRestoreSteps(buildRestoreSteps(isRu));
+    setRestorePhase("confirm");
+    setRestoreError(undefined);
+    setRestoreDialogOpen(true);
+  }, [isRu]);
+
+  const handleRestoreProgress: SyncProgressCallback = useCallback(
+    (stepId, status, detail) => {
+      setRestoreSteps(prev =>
+        prev.map(s => s.id === stepId ? { ...s, status, detail: detail ?? s.detail } : s),
+      );
+    },
+    [],
+  );
+
+  const handleRestoreConfirm = useCallback(async () => {
+    if (!restoreTargetBook || !onOpenServerBook) return;
+    setRestorePhase("running");
+    try {
+      await onOpenServerBook(restoreTargetBook, handleRestoreProgress);
+      setRestorePhase("done");
+    } catch (e) {
+      setRestoreError(e instanceof Error ? e.message : String(e));
+      setRestorePhase("error");
+    }
+  }, [restoreTargetBook, onOpenServerBook, handleRestoreProgress]);
 
   const startRename = (book: BookRecord) => {
     setEditingId(book.id);
@@ -238,7 +280,7 @@ function LibraryViewInner({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => onOpenServerBook?.(book)}
+                        onClick={() => handleRestoreClick(book)}
                         className="gap-1.5 text-xs"
                       >
                         <Download className="h-3 w-3" />
@@ -275,6 +317,16 @@ function LibraryViewInner({
           </>
         )}
       </div>
+
+      <SyncProgressDialog
+        isRu={isRu}
+        open={restoreDialogOpen}
+        onOpenChange={setRestoreDialogOpen}
+        onConfirm={handleRestoreConfirm}
+        steps={restoreSteps}
+        phase={restorePhase}
+        errorMessage={restoreError}
+      />
     </motion.div>
   );
 }
