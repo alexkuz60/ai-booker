@@ -12,12 +12,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { t } from "@/pages/parser/i18n";
 import type { BookRecord } from "@/pages/parser/types";
-import {
-  SyncProgressDialog,
-  buildRestoreSteps,
-  type SyncStep,
-  type SyncProgressCallback,
-} from "@/components/SyncProgressDialog";
 
 interface LibraryViewProps {
   isRu: boolean;
@@ -30,7 +24,7 @@ interface LibraryViewProps {
   onRename?: (bookId: string, newTitle: string) => void;
   serverBooks?: BookRecord[];
   loadingServerBooks?: boolean;
-  onOpenServerBook?: (book: BookRecord, onProgress?: SyncProgressCallback) => void;
+  onOpenServerBook?: (book: BookRecord) => void;
   onDeleteServerBook?: (bookId: string) => void;
 }
 
