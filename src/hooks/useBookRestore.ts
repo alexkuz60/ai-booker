@@ -515,15 +515,25 @@ export function useBookRestore({
         // ── Restore storyboard data (segments + phrases + type_mappings) from server ──
         report("storyboards", "running");
         try {
-          const allSceneIds = (allScenes || []).map(s => s.id);
+          const allSceneIds = allScenes.map(s => s.id);
           console.log(`[OpenBook] Restoring storyboards for ${allSceneIds.length} scenes...`);
           if (allSceneIds.length > 0) {
-            // Fetch segments for all scenes (batched)
-            const { data: serverSegments, error: segFetchErr } = await supabase
-              .from("scene_segments")
-              .select("id, scene_id, segment_number, segment_type, speaker, metadata")
-              .in("scene_id", allSceneIds)
-              .order("segment_number");
+            // Fetch segments for all scenes — chunked to avoid 1000-row limit
+            const serverSegments: Array<{
+              id: string; scene_id: string; segment_number: number;
+              segment_type: string; speaker: string | null; metadata: any;
+            }> = [];
+            let segFetchErr: any = null;
+            for (let i = 0; i < allSceneIds.length; i += 500) {
+              const chunk = allSceneIds.slice(i, i + 500);
+              const { data, error } = await supabase
+                .from("scene_segments")
+                .select("id, scene_id, segment_number, segment_type, speaker, metadata")
+                .in("scene_id", chunk)
+                .order("segment_number");
+              if (error) segFetchErr = error;
+              if (data) serverSegments.push(...data);
+            }
 
             console.log(`[OpenBook] Fetched ${serverSegments?.length ?? 0} segments from server${segFetchErr ? ` (error: ${segFetchErr.message})` : ""}`);
 
