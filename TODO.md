@@ -27,16 +27,14 @@
 ### Код: изменения в восстановлении (`useBookRestore.openSavedBook`)
 - [x] **Wipe OPFS перед записью** — `wipeProjectBrowserState()` вызывается ДО создания нового проекта
 - [x] **Очистка browser state** — sessionStorage, localStorage, in-memory кэши очищаются через `wipeProjectBrowserState()`
-- [ ] **Восстановление UI state** — после развертывания данных загрузить из `user_settings` (Supabase):
-  - `studio_session` (activeTab, selectedSceneIdx, chapterId)
-  - mixer/plugin configs для сцен текущей главы
+- [x] **Восстановление UI state** — `useStudioSession` уже читает `studio_session` из `user_settings` через `useCloudSettings` при пустом sessionStorage. Mixer/plugins аналогично. Wipe-and-Deploy очищает sessionStorage → cloud path активируется автоматически
 - [x] **Атомарная активация** — React state устанавливается только после полного завершения записи в OPFS
 
 ### Код: изменения в `acceptServerVersion` (`useServerSync`)
 - [x] **Делегирование Wipe-and-Deploy** — `acceptServerVersion` использует `wipeProjectBrowserState()` для полной очистки
 
 ### Код: изменения в Push to Server (`useSaveBookToProject.saveBook`)
-- [ ] **Сохранение UI state при Push** — верифицировать что все UI-настройки попадают в `user_settings` при Push
+- [x] **Сохранение UI state при Push** — верифицировано: `useCloudSettings` автоматически сохраняет `studio_session`, mixer configs и plugin configs в `user_settings` через debounced flush-on-unmount. Специальной логики в `saveBook` не требуется
 
 ### Код: утилита `wipeProjectBrowserState(bookId: string)`
 - [x] **Создана утилита** — `src/lib/projectCleanup.ts`: централизованная очистка OPFS + browser state + in-memory кэшей
