@@ -817,7 +817,7 @@ const Narrators = () => {
                 <Separator />
 
                 <div className="flex gap-2">
-                  <Button onClick={handlePreview} disabled={testing} variant="outline" className="gap-2">
+                  <Button data-preview-btn onClick={handlePreview} disabled={testing} variant="outline" className="gap-2">
                     {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : playing ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                     {playing ? (isRu ? "Стоп" : "Stop") : (isRu ? "Прослушать" : "Preview")}
                   </Button>
