@@ -20,6 +20,7 @@ import type {
   ChapterStatus,
   BookRecord,
   CharacterIndex,
+  CharacterAppearance,
   SceneCharacterMap,
 } from "@/pages/parser/types";
 import { classifySection, normalizeLevels } from "@/pages/parser/types";
