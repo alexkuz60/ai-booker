@@ -113,6 +113,9 @@
 | `src/lib/sceneIndex.ts` | **Индекс сцен** — sceneId→chapterId маппинг, dirty-маркеры, storyboarded/characterMapped |
 | `src/lib/contentHash.ts` | **FNV-1a 32-bit хеш** — контроль целостности контента сцен |
 | `src/lib/projectMigrator.ts` | **V1→V2 миграция** — автоматическая при открытии проекта (`ensureV2Layout`) |
+| `src/lib/serverDeploy.ts` | **Wipe-and-Deploy pipeline** — чистая async-функция `deployFromServer()`: загрузка данных с сервера → запись в OPFS (10 шагов). Батчинг запросов через `fetchChunked()` для >1000 записей |
+| `src/lib/localProjectResolver.ts` | **Резолвер проектов** — поиск/активация/создание OPFS ProjectStorage по bookId. `resolveLocalStorageForBook()`, `ensureWritableLocalStorage()` |
+| `src/lib/projectCleanup.ts` | **Очистка browser state** — `wipeProjectBrowserState()` (по bookId) и `wipeAllBrowserState()` |
 | `src/hooks/useProjectStorage.ts` | React-хук: create / open / close / import / export проекта |
 | `src/hooks/useProjectStorageContext.tsx` | React Context + Provider для глобального доступа |
 | `src/lib/localSync.ts` | `syncStructureToLocal()` / `readStructureFromLocal()` — запись/чтение структуры |
@@ -422,13 +425,15 @@ assert(storedBookId === targetBookId, "bookId mismatch — aborting write");
 
 Бизнес-логика Парсера декомпозирована на специализированные хуки:
 
-| Хук | Назначение |
+| Хук / Модуль | Назначение |
 |-----|------------|
 | `useBookManager` | Оркестратор: объединяет sub-хуки, управляет жизненным циклом книги |
 | `useLibrary` | Загрузка списка проектов из OPFS, fallback на Supabase RPC |
 | `useFileUpload` | Импорт PDF/DOCX/FB2, извлечение TOC, создание проекта в OPFS |
-| `useBookRestore` | Восстановление сессии из OPFS при открытии книги |
-| `useServerSync` | Сравнение таймстампов local vs server, диалог «новая версия» |
+| `useBookRestore` | **Тонкий оркестратор** (~290 строк): делегирует тяжёлую работу в `serverDeploy.ts` и `localProjectResolver.ts`, управляет UI-состоянием (PDF refs, total pages) |
+| `serverDeploy.ts` | **Чистая async-функция** `deployFromServer()`: 10-шаговый data pipeline (Server → OPFS) с батчингом запросов |
+| `localProjectResolver.ts` | Поиск/активация/создание OPFS-проекта по bookId |
+| `useServerSync` | Сравнение таймстампов local vs server, диалог «новая версия», поддержка `SyncProgressCallback` |
 | `useTocMutations` | CRUD-операции над TOC: rename, reorder, indent, delete, merge |
 | `useChapterAnalysis` | AI-анализ глав: извлечение текста → edge function → сцены |
 | `useParserCharacters` | Извлечение и управление персонажами в Парсере |

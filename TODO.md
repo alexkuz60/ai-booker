@@ -1,7 +1,7 @@
 # TODO — AI-Booker
 
 > Список задач, собранных по ходу обсуждения архитектуры и аудита кода.
-> Актуальная дата: 2026-03-22.
+> Актуальная дата: 2026-03-23.
 
 ---
 
@@ -18,7 +18,7 @@
 
 - [ ] **Доделать структурирование книги** — семантическая разбивка на сцены (Сценарист Stage 1), правка сцен каждой главы
 - [ ] **Инлайн-правка контента сцен** — пользовательское редактирование + гибридные алгоритмы очистки
-- [ ] **Кнопка «Загрузить с сервера»** — New Workstation Flow: список книг из БД → Wipe-and-Deploy в OPFS
+- [x] **Кнопка «Загрузить с сервера»** — Wipe-and-Deploy в OPFS с 10-шаговым прогресс-диалогом, батчинг запросов (>1000 строк)
 
 ## Wipe-and-Deploy: Local-Only восстановление (Фаза 2)
 
@@ -98,12 +98,21 @@
 - [ ] **Ж. Реестр AI-ролей ↔ Edge Functions** — заполнять маппинг роль → функция → промпт по мере реализации фич
 - [ ] **UI для inline-нарротаций** — дать пользователю контроль над интонационными пометками
 
+### Рефакторинг (завершён 2026-03-23)
+
+- [x] **Декомпозиция useBookRestore** — из монолитного хука (~800 строк) вынесены `serverDeploy.ts` (data pipeline) и `localProjectResolver.ts` (резолвинг проектов). Хук теперь ~290 строк — тонкий оркестратор
+- [x] **Батчинг запросов к Supabase** — `fetchChunked()` в `serverDeploy.ts` для сцен, сегментов и фраз (chunks 100-500), обход лимита 1000 строк
+- [x] **Фикс broken sync detection** — `useBookManager` корректно передаёт `checkServerNewer` и `setServerNewerBookId` в `openSavedBook`
+- [x] **Фикс silent failure при отсутствии локальной копии** — автоматический fallback на Wipe-and-Deploy с сервера
+- [x] **Progress UI для acceptServerVersion** — `SyncProgressDialog` теперь отображается при принятии серверной версии
+- [x] **Консолидация очистки** — `wipeAllBrowserState()` из `projectCleanup.ts` используется в `useBookManager.clearAllProjects`
+
 ## Выполненные задачи (архив)
 
 - [x] **Поддержка форматов DOC/DOCX** — загрузка через Mammoth.js с TOC из Heading-стилей + regex-фоллбэк
 - [x] **Поддержка формата FB2** — парсинг XML-структуры, извлечение TOC из `<section>/<title>`
 - [x] **Формат-агностическая обработка** — `fileFormatUtils.ts` с единым API для PDF/DOCX/FB2
-- [x] **Модульная декомпозиция Парсера** — хуки `useLibrary`, `useFileUpload`, `useBookRestore`, `useServerSync`, `useTocMutations`
+- [x] **Модульная декомпозиция Парсера** — хуки `useLibrary`, `useFileUpload`, `useBookRestore` (тонкий оркестратор), `useServerSync`, `useTocMutations` + модули `serverDeploy.ts`, `localProjectResolver.ts`
 - [x] **Каскадный fallback провайдеров** — `invokeWithFallback.ts` + `providerRouting.ts` для 402/429 автопереключения
 - [x] **Унифицированный провайдер-роутинг** — `_shared/providerRouting.ts` для всех Edge Functions (включая extract-characters после P1-рефакторинга)
 - [x] **Local-Only архитектура** — OPFS/FS Access как единственный source of truth, DB — только backup по кнопке «На сервер», восстановление — Wipe-and-Deploy
