@@ -113,6 +113,9 @@
 | `src/lib/sceneIndex.ts` | **Индекс сцен** — sceneId→chapterId маппинг, dirty-маркеры, storyboarded/characterMapped |
 | `src/lib/contentHash.ts` | **FNV-1a 32-bit хеш** — контроль целостности контента сцен |
 | `src/lib/projectMigrator.ts` | **V1→V2 миграция** — автоматическая при открытии проекта (`ensureV2Layout`) |
+| `src/lib/serverDeploy.ts` | **Wipe-and-Deploy pipeline** — чистая async-функция `deployFromServer()`: загрузка данных с сервера → запись в OPFS (10 шагов). Батчинг запросов через `fetchChunked()` для >1000 записей |
+| `src/lib/localProjectResolver.ts` | **Резолвер проектов** — поиск/активация/создание OPFS ProjectStorage по bookId. `resolveLocalStorageForBook()`, `ensureWritableLocalStorage()` |
+| `src/lib/projectCleanup.ts` | **Очистка browser state** — `wipeProjectBrowserState()` (по bookId) и `wipeAllBrowserState()` |
 | `src/hooks/useProjectStorage.ts` | React-хук: create / open / close / import / export проекта |
 | `src/hooks/useProjectStorageContext.tsx` | React Context + Provider для глобального доступа |
 | `src/lib/localSync.ts` | `syncStructureToLocal()` / `readStructureFromLocal()` — запись/чтение структуры |
