@@ -552,7 +552,6 @@ export function useBookRestore({
                 if (phrases) allPhrases.push(...phrases);
               }
 
-              // Fetch type mappings
               // Fetch type mappings — chunked
               const serverMappings: Array<{ scene_id: string; segment_type: string; character_id: string }> = [];
               for (let i = 0; i < allSceneIds.length; i += 500) {
