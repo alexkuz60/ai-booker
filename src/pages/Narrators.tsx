@@ -23,6 +23,8 @@ import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { SaveBookButton } from "@/components/SaveBookButton";
 import { CharacterProfileColumn, type CharacterProfileData } from "@/components/narrators/CharacterProfileColumn";
 import { cn } from "@/lib/utils";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { readCharacterIndex, saveCharacterIndex } from "@/lib/localCharacters";
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -138,6 +140,7 @@ function getVoiceDisplayName(provider: string | undefined, voiceId: string | und
 const Narrators = () => {
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
+  const { storage: projectStorage, meta: projectMeta } = useProjectStorageContext();
 
   // Book & character selection
   const [books, setBooks] = useState<BookOption[]>([]);
@@ -388,6 +391,22 @@ const Narrators = () => {
       if (error) throw error;
       setDirty(false);
       setCharacters(prev => prev.map(c => c.id === selectedId ? { ...c, voice_config: voiceConfig } : c));
+
+      // ── K4: Sync voice_config back to OPFS ──
+      if (projectStorage && projectMeta?.bookId === selectedBookId) {
+        try {
+          const localChars = await readCharacterIndex(projectStorage);
+          const idx = localChars.findIndex(c => c.id === selectedId);
+          if (idx >= 0) {
+            localChars[idx] = { ...localChars[idx], voice_config: voiceConfig as any };
+            await saveCharacterIndex(projectStorage, localChars);
+            console.log(`[Narrators] Synced voice_config to OPFS for ${localChars[idx].name}`);
+          }
+        } catch (opfsErr) {
+          console.warn("[Narrators] Failed to sync voice_config to OPFS:", opfsErr);
+        }
+      }
+
       toast.success(isRu ? "Голос сохранён" : "Voice saved");
     } catch {
       toast.error(isRu ? "Ошибка сохранения" : "Save error");
