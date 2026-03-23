@@ -7,6 +7,7 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
 import type { BookRecord } from "@/pages/parser/types";
+import { wipeProjectBrowserState } from "@/lib/projectCleanup";
 
 const BROWSER_ID_KEY = "booker_browser_id";
 const SERVER_SYNC_PREFIX = "booker_server_sync_checked";
