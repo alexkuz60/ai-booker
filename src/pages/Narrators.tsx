@@ -391,6 +391,22 @@ const Narrators = () => {
       if (error) throw error;
       setDirty(false);
       setCharacters(prev => prev.map(c => c.id === selectedId ? { ...c, voice_config: voiceConfig } : c));
+
+      // ── K4: Sync voice_config back to OPFS ──
+      if (projectStorage && projectMeta?.bookId === selectedBookId) {
+        try {
+          const localChars = await readCharacterIndex(projectStorage);
+          const idx = localChars.findIndex(c => c.id === selectedId);
+          if (idx >= 0) {
+            localChars[idx] = { ...localChars[idx], voice_config: voiceConfig as any };
+            await saveCharacterIndex(projectStorage, localChars);
+            console.log(`[Narrators] Synced voice_config to OPFS for ${localChars[idx].name}`);
+          }
+        } catch (opfsErr) {
+          console.warn("[Narrators] Failed to sync voice_config to OPFS:", opfsErr);
+        }
+      }
+
       toast.success(isRu ? "Голос сохранён" : "Voice saved");
     } catch {
       toast.error(isRu ? "Ошибка сохранения" : "Save error");
