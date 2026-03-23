@@ -445,6 +445,7 @@ export function useBookRestore({
       report("build_toc", "done", `${normalizedToc.length} ${isRu ? "глав" : "ch"}, ${(allScenes || []).length} ${isRu ? "сцен" : "sc"}`);
       setStep("workspace");
 
+      report("write_local", "running");
       const targetStorage = await ensureWritableLocalStorage(
         book.id,
         book.title || stripFileExtension(book.file_name),
