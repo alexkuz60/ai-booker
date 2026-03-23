@@ -1,8 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import type { SyncProgressCallback } from "@/components/SyncProgressDialog";
 import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
 import { useStoryboardPersistence } from "@/hooks/useStoryboardPersistence";
 import { readCharacterIndex } from "@/lib/localCharacters";
