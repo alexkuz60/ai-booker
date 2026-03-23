@@ -22,6 +22,7 @@ import { detectFileFormat, getSourcePath, stripFileExtension, type FileFormat } 
 import { getProjectActivityMs } from "@/lib/projectActivity";
 import { saveCharacterIndex } from "@/lib/localCharacters";
 import { saveStoryboardToLocal, type LocalTypeMappingEntry } from "@/lib/storyboardSync";
+import { wipeProjectBrowserState } from "@/lib/projectCleanup";
 
 interface UseBookRestoreParams {
   userId: string | undefined;
