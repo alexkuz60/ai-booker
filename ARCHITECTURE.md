@@ -425,13 +425,15 @@ assert(storedBookId === targetBookId, "bookId mismatch — aborting write");
 
 Бизнес-логика Парсера декомпозирована на специализированные хуки:
 
-| Хук | Назначение |
+| Хук / Модуль | Назначение |
 |-----|------------|
 | `useBookManager` | Оркестратор: объединяет sub-хуки, управляет жизненным циклом книги |
 | `useLibrary` | Загрузка списка проектов из OPFS, fallback на Supabase RPC |
 | `useFileUpload` | Импорт PDF/DOCX/FB2, извлечение TOC, создание проекта в OPFS |
-| `useBookRestore` | Восстановление сессии из OPFS при открытии книги |
-| `useServerSync` | Сравнение таймстампов local vs server, диалог «новая версия» |
+| `useBookRestore` | **Тонкий оркестратор** (~290 строк): делегирует тяжёлую работу в `serverDeploy.ts` и `localProjectResolver.ts`, управляет UI-состоянием (PDF refs, total pages) |
+| `serverDeploy.ts` | **Чистая async-функция** `deployFromServer()`: 10-шаговый data pipeline (Server → OPFS) с батчингом запросов |
+| `localProjectResolver.ts` | Поиск/активация/создание OPFS-проекта по bookId |
+| `useServerSync` | Сравнение таймстампов local vs server, диалог «новая версия», поддержка `SyncProgressCallback` |
 | `useTocMutations` | CRUD-операции над TOC: rename, reorder, indent, delete, merge |
 | `useChapterAnalysis` | AI-анализ глав: извлечение текста → edge function → сцены |
 | `useParserCharacters` | Извлечение и управление персонажами в Парсере |
