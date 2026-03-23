@@ -185,10 +185,10 @@ export function SyncProgressDialog({
           {phase === "confirm" && (
             <>
               <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
-              <AlertDialogAction onClick={onConfirm}>
+              <Button onClick={onConfirm}>
                 <CloudUpload className="h-4 w-4 mr-1.5" />
                 {isRu ? "Сохранить" : "Save"}
-              </AlertDialogAction>
+              </Button>
             </>
           )}
           {(phase === "done" || phase === "error") && (
