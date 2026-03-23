@@ -20,8 +20,9 @@ import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
 import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 import { detectFileFormat, getSourcePath, stripFileExtension, type FileFormat } from "@/lib/fileFormatUtils";
 import { getProjectActivityMs } from "@/lib/projectActivity";
-import { saveCharacterIndex } from "@/lib/localCharacters";
+import { saveCharacterIndex, saveSceneCharacterMap } from "@/lib/localCharacters";
 import { saveStoryboardToLocal, type LocalTypeMappingEntry } from "@/lib/storyboardSync";
+import type { SceneCharacterMap } from "@/pages/parser/types";
 import { wipeProjectBrowserState } from "@/lib/projectCleanup";
 
 interface UseBookRestoreParams {
