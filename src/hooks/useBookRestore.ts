@@ -315,6 +315,7 @@ export function useBookRestore({
       const isBookDocx = bookFormat === "docx";
 
       report("parse_pdf", "running");
+      let restoredPdf: any = null;
       let restoredTotalPages = 0;
       let tocFromPdf: { startPage: number; endPage: number; level: number }[] = [];
 
