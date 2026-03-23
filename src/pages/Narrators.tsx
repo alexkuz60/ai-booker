@@ -385,28 +385,19 @@ const Narrators = () => {
         ? { provider: "elevenlabs", voice_id: elVoice, stability: elStability, similarity_boost: elSimilarity, style: elStyle, speed: elSpeed, is_extra: isExtra }
         : { provider: "yandex", voice_id: voice, role: role !== "neutral" ? role : undefined, speed, pitch: pitch !== 0 ? pitch : undefined, volume: volume !== 0 ? volume : undefined, is_extra: isExtra };
 
-      const { error } = await supabase
-        .from("book_characters")
-        .update({ voice_config: voiceConfig, updated_at: new Date().toISOString() })
-        .eq("id", selectedId);
-      if (error) throw error;
+      // ── K4: Local-Only — write voice_config to OPFS only ──
+      if (!projectStorage || projectMeta?.bookId !== selectedBookId) {
+        throw new Error(isRu ? "Проект не открыт" : "Project not open");
+      }
+      const localChars = await readCharacterIndex(projectStorage);
+      const idx = localChars.findIndex(c => c.id === selectedId);
+      if (idx < 0) throw new Error(isRu ? "Персонаж не найден" : "Character not found");
+      localChars[idx] = { ...localChars[idx], voice_config: voiceConfig as any };
+      await saveCharacterIndex(projectStorage, localChars);
+      console.log(`[Narrators] Saved voice_config to OPFS for ${localChars[idx].name}`);
+
       setDirty(false);
       setCharacters(prev => prev.map(c => c.id === selectedId ? { ...c, voice_config: voiceConfig } : c));
-
-      // ── K4: Sync voice_config back to OPFS ──
-      if (projectStorage && projectMeta?.bookId === selectedBookId) {
-        try {
-          const localChars = await readCharacterIndex(projectStorage);
-          const idx = localChars.findIndex(c => c.id === selectedId);
-          if (idx >= 0) {
-            localChars[idx] = { ...localChars[idx], voice_config: voiceConfig as any };
-            await saveCharacterIndex(projectStorage, localChars);
-            console.log(`[Narrators] Synced voice_config to OPFS for ${localChars[idx].name}`);
-          }
-        } catch (opfsErr) {
-          console.warn("[Narrators] Failed to sync voice_config to OPFS:", opfsErr);
-        }
-      }
 
       toast.success(isRu ? "Голос сохранён" : "Voice saved");
     } catch {
