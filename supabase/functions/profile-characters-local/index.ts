@@ -134,6 +134,11 @@ Deno.serve(async (req) => {
     // Models that require max_completion_tokens instead of max_tokens
     const useMaxCompletionTokens = /gpt-5|o1|o3|o4/.test(usedModel);
 
+    // Cap max tokens based on model capability
+    const LOW_TOKEN_MODELS = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "claude-3-haiku", "claude-3-sonnet"];
+    const isLowTokenModel = LOW_TOKEN_MODELS.some(m => usedModel.includes(m));
+    const maxTokens = isLowTokenModel ? 16384 : 65536;
+
     const buildBody = (includeTemp: boolean) => JSON.stringify({
       model: usedModel,
       messages: [
@@ -141,7 +146,7 @@ Deno.serve(async (req) => {
         { role: "user", content: `## Characters to profile:\n\n${charBlocks}\n\nRespond with ONLY the JSON object.` },
       ],
       ...(includeTemp && !skipTemp ? { temperature: 0.3 } : {}),
-      ...(useMaxCompletionTokens ? { max_completion_tokens: 65536 } : { max_tokens: 65536 }),
+      ...(useMaxCompletionTokens ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
     });
 
     const aiStart = Date.now();
@@ -151,15 +156,31 @@ Deno.serve(async (req) => {
       body: buildBody(true),
     });
 
-    // Retry without temperature on 400 (some models reject it)
-    if (aiRes.status === 400 && !skipTemp) {
+    // Retry on 400: first without temperature, then with reduced max_tokens
+    if (aiRes.status === 400) {
       const errBody = await aiRes.text();
-      console.warn(`[profile-characters-local] 400 with temperature, retrying without. Model: ${usedModel}, body: ${errBody.slice(0, 300)}`);
-      aiRes = await fetch(resolved.endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${resolved.apiKey}` },
-        body: buildBody(false),
-      });
+      console.warn(`[profile-characters-local] 400, retrying. Model: ${usedModel}, body: ${errBody.slice(0, 300)}`);
+
+      // If error mentions max_tokens, reduce it
+      const isTokenError = /max_tokens|max_completion_tokens/i.test(errBody);
+      if (isTokenError) {
+        const reducedBody = JSON.stringify({
+          model: usedModel,
+          messages: JSON.parse(buildBody(false)).messages,
+          ...(useMaxCompletionTokens ? { max_completion_tokens: 8192 } : { max_tokens: 8192 }),
+        });
+        aiRes = await fetch(resolved.endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${resolved.apiKey}` },
+          body: reducedBody,
+        });
+      } else if (!skipTemp) {
+        aiRes = await fetch(resolved.endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${resolved.apiKey}` },
+          body: buildBody(false),
+        });
+      }
     }
 
     if (aiRes.status === 429) {
