@@ -23,6 +23,8 @@ import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { SaveBookButton } from "@/components/SaveBookButton";
 import { CharacterProfileColumn, type CharacterProfileData } from "@/components/narrators/CharacterProfileColumn";
 import { cn } from "@/lib/utils";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { readCharacterIndex, saveCharacterIndex } from "@/lib/localCharacters";
 
 // ─── Types ──────────────────────────────────────────────
 
