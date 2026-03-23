@@ -265,7 +265,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       }
 
       // ── 3. Replace parts ──
-      await supabase.from("book_parts").delete().eq("book_id", currentBookId);
+      const { count: deletedPartsCount } = await supabase
+        .from("book_parts")
+        .delete({ count: "exact" })
+        .eq("book_id", currentBookId);
       if (parts.length > 0) {
         const partInserts = parts
           .filter((p) => p.id)
@@ -281,6 +284,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
           if (error) console.warn("[SaveToServer] parts insert:", error);
         }
       }
+      console.log(`[SaveToServer] Parts: del ${deletedPartsCount ?? "?"} → ins ${parts.length}`);
 
       // ── 4. Sync characters to book_characters ──
       let savedCharCount = 0;
