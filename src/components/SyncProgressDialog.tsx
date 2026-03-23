@@ -97,9 +97,14 @@ export function SyncProgressDialog({
   const doneCount = steps.filter((s) => s.status === "done" || s.status === "skipped").length;
   const isRunningOrDone = phase === "running" || phase === "done" || phase === "error";
 
-  return (
-    <AlertDialog open={open} onOpenChange={phase === "running" ? undefined : onOpenChange}>
-      <AlertDialogContent className="max-w-md">
+    const isLocked = phase === "running";
+
+    return (
+      <AlertDialog open={open} onOpenChange={isLocked ? () => {} : onOpenChange}>
+        <AlertDialogContent
+          className="max-w-md"
+          onEscapeKeyDown={isLocked ? (e) => e.preventDefault() : undefined}
+        >
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <CloudUpload className="h-5 w-5 text-primary" />
