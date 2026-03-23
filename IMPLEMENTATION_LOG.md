@@ -369,7 +369,7 @@ Source → EQ (3-band) → Compressor → Limiter → Panner3D → Convolver (IR
 
 ---
 
-## Local-First Architecture (ProjectStorage)
+## Local-Only Architecture (ProjectStorage)
 
 **Статус:** ✅ Реализовано (Этапы 0–3.5)
 
