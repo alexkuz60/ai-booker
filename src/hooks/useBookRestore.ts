@@ -608,8 +608,10 @@ export function useBookRestore({
                 restoredCount++;
               }
               await Promise.all(writes);
+              report("storyboards", restoredCount > 0 ? "done" : "skipped", restoredCount > 0 ? `${restoredCount}` : undefined);
 
               // ── Build scene character maps from restored segments + characters ──
+              report("scene_maps", "running");
               if (restoredChars && restoredChars.length > 0) {
                 const charByName = new Map<string, string>();
                 for (const c of restoredChars) {
