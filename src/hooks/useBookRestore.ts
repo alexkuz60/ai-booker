@@ -306,13 +306,15 @@ export function useBookRestore({
       if (chapters.length === 0) {
         toast.info(t("noChaptersFound", isRu));
         setStep("upload");
+        report("fetch_structure", "error", isRu ? "Нет глав" : "No chapters");
         return;
       }
+      report("fetch_structure", "done", `${chapters.length}`);
 
       const bookFormat = detectFileFormat(book.file_name);
       const isBookDocx = bookFormat === "docx";
 
-      let restoredPdf: any = null;
+      report("parse_pdf", "running");
       let restoredTotalPages = 0;
       let tocFromPdf: { startPage: number; endPage: number; level: number }[] = [];
 
