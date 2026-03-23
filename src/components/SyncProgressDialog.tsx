@@ -9,6 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import { CloudUpload, Check, Loader2, AlertCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -184,10 +185,10 @@ export function SyncProgressDialog({
           {phase === "confirm" && (
             <>
               <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
-              <AlertDialogAction onClick={onConfirm}>
+              <Button onClick={onConfirm}>
                 <CloudUpload className="h-4 w-4 mr-1.5" />
                 {isRu ? "Сохранить" : "Save"}
-              </AlertDialogAction>
+              </Button>
             </>
           )}
           {(phase === "done" || phase === "error") && (
