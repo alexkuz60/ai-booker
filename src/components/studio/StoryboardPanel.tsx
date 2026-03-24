@@ -1001,12 +1001,12 @@ export function StoryboardPanel({
     );
   }
 
-  if (loading || analyzing) {
+  if (loading || bgAnalyzing) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3">
         <Loader2 className="h-5 w-5 animate-spin text-primary" />
         <p className="text-sm text-muted-foreground font-body">
-          {analyzing
+          {bgAnalyzing
             ? (isRu ? "Анализируем сцену…" : "Analyzing scene…")
             : (isRu ? "Загрузка…" : "Loading…")}
         </p>
@@ -1043,8 +1043,8 @@ export function StoryboardPanel({
           </span>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="sm" disabled={analyzing || !sceneContent} className="gap-1.5 h-7 text-xs">
-                {analyzing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+              <Button variant="ghost" size="sm" disabled={bgAnalyzing || !sceneContent} className="gap-1.5 h-7 text-xs">
+                {bgAnalyzing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
                 {isRu ? "Переанализ" : "Re-analyze"}
               </Button>
             </AlertDialogTrigger>
@@ -1111,7 +1111,7 @@ export function StoryboardPanel({
               variant="ghost"
               size="sm"
               onClick={runDetectNarrations}
-              disabled={detecting || analyzing || synthesizing}
+              disabled={detecting || bgAnalyzing || synthesizing}
               className="gap-1.5 h-7 text-xs"
               title={isRu ? "Поиск авторских вставок в диалогах" : "Detect narrator insertions in dialogues"}
             >
@@ -1125,7 +1125,7 @@ export function StoryboardPanel({
                 <Button
                   variant="ghost"
                   size="sm"
-                  disabled={correctingStress || analyzing || synthesizing}
+                  disabled={correctingStress || bgAnalyzing || synthesizing}
                   className="gap-1.5 h-7 text-xs"
                   title={isRu ? "Коррекция ударений" : "Stress correction"}
                 >
@@ -1201,7 +1201,7 @@ export function StoryboardPanel({
             variant="outline"
             size="sm"
             onClick={runSynthesis}
-            disabled={synthesizing || analyzing || segments.length === 0}
+            disabled={synthesizing || bgAnalyzing || segments.length === 0}
             className="gap-1.5 h-7 text-xs"
           >
             {synthesizing ? <AudioLines className="h-3 w-3 animate-pulse-glow text-primary" /> : <AudioLines className="h-3 w-3" />}
@@ -1235,7 +1235,7 @@ export function StoryboardPanel({
             size="sm"
             className="h-6 px-2 text-xs ml-auto shrink-0"
             onClick={runAnalysis}
-            disabled={analyzing || !sceneContent}
+            disabled={bgAnalyzing || !sceneContent}
           >
             <RefreshCw className="h-3 w-3 mr-1" />
             {isRu ? "Переанализ" : "Re-analyze"}
