@@ -157,7 +157,7 @@ export function useBookRestore({
 
   const openSavedBook = useCallback(async (
     book: BookRecord,
-    options?: { skipTimestampCheck?: boolean },
+    options?: { skipTimestampCheck?: boolean; downloadImpulses?: boolean },
     checkServerNewer?: (bookId: string) => Promise<boolean>,
     setServerNewerBookId?: (bookId: string | null) => void,
     onProgress?: SyncProgressCallback,
