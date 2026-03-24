@@ -780,7 +780,7 @@ export function StudioTimeline({
               }
             }}
           >
-            <div className="h-6 border-b border-border flex items-center px-2">
+            <div className="h-6 border-b border-border flex items-center px-2 sticky top-0 z-10 bg-background shrink-0">
               {mixerExpanded ? (
                 <>
                   <div className="w-[100px] shrink-0" />
