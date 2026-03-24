@@ -140,7 +140,7 @@ export function TrackMixerStrip({
           <div className="flex items-center gap-1 ml-1 shrink-0">
             <button
               className={`text-[8px] px-1 py-0.5 rounded border font-mono uppercase leading-none transition-colors font-semibold ${
-                mix?.preFxBypassed
+                !mix || mix.preFxBypassed
                   ? "border-border text-muted-foreground/40 bg-transparent"
                   : "border-accent text-accent bg-accent/15"
               }`}
