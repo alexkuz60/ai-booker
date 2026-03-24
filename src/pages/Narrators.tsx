@@ -254,6 +254,65 @@ const Narrators = () => {
 
   // Load characters + appearances for selected book
   const loadCharacters = useCallback(async () => {
+  // Helper: load appearances from DB (read-only, for display)
+  const loadAppearancesFromDB = useCallback(async (charIds: string[], bookId: string) => {
+    if (!charIds.length) return;
+    const { data: appData } = await supabase
+      .from("character_appearances")
+      .select("character_id, scene_id")
+      .in("character_id", charIds);
+
+    const { data: chapters } = await supabase
+      .from("book_chapters")
+      .select("id, title, chapter_number")
+      .eq("book_id", bookId)
+      .order("chapter_number");
+
+    const chapterIds = (chapters || []).map(ch => ch.id);
+    let scenes: SceneRow[] = [];
+    if (chapterIds.length > 0) {
+      const { data: sceneData } = await supabase
+        .from("book_scenes")
+        .select("id, chapter_id, scene_number")
+        .in("chapter_id", chapterIds);
+      scenes = sceneData || [];
+    }
+
+    const sceneToChapter = new Map<string, { chapterIdx: number; chapterId: string; chapterTitle: string; sceneNumber: number }>();
+    for (const [idx, ch] of (chapters || []).entries()) {
+      for (const s of scenes.filter(s => s.chapter_id === ch.id)) {
+        sceneToChapter.set(s.id, { chapterIdx: idx, chapterId: ch.id, chapterTitle: ch.title, sceneNumber: s.scene_number });
+      }
+    }
+
+    const appMap = new Map<string, { chapterIdx: number; chapterId?: string; chapterTitle: string; sceneNumbers: number[] }[]>();
+    const perChar = new Map<string, Map<number, { chapterId: string; title: string; scenes: Set<number> }>>();
+
+    for (const row of (appData || [])) {
+      const info = sceneToChapter.get(row.scene_id);
+      if (!info) continue;
+      if (!perChar.has(row.character_id)) perChar.set(row.character_id, new Map());
+      const chMap = perChar.get(row.character_id)!;
+      if (!chMap.has(info.chapterIdx)) chMap.set(info.chapterIdx, { chapterId: info.chapterId, title: info.chapterTitle, scenes: new Set() });
+      chMap.get(info.chapterIdx)!.scenes.add(info.sceneNumber);
+    }
+
+    for (const [charId, chMap] of perChar) {
+      const apps = Array.from(chMap.entries())
+        .sort(([a], [b]) => a - b)
+        .map(([chapterIdx, { chapterId, title, scenes }]) => ({
+          chapterIdx,
+          chapterId,
+          chapterTitle: title,
+          sceneNumbers: Array.from(scenes).sort((a, b) => a - b),
+        }));
+      appMap.set(charId, apps);
+    }
+    setAppearances(appMap);
+  }, []);
+
+  // Load characters + appearances for selected book
+  const loadCharacters = useCallback(async () => {
     if (!selectedBookId) { setCharacters([]); setAppearances(new Map()); return; }
     setLoading(true);
     try {
@@ -280,7 +339,6 @@ const Narrators = () => {
         // Try local appearances first
         const hasLocalAppearances = localChars.some(c => c.appearances?.length > 0);
         if (hasLocalAppearances) {
-          // Build chapterIdx→chapterId map from scene_index
           const sceneIdx = await readSceneIndex(projectStorage);
           const chapterIdByIdx = new Map<number, string>();
           if (sceneIdx) {
@@ -299,7 +357,7 @@ const Narrators = () => {
           }
           setAppearances(appMap);
         } else {
-          // Fallback: load appearances from DB (read-only supplement for display)
+          // Supplement: load appearances from DB for display
           await loadAppearancesFromDB(chars.map(c => c.id), selectedBookId);
         }
       } else {
@@ -314,68 +372,14 @@ const Narrators = () => {
           voice_config: (c.voice_config as Record<string, unknown>) || {},
         }));
         setCharacters(chars);
-
-        // Load appearances from DB
         if (chars.length > 0) {
-          const charIds = chars.map(c => c.id);
-          const { data: appData } = await supabase
-            .from("character_appearances")
-            .select("character_id, scene_id")
-            .in("character_id", charIds);
-
-          const { data: chapters } = await supabase
-            .from("book_chapters")
-            .select("id, title, chapter_number")
-            .eq("book_id", selectedBookId)
-            .order("chapter_number");
-
-          const chapterIds = (chapters || []).map(ch => ch.id);
-          let scenes: SceneRow[] = [];
-          if (chapterIds.length > 0) {
-            const { data: sceneData } = await supabase
-              .from("book_scenes")
-              .select("id, chapter_id, scene_number")
-              .in("chapter_id", chapterIds);
-            scenes = sceneData || [];
-          }
-
-          const sceneToChapter = new Map<string, { chapterIdx: number; chapterId: string; chapterTitle: string; sceneNumber: number }>();
-          for (const [idx, ch] of (chapters || []).entries()) {
-            for (const s of scenes.filter(s => s.chapter_id === ch.id)) {
-              sceneToChapter.set(s.id, { chapterIdx: idx, chapterId: ch.id, chapterTitle: ch.title, sceneNumber: s.scene_number });
-            }
-          }
-
-          const appMap = new Map<string, { chapterIdx: number; chapterId?: string; chapterTitle: string; sceneNumbers: number[] }[]>();
-          const perChar = new Map<string, Map<number, { chapterId: string; title: string; scenes: Set<number> }>>();
-
-          for (const row of (appData || [])) {
-            const info = sceneToChapter.get(row.scene_id);
-            if (!info) continue;
-            if (!perChar.has(row.character_id)) perChar.set(row.character_id, new Map());
-            const chMap = perChar.get(row.character_id)!;
-            if (!chMap.has(info.chapterIdx)) chMap.set(info.chapterIdx, { chapterId: info.chapterId, title: info.chapterTitle, scenes: new Set() });
-            chMap.get(info.chapterIdx)!.scenes.add(info.sceneNumber);
-          }
-
-          for (const [charId, chMap] of perChar) {
-            const apps = Array.from(chMap.entries())
-              .sort(([a], [b]) => a - b)
-              .map(([chapterIdx, { chapterId, title, scenes }]) => ({
-                chapterIdx,
-                chapterId,
-                chapterTitle: title,
-                sceneNumbers: Array.from(scenes).sort((a, b) => a - b),
-              }));
-            appMap.set(charId, apps);
-          }
-          setAppearances(appMap);
+          await loadAppearancesFromDB(chars.map(c => c.id), selectedBookId);
         }
       }
     } finally {
       setLoading(false);
     }
-  }, [selectedBookId, projectStorage, projectMeta?.bookId]);
+  }, [selectedBookId, projectStorage, projectMeta?.bookId, loadAppearancesFromDB]);
 
   useEffect(() => { loadCharacters(); }, [loadCharacters]);
 
