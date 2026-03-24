@@ -305,6 +305,16 @@ export function Panner3DStage({ isRu, allClips, selectedClipId, config, disabled
           <ParamSlider label="Rolloff" value={config.rolloffFactor} min={0} max={5} step={0.1} onChange={v => onUpdate({ rolloffFactor: v })} disabled={!config.enabled} />
         </div>
       </div>
+
+      <Panner3DExpandedDialog
+        open={expandedOpen}
+        onOpenChange={setExpandedOpen}
+        isRu={isRu}
+        allClips={allClips}
+        selectedClipId={selectedClipId}
+        config={config}
+        onUpdate={onUpdate}
+      />
     </div>
   );
 }
