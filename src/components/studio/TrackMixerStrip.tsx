@@ -234,7 +234,7 @@ export function TrackMixerStrip({
         {/* Reverb badge */}
         <button
           className={`text-[9px] px-1.5 py-0.5 rounded border shrink-0 font-mono uppercase leading-none transition-colors font-semibold ${
-            mix?.reverbBypassed
+            !mix || mix.reverbBypassed
               ? "border-border text-muted-foreground/60 bg-transparent"
               : "border-primary text-primary bg-primary/15"
           }`}
