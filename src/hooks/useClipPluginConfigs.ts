@@ -333,10 +333,14 @@ export function useClipPluginConfigs(sceneId: string | null) {
     });
   }, [getTrackRvState, saveToDb]);
 
-  // Cleanup
+  // Flush pending on unmount (HMR protection)
+  const flushRef = useRef(flushToDb);
+  flushRef.current = flushToDb;
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      // Synchronous best-effort flush
+      flushRef.current();
     };
   }, []);
 
