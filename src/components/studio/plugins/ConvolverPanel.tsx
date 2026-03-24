@@ -33,7 +33,7 @@ interface ImpulseRow {
   peaks: number[] | null;
 }
 
-export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpdate }: ConvolverPanelProps) {
+export function ConvolverPanel({ isRu, config, clipId, disabled, projectStorage, onToggle, onUpdate }: ConvolverPanelProps) {
   const [impulses, setImpulses] = useState<ImpulseRow[]>([]);
   const [loading, setLoading] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
