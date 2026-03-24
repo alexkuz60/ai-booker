@@ -76,7 +76,6 @@ export function StoryboardPanel({
   const sceneIdRef = useRef(sceneId);
   sceneIdRef.current = sceneId;
   const [loading, setLoading] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
   const [synthesizing, setSynthesizing] = useState(false);
   const [synthProgress, setSynthProgress] = useState("");
   const [detecting, setDetecting] = useState(false);
