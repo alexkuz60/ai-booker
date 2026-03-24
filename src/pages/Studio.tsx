@@ -495,6 +495,8 @@ const Studio = () => {
     <BackgroundAnalysisProvider
       storage={storage}
       getModelForRole={getModelForRole}
+      getEffectivePool={getEffectivePool}
+      isPoolEnabled={isPoolEnabled}
       userApiKeys={userApiKeys}
       isRu={isRu}
       onSceneSegmented={onSegmented}
@@ -525,7 +527,6 @@ const Studio = () => {
                     onPlaylistDurationsLoaded={handlePlaylistDurationsLoaded}
                     selectedSceneIndices={selectedSceneIndices}
                     onSelectedSceneIndicesChange={setSelectedSceneIndices}
-                    onBatchAnalyze={handleBatchAnalyze}
                   />
                 ) : (
                   <EmptyNavigator isRu={isRu} />
@@ -557,10 +558,6 @@ const Studio = () => {
                   onSilenceSecChange={handleSilenceSecChange}
                   onRecalcDone={() => setClipsRefreshToken(t => t + 1)}
                   onVoiceSaved={() => setClipsRefreshToken(t => t + 1)}
-                  batchSceneIds={batchSceneIds}
-                  batchScenes={batchScenes}
-                  onBatchComplete={handleBatchComplete}
-                  onBatchClose={handleBatchClose}
                   userApiKeys={userApiKeys}
                   clipsRefreshToken={clipsRefreshToken}
                 />
