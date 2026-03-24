@@ -29,9 +29,10 @@ export function Panner3DExpandedDialog({
   const draggingRef = useRef(false);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; color?: string } | null>(null);
 
-  // Draw
+  // Draw — use rAF to ensure canvas is mounted after dialog open
   useEffect(() => {
     if (!open) return;
+    const frameId = requestAnimationFrame(() => {
     const c = canvasRef.current;
     if (!c) return;
     const dpr = window.devicePixelRatio || 1;
