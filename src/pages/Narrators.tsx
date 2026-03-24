@@ -26,6 +26,8 @@ import { CharacterProfileColumn, type CharacterProfileData } from "@/components/
 import { cn } from "@/lib/utils";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { readCharacterIndex, saveCharacterIndex } from "@/lib/localCharacters";
+import { readSceneIndex } from "@/lib/sceneIndex";
+import type { CharacterIndex } from "@/pages/parser/types";
 
 // ─── Types ──────────────────────────────────────────────
 
