@@ -135,7 +135,7 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, projectStorage,
     drawPeaksWaveform(c, peaks);
   }, [selectedImpulse, fallbackPeaks, isRu]);
 
-  // Handle IR change → load into engine via stemCache
+  // Handle IR change → load into engine via irCache + update book manifest
   const handleImpulseChange = useCallback(async (impulseId: string) => {
     onUpdate({ impulseId });
 
@@ -143,20 +143,26 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, projectStorage,
     if (!impulse) return;
 
     try {
+      // Cache IR in OPFS and get audio data
+      await fetchIrWithCache(impulse.id, impulse.file_path);
+
+      // Add to book's impulse manifest
+      if (projectStorage) {
+        addToBookImpulseManifest(projectStorage, impulseId).catch(() => {});
+      }
+
+      // Load into engine via signed URL (engine needs URL, not ArrayBuffer)
       const { data: urlData } = await supabase.storage
         .from("impulse-responses")
         .createSignedUrl(impulse.file_path, 600);
       if (urlData?.signedUrl) {
-        // Pre-cache the IR audio
-        await fetchWithStemCache(impulse.file_path, urlData.signedUrl);
-        // Load into engine
         const { getAudioEngine } = await import("@/lib/audioEngine");
         await getAudioEngine().loadTrackConvolverIR(clipId, urlData.signedUrl);
       }
     } catch (e) {
       console.error("Failed to load IR into engine:", e);
     }
-  }, [impulses, clipId, onUpdate]);
+  }, [impulses, clipId, onUpdate, projectStorage]);
 
   // Preview clip through convolver
   const handlePreview = useCallback(async () => {
