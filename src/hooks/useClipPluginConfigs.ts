@@ -56,6 +56,10 @@ export interface ClipPluginConfig {
   limiter: ClipLimiterConfig;
   panner3d: ClipPanner3dConfig;
   convolver: ClipConvolverConfig;
+  /** When true, this clip's EQ/Comp/Limiter are individually configured (not following track FX) */
+  fxOverride?: boolean;
+  /** When true, this clip's Convolver is individually configured (not following track RV) */
+  rvOverride?: boolean;
 }
 
 export const DEFAULT_PANNER3D_CONFIG: ClipPanner3dConfig = {
@@ -86,10 +90,15 @@ export const DEFAULT_CLIP_PLUGIN_CONFIG: ClipPluginConfig = {
   limiter: { enabled: false, threshold: -3 },
   panner3d: { ...DEFAULT_PANNER3D_CONFIG },
   convolver: { ...DEFAULT_CONVOLVER_CONFIG },
+  fxOverride: false,
+  rvOverride: false,
 };
 
 /** All clip configs for a scene, keyed by clipId */
 export type SceneClipConfigs = Record<string, ClipPluginConfig>;
+
+/** Aggregate state for track-level FX/RV buttons */
+export type TrackPluginState = "on" | "off" | "mixed";
 
 // ─── Hook ───────────────────────────────────────────────────
 
