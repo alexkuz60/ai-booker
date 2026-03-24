@@ -6,7 +6,6 @@ import { StoryboardPanel } from "./StoryboardPanel";
 import { CharactersPanel, type CharactersPanelHandle } from "./CharactersPanel";
 import { AtmospherePanel } from "./AtmospherePanel";
 import { FinishedChaptersPanel } from "./FinishedChaptersPanel";
-import { BatchSegmentationPanel } from "./BatchSegmentationPanel";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { useAiRoles } from "@/hooks/useAiRoles";
 
@@ -32,16 +31,12 @@ interface StudioWorkspaceProps {
   onSilenceSecChange?: (sec: number) => void;
   onRecalcDone?: () => void;
   onVoiceSaved?: () => void;
-  batchSceneIds?: string[] | null;
-  batchScenes?: { id: string; title: string; sceneNumber: number; content?: string | null }[];
-  onBatchComplete?: () => void;
-  onBatchClose?: () => void;
   userApiKeys?: Record<string, string>;
   /** Token to force character list refresh (e.g. after speaker rename or segmentation) */
   clipsRefreshToken?: number;
 }
 
-export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, selectedSceneNumber, selectedSceneTitle, chapterId, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter, activeTab: externalTab, onTabChange, selectedSegmentId, onSelectSegment, onSynthesizingChange, onErrorSegmentsChange, silenceSec, onSilenceSecChange, onRecalcDone, onVoiceSaved, batchSceneIds, batchScenes, onBatchComplete, onBatchClose, userApiKeys = {}, clipsRefreshToken = 0 }: StudioWorkspaceProps) {
+export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, selectedSceneNumber, selectedSceneTitle, chapterId, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter, activeTab: externalTab, onTabChange, selectedSegmentId, onSelectSegment, onSynthesizingChange, onErrorSegmentsChange, silenceSec, onSilenceSecChange, onRecalcDone, onVoiceSaved, userApiKeys = {}, clipsRefreshToken = 0 }: StudioWorkspaceProps) {
   const [activeTab, setActiveTabLocal] = useState(() => externalTab || sessionStorage.getItem("studio_active_tab") || "storyboard");
   const charactersPanelRef = useRef<CharactersPanelHandle | null>(null);
   const [castingExternal, setCastingExternal] = useState(false);
@@ -69,8 +64,6 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, s
       setCastingExternal(false);
     }
   };
-
-  const isBatchMode = batchSceneIds && batchSceneIds.length > 0 && batchScenes && batchScenes.length > 0;
 
   return (
     <div className="h-full min-h-0 flex flex-col p-4">
@@ -118,38 +111,23 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, s
 
         <TabsContent value="storyboard" className="flex-1 mt-4 min-h-0">
           <div className="rounded-lg border border-border bg-card/50 h-full">
-            {isBatchMode ? (
-              <BatchSegmentationPanel
-                isRu={isRu}
-                sceneIds={batchSceneIds!}
-                scenes={batchScenes!}
-                chapterId={chapterId ?? null}
-                bookId={bookId ?? null}
-                userApiKeys={userApiKeys}
-                concurrency={3}
-                onComplete={onBatchComplete}
-                onSceneSegmented={onSegmented}
-                onClose={onBatchClose}
-              />
-            ) : (
-              <StoryboardPanel
-                sceneId={selectedSceneId ?? null}
-                sceneContent={selectedSceneContent ?? null}
-                sceneNumber={selectedSceneNumber ?? null}
-                sceneTitle={selectedSceneTitle ?? null}
-                chapterId={chapterId ?? null}
-                isRu={isRu}
-                bookId={bookId ?? null}
-                onSegmented={onSegmented}
-                selectedSegmentId={selectedSegmentId ?? null}
-                onSelectSegment={onSelectSegment}
-                onSynthesizingChange={onSynthesizingChange}
-                onErrorSegmentsChange={onErrorSegmentsChange}
-                silenceSec={silenceSec}
-                onSilenceSecChange={onSilenceSecChange}
-                onRecalcDone={onRecalcDone}
-              />
-            )}
+            <StoryboardPanel
+              sceneId={selectedSceneId ?? null}
+              sceneContent={selectedSceneContent ?? null}
+              sceneNumber={selectedSceneNumber ?? null}
+              sceneTitle={selectedSceneTitle ?? null}
+              chapterId={chapterId ?? null}
+              isRu={isRu}
+              bookId={bookId ?? null}
+              onSegmented={onSegmented}
+              selectedSegmentId={selectedSegmentId ?? null}
+              onSelectSegment={onSelectSegment}
+              onSynthesizingChange={onSynthesizingChange}
+              onErrorSegmentsChange={onErrorSegmentsChange}
+              silenceSec={silenceSec}
+              onSilenceSecChange={onSilenceSecChange}
+              onRecalcDone={onRecalcDone}
+            />
           </div>
         </TabsContent>
 
