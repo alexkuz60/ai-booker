@@ -46,6 +46,7 @@ export default function Admin() {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loaded: rolesLoaded } = useUserRole();
   const { isRu } = useLanguage();
+  const { setPageHeader } = usePageHeader();
   const navigate = useNavigate();
 
   const [users, setUsers] = useState<UserWithRoles[]>([]);
