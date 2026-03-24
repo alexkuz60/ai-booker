@@ -683,8 +683,13 @@ export function ChapterNavigator({
                       <span className={cn("px-1.5 py-0.5 rounded text-[10px] border shrink-0", colorClass)}>
                         {isRu ? (SCENE_TYPE_RU[scene.scene_type] || scene.scene_type) : scene.scene_type}
                       </span>
-                      <span className="truncate flex-1">{scene.title}</span>
-                       {isDirty && (
+                       <span className="truncate flex-1">{scene.title}</span>
+                       {isBgAnalyzing && (
+                         <span title={isRu ? "Анализ в фоне…" : "Analyzing in background…"}>
+                           <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
+                         </span>
+                       )}
+                       {isDirty && !isBgAnalyzing && (
                          <span title={isRu ? "Контент изменён в Парсере — нужен переанализ" : "Content edited in Parser — re-analysis needed"}>
                            <RefreshCw className="h-3 w-3 text-orange-500 shrink-0" />
                          </span>
