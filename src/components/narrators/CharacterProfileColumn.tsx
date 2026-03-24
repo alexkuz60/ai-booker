@@ -4,9 +4,12 @@
  * Mirrors the profile view from ParserCharactersPanel.
  */
 
-import { Brain } from "lucide-react";
+import { Brain, ExternalLink } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { saveStudioChapter } from "@/lib/studioChapter";
 
 // ─── i18n ────────────────────────────────────────────────
 const AGE_LABELS: Record<string, { ru: string; en: string }> = {
@@ -43,7 +46,9 @@ export interface CharacterProfileData {
   speech_tags: string[];
   psycho_tags: string[];
   aliases: string[];
-  appearances: { chapterIdx: number; chapterTitle: string; sceneNumbers: number[] }[];
+  appearances: { chapterIdx: number; chapterId?: string; chapterTitle: string; sceneNumbers: number[] }[];
+  bookTitle?: string;
+  bookId?: string;
 }
 
 interface CharacterProfileColumnProps {
@@ -53,6 +58,20 @@ interface CharacterProfileColumnProps {
 }
 
 export function CharacterProfileColumn({ character, isRu, onClose }: CharacterProfileColumnProps) {
+  const navigate = useNavigate();
+
+  const handleGoToChapter = (app: CharacterProfileData["appearances"][number]) => {
+    if (!app.chapterId) return;
+    saveStudioChapter({
+      chapterId: app.chapterId,
+      chapterTitle: app.chapterTitle,
+      bookTitle: character.bookTitle || "",
+      bookId: character.bookId,
+      scenes: [],
+    });
+    navigate("/studio");
+  };
+
   return (
     <div className="flex flex-col min-h-0 overflow-hidden h-full">
       {/* Header */}
@@ -160,21 +179,37 @@ export function CharacterProfileColumn({ character, isRu, onClose }: CharacterPr
               <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                 {isRu ? "Появления" : "Appearances"}
               </span>
-              <div className="mt-1.5 space-y-1">
+              <div className="mt-1.5 space-y-0.5">
                 {character.appearances.map((app) => (
-                  <div key={app.chapterIdx} className="flex items-center gap-2 text-xs">
-                    <span className="text-muted-foreground font-mono w-8 flex-shrink-0 text-right">
-                      #{app.chapterIdx + 1}
-                    </span>
-                    <span className="truncate flex-1 text-foreground/80">
-                      {app.chapterTitle}
-                    </span>
-                    {app.sceneNumbers.length > 0 && (
-                      <span className="text-muted-foreground font-mono flex-shrink-0">
-                        {isRu ? "сц." : "sc."} {app.sceneNumbers.join(", ")}
-                      </span>
+                  <Tooltip key={app.chapterIdx}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => handleGoToChapter(app)}
+                        disabled={!app.chapterId}
+                        className="w-full flex items-center gap-2 text-xs rounded px-1 py-0.5 text-left transition-colors hover:bg-accent/10 group disabled:opacity-50 disabled:cursor-default"
+                      >
+                        <span className="text-muted-foreground font-mono w-8 flex-shrink-0 text-right">
+                          #{app.chapterIdx + 1}
+                        </span>
+                        <span className="truncate flex-1 text-foreground/80">
+                          {app.chapterTitle}
+                        </span>
+                        {app.sceneNumbers.length > 0 && (
+                          <span className="text-muted-foreground font-mono flex-shrink-0">
+                            {isRu ? "сц." : "sc."} {app.sceneNumbers.join(", ")}
+                          </span>
+                        )}
+                        {app.chapterId && (
+                          <ExternalLink className="h-3 w-3 text-muted-foreground/30 group-hover:text-primary flex-shrink-0" />
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    {app.chapterId && (
+                      <TooltipContent side="right" className="text-xs">
+                        {isRu ? "Открыть в Студии" : "Open in Studio"}
+                      </TooltipContent>
                     )}
-                  </div>
+                  </Tooltip>
                 ))}
               </div>
             </div>
