@@ -25,11 +25,14 @@ import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 
 import { readSceneContentFromLocal } from "@/lib/localSceneContent";
 import { getCachedSceneIndex } from "@/lib/sceneIndex";
+import { BackgroundAnalysisProvider } from "@/hooks/useBackgroundAnalysis";
+import { useAiRoles } from "@/hooks/useAiRoles";
 
 const Studio = () => {
   const { isRu } = useLanguage();
   const { user } = useAuth();
   const userApiKeys = useUserApiKeys();
+  const { getModelForRole } = useAiRoles(userApiKeys);
   const {
     chapter, setChapter,
     selectedSceneIdx, setSelectedSceneIdx,
@@ -518,91 +521,99 @@ const Studio = () => {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="flex flex-col h-[calc(100vh-3rem)] min-h-0 overflow-hidden"
+    <BackgroundAnalysisProvider
+      storage={storage}
+      getModelForRole={getModelForRole}
+      userApiKeys={userApiKeys}
+      isRu={isRu}
+      onSceneSegmented={onSegmented}
     >
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <ResizablePanelGroup direction="horizontal" className="h-full min-h-0" autoSaveId="studio-h-panels">
-            <ResizablePanel defaultSize={30} minSize={15} maxSize={50} className="min-h-0">
-              {chapter ? (
-                <ChapterNavigator
-                  chapter={chapter}
-                  selectedSceneIdx={selectedSceneIdx}
-                  onSelectScene={setSelectedSceneIdx}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="flex flex-col h-[calc(100vh-3rem)] min-h-0 overflow-hidden"
+      >
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <ResizablePanelGroup direction="horizontal" className="h-full min-h-0" autoSaveId="studio-h-panels">
+              <ResizablePanel defaultSize={30} minSize={15} maxSize={50} className="min-h-0">
+                {chapter ? (
+                  <ChapterNavigator
+                    chapter={chapter}
+                    selectedSceneIdx={selectedSceneIdx}
+                    onSelectScene={setSelectedSceneIdx}
+                    isRu={isRu}
+                    segmentedSceneIds={segmentedSceneIds}
+                    renderedSceneIds={renderedSceneIds}
+                    fullyRenderedSceneIds={fullyRenderedSceneIds}
+                    staleAudioSceneIds={staleAudioSceneIds}
+                    clearedDirtySceneIds={clearedDirtySceneIds}
+                    onBatchResynthDone={() => setClipsRefreshToken(t => t + 1)}
+                    clipsRefreshToken={clipsRefreshToken}
+                    bookId={bookId}
+                    onPlaylistDurationsLoaded={handlePlaylistDurationsLoaded}
+                    selectedSceneIndices={selectedSceneIndices}
+                    onSelectedSceneIndicesChange={setSelectedSceneIndices}
+                    onBatchAnalyze={handleBatchAnalyze}
+                  />
+                ) : (
+                  <EmptyNavigator isRu={isRu} />
+                )}
+              </ResizablePanel>
+
+              <ResizableHandle withHandle />
+
+              <ResizablePanel defaultSize={70} className="min-h-0">
+                <StudioWorkspace
                   isRu={isRu}
-                  segmentedSceneIds={segmentedSceneIds}
-                  renderedSceneIds={renderedSceneIds}
-                  fullyRenderedSceneIds={fullyRenderedSceneIds}
-                  staleAudioSceneIds={staleAudioSceneIds}
-                  clearedDirtySceneIds={clearedDirtySceneIds}
-                  onBatchResynthDone={() => setClipsRefreshToken(t => t + 1)}
-                  clipsRefreshToken={clipsRefreshToken}
-                  bookId={bookId}
-                  onPlaylistDurationsLoaded={handlePlaylistDurationsLoaded}
-                  selectedSceneIndices={selectedSceneIndices}
-                  onSelectedSceneIndicesChange={setSelectedSceneIndices}
-                  onBatchAnalyze={handleBatchAnalyze}
-                />
-              ) : (
-                <EmptyNavigator isRu={isRu} />
-              )}
-            </ResizablePanel>
-
-            <ResizableHandle withHandle />
-
-            <ResizablePanel defaultSize={70} className="min-h-0">
-              <StudioWorkspace
-                isRu={isRu}
-                selectedSceneId={selectedScene?.id ?? null}
-                selectedSceneContent={sceneContent}
+                  selectedSceneId={selectedScene?.id ?? null}
+                  selectedSceneContent={sceneContent}
                   selectedSceneNumber={selectedScene?.scene_number ?? null}
                   selectedSceneTitle={selectedScene?.title ?? null}
                   chapterId={chapter?.chapterId ?? null}
-                bookId={bookId}
-                chapterSceneIds={chapterSceneIds}
-                onSegmented={onSegmented}
-                selectedCharacterId={selectedCharacterId}
-                onSelectCharacter={setSelectedCharacterId}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-                selectedSegmentId={selectedSegmentId}
-                onSelectSegment={setSelectedSegmentId}
-                onSynthesizingChange={setSynthesizingSegmentIds}
-                onErrorSegmentsChange={setErrorSegmentIds}
-                silenceSec={silenceSec}
-                onSilenceSecChange={handleSilenceSecChange}
-                onRecalcDone={() => setClipsRefreshToken(t => t + 1)}
-                onVoiceSaved={() => setClipsRefreshToken(t => t + 1)}
-                batchSceneIds={batchSceneIds}
-                batchScenes={batchScenes}
-                onBatchComplete={handleBatchComplete}
-                onBatchClose={handleBatchClose}
-                userApiKeys={userApiKeys}
-                clipsRefreshToken={clipsRefreshToken}
-              />
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        </div>
+                  bookId={bookId}
+                  chapterSceneIds={chapterSceneIds}
+                  onSegmented={onSegmented}
+                  selectedCharacterId={selectedCharacterId}
+                  onSelectCharacter={setSelectedCharacterId}
+                  activeTab={activeTab}
+                  onTabChange={setActiveTab}
+                  selectedSegmentId={selectedSegmentId}
+                  onSelectSegment={setSelectedSegmentId}
+                  onSynthesizingChange={setSynthesizingSegmentIds}
+                  onErrorSegmentsChange={setErrorSegmentIds}
+                  silenceSec={silenceSec}
+                  onSilenceSecChange={handleSilenceSecChange}
+                  onRecalcDone={() => setClipsRefreshToken(t => t + 1)}
+                  onVoiceSaved={() => setClipsRefreshToken(t => t + 1)}
+                  batchSceneIds={batchSceneIds}
+                  batchScenes={batchScenes}
+                  onBatchComplete={handleBatchComplete}
+                  onBatchClose={handleBatchClose}
+                  userApiKeys={userApiKeys}
+                  clipsRefreshToken={clipsRefreshToken}
+                />
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </div>
 
-        <StudioTimeline
-          isRu={isRu}
-          sceneDurationSec={sceneEstimate?.sec}
-          sceneId={selectedScene?.id ?? null}
-          bookId={bookId}
-          selectedCharacterId={selectedCharacterId}
-          onSelectCharacter={setSelectedCharacterId}
-          selectedSegmentId={selectedSegmentId}
-          onSelectSegment={handleSelectSegmentFromTimeline}
-          synthesizingSegmentIds={synthesizingSegmentIds}
-          errorSegmentIds={errorSegmentIds}
-          clipsRefreshToken={clipsRefreshToken}
-          onSceneRendered={() => setClipsRefreshToken(t => t + 1)}
-        />
-      </div>
-    </motion.div>
+          <StudioTimeline
+            isRu={isRu}
+            sceneDurationSec={sceneEstimate?.sec}
+            sceneId={selectedScene?.id ?? null}
+            bookId={bookId}
+            selectedCharacterId={selectedCharacterId}
+            onSelectCharacter={setSelectedCharacterId}
+            selectedSegmentId={selectedSegmentId}
+            onSelectSegment={handleSelectSegmentFromTimeline}
+            synthesizingSegmentIds={synthesizingSegmentIds}
+            errorSegmentIds={errorSegmentIds}
+            clipsRefreshToken={clipsRefreshToken}
+            onSceneRendered={() => setClipsRefreshToken(t => t + 1)}
+          />
+        </div>
+      </motion.div>
+    </BackgroundAnalysisProvider>
   );
 };
 
