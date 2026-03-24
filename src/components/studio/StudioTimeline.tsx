@@ -809,7 +809,7 @@ export function StudioTimeline({
                 .filter(c => c.trackId === track.id && c.hasAudio && !!c.audioPath)
                 .map(c => c.id);
               return (
-                <TrackMixerStrip
+                 <TrackMixerStrip
                   key={track.id}
                   trackId={track.id}
                   allClipIds={engineClipIds}
@@ -819,6 +819,7 @@ export function StudioTimeline({
                   expanded={mixerExpanded}
                   isSelected={isSelected}
                   onMixChange={onMixChange}
+                  trackHeight={dynamicTrackHeight}
                   onClick={() => {
                     if (charId && onSelectCharacter) onSelectCharacter(isSelected ? null : charId);
                   }}
