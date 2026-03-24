@@ -154,7 +154,7 @@ const Narrators = () => {
   const [loading, setLoading] = useState(false);
 
   // Appearances data
-  const [appearances, setAppearances] = useState<Map<string, { chapterIdx: number; chapterTitle: string; sceneNumbers: number[] }[]>>(new Map());
+  const [appearances, setAppearances] = useState<Map<string, { chapterIdx: number; chapterId?: string; chapterTitle: string; sceneNumbers: number[] }[]>>(new Map());
 
   // Voice state — Yandex
   const [voice, setVoice] = useState("marina");
