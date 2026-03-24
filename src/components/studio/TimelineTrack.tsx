@@ -31,6 +31,7 @@ interface TimelineTrackProps {
   storageSfx?: StorageAudioFile[];
   onInsertAudio?: (file: StorageAudioFile, atSec: number, layerType: "ambience" | "sfx") => void;
   isRu?: boolean;
+  trackHeight?: number;
 }
 
 const FADE_OPTIONS = [
