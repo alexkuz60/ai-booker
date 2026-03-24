@@ -56,6 +56,13 @@ export default function Admin() {
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
+    setPageHeader({
+      title: isRu ? 'Панель администратора' : 'Admin Panel',
+    });
+    return () => setPageHeader({});
+  }, [isRu, setPageHeader]);
+
+  useEffect(() => {
     if (!authLoading && rolesLoaded) {
       if (!user) { navigate('/auth'); return; }
       if (!isAdmin) { toast.error(isRu ? 'Доступ запрещён' : 'Access denied'); navigate('/'); return; }

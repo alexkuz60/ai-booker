@@ -101,6 +101,14 @@ export default function Profile() {
 
   const handleLangChange = (v: string) => setLang(v as "ru" | "en");
 
+  useEffect(() => {
+    setPageHeader({
+      title: isRu ? 'Профиль' : 'Profile',
+      subtitle: isRu ? 'Настройки пользователя и API' : 'User settings & API',
+    });
+    return () => setPageHeader({});
+  }, [isRu, setPageHeader]);
+
   if (loadingProfile) {
     return (
       <div className="flex-1 flex items-center justify-center">
