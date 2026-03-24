@@ -632,6 +632,13 @@ export function StudioTimeline({
 
   const height = collapsed ? TIMELINE_HEADER_HEIGHT : size;
 
+  // Dynamic track height: fill available space evenly, clamped 28–56px
+  const RESIZE_HANDLE_H = 8;
+  const MIXER_COL_HEADER_H = 24;
+  const trackCount = allTracks.length || 1;
+  const availableForTracks = size - RESIZE_HANDLE_H - TIMELINE_HEADER_HEIGHT - MIXER_COL_HEADER_H;
+  const dynamicTrackHeight = Math.max(28, Math.min(56, Math.floor(availableForTracks / trackCount)));
+
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
@@ -802,7 +809,7 @@ export function StudioTimeline({
                 .filter(c => c.trackId === track.id && c.hasAudio && !!c.audioPath)
                 .map(c => c.id);
               return (
-                <TrackMixerStrip
+                 <TrackMixerStrip
                   key={track.id}
                   trackId={track.id}
                   allClipIds={engineClipIds}
@@ -812,6 +819,7 @@ export function StudioTimeline({
                   expanded={mixerExpanded}
                   isSelected={isSelected}
                   onMixChange={onMixChange}
+                  trackHeight={dynamicTrackHeight}
                   onClick={() => {
                     if (charId && onSelectCharacter) onSelectCharacter(isSelected ? null : charId);
                   }}
@@ -867,6 +875,7 @@ export function StudioTimeline({
                     storageSfx={storageAudio.sfx}
                     onInsertAudio={handleInsertAudio}
                     isRu={isRu}
+                    trackHeight={dynamicTrackHeight}
                   />
                 ))}
                 <Playhead positionSec={player.positionSec} zoom={zoom} />

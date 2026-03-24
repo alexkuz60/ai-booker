@@ -17,6 +17,7 @@ interface TrackMixerStripProps {
   isSelected?: boolean;
   onClick?: () => void;
   onMixChange?: () => void;
+  trackHeight?: number;
 }
 
 /** Threshold in dB above which we consider signal "active" */
@@ -32,6 +33,7 @@ export function TrackMixerStrip({
   isSelected,
   onClick,
   onMixChange,
+  trackHeight,
 }: TrackMixerStripProps) {
   const engine = getAudioEngine();
 
@@ -121,11 +123,13 @@ export function TrackMixerStrip({
   }, [meter?.level]);
 
   if (!expanded) {
+    const hStyle = trackHeight ? { height: `${trackHeight}px` } : {};
     return (
       <div
-        className={`h-10 flex items-center px-3 border-b border-border/50 cursor-pointer transition-colors ${
+        className={`flex items-center px-3 border-b border-border/50 cursor-pointer transition-colors ${
           isSelected ? "bg-accent/20" : "hover:bg-muted/30"
         }`}
+        style={hStyle}
         onClick={onClick}
       >
         <div className="w-2.5 h-2.5 rounded-full shrink-0 mr-2" style={{ backgroundColor: color }} />
@@ -172,11 +176,13 @@ export function TrackMixerStrip({
   const meterLevel = meter?.level ?? -60;
   const meterLR: [number, number] = [meter?.levelL ?? -60, meter?.levelR ?? -60];
 
+  const hStyleExp = trackHeight ? { height: `${trackHeight}px` } : {};
   return (
     <div
-      className={`flex items-center gap-2 px-2 border-b border-border/50 cursor-pointer transition-colors h-10 ${
+      className={`flex items-center gap-2 px-2 border-b border-border/50 cursor-pointer transition-colors ${
         isSelected ? "bg-accent/20" : "hover:bg-muted/30"
       }`}
+      style={hStyleExp}
       onClick={onClick}
     >
       {/* Column 1: Color dot + name — fixed width */}

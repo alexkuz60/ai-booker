@@ -31,6 +31,7 @@ interface TimelineTrackProps {
   storageSfx?: StorageAudioFile[];
   onInsertAudio?: (file: StorageAudioFile, atSec: number, layerType: "ambience" | "sfx") => void;
   isRu?: boolean;
+  trackHeight?: number;
 }
 
 const FADE_OPTIONS = [
@@ -108,6 +109,7 @@ export function TimelineTrack({
   storageSfx,
   onInsertAudio,
   isRu,
+  trackHeight,
 }: TimelineTrackProps) {
   const showFades = zoom >= 2; // 200%+
   const isInsertableTrack = track.type === "atmosphere" || track.type === "sfx";
@@ -135,10 +137,11 @@ export function TimelineTrack({
       })
     : [];
 
+  const heightStyle = trackHeight ? `${trackHeight}px` : '2.5rem';
   const trackContent = (
     <div
-      className="flex h-10 border-b border-border/50 relative"
-      style={{ width: `${duration * zoom * 4}px` }}
+      className="flex border-b border-border/50 relative"
+      style={{ width: `${duration * zoom * 4}px`, height: heightStyle }}
       onContextMenu={(e) => {
         if (isInsertableTrack) {
           const rect = e.currentTarget.getBoundingClientRect();
