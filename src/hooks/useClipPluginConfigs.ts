@@ -114,6 +114,36 @@ export function useClipPluginConfigs(sceneId: string | null) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restoredRef = useRef<string | null>(null);
 
+  // Pending changes queue — accumulates all dirty clip configs between flushes
+  const pendingRef = useRef<Map<string, { trackId: string; config: ClipPluginConfig }>>(new Map());
+  const sceneIdRef = useRef(sceneId);
+  sceneIdRef.current = sceneId;
+  const userRef = useRef(user);
+  userRef.current = user;
+
+  // Flush all pending configs to DB
+  const flushToDb = useCallback(async () => {
+    const sid = sceneIdRef.current;
+    const u = userRef.current;
+    if (!sid || !u || pendingRef.current.size === 0) return;
+
+    const entries = Array.from(pendingRef.current.entries());
+    pendingRef.current.clear();
+
+    const rows = entries.map(([clipId, { trackId, config }]) => ({
+      scene_id: sid,
+      clip_id: clipId,
+      track_id: trackId,
+      user_id: u.id,
+      config: config as unknown as import("@/integrations/supabase/types").Json,
+      updated_at: new Date().toISOString(),
+    }));
+
+    await supabase.from("clip_plugin_configs").upsert(rows, {
+      onConflict: "scene_id,clip_id,user_id",
+    });
+  }, []);
+
   // Load configs from DB when scene changes
   useEffect(() => {
     if (!sceneId || !user) { setLoaded(true); return; }
@@ -141,34 +171,15 @@ export function useClipPluginConfigs(sceneId: string | null) {
     })();
   }, [sceneId, user]);
 
-  // Apply configs to engine when loaded
-  useEffect(() => {
-    if (!loaded) return;
-    const engine = getAudioEngine();
-    for (const [clipId, cfg] of Object.entries(configs)) {
-      applyConfigToEngine(engine, clipId, cfg);
-    }
-  }, [loaded, configs]);
-
-  // Debounced save to DB
+  // Debounced save to DB — accumulates pending, flushes after 400ms idle
   const saveToDb = useCallback((clipId: string, trackId: string, config: ClipPluginConfig) => {
-    if (!sceneId || !user) return;
+    if (!sceneIdRef.current || !userRef.current) return;
+    pendingRef.current.set(clipId, { trackId, config });
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(async () => {
-      await supabase.from("clip_plugin_configs").upsert(
-        {
-          scene_id: sceneId,
-          clip_id: clipId,
-          track_id: trackId,
-          user_id: user.id,
-          config: config as unknown as import("@/integrations/supabase/types").Json,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "scene_id,clip_id,user_id" },
-      );
+    saveTimerRef.current = setTimeout(() => {
+      flushToDb();
     }, 400);
-  }, [sceneId, user]);
-
+  }, [flushToDb]);
   /** Get config for a clip (returns default if none set) */
   const getClipConfig = useCallback((clipId: string): ClipPluginConfig => {
     return configs[clipId] ?? { ...DEFAULT_CLIP_PLUGIN_CONFIG };
