@@ -68,10 +68,11 @@ export function TrackMixerStrip({
   const isAtmoOrSfx = trackId === "ambience" || trackId.startsWith("atmosphere") || trackId === "sfx" || trackId.startsWith("sfx-");
   const hasAudioClips = allClipIds.length > 0;
 
-  // Poll meter + mix state at ~30fps when expanded, or 10fps for collapsed atmo/sfx with clips
+  // Poll meter + mix state at ~30fps when expanded, or 10fps for collapsed tracks with clips
   useEffect(() => {
     const shouldPoll = expanded || (isAtmoOrSfx && hasAudioClips);
     if (!shouldPoll) return;
+    pollState(); // initial poll
     let running = true;
     const rate = expanded ? 33 : 100;
     const interval = setInterval(() => { if (running) pollState(); }, rate);
@@ -91,10 +92,8 @@ export function TrackMixerStrip({
   }, [engine, effectiveIds, onMixChange, pollState]);
 
   const toggleReverbBypass = useCallback(() => {
-    // Read current state from any available clip
     const currentMix = effectiveIds.reduce<TrackMixState | null>((acc, id) => acc ?? engine.getTrackMixState(id), null);
-    if (!currentMix) return;
-    const newVal = !currentMix.reverbBypassed;
+    const newVal = currentMix ? !currentMix.reverbBypassed : false; // if no state, activate (set bypassed=false)
     for (const id of effectiveIds) engine.setTrackReverbBypassed(id, newVal);
     pollState();
     onMixChange?.();
@@ -102,8 +101,7 @@ export function TrackMixerStrip({
 
   const togglePreFxBypass = useCallback(() => {
     const currentMix = effectiveIds.reduce<TrackMixState | null>((acc, id) => acc ?? engine.getTrackMixState(id), null);
-    if (!currentMix) return;
-    const newVal = !currentMix.preFxBypassed;
+    const newVal = currentMix ? !currentMix.preFxBypassed : false;
     for (const id of effectiveIds) engine.setTrackPreFxBypassed(id, newVal);
     pollState();
     onMixChange?.();
