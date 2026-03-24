@@ -845,7 +845,14 @@ export function StudioTimeline({
               />
             </div>
           ) : (
-            <div ref={sceneScrollRef} className="flex-1 overflow-x-auto overflow-y-hidden">
+            <div ref={sceneScrollRef} className="flex-1 overflow-x-auto overflow-y-auto scrollbar-none"
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                if (mixerScrollRef.current && mixerScrollRef.current.scrollTop !== el.scrollTop) {
+                  mixerScrollRef.current.scrollTop = el.scrollTop;
+                }
+              }}
+            >
               <div
                 className="relative cursor-crosshair"
                 style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
