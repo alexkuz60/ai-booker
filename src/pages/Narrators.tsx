@@ -262,6 +262,7 @@ const Narrators = () => {
       if (isLocalProject) {
         // ── K4: Local-Only — read from OPFS ──
         const localChars = await readCharacterIndex(projectStorage);
+        console.log("[Narrators] OPFS chars:", localChars.length, "with appearances:", localChars.filter(c => c.appearances?.length).length, localChars.map(c => ({ name: c.name, app: c.appearances?.length ?? 0 })));
         const chars: BookCharacter[] = localChars.map(c => ({
           id: c.id,
           name: c.name,
