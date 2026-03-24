@@ -314,6 +314,7 @@ export function ImpulseManager({ isRu }: ImpulseManagerProps) {
                   <TableHead>{isRu ? "Название" : "Name"}</TableHead>
                   <TableHead>{isRu ? "Категория" : "Category"}</TableHead>
                   <TableHead>{isRu ? "Описание" : "Description"}</TableHead>
+                  <TableHead className="w-[90px] text-center">{isRu ? "Публичный" : "Public"}</TableHead>
                   <TableHead className="w-[80px]" />
                 </TableRow>
               </TableHeader>
