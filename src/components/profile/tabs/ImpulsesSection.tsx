@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { listCachedIrIds } from "@/lib/irCache";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -96,6 +97,13 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
   // Preview playback
   const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Cached IR IDs (OPFS)
+  const [cachedIds, setCachedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    listCachedIrIds().then(ids => setCachedIds(new Set(ids))).catch(() => {});
+  }, []);
 
   const fetchImpulses = useCallback(async () => {
     setLoading(true);
@@ -373,10 +381,15 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
                     );
                   }
 
+                  const isCached = cachedIds.has(imp.id);
+
                   return (
                     <div
                       key={imp.id}
-                      className="flex items-center gap-2 px-4 py-2.5 hover:bg-muted/30 transition-colors group"
+                      className={cn(
+                        "flex items-center gap-2 px-4 py-2.5 hover:bg-muted/30 transition-colors group",
+                        isCached && "border-l-2 border-l-yellow-500/70"
+                      )}
                     >
                       <Button
                         variant="ghost"
@@ -388,7 +401,7 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
                           ? <Square className="h-3 w-3 fill-current" />
                           : <Play className="h-3 w-3 fill-current" />}
                       </Button>
-                      <span className="text-sm truncate flex-1 min-w-0">{imp.name}</span>
+                      <span className={cn("text-sm truncate flex-1 min-w-0", isCached && "text-yellow-400/90")}>{imp.name}</span>
                       <Badge variant="outline" className="text-[10px] shrink-0">
                         {CAT_LABELS[lang][imp.category as ImpulseCategory] || imp.category}
                       </Badge>
