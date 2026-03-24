@@ -554,29 +554,22 @@ const Narrators = () => {
                         {ch.gender === "female" ? "♀" : "♂"}
                       </span>
                     )}
-                    {/* Brain icon for profile */}
+                    {/* Profile indicator */}
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setProfileViewId(isProfileOpen ? null : ch.id);
-                            if (!isSelected) setSelectedId(ch.id);
-                          }}
-                          className={cn(
-                            "shrink-0 p-0.5 rounded transition-colors",
-                            isProfileOpen
-                              ? "text-primary"
-                              : hasProfile
-                                ? "text-primary/40 hover:text-primary opacity-0 group-hover:opacity-100"
-                                : "text-muted-foreground/20 hover:text-muted-foreground/40 opacity-0 group-hover:opacity-100"
-                          )}
-                        >
-                          <Brain className="h-3 w-3" />
-                        </button>
+                        <span className={cn(
+                          "shrink-0 p-0.5",
+                          hasProfile ? "text-primary/50" : "text-muted-foreground/25"
+                        )}>
+                          {hasProfile
+                            ? <Brain className="h-3 w-3" />
+                            : <CircleHelp className="h-3 w-3" />}
+                        </span>
                       </TooltipTrigger>
                       <TooltipContent side="right" className="text-xs">
-                        {isRu ? "Профайл" : "Profile"}
+                        {hasProfile
+                          ? (isRu ? "Профайл создан" : "Profile available")
+                          : (isRu ? "Нет профайла" : "No profile")}
                       </TooltipContent>
                     </Tooltip>
                     {(ch.voice_config as any)?.voice_id && (
