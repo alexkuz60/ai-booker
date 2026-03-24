@@ -18,6 +18,7 @@ interface ConvolverPanelProps {
   config: ClipConvolverConfig;
   clipId: string;
   disabled?: boolean;
+  projectStorage?: import("@/lib/projectStorage").ProjectStorage | null;
   onToggle: () => void;
   onUpdate: (params: Partial<ClipConvolverConfig>) => void;
 }
