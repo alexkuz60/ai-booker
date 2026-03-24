@@ -258,6 +258,7 @@ export default function Parser() {
   const [restorePhase, setRestorePhase] = useState<"confirm" | "running" | "done" | "error">("confirm");
   const [restoreError, setRestoreError] = useState<string>();
   const [restoreTargetBook, setRestoreTargetBook] = useState<BookRecord | null>(null);
+  const [restoreDownloadIr, setRestoreDownloadIr] = useState(true);
 
   const handleRestoreClick = useCallback((book: BookRecord) => {
     setRestoreTargetBook(book);
