@@ -98,6 +98,13 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
   const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Cached IR IDs (OPFS)
+  const [cachedIds, setCachedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    listCachedIrIds().then(ids => setCachedIds(new Set(ids))).catch(() => {});
+  }, []);
+
   const fetchImpulses = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase
