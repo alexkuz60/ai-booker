@@ -148,6 +148,7 @@ export function ChannelPluginsPanel({
                 const isSelected = clip.id === selectedClipId;
                 const count = enabledCount(clip.id);
                 const hasAnyPlugin = count > 0;
+                const hasAudio = clip.hasAudio !== false;
 
                 return (
                   <ContextMenu key={clip.id}>
@@ -163,14 +164,19 @@ export function ChannelPluginsPanel({
                             style={{
                               left: `${leftPct}%`,
                               width: `${Math.max(widthPct, 0.5)}%`,
-                              backgroundColor: trackColor ?? "hsl(var(--primary))",
-                              backgroundImage: !hasAnyPlugin
-                                ? "repeating-linear-gradient(135deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px)"
-                                : undefined,
+                              backgroundColor: hasAudio
+                                ? (trackColor ?? "hsl(var(--primary))")
+                                : "hsl(var(--muted))",
+                              backgroundImage: !hasAudio
+                                ? "repeating-linear-gradient(135deg, transparent, transparent 2px, rgba(255,255,255,0.07) 2px, rgba(255,255,255,0.07) 4px)"
+                                : !hasAnyPlugin
+                                  ? "repeating-linear-gradient(135deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px)"
+                                  : undefined,
+                              borderBottom: !hasAudio ? "2px solid hsl(var(--destructive) / 0.5)" : undefined,
                             }}
                           >
                             {widthPct > 4 && (
-                              <span className="text-[7px] text-primary-foreground px-0.5 truncate block leading-[14px] font-body">
+                              <span className={`text-[7px] px-0.5 truncate block leading-[14px] font-body ${hasAudio ? "text-primary-foreground" : "text-muted-foreground"}`}>
                                 {clip.label}
                               </span>
                             )}
@@ -185,6 +191,11 @@ export function ChannelPluginsPanel({
                       </TooltipTrigger>
                       <TooltipContent side="bottom" className="text-xs">
                         <span className="font-mono">{clip.label}</span>
+                        {!hasAudio && (
+                          <span className="ml-1.5 text-destructive">
+                            {isRu ? "— нет аудио" : "— no audio"}
+                          </span>
+                        )}
                         <span className="ml-1.5 text-muted-foreground">
                           {count > 0
                             ? `— ${count} ${isRu ? "плагин(ов)" : "plugin(s)"}`
