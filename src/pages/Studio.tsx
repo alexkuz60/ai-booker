@@ -22,7 +22,7 @@ import { AiRolesButton } from "@/components/AiRolesButton";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { SaveBookButton } from "@/components/SaveBookButton";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
-import type { LocalChapterData } from "@/lib/localSync";
+
 import { readSceneContentFromLocal } from "@/lib/localSceneContent";
 import { getCachedSceneIndex } from "@/lib/sceneIndex";
 
