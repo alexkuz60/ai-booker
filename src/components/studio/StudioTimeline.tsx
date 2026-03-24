@@ -808,6 +808,10 @@ export function StudioTimeline({
               const engineClipIds = timelineClips
                 .filter(c => c.trackId === track.id && c.hasAudio && !!c.audioPath)
                 .map(c => c.id);
+              // All clip IDs on this track (for plugin state aggregation)
+              const trackClipIds = timelineClips
+                .filter(c => c.trackId === track.id)
+                .map(c => c.id);
               return (
                  <TrackMixerStrip
                   key={track.id}
@@ -820,6 +824,10 @@ export function StudioTimeline({
                   isSelected={isSelected}
                   onMixChange={onMixChange}
                   trackHeight={dynamicTrackHeight}
+                  fxState={clipPlugins.getTrackFxState(trackClipIds)}
+                  rvState={clipPlugins.getTrackRvState(trackClipIds)}
+                  onToggleFx={() => { clipPlugins.toggleTrackFx(trackClipIds, track.id); onPluginsChange(); onMixChange(); }}
+                  onToggleRv={() => { clipPlugins.toggleTrackRv(trackClipIds, track.id); onPluginsChange(); onMixChange(); }}
                   onClick={() => {
                     if (charId && onSelectCharacter) onSelectCharacter(isSelected ? null : charId);
                   }}
