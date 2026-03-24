@@ -542,7 +542,11 @@ const Narrators = () => {
                         ? "bg-accent/15 text-accent-foreground"
                         : "text-muted-foreground hover:bg-muted/50"
                     )}
-                    onClick={() => setSelectedId(isSelected ? null : ch.id)}
+                    onClick={() => {
+                      const newId = isSelected ? null : ch.id;
+                      setSelectedId(newId);
+                      setProfileViewId(newId);
+                    }}
                   >
                     <span className="truncate font-medium flex-1 text-xs">{ch.name}</span>
                     {ch.gender !== "unknown" && (
