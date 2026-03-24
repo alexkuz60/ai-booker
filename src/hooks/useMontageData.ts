@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { readStructureFromLocal } from "@/lib/localSync";
 import { clearStemCache } from "@/lib/stemCache";
 import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 
