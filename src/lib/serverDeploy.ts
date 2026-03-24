@@ -55,6 +55,8 @@ interface DeployParams {
   storage: ProjectStorage;
   isRu: boolean;
   report: SyncProgressCallback;
+  /** Whether to download IR audio files into global OPFS cache */
+  downloadImpulses?: boolean;
 }
 
 // ── Helpers ─────────────────────────────────────────────────
