@@ -111,13 +111,10 @@ export function ChannelPluginsPanel({
     return count;
   }, [clipConfigs]);
 
-  if (clips.length === 0) {
-    const hasTrack = !!trackLabel;
+  if (!trackLabel) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground/50 text-xs font-body">
-        {hasTrack
-          ? (isRu ? "Нет аудиоклипов на этой дорожке — сначала синтезируйте речь" : "No audio clips on this track — synthesize speech first")
-          : (isRu ? "Выберите дорожку для настройки плагинов" : "Select a track to configure plugins")}
+        {isRu ? "Выберите дорожку для настройки плагинов" : "Select a track to configure plugins"}
       </div>
     );
   }

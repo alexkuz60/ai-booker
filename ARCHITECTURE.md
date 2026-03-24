@@ -441,6 +441,50 @@ assert(storedBookId === targetBookId, "bookId mismatch — aborting write");
 - **FS Access API** — права сбрасываются при перезапуске браузера, потребуется re-pick папки.
 - `project.json` — единственный обязательный файл для валидации проекта.
 
+### 1.16 Кэширование аудио-импульсов (IR) для реверберации
+
+Импульсные отклики (Impulse Responses) для convolution reverb кэшируются по **гибридной** схеме:
+
+#### Глобальный OPFS-кэш
+
+Директория `ir-cache/` в **корне OPFS** (вне проектов книг) хранит файлы `{impulseId}.bin`.
+Один IR-файл обслуживает все книги пользователя — повторная загрузка с сервера не требуется.
+
+#### Per-book манифест
+
+В `project.json` каждой книги ведётся массив `usedImpulseIds: string[]`.
+При применении IR в `ConvolverPanel` — impulseId добавляется в манифест.
+При «На сервер» — манифест сохраняется вместе с `clip_plugin_configs`.
+
+#### Жизненный цикл
+
+1. Пользователь выбирает IR в ConvolverPanel
+2. Проверяется глобальный OPFS-кэш (`getIrFromCache`)
+3. При промахе — загрузка через signed URL из Supabase Storage (`impulse-responses` bucket)
+4. Запись в глобальный кэш (`putIrToCache`) — fire-and-forget
+5. Добавление impulseId в манифест книги (`addToBookImpulseManifest`)
+
+#### Wipe-and-Deploy
+
+При восстановлении проекта с сервера в диалоге подтверждения доступен чекбокс **«Скачать импульсы (IR)»**.
+Если включён — `downloadIrBatch()` извлекает список impulseId из `clip_plugin_configs` и пакетно загружает
+недостающие файлы в глобальный OPFS-кэш.
+
+#### Файлы
+
+| Файл | Назначение |
+|------|------------|
+| `src/lib/irCache.ts` | OPFS CRUD, fetch-with-cache, batch download, per-book manifest |
+| `src/components/studio/plugins/ConvolverPanel.tsx` | UI выбора IR, интеграция с кэшем |
+| `src/components/admin/ImpulseManager.tsx` | Админ: загрузка, `is_public` флаг, backfill peaks |
+| `src/lib/serverDeploy.ts` | Шаг `download_ir` в Wipe-and-Deploy pipeline |
+
+#### Серверное хранилище
+
+- Таблица `convolution_impulses` — метаданные (name, category, file_path, peaks, is_public)
+- Bucket `impulse-responses` — аудиофайлы IR
+- Администратор управляет флагом `is_public` в `/admin` → ImpulseManager
+
 ---
 
 ## 2. Модульная архитектура Парсера
