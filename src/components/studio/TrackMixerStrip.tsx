@@ -154,7 +154,7 @@ export function TrackMixerStrip({
             </button>
             <button
               className={`text-[8px] px-1 py-0.5 rounded border font-mono uppercase leading-none transition-colors font-semibold ${
-                mix?.reverbBypassed
+                !mix || mix.reverbBypassed
                   ? "border-border text-muted-foreground/40 bg-transparent"
                   : "border-primary text-primary bg-primary/15"
               }`}
