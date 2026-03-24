@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +35,13 @@ interface SyncProgressDialogProps {
   steps: SyncStep[];
   phase: "confirm" | "running" | "done" | "error";
   errorMessage?: string;
+  /** Optional checkboxes shown in confirm phase */
+  confirmOptions?: Array<{
+    id: string;
+    label: string;
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+  }>;
 }
 
 const STEP_COLORS = [
@@ -94,6 +102,7 @@ export function SyncProgressDialog({
   steps,
   phase,
   errorMessage,
+  confirmOptions,
 }: SyncProgressDialogProps) {
   const doneCount = steps.filter((s) => s.status === "done" || s.status === "skipped").length;
   const isRunningOrDone = phase === "running" || phase === "done" || phase === "error";
@@ -123,6 +132,19 @@ export function SyncProgressDialog({
                 ? "Текущее состояние проекта будет загружено на сервер как резервная копия. Это может занять некоторое время."
                 : "Current project state will be uploaded to the server as a backup. This may take a moment."}
             </AlertDialogDescription>
+          )}
+          {phase === "confirm" && confirmOptions && confirmOptions.length > 0 && (
+            <div className="space-y-2 pt-2">
+              {confirmOptions.map((opt) => (
+                <label key={opt.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={opt.checked}
+                    onCheckedChange={(v) => opt.onChange(!!v)}
+                  />
+                  <span className="text-foreground">{opt.label}</span>
+                </label>
+              ))}
+            </div>
           )}
         </AlertDialogHeader>
 
@@ -229,6 +251,7 @@ export function buildRestoreSteps(isRu: boolean): SyncStep[] {
     { id: "characters", label: isRu ? "Персонажи" : "Characters", status: "pending" },
     { id: "storyboards", label: isRu ? "Раскадровка сцен" : "Scene storyboards", status: "pending" },
     { id: "scene_maps", label: isRu ? "Карты персонажей сцен" : "Scene character maps", status: "pending" },
+    { id: "download_ir", label: isRu ? "Загрузка импульсов (IR)" : "Downloading impulses (IR)", status: "pending" },
     { id: "source_file", label: isRu ? "Сохранение файла" : "Saving source file", status: "pending" },
     { id: "finalize", label: isRu ? "Завершение" : "Finalizing", status: "pending" },
   ];

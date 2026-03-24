@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { getAudioEngine } from "@/lib/audioEngine";
 import { Radio, Waves } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -64,6 +65,7 @@ export function ChannelPluginsPanel({
   onTogglePlugin,
   onUpdateParams,
 }: ChannelPluginsPanelProps) {
+  const { storage: projectStorage } = useProjectStorageContext();
   // Selected clip ID for individual param editing
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
 
@@ -369,6 +371,7 @@ export function ChannelPluginsPanel({
                   isRu={isRu}
                   config={selectedConfig.convolver}
                   clipId={selectedClipId}
+                  projectStorage={projectStorage}
                   onToggle={() => onTogglePlugin(selectedClipId, "convolver")}
                   onUpdate={(params) => onUpdateParams(selectedClipId, "convolver", params)}
                 />

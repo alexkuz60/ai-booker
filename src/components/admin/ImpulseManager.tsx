@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Upload, Trash2, Waves, Music, RefreshCw } from "lucide-react";
 
 const CATEGORIES = ["hall", "room", "plate", "chamber", "spring", "outdoor", "special"] as const;
@@ -313,6 +314,7 @@ export function ImpulseManager({ isRu }: ImpulseManagerProps) {
                   <TableHead>{isRu ? "Название" : "Name"}</TableHead>
                   <TableHead>{isRu ? "Категория" : "Category"}</TableHead>
                   <TableHead>{isRu ? "Описание" : "Description"}</TableHead>
+                  <TableHead className="w-[90px] text-center">{isRu ? "Публичный" : "Public"}</TableHead>
                   <TableHead className="w-[80px]" />
                 </TableRow>
               </TableHeader>
@@ -327,6 +329,23 @@ export function ImpulseManager({ isRu }: ImpulseManagerProps) {
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
                       {imp.description || "—"}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Checkbox
+                        checked={imp.is_public}
+                        onCheckedChange={async (checked) => {
+                          const val = !!checked;
+                          const { error } = await supabase
+                            .from("convolution_impulses")
+                            .update({ is_public: val } as any)
+                            .eq("id", imp.id);
+                          if (error) {
+                            toast.error(error.message);
+                          } else {
+                            setImpulses(prev => prev.map(i => i.id === imp.id ? { ...i, is_public: val } : i));
+                          }
+                        }}
+                      />
                     </TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => handleDelete(imp)}>

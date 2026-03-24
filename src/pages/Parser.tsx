@@ -258,6 +258,7 @@ export default function Parser() {
   const [restorePhase, setRestorePhase] = useState<"confirm" | "running" | "done" | "error">("confirm");
   const [restoreError, setRestoreError] = useState<string>();
   const [restoreTargetBook, setRestoreTargetBook] = useState<BookRecord | null>(null);
+  const [restoreDownloadIr, setRestoreDownloadIr] = useState(true);
 
   const handleRestoreClick = useCallback((book: BookRecord) => {
     setRestoreTargetBook(book);
@@ -280,13 +281,13 @@ export default function Parser() {
     if (!restoreTargetBook) return;
     setRestorePhase("running");
     try {
-      await openSavedBook(restoreTargetBook, { skipTimestampCheck: true }, undefined, undefined, handleRestoreProgress);
+      await openSavedBook(restoreTargetBook, { skipTimestampCheck: true, downloadImpulses: restoreDownloadIr }, undefined, undefined, handleRestoreProgress);
       setRestorePhase("done");
     } catch (e) {
       setRestoreError(e instanceof Error ? e.message : String(e));
       setRestorePhase("error");
     }
-  }, [restoreTargetBook, openSavedBook, handleRestoreProgress]);
+  }, [restoreTargetBook, openSavedBook, handleRestoreProgress, restoreDownloadIr]);
 
   useEffect(() => {
     if (!new URLSearchParams(location.search).has("resetLocal")) return;
@@ -774,6 +775,14 @@ export default function Parser() {
         steps={restoreSteps}
         phase={restorePhase}
         errorMessage={restoreError}
+        confirmOptions={[
+          {
+            id: "download_ir",
+            label: isRu ? "Загрузить импульсы реверберации (IR)" : "Download reverb impulses (IR)",
+            checked: restoreDownloadIr,
+            onChange: setRestoreDownloadIr,
+          },
+        ]}
       />
     </motion.div>
   );

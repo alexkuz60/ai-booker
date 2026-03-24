@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ParamSlider } from "./ParamSlider";
 import { BypassButton } from "./BypassButton";
 import { drawPeaksWaveform } from "@/lib/irPeaks";
-import { fetchWithStemCache } from "@/lib/stemCache";
+import { fetchIrWithCache, addToBookImpulseManifest } from "@/lib/irCache";
 import { Play, Square } from "lucide-react";
 import type { ClipConvolverConfig } from "@/hooks/useClipPluginConfigs";
 
@@ -18,6 +18,7 @@ interface ConvolverPanelProps {
   config: ClipConvolverConfig;
   clipId: string;
   disabled?: boolean;
+  projectStorage?: import("@/lib/projectStorage").ProjectStorage | null;
   onToggle: () => void;
   onUpdate: (params: Partial<ClipConvolverConfig>) => void;
 }
@@ -32,7 +33,7 @@ interface ImpulseRow {
   peaks: number[] | null;
 }
 
-export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpdate }: ConvolverPanelProps) {
+export function ConvolverPanel({ isRu, config, clipId, disabled, projectStorage, onToggle, onUpdate }: ConvolverPanelProps) {
   const [impulses, setImpulses] = useState<ImpulseRow[]>([]);
   const [loading, setLoading] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -82,12 +83,7 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpd
     // Fallback: fetch + decode for old impulses without peaks
     (async () => {
       try {
-        const { data: urlData } = await supabase.storage
-          .from("impulse-responses")
-          .createSignedUrl(impulse.file_path, 600);
-        if (!urlData?.signedUrl) return;
-
-        const arrayBuf = await fetchWithStemCache(impulse.file_path, urlData.signedUrl);
+        const arrayBuf = await fetchIrWithCache(impulse.id, impulse.file_path);
         const { computePeaks } = await import("@/lib/irPeaks");
         const audioCtx = new AudioContext();
         const decoded = await audioCtx.decodeAudioData(arrayBuf);
@@ -139,7 +135,7 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpd
     drawPeaksWaveform(c, peaks);
   }, [selectedImpulse, fallbackPeaks, isRu]);
 
-  // Handle IR change → load into engine via stemCache
+  // Handle IR change → load into engine via irCache + update book manifest
   const handleImpulseChange = useCallback(async (impulseId: string) => {
     onUpdate({ impulseId });
 
@@ -147,20 +143,26 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, onToggle, onUpd
     if (!impulse) return;
 
     try {
+      // Cache IR in OPFS and get audio data
+      await fetchIrWithCache(impulse.id, impulse.file_path);
+
+      // Add to book's impulse manifest
+      if (projectStorage) {
+        addToBookImpulseManifest(projectStorage, impulseId).catch(() => {});
+      }
+
+      // Load into engine via signed URL (engine needs URL, not ArrayBuffer)
       const { data: urlData } = await supabase.storage
         .from("impulse-responses")
         .createSignedUrl(impulse.file_path, 600);
       if (urlData?.signedUrl) {
-        // Pre-cache the IR audio
-        await fetchWithStemCache(impulse.file_path, urlData.signedUrl);
-        // Load into engine
         const { getAudioEngine } = await import("@/lib/audioEngine");
         await getAudioEngine().loadTrackConvolverIR(clipId, urlData.signedUrl);
       }
     } catch (e) {
       console.error("Failed to load IR into engine:", e);
     }
-  }, [impulses, clipId, onUpdate]);
+  }, [impulses, clipId, onUpdate, projectStorage]);
 
   // Preview clip through convolver
   const handlePreview = useCallback(async () => {
