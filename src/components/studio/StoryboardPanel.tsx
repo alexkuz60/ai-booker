@@ -500,15 +500,25 @@ export function StoryboardPanel({
     return () => { supabase.removeChannel(channel); };
   }, [segments.map(s => s.segment_id).join(","), sceneId, onSynthesizingChange]);
 
-  // ─── AI Actions ───────────────────────────────────────────
+  // ─── AI Actions (Background) ───────────────────────────────
+  const bgAnalysis = useBackgroundAnalysis();
+
+  // Reload from OPFS when a background job completes for the current scene
+  useEffect(() => {
+    if (!sceneId) return;
+    const job = bgAnalysis.jobs.get(sceneId);
+    if (job?.status === "done") {
+      // Reload segments from OPFS
+      loadSegments(sceneId);
+    }
+  }, [bgAnalysis.completionToken, sceneId, loadSegments]);
+
+  const bgAnalyzing = sceneId ? bgAnalysis.isAnalyzing(sceneId) : false;
 
   const runAnalysis = useCallback(async () => {
     if (!sceneId) return;
-    const capturedSceneId = sceneId;
-    setAnalyzing(true);
 
-    // K3: Do NOT save previousLocal for restore — stale data must never survive a re-analysis attempt
-
+    // Clear local state immediately
     setSegments([]);
     setAudioStatus(new Map());
     setInlineNarrationSegIds(new Set());
@@ -517,99 +527,15 @@ export function StoryboardPanel({
     setContentDirty(false);
     typeMappingsRef.current = [];
     setInlineNarrationSpeaker(null);
-    await clearLocal();
-    // K3: content_dirty flag will be synced to DB only via pushToDb/Save to Server
 
-    try {
-      if (!storage) {
-        toast.error(isRu ? "Локальный проект не открыт" : "Local project is not open");
-        setAnalyzing(false);
-        return;
-      }
-
-      const localScene = await readSceneContentFromLocal(storage, {
-        sceneId: capturedSceneId,
-        chapterId,
-        sceneNumber,
-        title: sceneTitle,
-      });
-      const analysisContent = localScene?.content ?? null;
-
-      if (!analysisContent) {
-        toast.error(isRu ? "Текст сцены не найден в локальном проекте. Откройте книгу через Парсер." : "Scene text not found in local project. Open the book via Parser.");
-        setAnalyzing(false);
-        return;
-      }
-
-      const { data, error } = await invokeWithFallback({
-        functionName: "segment-scene",
-        body: { scene_id: capturedSceneId, content: analysisContent, language: isRu ? "ru" : "en", model: getModelForRole("screenwriter") },
-        userApiKeys,
-        isRu,
-      });
-      if (error) throw error;
-
-      // ── Stale guard: if user switched scene while AI was running, discard results ──
-      if (sceneIdRef.current !== capturedSceneId) {
-        console.warn(`[Storyboard] Analysis completed for scene ${capturedSceneId} but current scene is ${sceneIdRef.current} — discarding results`);
-        setAnalyzing(false);
-        return;
-      }
-
-      const result = data as { segments?: Segment[] };
-      const newSegments = result.segments || [];
-      const freshAudio = new Map<string, { status: string; durationMs: number }>();
-
-      setAudioStatus(freshAudio);
-      applySegments(newSegments);
-
-      if (hasStorage) {
-        await persistNow({
-          segments: newSegments,
-          typeMappings: [],
-          audioStatus: freshAudio,
-          inlineNarrationSpeaker: null,
-        });
-      }
-
-      // Clear content_dirty in DB — analysis was just done on fresh content
-      supabase.from("book_scenes").update({ content_dirty: false }).eq("id", capturedSceneId).then(() => {
-        console.debug(`[Storyboard] Cleared content_dirty for scene ${capturedSceneId}`);
-      });
-
-      onSegmented?.(capturedSceneId);
-
-      // Extract speakers as local characters (K4: OPFS is source of truth)
-      if (storage && newSegments.length > 0) {
-        try {
-          const { readCharacterIndex, upsertSpeakersFromSegments } = await import("@/lib/localCharacters");
-          const currentIndex = await readCharacterIndex(storage);
-          await upsertSpeakersFromSegments(storage, capturedSceneId, newSegments, currentIndex);
-          console.debug(`[Storyboard] Upserted speakers to local character index`);
-        } catch (e) {
-          console.warn("[Storyboard] Failed to upsert local speakers:", e);
-        }
-      }
-
-      toast.success(isRu ? "Раскадровка готова" : "Storyboard ready");
-    } catch (err: any) {
-      // If scene changed during analysis, silently discard the error too
-      if (sceneIdRef.current !== capturedSceneId) {
-        console.warn(`[Storyboard] Analysis error for stale scene ${capturedSceneId} — ignoring`);
-        setAnalyzing(false);
-        return;
-      }
-      const msg = err?.message || err?.context?.body || String(err);
-      console.error("Segmentation failed:", msg, err);
-
-      // K3: On failure, do NOT restore old storyboard — leave empty to prevent stale data resurrection
-      setSegments([]);
-      setLoaded(true);
-
-      toast.error(`${isRu ? "Ошибка анализа" : "Analysis failed"}: ${msg}`);
-    }
-    setAnalyzing(false);
-  }, [sceneId, chapterId, sceneNumber, sceneTitle, isRu, onSegmented, clearLocal, getModelForRole, userApiKeys, storage, hasStorage, loadFromLocal, persistNow, applySegments]);
+    // Submit to background service
+    bgAnalysis.submit([{
+      sceneId,
+      sceneTitle: sceneTitle ?? undefined,
+      sceneNumber,
+      chapterId,
+    }]);
+  }, [sceneId, sceneTitle, sceneNumber, chapterId, bgAnalysis]);
 
   // Auto-analysis removed: user starts segmentation manually via per-scene or batch buttons.
 
