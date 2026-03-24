@@ -1,0 +1,1 @@
+UPDATE public.book_scenes SET content_dirty = false WHERE id IN ('367f0548-94cd-4599-9697-609f50044606', '1b3da20c-be48-4126-81d6-a47299428474');
