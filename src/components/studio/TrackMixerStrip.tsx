@@ -92,10 +92,8 @@ export function TrackMixerStrip({
   }, [engine, effectiveIds, onMixChange, pollState]);
 
   const toggleReverbBypass = useCallback(() => {
-    // Read current state from any available clip
     const currentMix = effectiveIds.reduce<TrackMixState | null>((acc, id) => acc ?? engine.getTrackMixState(id), null);
-    if (!currentMix) return;
-    const newVal = !currentMix.reverbBypassed;
+    const newVal = currentMix ? !currentMix.reverbBypassed : false; // if no state, activate (set bypassed=false)
     for (const id of effectiveIds) engine.setTrackReverbBypassed(id, newVal);
     pollState();
     onMixChange?.();
@@ -103,8 +101,7 @@ export function TrackMixerStrip({
 
   const togglePreFxBypass = useCallback(() => {
     const currentMix = effectiveIds.reduce<TrackMixState | null>((acc, id) => acc ?? engine.getTrackMixState(id), null);
-    if (!currentMix) return;
-    const newVal = !currentMix.preFxBypassed;
+    const newVal = currentMix ? !currentMix.preFxBypassed : false;
     for (const id of effectiveIds) engine.setTrackPreFxBypassed(id, newVal);
     pollState();
     onMixChange?.();
