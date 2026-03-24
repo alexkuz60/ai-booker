@@ -35,6 +35,13 @@ interface SyncProgressDialogProps {
   steps: SyncStep[];
   phase: "confirm" | "running" | "done" | "error";
   errorMessage?: string;
+  /** Optional checkboxes shown in confirm phase */
+  confirmOptions?: Array<{
+    id: string;
+    label: string;
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+  }>;
 }
 
 const STEP_COLORS = [
