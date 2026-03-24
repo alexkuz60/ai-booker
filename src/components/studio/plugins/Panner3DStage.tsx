@@ -39,6 +39,7 @@ export function Panner3DStage({ isRu, allClips, selectedClipId, config, disabled
   const [canvasSize, setCanvasSize] = useState(120);
   const draggingRef = useRef(false);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; color?: string } | null>(null);
+  const [expandedOpen, setExpandedOpen] = useState(false);
 
   // Responsive canvas
   useEffect(() => {
