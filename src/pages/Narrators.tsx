@@ -367,7 +367,9 @@ const Narrators = () => {
       setPitch((vc.pitch as number) ?? 0);
       setVolume((vc.volume as number) ?? 0);
     }
-    setDirty(false);
+    // If character has no saved voice yet, mark dirty so user can save initial assignment
+    const hasVoice = !!(vc.voice_id);
+    setDirty(!hasVoice);
   }, [selectedId]);
 
   // Save voice config
