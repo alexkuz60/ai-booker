@@ -1,7 +1,9 @@
 import { motion } from "framer-motion";
 import heroImg from "@/assets/booker_home_half.webp";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const Home = () => {
+  const { isRu } = useLanguage();
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -24,7 +26,7 @@ const Home = () => {
             Ai Booker Studio
           </h1>
           <p className="text-muted-foreground font-body text-[0.84rem] font-bold tracking-wide drop-shadow mt-1">
-            Начитано эмоционально. Сведено профессионально.
+            {isRu ? "Начитано эмоционально. Сведено профессионально." : "Emotionally dictated. Professionally mixed."}
           </p>
         </div>
       </div>
