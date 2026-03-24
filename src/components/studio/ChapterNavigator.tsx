@@ -180,7 +180,6 @@ export function ChapterNavigator({
   onPlaylistDurationsLoaded,
   selectedSceneIndices,
   onSelectedSceneIndicesChange,
-  onBatchAnalyze,
 }: {
   chapter: StudioChapter;
   selectedSceneIdx: number | null;
@@ -197,7 +196,6 @@ export function ChapterNavigator({
   onPlaylistDurationsLoaded?: (m: Map<string, number>) => void;
   selectedSceneIndices?: Set<number>;
   onSelectedSceneIndicesChange?: (indices: Set<number>) => void;
-  onBatchAnalyze?: (sceneIds: string[]) => void;
 }) {
   const navigate = useNavigate();
   const { storage: projectStorage } = useProjectStorageContext();
@@ -290,13 +288,22 @@ export function ChapterNavigator({
 
   const multiCount = selectedSceneIndices?.size ?? 0;
   const handleBatchAnalyzeClick = useCallback(() => {
-    if (!onBatchAnalyze || !selectedSceneIndices || multiCount === 0) return;
-    const ids = [...selectedSceneIndices]
+    if (!selectedSceneIndices || multiCount === 0) return;
+    const jobs = [...selectedSceneIndices]
       .sort((a, b) => a - b)
-      .map(i => chapter.scenes[i]?.id)
-      .filter(Boolean) as string[];
-    if (ids.length > 0) onBatchAnalyze(ids);
-  }, [onBatchAnalyze, selectedSceneIndices, multiCount, chapter.scenes]);
+      .map(i => chapter.scenes[i])
+      .filter(s => s?.id)
+      .map(s => ({
+        sceneId: s.id!,
+        sceneTitle: s.title,
+        sceneNumber: s.scene_number,
+        chapterId: chapter.chapterId,
+      }));
+    if (jobs.length > 0) {
+      bgAnalysis.submit(jobs);
+      onSelectedSceneIndicesChange?.(new Set());
+    }
+  }, [bgAnalysis, selectedSceneIndices, multiCount, chapter.scenes, chapter.chapterId, onSelectedSceneIndicesChange]);
 
 
   const handleBatchResynth = async () => {
@@ -488,6 +495,15 @@ export function ChapterNavigator({
           <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider font-body">
             {isRu ? "Глава" : "Chapter"}
           </span>
+          {bgAnalysis.summary.running + bgAnalysis.summary.pending > 0 && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 gap-1 animate-pulse">
+              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+              {bgAnalysis.summary.done}/{bgAnalysis.summary.total}
+              {bgAnalysis.isPoolMode && (
+                <span className="text-[9px] ml-0.5">pool</span>
+              )}
+            </Badge>
+          )}
           {staleCount > 0 && (
             <Button
               size="sm"
@@ -551,16 +567,19 @@ export function ChapterNavigator({
                 size="sm"
                 variant="ghost"
                 className="h-6 px-1 gap-0.5"
-                disabled={!onBatchAnalyze}
                 onClick={() => {
-                  if (!onBatchAnalyze) return;
                   const unsegmented = chapter.scenes
                     .filter(s => s.id && !segmentedSceneIds?.has(s.id))
                     .map(s => s.id) as string[];
-                  const ids = unsegmented.length > 0
+                  const targetIds = unsegmented.length > 0
                     ? unsegmented
                     : chapter.scenes.map(s => s.id).filter(Boolean) as string[];
-                  if (ids.length > 0) onBatchAnalyze(ids);
+                  if (targetIds.length === 0) return;
+                  const jobs = targetIds.map(id => {
+                    const sc = chapter.scenes.find(s => s.id === id)!;
+                    return { sceneId: id, sceneTitle: sc.title, sceneNumber: sc.scene_number, chapterId: chapter.chapterId };
+                  });
+                  bgAnalysis.submit(jobs);
                 }}
                 title={tip}
               >

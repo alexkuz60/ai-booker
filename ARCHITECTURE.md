@@ -616,35 +616,39 @@ assert(storedBookId === targetBookId, "bookId mismatch — aborting write");
 
 ### 3.3 Фоновый анализ сцен (Background Analysis)
 
-Сегментация сцен выполняется **в фоновых потоках**, не блокируя навигацию между сценами. Пользователь может запустить переанализ одной или нескольких сцен и продолжать работу с другими сценами — результаты сохраняются напрямую в OPFS.
+Сегментация сцен выполняется **в фоновых потоках**, не блокируя навигацию между сценами. Результаты сохраняются напрямую в OPFS.
+
+**Два режима работы:**
+
+| Режим | Условие | Механизм | Конкурентность |
+|-------|---------|----------|----------------|
+| **Queue** | Пул не настроен или 1 сцена | `invokeWithFallback` с очередью | До 3 параллельных |
+| **Pool** | Пул включён + 2+ сцены | `ModelPoolManager` (round-robin, retry 429/402, circuit breaker) | models × 2 workers |
 
 **Архитектура:**
 
 | Компонент | Файл | Назначение |
 |-----------|------|------------|
-| `BackgroundAnalysisProvider` | `src/hooks/useBackgroundAnalysis.tsx` | React Context: очередь задач, параллельное выполнение (до 3), persist в OPFS |
-| `useBackgroundAnalysis()` | `src/hooks/useBackgroundAnalysis.tsx` | Хук-потребитель: `submit()`, `cancelAll()`, `isAnalyzing(sceneId)`, `completionToken` |
-| Индикаторы в навигаторе | `src/components/studio/ChapterNavigator.tsx` | Спиннер `Loader2` рядом с названием анализируемой сцены |
-| Реактивность StoryboardPanel | `src/components/studio/StoryboardPanel.tsx` | Автоперезагрузка из OPFS при `completionToken` если завершился анализ текущей сцены |
+| `BackgroundAnalysisProvider` | `src/hooks/useBackgroundAnalysis.tsx` | React Context: очередь/пул задач, persist в OPFS, pool stats |
+| `useBackgroundAnalysis()` | `src/hooks/useBackgroundAnalysis.tsx` | Хук: `submit()`, `cancelAll()`, `isAnalyzing()`, `completionToken`, `poolStats`, `summary` |
+| Индикаторы в навигаторе | `src/components/studio/ChapterNavigator.tsx` | Спиннер рядом со сценой + бейдж прогресса `done/total` в хедере |
+| Реактивность StoryboardPanel | `src/components/studio/StoryboardPanel.tsx` | Автоперезагрузка из OPFS при `completionToken` |
 
 **Жизненный цикл задачи:**
-1. `StoryboardPanel.runAnalysis()` → `bgAnalysis.submit([{ sceneId, sceneTitle, sceneNumber, chapterId }])`
-2. Задача попадает в очередь со статусом `pending`
-3. При наличии свободного слота (< 3 active) задача переходит в `running`
-4. Чтение контента сцены из OPFS → вызов edge function `segment-scene`
-5. Результат (сегменты) → `saveStoryboardToLocal()` прямо в OPFS (по `sceneId`, не по текущей сцене)
-6. Извлечение спикеров → `upsertSpeakersFromSegments()` в `characters/index.json`
-7. `completionToken++` → все слушатели реагируют
-8. Тост-уведомление: ✅ / ❌
+1. `submit(jobs)` → регистрация в `jobs` Map со статусом `pending`
+2. Pool mode: `ModelPoolManager.runAll()` / Queue mode: `processNext()` с `MAX_CONCURRENCY=3`
+3. Чтение контента из OPFS → вызов edge function `segment-scene`
+4. Результат → `saveStoryboardToLocal()` в OPFS по `sceneId` задачи (не по текущей сцене)
+5. Извлечение спикеров → `upsertSpeakersFromSegments()`
+6. `completionToken++` → все слушатели реагируют
+7. Тост: ✅ / ❌
 
 **Защита от race condition:**
-- Результаты пишутся в OPFS по `capturedSceneId` задачи, а не по текущему `sceneIdRef` — переключение сцен не влияет на запись
-- `cancelledRef` блокирует обработку результатов при отмене
-- `StoryboardPanel` реагирует на `completionToken` только если завершившаяся задача соответствует текущему `sceneId`
+- Результаты пишутся по `capturedSceneId` задачи — переключение сцен не влияет
+- `cancelledRef` блокирует обработку при отмене
+- `StoryboardPanel` реагирует на `completionToken` только если завершена текущая сцена
 
-**Интеграция с BatchSegmentationPanel:**
-- `BatchSegmentationPanel` использует собственный оркестратор (pool/sequential) для пакетной обработки
-- `BackgroundAnalysisProvider` — для одиночных/нескольких сцен из контекстного меню StoryboardPanel
+> **Историческая справка (2026-03-24):** `BatchSegmentationPanel` удалён. Его функциональность (включая Model Pool) перенесена в `BackgroundAnalysisProvider`. Кнопка ✨ в навигаторе и «Анализ выбранных» теперь напрямую вызывают `bgAnalysis.submit()`.
 
 ---
 
