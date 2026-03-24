@@ -137,7 +137,7 @@ export function TimelineTrack({
       })
     : [];
 
-  const heightStyle = props.trackHeight ? `${props.trackHeight}px` : '2.5rem';
+  const heightStyle = trackHeight ? `${trackHeight}px` : '2.5rem';
   const trackContent = (
     <div
       className="flex border-b border-border/50 relative"
