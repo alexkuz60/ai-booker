@@ -511,6 +511,8 @@ const Narrators = () => {
     psycho_tags: profileChar.psycho_tags || [],
     aliases: profileChar.aliases || [],
     appearances: appearances.get(profileChar.id) || [],
+    bookTitle: books.find(b => b.id === selectedBookId)?.title || "",
+    bookId: selectedBookId || undefined,
   } : null;
 
   return (
