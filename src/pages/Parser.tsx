@@ -281,13 +281,13 @@ export default function Parser() {
     if (!restoreTargetBook) return;
     setRestorePhase("running");
     try {
-      await openSavedBook(restoreTargetBook, { skipTimestampCheck: true }, undefined, undefined, handleRestoreProgress);
+      await openSavedBook(restoreTargetBook, { skipTimestampCheck: true, downloadImpulses: restoreDownloadIr }, undefined, undefined, handleRestoreProgress);
       setRestorePhase("done");
     } catch (e) {
       setRestoreError(e instanceof Error ? e.message : String(e));
       setRestorePhase("error");
     }
-  }, [restoreTargetBook, openSavedBook, handleRestoreProgress]);
+  }, [restoreTargetBook, openSavedBook, handleRestoreProgress, restoreDownloadIr]);
 
   useEffect(() => {
     if (!new URLSearchParams(location.search).has("resetLocal")) return;
