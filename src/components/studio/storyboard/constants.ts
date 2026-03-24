@@ -1,6 +1,6 @@
 import { Quote, BookOpen, User, Brain, MessageSquare, Music, StickyNote, MessageCircle, Phone } from "lucide-react";
 
-export const SEGMENT_TYPES = ["epigraph", "narrator", "first_person", "inner_thought", "dialogue", "monologue", "lyric", "footnote", "telephone"] as const;
+export const SEGMENT_TYPES = ["epigraph", "narrator", "first_person", "inner_thought", "dialogue", "monologue", "lyric", "footnote", "telephone", "remark"] as const;
 
 export const SEGMENT_CONFIG: Record<string, {
   icon: typeof Quote;
@@ -17,4 +17,5 @@ export const SEGMENT_CONFIG: Record<string, {
   lyric: { icon: Music, label_ru: "Стих", label_en: "Verse", color: "bg-pink-500/20 text-pink-400 border-pink-500/30" },
   footnote: { icon: StickyNote, label_ru: "Сноска", label_en: "Footnote", color: "bg-muted text-muted-foreground border-border" },
   telephone: { icon: Phone, label_ru: "Телефон", label_en: "Telephone", color: "bg-orange-500/20 text-orange-400 border-orange-500/30" },
+  remark: { icon: MessageSquare, label_ru: "Реплика", label_en: "Remark", color: "bg-violet-500/20 text-violet-400 border-violet-500/30" },
 };

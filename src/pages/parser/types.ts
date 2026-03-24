@@ -136,6 +136,7 @@ export const SCENE_TYPE_COLORS: Record<string, string> = {
   lyrical_digression: "bg-pink-500/20 text-pink-400 border-pink-500/30",
   description: "bg-green-500/20 text-green-400 border-green-500/30",
   inner_monologue: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  remark: "bg-violet-500/20 text-violet-400 border-violet-500/30",
   mixed: "bg-muted text-muted-foreground border-border",
 };
 

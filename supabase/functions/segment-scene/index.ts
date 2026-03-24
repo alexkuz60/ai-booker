@@ -19,6 +19,7 @@ const SEGMENT_TYPES = [
   "lyric",
   "footnote",
   "telephone",
+  "remark",
 ] as const;
 
 type SegmentType = (typeof SEGMENT_TYPES)[number];
