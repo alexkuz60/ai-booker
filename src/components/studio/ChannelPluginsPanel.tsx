@@ -65,6 +65,7 @@ export function ChannelPluginsPanel({
   onTogglePlugin,
   onUpdateParams,
 }: ChannelPluginsPanelProps) {
+  const { storage: projectStorage } = useProjectStorageContext();
   // Selected clip ID for individual param editing
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
 
