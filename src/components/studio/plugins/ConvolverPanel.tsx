@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ParamSlider } from "./ParamSlider";
 import { BypassButton } from "./BypassButton";
 import { drawPeaksWaveform } from "@/lib/irPeaks";
-import { fetchWithStemCache } from "@/lib/stemCache";
+import { fetchIrWithCache, addToBookImpulseManifest } from "@/lib/irCache";
 import { Play, Square } from "lucide-react";
 import type { ClipConvolverConfig } from "@/hooks/useClipPluginConfigs";
 
