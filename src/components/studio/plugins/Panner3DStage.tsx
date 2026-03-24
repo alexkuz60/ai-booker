@@ -251,7 +251,17 @@ export function Panner3DStage({ isRu, allClips, selectedClipId, config, disabled
         <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">
           {isRu ? "3D Позиция" : "3D Position"}
         </span>
-        <BypassButton label="3D" bypassed={!config.enabled} onToggle={onToggle} />
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setExpandedOpen(true)}
+            disabled={disabled}
+            className="p-0.5 rounded hover:bg-muted/40 text-muted-foreground/50 hover:text-muted-foreground transition-colors disabled:opacity-30"
+            title={isRu ? "Развернуть" : "Expand"}
+          >
+            <Maximize2 className="w-3 h-3" />
+          </button>
+          <BypassButton label="3D" bypassed={!config.enabled} onToggle={onToggle} />
+        </div>
       </div>
 
       <div className="flex gap-3 flex-1 min-h-0">
