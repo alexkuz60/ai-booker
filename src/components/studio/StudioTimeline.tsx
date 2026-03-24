@@ -349,6 +349,7 @@ export function StudioTimeline({
   // ── Seek to selected segment's clip start ─────────────────
   const prevSelectedRef = useRef<string | null>(null);
   const sceneScrollRef = useRef<HTMLDivElement>(null);
+  const mixerScrollRef = useRef<HTMLDivElement>(null);
   const seekCenterRef = useRef<{ zoom: number; percent: number }>({ zoom: 1, percent: 100 });
 
   useEffect(() => {
@@ -768,8 +769,18 @@ export function StudioTimeline({
       {/* Content: Mixer sidebar + Tracks + optional Plugins right sidebar */}
       {!collapsed && (
         <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
-          <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${sidebarWidth}px` }}>
-            <div className="h-6 border-b border-border flex items-center px-2">
+          <div
+            ref={mixerScrollRef}
+            className="shrink-0 border-r border-border flex flex-col overflow-y-auto scrollbar-none"
+            style={{ width: `${sidebarWidth}px` }}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              if (sceneScrollRef.current && sceneScrollRef.current.scrollTop !== el.scrollTop) {
+                sceneScrollRef.current.scrollTop = el.scrollTop;
+              }
+            }}
+          >
+            <div className="h-6 border-b border-border flex items-center px-2 sticky top-0 z-10 bg-background shrink-0">
               {mixerExpanded ? (
                 <>
                   <div className="w-[100px] shrink-0" />
@@ -834,7 +845,14 @@ export function StudioTimeline({
               />
             </div>
           ) : (
-            <div ref={sceneScrollRef} className="flex-1 overflow-x-auto overflow-y-hidden">
+            <div ref={sceneScrollRef} className="flex-1 overflow-x-auto overflow-y-auto scrollbar-none"
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                if (mixerScrollRef.current && mixerScrollRef.current.scrollTop !== el.scrollTop) {
+                  mixerScrollRef.current.scrollTop = el.scrollTop;
+                }
+              }}
+            >
               <div
                 className="relative cursor-crosshair"
                 style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
