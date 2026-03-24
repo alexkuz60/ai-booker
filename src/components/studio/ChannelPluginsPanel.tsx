@@ -36,6 +36,8 @@ export interface ClipInfo {
   durationSec: number;
   /** Character color from book_characters.color */
   charColor?: string;
+  /** Whether the clip has rendered audio loaded in the engine */
+  hasAudio?: boolean;
 }
 
 interface ChannelPluginsPanelProps {
