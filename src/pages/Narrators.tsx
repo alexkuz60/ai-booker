@@ -257,82 +257,120 @@ const Narrators = () => {
     if (!selectedBookId) { setCharacters([]); setAppearances(new Map()); return; }
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from("book_characters")
-        .select("id, name, gender, age_group, temperament, description, speech_style, speech_tags, psycho_tags, aliases, voice_config")
-        .eq("book_id", selectedBookId)
-        .order("sort_order");
-      const chars: BookCharacter[] = (data || []).map(c => ({
-        ...c,
-        voice_config: (c.voice_config as Record<string, unknown>) || {},
-      }));
-      setCharacters(chars);
+      const isLocalProject = projectStorage && projectMeta?.bookId === selectedBookId;
 
-      // Load appearances
-      if (chars.length > 0) {
-        const charIds = chars.map(c => c.id);
-        const { data: appData } = await supabase
-          .from("character_appearances")
-          .select("character_id, scene_id")
-          .in("character_id", charIds);
+      if (isLocalProject) {
+        // ── K4: Local-Only — read from OPFS ──
+        const localChars = await readCharacterIndex(projectStorage);
+        const chars: BookCharacter[] = localChars.map(c => ({
+          id: c.id,
+          name: c.name,
+          gender: c.gender,
+          age_group: c.age_group,
+          temperament: c.temperament ?? null,
+          description: c.description ?? null,
+          speech_style: c.speech_style ?? null,
+          speech_tags: c.speech_tags || [],
+          psycho_tags: c.psycho_tags || [],
+          aliases: c.aliases || [],
+          voice_config: (c.voice_config as Record<string, unknown>) || {},
+        }));
+        setCharacters(chars);
 
-        // Load chapters + scenes for mapping
-        const { data: chapters } = await supabase
-          .from("book_chapters")
-          .select("id, title, chapter_number")
-          .eq("book_id", selectedBookId)
-          .order("chapter_number");
-
-        const chapterIds = (chapters || []).map(ch => ch.id);
-        let scenes: SceneRow[] = [];
-        if (chapterIds.length > 0) {
-          const { data: sceneData } = await supabase
-            .from("book_scenes")
-            .select("id, chapter_id, scene_number")
-            .in("chapter_id", chapterIds);
-          scenes = sceneData || [];
-        }
-
-        // Build scene -> chapter mapping
-        const sceneToChapter = new Map<string, { chapterIdx: number; chapterId: string; chapterTitle: string; sceneNumber: number }>();
-        for (const [idx, ch] of (chapters || []).entries()) {
-          const chScenes = scenes.filter(s => s.chapter_id === ch.id);
-          for (const s of chScenes) {
-            sceneToChapter.set(s.id, { chapterIdx: idx, chapterId: ch.id, chapterTitle: ch.title, sceneNumber: s.scene_number });
+        // Build chapterIdx→chapterId map from scene_index
+        const sceneIdx = await readSceneIndex(projectStorage);
+        const chapterIdByIdx = new Map<number, string>();
+        if (sceneIdx) {
+          for (const entry of Object.values(sceneIdx.entries)) {
+            chapterIdByIdx.set(entry.chapterIndex, entry.chapterId);
           }
         }
 
-        // Build per-character appearances
-        const appMap = new Map<string, { chapterIdx: number; chapterId: string; chapterTitle: string; sceneNumbers: number[] }[]>();
-        const perChar = new Map<string, Map<number, { chapterId: string; title: string; scenes: Set<number> }>>();
-
-        for (const row of (appData || [])) {
-          const info = sceneToChapter.get(row.scene_id);
-          if (!info) continue;
-          if (!perChar.has(row.character_id)) perChar.set(row.character_id, new Map());
-          const chMap = perChar.get(row.character_id)!;
-          if (!chMap.has(info.chapterIdx)) chMap.set(info.chapterIdx, { chapterId: info.chapterId, title: info.chapterTitle, scenes: new Set() });
-          chMap.get(info.chapterIdx)!.scenes.add(info.sceneNumber);
+        // Use local appearances from CharacterIndex, enrich with chapterId
+        const appMap = new Map<string, { chapterIdx: number; chapterId?: string; chapterTitle: string; sceneNumbers: number[] }[]>();
+        for (const c of localChars) {
+          if (c.appearances?.length) {
+            appMap.set(c.id, c.appearances.map(a => ({
+              ...a,
+              chapterId: chapterIdByIdx.get(a.chapterIdx),
+            })));
+          }
         }
-
-        for (const [charId, chMap] of perChar) {
-          const apps = Array.from(chMap.entries())
-            .sort(([a], [b]) => a - b)
-            .map(([chapterIdx, { chapterId, title, scenes }]) => ({
-              chapterIdx,
-              chapterId,
-              chapterTitle: title,
-              sceneNumbers: Array.from(scenes).sort((a, b) => a - b),
-            }));
-          appMap.set(charId, apps);
-        }
-
         setAppearances(appMap);
+      } else {
+        // Fallback: load from DB for books without open OPFS project
+        const { data } = await supabase
+          .from("book_characters")
+          .select("id, name, gender, age_group, temperament, description, speech_style, speech_tags, psycho_tags, aliases, voice_config")
+          .eq("book_id", selectedBookId)
+          .order("sort_order");
+        const chars: BookCharacter[] = (data || []).map(c => ({
+          ...c,
+          voice_config: (c.voice_config as Record<string, unknown>) || {},
+        }));
+        setCharacters(chars);
+
+        // Load appearances from DB
+        if (chars.length > 0) {
+          const charIds = chars.map(c => c.id);
+          const { data: appData } = await supabase
+            .from("character_appearances")
+            .select("character_id, scene_id")
+            .in("character_id", charIds);
+
+          const { data: chapters } = await supabase
+            .from("book_chapters")
+            .select("id, title, chapter_number")
+            .eq("book_id", selectedBookId)
+            .order("chapter_number");
+
+          const chapterIds = (chapters || []).map(ch => ch.id);
+          let scenes: SceneRow[] = [];
+          if (chapterIds.length > 0) {
+            const { data: sceneData } = await supabase
+              .from("book_scenes")
+              .select("id, chapter_id, scene_number")
+              .in("chapter_id", chapterIds);
+            scenes = sceneData || [];
+          }
+
+          const sceneToChapter = new Map<string, { chapterIdx: number; chapterId: string; chapterTitle: string; sceneNumber: number }>();
+          for (const [idx, ch] of (chapters || []).entries()) {
+            for (const s of scenes.filter(s => s.chapter_id === ch.id)) {
+              sceneToChapter.set(s.id, { chapterIdx: idx, chapterId: ch.id, chapterTitle: ch.title, sceneNumber: s.scene_number });
+            }
+          }
+
+          const appMap = new Map<string, { chapterIdx: number; chapterId?: string; chapterTitle: string; sceneNumbers: number[] }[]>();
+          const perChar = new Map<string, Map<number, { chapterId: string; title: string; scenes: Set<number> }>>();
+
+          for (const row of (appData || [])) {
+            const info = sceneToChapter.get(row.scene_id);
+            if (!info) continue;
+            if (!perChar.has(row.character_id)) perChar.set(row.character_id, new Map());
+            const chMap = perChar.get(row.character_id)!;
+            if (!chMap.has(info.chapterIdx)) chMap.set(info.chapterIdx, { chapterId: info.chapterId, title: info.chapterTitle, scenes: new Set() });
+            chMap.get(info.chapterIdx)!.scenes.add(info.sceneNumber);
+          }
+
+          for (const [charId, chMap] of perChar) {
+            const apps = Array.from(chMap.entries())
+              .sort(([a], [b]) => a - b)
+              .map(([chapterIdx, { chapterId, title, scenes }]) => ({
+                chapterIdx,
+                chapterId,
+                chapterTitle: title,
+                sceneNumbers: Array.from(scenes).sort((a, b) => a - b),
+              }));
+            appMap.set(charId, apps);
+          }
+          setAppearances(appMap);
+        }
       }
     } finally {
       setLoading(false);
     }
-  }, [selectedBookId]);
+  }, [selectedBookId, projectStorage, projectMeta?.bookId]);
 
   useEffect(() => { loadCharacters(); }, [loadCharacters]);
 
