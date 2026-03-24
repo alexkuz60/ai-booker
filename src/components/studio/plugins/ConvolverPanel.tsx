@@ -83,12 +83,7 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, projectStorage,
     // Fallback: fetch + decode for old impulses without peaks
     (async () => {
       try {
-        const { data: urlData } = await supabase.storage
-          .from("impulse-responses")
-          .createSignedUrl(impulse.file_path, 600);
-        if (!urlData?.signedUrl) return;
-
-        const arrayBuf = await fetchWithStemCache(impulse.file_path, urlData.signedUrl);
+        const arrayBuf = await fetchIrWithCache(impulse.id, impulse.file_path);
         const { computePeaks } = await import("@/lib/irPeaks");
         const audioCtx = new AudioContext();
         const decoded = await audioCtx.decodeAudioData(arrayBuf);
