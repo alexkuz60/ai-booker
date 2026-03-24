@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useContext } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useBackgroundAnalysis } from "@/hooks/useBackgroundAnalysis";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { useNavigate } from "react-router-dom";
