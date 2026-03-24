@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Upload, Trash2, Waves, Music, RefreshCw } from "lucide-react";
 
 const CATEGORIES = ["hall", "room", "plate", "chamber", "spring", "outdoor", "special"] as const;
