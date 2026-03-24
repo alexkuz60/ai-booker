@@ -615,7 +615,7 @@ const Narrators = () => {
           <div className="flex items-center justify-center h-full text-muted-foreground">
             <div className="text-center space-y-2 p-4">
               <Brain className="h-8 w-8 mx-auto text-muted-foreground/30" />
-              <p className="text-xs">{isRu ? "Нажмите 🧠 у персонажа для просмотра профайла" : "Click 🧠 on a character to view profile"}</p>
+              <p className="text-xs">{isRu ? "Выберите персонажа для просмотра профайла" : "Select a character to view profile"}</p>
             </div>
           </div>
         )}
