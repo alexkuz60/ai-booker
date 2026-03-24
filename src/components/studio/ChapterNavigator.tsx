@@ -77,21 +77,8 @@ async function scanBookForStaleAudio(
     }
   }
 
-  // Fallback to DB only if no local data (backwards compat during migration)
-  if (charVoiceMap.size === 0) {
-    const { data: chars } = await supabase
-      .from("book_characters")
-      .select("name, aliases, voice_config")
-      .eq("book_id", bookId);
-    if (!chars?.length) return report;
-    for (const c of chars) {
-      const vc = (c.voice_config || {}) as Record<string, unknown>;
-      charVoiceMap.set((c.name || "").toLowerCase(), vc);
-      for (const a of (c.aliases || [])) {
-        charVoiceMap.set((a as string).toLowerCase(), vc);
-      }
-    }
-  }
+  // LOCAL-ONLY: if no local characters, return empty report (K4 — no DB fallback)
+  if (charVoiceMap.size === 0) return report;
 
   if (charVoiceMap.size === 0) return report;
 
