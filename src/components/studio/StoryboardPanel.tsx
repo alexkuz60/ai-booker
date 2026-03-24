@@ -503,6 +503,7 @@ export function StoryboardPanel({
 
   const runAnalysis = useCallback(async () => {
     if (!sceneId) return;
+    const capturedSceneId = sceneId;
     setAnalyzing(true);
 
     // K3: Do NOT save previousLocal for restore — stale data must never survive a re-analysis attempt
@@ -526,7 +527,7 @@ export function StoryboardPanel({
       }
 
       const localScene = await readSceneContentFromLocal(storage, {
-        sceneId,
+        sceneId: capturedSceneId,
         chapterId,
         sceneNumber,
         title: sceneTitle,
@@ -541,11 +542,18 @@ export function StoryboardPanel({
 
       const { data, error } = await invokeWithFallback({
         functionName: "segment-scene",
-        body: { scene_id: sceneId, content: analysisContent, language: isRu ? "ru" : "en", model: getModelForRole("screenwriter") },
+        body: { scene_id: capturedSceneId, content: analysisContent, language: isRu ? "ru" : "en", model: getModelForRole("screenwriter") },
         userApiKeys,
         isRu,
       });
       if (error) throw error;
+
+      // ── Stale guard: if user switched scene while AI was running, discard results ──
+      if (sceneIdRef.current !== capturedSceneId) {
+        console.warn(`[Storyboard] Analysis completed for scene ${capturedSceneId} but current scene is ${sceneIdRef.current} — discarding results`);
+        setAnalyzing(false);
+        return;
+      }
 
       const result = data as { segments?: Segment[] };
       const newSegments = result.segments || [];
@@ -564,18 +572,18 @@ export function StoryboardPanel({
       }
 
       // Clear content_dirty in DB — analysis was just done on fresh content
-      supabase.from("book_scenes").update({ content_dirty: false }).eq("id", sceneId).then(() => {
-        console.debug(`[Storyboard] Cleared content_dirty for scene ${sceneId}`);
+      supabase.from("book_scenes").update({ content_dirty: false }).eq("id", capturedSceneId).then(() => {
+        console.debug(`[Storyboard] Cleared content_dirty for scene ${capturedSceneId}`);
       });
 
-      onSegmented?.(sceneId);
+      onSegmented?.(capturedSceneId);
 
       // Extract speakers as local characters (K4: OPFS is source of truth)
       if (storage && newSegments.length > 0) {
         try {
           const { readCharacterIndex, upsertSpeakersFromSegments } = await import("@/lib/localCharacters");
           const currentIndex = await readCharacterIndex(storage);
-          await upsertSpeakersFromSegments(storage, sceneId, newSegments, currentIndex);
+          await upsertSpeakersFromSegments(storage, capturedSceneId, newSegments, currentIndex);
           console.debug(`[Storyboard] Upserted speakers to local character index`);
         } catch (e) {
           console.warn("[Storyboard] Failed to upsert local speakers:", e);
@@ -584,6 +592,12 @@ export function StoryboardPanel({
 
       toast.success(isRu ? "Раскадровка готова" : "Storyboard ready");
     } catch (err: any) {
+      // If scene changed during analysis, silently discard the error too
+      if (sceneIdRef.current !== capturedSceneId) {
+        console.warn(`[Storyboard] Analysis error for stale scene ${capturedSceneId} — ignoring`);
+        setAnalyzing(false);
+        return;
+      }
       const msg = err?.message || err?.context?.body || String(err);
       console.error("Segmentation failed:", msg, err);
 
