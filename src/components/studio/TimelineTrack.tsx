@@ -136,10 +136,11 @@ export function TimelineTrack({
       })
     : [];
 
+  const heightStyle = props.trackHeight ? `${props.trackHeight}px` : '2.5rem';
   const trackContent = (
     <div
-      className="flex h-10 border-b border-border/50 relative"
-      style={{ width: `${duration * zoom * 4}px` }}
+      className="flex border-b border-border/50 relative"
+      style={{ width: `${duration * zoom * 4}px`, height: heightStyle }}
       onContextMenu={(e) => {
         if (isInsertableTrack) {
           const rect = e.currentTarget.getBoundingClientRect();
