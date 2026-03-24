@@ -330,6 +330,23 @@ export function ImpulseManager({ isRu }: ImpulseManagerProps) {
                     <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
                       {imp.description || "—"}
                     </TableCell>
+                    <TableCell className="text-center">
+                      <Checkbox
+                        checked={imp.is_public}
+                        onCheckedChange={async (checked) => {
+                          const val = !!checked;
+                          const { error } = await supabase
+                            .from("convolution_impulses")
+                            .update({ is_public: val } as any)
+                            .eq("id", imp.id);
+                          if (error) {
+                            toast.error(error.message);
+                          } else {
+                            setImpulses(prev => prev.map(i => i.id === imp.id ? { ...i, is_public: val } : i));
+                          }
+                        }}
+                      />
+                    </TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => handleDelete(imp)}>
                         <Trash2 className="h-4 w-4" />
