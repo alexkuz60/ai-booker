@@ -5,8 +5,10 @@
  */
 
 import { useRef, useEffect, useCallback, useState } from "react";
+import { Maximize2 } from "lucide-react";
 import { ParamSlider } from "./ParamSlider";
 import { BypassButton } from "./BypassButton";
+import { Panner3DExpandedDialog } from "./Panner3DExpandedDialog";
 import type { ClipPanner3dConfig } from "@/hooks/useClipPluginConfigs";
 
 /** Info about a clip to render on the stage */
@@ -37,6 +39,7 @@ export function Panner3DStage({ isRu, allClips, selectedClipId, config, disabled
   const [canvasSize, setCanvasSize] = useState(120);
   const draggingRef = useRef(false);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; color?: string } | null>(null);
+  const [expandedOpen, setExpandedOpen] = useState(false);
 
   // Responsive canvas
   useEffect(() => {
@@ -248,7 +251,17 @@ export function Panner3DStage({ isRu, allClips, selectedClipId, config, disabled
         <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">
           {isRu ? "3D Позиция" : "3D Position"}
         </span>
-        <BypassButton label="3D" bypassed={!config.enabled} onToggle={onToggle} />
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setExpandedOpen(true)}
+            disabled={disabled}
+            className="p-0.5 rounded hover:bg-muted/40 text-muted-foreground/50 hover:text-muted-foreground transition-colors disabled:opacity-30"
+            title={isRu ? "Развернуть" : "Expand"}
+          >
+            <Maximize2 className="w-3 h-3" />
+          </button>
+          <BypassButton label="3D" bypassed={!config.enabled} onToggle={onToggle} />
+        </div>
       </div>
 
       <div className="flex gap-3 flex-1 min-h-0">
@@ -292,6 +305,16 @@ export function Panner3DStage({ isRu, allClips, selectedClipId, config, disabled
           <ParamSlider label="Rolloff" value={config.rolloffFactor} min={0} max={5} step={0.1} onChange={v => onUpdate({ rolloffFactor: v })} disabled={!config.enabled} />
         </div>
       </div>
+
+      <Panner3DExpandedDialog
+        open={expandedOpen}
+        onOpenChange={setExpandedOpen}
+        isRu={isRu}
+        allClips={allClips}
+        selectedClipId={selectedClipId}
+        config={config}
+        onUpdate={onUpdate}
+      />
     </div>
   );
 }
