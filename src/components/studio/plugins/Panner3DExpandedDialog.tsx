@@ -241,7 +241,7 @@ export function Panner3DExpandedDialog({
       <DialogContent className="max-w-[580px] p-4 gap-3 bg-background border-border">
         <DialogHeader className="pb-0">
           <DialogTitle className="text-sm font-mono">
-            {isRu ? "3D Панорама — расширенный вид" : "3D Panner — Expanded View"}
+            {isRu ? "3D Панорама" : "3D Panorama"}
           </DialogTitle>
         </DialogHeader>
 
