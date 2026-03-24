@@ -36,7 +36,7 @@ interface UseServerSyncParams {
   loadBookFromServerById: (bookId: string) => Promise<BookRecord | null>;
   /** Ref-based: updated by orchestrator after openSavedBook is created */
   openSavedBookRef: React.MutableRefObject<
-    ((book: BookRecord, options?: { skipTimestampCheck?: boolean }, _c?: any, _s?: any, onProgress?: SyncProgressCallback) => Promise<void>) | undefined
+    ((book: BookRecord, options?: { skipTimestampCheck?: boolean; downloadImpulses?: boolean }, _c?: any, _s?: any, onProgress?: SyncProgressCallback) => Promise<void>) | undefined
   >;
 }
 

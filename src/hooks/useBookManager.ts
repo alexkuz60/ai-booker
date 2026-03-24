@@ -122,7 +122,7 @@ export function useBookManager({
   // ── Wrap openSavedBook to inject sync dependencies ─────────
   const openSavedBook = useCallback(async (
     book: BookRecord,
-    options?: { skipTimestampCheck?: boolean },
+    options?: { skipTimestampCheck?: boolean; downloadImpulses?: boolean },
     _checkServerNewer?: any,
     _setServerNewerBookId?: any,
     onProgress?: import("@/components/SyncProgressDialog").SyncProgressCallback,
