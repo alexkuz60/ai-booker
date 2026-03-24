@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Volume2, Loader2, Play, Square, Save, RotateCcw, Brain } from "lucide-react";
+import { Volume2, Loader2, Play, Square, Save, RotateCcw, Brain, CircleHelp } from "lucide-react";
 import { TheaterMasks } from "@/components/icons/TheaterMasks";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -542,7 +542,11 @@ const Narrators = () => {
                         ? "bg-accent/15 text-accent-foreground"
                         : "text-muted-foreground hover:bg-muted/50"
                     )}
-                    onClick={() => setSelectedId(isSelected ? null : ch.id)}
+                    onClick={() => {
+                      const newId = isSelected ? null : ch.id;
+                      setSelectedId(newId);
+                      setProfileViewId(newId);
+                    }}
                   >
                     <span className="truncate font-medium flex-1 text-xs">{ch.name}</span>
                     {ch.gender !== "unknown" && (
@@ -550,29 +554,22 @@ const Narrators = () => {
                         {ch.gender === "female" ? "♀" : "♂"}
                       </span>
                     )}
-                    {/* Brain icon for profile */}
+                    {/* Profile indicator */}
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setProfileViewId(isProfileOpen ? null : ch.id);
-                            if (!isSelected) setSelectedId(ch.id);
-                          }}
-                          className={cn(
-                            "shrink-0 p-0.5 rounded transition-colors",
-                            isProfileOpen
-                              ? "text-primary"
-                              : hasProfile
-                                ? "text-primary/40 hover:text-primary opacity-0 group-hover:opacity-100"
-                                : "text-muted-foreground/20 hover:text-muted-foreground/40 opacity-0 group-hover:opacity-100"
-                          )}
-                        >
-                          <Brain className="h-3 w-3" />
-                        </button>
+                        <span className={cn(
+                          "shrink-0 p-0.5",
+                          hasProfile ? "text-primary/50" : "text-muted-foreground/25"
+                        )}>
+                          {hasProfile
+                            ? <Brain className="h-3 w-3" />
+                            : <CircleHelp className="h-3 w-3" />}
+                        </span>
                       </TooltipTrigger>
                       <TooltipContent side="right" className="text-xs">
-                        {isRu ? "Профайл" : "Profile"}
+                        {hasProfile
+                          ? (isRu ? "Профайл создан" : "Profile available")
+                          : (isRu ? "Нет профайла" : "No profile")}
                       </TooltipContent>
                     </Tooltip>
                     {(ch.voice_config as any)?.voice_id && (
@@ -618,7 +615,7 @@ const Narrators = () => {
           <div className="flex items-center justify-center h-full text-muted-foreground">
             <div className="text-center space-y-2 p-4">
               <Brain className="h-8 w-8 mx-auto text-muted-foreground/30" />
-              <p className="text-xs">{isRu ? "Нажмите 🧠 у персонажа для просмотра профайла" : "Click 🧠 on a character to view profile"}</p>
+              <p className="text-xs">{isRu ? "Выберите персонажа для просмотра профайла" : "Select a character to view profile"}</p>
             </div>
           </div>
         )}
