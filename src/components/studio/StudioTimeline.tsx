@@ -349,6 +349,7 @@ export function StudioTimeline({
   // ── Seek to selected segment's clip start ─────────────────
   const prevSelectedRef = useRef<string | null>(null);
   const sceneScrollRef = useRef<HTMLDivElement>(null);
+  const mixerScrollRef = useRef<HTMLDivElement>(null);
   const seekCenterRef = useRef<{ zoom: number; percent: number }>({ zoom: 1, percent: 100 });
 
   useEffect(() => {
