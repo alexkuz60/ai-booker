@@ -229,6 +229,7 @@ export function buildRestoreSteps(isRu: boolean): SyncStep[] {
     { id: "characters", label: isRu ? "Персонажи" : "Characters", status: "pending" },
     { id: "storyboards", label: isRu ? "Раскадровка сцен" : "Scene storyboards", status: "pending" },
     { id: "scene_maps", label: isRu ? "Карты персонажей сцен" : "Scene character maps", status: "pending" },
+    { id: "download_ir", label: isRu ? "Загрузка импульсов (IR)" : "Downloading impulses (IR)", status: "pending" },
     { id: "source_file", label: isRu ? "Сохранение файла" : "Saving source file", status: "pending" },
     { id: "finalize", label: isRu ? "Завершение" : "Finalizing", status: "pending" },
   ];
