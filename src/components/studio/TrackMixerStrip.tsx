@@ -68,10 +68,11 @@ export function TrackMixerStrip({
   const isAtmoOrSfx = trackId === "ambience" || trackId.startsWith("atmosphere") || trackId === "sfx" || trackId.startsWith("sfx-");
   const hasAudioClips = allClipIds.length > 0;
 
-  // Poll meter + mix state at ~30fps when expanded, or 10fps for collapsed atmo/sfx with clips
+  // Poll meter + mix state at ~30fps when expanded, or 10fps for collapsed tracks with clips
   useEffect(() => {
     const shouldPoll = expanded || (isAtmoOrSfx && hasAudioClips);
     if (!shouldPoll) return;
+    pollState(); // initial poll
     let running = true;
     const rate = expanded ? 33 : 100;
     const interval = setInterval(() => { if (running) pollState(); }, rate);
