@@ -5,8 +5,10 @@
  */
 
 import { useRef, useEffect, useCallback, useState } from "react";
+import { Maximize2 } from "lucide-react";
 import { ParamSlider } from "./ParamSlider";
 import { BypassButton } from "./BypassButton";
+import { Panner3DExpandedDialog } from "./Panner3DExpandedDialog";
 import type { ClipPanner3dConfig } from "@/hooks/useClipPluginConfigs";
 
 /** Info about a clip to render on the stage */
