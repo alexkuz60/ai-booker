@@ -201,6 +201,7 @@ export function ChapterNavigator({
 }) {
   const navigate = useNavigate();
   const { storage: projectStorage } = useProjectStorageContext();
+  const bgAnalysis = useBackgroundAnalysis();
   const [chapterOpen, setChapterOpen] = useState(true);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
