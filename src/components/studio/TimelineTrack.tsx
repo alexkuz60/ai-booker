@@ -109,6 +109,7 @@ export function TimelineTrack({
   storageSfx,
   onInsertAudio,
   isRu,
+  trackHeight,
 }: TimelineTrackProps) {
   const showFades = zoom >= 2; // 200%+
   const isInsertableTrack = track.type === "atmosphere" || track.type === "sfx";
