@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useBackgroundAnalysis } from "@/hooks/useBackgroundAnalysis";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { useNavigate } from "react-router-dom";
 import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2, Clock, Timer, BookOpen, Scissors, Disc, Sparkles } from "lucide-react";
@@ -200,6 +201,7 @@ export function ChapterNavigator({
 }) {
   const navigate = useNavigate();
   const { storage: projectStorage } = useProjectStorageContext();
+  const bgAnalysis = useBackgroundAnalysis();
   const [chapterOpen, setChapterOpen] = useState(true);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
@@ -657,8 +659,9 @@ export function ChapterNavigator({
                    const isStale = staleAudioSceneIds?.has(scene.id || "");
                    const isActual = !!actualSec;
                    const sceneRender = scene.id ? renderStatus.get(scene.id) : undefined;
-                   const isMultiSelected = selectedSceneIndices?.has(idx);
-                   const isDirty = dirtySceneIds.has(scene.id || "");
+                    const isMultiSelected = selectedSceneIndices?.has(idx);
+                    const isDirty = dirtySceneIds.has(scene.id || "");
+                    const isBgAnalyzing = scene.id ? bgAnalysis.isAnalyzing(scene.id) : false;
 
                   const durationColor = isStale
                     ? "text-yellow-500"
@@ -680,8 +683,13 @@ export function ChapterNavigator({
                       <span className={cn("px-1.5 py-0.5 rounded text-[10px] border shrink-0", colorClass)}>
                         {isRu ? (SCENE_TYPE_RU[scene.scene_type] || scene.scene_type) : scene.scene_type}
                       </span>
-                      <span className="truncate flex-1">{scene.title}</span>
-                       {isDirty && (
+                       <span className="truncate flex-1">{scene.title}</span>
+                       {isBgAnalyzing && (
+                         <span title={isRu ? "Анализ в фоне…" : "Analyzing in background…"}>
+                           <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
+                         </span>
+                       )}
+                       {isDirty && !isBgAnalyzing && (
                          <span title={isRu ? "Контент изменён в Парсере — нужен переанализ" : "Content edited in Parser — re-analysis needed"}>
                            <RefreshCw className="h-3 w-3 text-orange-500 shrink-0" />
                          </span>
