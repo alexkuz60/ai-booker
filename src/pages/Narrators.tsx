@@ -252,8 +252,6 @@ const Narrators = () => {
     })();
   }, []);
 
-  // Load characters + appearances for selected book
-  const loadCharacters = useCallback(async () => {
   // Helper: load appearances from DB (read-only, for display)
   const loadAppearancesFromDB = useCallback(async (charIds: string[], bookId: string) => {
     if (!charIds.length) return;
