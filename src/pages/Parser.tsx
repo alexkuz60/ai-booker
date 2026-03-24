@@ -775,6 +775,14 @@ export default function Parser() {
         steps={restoreSteps}
         phase={restorePhase}
         errorMessage={restoreError}
+        confirmOptions={[
+          {
+            id: "download_ir",
+            label: isRu ? "Загрузить импульсы реверберации (IR)" : "Download reverb impulses (IR)",
+            checked: restoreDownloadIr,
+            onChange: setRestoreDownloadIr,
+          },
+        ]}
       />
     </motion.div>
   );
