@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { readStructureFromLocal } from "@/lib/localSync";
+import { readStructureFromLocal, type LocalChapterData } from "@/lib/localSync";
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Clock, Loader2 } from "lucide-react";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
