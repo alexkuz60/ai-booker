@@ -381,10 +381,15 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
                     );
                   }
 
+                  const isCached = cachedIds.has(imp.id);
+
                   return (
                     <div
                       key={imp.id}
-                      className="flex items-center gap-2 px-4 py-2.5 hover:bg-muted/30 transition-colors group"
+                      className={cn(
+                        "flex items-center gap-2 px-4 py-2.5 hover:bg-muted/30 transition-colors group",
+                        isCached && "border-l-2 border-l-yellow-500/70"
+                      )}
                     >
                       <Button
                         variant="ghost"
