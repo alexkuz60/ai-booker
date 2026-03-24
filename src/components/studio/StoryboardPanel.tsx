@@ -263,6 +263,11 @@ export function StoryboardPanel({
           setInlineNarrationSpeaker(local.inlineNarrationSpeaker);
           setAudioStatus(new Map(Object.entries(local.audioStatus || {})));
           applySegments(local.segments);
+          // LOCAL-ONLY: detect dirty via contentHash comparison (K3)
+          if (local.contentHash) {
+            const { isSceneDirty } = await import("@/lib/sceneIndex");
+            setContentDirty(isSceneDirty(sid, local.contentHash));
+          }
           setLoading(false);
           return;
         }
