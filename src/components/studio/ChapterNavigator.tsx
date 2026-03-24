@@ -558,16 +558,19 @@ export function ChapterNavigator({
                 size="sm"
                 variant="ghost"
                 className="h-6 px-1 gap-0.5"
-                disabled={!onBatchAnalyze}
                 onClick={() => {
-                  if (!onBatchAnalyze) return;
                   const unsegmented = chapter.scenes
                     .filter(s => s.id && !segmentedSceneIds?.has(s.id))
                     .map(s => s.id) as string[];
-                  const ids = unsegmented.length > 0
+                  const targetIds = unsegmented.length > 0
                     ? unsegmented
                     : chapter.scenes.map(s => s.id).filter(Boolean) as string[];
-                  if (ids.length > 0) onBatchAnalyze(ids);
+                  if (targetIds.length === 0) return;
+                  const jobs = targetIds.map(id => {
+                    const sc = chapter.scenes.find(s => s.id === id)!;
+                    return { sceneId: id, sceneTitle: sc.title, sceneNumber: sc.scene_number, chapterId: chapter.chapterId };
+                  });
+                  bgAnalysis.submit(jobs);
                 }}
                 title={tip}
               >
