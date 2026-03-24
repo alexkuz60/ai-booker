@@ -180,7 +180,6 @@ export function ChapterNavigator({
   onPlaylistDurationsLoaded,
   selectedSceneIndices,
   onSelectedSceneIndicesChange,
-  onBatchAnalyze,
 }: {
   chapter: StudioChapter;
   selectedSceneIdx: number | null;
@@ -197,7 +196,6 @@ export function ChapterNavigator({
   onPlaylistDurationsLoaded?: (m: Map<string, number>) => void;
   selectedSceneIndices?: Set<number>;
   onSelectedSceneIndicesChange?: (indices: Set<number>) => void;
-  onBatchAnalyze?: (sceneIds: string[]) => void;
 }) {
   const navigate = useNavigate();
   const { storage: projectStorage } = useProjectStorageContext();
@@ -290,13 +288,22 @@ export function ChapterNavigator({
 
   const multiCount = selectedSceneIndices?.size ?? 0;
   const handleBatchAnalyzeClick = useCallback(() => {
-    if (!onBatchAnalyze || !selectedSceneIndices || multiCount === 0) return;
-    const ids = [...selectedSceneIndices]
+    if (!selectedSceneIndices || multiCount === 0) return;
+    const jobs = [...selectedSceneIndices]
       .sort((a, b) => a - b)
-      .map(i => chapter.scenes[i]?.id)
-      .filter(Boolean) as string[];
-    if (ids.length > 0) onBatchAnalyze(ids);
-  }, [onBatchAnalyze, selectedSceneIndices, multiCount, chapter.scenes]);
+      .map(i => chapter.scenes[i])
+      .filter(s => s?.id)
+      .map(s => ({
+        sceneId: s.id!,
+        sceneTitle: s.title,
+        sceneNumber: s.scene_number,
+        chapterId: chapter.chapterId,
+      }));
+    if (jobs.length > 0) {
+      bgAnalysis.submit(jobs);
+      onSelectedSceneIndicesChange?.(new Set());
+    }
+  }, [bgAnalysis, selectedSceneIndices, multiCount, chapter.scenes, chapter.chapterId, onSelectedSceneIndicesChange]);
 
 
   const handleBatchResynth = async () => {
