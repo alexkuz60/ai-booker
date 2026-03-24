@@ -401,7 +401,7 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
                           ? <Square className="h-3 w-3 fill-current" />
                           : <Play className="h-3 w-3 fill-current" />}
                       </Button>
-                      <span className="text-sm truncate flex-1 min-w-0">{imp.name}</span>
+                      <span className={cn("text-sm truncate flex-1 min-w-0", isCached && "text-yellow-400/90")}>{imp.name}</span>
                       <Badge variant="outline" className="text-[10px] shrink-0">
                         {CAT_LABELS[lang][imp.category as ImpulseCategory] || imp.category}
                       </Badge>
