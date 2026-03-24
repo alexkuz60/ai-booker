@@ -3,6 +3,7 @@ import heroImg from "@/assets/booker_home_half.webp";
 import { useLanguage } from "@/hooks/useLanguage";
 
 const Home = () => {
+  const { isRu } = useLanguage();
   return (
     <motion.div
       initial={{ opacity: 0 }}
