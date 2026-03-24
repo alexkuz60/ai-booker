@@ -232,7 +232,7 @@ export function ConvolverPanel({ isRu, config, clipId, disabled, projectStorage,
         {/* Waveform + preview */}
         <div className="flex-1 min-h-0 relative" style={{ minHeight: 40 }}>
           <canvas ref={canvasRef} className="w-full h-full rounded" style={{ display: "block" }} />
-          {config.impulseId && (
+          {config.impulseId && !disabled && (
             <button
               onClick={handlePreview}
               className={`absolute top-1 right-1 p-1 rounded transition-colors ${

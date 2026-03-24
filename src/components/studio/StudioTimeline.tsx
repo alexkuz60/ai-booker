@@ -537,6 +537,7 @@ export function StudioTimeline({
         startSec: c.startSec,
         durationSec: c.durationSec,
         charColor: trackInfo?.color,
+        hasAudio: c.hasAudio && !!c.audioPath,
       }));
   }, [selectedCharacterId, timelineClips, charTracks]);
 

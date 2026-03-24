@@ -36,6 +36,8 @@ export interface ClipInfo {
   durationSec: number;
   /** Character color from book_characters.color */
   charColor?: string;
+  /** Whether the clip has rendered audio loaded in the engine */
+  hasAudio?: boolean;
 }
 
 interface ChannelPluginsPanelProps {
@@ -368,6 +370,7 @@ export function ChannelPluginsPanel({
                   isRu={isRu}
                   config={selectedConfig.convolver}
                   clipId={selectedClipId}
+                  disabled={!selectedClip?.hasAudio}
                   projectStorage={projectStorage}
                   onToggle={() => onTogglePlugin(selectedClipId, "convolver")}
                   onUpdate={(params) => onUpdateParams(selectedClipId, "convolver", params)}
