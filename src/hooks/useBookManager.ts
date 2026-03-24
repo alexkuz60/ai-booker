@@ -110,7 +110,7 @@ export function useBookManager({
   });
 
   // openSavedBook ref for useServerSync (breaks circular dependency)
-  const openSavedBookRef = useRef<(book: BookRecord, options?: { skipTimestampCheck?: boolean }) => Promise<void>>();
+  const openSavedBookRef = useRef<(book: BookRecord, options?: { skipTimestampCheck?: boolean; downloadImpulses?: boolean }) => Promise<void>>();
 
   const serverSync = useServerSync({
     projectStorage, storageBackend,
