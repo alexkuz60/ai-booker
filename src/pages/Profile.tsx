@@ -11,6 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useCloudSettings } from '@/hooks/useCloudSettings';
 import { useUserRole } from '@/hooks/useUserRole';
+import { usePageHeader } from '@/hooks/usePageHeader';
 
 import { ProfileTab } from '@/components/profile/tabs/ProfileTab';
 import { PreferencesTab } from '@/components/profile/tabs/PreferencesTab';
