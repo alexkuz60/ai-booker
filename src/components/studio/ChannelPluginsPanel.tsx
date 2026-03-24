@@ -370,6 +370,7 @@ export function ChannelPluginsPanel({
                   isRu={isRu}
                   config={selectedConfig.convolver}
                   clipId={selectedClipId}
+                  disabled={!selectedClip?.hasAudio}
                   projectStorage={projectStorage}
                   onToggle={() => onTogglePlugin(selectedClipId, "convolver")}
                   onUpdate={(params) => onUpdateParams(selectedClipId, "convolver", params)}
