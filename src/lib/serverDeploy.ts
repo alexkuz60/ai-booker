@@ -87,6 +87,7 @@ export async function deployFromServer({
   storage,
   isRu,
   report,
+  downloadImpulses = false,
 }: DeployParams): Promise<DeployResult> {
   // ── 1. Fetch structure (parts + chapters + source file) ───
   report("fetch_structure", "running");
