@@ -118,72 +118,48 @@ const Studio = () => {
     setPlaylistDurations(m);
   }, []);
 
-  // Resolve scene IDs and bookId from DB
+  // LOCAL-ONLY: resolve bookId and scene IDs from OPFS, not DB (K3)
   useEffect(() => {
-    if (!chapter) return;
+    if (!chapter || !storage) return;
     const needIds = chapter.scenes.some(s => !s.id);
-    const currentBookId = bookId || chapter.bookId;
     const needBookId = !bookId;
     if (!needIds && !needBookId) return;
 
+    let cancelled = false;
     (async () => {
-      let dbChapters: { id: string; title: string; book_id: string }[] | null = null;
+      try {
+        const local = await readStructureFromLocal(storage);
+        if (cancelled || !local?.structure) return;
 
-      if (chapter.chapterId) {
-        let idQuery = supabase
-          .from("book_chapters")
-          .select("id, title, book_id")
-          .eq("id", chapter.chapterId);
-
-        if (currentBookId) {
-          idQuery = idQuery.eq("book_id", currentBookId);
+        if (needBookId && local.structure.bookId) {
+          setBookId(local.structure.bookId);
         }
 
-        const { data } = await idQuery;
-        dbChapters = data;
-      }
+        if (needIds) {
+          // Find chapter index by chapterId
+          let chapterIndex: number | null = null;
+          for (const [idx, id] of local.chapterIdMap.entries()) {
+            if (id === chapter.chapterId) { chapterIndex = idx; break; }
+          }
+          if (chapterIndex === null) return;
 
-      if (!dbChapters?.length) {
-        let fallbackQuery = supabase
-          .from("book_chapters")
-          .select("id, title, book_id")
-          .eq("title", chapter.chapterTitle)
-          .order("chapter_number", { ascending: true })
-          .limit(1);
+          const result = local.chapterResults.get(chapterIndex);
+          if (!result?.scenes?.length) return;
 
-        if (currentBookId) {
-          fallbackQuery = fallbackQuery.eq("book_id", currentBookId);
+          const updated = { ...chapter, scenes: chapter.scenes.map(s => {
+            if (s.id) return s;
+            const match = result.scenes.find(ls => ls.scene_number === s.scene_number);
+            return match && (match as any).id ? { ...s, id: (match as any).id } : s;
+          })};
+          if (!cancelled) setChapter(updated);
         }
-
-        const { data } = await fallbackQuery;
-        dbChapters = data;
-      }
-
-      if (!dbChapters?.length) return;
-
-      if (needBookId && dbChapters[0]?.book_id) {
-        setBookId(dbChapters[0].book_id);
-      }
-
-      if (needIds) {
-        const chapterIds = dbChapters.map(c => c.id);
-        // LOCAL-FIRST: fetch only IDs for mapping, never content
-        const { data: dbScenes } = await supabase
-          .from("book_scenes")
-          .select("id, chapter_id, scene_number")
-          .in("chapter_id", chapterIds)
-          .order("scene_number");
-        if (!dbScenes?.length) return;
-
-        const updated = { ...chapter, scenes: chapter.scenes.map(s => {
-          if (s.id) return s;
-          const match = dbScenes.find(db => db.scene_number === s.scene_number);
-          return match ? { ...s, id: match.id } : s;
-        })};
-        setChapter(updated);
+      } catch (err) {
+        console.warn("[Studio] Failed to resolve IDs from OPFS:", err);
       }
     })();
-  }, [chapter?.chapterId, chapter?.chapterTitle, bookId, chapter, setChapter]);
+
+    return () => { cancelled = true; };
+  }, [chapter?.chapterId, chapter?.scenes.some(s => !s.id), bookId, storage, setChapter]);
 
   // Cross-page navigation: if chapter has no scenes (e.g. from Narrators link),
   // hydrate full scene list from OPFS structure data.
