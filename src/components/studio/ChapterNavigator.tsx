@@ -77,21 +77,8 @@ async function scanBookForStaleAudio(
     }
   }
 
-  // Fallback to DB only if no local data (backwards compat during migration)
-  if (charVoiceMap.size === 0) {
-    const { data: chars } = await supabase
-      .from("book_characters")
-      .select("name, aliases, voice_config")
-      .eq("book_id", bookId);
-    if (!chars?.length) return report;
-    for (const c of chars) {
-      const vc = (c.voice_config || {}) as Record<string, unknown>;
-      charVoiceMap.set((c.name || "").toLowerCase(), vc);
-      for (const a of (c.aliases || [])) {
-        charVoiceMap.set((a as string).toLowerCase(), vc);
-      }
-    }
-  }
+  // LOCAL-ONLY: if no local characters, return empty report (K4 — no DB fallback)
+  if (charVoiceMap.size === 0) return report;
 
   if (charVoiceMap.size === 0) return report;
 
@@ -588,15 +575,8 @@ export function ChapterNavigator({
             className="h-6 w-6 p-0"
             onClick={() => {
               if (bookId) sessionStorage.setItem("montage_book_id", bookId);
-              const sceneId = chapter.scenes[0]?.id;
-              if (sceneId) {
-                supabase.from("book_scenes").select("chapter_id").eq("id", sceneId).single().then(({ data }) => {
-                  if (data?.chapter_id) sessionStorage.setItem("montage_chapter_id", data.chapter_id);
-                  navigate("/montage");
-                });
-              } else {
-                navigate("/montage");
-              }
+              if (chapter.chapterId) sessionStorage.setItem("montage_chapter_id", chapter.chapterId);
+              navigate("/montage");
             }}
             title={isRu ? "Открыть в Монтаже" : "Open in Montage"}
           >

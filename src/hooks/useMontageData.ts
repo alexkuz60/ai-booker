@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { readStructureFromLocal } from "@/lib/localSync";
 import { clearStemCache } from "@/lib/stemCache";
 import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 
@@ -69,6 +71,7 @@ function loadContext(): MontageContext | null {
 // ─── Hook ───────────────────────────────────────────────────
 export function useMontageData() {
   const { user } = useAuth();
+  const { storage } = useProjectStorageContext();
 
   const [bookId, setBookId] = useState<string | null>(null);
   const [bookTitle, setBookTitle] = useState<string>("");
@@ -94,7 +97,6 @@ export function useMontageData() {
       sessionStorage.removeItem("montage_chapter_id");
       setBookId(studioBookId);
       setChapterId(studioChapterId);
-      fetchTitles(studioBookId, studioChapterId);
     } else {
       const saved = loadContext();
       if (saved) {
@@ -115,26 +117,65 @@ export function useMontageData() {
     prevChapterIdRef.current = chapterId;
   }, [chapterId]);
 
-  async function fetchTitles(bId: string, cId: string) {
-    const [bookRes, chapterRes] = await Promise.all([
-      supabase.from("books").select("title").eq("id", bId).single(),
-      supabase.from("book_chapters").select("title").eq("id", cId).single(),
-    ]);
-    const bTitle = bookRes.data?.title ?? "";
-    const cTitle = chapterRes.data?.title ?? "";
-    setBookTitle(bTitle);
-    setChapterTitle(cTitle);
-    saveContext({ bookId: bId, bookTitle: bTitle, chapterId: cId, chapterTitle: cTitle });
-  }
-
-  // Load scenes
+  // LOCAL-ONLY: resolve titles and scene list from OPFS (K3)
   useEffect(() => {
-    if (!chapterId) { setScenes([]); return; }
+    if (!storage || !chapterId) { setScenes([]); return; }
+    let cancelled = false;
     (async () => {
-      const { data } = await supabase.from("book_scenes").select("id, title, scene_number, silence_sec").eq("chapter_id", chapterId).order("scene_number");
-      setScenes(data ?? []);
+      try {
+        const local = await readStructureFromLocal(storage);
+        if (cancelled || !local?.structure) return;
+
+        // Set book title from OPFS
+        if (local.structure.title && !bookTitle) {
+          setBookTitle(local.structure.title);
+        }
+
+        // Find chapter by ID and get its scenes
+        let foundChapterIndex: number | null = null;
+        let foundChapterTitle = "";
+        for (const [idx, id] of local.chapterIdMap.entries()) {
+          if (id === chapterId) {
+            foundChapterIndex = idx;
+            const tocEntry = local.structure.toc[idx];
+            foundChapterTitle = tocEntry?.title || "";
+            break;
+          }
+        }
+
+        if (foundChapterTitle && !chapterTitle) {
+          setChapterTitle(foundChapterTitle);
+        }
+
+        // Save context for reload persistence
+        if (bookId && local.structure.title && foundChapterTitle) {
+          saveContext({
+            bookId,
+            bookTitle: local.structure.title,
+            chapterId,
+            chapterTitle: foundChapterTitle,
+          });
+        }
+
+        if (foundChapterIndex !== null) {
+          const result = local.chapterResults.get(foundChapterIndex);
+          if (result?.scenes) {
+            const sceneOptions: SceneOption[] = result.scenes
+              .filter((s: any) => s.id)
+              .map((s: any) => ({
+                id: s.id,
+                title: s.title,
+                scene_number: s.scene_number,
+              }));
+            if (!cancelled) setScenes(sceneOptions);
+          }
+        }
+      } catch (err) {
+        console.warn("[Montage] Failed to load structure from OPFS:", err);
+      }
     })();
-  }, [chapterId]);
+    return () => { cancelled = true; };
+  }, [storage, chapterId, bookId]);
 
   const sceneIds = useMemo(() => scenes.map(s => s.id), [scenes]);
 
