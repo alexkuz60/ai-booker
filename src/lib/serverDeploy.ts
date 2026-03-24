@@ -619,6 +619,68 @@ export async function deployFromServer({
     report("storyboards", "error");
   }
 
+  // ── 8b. Download IR impulses into global OPFS cache ───────
+  if (downloadImpulses) {
+    report("download_ir", "running");
+    try {
+      // Extract unique impulseIds from clip_plugin_configs for this book's scenes
+      const allSceneIds: string[] = [];
+      for (const [, result] of chapterResults) {
+        for (const sc of result.scenes) {
+          if (sc.id) allSceneIds.push(sc.id);
+        }
+      }
+
+      if (allSceneIds.length > 0) {
+        const configs = await fetchChunked<{ config: any }>(
+          "clip_plugin_configs",
+          "config",
+          "scene_id",
+          allSceneIds,
+          50,
+        );
+
+        const impulseIds = new Set<string>();
+        for (const c of configs) {
+          const cfg = c.config as Record<string, any>;
+          const convolver = cfg?.convolver;
+          if (convolver?.impulseId) {
+            impulseIds.add(convolver.impulseId);
+          }
+        }
+
+        if (impulseIds.size > 0) {
+          const { downloadIrBatch } = await import("@/lib/irCache");
+          const ids = Array.from(impulseIds);
+          const downloaded = await downloadIrBatch(ids, (done, total) => {
+            report("download_ir", "running", `${done}/${total}`);
+          });
+
+          // Save manifest to project.json
+          try {
+            const projMeta = await storage.readJSON<Record<string, unknown>>("project.json");
+            if (projMeta) {
+              projMeta.usedImpulseIds = ids;
+              await storage.writeJSON("project.json", projMeta);
+            }
+          } catch {}
+
+          report("download_ir", "done", `${downloaded}`);
+          console.log(`[Deploy] Downloaded ${downloaded} IR files`);
+        } else {
+          report("download_ir", "skipped");
+        }
+      } else {
+        report("download_ir", "skipped");
+      }
+    } catch (err) {
+      console.warn("[Deploy] IR download failed:", err);
+      report("download_ir", "error");
+    }
+  } else {
+    report("download_ir", "skipped");
+  }
+
   // ── 9. Source file ────────────────────────────────────────
   report("source_file", "running");
   if (pdfBlob) {
