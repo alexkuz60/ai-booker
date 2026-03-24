@@ -133,6 +133,19 @@ export function SyncProgressDialog({
                 : "Current project state will be uploaded to the server as a backup. This may take a moment."}
             </AlertDialogDescription>
           )}
+          {phase === "confirm" && confirmOptions && confirmOptions.length > 0 && (
+            <div className="space-y-2 pt-2">
+              {confirmOptions.map((opt) => (
+                <label key={opt.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={opt.checked}
+                    onCheckedChange={(v) => opt.onChange(!!v)}
+                  />
+                  <span className="text-foreground">{opt.label}</span>
+                </label>
+              ))}
+            </div>
+          )}
         </AlertDialogHeader>
 
         {isRunningOrDone && (
