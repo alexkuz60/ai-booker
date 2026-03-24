@@ -588,15 +588,8 @@ export function ChapterNavigator({
             className="h-6 w-6 p-0"
             onClick={() => {
               if (bookId) sessionStorage.setItem("montage_book_id", bookId);
-              const sceneId = chapter.scenes[0]?.id;
-              if (sceneId) {
-                supabase.from("book_scenes").select("chapter_id").eq("id", sceneId).single().then(({ data }) => {
-                  if (data?.chapter_id) sessionStorage.setItem("montage_chapter_id", data.chapter_id);
-                  navigate("/montage");
-                });
-              } else {
-                navigate("/montage");
-              }
+              if (chapter.chapterId) sessionStorage.setItem("montage_chapter_id", chapter.chapterId);
+              navigate("/montage");
             }}
             title={isRu ? "Открыть в Монтаже" : "Open in Montage"}
           >
