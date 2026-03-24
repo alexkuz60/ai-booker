@@ -875,6 +875,7 @@ export function StudioTimeline({
                     storageSfx={storageAudio.sfx}
                     onInsertAudio={handleInsertAudio}
                     isRu={isRu}
+                    trackHeight={dynamicTrackHeight}
                   />
                 ))}
                 <Playhead positionSec={player.positionSec} zoom={zoom} />
