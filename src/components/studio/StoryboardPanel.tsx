@@ -451,8 +451,7 @@ export function StoryboardPanel({
     autoAnalyzeAttemptedRef.current = null;
     if (sceneId) {
       loadSegments(sceneId);
-      supabase.from("book_scenes").select("content_dirty").eq("id", sceneId).maybeSingle()
-        .then(({ data }) => { if (data?.content_dirty) setContentDirty(true); });
+      // LOCAL-ONLY: detect dirty from local contentHash, not DB
     }
   }, [sceneId, loadSegments]);
 
