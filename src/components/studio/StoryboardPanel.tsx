@@ -70,6 +70,10 @@ export function StoryboardPanel({
   const { getModelForRole } = useAiRoles(userApiKeys);
   const { loadFromLocal, persist, persistNow, clearLocal, pushToDb, hasStorage } = useStoryboardPersistence(sceneId, chapterId);
   const [segments, setSegments] = useState<Segment[]>([]);
+
+  // Track current sceneId to detect stale async results
+  const sceneIdRef = useRef(sceneId);
+  sceneIdRef.current = sceneId;
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [synthesizing, setSynthesizing] = useState(false);
