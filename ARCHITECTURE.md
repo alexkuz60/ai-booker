@@ -485,6 +485,49 @@ assert(storedBookId === targetBookId, "bookId mismatch — aborting write");
 - Bucket `impulse-responses` — аудиофайлы IR
 - Администратор управляет флагом `is_public` в `/admin` → ImpulseManager
 
+### 1.17 Плагины клипов и иерархическое управление (Clip Plugin System)
+
+Каждый клип на таймлайне может иметь индивидуальную цепочку обработки: EQ → Compressor → Limiter → Panner3D → Convolver.
+
+#### Иерархия управления: Track → Clip
+
+Кнопки **FX** и **RV** на микшерной полоске дорожки работают как **track-level** переключатели:
+
+- **Track ON:** Включает плагины для **всех** клипов дорожки, которые не были индивидуально переопределены.
+- **Track OFF:** Выключает плагины только для клипов **без индивидуальных override** (`fxOverride`/`rvOverride` = false).
+- **Mixed state:** Если часть клипов имеет override — кнопка отображается в **полу-ярком** цвете (muted accent).
+
+#### Per-clip override
+
+Когда пользователь вручную переключает плагин на **конкретном клипе** в `ChannelPluginsPanel`:
+- Устанавливается флаг `fxOverride: true` (или `rvOverride: true`)
+- Этот клип больше не подчиняется track-level переключателю
+- Track-level toggle пропускает overridden клипы
+
+#### Визуальная индикация в полоске клипов
+
+В `ChannelPluginsPanel` клипы отображаются пропорционально длительности:
+
+| Состояние | Визуал |
+|-----------|--------|
+| Есть аудио + плагины | Цвет дорожки, полная непрозрачность, бейдж с числом плагинов |
+| Есть аудио, нет плагинов | Цвет дорожки, штриховка, приглушённый |
+| Нет аудио (не отрендерен) | Серый фон (`--muted`), штриховка, красная нижняя граница, тултип «нет аудио» |
+
+#### Файлы
+
+| Файл | Назначение |
+|------|------------|
+| `src/hooks/useClipPluginConfigs.ts` | CRUD конфигов, aggregate state (on/off/mixed), track-level toggle с override-логикой |
+| `src/components/studio/ChannelPluginsPanel.tsx` | UI per-clip настройки: EQ/CMP/LIM/3D/IR, полоска клипов с индикацией аудио |
+| `src/components/studio/TrackMixerStrip.tsx` | Микшерная полоска: FX/RV кнопки с aggregate state, volume/pan |
+| `src/components/studio/plugins/ConvolverPanel.tsx` | Выбор IR, превью через движок (только клипы с аудио) |
+
+#### Персистентность
+
+Конфиги хранятся в таблице `clip_plugin_configs` (Supabase) с привязкой к `scene_id` + `user_id`.
+При «На сервер» — сохраняются вместе с остальным UI-состоянием через `user_settings`.
+
 ---
 
 ## 2. Модульная архитектура Парсера
