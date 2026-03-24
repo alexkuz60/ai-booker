@@ -1,11 +1,17 @@
 /**
  * TrackMixerStrip — compact horizontal mixer strip for timeline sidebar.
  * Column layout: [Color dot + Name] | [PreFX] [Vol slider] [Pan slider] [Reverb]
+ *
+ * FX/RV buttons reflect aggregate clip plugin state:
+ * - ON  = all non-overridden clips have plugins enabled
+ * - OFF = all non-overridden clips have plugins disabled
+ * - MIXED = some clips differ or have individual overrides
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { getAudioEngine, type TrackMeterData, type TrackMixState } from "@/lib/audioEngine";
 import { VuSlider } from "./VuSlider";
+import type { TrackPluginState } from "@/hooks/useClipPluginConfigs";
 
 interface TrackMixerStripProps {
   trackId: string;
@@ -18,6 +24,14 @@ interface TrackMixerStripProps {
   onClick?: () => void;
   onMixChange?: () => void;
   trackHeight?: number;
+  /** Aggregate FX state from clip plugin configs */
+  fxState?: TrackPluginState;
+  /** Aggregate RV state from clip plugin configs */
+  rvState?: TrackPluginState;
+  /** Toggle FX for all non-overridden clips on this track */
+  onToggleFx?: () => void;
+  /** Toggle RV for all non-overridden clips on this track */
+  onToggleRv?: () => void;
 }
 
 /** Threshold in dB above which we consider signal "active" */
@@ -34,6 +48,10 @@ export function TrackMixerStrip({
   onClick,
   onMixChange,
   trackHeight,
+  fxState = "off",
+  rvState = "off",
+  onToggleFx,
+  onToggleRv,
 }: TrackMixerStripProps) {
   const engine = getAudioEngine();
 
@@ -91,34 +109,32 @@ export function TrackMixerStrip({
     onMixChange?.();
   }, [engine, effectiveIds, onMixChange, pollState]);
 
-  const toggleReverbBypass = useCallback(() => {
-    const currentMix = effectiveIds.reduce<TrackMixState | null>((acc, id) => acc ?? engine.getTrackMixState(id), null);
-    const newVal = currentMix ? !currentMix.reverbBypassed : false; // if no state, activate (set bypassed=false)
-    for (const id of effectiveIds) engine.setTrackReverbBypassed(id, newVal);
-    pollState();
-    onMixChange?.();
-  }, [engine, effectiveIds, onMixChange, pollState]);
-
-  const togglePreFxBypass = useCallback(() => {
-    const currentMix = effectiveIds.reduce<TrackMixState | null>((acc, id) => acc ?? engine.getTrackMixState(id), null);
-    const newVal = currentMix ? !currentMix.preFxBypassed : false;
-    for (const id of effectiveIds) engine.setTrackPreFxBypassed(id, newVal);
-    pollState();
-    onMixChange?.();
-  }, [engine, effectiveIds, onMixChange, pollState]);
-
   // Signal activity flag
   const hasSignal = (meter?.level ?? -60) > SIGNAL_THRESHOLD_DB;
-  const fxActive = !mix?.preFxBypassed && hasSignal;
-  const rvActive = !mix?.reverbBypassed && hasSignal;
 
   // Glow intensity based on signal level (0..1)
   const glowIntensity = useMemo(() => {
     const level = meter?.level ?? -60;
     if (level <= SIGNAL_THRESHOLD_DB) return 0;
-    // Map -50..-6 dB → 0..1
     return Math.min(1, Math.max(0, (level - SIGNAL_THRESHOLD_DB) / (SIGNAL_THRESHOLD_DB * -0.88)));
   }, [meter?.level]);
+
+  /** CSS class for FX button based on aggregate state */
+  const fxClassName = fxState === "on"
+    ? "border-accent text-accent bg-accent/15"
+    : fxState === "mixed"
+      ? "border-accent/50 text-accent/60 bg-accent/8"
+      : "border-border text-muted-foreground/40 bg-transparent";
+
+  /** CSS class for RV button based on aggregate state */
+  const rvClassName = rvState === "on"
+    ? "border-primary text-primary bg-primary/15"
+    : rvState === "mixed"
+      ? "border-primary/50 text-primary/60 bg-primary/8"
+      : "border-border text-muted-foreground/40 bg-transparent";
+
+  const fxGlow = fxState !== "off" && hasSignal;
+  const rvGlow = rvState !== "off" && hasSignal;
 
   if (!expanded) {
     const hStyle = trackHeight ? { height: `${trackHeight}px` } : {};
@@ -134,32 +150,24 @@ export function TrackMixerStrip({
         <span className={`text-xs font-body truncate flex-1 ${isSelected ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
           {label}
         </span>
-        {isAtmoOrSfx && hasAudioClips && (
+        {(isAtmoOrSfx ? hasAudioClips : true) && (
           <div className="flex items-center gap-1 ml-1 shrink-0">
             <button
-              className={`text-[8px] px-1 py-0.5 rounded border font-mono uppercase leading-none transition-colors font-semibold ${
-                !mix || mix.preFxBypassed
-                  ? "border-border text-muted-foreground/40 bg-transparent"
-                  : "border-accent text-accent bg-accent/15"
-              }`}
-              style={fxActive ? {
+              className={`text-[8px] px-1 py-0.5 rounded border font-mono uppercase leading-none transition-colors font-semibold ${fxClassName}`}
+              style={fxGlow ? {
                 boxShadow: `0 0 ${4 + glowIntensity * 6}px hsl(var(--accent) / ${0.3 + glowIntensity * 0.4})`,
               } : undefined}
-              onClick={(e) => { e.stopPropagation(); togglePreFxBypass(); }}
+              onClick={(e) => { e.stopPropagation(); onToggleFx?.(); }}
               title="Pre-FX"
             >
               FX
             </button>
             <button
-              className={`text-[8px] px-1 py-0.5 rounded border font-mono uppercase leading-none transition-colors font-semibold ${
-                !mix || mix.reverbBypassed
-                  ? "border-border text-muted-foreground/40 bg-transparent"
-                  : "border-primary text-primary bg-primary/15"
-              }`}
-              style={rvActive ? {
+              className={`text-[8px] px-1 py-0.5 rounded border font-mono uppercase leading-none transition-colors font-semibold ${rvClassName}`}
+              style={rvGlow ? {
                 boxShadow: `0 0 ${4 + glowIntensity * 6}px hsl(var(--primary) / ${0.3 + glowIntensity * 0.4})`,
               } : undefined}
-              onClick={(e) => { e.stopPropagation(); toggleReverbBypass(); }}
+              onClick={(e) => { e.stopPropagation(); onToggleRv?.(); }}
               title="Reverb"
             >
               RV
@@ -195,15 +203,11 @@ export function TrackMixerStrip({
       <div className="flex items-center gap-1.5 flex-1 min-w-0">
         {/* Pre-FX badge */}
         <button
-          className={`text-[9px] px-1.5 py-0.5 rounded border shrink-0 font-mono uppercase leading-none transition-colors font-semibold ${
-            !mix || mix.preFxBypassed
-              ? "border-border text-muted-foreground/60 bg-transparent"
-              : "border-accent text-accent bg-accent/15"
-          }`}
-          style={fxActive ? {
+          className={`text-[9px] px-1.5 py-0.5 rounded border shrink-0 font-mono uppercase leading-none transition-colors font-semibold ${fxClassName}`}
+          style={fxGlow ? {
             boxShadow: `0 0 ${4 + glowIntensity * 8}px hsl(var(--accent) / ${0.35 + glowIntensity * 0.45})`,
           } : undefined}
-          onClick={(e) => { e.stopPropagation(); togglePreFxBypass(); }}
+          onClick={(e) => { e.stopPropagation(); onToggleFx?.(); }}
           title="Pre-FX"
         >
           FX
@@ -231,15 +235,11 @@ export function TrackMixerStrip({
 
         {/* Reverb badge */}
         <button
-          className={`text-[9px] px-1.5 py-0.5 rounded border shrink-0 font-mono uppercase leading-none transition-colors font-semibold ${
-            !mix || mix.reverbBypassed
-              ? "border-border text-muted-foreground/60 bg-transparent"
-              : "border-primary text-primary bg-primary/15"
-          }`}
-          style={rvActive ? {
+          className={`text-[9px] px-1.5 py-0.5 rounded border shrink-0 font-mono uppercase leading-none transition-colors font-semibold ${rvClassName}`}
+          style={rvGlow ? {
             boxShadow: `0 0 ${4 + glowIntensity * 8}px hsl(var(--primary) / ${0.35 + glowIntensity * 0.45})`,
           } : undefined}
-          onClick={(e) => { e.stopPropagation(); toggleReverbBypass(); }}
+          onClick={(e) => { e.stopPropagation(); onToggleRv?.(); }}
           title="Reverb"
         >
           RV

@@ -56,6 +56,10 @@ export interface ClipPluginConfig {
   limiter: ClipLimiterConfig;
   panner3d: ClipPanner3dConfig;
   convolver: ClipConvolverConfig;
+  /** When true, this clip's EQ/Comp/Limiter are individually configured (not following track FX) */
+  fxOverride?: boolean;
+  /** When true, this clip's Convolver is individually configured (not following track RV) */
+  rvOverride?: boolean;
 }
 
 export const DEFAULT_PANNER3D_CONFIG: ClipPanner3dConfig = {
@@ -86,10 +90,15 @@ export const DEFAULT_CLIP_PLUGIN_CONFIG: ClipPluginConfig = {
   limiter: { enabled: false, threshold: -3 },
   panner3d: { ...DEFAULT_PANNER3D_CONFIG },
   convolver: { ...DEFAULT_CONVOLVER_CONFIG },
+  fxOverride: false,
+  rvOverride: false,
 };
 
 /** All clip configs for a scene, keyed by clipId */
 export type SceneClipConfigs = Record<string, ClipPluginConfig>;
+
+/** Aggregate state for track-level FX/RV buttons */
+export type TrackPluginState = "on" | "off" | "mixed";
 
 // ─── Hook ───────────────────────────────────────────────────
 
@@ -165,7 +174,7 @@ export function useClipPluginConfigs(sceneId: string | null) {
     return configs[clipId] ?? { ...DEFAULT_CLIP_PLUGIN_CONFIG };
   }, [configs]);
 
-  /** Toggle a specific plugin on a clip */
+  /** Toggle a specific plugin on a clip — marks clip as individually overridden */
   const togglePlugin = useCallback((
     clipId: string,
     trackId: string,
@@ -174,9 +183,13 @@ export function useClipPluginConfigs(sceneId: string | null) {
     const engine = getAudioEngine();
     setConfigs(prev => {
       const current = prev[clipId] ?? { ...DEFAULT_CLIP_PLUGIN_CONFIG };
+      const isFxPlugin = plugin === "eq" || plugin === "comp" || plugin === "limiter";
       const updated: ClipPluginConfig = {
         ...current,
         [plugin]: { ...current[plugin], enabled: !current[plugin].enabled },
+        // Mark as individually overridden
+        ...(isFxPlugin ? { fxOverride: true } : {}),
+        ...(plugin === "convolver" ? { rvOverride: true } : {}),
       };
       applyConfigToEngine(engine, clipId, updated);
       saveToDb(clipId, trackId, updated);
@@ -196,7 +209,7 @@ export function useClipPluginConfigs(sceneId: string | null) {
     saveToDb(clipId, trackId, config);
   }, [saveToDb]);
 
-  /** Update a single plugin section for a clip */
+  /** Update a single plugin section for a clip — marks as overridden */
   const updatePluginParams = useCallback((
     clipId: string,
     trackId: string,
@@ -206,9 +219,12 @@ export function useClipPluginConfigs(sceneId: string | null) {
     const engine = getAudioEngine();
     setConfigs(prev => {
       const current = prev[clipId] ?? { ...DEFAULT_CLIP_PLUGIN_CONFIG };
+      const isFxPlugin = plugin === "eq" || plugin === "comp" || plugin === "limiter";
       const updated: ClipPluginConfig = {
         ...current,
         [plugin]: { ...current[plugin], ...params },
+        ...(isFxPlugin ? { fxOverride: true } : {}),
+        ...(plugin === "convolver" ? { rvOverride: true } : {}),
       };
       applyConfigToEngine(engine, clipId, updated);
       saveToDb(clipId, trackId, updated);
@@ -218,6 +234,93 @@ export function useClipPluginConfigs(sceneId: string | null) {
 
   /** Get all configs (for snapshot into scene_playlists) */
   const getAllConfigs = useCallback((): SceneClipConfigs => configs, [configs]);
+
+  /**
+   * Compute aggregate FX state for a set of clip IDs.
+   * "on" = all non-overridden clips have EQ+Comp+Limiter enabled
+   * "off" = all non-overridden clips have them disabled
+   * "mixed" = some clips differ or have overrides
+   */
+  const getTrackFxState = useCallback((clipIds: string[]): TrackPluginState => {
+    if (clipIds.length === 0) return "off";
+    let hasOn = false, hasOff = false, hasOverride = false;
+    for (const id of clipIds) {
+      const cfg = configs[id];
+      if (cfg?.fxOverride) { hasOverride = true; continue; }
+      const anyEnabled = cfg ? (cfg.eq.enabled || cfg.comp.enabled || cfg.limiter.enabled) : false;
+      if (anyEnabled) hasOn = true; else hasOff = true;
+    }
+    if (hasOverride) return "mixed";
+    if (hasOn && hasOff) return "mixed";
+    return hasOn ? "on" : "off";
+  }, [configs]);
+
+  /**
+   * Compute aggregate RV (convolver) state for a set of clip IDs.
+   */
+  const getTrackRvState = useCallback((clipIds: string[]): TrackPluginState => {
+    if (clipIds.length === 0) return "off";
+    let hasOn = false, hasOff = false, hasOverride = false;
+    for (const id of clipIds) {
+      const cfg = configs[id];
+      if (cfg?.rvOverride) { hasOverride = true; continue; }
+      const enabled = cfg?.convolver.enabled ?? false;
+      if (enabled) hasOn = true; else hasOff = true;
+    }
+    if (hasOverride) return "mixed";
+    if (hasOn && hasOff) return "mixed";
+    return hasOn ? "on" : "off";
+  }, [configs]);
+
+  /**
+   * Toggle FX (EQ+Comp+Limiter) for all non-overridden clips on a track.
+   */
+  const toggleTrackFx = useCallback((clipIds: string[], trackId: string) => {
+    const currentState = getTrackFxState(clipIds);
+    const newEnabled = currentState !== "on"; // off/mixed → turn on; on → turn off
+    const engine = getAudioEngine();
+    setConfigs(prev => {
+      const next = { ...prev };
+      for (const clipId of clipIds) {
+        const current = next[clipId] ?? { ...DEFAULT_CLIP_PLUGIN_CONFIG };
+        if (current.fxOverride) continue; // skip individually configured
+        const updated: ClipPluginConfig = {
+          ...current,
+          eq: { ...current.eq, enabled: newEnabled },
+          comp: { ...current.comp, enabled: newEnabled },
+          limiter: { ...current.limiter, enabled: newEnabled },
+        };
+        applyConfigToEngine(engine, clipId, updated);
+        saveToDb(clipId, trackId, updated);
+        next[clipId] = updated;
+      }
+      return next;
+    });
+  }, [getTrackFxState, saveToDb]);
+
+  /**
+   * Toggle RV (Convolver) for all non-overridden clips on a track.
+   */
+  const toggleTrackRv = useCallback((clipIds: string[], trackId: string) => {
+    const currentState = getTrackRvState(clipIds);
+    const newEnabled = currentState !== "on";
+    const engine = getAudioEngine();
+    setConfigs(prev => {
+      const next = { ...prev };
+      for (const clipId of clipIds) {
+        const current = next[clipId] ?? { ...DEFAULT_CLIP_PLUGIN_CONFIG };
+        if (current.rvOverride) continue;
+        const updated: ClipPluginConfig = {
+          ...current,
+          convolver: { ...current.convolver, enabled: newEnabled },
+        };
+        applyConfigToEngine(engine, clipId, updated);
+        saveToDb(clipId, trackId, updated);
+        next[clipId] = updated;
+      }
+      return next;
+    });
+  }, [getTrackRvState, saveToDb]);
 
   // Cleanup
   useEffect(() => {
@@ -234,6 +337,10 @@ export function useClipPluginConfigs(sceneId: string | null) {
     updateClipConfig,
     updatePluginParams,
     getAllConfigs,
+    getTrackFxState,
+    getTrackRvState,
+    toggleTrackFx,
+    toggleTrackRv,
   };
 }
 
