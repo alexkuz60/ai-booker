@@ -25,6 +25,7 @@ export default function Profile() {
   const { user } = useAuth();
   const { isAdmin } = useUserRole();
   const { lang, isRu, setLang } = useLanguage();
+  const { setPageHeader } = usePageHeader();
 
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
