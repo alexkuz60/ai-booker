@@ -495,6 +495,15 @@ export function ChapterNavigator({
           <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider font-body">
             {isRu ? "Глава" : "Chapter"}
           </span>
+          {bgAnalysis.summary.running + bgAnalysis.summary.pending > 0 && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 gap-1 animate-pulse">
+              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+              {bgAnalysis.summary.done}/{bgAnalysis.summary.total}
+              {bgAnalysis.isPoolMode && (
+                <span className="text-[9px] ml-0.5">pool</span>
+              )}
+            </Badge>
+          )}
           {staleCount > 0 && (
             <Button
               size="sm"
