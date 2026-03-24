@@ -529,7 +529,7 @@ export function StudioTimeline({
     const charTrackId = `char-${selectedCharacterId}`;
     const trackInfo = charTracks.find(t => t.id === charTrackId);
     return timelineClips
-      .filter(c => c.trackId === charTrackId && c.hasAudio && !!c.audioPath)
+      .filter(c => c.trackId === charTrackId)
       .map(c => ({
         id: c.id,
         label: c.label || c.segmentType || c.id,
@@ -543,7 +543,7 @@ export function StudioTimeline({
   // ALL scene clips across all character tracks (for Panner3D multi-character view)
   const allSceneClips = useMemo((): ClipInfo[] => {
     return timelineClips
-      .filter(c => c.trackId.startsWith("char-") && c.hasAudio && !!c.audioPath)
+      .filter(c => c.trackId.startsWith("char-"))
       .map(c => {
         const trackInfo = charTracks.find(t => t.id === c.trackId);
         return {
