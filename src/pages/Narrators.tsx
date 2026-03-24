@@ -292,11 +292,11 @@ const Narrators = () => {
         }
 
         // Build scene -> chapter mapping
-        const sceneToChapter = new Map<string, { chapterIdx: number; chapterTitle: string; sceneNumber: number }>();
+        const sceneToChapter = new Map<string, { chapterIdx: number; chapterId: string; chapterTitle: string; sceneNumber: number }>();
         for (const [idx, ch] of (chapters || []).entries()) {
           const chScenes = scenes.filter(s => s.chapter_id === ch.id);
           for (const s of chScenes) {
-            sceneToChapter.set(s.id, { chapterIdx: idx, chapterTitle: ch.title, sceneNumber: s.scene_number });
+            sceneToChapter.set(s.id, { chapterIdx: idx, chapterId: ch.id, chapterTitle: ch.title, sceneNumber: s.scene_number });
           }
         }
 
