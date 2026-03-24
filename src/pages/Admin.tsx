@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useLanguage } from '@/hooks/useLanguage';
+import { usePageHeader } from '@/hooks/usePageHeader';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -45,6 +46,7 @@ export default function Admin() {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loaded: rolesLoaded } = useUserRole();
   const { isRu } = useLanguage();
+  const { setPageHeader } = usePageHeader();
   const navigate = useNavigate();
 
   const [users, setUsers] = useState<UserWithRoles[]>([]);
@@ -52,6 +54,13 @@ export default function Admin() {
   const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedRole, setSelectedRole] = useState<AppRole>('user');
   const [adding, setAdding] = useState(false);
+
+  useEffect(() => {
+    setPageHeader({
+      title: isRu ? 'Панель администратора' : 'Admin Panel',
+    });
+    return () => setPageHeader({});
+  }, [isRu, setPageHeader]);
 
   useEffect(() => {
     if (!authLoading && rolesLoaded) {
