@@ -186,6 +186,52 @@ const Studio = () => {
     })();
   }, [chapter?.chapterId, chapter?.chapterTitle, bookId, chapter, setChapter]);
 
+  // Cross-page navigation: if chapter has no scenes (e.g. from Narrators link),
+  // hydrate full scene list from OPFS structure data.
+  useEffect(() => {
+    if (!storage || !chapter?.chapterId || chapter.scenes.length > 0) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const local = await readStructureFromLocal(storage);
+        if (cancelled || !local?.structure) return;
+
+        // Find chapter index by chapterId
+        let chapterIndex: number | null = null;
+        for (const [idx, id] of local.chapterIdMap.entries()) {
+          if (id === chapter.chapterId) { chapterIndex = idx; break; }
+        }
+        if (chapterIndex === null) return;
+
+        const result = local.chapterResults.get(chapterIndex);
+        const tocEntry = local.structure.toc[chapterIndex];
+        if (!result?.scenes?.length || !tocEntry) return;
+
+        const hydrated = {
+          chapterId: chapter.chapterId,
+          chapterTitle: tocEntry.title,
+          bookTitle: local.structure.title || chapter.bookTitle,
+          bookId: local.structure.bookId || chapter.bookId,
+          scenes: result.scenes.map(s => ({
+            id: (s as any).id,
+            scene_number: s.scene_number,
+            title: s.title,
+            scene_type: s.scene_type || "mixed",
+            mood: s.mood || "",
+            bpm: s.bpm || 120,
+          })),
+        };
+
+        if (!cancelled) setChapter(hydrated);
+      } catch (err) {
+        console.error("[Studio] Failed to hydrate chapter from OPFS:", err);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [storage, chapter?.chapterId, chapter?.scenes?.length, setChapter]);
+
   // Hydrate chapter scene content from OPFS using robust scene lookup.
   // This avoids relying on sessionStorage snapshots or a single chapter file path.
   useEffect(() => {
