@@ -29,9 +29,10 @@ export function Panner3DExpandedDialog({
   const draggingRef = useRef(false);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; color?: string } | null>(null);
 
-  // Draw
+  // Draw — use rAF to ensure canvas is mounted after dialog open
   useEffect(() => {
     if (!open) return;
+    const frameId = requestAnimationFrame(() => {
     const c = canvasRef.current;
     if (!c) return;
     const dpr = window.devicePixelRatio || 1;
@@ -162,22 +163,22 @@ export function Panner3DExpandedDialog({
         ctx.globalAlpha = 1;
       }
 
-      // Label for all clips in expanded view
-      if (isEnabled || isSelected) {
-        ctx.font = isSelected ? "bold 11px sans-serif" : "10px sans-serif";
-        ctx.fillStyle = isSelected ? "hsl(160, 70%, 75%)" : "hsla(220, 10%, 60%, 0.8)";
-        ctx.textAlign = "center";
-        ctx.fillText(clip.label, sx, sz - dotR - 5);
-      }
+      // Label for ALL clips in expanded view (always show)
+      ctx.font = isSelected ? "bold 11px sans-serif" : "10px sans-serif";
+      ctx.fillStyle = isSelected ? "hsl(160, 70%, 75%)" : "hsla(220, 10%, 60%, 0.8)";
+      ctx.textAlign = "center";
+      ctx.fillText(clip.label, sx, sz - dotR - 5);
 
       // Height indicator
-      if (isSelected && Math.abs(p3d.positionY) > 0.1) {
+      if (Math.abs(p3d.positionY) > 0.1) {
         ctx.font = "9px monospace";
-        ctx.fillStyle = "hsl(45, 80%, 60%)";
+        ctx.fillStyle = isSelected ? "hsl(45, 80%, 60%)" : "hsla(45, 60%, 50%, 0.5)";
         ctx.textAlign = "center";
         ctx.fillText(`Y:${p3d.positionY.toFixed(1)}`, sx, sz + dotR + 12);
       }
     }
+    }); // end rAF
+    return () => cancelAnimationFrame(frameId);
   }, [open, allClips, selectedClipId, config, isRu]);
 
   const worldFromCanvas = useCallback((clientX: number, clientY: number) => {
@@ -240,7 +241,7 @@ export function Panner3DExpandedDialog({
       <DialogContent className="max-w-[580px] p-4 gap-3 bg-background border-border">
         <DialogHeader className="pb-0">
           <DialogTitle className="text-sm font-mono">
-            {isRu ? "3D Панорама — расширенный вид" : "3D Panner — Expanded View"}
+            {isRu ? "3D Панорама" : "3D Panorama"}
           </DialogTitle>
         </DialogHeader>
 
