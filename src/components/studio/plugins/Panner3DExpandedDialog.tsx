@@ -237,7 +237,7 @@ export function Panner3DExpandedDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[540px] p-4 gap-3 bg-background border-border">
+      <DialogContent className="max-w-[580px] p-4 gap-3 bg-background border-border">
         <DialogHeader className="pb-0">
           <DialogTitle className="text-sm font-mono">
             {isRu ? "3D Панорама — расширенный вид" : "3D Panner — Expanded View"}
