@@ -212,6 +212,7 @@ export function useBookRestore({
         storage: targetStorage,
         isRu,
         report,
+        downloadImpulses: options?.downloadImpulses ?? false,
       });
 
       // Apply results to React state
