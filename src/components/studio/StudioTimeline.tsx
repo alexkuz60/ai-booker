@@ -769,7 +769,17 @@ export function StudioTimeline({
       {/* Content: Mixer sidebar + Tracks + optional Plugins right sidebar */}
       {!collapsed && (
         <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
-          <div className="shrink-0 border-r border-border flex flex-col overflow-y-auto scrollbar-none" style={{ width: `${sidebarWidth}px` }}>
+          <div
+            ref={mixerScrollRef}
+            className="shrink-0 border-r border-border flex flex-col overflow-y-auto scrollbar-none"
+            style={{ width: `${sidebarWidth}px` }}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              if (sceneScrollRef.current && sceneScrollRef.current.scrollTop !== el.scrollTop) {
+                sceneScrollRef.current.scrollTop = el.scrollTop;
+              }
+            }}
+          >
             <div className="h-6 border-b border-border flex items-center px-2">
               {mixerExpanded ? (
                 <>
