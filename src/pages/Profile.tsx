@@ -11,7 +11,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useCloudSettings } from '@/hooks/useCloudSettings';
 import { useUserRole } from '@/hooks/useUserRole';
-import { usePageHeader } from '@/hooks/usePageHeader';
 
 import { ProfileTab } from '@/components/profile/tabs/ProfileTab';
 import { PreferencesTab } from '@/components/profile/tabs/PreferencesTab';
@@ -25,7 +24,6 @@ export default function Profile() {
   const { user } = useAuth();
   const { isAdmin } = useUserRole();
   const { lang, isRu, setLang } = useLanguage();
-  const { setPageHeader } = usePageHeader();
 
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
@@ -100,14 +98,6 @@ export default function Profile() {
   }, []);
 
   const handleLangChange = (v: string) => setLang(v as "ru" | "en");
-
-  useEffect(() => {
-    setPageHeader({
-      title: isRu ? 'Профиль' : 'Profile',
-      subtitle: isRu ? 'Настройки пользователя и API' : 'User settings & API',
-    });
-    return () => setPageHeader({});
-  }, [isRu, setPageHeader]);
 
   if (loadingProfile) {
     return (
