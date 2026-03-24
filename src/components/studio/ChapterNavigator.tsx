@@ -659,8 +659,9 @@ export function ChapterNavigator({
                    const isStale = staleAudioSceneIds?.has(scene.id || "");
                    const isActual = !!actualSec;
                    const sceneRender = scene.id ? renderStatus.get(scene.id) : undefined;
-                   const isMultiSelected = selectedSceneIndices?.has(idx);
-                   const isDirty = dirtySceneIds.has(scene.id || "");
+                    const isMultiSelected = selectedSceneIndices?.has(idx);
+                    const isDirty = dirtySceneIds.has(scene.id || "");
+                    const isBgAnalyzing = scene.id ? bgAnalysis.isAnalyzing(scene.id) : false;
 
                   const durationColor = isStale
                     ? "text-yellow-500"
