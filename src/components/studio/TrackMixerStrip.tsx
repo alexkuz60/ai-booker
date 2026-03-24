@@ -33,6 +33,7 @@ export function TrackMixerStrip({
   isSelected,
   onClick,
   onMixChange,
+  trackHeight,
 }: TrackMixerStripProps) {
   const engine = getAudioEngine();
 
