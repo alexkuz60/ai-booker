@@ -262,7 +262,6 @@ const Narrators = () => {
       if (isLocalProject) {
         // ── K4: Local-Only — read from OPFS ──
         const localChars = await readCharacterIndex(projectStorage);
-        console.log("[Narrators] OPFS chars:", localChars.length, "with appearances:", localChars.filter(c => c.appearances?.length).length, localChars.map(c => ({ name: c.name, app: c.appearances?.length ?? 0 })));
         const chars: BookCharacter[] = localChars.map(c => ({
           id: c.id,
           name: c.name,
@@ -278,26 +277,31 @@ const Narrators = () => {
         }));
         setCharacters(chars);
 
-        // Build chapterIdx→chapterId map from scene_index
-        const sceneIdx = await readSceneIndex(projectStorage);
-        const chapterIdByIdx = new Map<number, string>();
-        if (sceneIdx) {
-          for (const entry of Object.values(sceneIdx.entries)) {
-            chapterIdByIdx.set(entry.chapterIndex, entry.chapterId);
+        // Try local appearances first
+        const hasLocalAppearances = localChars.some(c => c.appearances?.length > 0);
+        if (hasLocalAppearances) {
+          // Build chapterIdx→chapterId map from scene_index
+          const sceneIdx = await readSceneIndex(projectStorage);
+          const chapterIdByIdx = new Map<number, string>();
+          if (sceneIdx) {
+            for (const entry of Object.values(sceneIdx.entries)) {
+              chapterIdByIdx.set(entry.chapterIndex, entry.chapterId);
+            }
           }
-        }
-
-        // Use local appearances from CharacterIndex, enrich with chapterId
-        const appMap = new Map<string, { chapterIdx: number; chapterId?: string; chapterTitle: string; sceneNumbers: number[] }[]>();
-        for (const c of localChars) {
-          if (c.appearances?.length) {
-            appMap.set(c.id, c.appearances.map(a => ({
-              ...a,
-              chapterId: chapterIdByIdx.get(a.chapterIdx),
-            })));
+          const appMap = new Map<string, { chapterIdx: number; chapterId?: string; chapterTitle: string; sceneNumbers: number[] }[]>();
+          for (const c of localChars) {
+            if (c.appearances?.length) {
+              appMap.set(c.id, c.appearances.map(a => ({
+                ...a,
+                chapterId: chapterIdByIdx.get(a.chapterIdx),
+              })));
+            }
           }
+          setAppearances(appMap);
+        } else {
+          // Fallback: load appearances from DB (read-only supplement for display)
+          await loadAppearancesFromDB(chars.map(c => c.id), selectedBookId);
         }
-        setAppearances(appMap);
       } else {
         // Fallback: load from DB for books without open OPFS project
         const { data } = await supabase
