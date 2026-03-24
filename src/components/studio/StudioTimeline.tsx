@@ -768,7 +768,7 @@ export function StudioTimeline({
       {/* Content: Mixer sidebar + Tracks + optional Plugins right sidebar */}
       {!collapsed && (
         <div ref={tracksContainerRef} className="flex-1 flex min-h-0 overflow-hidden">
-          <div className="shrink-0 border-r border-border flex flex-col" style={{ width: `${sidebarWidth}px` }}>
+          <div className="shrink-0 border-r border-border flex flex-col overflow-y-auto scrollbar-none" style={{ width: `${sidebarWidth}px` }}>
             <div className="h-6 border-b border-border flex items-center px-2">
               {mixerExpanded ? (
                 <>
