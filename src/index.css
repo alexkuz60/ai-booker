@@ -207,12 +207,3 @@
   color: hsl(var(--foreground));
   border-color: hsl(160 50% 30%);
 }
-
-/* Hide scrollbar but keep scroll functionality */
-.scrollbar-none {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
-}
