@@ -1,4 +1,6 @@
 import { motion } from "framer-motion";
+// @ts-ignore – used for cross-page chapter hydration
+import { readStructureFromLocal } from "@/lib/localSync";
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Clock, Loader2 } from "lucide-react";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
