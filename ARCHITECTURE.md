@@ -604,7 +604,7 @@ assert(storedBookId === targetBookId, "bookId mismatch — aborting write");
 | `epigraph` | Эпиграф | Epigraph | Эпиграф главы/сцены |
 | `footnote` | Сноска | Footnote | Комментарий / примечание |
 | `telephone` | Телефон | Telephone | Телефонный разговор |
-| `remark` | Реплика | Remark | ⚠️ **НЕ РЕАЛИЗОВАНО** — одиночная реплика вне диалога |
+| `remark` | Реплика | Remark | Короткая реплика / вставка вне диалога |
 
 **Ключевые файлы:**
 | Файл | Назначение |
