@@ -17,6 +17,7 @@ interface TrackMixerStripProps {
   isSelected?: boolean;
   onClick?: () => void;
   onMixChange?: () => void;
+  trackHeight?: number;
 }
 
 /** Threshold in dB above which we consider signal "active" */
