@@ -301,23 +301,24 @@ const Narrators = () => {
         }
 
         // Build per-character appearances
-        const appMap = new Map<string, { chapterIdx: number; chapterTitle: string; sceneNumbers: number[] }[]>();
-        const perChar = new Map<string, Map<number, { title: string; scenes: Set<number> }>>();
+        const appMap = new Map<string, { chapterIdx: number; chapterId: string; chapterTitle: string; sceneNumbers: number[] }[]>();
+        const perChar = new Map<string, Map<number, { chapterId: string; title: string; scenes: Set<number> }>>();
 
         for (const row of (appData || [])) {
           const info = sceneToChapter.get(row.scene_id);
           if (!info) continue;
           if (!perChar.has(row.character_id)) perChar.set(row.character_id, new Map());
           const chMap = perChar.get(row.character_id)!;
-          if (!chMap.has(info.chapterIdx)) chMap.set(info.chapterIdx, { title: info.chapterTitle, scenes: new Set() });
+          if (!chMap.has(info.chapterIdx)) chMap.set(info.chapterIdx, { chapterId: info.chapterId, title: info.chapterTitle, scenes: new Set() });
           chMap.get(info.chapterIdx)!.scenes.add(info.sceneNumber);
         }
 
         for (const [charId, chMap] of perChar) {
           const apps = Array.from(chMap.entries())
             .sort(([a], [b]) => a - b)
-            .map(([chapterIdx, { title, scenes }]) => ({
+            .map(([chapterIdx, { chapterId, title, scenes }]) => ({
               chapterIdx,
+              chapterId,
               chapterTitle: title,
               sceneNumbers: Array.from(scenes).sort((a, b) => a - b),
             }));
