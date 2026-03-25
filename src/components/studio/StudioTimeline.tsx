@@ -464,7 +464,7 @@ export function StudioTimeline({
       : [];
 
     // Always show both atmosphere and SFX tracks
-    return [...narratorTrack, ...charTracks, ...FIXED_TRACKS];
+    return [...narratorTrack, ...charTracks, ...getFixedTracks(isRu)];
   }, [charTracks, timelineClips, isRu]);
 
   // ── Mixer sidebar expanded state ───────────────────────────
