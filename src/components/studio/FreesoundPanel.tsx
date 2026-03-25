@@ -217,12 +217,26 @@ export function FreesoundPanel({ isRu }: FreesoundPanelProps) {
             {results.map((sound) => (
               <div
                 key={sound.id}
-                className={`flex items-center gap-2 p-2 rounded-md border transition-colors ${
+                draggable
+                onDragStart={(e) => {
+                  const dragId = `freesound-${sound.id}`;
+                  setDragAudio(dragId, {
+                    fetchUrl: sound.preview_url,
+                    prompt: sound.name,
+                    category: "sfx",
+                  });
+                  e.dataTransfer.setData(DRAG_AUDIO_MIME, dragId);
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
+                onDragEnd={() => clearDragAudio(`freesound-${sound.id}`)}
+                className={cn(
+                  "flex items-center gap-2 p-2 rounded-md border transition-colors cursor-grab active:cursor-grabbing",
                   playingId === sound.id
                     ? "border-primary/40 bg-primary/5"
                     : "border-border/50 bg-card/30 hover:bg-card/60"
-                }`}
+                )}
               >
+                <GripVertical className="h-3 w-3 text-muted-foreground/50 shrink-0" />
                 <Button
                   variant="ghost"
                   size="icon"
