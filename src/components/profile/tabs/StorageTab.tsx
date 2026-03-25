@@ -91,6 +91,7 @@ const isImageFile = (mime: string | null) => mime?.startsWith('image/') ?? false
 interface StorageTabProps {
   isRu: boolean;
   userId: string;
+  onStatsReady?: (fileCount: number, totalBytes: number) => void;
 }
 
 /* ─── Component ───────────────────────────────────────────────────────────── */
