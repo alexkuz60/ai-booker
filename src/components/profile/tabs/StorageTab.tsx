@@ -91,11 +91,12 @@ const isImageFile = (mime: string | null) => mime?.startsWith('image/') ?? false
 interface StorageTabProps {
   isRu: boolean;
   userId: string;
+  onStatsReady?: (fileCount: number, totalBytes: number) => void;
 }
 
 /* ─── Component ───────────────────────────────────────────────────────────── */
 
-export function StorageTab({ isRu, userId }: StorageTabProps) {
+export function StorageTab({ isRu, userId, onStatsReady }: StorageTabProps) {
   const [files, setFiles] = useState<StorageFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -293,6 +294,11 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
 
   /* Derived data */
   const totalSize = useMemo(() => files.reduce((s, f) => s + f.size, 0), [files]);
+
+  // Notify parent about stats
+  useEffect(() => {
+    if (!loading) onStatsReady?.(files.length, totalSize);
+  }, [loading, files.length, totalSize, onStatsReady]);
   const displayed = useMemo(() => {
     if (!searchQuery.trim()) return files;
     return files.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -330,19 +336,6 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
           onChange={handleFileSelected}
           accept="audio/*,image/*,.mp3,.wav,.ogg,.flac,.aac,.m4a"
         />
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {loading ? (
-            Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20" />)
-          ) : (
-            <>
-              <StatCard label={isRu ? 'Файлов' : 'Files'} value={files.length} icon={FolderOpen} accent />
-              <StatCard label={isRu ? 'Категорий' : 'Categories'} value={CATEGORIES.length} icon={HardDrive} />
-              <StatCard label={isRu ? 'Размер' : 'Size'} value={formatBytes(totalSize)} icon={HardDrive} />
-            </>
-          )}
-        </div>
 
         {/* Search + refresh */}
         <div className="flex items-center gap-3">
@@ -790,23 +783,5 @@ function OrphanedFilesSection({ isRu, userId, onPreview }: { isRu: boolean; user
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-/* ─── StatCard ────────────────────────────────────────────────────────────── */
-
-function StatCard({ label, value, icon: Icon, accent }: { label: string; value: string | number; icon: React.ElementType; accent?: boolean }) {
-  return (
-    <Card className={cn('border', accent ? 'border-primary/40 bg-primary/5' : 'border-border bg-card')}>
-      <CardContent className="flex items-start gap-3 p-4">
-        <div className={cn('rounded-lg p-2 mt-0.5 shrink-0', accent ? 'bg-primary/15' : 'bg-muted')}>
-          <Icon className={cn('h-5 w-5', accent ? 'text-primary' : 'text-muted-foreground')} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold leading-tight">{label}</p>
-          <p className="text-2xl font-extrabold mt-0.5">{value}</p>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
