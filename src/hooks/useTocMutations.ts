@@ -220,23 +220,54 @@ export function useTocMutations({
       return;
     }
 
-    // Parent with children: distribute scenes back to their original chapters
+    // Parent with children: distribute scenes back using scene IDs to match ownership
     const indices = [selectedIdx, ...childIndices];
     setChapterResults(prev => {
       const next = new Map(prev);
-      let offset = 0;
+
+      // Build a set of scene IDs belonging to each child chapter
+      const chapterSceneIds = new Map<number, Set<string>>();
       for (const idx of indices) {
         const existing = prev.get(idx);
         if (!existing) continue;
-        const count = existing.scenes.length;
-        const slice = updatedScenes.slice(offset, offset + count);
-        const restored = slice.map((sc, i) => ({
-          ...sc,
-          scene_number: existing.scenes[i]?.scene_number ?? i + 1,
-        }));
-        next.set(idx, { ...existing, scenes: restored });
-        offset += count;
+        const ids = new Set<string>();
+        for (const sc of existing.scenes) {
+          if (sc.id) ids.add(sc.id);
+        }
+        chapterSceneIds.set(idx, ids);
       }
+
+      // Distribute updated scenes by matching IDs to their original chapter
+      const distributed = new Map<number, Scene[]>();
+      for (const idx of indices) distributed.set(idx, []);
+
+      for (const sc of updatedScenes) {
+        let assigned = false;
+        if (sc.id) {
+          for (const idx of indices) {
+            if (chapterSceneIds.get(idx)?.has(sc.id)) {
+              distributed.get(idx)!.push(sc);
+              assigned = true;
+              break;
+            }
+          }
+        }
+        // New scenes (from split) or scenes without id — assign to last chapter with scenes
+        if (!assigned) {
+          // Find which chapter the previous scene belongs to, or append to first chapter
+          const lastIdx = indices[indices.length - 1];
+          distributed.get(lastIdx)!.push(sc);
+        }
+      }
+
+      for (const idx of indices) {
+        const existing = prev.get(idx);
+        if (!existing) continue;
+        const scenes = distributed.get(idx) || [];
+        const renumbered = scenes.map((sc, i) => ({ ...sc, scene_number: i + 1 }));
+        next.set(idx, { ...existing, scenes: renumbered });
+      }
+
       return next;
     });
     scheduleSave();
