@@ -1,5 +1,5 @@
 /**
- * Helpers for syncing book structure to local ProjectStorage.
+ * Helpers for syncing book structure to local ProjectStorage (V2 layout).
  * Writes JSON snapshots of the book's structure so it can be restored offline.
  */
 
@@ -10,7 +10,7 @@ import {
   isFolderNode,
   sanitizeChapterResultsForStructure,
 } from "@/lib/tocStructure";
-import { paths, getActiveLayout } from "@/lib/projectPaths";
+import { paths } from "@/lib/projectPaths";
 import { buildSceneIndex, writeSceneIndex, readSceneIndex } from "@/lib/sceneIndex";
 
 export interface LocalBookStructure {
@@ -92,60 +92,29 @@ export async function syncStructureToLocal(
     const sanitizedResults = sanitizeChapterResultsForStructure(data.toc, data.chapterResults);
     const leafChapterIds = new Set(getLeafChapterIds(data.toc, data.chapterIdMap));
 
-    const isV2 = getActiveLayout() === "v2";
+    // Clean up stale chapter directories
+    const existingChapters = await storage.listDir("chapters").catch(() => []);
+    const staleDeletes = existingChapters
+      .filter((dirName) => !leafChapterIds.has(dirName))
+      .map((dirName) => storage.delete(`chapters/${dirName}`).catch(() => undefined));
 
-    if (isV2) {
-      // V2: clean up stale chapter directories
-      const existingChapters = await storage.listDir("chapters").catch(() => []);
-      const staleDeletes = existingChapters
-        .filter((dirName) => !leafChapterIds.has(dirName))
-        .map((dirName) => storage.delete(`chapters/${dirName}`).catch(() => undefined));
+    const sceneWrites: Promise<void>[] = [];
+    sanitizedResults.forEach((result, idx) => {
+      if (isFolderNode(data.toc, idx)) return;
+      const chapterId = data.chapterIdMap.get(idx);
+      if (!chapterId) return;
+      const chapterData: LocalChapterData = {
+        chapterId,
+        chapterIndex: idx,
+        scenes: result.scenes,
+        status: result.status,
+      };
+      sceneWrites.push(storage.writeJSON(paths.chapterContent(chapterId), chapterData));
+    });
 
-      const sceneWrites: Promise<void>[] = [];
-      sanitizedResults.forEach((result, idx) => {
-        if (isFolderNode(data.toc, idx)) return;
-        const chapterId = data.chapterIdMap.get(idx);
-        if (!chapterId) return;
-        const chapterData: LocalChapterData = {
-          chapterId,
-          chapterIndex: idx,
-          scenes: result.scenes,
-          status: result.status,
-        };
-        sceneWrites.push(storage.writeJSON(paths.chapterContent(chapterId), chapterData));
-      });
+    await Promise.all([...staleDeletes, ...sceneWrites]);
 
-      await Promise.all([...staleDeletes, ...sceneWrites]);
-    } else {
-      // V1: flat cleanup
-      const contentDir = paths.chapterContentDir();
-      const existingSceneFiles = await storage.listDir(contentDir).catch(() => []);
-      const staleSceneDeletes = existingSceneFiles
-        .filter((f) => {
-          const cid = paths.chapterIdFromFileName(f);
-          if (!cid) return false;
-          return !leafChapterIds.has(cid);
-        })
-        .map((f) => storage.delete(`${contentDir}/${f}`).catch(() => undefined));
-
-      const sceneWrites: Promise<void>[] = [];
-      sanitizedResults.forEach((result, idx) => {
-        if (isFolderNode(data.toc, idx)) return;
-        const chapterId = data.chapterIdMap.get(idx);
-        if (!chapterId) return;
-        const chapterData: LocalChapterData = {
-          chapterId,
-          chapterIndex: idx,
-          scenes: result.scenes,
-          status: result.status,
-        };
-        sceneWrites.push(storage.writeJSON(paths.chapterContent(chapterId), chapterData));
-      });
-
-      await Promise.all([...staleSceneDeletes, ...sceneWrites]);
-    }
-
-    // 4. Build and write scene index (V2 — but also write for V1 to prepare migration)
+    // 4. Build and write scene index
     const existingIndex = await readSceneIndex(storage);
     const sceneIndex = buildSceneIndex(data.chapterIdMap, sanitizedResults, existingIndex);
     await writeSceneIndex(storage, sceneIndex);
@@ -179,46 +148,23 @@ export async function readStructureFromLocal(
       });
     }
 
-    // Per-chapter results
+    // Per-chapter results: iterate chapter directories
     const chapterResults = new Map<number, { scenes: Scene[]; status: ChapterStatus }>();
-    const isV2 = getActiveLayout() === "v2";
-
-    if (isV2) {
-      // V2: iterate chapter directories
-      const chapterDirs = await storage.listDir("chapters").catch(() => []);
-      const reads = chapterDirs.map(async (chapterId) => {
-        const data = await storage.readJSON<LocalChapterData>(
-          `chapters/${chapterId}/content.json`,
-        );
-        if (!data) return;
-        if (Number.isNaN(data.chapterIndex) || isFolderNode(structure.toc, data.chapterIndex)) {
-          return;
-        }
-        chapterResults.set(data.chapterIndex, {
-          scenes: data.scenes,
-          status: data.status,
-        });
+    const chapterDirs = await storage.listDir("chapters").catch(() => []);
+    const reads = chapterDirs.map(async (chapterId) => {
+      const data = await storage.readJSON<LocalChapterData>(
+        `chapters/${chapterId}/content.json`,
+      );
+      if (!data) return;
+      if (Number.isNaN(data.chapterIndex) || isFolderNode(structure.toc, data.chapterIndex)) {
+        return;
+      }
+      chapterResults.set(data.chapterIndex, {
+        scenes: data.scenes,
+        status: data.status,
       });
-      await Promise.all(reads);
-    } else {
-      // V1: flat scan
-      const contentDir = paths.chapterContentDir();
-      const sceneFiles = await storage.listDir(contentDir);
-      const reads = sceneFiles
-        .filter((f) => paths.isChapterContentFile(f))
-        .map(async (f) => {
-          const data = await storage.readJSON<LocalChapterData>(`${contentDir}/${f}`);
-          if (!data) return;
-          if (Number.isNaN(data.chapterIndex) || isFolderNode(structure.toc, data.chapterIndex)) {
-            return;
-          }
-          chapterResults.set(data.chapterIndex, {
-            scenes: data.scenes,
-            status: data.status,
-          });
-        });
-      await Promise.all(reads);
-    }
+    });
+    await Promise.all(reads);
 
     const sanitizedResults = sanitizeChapterResultsForStructure(structure.toc, chapterResults);
     return { structure, chapterIdMap, chapterResults: sanitizedResults };

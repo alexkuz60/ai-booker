@@ -16,14 +16,14 @@ import {
   upsertSpeakersFromSegments,
   listSceneCharacterMaps,
 } from "@/lib/localCharacters";
-import { setActiveLayout } from "@/lib/projectPaths";
+import { setCachedSceneIndex, type SceneIndexData } from "@/lib/sceneIndex";
 
-// Force V1 layout for tests (mock storage uses flat paths)
+// Set up a mock scene index for V2 tests
 beforeEach(() => {
-  setActiveLayout("v1");
+  setCachedSceneIndex(null);
 });
 
-// ─── In-memory ProjectStorage mock ──────────────────────────
+// ─── In-memory ProjectStorage mock (V2 layout) ─────────────
 
 function createMockStorage(): ProjectStorage & { _data: Record<string, unknown> } {
   const data: Record<string, unknown> = {};
@@ -72,6 +72,21 @@ const makeChar = (overrides: Partial<CharacterIndex> & { id: string; name: strin
 const charAnna = makeChar({ id: "c1", name: "Анна", gender: "female", aliases: ["Аня", "Аннушка"] });
 const charIvan = makeChar({ id: "c2", name: "Иван", gender: "male" });
 
+// Helper to set up a scene index with character mappings for tests
+function setupSceneIndex(sceneIds: string[], characterMapped: string[] = []) {
+  const entries: Record<string, any> = {};
+  for (const sid of sceneIds) {
+    entries[sid] = { chapterId: "ch-1", chapterIndex: 0, sceneNumber: 1, contentHash: 0 };
+  }
+  setCachedSceneIndex({
+    version: 2,
+    updatedAt: new Date().toISOString(),
+    entries,
+    storyboarded: [],
+    characterMapped,
+  });
+}
+
 // ─── Tests ──────────────────────────────────────────────────
 
 describe("localCharacters — CRUD", () => {
@@ -79,20 +94,20 @@ describe("localCharacters — CRUD", () => {
     const storage = createMockStorage();
     await saveCharacterIndex(storage, [charAnna, charIvan]);
 
-    expect(storage._data["characters/index.json"]).toHaveLength(2);
+    expect(storage._data["characters.json"]).toHaveLength(2);
     expect(storage._data["structure/characters.json"]).toHaveLength(2);
   });
 
-  it("readCharacterIndex reads from characters/index.json", async () => {
+  it("readCharacterIndex reads from characters.json", async () => {
     const storage = createMockStorage();
-    storage._data["characters/index.json"] = [charAnna];
+    storage._data["characters.json"] = [charAnna];
 
     const result = await readCharacterIndex(storage);
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe("Анна");
   });
 
-  it("readCharacterIndex migrates legacy format when index.json is absent", async () => {
+  it("readCharacterIndex migrates legacy format when characters.json is absent", async () => {
     const storage = createMockStorage();
     const legacy: LocalCharacter[] = [{
       id: "legacy-1",
@@ -111,7 +126,7 @@ describe("localCharacters — CRUD", () => {
     expect(result[0].age_group).toBe("adult");
     expect(result[0].temperament).toBe("cold");
     // Verify it also persisted the migrated index
-    expect(storage._data["characters/index.json"]).toHaveLength(1);
+    expect(storage._data["characters.json"]).toHaveLength(1);
   });
 
   it("readCharacterIndex returns [] when both sources are empty", async () => {
@@ -124,6 +139,7 @@ describe("localCharacters — CRUD", () => {
 describe("localCharacters — scene character maps", () => {
   it("saveSceneCharacterMap / readSceneCharacterMap roundtrip", async () => {
     const storage = createMockStorage();
+    setupSceneIndex(["s1"]);
     const map: SceneCharacterMap = {
       sceneId: "s1",
       updatedAt: new Date().toISOString(),
@@ -143,7 +159,8 @@ describe("localCharacters — scene character maps", () => {
 
   it("getSceneCharacterIds returns character IDs from a scene map", async () => {
     const storage = createMockStorage();
-    storage._data["characters/scene_s1.json"] = {
+    setupSceneIndex(["s1"]);
+    storage._data["chapters/ch-1/scenes/s1/characters.json"] = {
       sceneId: "s1",
       updatedAt: "",
       speakers: [
@@ -167,12 +184,13 @@ describe("localCharacters — scene character maps", () => {
 
   it("getChapterCharacterIds aggregates across scenes", async () => {
     const storage = createMockStorage();
-    storage._data["characters/scene_s1.json"] = {
+    setupSceneIndex(["s1", "s2"]);
+    storage._data["chapters/ch-1/scenes/s1/characters.json"] = {
       sceneId: "s1", updatedAt: "",
       speakers: [{ characterId: "c1", role_in_scene: "speaker", segment_ids: ["seg1"] }],
       typeMappings: [],
     } satisfies SceneCharacterMap;
-    storage._data["characters/scene_s2.json"] = {
+    storage._data["chapters/ch-1/scenes/s2/characters.json"] = {
       sceneId: "s2", updatedAt: "",
       speakers: [{ characterId: "c2", role_in_scene: "speaker", segment_ids: ["seg3"] }],
       typeMappings: [],
@@ -188,7 +206,8 @@ describe("localCharacters — scene character maps", () => {
 describe("localCharacters — countSegmentAppearances", () => {
   it("counts segment appearances across all scene maps", async () => {
     const storage = createMockStorage();
-    storage._data["characters/scene_s1.json"] = {
+    setupSceneIndex(["s1", "s2"], ["s1", "s2"]);
+    storage._data["chapters/ch-1/scenes/s1/characters.json"] = {
       sceneId: "s1", updatedAt: "",
       speakers: [
         { characterId: "c1", role_in_scene: "speaker", segment_ids: ["seg1", "seg2"] },
@@ -196,7 +215,7 @@ describe("localCharacters — countSegmentAppearances", () => {
       ],
       typeMappings: [],
     } satisfies SceneCharacterMap;
-    storage._data["characters/scene_s2.json"] = {
+    storage._data["chapters/ch-1/scenes/s2/characters.json"] = {
       sceneId: "s2", updatedAt: "",
       speakers: [
         { characterId: "c1", role_in_scene: "speaker", segment_ids: ["seg4"] },
@@ -274,6 +293,7 @@ describe("localCharacters — migration", () => {
 describe("localCharacters — upsertSpeakersFromSegments", () => {
   it("creates new speakers and system characters from segments", async () => {
     const storage = createMockStorage();
+    setupSceneIndex(["scene-1"]);
     const segments = [
       { segment_id: "seg1", segment_type: "dialogue", speaker: "Лена" },
       { segment_id: "seg2", segment_type: "narrator", speaker: null },
@@ -282,20 +302,19 @@ describe("localCharacters — upsertSpeakersFromSegments", () => {
 
     const result = await upsertSpeakersFromSegments(storage, "scene-1", segments, []);
 
-    // Should have Лена, Миша, and Рассказчик (system narrator)
     expect(result.length).toBe(3);
     expect(result.find(c => c.name === "Лена")).toBeDefined();
     expect(result.find(c => c.name === "Миша")).toBeDefined();
     expect(result.find(c => c.name === "Рассказчик")).toBeDefined();
 
-    // Scene map should be written
-    const map = storage._data["characters/scene_scene-1.json"] as SceneCharacterMap;
+    const map = storage._data["chapters/ch-1/scenes/scene-1/characters.json"] as SceneCharacterMap;
     expect(map).toBeDefined();
-    expect(map.speakers.length).toBe(3); // Лена, Миша, Рассказчик
+    expect(map.speakers.length).toBe(3);
   });
 
   it("does not duplicate existing characters", async () => {
     const storage = createMockStorage();
+    setupSceneIndex(["scene-2"]);
     const existing = [makeChar({ id: "existing-1", name: "Лена" })];
     const segments = [
       { segment_id: "seg1", segment_type: "dialogue", speaker: "Лена" },
@@ -309,13 +328,13 @@ describe("localCharacters — upsertSpeakersFromSegments", () => {
 
   it("finds existing characters by alias", async () => {
     const storage = createMockStorage();
+    setupSceneIndex(["scene-3"]);
     const existing = [makeChar({ id: "c-anna", name: "Анна", aliases: ["Аня"] })];
     const segments = [
       { segment_id: "seg1", segment_type: "dialogue", speaker: "Аня" },
     ];
 
     const result = await upsertSpeakersFromSegments(storage, "scene-3", segments, existing);
-    // Should NOT create a new character — "Аня" is an alias for "Анна"
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe("Анна");
   });

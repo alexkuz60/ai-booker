@@ -1,6 +1,5 @@
 /**
  * Local-first persistence for storyboard data (segments, phrases, type mappings).
- * V1: storyboard/scene_{id}.json
  * V2: chapters/{chapterId}/scenes/{sceneId}/storyboard.json
  */
 
@@ -8,7 +7,7 @@ import type { ProjectStorage } from "@/lib/projectStorage";
 import type { Segment, Phrase, CharacterOption } from "@/components/studio/storyboard/types";
 import type { PhraseAnnotation, TtsProvider } from "@/components/studio/phraseAnnotations";
 import { touchProjectUpdatedAt } from "@/lib/projectActivity";
-import { paths, getActiveLayout } from "@/lib/projectPaths";
+import { paths } from "@/lib/projectPaths";
 import { markStoryboarded, unmarkStoryboarded, getCachedSceneIndex, readSceneIndex } from "@/lib/sceneIndex";
 
 // ─── Types ──────────────────────────────────────────────────
@@ -47,11 +46,10 @@ async function resolveStoryboardPath(
   let filePath = paths.storyboard(sceneId, chapterId);
   if (!filePath.includes("__unresolved__")) return filePath;
 
-  if (getActiveLayout() === "v2") {
-    await readSceneIndex(storage);
-    filePath = paths.storyboard(sceneId, chapterId);
-    if (!filePath.includes("__unresolved__")) return filePath;
-  }
+  // Try re-reading scene index to resolve
+  await readSceneIndex(storage);
+  filePath = paths.storyboard(sceneId, chapterId);
+  if (!filePath.includes("__unresolved__")) return filePath;
 
   return null;
 }
@@ -136,21 +134,6 @@ export async function deleteStoryboardFromLocal(
 export async function listStoryboardedScenes(
   storage: ProjectStorage,
 ): Promise<string[]> {
-  if (getActiveLayout() === "v2") {
-    const index = getCachedSceneIndex() ?? await readSceneIndex(storage);
-    return index ? [...index.storyboarded] : [];
-  }
-
-  try {
-    const dir = paths.storyboardDir();
-    const files = await storage.listDir(dir);
-    return files
-      .filter((f) => {
-        const sid = paths.sceneIdFromStoryboardFile(f);
-        return sid !== null;
-      })
-      .map((f) => paths.sceneIdFromStoryboardFile(f)!);
-  } catch {
-    return [];
-  }
+  const index = getCachedSceneIndex() ?? await readSceneIndex(storage);
+  return index ? [...index.storyboarded] : [];
 }
