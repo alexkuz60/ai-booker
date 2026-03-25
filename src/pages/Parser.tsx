@@ -259,6 +259,8 @@ export default function Parser() {
   const [restoreError, setRestoreError] = useState<string>();
   const [restoreTargetBook, setRestoreTargetBook] = useState<BookRecord | null>(null);
   const [restoreDownloadIr, setRestoreDownloadIr] = useState(true);
+  const [restoreDownloadAtmo, setRestoreDownloadAtmo] = useState(true);
+  const [restoreDownloadSfx, setRestoreDownloadSfx] = useState(true);
 
   const handleRestoreClick = useCallback((book: BookRecord) => {
     setRestoreTargetBook(book);
@@ -281,13 +283,13 @@ export default function Parser() {
     if (!restoreTargetBook) return;
     setRestorePhase("running");
     try {
-      await openSavedBook(restoreTargetBook, { skipTimestampCheck: true, downloadImpulses: restoreDownloadIr }, undefined, undefined, handleRestoreProgress);
+      await openSavedBook(restoreTargetBook, { skipTimestampCheck: true, downloadImpulses: restoreDownloadIr, downloadAtmosphere: restoreDownloadAtmo, downloadSfx: restoreDownloadSfx }, undefined, undefined, handleRestoreProgress);
       setRestorePhase("done");
     } catch (e) {
       setRestoreError(e instanceof Error ? e.message : String(e));
       setRestorePhase("error");
     }
-  }, [restoreTargetBook, openSavedBook, handleRestoreProgress, restoreDownloadIr]);
+  }, [restoreTargetBook, openSavedBook, handleRestoreProgress, restoreDownloadIr, restoreDownloadAtmo, restoreDownloadSfx]);
 
   useEffect(() => {
     if (!new URLSearchParams(location.search).has("resetLocal")) return;
@@ -781,6 +783,18 @@ export default function Parser() {
             label: isRu ? "Загрузить импульсы реверберации (IR)" : "Download reverb impulses (IR)",
             checked: restoreDownloadIr,
             onChange: setRestoreDownloadIr,
+          },
+          {
+            id: "download_atmo",
+            label: isRu ? "Загрузить звуки атмосферы" : "Download atmosphere sounds",
+            checked: restoreDownloadAtmo,
+            onChange: setRestoreDownloadAtmo,
+          },
+          {
+            id: "download_sfx",
+            label: isRu ? "Загрузить звуковые эффекты (SFX)" : "Download sound effects (SFX)",
+            checked: restoreDownloadSfx,
+            onChange: setRestoreDownloadSfx,
           },
         ]}
       />
