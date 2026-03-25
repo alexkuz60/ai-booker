@@ -14,6 +14,7 @@ import Parser from "./pages/Parser";
 import Studio from "./pages/Studio";
 import Montage from "./pages/Montage";
 import Narrators from "./pages/Narrators";
+import Soundscape from "./pages/Soundscape";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
@@ -44,6 +45,7 @@ function ProtectedRoutes() {
             <Route path="/studio" element={<Studio />} />
             <Route path="/montage" element={<Montage />} />
             <Route path="/narrators" element={<Narrators />} />
+            <Route path="/soundscape" element={<Soundscape />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<NotFound />} />
