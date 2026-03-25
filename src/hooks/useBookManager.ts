@@ -110,7 +110,7 @@ export function useBookManager({
   });
 
   // openSavedBook ref for useServerSync (breaks circular dependency)
-  const openSavedBookRef = useRef<(book: BookRecord, options?: { skipTimestampCheck?: boolean; downloadImpulses?: boolean }) => Promise<void>>();
+  const openSavedBookRef = useRef<(book: BookRecord, options?: { skipTimestampCheck?: boolean; downloadImpulses?: boolean; downloadAtmosphere?: boolean; downloadSfx?: boolean }) => Promise<void>>();
 
   const serverSync = useServerSync({
     projectStorage, storageBackend,
@@ -122,7 +122,7 @@ export function useBookManager({
   // ── Wrap openSavedBook to inject sync dependencies ─────────
   const openSavedBook = useCallback(async (
     book: BookRecord,
-    options?: { skipTimestampCheck?: boolean; downloadImpulses?: boolean },
+    options?: { skipTimestampCheck?: boolean; downloadImpulses?: boolean; downloadAtmosphere?: boolean; downloadSfx?: boolean },
     _checkServerNewer?: any,
     _setServerNewerBookId?: any,
     onProgress?: import("@/components/SyncProgressDialog").SyncProgressCallback,
