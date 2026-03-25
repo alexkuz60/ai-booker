@@ -294,6 +294,11 @@ export function StorageTab({ isRu, userId, onStatsReady }: StorageTabProps) {
 
   /* Derived data */
   const totalSize = useMemo(() => files.reduce((s, f) => s + f.size, 0), [files]);
+
+  // Notify parent about stats
+  useEffect(() => {
+    if (!loading) onStatsReady?.(files.length, totalSize);
+  }, [loading, files.length, totalSize, onStatsReady]);
   const displayed = useMemo(() => {
     if (!searchQuery.trim()) return files;
     return files.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -331,19 +336,6 @@ export function StorageTab({ isRu, userId, onStatsReady }: StorageTabProps) {
           onChange={handleFileSelected}
           accept="audio/*,image/*,.mp3,.wav,.ogg,.flac,.aac,.m4a"
         />
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {loading ? (
-            Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20" />)
-          ) : (
-            <>
-              <StatCard label={isRu ? 'Файлов' : 'Files'} value={files.length} icon={FolderOpen} accent />
-              <StatCard label={isRu ? 'Категорий' : 'Categories'} value={CATEGORIES.length} icon={HardDrive} />
-              <StatCard label={isRu ? 'Размер' : 'Size'} value={formatBytes(totalSize)} icon={HardDrive} />
-            </>
-          )}
-        </div>
 
         {/* Search + refresh */}
         <div className="flex items-center gap-3">
