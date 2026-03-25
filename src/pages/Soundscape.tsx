@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { HardDrive } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
+
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 import { usePageHeader } from '@/hooks/usePageHeader';
