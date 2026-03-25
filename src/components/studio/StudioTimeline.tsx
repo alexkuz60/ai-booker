@@ -257,8 +257,18 @@ export function StudioTimeline({
   const [charTracks, setCharTracks] = useState<TimelineTrackData[]>([]);
   const [speakerToCharId, setSpeakerToCharId] = useState<Map<string, string>>(new Map());
   const [typeMappings, setTypeMappings] = useState<TypeMappingsByScene>(new Map());
+  const [charDataReady, setCharDataReady] = useState(false);
 
   const contextSceneIds = useMemo(() => sceneId ? [sceneId] : [], [sceneId]);
+
+  // Reset char data readiness when scene changes to prevent stale clips
+  const prevSceneIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (sceneId !== prevSceneIdRef.current) {
+      prevSceneIdRef.current = sceneId ?? null;
+      setCharDataReady(false);
+    }
+  }, [sceneId]);
 
   useEffect(() => {
     if (!bookId || contextSceneIds.length === 0) {
