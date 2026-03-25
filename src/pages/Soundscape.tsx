@@ -1,12 +1,11 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Waves, HardDrive, Activity } from 'lucide-react';
+import { HardDrive } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 import { usePageHeader } from '@/hooks/usePageHeader';
 import { StorageTab } from '@/components/profile/tabs/StorageTab';
-import { AiUsageWidget } from '@/components/profile/AiUsageWidget';
 
 export default function Soundscape() {
   const { user } = useAuth();
@@ -46,18 +45,6 @@ export default function Soundscape() {
           </h2>
         </div>
         <StorageTab isRu={isRu} userId={user.id} />
-      </section>
-
-      <Separator className="my-2" />
-
-      <section>
-        <div className="flex items-center gap-2 mb-4">
-          <Activity className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-semibold font-display">
-            {isRu ? 'AI Аналитика' : 'AI Analytics'}
-          </h2>
-        </div>
-        <AiUsageWidget isRu={isRu} />
       </section>
     </motion.div>
   );
