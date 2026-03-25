@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Network, Globe, Zap, Sparkles } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { Network, Globe, Zap, Sparkles, Mic2, Brain } from 'lucide-react';
 import { OpenRouterDashboard } from '@/components/profile/OpenRouterDashboard';
 import { ProxyApiDashboard } from '@/components/profile/ProxyApiDashboard';
 import { DotPointDashboard } from '@/components/profile/DotPointDashboard';
+import { ApiKeysTab } from '@/components/profile/tabs/ApiKeysTab';
 
 interface ApiRoutersTabProps {
   apiKeys: Record<string, string>;
@@ -30,7 +32,7 @@ export function ApiRoutersTab({
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-2">
         <Network className="h-5 w-5 text-primary" />
-        <h3 className="text-lg font-semibold font-display">{isRu ? 'API Роутеры' : 'API Routers'}</h3>
+        <h3 className="text-lg font-semibold font-display">{isRu ? 'API-ключи и роутеры' : 'API Keys & Routers'}</h3>
       </div>
 
       <Tabs value={activeRouter} onValueChange={setActiveRouter}>
@@ -56,6 +58,14 @@ export function ApiRoutersTab({
             <Network className="h-4 w-4 shrink-0" />
             <span>DotPoint</span>
             {apiKeys['dotpoint'] && <Badge variant="outline" className="ml-1 text-[10px] h-4 bg-emerald-500/10 text-emerald-400 border-emerald-500/30">ON</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="llm-keys" className="flex items-center gap-2 flex-1">
+            <Brain className="h-4 w-4 shrink-0" />
+            <span>{isRu ? 'LLM Провайдеры' : 'LLM Providers'}</span>
+          </TabsTrigger>
+          <TabsTrigger value="tts-keys" className="flex items-center gap-2 flex-1">
+            <Mic2 className="h-4 w-4 shrink-0" />
+            <span>{isRu ? 'Провайдеры озвучки' : 'Voice Providers'}</span>
           </TabsTrigger>
         </TabsList>
 
@@ -96,6 +106,28 @@ export function ApiRoutersTab({
             onSave={onSave}
             saving={saving}
             language={language}
+          />
+        </TabsContent>
+
+        <TabsContent value="llm-keys" forceMount className="data-[state=inactive]:hidden">
+          <ApiKeysTab
+            apiKeys={apiKeys}
+            saving={saving}
+            isRu={isRu}
+            onKeyChange={onKeyChange}
+            onSave={onSave}
+            section="llm"
+          />
+        </TabsContent>
+
+        <TabsContent value="tts-keys" forceMount className="data-[state=inactive]:hidden">
+          <ApiKeysTab
+            apiKeys={apiKeys}
+            saving={saving}
+            isRu={isRu}
+            onKeyChange={onKeyChange}
+            onSave={onSave}
+            section="tts"
           />
         </TabsContent>
       </Tabs>

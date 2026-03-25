@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Key, Mic2, Brain, Loader2, Check, Square, Volume2 } from 'lucide-react';
 import { ApiKeyField } from '@/components/profile/ApiKeyField';
@@ -26,6 +25,8 @@ interface ApiKeysTabProps {
   isRu: boolean;
   onKeyChange: (provider: string, v: string) => void;
   onSave: () => void;
+  /** Which section to render: 'llm' | 'tts' | undefined (both) */
+  section?: 'llm' | 'tts';
 }
 
 function renderHint(p: typeof TTS_PROVIDERS[number], isRu: boolean) {
@@ -155,64 +156,80 @@ function TtsTestButton({ provider, isRu }: { provider: TtsProvider; isRu: boolea
 
 const TESTABLE_TTS: Set<string> = new Set(['elevenlabs', 'yandex_speechkit', 'salute_speech']);
 
-export function ApiKeysTab({ apiKeys, saving, isRu, onKeyChange, onSave }: ApiKeysTabProps) {
+export function ApiKeysTab({ apiKeys, saving, isRu, onKeyChange, onSave, section }: ApiKeysTabProps) {
   const p = (key: string) => getProfileText(key, isRu);
+
+  const showTts = !section || section === 'tts';
+  const showLlm = !section || section === 'llm';
+
+  const icon = section === 'tts' ? <Mic2 className="h-5 w-5 text-primary" /> : <Brain className="h-5 w-5 text-primary" />;
+  const title = section === 'tts'
+    ? (isRu ? 'Провайдеры озвучки' : 'Voice Providers')
+    : section === 'llm'
+      ? (isRu ? 'LLM Провайдеры' : 'LLM Providers')
+      : p('apiKeys');
 
   return (
     <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
       <CardHeader className="flex flex-row items-center gap-2 pb-4">
-        <Key className="h-5 w-5 text-primary" />
-        <CardTitle className="font-display">{p('apiKeys')}</CardTitle>
+        {icon}
+        <CardTitle className="font-display">{title}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground mb-4">{p('byokDescription')}</p>
+        {!section && <p className="text-sm text-muted-foreground mb-4">{p('byokDescription')}</p>}
 
-        {/* TTS Providers */}
-        <div className="flex items-center gap-2 mb-3">
-          <Mic2 className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-semibold font-display">{p('ttsProviders')}</h3>
-        </div>
-
-        {TTS_PROVIDERS.map(prov => (
-          <div key={prov.provider} className="space-y-2">
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <ApiKeyField
-                  provider={prov.provider}
-                  label={p(prov.labelKey)}
-                  value={apiKeys[prov.provider] || ''}
-                  onChange={(v) => onKeyChange(prov.provider, v)}
-                  placeholder={prov.placeholder}
-                  hint={renderHint(prov, isRu)}
-                />
+        {showTts && (
+          <>
+            {!section && (
+              <div className="flex items-center gap-2 mb-3">
+                <Mic2 className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold font-display">{p('ttsProviders')}</h3>
               </div>
-              {TESTABLE_TTS.has(prov.provider) && (
-                <div className="pb-6">
-                  <TtsTestButton provider={prov.provider as TtsProvider} isRu={isRu} />
+            )}
+            {TTS_PROVIDERS.map(prov => (
+              <div key={prov.provider} className="space-y-2">
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <ApiKeyField
+                      provider={prov.provider}
+                      label={p(prov.labelKey)}
+                      value={apiKeys[prov.provider] || ''}
+                      onChange={(v) => onKeyChange(prov.provider, v)}
+                      placeholder={prov.placeholder}
+                      hint={renderHint(prov, isRu)}
+                    />
+                  </div>
+                  {TESTABLE_TTS.has(prov.provider) && (
+                    <div className="pb-6">
+                      <TtsTestButton provider={prov.provider as TtsProvider} isRu={isRu} />
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
-        ))}
+              </div>
+            ))}
+          </>
+        )}
 
-        <Separator className="my-6" />
-
-        {/* LLM Providers */}
-        <div className="flex items-center gap-2 mb-3">
-          <Brain className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-semibold font-display">{p('llmProviders')}</h3>
-        </div>
-
-        {LLM_PROVIDERS.map(prov => (
-          <ApiKeyField
-            key={prov.provider}
-            provider={prov.provider}
-            label={p(prov.labelKey)}
-            value={apiKeys[prov.provider] || ''}
-            onChange={(v) => onKeyChange(prov.provider, v)}
-            placeholder={prov.placeholder}
-          />
-        ))}
+        {showLlm && (
+          <>
+            {!section && (
+              <div className="flex items-center gap-2 mb-3">
+                <Brain className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold font-display">{p('llmProviders')}</h3>
+              </div>
+            )}
+            {LLM_PROVIDERS.map(prov => (
+              <ApiKeyField
+                key={prov.provider}
+                provider={prov.provider}
+                label={p(prov.labelKey)}
+                value={apiKeys[prov.provider] || ''}
+                onChange={(v) => onKeyChange(prov.provider, v)}
+                placeholder={prov.placeholder}
+              />
+            ))}
+          </>
+        )}
 
         <div className="pt-4">
           <Button onClick={onSave} disabled={saving}>
