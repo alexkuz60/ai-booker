@@ -1,7 +1,6 @@
 /**
- * Local-first character persistence layer.
- * V1: characters/index.json + characters/scene_{id}.json
- * V2: characters.json (root) + chapters/{chapterId}/scenes/{sceneId}/characters.json
+ * Local-first character persistence layer (V2 layout).
+ * characters.json (root) + chapters/{chapterId}/scenes/{sceneId}/characters.json
  *
  * Handles migration from legacy structure/characters.json (LocalCharacter[]).
  */
@@ -16,7 +15,7 @@ import type {
   TocChapter,
 } from "@/pages/parser/types";
 import { touchProjectUpdatedAt } from "@/lib/projectActivity";
-import { paths, getActiveLayout } from "@/lib/projectPaths";
+import { paths } from "@/lib/projectPaths";
 import { markCharacterMapped, getCachedSceneIndex } from "@/lib/sceneIndex";
 
 // ─── Read / Write helpers ────────────────────────────────────
@@ -25,7 +24,7 @@ export async function readCharacterIndex(
   storage: ProjectStorage,
 ): Promise<CharacterIndex[]> {
   try {
-    // Try new location first
+    // Try current location
     const data = await storage.readJSON<CharacterIndex[]>(paths.characterIndex());
     if (data && data.length > 0) return data;
 
@@ -85,26 +84,16 @@ export async function saveSceneCharacterMap(
 }
 
 /**
- * List all scene character map files to compute aggregate data.
+ * List all scene character map IDs using scene index.
  */
 export async function listSceneCharacterMaps(
   storage: ProjectStorage,
 ): Promise<string[]> {
-  // V2: use scene index
   const index = getCachedSceneIndex();
-  if (index && getActiveLayout() === "v2") {
+  if (index) {
     return index.characterMapped.map(sid => `scene_${sid}.json`);
   }
-
-  // V1: scan directory
-  try {
-    const dir = paths.characterDir();
-    if (!dir) return [];
-    const files = await storage.listDir(dir);
-    return files.filter(f => f.startsWith("scene_") && f.endsWith(".json"));
-  } catch {
-    return [];
-  }
+  return [];
 }
 
 /**
@@ -146,29 +135,12 @@ export async function countSegmentAppearances(
   const counts = new Map<string, number>();
   const index = getCachedSceneIndex();
 
-  if (index && getActiveLayout() === "v2") {
-    // V2: read from nested paths
+  if (index) {
     const reads = index.characterMapped.map(async (sceneId) => {
       try {
         const map = await storage.readJSON<SceneCharacterMap>(
           paths.sceneCharacterMap(sceneId),
         );
-        if (map) {
-          for (const s of map.speakers) {
-            counts.set(s.characterId, (counts.get(s.characterId) ?? 0) + s.segment_ids.length);
-          }
-        }
-      } catch { /* skip */ }
-    });
-    await Promise.all(reads);
-  } else {
-    // V1: use flat directory
-    const files = await listSceneCharacterMaps(storage);
-    const dir = paths.characterDir();
-    if (!dir) return counts;
-    const reads = files.map(async (f) => {
-      try {
-        const map = await storage.readJSON<SceneCharacterMap>(`${dir}/${f}`);
         if (map) {
           for (const s of map.speakers) {
             counts.set(s.characterId, (counts.get(s.characterId) ?? 0) + s.segment_ids.length);
@@ -184,8 +156,6 @@ export async function countSegmentAppearances(
 
 /**
  * Rebuild appearances for characters from scene index + scene character maps.
- * Used when characters loaded from OPFS/server have empty appearances.
- * Returns updated characters with populated appearances + sceneCount.
  */
 export async function rebuildAppearancesFromLocal(
   storage: ProjectStorage,
@@ -205,7 +175,6 @@ export async function rebuildAppearancesFromLocal(
   const charAppMap = new Map<string, Map<number, Set<number>>>();
   const charSceneCount = new Map<string, number>();
 
-  // Read all character-mapped scenes
   const mappedSceneIds = index.characterMapped || [];
   const reads = mappedSceneIds.map(async (sceneId) => {
     const entry = index.entries[sceneId];
@@ -236,7 +205,6 @@ export async function rebuildAppearancesFromLocal(
   });
   await Promise.all(reads);
 
-  // Apply to characters
   return characters.map(c => {
     const chapterMap = charAppMap.get(c.id);
     if (!chapterMap) return { ...c, appearances: [], sceneCount: charSceneCount.get(c.id) || 0 };
@@ -356,12 +324,10 @@ export async function upsertSpeakersFromSegments(
   sceneId: string,
   segments: SegmentLike[],
   existingIndex: CharacterIndex[],
-  /** Pass current typeMappings to preserve them in the scene character map */
   currentTypeMappings?: Array<{ segmentType: string; characterId: string }>,
 ): Promise<CharacterIndex[]> {
   const updatedIndex = [...existingIndex];
 
-  // Collect ALL segments with an explicit speaker name.
   const speakerSegments = new Map<string, string[]>();
   for (const seg of segments) {
     if (seg.speaker?.trim()) {
@@ -372,7 +338,6 @@ export async function upsertSpeakersFromSegments(
     }
   }
 
-  // Ensure speakers exist in index
   for (const [name] of speakerSegments) {
     if (!findCharacterByNameOrAlias(updatedIndex, name)) {
       updatedIndex.push({
@@ -391,7 +356,6 @@ export async function upsertSpeakersFromSegments(
     }
   }
 
-  // Ensure system characters exist
   for (const sys of SYSTEM_DEFS) {
     const hasType = segments.some(seg => sys.types.includes(seg.segment_type));
     if (!hasType) continue;
@@ -416,7 +380,6 @@ export async function upsertSpeakersFromSegments(
     }
   }
 
-  // Build scene character map
   const nameLookup = buildNameLookup(updatedIndex);
   const speakers: SceneCharacterMap["speakers"] = [];
 
@@ -427,7 +390,6 @@ export async function upsertSpeakersFromSegments(
     }
   }
 
-  // System character scene mappings
   for (const sys of SYSTEM_DEFS) {
     const matchingSegIds = segments
       .filter(seg => sys.types.includes(seg.segment_type))
@@ -442,7 +404,6 @@ export async function upsertSpeakersFromSegments(
     }
   }
 
-  // Preserve typeMappings if provided, otherwise keep empty
   const typeMappings: SceneCharacterMap["typeMappings"] = currentTypeMappings
     ? currentTypeMappings.map(m => ({ segmentType: m.segmentType, characterId: m.characterId }))
     : [];
@@ -454,7 +415,6 @@ export async function upsertSpeakersFromSegments(
     typeMappings,
   };
 
-  // Persist both
   await Promise.all([
     saveCharacterIndex(storage, updatedIndex),
     saveSceneCharacterMap(storage, sceneMap),
