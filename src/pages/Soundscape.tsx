@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { HardDrive, FolderOpen } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -20,31 +20,41 @@ export default function Soundscape() {
   const { user } = useAuth();
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
-  const [stats, setStats] = useState<{ count: number; bytes: number } | null>(null);
+  const [fileCount, setFileCount] = useState(0);
+  const [totalBytes, setTotalBytes] = useState(0);
 
   const handleStatsReady = useCallback((count: number, bytes: number) => {
-    setStats({ count, bytes });
+    setFileCount(count);
+    setTotalBytes(bytes);
   }, []);
+
+  const headerRight = useMemo(() => {
+    if (!fileCount && !totalBytes) return undefined;
+    return (
+      <div className="flex items-center gap-3">
+        <Badge variant="secondary" className="gap-1.5 text-xs font-medium">
+          <FolderOpen className="h-3.5 w-3.5" />
+          {isRu ? 'Файлов' : 'Files'}: {fileCount}
+        </Badge>
+        <Badge variant="secondary" className="gap-1.5 text-xs font-medium">
+          <HardDrive className="h-3.5 w-3.5" />
+          {formatBytes(totalBytes)}
+        </Badge>
+      </div>
+    );
+  }, [fileCount, totalBytes, isRu]);
+
+  const headerRightRef = useRef(headerRight);
+  headerRightRef.current = headerRight;
 
   useEffect(() => {
     setPageHeader({
       title: isRu ? 'Звуковое оформление книги' : 'Book Soundscape',
       subtitle: isRu ? 'Управление аудио-коллекциями' : 'Audio collections management',
-      headerRight: stats ? (
-        <div className="flex items-center gap-3">
-          <Badge variant="secondary" className="gap-1.5 text-xs font-medium">
-            <FolderOpen className="h-3.5 w-3.5" />
-            {isRu ? 'Файлов' : 'Files'}: {stats.count}
-          </Badge>
-          <Badge variant="secondary" className="gap-1.5 text-xs font-medium">
-            <HardDrive className="h-3.5 w-3.5" />
-            {formatBytes(stats.bytes)}
-          </Badge>
-        </div>
-      ) : undefined,
+      headerRight: headerRightRef.current,
     });
     return () => setPageHeader({});
-  }, [isRu, setPageHeader, stats]);
+  }, [isRu, setPageHeader, fileCount, totalBytes]);
 
   if (!user) return null;
 
