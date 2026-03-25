@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 import { usePageHeader } from '@/hooks/usePageHeader';
 import { StorageTab } from '@/components/profile/tabs/StorageTab';
+import { AtmospherePanel } from '@/components/studio/AtmospherePanel';
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -62,9 +63,19 @@ export default function Soundscape() {
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex-1 p-4 sm:p-8 w-full space-y-6"
+      className="flex-1 p-4 sm:p-8 w-full"
     >
-      <StorageTab isRu={isRu} userId={user.id} onStatsReady={handleStatsReady} />
+      <div className="grid grid-cols-[1fr_1fr] gap-6 h-[calc(100vh-8rem)]">
+        {/* Left: File storage list */}
+        <div className="flex flex-col min-h-0 overflow-auto">
+          <StorageTab isRu={isRu} userId={user.id} onStatsReady={handleStatsReady} />
+        </div>
+
+        {/* Right: Sound generation tabs */}
+        <div className="flex flex-col min-h-0 border border-border rounded-lg overflow-hidden bg-card/30">
+          <AtmospherePanel isRu={isRu} sceneId={null} />
+        </div>
+      </div>
     </motion.div>
   );
 }
