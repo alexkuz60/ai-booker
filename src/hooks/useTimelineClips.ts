@@ -112,7 +112,7 @@ export function useTimelineClips(
           .in("id", sceneIds),
         supabase
           .from("scene_atmospheres")
-          .select("id, scene_id, layer_type, audio_path, duration_ms, volume, fade_in_ms, fade_out_ms")
+          .select("id, scene_id, layer_type, audio_path, duration_ms, volume, fade_in_ms, fade_out_ms, offset_ms")
           .in("scene_id", sceneIds)
           .order("created_at"),
       ]);
