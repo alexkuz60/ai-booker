@@ -97,7 +97,7 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeUploadCategory, setActiveUploadCategory] = useState<Category | null>(null);
 
-  /* Load files from all categories */
+  /* Load files from all categories + check OPFS cache status */
   const loadFiles = useCallback(async () => {
     setLoading(true);
     try {
@@ -118,9 +118,20 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
             size: item.metadata?.size ?? 0,
             mime_type: item.metadata?.mimetype ?? null,
             created_at: item.created_at ?? '',
+            cached: false,
           });
         }
       }
+
+      // Check OPFS cache status for cacheable categories (atmosphere, sfx)
+      const cacheChecks = allFiles.map(async (f) => {
+        const meta = CATEGORY_META[f.category as Category];
+        if (meta?.cacheCategory) {
+          f.cached = await isAudioAssetCached(meta.cacheCategory, f.id);
+        }
+      });
+      await Promise.all(cacheChecks);
+
       setFiles(allFiles);
     } finally {
       setLoading(false);
