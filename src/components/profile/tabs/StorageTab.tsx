@@ -3,7 +3,7 @@ import {
   HardDrive, FolderOpen, FileAudio, Search, Loader2, Trash2, Eye,
   Download, RefreshCw, Upload, Music, Waves, CloudRain, AudioLines,
   FileText, File, FileImage, ChevronDown, ChevronRight, FolderClosed,
-  Ghost, ScanSearch, Trash,
+  Ghost, ScanSearch, Trash, DatabaseBackup,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,11 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ImpulsesSection } from './ImpulsesSection';
+import {
+  isAudioAssetCached,
+  removeAudioAssetFromCache,
+  type AudioAssetCategory,
+} from '@/lib/audioAssetCache';
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 
@@ -33,20 +38,22 @@ type StorageFile = {
   size: number;
   mime_type: string | null;
   created_at: string;
+  /** Whether the file is cached locally in OPFS */
+  cached?: boolean;
 };
 
 type PreviewState = { file: StorageFile; url: string; textContent?: string } | null;
 
 /* ─── Categories (virtual folders inside user-media bucket) ───────────────── */
 
-const CATEGORIES = ['sounds', 'atmosphere', 'music', 'audio-ready'] as const;
+const CATEGORIES = ['sfx', 'atmosphere', 'music', 'audio-ready'] as const;
 type Category = (typeof CATEGORIES)[number];
 
-const CATEGORY_META: Record<Category, { icon: React.ElementType; ru: string; en: string; color: string }> = {
-  sounds:        { icon: Waves,      ru: 'Звуки',           en: 'Sounds',      color: 'text-primary border-primary/30' },
-  atmosphere:    { icon: CloudRain,  ru: 'Атмосфера',       en: 'Atmosphere',   color: 'text-accent border-accent/30' },
-  music:         { icon: Music,      ru: 'Музыка',          en: 'Music',        color: 'text-green-400 border-green-400/30' },
-  'audio-ready': { icon: AudioLines, ru: 'Готовые аудио',   en: 'Ready Audio',  color: 'text-amber-400 border-amber-400/30' },
+const CATEGORY_META: Record<Category, { icon: React.ElementType; ru: string; en: string; color: string; cacheCategory?: AudioAssetCategory }> = {
+  sfx:           { icon: Waves,      ru: 'Звуковые эффекты', en: 'Sound Effects', color: 'text-primary border-primary/30', cacheCategory: 'sfx' },
+  atmosphere:    { icon: CloudRain,  ru: 'Атмосфера',        en: 'Atmosphere',    color: 'text-accent border-accent/30', cacheCategory: 'atmosphere' },
+  music:         { icon: Music,      ru: 'Музыка',           en: 'Music',         color: 'text-green-400 border-green-400/30' },
+  'audio-ready': { icon: AudioLines, ru: 'Готовые аудио',    en: 'Ready Audio',   color: 'text-amber-400 border-amber-400/30' },
 };
 
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */
