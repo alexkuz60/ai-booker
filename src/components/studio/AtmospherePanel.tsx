@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { cn } from "@/lib/utils";
 import {
   Wand2, Loader2, Play, Pause, Save, Music, Volume2, Sparkles,
   Clock, Sliders, Zap, Trash2, Pencil, ArrowRight, RotateCcw,
