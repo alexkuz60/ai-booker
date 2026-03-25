@@ -335,13 +335,18 @@ export function StorageTab({ isRu, userId, onStatsReady }: StorageTabProps) {
     const item = getDragAudio(dragId);
     if (!item) return;
 
-    const catMap: Record<string, string> = { sfx: "sfx", atmosphere: "atmosphere", music: "music" };
-    const folder = catMap[item.category] || "sfx";
     const slug = item.prompt.toLowerCase().replace(/[^a-zа-я0-9]+/gi, "-").slice(0, 40);
     const fileName = `${slug}-${Date.now()}.mp3`;
 
     try {
-      await saveToStorage(item.blob, item.category as SoundCategory, fileName);
+      let blob = item.blob;
+      if (!blob && item.fetchUrl) {
+        const resp = await fetch(item.fetchUrl);
+        if (!resp.ok) throw new Error("Download failed");
+        blob = await resp.blob();
+      }
+      if (!blob) throw new Error("No audio data");
+      await saveToStorage(blob, item.category as SoundCategory, fileName);
       toast.success(isRu ? 'Сохранено в хранилище' : 'Saved to storage');
       await loadFiles();
     } catch (err: any) {

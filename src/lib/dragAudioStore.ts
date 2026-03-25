@@ -1,11 +1,13 @@
 /**
  * Module-level store for drag-and-drop of generated audio blobs.
- * Used to pass Blob data between AtmospherePanel (drag source)
+ * Used to pass Blob/URL data between AtmospherePanel/FreesoundPanel (drag source)
  * and StorageTab (drop target) via HTML5 DnD API.
  */
 
 export interface DragAudioItem {
-  blob: Blob;
+  blob?: Blob;
+  /** Remote URL to fetch blob from (used by Freesound) */
+  fetchUrl?: string;
   prompt: string;
   category: "sfx" | "atmosphere" | "music";
 }
