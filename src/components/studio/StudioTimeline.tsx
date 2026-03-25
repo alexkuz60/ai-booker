@@ -393,6 +393,8 @@ export function StudioTimeline({
   const effectiveCharMap = charDataReady ? speakerToCharId : new Map<string, string>();
   const effectiveTypeMappings = charDataReady ? typeMappings : new Map() as TypeMappingsByScene;
   const { clips: timelineClips, sceneBoundaries } = useTimelineClips(contextSceneIds, effectiveCharMap, combinedRefreshToken, effectiveTypeMappings);
+  const sceneBoundariesRef = useRef(sceneBoundaries);
+  sceneBoundariesRef.current = sceneBoundaries;
 
   // ── Audio player ──────────────────────────────────────────
   const player = useTimelinePlayer(timelineClips);
