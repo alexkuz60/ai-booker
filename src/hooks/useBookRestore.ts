@@ -21,6 +21,8 @@ import type { ProjectStorage } from "@/lib/projectStorage";
 import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
 import { normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 import { detectFileFormat, getSourcePath, type FileFormat } from "@/lib/fileFormatUtils";
+import { findSourceBlob } from "@/lib/fileFormatUtils";
+import { detectFileFormat, getSourcePath, type FileFormat } from "@/lib/fileFormatUtils";
 import { wipeProjectBrowserState } from "@/lib/projectCleanup";
 import {
   resolveLocalStorageForBook,
@@ -183,9 +185,27 @@ export function useBookRestore({
       }
     }
 
+    // ── Preserve source file from existing OPFS before wipe ──
+    let preservedSourceBlob: Blob | null = null;
+    const existingProjects = localProjectNamesByBookId.get(book.id) || [];
+    if (existingProjects.length > 0) {
+      try {
+        const { OPFSStorage } = await import("@/lib/projectStorage");
+        const oldStore = await OPFSStorage.openOrCreate(existingProjects[0]);
+        if (oldStore.isReady) {
+          const found = await findSourceBlob(oldStore);
+          if (found) {
+            preservedSourceBlob = found.blob;
+            console.log(`[OpenBook] Preserved source file (${found.format}) before wipe`);
+          }
+        }
+      } catch (err) {
+        console.warn("[OpenBook] Failed to preserve source file:", err);
+      }
+    }
+
     // ── Wipe-and-Deploy ─────────────────────────────────────
     report("wipe", "running");
-    const existingProjects = localProjectNamesByBookId.get(book.id) || [];
     await wipeProjectBrowserState(book.id, existingProjects);
     clearTransientBookState();
     setStep("extracting_toc");
@@ -213,6 +233,7 @@ export function useBookRestore({
         isRu,
         report,
         downloadImpulses: options?.downloadImpulses ?? false,
+        preservedSourceBlob,
       });
 
       // Apply results to React state
@@ -224,10 +245,12 @@ export function useBookRestore({
       setChapterResults(result.chapterResults);
       setStep("workspace");
 
-      const pdfStatus = result.pdfProxy
-        ? ` (${t("pdfRestored", isRu)})`
-        : ` (${t("pdfNotFound", isRu)})`;
-      toast.success(`${t("bookLoaded", isRu)}: «${book.title}»${pdfStatus}`);
+      const bookFormat = detectFileFormat(book.file_name);
+      const formatLabel = bookFormat.toUpperCase();
+      const sourceStatus = result.sourceFilePreserved
+        ? ` (${isRu ? `${formatLabel} сохранён` : `${formatLabel} preserved`})`
+        : ` (${isRu ? `${formatLabel} не найден, только просмотр` : `${formatLabel} not found, view only`})`;
+      toast.success(`${t("bookLoaded", isRu)}: «${book.title}»${sourceStatus}`);
     } catch (err: any) {
       console.error("Failed to open book:", err);
       setErrorMsg(err.message || "Unknown error");
