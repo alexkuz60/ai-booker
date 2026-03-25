@@ -286,10 +286,13 @@ export function StudioTimeline({
       }
       setTypeMappings(tm);
 
-      // Character IDs from scene map speakers
+      // Character IDs from scene map speakers + type mappings (system chars like Narrator)
       const charIdSet = new Set<string>();
       if (sceneMap?.speakers) {
         for (const s of sceneMap.speakers) charIdSet.add(s.characterId);
+      }
+      if (sceneMap?.typeMappings) {
+        for (const m of sceneMap.typeMappings) charIdSet.add(m.characterId);
       }
 
       if (charIdSet.size === 0) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
