@@ -34,8 +34,8 @@ export interface TimelineTrackData {
   type: "narrator" | "atmosphere" | "sfx";
 }
 
-const FIXED_TRACKS: TimelineTrackData[] = [
-  { id: "atmosphere-bg", label: "Атмосфера", color: "hsl(175 45% 45%)", type: "atmosphere" },
+const getFixedTracks = (isRu: boolean): TimelineTrackData[] => [
+  { id: "atmosphere-bg", label: isRu ? "Атмосфера" : "Ambience", color: "hsl(175 45% 45%)", type: "atmosphere" },
   { id: "atmosphere-sfx", label: "SFX", color: "hsl(220 50% 55%)", type: "sfx" },
 ];
 
@@ -464,7 +464,7 @@ export function StudioTimeline({
       : [];
 
     // Always show both atmosphere and SFX tracks
-    return [...narratorTrack, ...charTracks, ...FIXED_TRACKS];
+    return [...narratorTrack, ...charTracks, ...getFixedTracks(isRu)];
   }, [charTracks, timelineClips, isRu]);
 
   // ── Mixer sidebar expanded state ───────────────────────────
