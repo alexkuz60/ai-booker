@@ -150,26 +150,30 @@ export function useProjectStorage(): UseProjectStorageReturn {
   const openProjectByName = useCallback(async (projectName: string): Promise<ProjectStorage | null> => {
     if (!projectName) return null;
 
-    if (storage?.projectName === projectName && meta) {
-      // Project already open — but ensure scene index is in memory
-      // (could have been lost due to HMR or module reload)
-      await ensureV2Layout(storage);
-      return storage;
-    }
-
     if (backend !== "opfs") {
-      return storage?.projectName === projectName ? storage : null;
+      if (storage?.projectName === projectName && meta) {
+        await ensureV2Layout(storage);
+        return storage;
+      }
+      return null;
     }
 
     setLoading(true);
     try {
+      const existingProjects = await OPFSStorage.listProjects();
+      if (!existingProjects.includes(projectName)) {
+        return null;
+      }
+
+      // Always reopen a fresh OPFS handle instead of reusing the active one.
+      // This avoids "zombie" handles after Wipe-and-Deploy deletes a project
+      // and recreates it under the same directory name.
       const store = await OPFSStorage.openOrCreate(projectName);
       const projectMeta = await store.readJSON<ProjectMeta>("project.json");
       if (!projectMeta) {
         throw new Error("Not a valid Booker project (project.json not found)");
       }
 
-      // Migrate V1→V2 if needed AND load scene index into memory
       await ensureV2Layout(store);
 
       setStorage(store);
