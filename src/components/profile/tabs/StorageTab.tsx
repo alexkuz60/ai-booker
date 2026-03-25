@@ -3,7 +3,7 @@ import {
   HardDrive, FolderOpen, FileAudio, Search, Loader2, Trash2, Eye,
   Download, RefreshCw, Upload, Music, Waves, CloudRain, AudioLines,
   FileText, File, FileImage, ChevronDown, ChevronRight, FolderClosed,
-  Ghost, ScanSearch, Trash,
+  Ghost, ScanSearch, Trash, DatabaseBackup,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,11 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ImpulsesSection } from './ImpulsesSection';
+import {
+  isAudioAssetCached,
+  removeAudioAssetFromCache,
+  type AudioAssetCategory,
+} from '@/lib/audioAssetCache';
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 
@@ -33,20 +38,22 @@ type StorageFile = {
   size: number;
   mime_type: string | null;
   created_at: string;
+  /** Whether the file is cached locally in OPFS */
+  cached?: boolean;
 };
 
 type PreviewState = { file: StorageFile; url: string; textContent?: string } | null;
 
 /* ─── Categories (virtual folders inside user-media bucket) ───────────────── */
 
-const CATEGORIES = ['sounds', 'atmosphere', 'music', 'audio-ready'] as const;
+const CATEGORIES = ['sfx', 'atmosphere', 'music', 'audio-ready'] as const;
 type Category = (typeof CATEGORIES)[number];
 
-const CATEGORY_META: Record<Category, { icon: React.ElementType; ru: string; en: string; color: string }> = {
-  sounds:        { icon: Waves,      ru: 'Звуки',           en: 'Sounds',      color: 'text-primary border-primary/30' },
-  atmosphere:    { icon: CloudRain,  ru: 'Атмосфера',       en: 'Atmosphere',   color: 'text-accent border-accent/30' },
-  music:         { icon: Music,      ru: 'Музыка',          en: 'Music',        color: 'text-green-400 border-green-400/30' },
-  'audio-ready': { icon: AudioLines, ru: 'Готовые аудио',   en: 'Ready Audio',  color: 'text-amber-400 border-amber-400/30' },
+const CATEGORY_META: Record<Category, { icon: React.ElementType; ru: string; en: string; color: string; cacheCategory?: AudioAssetCategory }> = {
+  sfx:           { icon: Waves,      ru: 'Звуковые эффекты', en: 'Sound Effects', color: 'text-primary border-primary/30', cacheCategory: 'sfx' },
+  atmosphere:    { icon: CloudRain,  ru: 'Атмосфера',        en: 'Atmosphere',    color: 'text-accent border-accent/30', cacheCategory: 'atmosphere' },
+  music:         { icon: Music,      ru: 'Музыка',           en: 'Music',         color: 'text-green-400 border-green-400/30' },
+  'audio-ready': { icon: AudioLines, ru: 'Готовые аудио',    en: 'Ready Audio',   color: 'text-amber-400 border-amber-400/30' },
 };
 
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */
@@ -90,7 +97,7 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeUploadCategory, setActiveUploadCategory] = useState<Category | null>(null);
 
-  /* Load files from all categories */
+  /* Load files from all categories + check OPFS cache status */
   const loadFiles = useCallback(async () => {
     setLoading(true);
     try {
@@ -111,9 +118,20 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
             size: item.metadata?.size ?? 0,
             mime_type: item.metadata?.mimetype ?? null,
             created_at: item.created_at ?? '',
+            cached: false,
           });
         }
       }
+
+      // Check OPFS cache status for cacheable categories (atmosphere, sfx)
+      const cacheChecks = allFiles.map(async (f) => {
+        const meta = CATEGORY_META[f.category as Category];
+        if (meta?.cacheCategory) {
+          f.cached = await isAudioAssetCached(meta.cacheCategory, f.id);
+        }
+      });
+      await Promise.all(cacheChecks);
+
       setFiles(allFiles);
     } finally {
       setLoading(false);
@@ -154,7 +172,7 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  /* Delete */
+  /* Delete — also removes from OPFS cache if applicable */
   const handleDelete = async (file: StorageFile) => {
     setDeletingId(file.id);
     try {
@@ -162,6 +180,11 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
       if (error) {
         toast.error(isRu ? 'Ошибка удаления' : 'Delete error');
       } else {
+        // Also clear from OPFS cache
+        const meta = CATEGORY_META[file.category as Category];
+        if (meta?.cacheCategory) {
+          removeAudioAssetFromCache(meta.cacheCategory, file.id).catch(() => {});
+        }
         toast.success(`«${file.name}» ${isRu ? 'удалён' : 'deleted'}`);
         setFiles(prev => prev.filter(f => f.id !== file.id));
         if (preview?.file.id === file.id) setPreview(null);
@@ -276,6 +299,7 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
                   const catFiles = groupedFiles[cat] || [];
                   const isCollapsed = collapsedGroups.has(cat);
                   const catSize = catFiles.reduce((s, f) => s + f.size, 0);
+                  const cachedCount = meta.cacheCategory ? catFiles.filter(f => f.cached).length : 0;
                   const CatIcon = meta.icon;
 
                   return (
@@ -292,6 +316,12 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
                             <CatIcon className="h-5 w-5 shrink-0" />
                             <span className="text-base font-semibold">{isRu ? meta.ru : meta.en}</span>
                             <Badge variant="outline" className="ml-1 h-5 px-1.5 text-xs">{catFiles.length}</Badge>
+                            {meta.cacheCategory && cachedCount > 0 && (
+                              <Badge variant="outline" className="ml-1 h-5 px-1.5 text-xs border-amber-400/40 text-amber-400">
+                                <DatabaseBackup className="h-3 w-3 mr-0.5" />
+                                {cachedCount}
+                              </Badge>
+                            )}
                             <span className="text-xs text-muted-foreground ml-auto mr-2">{formatBytes(catSize)}</span>
                           </button>
                         </CollapsibleTrigger>
@@ -330,6 +360,14 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
                                 >
                                   <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
                                   <span className="text-sm truncate flex-1 min-w-0">{file.name}</span>
+                                  {file.cached && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <DatabaseBackup className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>{isRu ? 'Кэшировано локально' : 'Cached locally'}</TooltipContent>
+                                    </Tooltip>
+                                  )}
                                   <span className="text-xs text-muted-foreground shrink-0">{formatBytes(file.size)}</span>
                                   {file.created_at && (
                                     <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">
