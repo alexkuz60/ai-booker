@@ -50,6 +50,7 @@ export function deriveStoryboardTypeMappings(
   const charById = new Map(characters.map((character) => [character.id, character]));
   const mappings: LocalTypeMappingEntry[] = [];
   const seen = new Set<string>();
+  const presentSegmentTypes = new Set(segments.map((segment) => segment.segment_type));
 
   for (const segment of segments) {
     const speakerId = nameMap.get(normalizeName(segment.speaker));
@@ -64,6 +65,24 @@ export function deriveStoryboardTypeMappings(
       characterName: character.name,
     });
     seen.add(segment.segment_type);
+  }
+
+  for (const persistedMapping of persistedTypeMappings) {
+    if (
+      persistedMapping.segmentType === "inline_narration" ||
+      seen.has(persistedMapping.segmentType) ||
+      !presentSegmentTypes.has(persistedMapping.segmentType) ||
+      !charById.has(persistedMapping.characterId)
+    ) {
+      continue;
+    }
+
+    mappings.push({
+      segmentType: persistedMapping.segmentType,
+      characterId: persistedMapping.characterId,
+      characterName: charById.get(persistedMapping.characterId)?.name ?? persistedMapping.characterName,
+    });
+    seen.add(persistedMapping.segmentType);
   }
 
   const inlineSpeakerId = nameMap.get(normalizeName(inlineNarrationSpeaker));
