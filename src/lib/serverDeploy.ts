@@ -101,6 +101,7 @@ export async function deployFromServer({
   downloadAtmosphere = false,
   downloadSfx = false,
   preservedSourceBlob,
+  userId: paramUserId,
 }: DeployParams): Promise<DeployResult> {
   // ── 1. Fetch structure (parts + chapters) ─────────────────
   // NOTE: Source file is NEVER downloaded from server.
@@ -698,8 +699,9 @@ export async function deployFromServer({
     report("download_atmo", "running");
     try {
       const { downloadAudioAssetsBatch } = await import("@/lib/audioAssetCache");
-      const userId = book.user_id;
-      const count = await downloadAudioAssetsBatch(userId, "atmosphere", (done, total) => {
+      const assetUserId = paramUserId || "";
+      if (!assetUserId) throw new Error("No userId for atmosphere download");
+      const count = await downloadAudioAssetsBatch(assetUserId, "atmosphere", (done, total) => {
         report("download_atmo", "running", `${done}/${total}`);
       });
       report("download_atmo", count > 0 ? "done" : "skipped", count > 0 ? `${count}` : undefined);
