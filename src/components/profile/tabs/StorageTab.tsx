@@ -109,36 +109,63 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
   /** Map: audio_path → FileUsageEntry[] */
   const [usageMap, setUsageMap] = useState<Map<string, FileUsageEntry[]>>(new Map());
 
-  /* Load usage info from scene_atmospheres */
+  /* Load usage info: which audio files are referenced in scene_atmospheres */
   const loadUsageMap = useCallback(async () => {
-    const { data } = await supabase
-      .from('scene_atmospheres')
-      .select(`
-        audio_path,
-        offset_ms,
-        book_scenes!inner(
-          title,
-          book_chapters!inner(
-            title,
-            book_parts(title),
-            books!inner(user_id)
-          )
-        )
-      `)
-      .eq('book_scenes.book_chapters.books.user_id', userId);
-    if (!data) return;
+    // 1) Get user's book IDs
+    const { data: books } = await supabase
+      .from('books').select('id').eq('user_id', userId);
+    if (!books || books.length === 0) return;
+    const bookIds = books.map(b => b.id);
+
+    // 2) Get chapters for these books (with part info)
+    const { data: chapters } = await supabase
+      .from('book_chapters').select('id, title, book_id, part_id')
+      .in('book_id', bookIds);
+    if (!chapters) return;
+
+    // 3) Get parts
+    const partIds = [...new Set(chapters.filter(c => c.part_id).map(c => c.part_id!))];
+    let partsMap = new Map<string, string>();
+    if (partIds.length > 0) {
+      const { data: parts } = await supabase
+        .from('book_parts').select('id, title').in('id', partIds);
+      if (parts) parts.forEach(p => partsMap.set(p.id, p.title));
+    }
+    const chapterMap = new Map(chapters.map(c => [c.id, c]));
+
+    // 4) Get scenes
+    const chapterIds = chapters.map(c => c.id);
+    const { data: scenes } = await supabase
+      .from('book_scenes').select('id, title, chapter_id')
+      .in('chapter_id', chapterIds);
+    if (!scenes) return;
+    const sceneMap = new Map(scenes.map(s => [s.id, s]));
+
+    // 5) Get all scene_atmospheres for these scenes
+    const sceneIds = scenes.map(s => s.id);
+    const allAtmos: Array<{ audio_path: string; offset_ms: number; scene_id: string }> = [];
+    // Batch by 200 to avoid query limits
+    for (let i = 0; i < sceneIds.length; i += 200) {
+      const batch = sceneIds.slice(i, i + 200);
+      const { data } = await supabase
+        .from('scene_atmospheres').select('audio_path, offset_ms, scene_id')
+        .in('scene_id', batch);
+      if (data) allAtmos.push(...data);
+    }
+
+    // 6) Build map
     const map = new Map<string, FileUsageEntry[]>();
-    for (const row of data) {
-      const scene = (row as any).book_scenes;
+    for (const atmo of allAtmos) {
+      const scene = sceneMap.get(atmo.scene_id);
       if (!scene) continue;
-      const ch = scene.book_chapters;
+      const ch = chapterMap.get(scene.chapter_id);
       const entry: FileUsageEntry = {
         sceneTitle: scene.title || '—',
         chapterTitle: ch?.title || '—',
-        partTitle: ch?.book_parts?.title,
-        offsetMs: row.offset_ms ?? 0,
+        partTitle: ch?.part_id ? partsMap.get(ch.part_id) : undefined,
+        offsetMs: atmo.offset_ms ?? 0,
       };
-      const key = row.audio_path;
+      const key = atmo.audio_path;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(entry);
     }
