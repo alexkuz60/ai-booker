@@ -785,21 +785,3 @@ function OrphanedFilesSection({ isRu, userId, onPreview }: { isRu: boolean; user
     </div>
   );
 }
-
-/* ─── StatCard ────────────────────────────────────────────────────────────── */
-
-function StatCard({ label, value, icon: Icon, accent }: { label: string; value: string | number; icon: React.ElementType; accent?: boolean }) {
-  return (
-    <Card className={cn('border', accent ? 'border-primary/40 bg-primary/5' : 'border-border bg-card')}>
-      <CardContent className="flex items-start gap-3 p-4">
-        <div className={cn('rounded-lg p-2 mt-0.5 shrink-0', accent ? 'bg-primary/15' : 'bg-muted')}>
-          <Icon className={cn('h-5 w-5', accent ? 'text-primary' : 'text-muted-foreground')} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold leading-tight">{label}</p>
-          <p className="text-2xl font-extrabold mt-0.5">{value}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
