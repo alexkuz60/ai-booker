@@ -320,7 +320,7 @@ function SceneCards({
                     </div>
                   </div>
                   {content && (
-                    <p className="text-sm text-muted-foreground whitespace-pre-line select-text">
+                    <p className="text-sm text-muted-foreground whitespace-pre-line select-text leading-snug">
                       {isExpanded ? renderMarkedText(content) : (
                         <>
                           {renderMarkedText(preview)}{hasMore && "…"}
