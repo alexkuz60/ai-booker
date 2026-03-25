@@ -234,6 +234,7 @@ export function useBookRestore({
         downloadAtmosphere: options?.downloadAtmosphere ?? false,
         downloadSfx: options?.downloadSfx ?? false,
         preservedSourceBlob,
+        userId,
       });
 
       // Apply results to React state
