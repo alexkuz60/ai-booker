@@ -314,7 +314,9 @@ export function useTimelineClips(
           if (!boundary) continue;
 
           const trackId = layer.layer_type === "sfx" ? "atmosphere-sfx" : "atmosphere-bg";
-          const startSec = boundary.startSec + boundary.silenceSec; // start after silence
+          const sceneAudioStart = boundary.startSec + boundary.silenceSec;
+          const offsetSec = ((layer as any).offset_ms || 0) / 1000;
+          const startSec = sceneAudioStart + offsetSec;
           const clipLenSec = (layer.duration_ms || 0) / 1000 || 10;
 
           // Scene content end (absolute) → duration from clip start

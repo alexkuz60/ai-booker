@@ -98,7 +98,7 @@ export function StudioTimeline({
   const combinedRefreshToken = clipsRefreshToken + localRefresh;
 
   // Handler for inserting audio from storage into atmosphere/sfx track
-  const handleInsertAudio = useCallback(async (file: StorageAudioFile, _atSec: number, layerType: "ambience" | "sfx" = "ambience") => {
+  const handleInsertAudio = useCallback(async (file: StorageAudioFile, atSec: number, layerType: "ambience" | "sfx" = "ambience") => {
     if (!sceneId || !user) {
       toast.error(isRu ? "Нет активной сцены" : "No active scene");
       return;
@@ -137,6 +137,11 @@ export function StudioTimeline({
       // use fallback duration
     }
 
+    // Compute offset relative to scene start (atSec is absolute timeline position)
+    const boundary = sceneBoundariesRef.current?.find(b => b.sceneId === sceneId);
+    const sceneStartSec = boundary ? boundary.startSec + boundary.silenceSec : 0;
+    const offsetMs = Math.max(0, Math.round((atSec - sceneStartSec) * 1000));
+
     const { error } = await supabase.from("scene_atmospheres").insert({
       scene_id: sceneId,
       layer_type: layerType,
@@ -146,6 +151,7 @@ export function StudioTimeline({
       fade_in_ms: layerType === "sfx" ? 0 : 500,
       fade_out_ms: layerType === "sfx" ? 0 : 1000,
       prompt_used: file.name,
+      offset_ms: offsetMs,
     });
 
     if (error) {
@@ -455,13 +461,8 @@ export function StudioTimeline({
       ? [{ id: "narrator-fallback", label: isRu ? "Рассказчик" : "Narrator", color: "hsl(var(--primary))", type: "narrator" }]
       : [];
 
-    const hasAtmoBg = timelineClips.some(c => c.trackId === "atmosphere-bg");
-    const hasAtmoSfx = timelineClips.some(c => c.trackId === "atmosphere-sfx");
-    const atmoTracks: TimelineTrackData[] = [];
-    if (hasAtmoBg) atmoTracks.push({ id: "atmosphere-bg", label: isRu ? "Атмосфера" : "Ambience", color: "hsl(175 45% 45%)", type: "atmosphere" });
-    if (hasAtmoSfx) atmoTracks.push({ id: "atmosphere-sfx", label: "SFX", color: "hsl(220 50% 55%)", type: "sfx" });
-
-    return [...narratorTrack, ...charTracks, ...(atmoTracks.length ? atmoTracks : FIXED_TRACKS)];
+    // Always show both atmosphere and SFX tracks
+    return [...narratorTrack, ...charTracks, ...FIXED_TRACKS];
   }, [charTracks, timelineClips, isRu]);
 
   // ── Mixer sidebar expanded state ───────────────────────────
