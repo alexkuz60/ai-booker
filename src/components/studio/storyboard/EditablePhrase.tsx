@@ -113,7 +113,7 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
             }
             if (e.key === "Escape") { setDraft(phrase.text); setEditing(false); }
           }}
-          className="flex-1 text-sm font-body text-foreground leading-relaxed bg-background border border-primary/30 rounded px-2 py-1 resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+          className="flex-1 text-sm font-body text-foreground bg-background border border-primary/30 rounded px-2 py-1 resize-none focus:outline-none focus:ring-1 focus:ring-primary" style={{ lineHeight: '1.1' }}
         />
         <button onClick={save} className="shrink-0 text-primary hover:text-primary/80 pt-1">
           <Check className="h-3.5 w-3.5" />
@@ -125,11 +125,11 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div onContextMenu={handleContextMenu} className="flex gap-2 px-3 py-1.5 hover:bg-accent/20 transition-colors group">
+        <div onContextMenu={handleContextMenu} className="flex gap-2 px-3 py-0.5 hover:bg-accent/20 transition-colors group">
           <span className="text-[10px] text-muted-foreground font-mono pt-0.5 shrink-0 w-5 text-right">
             {phrase.phrase_number}
           </span>
-          <p ref={textRef} className="text-sm font-body text-foreground leading-relaxed flex-1 select-text">
+          <p ref={textRef} className="text-sm font-body text-foreground flex-1 select-text" style={{ lineHeight: '1.1' }}>
             {renderAnnotatedText(phrase.text, phrase.annotations)}
           </p>
           <button
