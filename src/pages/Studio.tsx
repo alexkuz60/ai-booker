@@ -231,6 +231,88 @@ const Studio = () => {
     };
   }, [storage, chapter?.chapterId, chapter?.scenes.map((scene) => `${scene.id ?? "no-id"}:${scene.scene_number}:${scene.title}`).join("|"), setChapter]);
 
+  // ── Diagnostic: scene ID consistency check ──
+  useEffect(() => {
+    if (!chapter || !storage?.isReady) return;
+    const sceneIds = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
+    if (sceneIds.length === 0) return;
+
+    (async () => {
+      try {
+        // 1. OPFS structure data
+        const local = await readStructureFromLocal(storage);
+        let opfsSceneIds: string[] = [];
+        if (local) {
+          let chIdx: number | null = null;
+          for (const [idx, id] of local.chapterIdMap.entries()) {
+            if (id === chapter.chapterId) { chIdx = idx; break; }
+          }
+          if (chIdx !== null) {
+            const result = local.chapterResults.get(chIdx);
+            opfsSceneIds = (result?.scenes || []).map(s => (s as any).id).filter(Boolean);
+          }
+        }
+
+        // 2. Scene index
+        const sceneIndex = getCachedSceneIndex();
+        const indexSceneIds = sceneIndex
+          ? Object.keys(sceneIndex.entries).filter(id => sceneIndex.entries[id]?.chapterId === chapter.chapterId)
+          : [];
+
+        // 3. DB scene IDs
+        const { data: dbScenes } = await supabase
+          .from("book_scenes")
+          .select("id, scene_number, title")
+          .eq("chapter_id", chapter.chapterId)
+          .order("scene_number");
+
+        const dbSceneIds = (dbScenes || []).map(s => s.id);
+
+        // 4. Storyboard existence
+        const storyboarded = sceneIndex?.storyboarded || [];
+
+        console.group("[Studio Diagnostic] Scene ID consistency for chapter:", chapter.chapterTitle);
+        console.table({
+          "Session (UI)": { count: sceneIds.length, ids: sceneIds.join(", ") },
+          "OPFS structure": { count: opfsSceneIds.length, ids: opfsSceneIds.join(", ") },
+          "Scene index": { count: indexSceneIds.length, ids: indexSceneIds.join(", ") },
+          "Database": { count: dbSceneIds.length, ids: dbSceneIds.join(", ") },
+        });
+
+        // Divergence analysis
+        const uiSet = new Set(sceneIds);
+        const opfsSet = new Set(opfsSceneIds);
+        const dbSet = new Set(dbSceneIds);
+        const indexSet = new Set(indexSceneIds);
+
+        const onlyInUI = sceneIds.filter(id => !opfsSet.has(id) && !dbSet.has(id));
+        const inDBnotOPFS = dbSceneIds.filter(id => !opfsSet.has(id));
+        const inOPFSnotDB = opfsSceneIds.filter(id => !dbSet.has(id));
+        const storyboardsForMissing = storyboarded.filter(id => !uiSet.has(id));
+
+        if (onlyInUI.length) console.warn("⚠️ IDs only in UI (orphaned):", onlyInUI);
+        if (inDBnotOPFS.length) console.warn("⚠️ IDs in DB but not OPFS:", inDBnotOPFS);
+        if (inOPFSnotDB.length) console.info("ℹ️ IDs in OPFS but not DB (not pushed yet):", inOPFSnotDB);
+        if (storyboardsForMissing.length) console.warn("⚠️ Storyboards exist for non-current scene IDs:", storyboardsForMissing);
+
+        // Per-scene detail
+        console.table(chapter.scenes.map((s, i) => ({
+          "#": s.scene_number,
+          title: s.title?.slice(0, 30),
+          "UI id": s.id?.slice(0, 8) || "—",
+          "OPFS id": opfsSceneIds[i]?.slice(0, 8) || "—",
+          "DB id": dbSceneIds[i]?.slice(0, 8) || "—",
+          "match": s.id === opfsSceneIds[i] && s.id === dbSceneIds[i] ? "✅" : "❌",
+          "has storyboard": storyboarded.includes(s.id || "") ? "✅" : "—",
+        })));
+
+        console.groupEnd();
+      } catch (err) {
+        console.warn("[Studio Diagnostic] Error:", err);
+      }
+    })();
+  }, [chapter?.chapterId, storage?.isReady]);
+
   // LOCAL-ONLY: segmented scene IDs come exclusively from OPFS scene_index
   useEffect(() => {
     if (!chapter) return;
