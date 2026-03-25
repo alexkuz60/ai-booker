@@ -65,6 +65,8 @@ interface DeployParams {
   downloadSfx?: boolean;
   /** Source file blob preserved from the old OPFS project before wipe */
   preservedSourceBlob?: Blob | null;
+  /** User ID for downloading per-user audio assets */
+  userId?: string;
 }
 
 // ── Helpers ─────────────────────────────────────────────────
