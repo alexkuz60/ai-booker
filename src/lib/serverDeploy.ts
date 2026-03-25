@@ -718,8 +718,9 @@ export async function deployFromServer({
     report("download_sfx", "running");
     try {
       const { downloadAudioAssetsBatch } = await import("@/lib/audioAssetCache");
-      const userId = book.user_id;
-      const count = await downloadAudioAssetsBatch(userId, "sfx", (done, total) => {
+      const sfxUserId = paramUserId || "";
+      if (!sfxUserId) throw new Error("No userId for SFX download");
+      const count = await downloadAudioAssetsBatch(sfxUserId, "sfx", (done, total) => {
         report("download_sfx", "running", `${done}/${total}`);
       });
       report("download_sfx", count > 0 ? "done" : "skipped", count > 0 ? `${count}` : undefined);
