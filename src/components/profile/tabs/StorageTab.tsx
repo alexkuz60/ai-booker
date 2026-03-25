@@ -106,6 +106,44 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
   const [uploadingCategory, setUploadingCategory] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeUploadCategory, setActiveUploadCategory] = useState<Category | null>(null);
+  /** Map: audio_path → FileUsageEntry[] */
+  const [usageMap, setUsageMap] = useState<Map<string, FileUsageEntry[]>>(new Map());
+
+  /* Load usage info from scene_atmospheres */
+  const loadUsageMap = useCallback(async () => {
+    const { data } = await supabase
+      .from('scene_atmospheres')
+      .select(`
+        audio_path,
+        offset_ms,
+        book_scenes!inner(
+          title,
+          book_chapters!inner(
+            title,
+            book_parts(title),
+            books!inner(user_id)
+          )
+        )
+      `)
+      .eq('book_scenes.book_chapters.books.user_id', userId);
+    if (!data) return;
+    const map = new Map<string, FileUsageEntry[]>();
+    for (const row of data) {
+      const scene = (row as any).book_scenes;
+      if (!scene) continue;
+      const ch = scene.book_chapters;
+      const entry: FileUsageEntry = {
+        sceneTitle: scene.title || '—',
+        chapterTitle: ch?.title || '—',
+        partTitle: ch?.book_parts?.title,
+        offsetMs: row.offset_ms ?? 0,
+      };
+      const key = row.audio_path;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(entry);
+    }
+    setUsageMap(map);
+  }, [userId]);
 
   /* Load files from all categories + check OPFS cache status */
   const loadFiles = useCallback(async () => {
@@ -148,7 +186,7 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
     }
   }, [userId]);
 
-  useEffect(() => { loadFiles(); }, [loadFiles]);
+  useEffect(() => { loadFiles(); loadUsageMap(); }, [loadFiles, loadUsageMap]);
 
   /* Upload */
   const handleUploadClick = (cat: Category) => {
