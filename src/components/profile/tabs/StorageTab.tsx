@@ -31,6 +31,14 @@ import {
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 
+/** Where a file is used: scene atmosphere reference */
+type FileUsageEntry = {
+  sceneTitle: string;
+  chapterTitle: string;
+  partTitle?: string;
+  offsetMs: number;
+};
+
 type StorageFile = {
   id: string;
   name: string;
@@ -40,6 +48,8 @@ type StorageFile = {
   created_at: string;
   /** Whether the file is cached locally in OPFS */
   cached?: boolean;
+  /** Scenes where this file is used */
+  usages?: FileUsageEntry[];
 };
 
 type PreviewState = { file: StorageFile; url: string; textContent?: string } | null;
@@ -96,6 +106,71 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
   const [uploadingCategory, setUploadingCategory] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeUploadCategory, setActiveUploadCategory] = useState<Category | null>(null);
+  /** Map: audio_path → FileUsageEntry[] */
+  const [usageMap, setUsageMap] = useState<Map<string, FileUsageEntry[]>>(new Map());
+
+  /* Load usage info: which audio files are referenced in scene_atmospheres */
+  const loadUsageMap = useCallback(async () => {
+    // 1) Get user's book IDs
+    const { data: books } = await supabase
+      .from('books').select('id').eq('user_id', userId);
+    if (!books || books.length === 0) return;
+    const bookIds = books.map(b => b.id);
+
+    // 2) Get chapters for these books (with part info)
+    const { data: chapters } = await supabase
+      .from('book_chapters').select('id, title, book_id, part_id')
+      .in('book_id', bookIds);
+    if (!chapters) return;
+
+    // 3) Get parts
+    const partIds = [...new Set(chapters.filter(c => c.part_id).map(c => c.part_id!))];
+    let partsMap = new Map<string, string>();
+    if (partIds.length > 0) {
+      const { data: parts } = await supabase
+        .from('book_parts').select('id, title').in('id', partIds);
+      if (parts) parts.forEach(p => partsMap.set(p.id, p.title));
+    }
+    const chapterMap = new Map(chapters.map(c => [c.id, c]));
+
+    // 4) Get scenes
+    const chapterIds = chapters.map(c => c.id);
+    const { data: scenes } = await supabase
+      .from('book_scenes').select('id, title, chapter_id')
+      .in('chapter_id', chapterIds);
+    if (!scenes) return;
+    const sceneMap = new Map(scenes.map(s => [s.id, s]));
+
+    // 5) Get all scene_atmospheres for these scenes
+    const sceneIds = scenes.map(s => s.id);
+    const allAtmos: Array<{ audio_path: string; offset_ms: number; scene_id: string }> = [];
+    // Batch by 200 to avoid query limits
+    for (let i = 0; i < sceneIds.length; i += 200) {
+      const batch = sceneIds.slice(i, i + 200);
+      const { data } = await supabase
+        .from('scene_atmospheres').select('audio_path, offset_ms, scene_id')
+        .in('scene_id', batch);
+      if (data) allAtmos.push(...data);
+    }
+
+    // 6) Build map
+    const map = new Map<string, FileUsageEntry[]>();
+    for (const atmo of allAtmos) {
+      const scene = sceneMap.get(atmo.scene_id);
+      if (!scene) continue;
+      const ch = chapterMap.get(scene.chapter_id);
+      const entry: FileUsageEntry = {
+        sceneTitle: scene.title || '—',
+        chapterTitle: ch?.title || '—',
+        partTitle: ch?.part_id ? partsMap.get(ch.part_id) : undefined,
+        offsetMs: atmo.offset_ms ?? 0,
+      };
+      const key = atmo.audio_path;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(entry);
+    }
+    setUsageMap(map);
+  }, [userId]);
 
   /* Load files from all categories + check OPFS cache status */
   const loadFiles = useCallback(async () => {
@@ -138,7 +213,7 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
     }
   }, [userId]);
 
-  useEffect(() => { loadFiles(); }, [loadFiles]);
+  useEffect(() => { loadFiles(); loadUsageMap(); }, [loadFiles, loadUsageMap]);
 
   /* Upload */
   const handleUploadClick = (cat: Category) => {
@@ -353,13 +428,44 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
                             {catFiles.map(file => {
                               const Icon = fileIcon(file.mime_type);
                               const canPreview = isAudioFile(file.mime_type) || isImageFile(file.mime_type);
+                              const fileUsages = usageMap.get(file.id) || [];
+                              const isUsed = fileUsages.length > 0;
                               return (
                                 <div
                                   key={file.id}
                                   className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors group"
                                 >
                                   <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-                                  <span className="text-sm truncate flex-1 min-w-0">{file.name}</span>
+                                  {isUsed ? (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="text-sm truncate flex-1 min-w-0 text-yellow-400 cursor-help">
+                                          {file.name}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="right" className="max-w-xs">
+                                        <p className="font-semibold text-xs mb-1">
+                                          {isRu ? `Используется (${fileUsages.length})` : `In use (${fileUsages.length})`}
+                                        </p>
+                                        <ul className="space-y-0.5 text-xs">
+                                          {fileUsages.slice(0, 10).map((u, i) => (
+                                            <li key={i} className="text-muted-foreground">
+                                              {u.partTitle ? `${u.partTitle} → ` : ''}
+                                              {u.chapterTitle} → {u.sceneTitle}
+                                              {u.offsetMs > 0 ? ` @ ${(u.offsetMs / 1000).toFixed(1)}s` : ''}
+                                            </li>
+                                          ))}
+                                          {fileUsages.length > 10 && (
+                                            <li className="text-muted-foreground italic">
+                                              …{isRu ? `ещё ${fileUsages.length - 10}` : `${fileUsages.length - 10} more`}
+                                            </li>
+                                          )}
+                                        </ul>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  ) : (
+                                    <span className="text-sm truncate flex-1 min-w-0">{file.name}</span>
+                                  )}
                                   {file.cached && (
                                     <Tooltip>
                                       <TooltipTrigger asChild>
