@@ -172,7 +172,7 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  /* Delete */
+  /* Delete — also removes from OPFS cache if applicable */
   const handleDelete = async (file: StorageFile) => {
     setDeletingId(file.id);
     try {
@@ -180,6 +180,11 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
       if (error) {
         toast.error(isRu ? 'Ошибка удаления' : 'Delete error');
       } else {
+        // Also clear from OPFS cache
+        const meta = CATEGORY_META[file.category as Category];
+        if (meta?.cacheCategory) {
+          removeAudioAssetFromCache(meta.cacheCategory, file.id).catch(() => {});
+        }
         toast.success(`«${file.name}» ${isRu ? 'удалён' : 'deleted'}`);
         setFiles(prev => prev.filter(f => f.id !== file.id));
         if (preview?.file.id === file.id) setPreview(null);
