@@ -16,6 +16,8 @@ import { suggestVoiceCandidates, ACCENTUATION_YANDEX_ROLE, detectAccentuation, t
 import { useLocalCharacters } from "@/hooks/useLocalCharacters";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { readSceneContentFromLocal } from "@/lib/localSceneContent";
+import { readStoryboardFromLocal } from "@/lib/storyboardSync";
+import { deriveStoryboardCharacterIds, deriveStoryboardTypeMappings } from "@/lib/storyboardCharacterRouting";
 import type { CharacterIndex } from "@/pages/parser/types";
 
 // ─── Types ──────────────────────────────────────────────
@@ -141,6 +143,8 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
   const sceneCharIds = localChars.sceneCharIds;
   const chapterCharIds = localChars.chapterCharIds;
   const segmentCounts = localChars.segmentCounts;
+  const [storyboardSceneCharIds, setStoryboardSceneCharIds] = useState<Set<string>>(new Set());
+  const [storyboardChapterCharIds, setStoryboardChapterCharIds] = useState<Set<string>>(new Set());
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [profiling, setProfiling] = useState(false);
@@ -203,14 +207,74 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     "Рассказчик", "Narrator", "Комментатор", "Commentator",
   ]), []);
 
+  useEffect(() => {
+    if (!storage || !sceneId) {
+      setStoryboardSceneCharIds(new Set());
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const storyboard = await readStoryboardFromLocal(storage, sceneId);
+      if (cancelled) return;
+
+      const mappings = deriveStoryboardTypeMappings(
+        storyboard?.segments ?? [],
+        characters,
+        storyboard?.typeMappings ?? [],
+        storyboard?.inlineNarrationSpeaker ?? null,
+      );
+      setStoryboardSceneCharIds(deriveStoryboardCharacterIds(storyboard?.segments ?? [], characters, mappings));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [storage, sceneId, characters, refreshToken]);
+
+  useEffect(() => {
+    if (!storage || !chapterSceneIds?.length) {
+      setStoryboardChapterCharIds(new Set());
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const ids = new Set<string>();
+      const storyboards = await Promise.all(chapterSceneIds.map((sid) => readStoryboardFromLocal(storage, sid)));
+      if (cancelled) return;
+
+      for (const storyboard of storyboards) {
+        const mappings = deriveStoryboardTypeMappings(
+          storyboard?.segments ?? [],
+          characters,
+          storyboard?.typeMappings ?? [],
+          storyboard?.inlineNarrationSpeaker ?? null,
+        );
+        for (const id of deriveStoryboardCharacterIds(storyboard?.segments ?? [], characters, mappings)) {
+          ids.add(id);
+        }
+      }
+
+      setStoryboardChapterCharIds(ids);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [storage, chapterSceneIds, characters, refreshToken]);
+
+  const effectiveSceneCharIds = storyboardSceneCharIds.size > 0 ? storyboardSceneCharIds : sceneCharIds;
+  const effectiveChapterCharIds = storyboardChapterCharIds.size > 0 ? storyboardChapterCharIds : chapterCharIds;
+
   // Filtered character list
   const filteredCharacters = useMemo(() => {
     let list: BookCharacter[];
     if (filterMode === "scene" && sceneId) {
-      const sceneChars = characters.filter(c => sceneCharIds.has(c.id));
+      const sceneChars = characters.filter(c => effectiveSceneCharIds.has(c.id));
       list = sceneChars.length > 0 ? sceneChars : characters.filter(c => SYSTEM_NAMES.has(c.name));
     } else if (filterMode === "chapter") {
-      const chapterChars = characters.filter(c => chapterCharIds.has(c.id) || SYSTEM_NAMES.has(c.name));
+      const chapterChars = characters.filter(c => effectiveChapterCharIds.has(c.id) || SYSTEM_NAMES.has(c.name));
       list = chapterChars.length > 0 ? chapterChars : characters;
     } else {
       list = characters;
@@ -222,7 +286,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
       if (aSys && bSys) return (a.sort_order ?? 0) - (b.sort_order ?? 0);
       return a.name.localeCompare(b.name);
     });
-  }, [characters, filterMode, sceneCharIds, chapterCharIds, sceneId, SYSTEM_NAMES]);
+  }, [characters, filterMode, effectiveSceneCharIds, effectiveChapterCharIds, sceneId, SYSTEM_NAMES]);
 
   // Sync voice settings when character selected
   useEffect(() => {
@@ -778,7 +842,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
               )}
               {characters.length > 0 && (
                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                  {filterMode === "scene" && sceneCharIds.size > 0 ? filteredCharacters.length : characters.length}
+                  {filterMode === "scene" && effectiveSceneCharIds.size > 0 ? filteredCharacters.length : characters.length}
                 </Badge>
               )}
             </div>
@@ -1096,7 +1160,7 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
                       </div>
                     )}
                     {/* Scene-level Speech Refinement */}
-                    {sceneId && sceneCharIds.has(selectedChar.id) && (
+                    {sceneId && effectiveSceneCharIds.has(selectedChar.id) && (
                       <div className="mt-4 pt-3 border-t border-border">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">

@@ -31,6 +31,7 @@ import { SegmentTypeBadge } from "./storyboard/SegmentTypeBadge";
 import { SpeakerBadge } from "./storyboard/SpeakerBadge";
 import { StressReviewPanel, type StressSuggestion } from "./storyboard/StressReviewPanel";
 import type { LocalTypeMappingEntry } from "@/lib/storyboardSync";
+import { deriveStoryboardTypeMappings } from "@/lib/storyboardCharacterRouting";
 
 // ─── Main component ─────────────────────────────────────────
 
@@ -103,15 +104,31 @@ export function StoryboardPanel({
   const inlineNarrationSpeakerRef = useRef(inlineNarrationSpeaker);
   inlineNarrationSpeakerRef.current = inlineNarrationSpeaker;
 
+  const deriveCurrentTypeMappings = useCallback((sourceSegments: Segment[], sourceSpeaker?: string | null) => {
+    return deriveStoryboardTypeMappings(
+      sourceSegments,
+      characters,
+      typeMappingsRef.current,
+      sourceSpeaker !== undefined ? sourceSpeaker : inlineNarrationSpeakerRef.current,
+    );
+  }, [characters]);
+
   /** Build a snapshot for OPFS persistence */
   const buildSnapshot = useCallback(
-    (segs?: Segment[], audio?: Map<string, { status: string; durationMs: number }>, speaker?: string | null): StoryboardSnapshot => ({
-      segments: segs ?? segments,
-      typeMappings: typeMappingsRef.current,
-      audioStatus: audio ?? audioStatus,
-      inlineNarrationSpeaker: speaker !== undefined ? speaker : inlineNarrationSpeaker,
-    }),
-    [segments, audioStatus, inlineNarrationSpeaker],
+    (segs?: Segment[], audio?: Map<string, { status: string; durationMs: number }>, speaker?: string | null): StoryboardSnapshot => {
+      const nextSegments = segs ?? segments;
+      const nextSpeaker = speaker !== undefined ? speaker : inlineNarrationSpeaker;
+      const nextTypeMappings = deriveCurrentTypeMappings(nextSegments, nextSpeaker);
+      typeMappingsRef.current = nextTypeMappings;
+
+      return {
+        segments: nextSegments,
+        typeMappings: nextTypeMappings,
+        audioStatus: audio ?? audioStatus,
+        inlineNarrationSpeaker: nextSpeaker,
+      };
+    },
+    [segments, audioStatus, inlineNarrationSpeaker, deriveCurrentTypeMappings],
   );
 
   // Reset merge selection when scene changes
@@ -263,7 +280,12 @@ export function StoryboardPanel({
         if (local && local.segments.length > 0) {
           const firstPhrase = local.segments[0]?.phrases?.[0]?.text?.slice(0, 80) || "(empty)";
           console.debug(`[Storyboard] Loaded ${local.segments.length} segments from OPFS, first phrase: "${firstPhrase}"`);
-          typeMappingsRef.current = local.typeMappings || [];
+          typeMappingsRef.current = deriveStoryboardTypeMappings(
+            local.segments,
+            characters,
+            local.typeMappings || [],
+            local.inlineNarrationSpeaker,
+          );
           setInlineNarrationSpeaker(local.inlineNarrationSpeaker);
           setAudioStatus(new Map(Object.entries(local.audioStatus || {})));
           applySegments(local.segments);
@@ -288,7 +310,7 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка загрузки сегментов" : "Failed to load segments");
     }
     setLoading(false);
-  }, [isRu, hasStorage, loadFromLocal, applySegments]);
+  }, [isRu, hasStorage, loadFromLocal, applySegments, characters]);
 
   // ─── Segment Operations ───────────────────────────────────
 
@@ -627,20 +649,8 @@ export function StoryboardPanel({
   // ─── Character Sync (local-only — update typeMappings ref) ──
 
   const syncTypeMappings = useCallback((updatedSegments: Segment[]) => {
-    // Rebuild typeMappings from current segments + characters
-    const mappings: LocalTypeMappingEntry[] = [];
-    const seen = new Set<string>();
-    for (const seg of updatedSegments) {
-      if (seg.speaker && !seen.has(seg.segment_type)) {
-        const charRecord = characters.find(c => c.name === seg.speaker);
-        if (charRecord) {
-          mappings.push({ segmentType: seg.segment_type, characterId: charRecord.id, characterName: charRecord.name });
-          seen.add(seg.segment_type);
-        }
-      }
-    }
-    typeMappingsRef.current = mappings;
-  }, [characters]);
+    typeMappingsRef.current = deriveCurrentTypeMappings(updatedSegments);
+  }, [deriveCurrentTypeMappings]);
 
   const PROPAGATE_TYPES = new Set(["narrator", "first_person", "inner_thought", "epigraph", "lyric", "footnote"]);
 

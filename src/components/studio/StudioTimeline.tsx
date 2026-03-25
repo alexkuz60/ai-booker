@@ -24,6 +24,7 @@ import { TimelineRuler } from "./TimelineRuler";
 import { TimelineTrack } from "./TimelineTrack";
 import { Playhead } from "./TimelinePlayhead";
 import { ChannelPluginsPanel, type ClipInfo } from "./ChannelPluginsPanel";
+import { buildCharacterNameMap, deriveStoryboardCharacterIds, deriveStoryboardTypeMappings } from "@/lib/storyboardCharacterRouting";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -286,66 +287,34 @@ export function StudioTimeline({
 
       const sid = contextSceneIds[0];
 
-      // Read scene character map + storyboard + character index in parallel from OPFS
-      const { readSceneCharacterMap, readCharacterIndex } = await import("@/lib/localCharacters");
+      // Read storyboard + character index in parallel from OPFS
+      const { readCharacterIndex } = await import("@/lib/localCharacters");
       const { readStoryboardFromLocal } = await import("@/lib/storyboardSync");
-      const [sceneMap, allChars, storyboard] = await Promise.all([
-        readSceneCharacterMap(storage, sid),
+      const [allChars, storyboard] = await Promise.all([
         readCharacterIndex(storage),
         readStoryboardFromLocal(storage, sid),
       ]);
 
-      // Build type mappings from STORYBOARD (source of truth), not scene character map
+      const storyboardSegments = storyboard?.segments ?? [];
+      const derivedMappings = deriveStoryboardTypeMappings(
+        storyboardSegments,
+        allChars,
+        storyboard?.typeMappings ?? [],
+        storyboard?.inlineNarrationSpeaker ?? null,
+      );
+
+      // Build type mappings strictly from STORYBOARD (source of truth)
       const tm: TypeMappingsByScene = new Map();
-      if (storyboard?.typeMappings && storyboard.typeMappings.length > 0) {
+      if (derivedMappings.length > 0) {
         const sceneTypeMappings = new Map<string, string>();
-        for (const m of storyboard.typeMappings) {
-          sceneTypeMappings.set(m.segmentType, m.characterId);
-        }
-        tm.set(sid, sceneTypeMappings);
-      } else if (sceneMap?.typeMappings && sceneMap.typeMappings.length > 0) {
-        // Fallback to scene character map (e.g. after restore)
-        const sceneTypeMappings = new Map<string, string>();
-        for (const m of sceneMap.typeMappings) {
+        for (const m of derivedMappings) {
           sceneTypeMappings.set(m.segmentType, m.characterId);
         }
         tm.set(sid, sceneTypeMappings);
       }
       setTypeMappings(tm);
 
-      // Character IDs from scene map speakers + storyboard type mappings
-      const charIdSet = new Set<string>();
-      if (sceneMap?.speakers) {
-        for (const s of sceneMap.speakers) charIdSet.add(s.characterId);
-      }
-      // Include characters referenced by storyboard type mappings
-      if (storyboard?.typeMappings) {
-        for (const m of storyboard.typeMappings) charIdSet.add(m.characterId);
-      }
-      // Include characters referenced by scene map type mappings (fallback)
-      if (sceneMap?.typeMappings) {
-        for (const m of sceneMap.typeMappings) charIdSet.add(m.characterId);
-      }
-
-      // ── Include system characters based on storyboard segment types ──
-      // Even without explicit typeMappings, narrator/epigraph/lyric/footnote
-      // segments should route to Рассказчик/Комментатор tracks.
-      const SYSTEM_TYPE_DEFS: Array<{ types: string[]; names: string[] }> = [
-        { types: ["narrator", "epigraph", "lyric"], names: ["рассказчик", "narrator"] },
-        { types: ["footnote"], names: ["комментатор", "commentator"] },
-      ];
-      if (storyboard?.segments) {
-        const segTypes = new Set(storyboard.segments.map(s => s.segment_type));
-        for (const sys of SYSTEM_TYPE_DEFS) {
-          if (sys.types.some(t => segTypes.has(t))) {
-            // Find system character in allChars by name
-            const sysChar = allChars.find(c =>
-              sys.names.includes(c.name.toLowerCase())
-            );
-            if (sysChar) charIdSet.add(sysChar.id);
-          }
-        }
-      }
+      const charIdSet = deriveStoryboardCharacterIds(storyboardSegments, allChars, derivedMappings);
 
       if (charIdSet.size === 0) {
         setCharTracks([]); setSpeakerToCharId(new Map());
@@ -361,21 +330,7 @@ export function StudioTimeline({
         return;
       }
 
-      const nameMap = new Map<string, string>();
-      for (const c of sceneChars) {
-        nameMap.set(c.name.toLowerCase(), c.id);
-        for (const alias of (c.aliases ?? [])) {
-          if (alias) nameMap.set(alias.toLowerCase(), c.id);
-        }
-      }
-      // Also add ALL characters' names for fallback matching
-      for (const c of allChars) {
-        if (!nameMap.has(c.name.toLowerCase())) nameMap.set(c.name.toLowerCase(), c.id);
-        for (const alias of (c.aliases ?? [])) {
-          if (alias && !nameMap.has(alias.toLowerCase())) nameMap.set(alias.toLowerCase(), c.id);
-        }
-      }
-      setSpeakerToCharId(nameMap);
+      setSpeakerToCharId(buildCharacterNameMap(sceneChars));
 
       setCharTracks(
         sceneChars.map((c, i) => ({
