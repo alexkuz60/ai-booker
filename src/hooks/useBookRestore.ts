@@ -274,14 +274,16 @@ export function useBookRestore({
     if (storage?.isReady) {
       try {
         const meta = await storage.readJSON<Record<string, unknown>>("project.json");
-        if (meta?.fileFormat === "docx") format = "docx";
+        if (meta?.fileFormat) format = meta.fileFormat as FileFormat;
       } catch {}
     }
-    if (format === "pdf" && fileName && detectFileFormat(fileName) === "docx") {
-      format = "docx";
+    if (format === "pdf" && fileName) {
+      const detected = detectFileFormat(fileName);
+      if (detected !== "pdf") format = detected;
     }
 
-    if (format === "docx") return null;
+    // Only PDF format needs a proxy loader; DOCX and FB2 don't use pdfjs
+    if (format !== "pdf") return null;
 
     const loadPdf = async (arrayBuffer: ArrayBuffer) => {
       const { getDocument } = await import("pdfjs-dist");
