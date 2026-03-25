@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { User, Key, Settings, HardDrive, Network, Activity } from 'lucide-react';
+import { User, Key, Settings, Network } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
@@ -18,7 +18,6 @@ import { PreferencesTab } from '@/components/profile/tabs/PreferencesTab';
 import { ApiKeysTab } from '@/components/profile/tabs/ApiKeysTab';
 import { ApiRoutersTab } from '@/components/profile/tabs/ApiRoutersTab';
 import { StorageTab } from '@/components/profile/tabs/StorageTab';
-import { AiUsageWidget } from '@/components/profile/AiUsageWidget';
 
 export default function Profile() {
   const { theme, setTheme } = useTheme();
@@ -197,59 +196,6 @@ export default function Profile() {
             />
           </TabsContent>
 
-        </Tabs>
-      </section>
-
-      <Separator className="my-2" />
-
-      <section>
-        <div className="flex items-center gap-2 mb-4">
-          <HardDrive className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-semibold font-display">
-            {isRu ? 'Файлохранилище' : 'File Storage'}
-          </h2>
-        </div>
-        {user && <StorageTab isRu={isRu} userId={user.id} />}
-      </section>
-
-      <Separator className="my-2" />
-
-      <section>
-        <div className="flex items-center gap-2 mb-4">
-          <Activity className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-semibold font-display">
-            {isRu ? 'AI Аналитика' : 'AI Analytics'}
-          </h2>
-        </div>
-        <AiUsageWidget isRu={isRu} />
-      </section>
-
-      <Separator className="my-2" />
-
-      <section>
-        <div className="flex items-center gap-2 mb-4">
-          <Key className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-semibold font-display">
-            {isRu ? 'Управление API' : 'API Management'}
-          </h2>
-        </div>
-        <Tabs value={apiTab} onValueChange={setApiTab} className="space-y-6">
-          <TabsList className="flex w-full h-auto flex-wrap gap-0.5">
-            <TabsTrigger value="api-keys" className="flex items-center gap-2 flex-1">
-              <Key className="h-4 w-4 shrink-0" />
-              <span>{isRu ? 'API Ключи' : 'API Keys'}</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="api-keys">
-            <ApiKeysTab
-              apiKeys={apiKeys}
-              saving={saving}
-              isRu={isRu}
-              onKeyChange={setKeyValue}
-              onSave={handleSaveApiKeys}
-            />
-          </TabsContent>
         </Tabs>
       </section>
     </motion.div>
