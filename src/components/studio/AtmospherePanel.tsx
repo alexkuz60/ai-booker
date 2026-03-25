@@ -478,6 +478,9 @@ function GeneratorPanel({
                   !item.savedPath && "cursor-grab active:cursor-grabbing"
                 )}
               >
+                {!item.savedPath && (
+                  <GripVertical className="h-3 w-3 text-muted-foreground/50 shrink-0" />
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
