@@ -35,8 +35,8 @@ export interface TimelineTrackData {
 }
 
 const FIXED_TRACKS: TimelineTrackData[] = [
-  { id: "ambience", label: "Атмосфера", color: "hsl(175 45% 45%)", type: "atmosphere" },
-  { id: "sfx", label: "SFX", color: "hsl(220 50% 55%)", type: "sfx" },
+  { id: "atmosphere-bg", label: "Атмосфера", color: "hsl(175 45% 45%)", type: "atmosphere" },
+  { id: "atmosphere-sfx", label: "SFX", color: "hsl(220 50% 55%)", type: "sfx" },
 ];
 
 const TRACK_LABELS_WIDTH_COLLAPSED = 112;
