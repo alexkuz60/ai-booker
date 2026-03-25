@@ -311,6 +311,26 @@ export function StudioTimeline({
         for (const m of sceneMap.typeMappings) charIdSet.add(m.characterId);
       }
 
+      // ── Include system characters based on storyboard segment types ──
+      // Even without explicit typeMappings, narrator/epigraph/lyric/footnote
+      // segments should route to Рассказчик/Комментатор tracks.
+      const SYSTEM_TYPE_DEFS: Array<{ types: string[]; names: string[] }> = [
+        { types: ["narrator", "epigraph", "lyric"], names: ["рассказчик", "narrator"] },
+        { types: ["footnote"], names: ["комментатор", "commentator"] },
+      ];
+      if (storyboard?.segments) {
+        const segTypes = new Set(storyboard.segments.map(s => s.segment_type));
+        for (const sys of SYSTEM_TYPE_DEFS) {
+          if (sys.types.some(t => segTypes.has(t))) {
+            // Find system character in allChars by name
+            const sysChar = allChars.find(c =>
+              sys.names.includes(c.name.toLowerCase())
+            );
+            if (sysChar) charIdSet.add(sysChar.id);
+          }
+        }
+      }
+
       if (charIdSet.size === 0) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
 
       // Filter only chars appearing in this scene
