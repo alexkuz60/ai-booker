@@ -96,7 +96,7 @@ interface StorageTabProps {
 
 /* ─── Component ───────────────────────────────────────────────────────────── */
 
-export function StorageTab({ isRu, userId }: StorageTabProps) {
+export function StorageTab({ isRu, userId, onStatsReady }: StorageTabProps) {
   const [files, setFiles] = useState<StorageFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
