@@ -21,7 +21,6 @@ import type { ProjectStorage } from "@/lib/projectStorage";
 import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
 import { normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 import { detectFileFormat, getSourcePath, findSourceBlob, type FileFormat } from "@/lib/fileFormatUtils";
-import { detectFileFormat, getSourcePath, type FileFormat } from "@/lib/fileFormatUtils";
 import { wipeProjectBrowserState } from "@/lib/projectCleanup";
 import {
   resolveLocalStorageForBook,
