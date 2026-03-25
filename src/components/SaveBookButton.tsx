@@ -17,6 +17,13 @@ interface SaveBookButtonProps {
   onDownloadZip?: () => void | Promise<void>;
   showImportZip?: boolean;
   onImportZip?: (file: File) => void | Promise<void>;
+  /** Optional checkboxes shown in the sync confirm dialog */
+  confirmOptions?: Array<{
+    id: string;
+    label: string;
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+  }>;
 }
 
 export function SaveBookButton({
@@ -28,6 +35,7 @@ export function SaveBookButton({
   onDownloadZip,
   showImportZip,
   onImportZip,
+  confirmOptions,
 }: SaveBookButtonProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -84,6 +92,7 @@ export function SaveBookButton({
         steps={steps}
         phase={phase}
         errorMessage={errorMessage}
+        confirmOptions={confirmOptions}
       />
 
       {showDownloadZip && onDownloadZip && (

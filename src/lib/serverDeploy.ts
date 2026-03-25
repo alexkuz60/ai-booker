@@ -59,8 +59,14 @@ interface DeployParams {
   report: SyncProgressCallback;
   /** Whether to download IR audio files into global OPFS cache */
   downloadImpulses?: boolean;
+  /** Whether to download atmosphere audio files into OPFS cache */
+  downloadAtmosphere?: boolean;
+  /** Whether to download SFX audio files into OPFS cache */
+  downloadSfx?: boolean;
   /** Source file blob preserved from the old OPFS project before wipe */
   preservedSourceBlob?: Blob | null;
+  /** User ID for downloading per-user audio assets */
+  userId?: string;
 }
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -92,7 +98,10 @@ export async function deployFromServer({
   isRu,
   report,
   downloadImpulses = false,
+  downloadAtmosphere = false,
+  downloadSfx = false,
   preservedSourceBlob,
+  userId: paramUserId,
 }: DeployParams): Promise<DeployResult> {
   // ── 1. Fetch structure (parts + chapters) ─────────────────
   // NOTE: Source file is NEVER downloaded from server.
@@ -683,6 +692,44 @@ export async function deployFromServer({
     }
   } else {
     report("download_ir", "skipped");
+  }
+
+  // ── 8c. Download atmosphere audio into OPFS cache ─────────
+  if (downloadAtmosphere) {
+    report("download_atmo", "running");
+    try {
+      const { downloadAudioAssetsBatch } = await import("@/lib/audioAssetCache");
+      const assetUserId = paramUserId || "";
+      if (!assetUserId) throw new Error("No userId for atmosphere download");
+      const count = await downloadAudioAssetsBatch(assetUserId, "atmosphere", (done, total) => {
+        report("download_atmo", "running", `${done}/${total}`);
+      });
+      report("download_atmo", count > 0 ? "done" : "skipped", count > 0 ? `${count}` : undefined);
+    } catch (err) {
+      console.warn("[Deploy] Atmosphere download failed:", err);
+      report("download_atmo", "error");
+    }
+  } else {
+    report("download_atmo", "skipped");
+  }
+
+  // ── 8d. Download SFX audio into OPFS cache ───────────────
+  if (downloadSfx) {
+    report("download_sfx", "running");
+    try {
+      const { downloadAudioAssetsBatch } = await import("@/lib/audioAssetCache");
+      const sfxUserId = paramUserId || "";
+      if (!sfxUserId) throw new Error("No userId for SFX download");
+      const count = await downloadAudioAssetsBatch(sfxUserId, "sfx", (done, total) => {
+        report("download_sfx", "running", `${done}/${total}`);
+      });
+      report("download_sfx", count > 0 ? "done" : "skipped", count > 0 ? `${count}` : undefined);
+    } catch (err) {
+      console.warn("[Deploy] SFX download failed:", err);
+      report("download_sfx", "error");
+    }
+  } else {
+    report("download_sfx", "skipped");
   }
 
   // ── 9. Source file (preserved from local, never from server) ──

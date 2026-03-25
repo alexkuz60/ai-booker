@@ -252,6 +252,8 @@ export function buildRestoreSteps(isRu: boolean): SyncStep[] {
     { id: "storyboards", label: isRu ? "Раскадровка сцен" : "Scene storyboards", status: "pending" },
     { id: "scene_maps", label: isRu ? "Карты персонажей сцен" : "Scene character maps", status: "pending" },
     { id: "download_ir", label: isRu ? "Загрузка импульсов (IR)" : "Downloading impulses (IR)", status: "pending" },
+    { id: "download_atmo", label: isRu ? "Загрузка атмосферы" : "Downloading atmosphere", status: "pending" },
+    { id: "download_sfx", label: isRu ? "Загрузка SFX" : "Downloading SFX", status: "pending" },
     { id: "source_file", label: isRu ? "Сохранение файла" : "Saving source file", status: "pending" },
     { id: "finalize", label: isRu ? "Завершение" : "Finalizing", status: "pending" },
   ];
