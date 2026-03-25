@@ -48,6 +48,8 @@ export interface DeployResult {
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
   pdfProxy: any | null;
   totalPages: number;
+  /** True when the source file was preserved from the local project */
+  sourceFilePreserved: boolean;
 }
 
 interface DeployParams {
@@ -57,6 +59,8 @@ interface DeployParams {
   report: SyncProgressCallback;
   /** Whether to download IR audio files into global OPFS cache */
   downloadImpulses?: boolean;
+  /** Source file blob preserved from the old OPFS project before wipe */
+  preservedSourceBlob?: Blob | null;
 }
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -88,10 +92,13 @@ export async function deployFromServer({
   isRu,
   report,
   downloadImpulses = false,
+  preservedSourceBlob,
 }: DeployParams): Promise<DeployResult> {
-  // ── 1. Fetch structure (parts + chapters + source file) ───
+  // ── 1. Fetch structure (parts + chapters) ─────────────────
+  // NOTE: Source file is NEVER downloaded from server.
+  // It must be preserved from the local OPFS project before wipe.
   report("fetch_structure", "running");
-  const [partsRes, chaptersRes, pdfBlob] = await Promise.all([
+  const [partsRes, chaptersRes] = await Promise.all([
     supabase
       .from("book_parts")
       .select("id, part_number, title")
@@ -104,12 +111,6 @@ export async function deployFromServer({
       )
       .eq("book_id", book.id)
       .order("chapter_number"),
-    book.file_path
-      ? supabase.storage
-          .from("book-uploads")
-          .download(book.file_path)
-          .then((r) => r.data)
-      : Promise.resolve(null),
   ]);
 
   const parts = partsRes.data || [];
@@ -121,18 +122,21 @@ export async function deployFromServer({
   }
   report("fetch_structure", "done", `${chapters.length}`);
 
+  // Use locally preserved source blob (never from server)
+  const localSourceBlob = preservedSourceBlob ?? null;
+
   // ── 2. Parse PDF (if applicable) ──────────────────────────
   const bookFormat = detectFileFormat(book.file_name);
-  const isBookDocx = bookFormat === "docx";
+  const isBookPdf = bookFormat === "pdf";
 
   report("parse_pdf", "running");
   let pdfProxy: any = null;
   let totalPages = 0;
   let tocFromPdf: { startPage: number; endPage: number; level: number }[] = [];
 
-  if (!isBookDocx && pdfBlob) {
+  if (isBookPdf && localSourceBlob) {
     try {
-      const arrayBuffer = await pdfBlob.arrayBuffer();
+      const arrayBuffer = await localSourceBlob.arrayBuffer();
       const { getDocument } = await import("pdfjs-dist");
       const pdf = await getDocument({ data: arrayBuffer }).promise;
       pdfProxy = pdf;
@@ -196,7 +200,7 @@ export async function deployFromServer({
       console.warn("Could not restore PDF for analysis:", pdfErr);
     }
   }
-  report("parse_pdf", isBookDocx ? "skipped" : pdfProxy ? "done" : "skipped");
+  report("parse_pdf", !isBookPdf ? "skipped" : pdfProxy ? "done" : "skipped");
 
   // ── 3. Build TOC ──────────────────────────────────────────
   report("build_toc", "running");
@@ -681,14 +685,16 @@ export async function deployFromServer({
     report("download_ir", "skipped");
   }
 
-  // ── 9. Source file ────────────────────────────────────────
+  // ── 9. Source file (preserved from local, never from server) ──
   report("source_file", "running");
-  if (pdfBlob) {
+  let sourceFilePreserved = false;
+  if (localSourceBlob) {
     const sourcePath = getSourcePath(bookFormat);
     try {
-      await storage.writeBlob(sourcePath, pdfBlob);
+      await storage.writeBlob(sourcePath, localSourceBlob);
+      sourceFilePreserved = true;
     } catch (err) {
-      console.warn("[Deploy] Failed to save source file:", err);
+      console.warn("[Deploy] Failed to save preserved source file:", err);
     }
   }
 
@@ -702,10 +708,10 @@ export async function deployFromServer({
       await storage.writeJSON("project.json", projMeta);
     }
   } catch {}
-  report("source_file", "done");
+  report("source_file", sourceFilePreserved ? "done" : "skipped");
 
   // ── 10. Finalize ──────────────────────────────────────────
   report("finalize", "done");
 
-  return { toc, chapterIdMap, partIdMap, chapterResults, pdfProxy, totalPages };
+  return { toc, chapterIdMap, partIdMap, chapterResults, pdfProxy, totalPages, sourceFilePreserved };
 }
