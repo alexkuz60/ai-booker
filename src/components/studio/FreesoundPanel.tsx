@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import {
-  Search, Play, Pause, Save, Loader2, Clock, Star, User, ExternalLink, ChevronLeft, ChevronRight,
+  Search, Play, Pause, Save, Loader2, Clock, Star, User, ExternalLink, ChevronLeft, ChevronRight, GripVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,8 @@ import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { saveToStorage } from "@/lib/soundProvider";
+import { cn } from "@/lib/utils";
+import { setDragAudio, clearDragAudio, DRAG_AUDIO_MIME } from "@/lib/dragAudioStore";
 
 interface FreesoundResult {
   id: number;
