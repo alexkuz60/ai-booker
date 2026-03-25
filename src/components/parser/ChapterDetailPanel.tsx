@@ -320,13 +320,13 @@ function SceneCards({
                     </div>
                   </div>
                   {content && (
-                    <p className="text-sm text-muted-foreground whitespace-pre-line select-text leading-none">
-                      {isExpanded ? renderMarkedText(content) : (
-                        <>
-                          {renderMarkedText(preview)}{hasMore && "…"}
-                        </>
-                      )}
-                    </p>
+                    <div className="text-sm text-muted-foreground select-text" style={{ lineHeight: '1.1' }}>
+                      {(isExpanded ? content : (preview + (hasMore ? "…" : ""))).split(/\n\n+/).map((para, pi) => (
+                        <p key={pi} className="whitespace-pre-line" style={{ marginTop: pi === 0 ? 0 : '0.2em', marginBottom: 0 }}>
+                          {renderMarkedText(para)}
+                        </p>
+                      ))}
+                    </div>
                   )}
                 </CardContent>
               </Card>
