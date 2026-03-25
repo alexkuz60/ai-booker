@@ -115,9 +115,13 @@ export async function removeAudioAssetFromCache(
 
 // ── Fetch with cache ────────────────────────────────────────
 
+/** In-flight dedup: prevents parallel downloads of the same storagePath */
+const inflightFetches = new Map<string, Promise<ArrayBuffer>>();
+
 /**
  * Fetch audio asset with OPFS cache-first strategy.
  * Falls back to Supabase Storage signed URL if not cached.
+ * Deduplicates parallel requests for the same storagePath.
  */
 export async function fetchAudioAssetWithCache(
   category: AudioAssetCategory,
@@ -130,26 +134,43 @@ export async function fetchAudioAssetWithCache(
     return cached;
   }
 
-  // 2. Fetch from server
-  console.log(`[audioAssetCache] MISS ${category}, fetching: ${storagePath}`);
-  const { data: urlData } = await supabase.storage
-    .from("user-media")
-    .createSignedUrl(storagePath, 600);
-  if (!urlData?.signedUrl) {
-    throw new Error(`No signed URL for audio asset: ${storagePath}`);
+  // 2. Deduplicate in-flight requests
+  const cacheKey = `${category}:${storagePath}`;
+  const existing = inflightFetches.get(cacheKey);
+  if (existing) {
+    console.log(`[audioAssetCache] DEDUP ${category}: ${storagePath}`);
+    return existing;
   }
 
-  const response = await fetch(urlData.signedUrl);
-  if (!response.ok) {
-    throw new Error(`Audio asset fetch failed: ${response.status}`);
+  // 3. Fetch from server
+  const fetchPromise = (async () => {
+    console.log(`[audioAssetCache] MISS ${category}, fetching: ${storagePath}`);
+    const { data: urlData } = await supabase.storage
+      .from("user-media")
+      .createSignedUrl(storagePath, 600);
+    if (!urlData?.signedUrl) {
+      throw new Error(`No signed URL for audio asset: ${storagePath}`);
+    }
+
+    const response = await fetch(urlData.signedUrl);
+    if (!response.ok) {
+      throw new Error(`Audio asset fetch failed: ${response.status}`);
+    }
+
+    const arrayBuf = await response.arrayBuffer();
+
+    // 4. Store in OPFS cache (fire-and-forget)
+    putAudioAssetToCache(category, storagePath, arrayBuf).catch(() => {});
+
+    return arrayBuf;
+  })();
+
+  inflightFetches.set(cacheKey, fetchPromise);
+  try {
+    return await fetchPromise;
+  } finally {
+    inflightFetches.delete(cacheKey);
   }
-
-  const arrayBuf = await response.arrayBuffer();
-
-  // 3. Store in OPFS cache (fire-and-forget)
-  putAudioAssetToCache(category, storagePath, arrayBuf).catch(() => {});
-
-  return arrayBuf;
 }
 
 // ── Batch download ──────────────────────────────────────────
