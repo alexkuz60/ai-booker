@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { cn } from "@/lib/utils";
 import {
   Wand2, Loader2, Play, Pause, Save, Music, Volume2, Sparkles,
   Clock, Sliders, Zap, Trash2, Pencil, ArrowRight, RotateCcw,
@@ -24,6 +25,8 @@ import {
   type SoundCategory,
   type GeneratedSound,
 } from "@/lib/soundProvider";
+import { GripVertical } from "lucide-react";
+import { setDragAudio, clearDragAudio, DRAG_AUDIO_MIME } from "@/lib/dragAudioStore";
 import { ElevenLabsCreditsWidget } from "./ElevenLabsCreditsWidget";
 import { FreesoundPanel } from "./FreesoundPanel";
 
@@ -455,8 +458,29 @@ function GeneratorPanel({
             {filtered.map((item) => (
               <div
                 key={item.id}
-                className="flex items-center gap-2 p-2 rounded-md border border-border/50 bg-card/30 hover:bg-card/60 transition-colors"
+                draggable={!item.savedPath}
+                onDragStart={(e) => {
+                  if (item.savedPath) return;
+                  const dragId = item.id;
+                  setDragAudio(dragId, {
+                    blob: item.sound.blob,
+                    prompt: item.prompt,
+                    category: item.category,
+                  });
+                  e.dataTransfer.setData(DRAG_AUDIO_MIME, dragId);
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
+                onDragEnd={() => {
+                  clearDragAudio(item.id);
+                }}
+                className={cn(
+                  "flex items-center gap-2 p-2 rounded-md border border-border/50 bg-card/30 hover:bg-card/60 transition-colors",
+                  !item.savedPath && "cursor-grab active:cursor-grabbing"
+                )}
               >
+                {!item.savedPath && (
+                  <GripVertical className="h-3 w-3 text-muted-foreground/50 shrink-0" />
+                )}
                 <Button
                   variant="ghost"
                   size="icon"

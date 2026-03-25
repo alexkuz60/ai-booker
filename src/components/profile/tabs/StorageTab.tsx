@@ -28,6 +28,8 @@ import {
   removeAudioAssetFromCache,
   type AudioAssetCategory,
 } from '@/lib/audioAssetCache';
+import { getDragAudio, DRAG_AUDIO_MIME } from '@/lib/dragAudioStore';
+import { saveToStorage, type SoundCategory } from '@/lib/soundProvider';
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 
@@ -322,11 +324,53 @@ export function StorageTab({ isRu, userId, onStatsReady }: StorageTabProps) {
     });
   };
 
+  /* ─── Drop handler for dragged generated audio ──────────────── */
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const dragId = e.dataTransfer.getData(DRAG_AUDIO_MIME);
+    if (!dragId) return;
+    const item = getDragAudio(dragId);
+    if (!item) return;
+
+    const catMap: Record<string, string> = { sfx: "sfx", atmosphere: "atmosphere", music: "music" };
+    const folder = catMap[item.category] || "sfx";
+    const slug = item.prompt.toLowerCase().replace(/[^a-zа-я0-9]+/gi, "-").slice(0, 40);
+    const fileName = `${slug}-${Date.now()}.mp3`;
+
+    try {
+      await saveToStorage(item.blob, item.category as SoundCategory, fileName);
+      toast.success(isRu ? 'Сохранено в хранилище' : 'Saved to storage');
+      await loadFiles();
+    } catch (err: any) {
+      toast.error(err.message || (isRu ? 'Ошибка сохранения' : 'Save failed'));
+    }
+  }, [isRu, loadFiles]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes(DRAG_AUDIO_MIME)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      setDragOver(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOver(false);
+  }, []);
+
   /* ─── Render ─────────────────────────────────────────────────── */
 
   return (
     <TooltipProvider>
-      <div className="space-y-6">
+      <div
+        className="space-y-6"
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+      >
         {/* Hidden file input */}
         <input
           ref={fileInputRef}
@@ -354,7 +398,15 @@ export function StorageTab({ isRu, userId, onStatsReady }: StorageTabProps) {
         </div>
 
         {/* File list grouped by category */}
-        <div className="border rounded-md overflow-hidden">
+        <div className={cn(
+          "border rounded-md overflow-hidden transition-colors",
+          dragOver && "border-primary border-2 bg-primary/5"
+        )}>
+          {dragOver && (
+            <div className="flex items-center justify-center py-3 text-xs text-primary font-medium border-b border-primary/20 bg-primary/10">
+              {isRu ? '⬇ Отпустите, чтобы сохранить в хранилище' : '⬇ Drop to save to storage'}
+            </div>
+          )}
           <ScrollArea className="h-[calc(100vh-28rem)] min-h-[300px]">
             {loading ? (
               <div className="flex items-center justify-center py-12">
