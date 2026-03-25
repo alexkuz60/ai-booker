@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { saveToStorage } from "@/lib/soundProvider";
 import { cn } from "@/lib/utils";
 import { setDragAudio, clearDragAudio, DRAG_AUDIO_MIME } from "@/lib/dragAudioStore";
+import { createDragGhost } from "@/lib/dragGhost";
 
 interface FreesoundResult {
   id: number;
@@ -227,6 +228,8 @@ export function FreesoundPanel({ isRu }: FreesoundPanelProps) {
                   });
                   e.dataTransfer.setData(DRAG_AUDIO_MIME, dragId);
                   e.dataTransfer.effectAllowed = "copy";
+                  const ghost = createDragGhost(sound.name, "sfx");
+                  e.dataTransfer.setDragImage(ghost, 20, 16);
                 }}
                 onDragEnd={() => clearDragAudio(`freesound-${sound.id}`)}
                 className={cn(

@@ -27,6 +27,7 @@ import {
 } from "@/lib/soundProvider";
 import { GripVertical } from "lucide-react";
 import { setDragAudio, clearDragAudio, DRAG_AUDIO_MIME } from "@/lib/dragAudioStore";
+import { createDragGhost } from "@/lib/dragGhost";
 import { ElevenLabsCreditsWidget } from "./ElevenLabsCreditsWidget";
 import { FreesoundPanel } from "./FreesoundPanel";
 
@@ -469,6 +470,8 @@ function GeneratorPanel({
                   });
                   e.dataTransfer.setData(DRAG_AUDIO_MIME, dragId);
                   e.dataTransfer.effectAllowed = "copy";
+                  const ghost = createDragGhost(item.prompt, item.category);
+                  e.dataTransfer.setDragImage(ghost, 20, 16);
                 }}
                 onDragEnd={() => {
                   clearDragAudio(item.id);
