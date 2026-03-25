@@ -17,7 +17,7 @@ import { ProfileTab } from '@/components/profile/tabs/ProfileTab';
 import { PreferencesTab } from '@/components/profile/tabs/PreferencesTab';
 import { ApiKeysTab } from '@/components/profile/tabs/ApiKeysTab';
 import { ApiRoutersTab } from '@/components/profile/tabs/ApiRoutersTab';
-import { StorageTab } from '@/components/profile/tabs/StorageTab';
+
 
 export default function Profile() {
   const { theme, setTheme } = useTheme();
@@ -196,6 +196,34 @@ export default function Profile() {
             />
           </TabsContent>
 
+        </Tabs>
+      </section>
+
+      <Separator className="my-2" />
+
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <Key className="h-5 w-5 text-primary" />
+          <h2 className="text-xl font-semibold font-display">
+            {isRu ? 'Управление API' : 'API Management'}
+          </h2>
+        </div>
+        <Tabs value={apiTab} onValueChange={setApiTab} className="space-y-6">
+          <TabsList className="flex w-full h-auto flex-wrap gap-0.5">
+            <TabsTrigger value="api-keys" className="flex items-center gap-2 flex-1">
+              <Key className="h-4 w-4 shrink-0" />
+              <span>{isRu ? 'API Ключи' : 'API Keys'}</span>
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="api-keys">
+            <ApiKeysTab
+              apiKeys={apiKeys}
+              saving={saving}
+              isRu={isRu}
+              onKeyChange={setKeyValue}
+              onSave={handleSaveApiKeys}
+            />
+          </TabsContent>
         </Tabs>
       </section>
     </motion.div>
