@@ -257,8 +257,18 @@ export function StudioTimeline({
   const [charTracks, setCharTracks] = useState<TimelineTrackData[]>([]);
   const [speakerToCharId, setSpeakerToCharId] = useState<Map<string, string>>(new Map());
   const [typeMappings, setTypeMappings] = useState<TypeMappingsByScene>(new Map());
+  const [charDataReady, setCharDataReady] = useState(false);
 
   const contextSceneIds = useMemo(() => sceneId ? [sceneId] : [], [sceneId]);
+
+  // Reset char data readiness when scene changes to prevent stale clips
+  const prevSceneIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (sceneId !== prevSceneIdRef.current) {
+      prevSceneIdRef.current = sceneId ?? null;
+      setCharDataReady(false);
+    }
+  }, [sceneId]);
 
   useEffect(() => {
     if (!bookId || contextSceneIds.length === 0) {
@@ -311,11 +321,39 @@ export function StudioTimeline({
         for (const m of sceneMap.typeMappings) charIdSet.add(m.characterId);
       }
 
-      if (charIdSet.size === 0) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
+      // ── Include system characters based on storyboard segment types ──
+      // Even without explicit typeMappings, narrator/epigraph/lyric/footnote
+      // segments should route to Рассказчик/Комментатор tracks.
+      const SYSTEM_TYPE_DEFS: Array<{ types: string[]; names: string[] }> = [
+        { types: ["narrator", "epigraph", "lyric"], names: ["рассказчик", "narrator"] },
+        { types: ["footnote"], names: ["комментатор", "commentator"] },
+      ];
+      if (storyboard?.segments) {
+        const segTypes = new Set(storyboard.segments.map(s => s.segment_type));
+        for (const sys of SYSTEM_TYPE_DEFS) {
+          if (sys.types.some(t => segTypes.has(t))) {
+            // Find system character in allChars by name
+            const sysChar = allChars.find(c =>
+              sys.names.includes(c.name.toLowerCase())
+            );
+            if (sysChar) charIdSet.add(sysChar.id);
+          }
+        }
+      }
+
+      if (charIdSet.size === 0) {
+        setCharTracks([]); setSpeakerToCharId(new Map());
+        setCharDataReady(true);
+        return;
+      }
 
       // Filter only chars appearing in this scene
       const sceneChars = allChars.filter(c => charIdSet.has(c.id));
-      if (sceneChars.length === 0) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
+      if (sceneChars.length === 0) {
+        setCharTracks([]); setSpeakerToCharId(new Map());
+        setCharDataReady(true);
+        return;
+      }
 
       const nameMap = new Map<string, string>();
       for (const c of sceneChars) {
@@ -341,11 +379,14 @@ export function StudioTimeline({
           type: "narrator" as const,
         }))
       );
+      setCharDataReady(true);
     })();
   }, [bookId, sceneId, clipsRefreshToken, storage]);
 
-  // ── Real clips from segments ──────────────────────────────
-  const { clips: timelineClips, sceneBoundaries } = useTimelineClips(contextSceneIds, speakerToCharId, combinedRefreshToken, typeMappings);
+  // ── Real clips from segments (wait for char data to be ready) ──
+  const effectiveCharMap = charDataReady ? speakerToCharId : new Map<string, string>();
+  const effectiveTypeMappings = charDataReady ? typeMappings : new Map() as TypeMappingsByScene;
+  const { clips: timelineClips, sceneBoundaries } = useTimelineClips(contextSceneIds, effectiveCharMap, combinedRefreshToken, effectiveTypeMappings);
 
   // ── Audio player ──────────────────────────────────────────
   const player = useTimelinePlayer(timelineClips);
