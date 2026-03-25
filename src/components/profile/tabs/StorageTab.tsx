@@ -401,13 +401,44 @@ export function StorageTab({ isRu, userId }: StorageTabProps) {
                             {catFiles.map(file => {
                               const Icon = fileIcon(file.mime_type);
                               const canPreview = isAudioFile(file.mime_type) || isImageFile(file.mime_type);
+                              const fileUsages = usageMap.get(file.id) || [];
+                              const isUsed = fileUsages.length > 0;
                               return (
                                 <div
                                   key={file.id}
                                   className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors group"
                                 >
                                   <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-                                  <span className="text-sm truncate flex-1 min-w-0">{file.name}</span>
+                                  {isUsed ? (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="text-sm truncate flex-1 min-w-0 text-yellow-400 cursor-help">
+                                          {file.name}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="right" className="max-w-xs">
+                                        <p className="font-semibold text-xs mb-1">
+                                          {isRu ? `Используется (${fileUsages.length})` : `In use (${fileUsages.length})`}
+                                        </p>
+                                        <ul className="space-y-0.5 text-xs">
+                                          {fileUsages.slice(0, 10).map((u, i) => (
+                                            <li key={i} className="text-muted-foreground">
+                                              {u.partTitle ? `${u.partTitle} → ` : ''}
+                                              {u.chapterTitle} → {u.sceneTitle}
+                                              {u.offsetMs > 0 ? ` @ ${(u.offsetMs / 1000).toFixed(1)}s` : ''}
+                                            </li>
+                                          ))}
+                                          {fileUsages.length > 10 && (
+                                            <li className="text-muted-foreground italic">
+                                              …{isRu ? `ещё ${fileUsages.length - 10}` : `${fileUsages.length - 10} more`}
+                                            </li>
+                                          )}
+                                        </ul>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  ) : (
+                                    <span className="text-sm truncate flex-1 min-w-0">{file.name}</span>
+                                  )}
                                   {file.cached && (
                                     <Tooltip>
                                       <TooltipTrigger asChild>
