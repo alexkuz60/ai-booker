@@ -31,6 +31,14 @@ import {
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 
+/** Where a file is used: scene atmosphere reference */
+type FileUsageEntry = {
+  sceneTitle: string;
+  chapterTitle: string;
+  partTitle?: string;
+  offsetMs: number;
+};
+
 type StorageFile = {
   id: string;
   name: string;
@@ -40,6 +48,8 @@ type StorageFile = {
   created_at: string;
   /** Whether the file is cached locally in OPFS */
   cached?: boolean;
+  /** Scenes where this file is used */
+  usages?: FileUsageEntry[];
 };
 
 type PreviewState = { file: StorageFile; url: string; textContent?: string } | null;
