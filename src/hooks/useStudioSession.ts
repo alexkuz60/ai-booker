@@ -114,8 +114,10 @@ export function useStudioSession() {
   const [activeTab, setActiveTab] = useState(() =>
     sessionStorage.getItem("studio_active_tab") || "storyboard"
   );
-  const [restored, setRestored] = useState(false);
-  const restoredRef = useRef(false);
+  // If sessionStorage already has a chapter, skip the loading state (avoids HMR flash)
+  const hasSessionChapter = !!loadStudioChapter();
+  const [restored, setRestored] = useState(hasSessionChapter);
+  const restoredRef = useRef(hasSessionChapter);
 
   // ── One-time restore on mount ─────────────────────────────
   useEffect(() => {
