@@ -157,9 +157,10 @@ export function ChannelPluginsPanel({
                         <ContextMenuTrigger asChild>
                           <button
                             onClick={() => setSelectedClipId(clip.id)}
-                            className={`absolute top-0 h-full rounded-sm cursor-pointer transition-all duration-150 overflow-hidden select-none
+                            className={`absolute top-0 h-full rounded-sm cursor-pointer transition-all duration-150 overflow-hidden select-none border
                               ${isSelected ? "ring-1 ring-primary ring-offset-1 ring-offset-background" : ""}
-                              ${hasAnyPlugin ? "opacity-90 hover:opacity-100" : "opacity-35 hover:opacity-55"}
+                              ${hasAnyPlugin ? "opacity-90 hover:opacity-100" : "opacity-50 hover:opacity-70"}
+                              ${hasAudio ? "border-border/40" : "border-border/30"}
                             `}
                             style={{
                               left: `${leftPct}%`,
