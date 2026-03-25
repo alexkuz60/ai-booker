@@ -507,6 +507,7 @@ export type Database = {
           fade_out_ms: number
           id: string
           layer_type: string
+          offset_ms: number
           prompt_used: string
           scene_id: string
           volume: number
@@ -519,6 +520,7 @@ export type Database = {
           fade_out_ms?: number
           id?: string
           layer_type?: string
+          offset_ms?: number
           prompt_used?: string
           scene_id: string
           volume?: number
@@ -531,6 +533,7 @@ export type Database = {
           fade_out_ms?: number
           id?: string
           layer_type?: string
+          offset_ms?: number
           prompt_used?: string
           scene_id?: string
           volume?: number

@@ -1,0 +1,1 @@
+ALTER TABLE public.scene_atmospheres ADD COLUMN IF NOT EXISTS offset_ms integer NOT NULL DEFAULT 0;
