@@ -26,7 +26,25 @@ export async function getBookIdFromStorage(
   }
 }
 
-// ── Find the freshest OPFS project for a bookId ────────────
+async function getExistingOpfsProjects(): Promise<Set<string>> {
+  try {
+    return new Set(await OPFSStorage.listProjects());
+  } catch {
+    return new Set<string>();
+  }
+}
+
+async function isCurrentStorageUsable(
+  storage: ProjectStorage | null | undefined,
+  storageBackend: "fs-access" | "opfs" | "none",
+): Promise<boolean> {
+  if (!storage?.isReady) return false;
+  if (storageBackend !== "opfs") return true;
+  const existing = await getExistingOpfsProjects();
+  return existing.has(storage.projectName);
+}
+
+// ── Find the freshest OPFS project for a bookId ──────────
 
 export interface ResolveOptions {
   activate?: boolean;
@@ -45,8 +63,11 @@ export async function resolveLocalStorageForBook(
   const activate = resolveOpts?.activate ?? false;
 
   if (opts.storageBackend === "opfs") {
-    const projectNames = opts.localProjectNamesByBookId.get(targetBookId);
-    if (projectNames?.length) {
+    const existingProjects = await getExistingOpfsProjects();
+    const projectNames = (opts.localProjectNamesByBookId.get(targetBookId) || [])
+      .filter((projectName) => existingProjects.has(projectName));
+
+    if (projectNames.length) {
       try {
         const ranked = (
           await Promise.all(
@@ -90,7 +111,8 @@ export async function resolveLocalStorageForBook(
   }
 
   const activeBookId = await getBookIdFromStorage(opts.projectStorage);
-  if (opts.projectStorage?.isReady && activeBookId === targetBookId) {
+  const currentStorageUsable = await isCurrentStorageUsable(opts.projectStorage, opts.storageBackend);
+  if (opts.projectStorage?.isReady && activeBookId === targetBookId && currentStorageUsable) {
     return opts.projectStorage;
   }
 
@@ -117,7 +139,8 @@ export async function ensureWritableLocalStorage(
   if (existing?.isReady) return existing;
 
   const activeBookId = await getBookIdFromStorage(opts.projectStorage);
-  if (opts.projectStorage?.isReady && activeBookId === targetBookId) {
+  const currentStorageUsable = await isCurrentStorageUsable(opts.projectStorage, opts.storageBackend);
+  if (opts.projectStorage?.isReady && activeBookId === targetBookId && currentStorageUsable) {
     return opts.projectStorage;
   }
 
