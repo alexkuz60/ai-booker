@@ -341,11 +341,19 @@ export function StudioTimeline({
         }
       }
 
-      if (charIdSet.size === 0) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
+      if (charIdSet.size === 0) {
+        setCharTracks([]); setSpeakerToCharId(new Map());
+        setCharDataReady(true);
+        return;
+      }
 
       // Filter only chars appearing in this scene
       const sceneChars = allChars.filter(c => charIdSet.has(c.id));
-      if (sceneChars.length === 0) { setCharTracks([]); setSpeakerToCharId(new Map()); return; }
+      if (sceneChars.length === 0) {
+        setCharTracks([]); setSpeakerToCharId(new Map());
+        setCharDataReady(true);
+        return;
+      }
 
       const nameMap = new Map<string, string>();
       for (const c of sceneChars) {
@@ -371,11 +379,14 @@ export function StudioTimeline({
           type: "narrator" as const,
         }))
       );
+      setCharDataReady(true);
     })();
   }, [bookId, sceneId, clipsRefreshToken, storage]);
 
-  // ── Real clips from segments ──────────────────────────────
-  const { clips: timelineClips, sceneBoundaries } = useTimelineClips(contextSceneIds, speakerToCharId, combinedRefreshToken, typeMappings);
+  // ── Real clips from segments (wait for char data to be ready) ──
+  const effectiveCharMap = charDataReady ? speakerToCharId : new Map<string, string>();
+  const effectiveTypeMappings = charDataReady ? typeMappings : new Map() as TypeMappingsByScene;
+  const { clips: timelineClips, sceneBoundaries } = useTimelineClips(contextSceneIds, effectiveCharMap, combinedRefreshToken, effectiveTypeMappings);
 
   // ── Audio player ──────────────────────────────────────────
   const player = useTimelinePlayer(timelineClips);
