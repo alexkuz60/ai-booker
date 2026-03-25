@@ -262,11 +262,31 @@ export function extractDocxChapterText(
 }
 
 /**
- * Strip HTML tags to get plain text (for analysis pipeline compatibility).
+ * Convert HTML to plain text preserving paragraph boundaries as \n.
+ * Block-level elements (<p>, <h1>-<h6>, <br>, <blockquote>, <div>, <li>)
+ * produce line breaks so AI can distinguish paragraphs, dialogues, etc.
  */
 export function stripHtml(html: string): string {
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  return doc.body.textContent || "";
+  // Insert newline markers before block-level closing/self-closing tags
+  let marked = html
+    // Self-closing <br/> or <br>
+    .replace(/<br\s*\/?>/gi, "\n")
+    // Block-level end tags → newline before them
+    .replace(/<\/(p|h[1-6]|div|blockquote|li|tr|section|article)>/gi, "\n")
+    // Block-level open tags (except the very first) → newline
+    .replace(/<(p|h[1-6]|div|blockquote|li|tr|section|article)[\s>]/gi, "\n");
+
+  // Strip remaining tags
+  const doc = new DOMParser().parseFromString(marked, "text/html");
+  const text = doc.body.textContent || "";
+
+  // Normalize: collapse 3+ newlines → 2, trim each line
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line, i, arr) => !(line === "" && i > 0 && arr[i - 1] === ""))
+    .join("\n")
+    .trim();
 }
 
 /**
