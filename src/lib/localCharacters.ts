@@ -356,6 +356,8 @@ export async function upsertSpeakersFromSegments(
   sceneId: string,
   segments: SegmentLike[],
   existingIndex: CharacterIndex[],
+  /** Pass current typeMappings to preserve them in the scene character map */
+  currentTypeMappings?: Array<{ segmentType: string; characterId: string }>,
 ): Promise<CharacterIndex[]> {
   const updatedIndex = [...existingIndex];
 
@@ -440,11 +442,16 @@ export async function upsertSpeakersFromSegments(
     }
   }
 
+  // Preserve typeMappings if provided, otherwise keep empty
+  const typeMappings: SceneCharacterMap["typeMappings"] = currentTypeMappings
+    ? currentTypeMappings.map(m => ({ segmentType: m.segmentType, characterId: m.characterId }))
+    : [];
+
   const sceneMap: SceneCharacterMap = {
     sceneId,
     updatedAt: new Date().toISOString(),
     speakers,
-    typeMappings: [],
+    typeMappings,
   };
 
   // Persist both

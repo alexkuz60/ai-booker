@@ -268,29 +268,45 @@ export function StudioTimeline({
     (async () => {
       if (!storage) return;
 
-      // Read scene character map from OPFS
+      const sid = contextSceneIds[0];
+
+      // Read scene character map + storyboard + character index in parallel from OPFS
       const { readSceneCharacterMap, readCharacterIndex } = await import("@/lib/localCharacters");
-      const [sceneMap, allChars] = await Promise.all([
-        readSceneCharacterMap(storage, contextSceneIds[0]),
+      const { readStoryboardFromLocal } = await import("@/lib/storyboardSync");
+      const [sceneMap, allChars, storyboard] = await Promise.all([
+        readSceneCharacterMap(storage, sid),
         readCharacterIndex(storage),
+        readStoryboardFromLocal(storage, sid),
       ]);
 
-      // Build type mappings from OPFS scene map
+      // Build type mappings from STORYBOARD (source of truth), not scene character map
       const tm: TypeMappingsByScene = new Map();
-      if (sceneMap?.typeMappings) {
+      if (storyboard?.typeMappings && storyboard.typeMappings.length > 0) {
+        const sceneTypeMappings = new Map<string, string>();
+        for (const m of storyboard.typeMappings) {
+          sceneTypeMappings.set(m.segmentType, m.characterId);
+        }
+        tm.set(sid, sceneTypeMappings);
+      } else if (sceneMap?.typeMappings && sceneMap.typeMappings.length > 0) {
+        // Fallback to scene character map (e.g. after restore)
         const sceneTypeMappings = new Map<string, string>();
         for (const m of sceneMap.typeMappings) {
           sceneTypeMappings.set(m.segmentType, m.characterId);
         }
-        tm.set(contextSceneIds[0], sceneTypeMappings);
+        tm.set(sid, sceneTypeMappings);
       }
       setTypeMappings(tm);
 
-      // Character IDs from scene map speakers + type mappings (system chars like Narrator)
+      // Character IDs from scene map speakers + storyboard type mappings
       const charIdSet = new Set<string>();
       if (sceneMap?.speakers) {
         for (const s of sceneMap.speakers) charIdSet.add(s.characterId);
       }
+      // Include characters referenced by storyboard type mappings
+      if (storyboard?.typeMappings) {
+        for (const m of storyboard.typeMappings) charIdSet.add(m.characterId);
+      }
+      // Include characters referenced by scene map type mappings (fallback)
       if (sceneMap?.typeMappings) {
         for (const m of sceneMap.typeMappings) charIdSet.add(m.characterId);
       }

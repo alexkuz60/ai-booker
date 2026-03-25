@@ -711,7 +711,10 @@ export function StoryboardPanel({
       try {
         const { readCharacterIndex, upsertSpeakersFromSegments } = await import("@/lib/localCharacters");
         const currentIndex = await readCharacterIndex(storage);
-        const updatedIndex = await upsertSpeakersFromSegments(storage, sceneId, updatedSegments, currentIndex);
+        const updatedIndex = await upsertSpeakersFromSegments(
+          storage, sceneId, updatedSegments, currentIndex,
+          typeMappingsRef.current.map(m => ({ segmentType: m.segmentType, characterId: m.characterId })),
+        );
         setCharacters(updatedIndex.map(c => ({
           id: c.id,
           name: c.name,
