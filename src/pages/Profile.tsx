@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { User, Key, Settings, Network } from 'lucide-react';
+import { User, Key, Settings, Network, Activity } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
@@ -17,6 +17,7 @@ import { ProfileTab } from '@/components/profile/tabs/ProfileTab';
 import { PreferencesTab } from '@/components/profile/tabs/PreferencesTab';
 import { ApiKeysTab } from '@/components/profile/tabs/ApiKeysTab';
 import { ApiRoutersTab } from '@/components/profile/tabs/ApiRoutersTab';
+import { AiUsageWidget } from '@/components/profile/AiUsageWidget';
 
 
 export default function Profile() {
@@ -225,6 +226,18 @@ export default function Profile() {
             />
           </TabsContent>
         </Tabs>
+      </section>
+
+      <Separator className="my-2" />
+
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="h-5 w-5 text-primary" />
+          <h2 className="text-xl font-semibold font-display">
+            {isRu ? 'AI Аналитика' : 'AI Analytics'}
+          </h2>
+        </div>
+        <AiUsageWidget isRu={isRu} />
       </section>
     </motion.div>
   );
