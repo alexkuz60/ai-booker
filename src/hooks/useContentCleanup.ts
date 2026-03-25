@@ -150,13 +150,20 @@ function splitAtChapterMarker(
   const beforeScene: Scene = {
     ...scene,
     content: beforeContent,
+    char_count: beforeContent.length,
+    content_preview: beforeContent.slice(0, 200),
+    dirty: true,
   };
 
   const afterScene: Scene = {
     ...scene,
+    id: crypto.randomUUID(),
     scene_number: scene.scene_number + 1,
     title: `${scene.title} (продолж.)`,
     content: afterContent,
+    char_count: afterContent.length,
+    content_preview: afterContent.slice(0, 200),
+    dirty: true,
   };
 
   // Re-number all subsequent scenes
