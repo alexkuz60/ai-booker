@@ -465,6 +465,7 @@ Deno.serve(async (req) => {
       coverage: {
         lengthPct: Math.round(coverageRatio * 100),
         sourcePct: Math.round(sourceCoverage * 100),
+        rawPct: Math.round(rawCoverage * 100),
         usedFallback: usedFallbackSegmentation,
       },
     }), {
