@@ -252,12 +252,11 @@ export function ChapterNavigator({
       // LOCAL-ONLY dirty detection: compare contentHash in storyboard vs scene index
       const { isSceneDirty } = await import("@/lib/sceneIndex");
       const { readStoryboardFromLocal } = await import("@/lib/storyboardSync");
-      const storage = (window as any).__projectStorage as import("@/lib/projectStorage").ProjectStorage | undefined;
       const nextDirtyIds = new Set<string>();
-      if (storage) {
+      if (projectStorage) {
         await Promise.all(sceneIds.map(async (sid) => {
           try {
-            const sb = await readStoryboardFromLocal(storage, sid);
+            const sb = await readStoryboardFromLocal(projectStorage, sid);
             if (sb?.contentHash && isSceneDirty(sid, sb.contentHash)) {
               nextDirtyIds.add(sid);
             }
