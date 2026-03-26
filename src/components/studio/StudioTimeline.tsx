@@ -36,8 +36,8 @@ export interface TimelineTrackData {
 }
 
 const getFixedTracks = (isRu: boolean): TimelineTrackData[] => [
-  { id: "atmosphere-bg", label: isRu ? "Атмосфера" : "Ambience", color: "hsl(175 45% 45%)", type: "atmosphere" },
-  { id: "atmosphere-sfx", label: "SFX", color: "hsl(220 50% 55%)", type: "sfx" },
+  { id: "atmosphere-bg", label: isRu ? "Атмосфера" : "Ambience", color: "hsl(175 50% 55%)", type: "atmosphere" },
+  { id: "atmosphere-sfx", label: "SFX", color: "hsl(220 55% 60%)", type: "sfx" },
 ];
 
 const TRACK_LABELS_WIDTH_COLLAPSED = 112;
@@ -46,14 +46,14 @@ const TRACK_LABELS_WIDTH_EXPANDED = 360;
 const NARRATOR_COLORS = [
   "hsl(var(--primary))",
   "hsl(var(--accent))",
-  "hsl(30 70% 55%)",
-  "hsl(280 55% 55%)",
-  "hsl(350 65% 55%)",
-  "hsl(160 50% 45%)",
-  "hsl(200 60% 50%)",
-  "hsl(45 75% 50%)",
-  "hsl(320 55% 50%)",
-  "hsl(100 45% 45%)",
+  "hsl(30 75% 60%)",
+  "hsl(280 60% 62%)",
+  "hsl(350 70% 62%)",
+  "hsl(160 55% 55%)",
+  "hsl(200 65% 58%)",
+  "hsl(45 80% 58%)",
+  "hsl(320 60% 58%)",
+  "hsl(100 50% 55%)",
 ];
 
 // ─── Constants ──────────────────────────────────────────────
