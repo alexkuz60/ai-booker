@@ -146,8 +146,6 @@ interface AiCallOpts {
   systemPrompt: string;
   jsonSuffix: string;
   charBlocksText: string;
-  skipTemp: boolean;
-  useMaxCompletionTokens: boolean;
   maxTokens: number;
 }
 
@@ -264,10 +262,6 @@ Deno.serve(async (req) => {
 
     const jsonSuffix = `\n\nRespond with ONLY a valid JSON: {"characters": [{"name": "...", "age_group": "...", "temperament": "...", "speech_style": "...", "description": "...", "speech_tags": ["#tag1", "#tag2"], "psycho_tags": ["#tag1", "#tag2"]}]}\n\nspeech_tags: 2-4 hashtags describing speech MANNER for TTS voice synthesis (tempo, intonation, articulation). Examples: #отрывисто #быстро #нервно #хрипло #тихо #громко #монотонно #певуче #резко.\npsycho_tags: 2-4 hashtags describing character PSYCHOTYPE for voice auto-casting. Examples: #паникер #эгоцентрист #невротик #меланхолик #лидер #интроверт #манипулятор #оптимист.\nTags MUST start with # and be in the same language as the text.`;
 
-    // Models config
-    const MODELS_NO_TEMPERATURE = ["o1", "o3", "o4-mini", "deepseek-r1"];
-    const skipTemp = MODELS_NO_TEMPERATURE.some(m => usedModel.includes(m));
-    const useMaxCompletionTokens = /gpt-5|o1|o3|o4/.test(usedModel);
     const maxOutputTokens = getMaxOutputTokens(usedModel);
 
     // ── Context-aware chunking ──
@@ -307,8 +301,6 @@ Deno.serve(async (req) => {
       usedModel,
       systemPrompt,
       jsonSuffix,
-      skipTemp,
-      useMaxCompletionTokens,
       maxTokens: maxOutputTokens,
     };
 
