@@ -1162,21 +1162,6 @@ export function StoryboardPanel({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-          {segments.length > 0 && (
-            <label className="ml-auto flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground select-none">
-              <Checkbox
-                checked={mergeChecked.size > 0 && mergeChecked.size === segments.length}
-                onCheckedChange={(checked) => {
-                  if (checked) {
-                    setMergeChecked(new Set(segments.map(s => s.segment_id)));
-                  } else {
-                    setMergeChecked(new Set());
-                  }
-                }}
-              />
-              {isRu ? "Все" : "All"}
-            </label>
-          )}
           {dialogueCount > 0 && (
             <Button
               variant="ghost"
@@ -1291,6 +1276,21 @@ export function StoryboardPanel({
             {recalcRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Timer className="h-3 w-3" />}
             {isRu ? "Пересчёт" : "Recalc"}
           </Button>
+          {segments.length > 0 && (
+            <label className="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground select-none border-l border-border pl-2 ml-0.5">
+              <Checkbox
+                checked={mergeChecked.size > 0 && mergeChecked.size === segments.length}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setMergeChecked(new Set(segments.map(s => s.segment_id)));
+                  } else {
+                    setMergeChecked(new Set());
+                  }
+                }}
+              />
+              {isRu ? "Все" : "All"}
+            </label>
+          )}
         </div>
       </div>
       {contentDirty && segments.length > 0 && (
