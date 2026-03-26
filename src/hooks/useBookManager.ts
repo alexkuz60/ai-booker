@@ -254,6 +254,8 @@ export function useBookManager({
               const structFiles = await store.listDir("structure").catch(() => []);
               for (const f of structFiles) await store.delete(`structure/${f}`).catch(() => {});
               try { await store.delete("chapters"); } catch {} // V2 nested
+              // Characters are tightly coupled to scene IDs — must be rebuilt from scratch
+              try { await store.delete(paths.characterIndex()); } catch {}
               const contentDir = paths.chapterContentDir();
               const sceneFiles = await store.listDir(contentDir).catch(() => []);
               for (const f of sceneFiles) await store.delete(`${contentDir}/${f}`).catch(() => {});
@@ -262,8 +264,9 @@ export function useBookManager({
         }
       } else if (projectStorage?.isReady) {
         try {
-          await projectStorage.writeJSON(paths.structureToc(), []);
+         await projectStorage.writeJSON(paths.structureToc(), []);
           await projectStorage.writeJSON(paths.structureCharactersLegacy(), []);
+          await projectStorage.writeJSON(paths.characterIndex(), []);
         } catch {}
       }
 
