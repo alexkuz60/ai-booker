@@ -83,6 +83,7 @@ export function StoryboardPanel({
   const [correctingStress, setCorrectingStress] = useState(false);
   const [resynthSegId, setResynthSegId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [analysisPending, setAnalysisPending] = useState(false);
   const [characters, setCharacters] = useState<CharacterOption[]>([]);
   const [audioStatus, setAudioStatus] = useState<Map<string, { status: string; durationMs: number }>>(new Map());
   const [inlineNarrationSegIds, setInlineNarrationSegIds] = useState<Set<string>>(new Set());
@@ -277,6 +278,7 @@ export function StoryboardPanel({
   const loadSegments = useCallback(async (sid: string) => {
     console.debug(`[Storyboard] loadSegments called for sceneId=${sid}, hasStorage=${hasStorage}`);
     setLoading(true);
+    setAnalysisPending(false);
     try {
       if (hasStorage) {
         const local = await loadFromLocal(sid);
@@ -494,6 +496,7 @@ export function StoryboardPanel({
     setSegments([]);
     setLoaded(false);
     setContentDirty(false);
+    setAnalysisPending(false);
     autoAnalyzeAttemptedRef.current = null;
     if (sceneId) {
       loadSegments(sceneId);
@@ -545,7 +548,12 @@ export function StoryboardPanel({
     const job = bgAnalysis.jobs.get(sceneId);
     if (job?.status === "done") {
       // Reload segments from OPFS
+      setAnalysisPending(false);
       loadSegments(sceneId);
+      return;
+    }
+    if (job?.status === "error") {
+      setAnalysisPending(false);
     }
   }, [bgAnalysis.completionToken, sceneId, loadSegments]);
 
@@ -553,17 +561,7 @@ export function StoryboardPanel({
 
   const runAnalysis = useCallback(async () => {
     if (!sceneId) return;
-
-    // Clear local state immediately
-    setSegments([]);
-    setAudioStatus(new Map());
-    setInlineNarrationSegIds(new Set());
-    setStaleAudioSegIds(new Set());
-    setMergeChecked(new Set());
-    setContentDirty(false);
-    typeMappingsRef.current = [];
-    contentHashRef.current = undefined; // Will be set by background analysis on completion
-    setInlineNarrationSpeaker(null);
+    setAnalysisPending(true);
 
     // Submit to background service
     bgAnalysis.submit([{
@@ -1030,7 +1028,7 @@ export function StoryboardPanel({
     );
   }
 
-  if (loading || bgAnalyzing) {
+  if (loading || (bgAnalyzing && segments.length === 0)) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3">
         <Loader2 className="h-5 w-5 animate-spin text-primary" />
@@ -1049,8 +1047,8 @@ export function StoryboardPanel({
         <Sparkles className="h-8 w-8 text-muted-foreground/40" />
         <p className="text-sm text-muted-foreground font-body text-center max-w-xs">
           {isRu
-            ? "Нет контента для анализа. Переанализируйте главу в Парсере."
-            : "No content to analyze. Re-analyze the chapter in Parser."}
+            ? "Для этой сцены в локальном проекте нет полного текста. Раскадровка недоступна, пока текст не появится в проекте."
+            : "This scene has no full text in the local project yet. Storyboard stays unavailable until the text exists locally."}
         </p>
       </div>
     );
@@ -1070,6 +1068,12 @@ export function StoryboardPanel({
               </span>
             )}
           </span>
+          {analysisPending && segments.length > 0 && (
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground font-body">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {isRu ? "Переанализ в фоне…" : "Re-analysis in background…"}
+            </span>
+          )}
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="ghost" size="sm" disabled={bgAnalyzing || !sceneContent} className="gap-1.5 h-7 text-xs">
