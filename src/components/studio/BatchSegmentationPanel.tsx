@@ -59,7 +59,7 @@ export function BatchSegmentationPanel({
   onSceneSegmented,
   onClose,
 }: BatchSegmentationPanelProps) {
-  const { getModelForRole, getEffectivePool, isPoolEnabled } = useAiRoles(userApiKeys);
+  const { getModelForRole, getModelForBatch, getEffectivePool, isPoolEnabled } = useAiRoles(userApiKeys);
   const { storage } = useProjectStorageContext();
   const [jobs, setJobs] = useState<SceneJob[]>([]);
   const [running, setRunning] = useState(false);
@@ -183,7 +183,7 @@ export function BatchSegmentationPanel({
   // ── Classic fixed-concurrency batch ───────────────────────────────────
 
   const runClassicBatch = useCallback(async (pendingJobs: SceneJob[]) => {
-    const model = getModelForRole("screenwriter");
+    const model = getModelForBatch("screenwriter");
     const queue = [...pendingJobs];
     let idx = 0;
 
