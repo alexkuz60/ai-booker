@@ -193,6 +193,8 @@ export function BackgroundAnalysisProvider({
 
     const result = data as { segments?: Segment[]; coverage?: { lengthPct: number; sourcePct: number; usedFallback: boolean } };
     const newSegments = result.segments || [];
+    const totalPhrases = newSegments.reduce((a, s) => a + (s.phrases?.length || 0), 0);
+    console.info(`[BgAnalysis] ✅ sceneId=${job.sceneId} → ${newSegments.length} segments, ${totalPhrases} phrases, fallback=${result.coverage?.usedFallback}, coverage: len=${result.coverage?.lengthPct}% src=${result.coverage?.sourcePct}%`);
 
     // Warn user if server used fallback segmentation (AI truncated)
     if (result.coverage?.usedFallback) {
