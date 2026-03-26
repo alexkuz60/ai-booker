@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { ModelPoolManager, type PoolTask, type PoolStats, logPoolStats } from "@/lib/modelPoolManager";
 import { enrichBodyWithKeys, invokeWithFallback } from "@/lib/invokeWithFallback";
+import { fnv1a32 } from "@/lib/contentHash";
 import { toast } from "sonner";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { readSceneContentFromLocal } from "@/lib/localSceneContent";
@@ -148,6 +149,7 @@ export function BatchSegmentationPanel({
             typeMappings: [],
             audioStatus: new Map(),
             inlineNarrationSpeaker: null,
+            contentHash: fnv1a32(freshContent),
           }, chapterId ?? undefined);
         }
         // Clear content_dirty — analysis was just done on fresh content
@@ -214,6 +216,7 @@ export function BatchSegmentationPanel({
               typeMappings: [],
               audioStatus: new Map(),
               inlineNarrationSpeaker: null,
+              contentHash: fnv1a32(freshContent),
             }, chapterId ?? undefined);
           }
           // Clear content_dirty — analysis was just done on fresh content
