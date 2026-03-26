@@ -149,6 +149,7 @@ export function BatchSegmentationPanel({
             typeMappings: [],
             audioStatus: new Map(),
             inlineNarrationSpeaker: null,
+            contentHash: fnv1a32(freshContent),
           }, chapterId ?? undefined);
         }
         // Clear content_dirty — analysis was just done on fresh content
@@ -215,6 +216,7 @@ export function BatchSegmentationPanel({
               typeMappings: [],
               audioStatus: new Map(),
               inlineNarrationSpeaker: null,
+              contentHash: fnv1a32(freshContent),
             }, chapterId ?? undefined);
           }
           // Clear content_dirty — analysis was just done on fresh content
