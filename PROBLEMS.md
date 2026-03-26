@@ -1,7 +1,7 @@
 # Архив решённых проблем и багов
 
 > Этот файл — **read-only архив**. Новые задачи добавляются в `TODO.md`.
-> Актуальная дата: 2026-03-22.
+> Актуальная дата: 2026-03-26.
 
 ---
 
@@ -51,11 +51,24 @@
 | B12 | `acceptServerVersion` не заменяет локалку | ✅ Исправлено |
 | B13 | `openSavedBook` делает upsert при чтении | ✅ Исправлено |
 | B14 | Хардкод `source/book.pdf` — DOCX/FB2 не работает | ✅ Исправлено |
+| B15 | Stale scene data after merge/delete in Parser | ✅ Исправлено |
+| B16 | Автозапуск анализа при выборе главы в навигаторе | ✅ Исправлено |
 
-### Н. Восстановление сессии после перезагрузки ПК — ✅ РЕШЕНО (B15)
+### Н. Восстановление сессии после перезагрузки ПК — ✅ РЕШЕНО (B15-old)
 - Браузеры восстанавливают `sessionStorage` после перезапуска → стейл `ACTIVE_BOOK_KEY` открывал вчерашнюю книгу.
 - Решение: heartbeat-таймстамп в `localStorage` (5 мин порог). При стейл-сессии — сброс в библиотеку.
 - Файл: `useBookManager.ts` (heartbeat guard + effects).
+
+### О. Stale scene data после слияния/удаления сцен — ✅ РЕШЕНО (B15)
+- При слиянии или удалении сцен в Парсере `buildSceneIndex` переносил массивы `storyboarded`/`characterMapped` as-is из старого индекса → удалённые sceneId оставались «призраками».
+- OPFS-папки удалённых сцен (storyboard.json, characters.json) не очищались.
+- Решение: `buildSceneIndex` фильтрует storyboarded/characterMapped по валидным entries; `syncStructureToLocal` удаляет orphan scene directories.
+- Файлы: `sceneIndex.ts`, `localSync.ts`.
+
+### П. Автозапуск анализа при выборе главы — ✅ РЕШЕНО (B16)
+- `NavSidebar.onClick` автоматически вызывал `onAnalyzeChapter(idx)` для pending глав.
+- Решение: убран auto-trigger из навигатора. Анализ — строго по кнопке в панели деталей.
+- Файл: `NavSidebar.tsx`.
 
 ---
 
