@@ -82,11 +82,8 @@ export async function invokeWithFallback<T = unknown>(
 
   // Check if we need fallback
   const needsFallback = isRetryableError(firstResult);
-  const isLovableProvider = !originalModel.startsWith("openrouter/") &&
-    !originalModel.startsWith("proxyapi/") &&
-    !originalModel.startsWith("dotpoint/");
 
-  if (!needsFallback || !isLovableProvider) {
+  if (!needsFallback) {
     if (firstResult.error) {
       firstResult.error.message = await extractFunctionErrorMessage(firstResult);
     }
