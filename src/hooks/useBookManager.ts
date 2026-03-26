@@ -264,8 +264,9 @@ export function useBookManager({
         }
       } else if (projectStorage?.isReady) {
         try {
-          await projectStorage.writeJSON(paths.structureToc(), []);
+         await projectStorage.writeJSON(paths.structureToc(), []);
           await projectStorage.writeJSON(paths.structureCharactersLegacy(), []);
+          await projectStorage.writeJSON(paths.characterIndex(), []);
         } catch {}
       }
 
