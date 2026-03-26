@@ -71,6 +71,13 @@ export function useStoryboardPersistence(sceneId: string | null, chapterId?: str
     await saveStoryboardToLocal(storage, sceneId, snapshot, chapterId ?? undefined);
   }, [storage, sceneId, chapterId]);
 
+  // Clear latestSnapshotRef when sceneId changes to prevent cross-contamination.
+  // BUG FIX: Without this, navigating A→B→C would write scene A's snapshot to scene B's
+  // storyboard path during cleanup, because latestSnapshotRef still held A's data.
+  useEffect(() => {
+    latestSnapshotRef.current = null;
+  }, [sceneId]);
+
   useEffect(() => {
     return () => {
       if (debounceRef.current) {
