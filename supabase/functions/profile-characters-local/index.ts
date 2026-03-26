@@ -67,11 +67,11 @@ function getModelContextLimit(model: string): number {
   return 32_000; // conservative default
 }
 
-/** Max output tokens by model */
+/** Max output tokens by model — keep proportional to avoid token waste */
 function getMaxOutputTokens(model: string): number {
   const LOW_TOKEN_MODELS = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "claude-3-haiku", "claude-3-sonnet"];
   if (LOW_TOKEN_MODELS.some(m => model.includes(m))) return 16_384;
-  return 65_536;
+  return 16_384; // was 65_536 — profiling rarely needs more than 16K output
 }
 
 function parseProfilesFromContent(content: string): ProfileResult[] | undefined {
