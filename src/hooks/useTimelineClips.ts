@@ -245,7 +245,7 @@ export function useTimelineClips(
             speaker: seg.speaker,
             startSec: sceneOffset,
             durationSec,
-            label: seg.speaker || SEGMENT_TYPE_LABELS[seg.segment_type] || seg.segment_type,
+            label: (SYSTEM_TYPE_TO_CHAR[seg.segment_type] ? SEGMENT_TYPE_LABELS[seg.segment_type] : seg.speaker) || SEGMENT_TYPE_LABELS[seg.segment_type] || seg.segment_type,
             segmentType: seg.segment_type,
             hasAudio: !!audioInfo,
             audioPath: audioInfo?.audioPath,
