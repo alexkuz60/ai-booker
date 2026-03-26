@@ -185,13 +185,6 @@ export async function markCharacterMapped(
   }
 }
 
-/**
- * Get content hash for a scene from the index.
- * Returns 0 if scene not found.
- */
-export function getContentHash(sceneId: string): number {
-  return _cachedIndex?.entries[sceneId]?.contentHash ?? 0;
-}
 
 // ─── Explicit dirty flag management ────────────────────────
 

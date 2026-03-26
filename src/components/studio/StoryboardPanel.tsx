@@ -302,7 +302,7 @@ export function StoryboardPanel({
           contentHashRef.current = local.contentHash;
           if (isStale()) return;
           applySegments(local.segments);
-          if (local.contentHash) {
+          if (local.contentHash != null) {
             const { isSceneDirty } = await import("@/lib/sceneIndex");
             if (isStale()) return;
             const dirty = isSceneDirty(sid);
