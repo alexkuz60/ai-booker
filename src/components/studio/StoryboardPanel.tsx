@@ -95,6 +95,8 @@ export function StoryboardPanel({
   const [staleAudioSegIds, setStaleAudioSegIds] = useState<Set<string>>(new Set());
   const [cleaningMetadata, setCleaningMetadata] = useState(false);
   const [contentDirty, setContentDirty] = useState(false);
+  /** Preserved contentHash from analysis — survives all edits */
+  const contentHashRef = useRef<number | undefined>(undefined);
   const [stressReviewOpen, setStressReviewOpen] = useState(false);
   const [stressSuggestions, setStressSuggestions] = useState<StressSuggestion[]>([]);
   const autoAnalyzeAttemptedRef = useRef<string | null>(null);
@@ -113,7 +115,7 @@ export function StoryboardPanel({
     );
   }, [characters]);
 
-  /** Build a snapshot for OPFS persistence */
+  /** Build a snapshot for OPFS persistence — always preserves contentHash */
   const buildSnapshot = useCallback(
     (segs?: Segment[], audio?: Map<string, { status: string; durationMs: number }>, speaker?: string | null): StoryboardSnapshot => {
       const nextSegments = segs ?? segments;
@@ -126,6 +128,7 @@ export function StoryboardPanel({
         typeMappings: nextTypeMappings,
         audioStatus: audio ?? audioStatus,
         inlineNarrationSpeaker: nextSpeaker,
+        contentHash: contentHashRef.current,
       };
     },
     [segments, audioStatus, inlineNarrationSpeaker, deriveCurrentTypeMappings],
@@ -288,6 +291,8 @@ export function StoryboardPanel({
           );
           setInlineNarrationSpeaker(local.inlineNarrationSpeaker);
           setAudioStatus(new Map(Object.entries(local.audioStatus || {})));
+          // Preserve contentHash from analysis — survives all subsequent edits
+          contentHashRef.current = local.contentHash;
           applySegments(local.segments);
           // LOCAL-ONLY: detect dirty via contentHash comparison (K3)
           if (local.contentHash) {
@@ -301,6 +306,7 @@ export function StoryboardPanel({
       }
 
       typeMappingsRef.current = [];
+      contentHashRef.current = undefined;
       setInlineNarrationSpeaker(null);
       setAudioStatus(new Map());
       setSegments([]);
@@ -547,6 +553,7 @@ export function StoryboardPanel({
     setMergeChecked(new Set());
     setContentDirty(false);
     typeMappingsRef.current = [];
+    contentHashRef.current = undefined; // Will be set by background analysis on completion
     setInlineNarrationSpeaker(null);
 
     // Submit to background service

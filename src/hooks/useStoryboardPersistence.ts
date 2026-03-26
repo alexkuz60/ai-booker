@@ -26,6 +26,8 @@ export interface StoryboardSnapshot {
   typeMappings: LocalTypeMappingEntry[];
   audioStatus: Map<string, { status: string; durationMs: number }>;
   inlineNarrationSpeaker: string | null;
+  /** Content hash at time of analysis — MUST be preserved through all edits */
+  contentHash?: number;
 }
 
 export function useStoryboardPersistence(sceneId: string | null, chapterId?: string | null) {
