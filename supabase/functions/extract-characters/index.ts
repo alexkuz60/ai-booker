@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
 import { resolveTaskPromptWithOverrides } from "../_shared/taskPrompts.ts";
 import { resolveAiEndpoint, extractProviderFields } from "../_shared/providerRouting.ts";
+import { temperatureParam } from "../_shared/modelParams.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -132,16 +133,13 @@ async function callAI(
   const provider = detectProvider(model);
   const t0 = Date.now();
 
-  // Some models (e.g. o1, o3, deepseek-reasoner) don't support temperature
-  const supportsTemperature = !/\b(o1|o3|o4|deepseek-reasoner)\b/i.test(resolvedModel);
-
   const body: Record<string, unknown> = {
     model: resolvedModel,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    ...(supportsTemperature ? { temperature: 0.3 } : {}),
+    ...temperatureParam(resolvedModel, 0.3),
     tools: [characterToolSchema],
     tool_choice: { type: "function", function: { name: "report_characters" } },
   };

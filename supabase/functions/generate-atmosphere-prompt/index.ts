@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { logAiUsage } from "../_shared/logAiUsage.ts";
 import { resolveTaskPromptWithOverrides } from "../_shared/taskPrompts.ts";
 
+import { temperatureParam } from "../_shared/modelParams.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -113,7 +114,7 @@ Content excerpt: ${contentSummary || "(no content available)"}`;
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.7,
+        ...temperatureParam(usedModel, 0.7),
       }),
     });
 
