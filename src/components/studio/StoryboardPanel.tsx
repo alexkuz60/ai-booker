@@ -1155,6 +1155,17 @@ export function StoryboardPanel({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          {mergeChecked.size >= 2 && (
+            <SpeakerBadge
+              speaker={null}
+              characters={characters}
+              isRu={isRu}
+              onChange={(newSpeaker) => {
+                const firstChecked = segments.find(s => mergeChecked.has(s.segment_id));
+                if (firstChecked) updateSpeaker(firstChecked.segment_id, newSpeaker);
+              }}
+            />
+          )}
           {dialogueCount > 0 && (
             <Button
               variant="ghost"
