@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { ModelPoolManager, type PoolTask, type PoolStats, logPoolStats } from "@/lib/modelPoolManager";
 import { enrichBodyWithKeys, invokeWithFallback } from "@/lib/invokeWithFallback";
+import { fnv1a32 } from "@/lib/contentHash";
 import { toast } from "sonner";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { readSceneContentFromLocal } from "@/lib/localSceneContent";

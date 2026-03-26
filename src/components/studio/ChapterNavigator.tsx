@@ -268,7 +268,7 @@ export function ChapterNavigator({
       }
       setDirtySceneIds(nextDirtyIds);
     })();
-  }, [chapter.scenes.map(s => s.id).join(","), clipsRefreshToken, clearedDirtySceneIds]);
+  }, [chapter.scenes.map(s => s.id).join(","), clipsRefreshToken, clearedDirtySceneIds, projectStorage]);
 
   const staleCount = staleAudioSceneIds?.size ?? 0;
   const lastClickedIdxRef = useRef<number | null>(null);
