@@ -90,7 +90,7 @@ export async function invokeWithFallback<T = unknown>(
     return firstResult as InvokeResult<T>;
   }
 
-  // Build fallback chain
+  // Build fallback chain (excludes the original provider to avoid re-trying the same one)
   const fallbacks = buildFallbackChain(originalModel, userApiKeys, modelField, body);
 
   for (const fb of fallbacks) {
