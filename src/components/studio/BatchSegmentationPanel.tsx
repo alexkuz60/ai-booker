@@ -144,6 +144,21 @@ export function BatchSegmentationPanel({
         });
         if (error) throw error;
         const newSegments: Segment[] = data?.segments ?? [];
+
+        // Client-side coverage check (DNI-1: author text integrity)
+        if (newSegments.length > 0) {
+          const segTextLen = newSegments.reduce((sum: number, s: Segment) =>
+            sum + s.phrases.reduce((ps: number, p: { text?: string }) => ps + (p.text?.length || 0), 0), 0);
+          const coverage = freshContent.length > 0 ? segTextLen / freshContent.length : 0;
+          if (coverage < 0.5) {
+            throw new Error(
+              isRu
+                ? `Покрытие ${Math.round(coverage * 100)}% — ИИ обрезал результат`
+                : `Coverage ${Math.round(coverage * 100)}% — AI truncated output`
+            );
+          }
+        }
+
         // Persist to OPFS so StoryboardPanel can read it
         if (storage) {
           await saveStoryboardToLocal(storage, job.scene.id, {
@@ -211,6 +226,21 @@ export function BatchSegmentationPanel({
           });
           if (error) throw error;
           const newSegments: Segment[] = (data as any)?.segments ?? [];
+
+          // Client-side coverage check (DNI-1: author text integrity)
+          if (newSegments.length > 0) {
+            const segTextLen = newSegments.reduce((sum: number, s: Segment) =>
+              sum + s.phrases.reduce((ps: number, p: { text?: string }) => ps + (p.text?.length || 0), 0), 0);
+            const coverage = freshContent.length > 0 ? segTextLen / freshContent.length : 0;
+            if (coverage < 0.5) {
+              throw new Error(
+                isRu
+                  ? `Покрытие ${Math.round(coverage * 100)}% — ИИ обрезал результат`
+                  : `Coverage ${Math.round(coverage * 100)}% — AI truncated output`
+              );
+            }
+          }
+
           // Persist to OPFS so StoryboardPanel can read it
           if (storage) {
             await saveStoryboardToLocal(storage, job.scene.id, {
