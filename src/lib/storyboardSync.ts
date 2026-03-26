@@ -107,8 +107,20 @@ export async function readStoryboardFromLocal(
       return null;
     }
     const result = await storage.readJSON<LocalStoryboardData>(filePath);
-    const firstPhrase = result?.segments?.[0]?.phrases?.[0]?.text?.slice(0, 60) || "(empty)";
-    console.info(`[StoryboardSync] 📖 READ sceneId=${sceneId} path=${filePath} segs=${result?.segments?.length ?? 0} first="${firstPhrase}"`);
+    if (!result) return null;
+
+    // INTEGRITY CHECK: reject data if stored sceneId doesn't match requested sceneId.
+    // This catches "viral contamination" where one scene's data was written to another's path.
+    if (result.sceneId && result.sceneId !== sceneId) {
+      console.error(
+        `[StoryboardSync] ❌ INTEGRITY VIOLATION: file at ${filePath} contains sceneId=${result.sceneId} but was requested for sceneId=${sceneId}. ` +
+        `Rejecting corrupted data. Delete and re-analyze this scene.`
+      );
+      return null;
+    }
+
+    const firstPhrase = result.segments?.[0]?.phrases?.[0]?.text?.slice(0, 60) || "(empty)";
+    console.info(`[StoryboardSync] 📖 READ sceneId=${sceneId} path=${filePath} segs=${result.segments?.length ?? 0} first="${firstPhrase}"`);
     return result;
   } catch {
     return null;
