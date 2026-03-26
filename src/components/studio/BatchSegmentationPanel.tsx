@@ -187,18 +187,26 @@ export function BatchSegmentationPanel({
         }
 
         // Persist to OPFS so StoryboardPanel can read it
-        if (storage) {
-          await saveStoryboardToLocal(storage, job.scene.id, {
-            segments: newSegments,
-            typeMappings: [],
-            audioStatus: new Map(),
-            inlineNarrationSpeaker: null,
-            contentHash: fnv1a32(freshContent),
-          }, chapterId ?? undefined);
-        }
-        // Clear content_dirty — analysis was just done on fresh content
-        await supabase.from("book_scenes").update({ content_dirty: false }).eq("id", job.scene.id);
-        return { sceneId: job.scene.id, count: newSegments.length };
+          if (storage) {
+            const currentHash = fnv1a32(freshContent);
+            await saveStoryboardToLocal(storage, job.scene.id, {
+              segments: newSegments,
+              typeMappings: [],
+              audioStatus: new Map(),
+              inlineNarrationSpeaker: null,
+              contentHash: currentHash,
+            }, chapterId ?? undefined);
+            // Sync scene index contentHash to match storyboard — prevents false dirty banners
+            const { getCachedSceneIndex, writeSceneIndex } = await import("@/lib/sceneIndex");
+            const cachedIdx = getCachedSceneIndex();
+            if (cachedIdx?.entries[job.scene.id] && cachedIdx.entries[job.scene.id].contentHash !== currentHash) {
+              cachedIdx.entries[job.scene.id].contentHash = currentHash;
+              await writeSceneIndex(storage, cachedIdx);
+            }
+          }
+          // Clear content_dirty — analysis was just done on fresh content
+          await supabase.from("book_scenes").update({ content_dirty: false }).eq("id", job.scene.id);
+          return { sceneId: job.scene.id, count: newSegments.length };
       },
     }));
 
@@ -293,13 +301,21 @@ export function BatchSegmentationPanel({
 
           // Persist to OPFS so StoryboardPanel can read it
           if (storage) {
+            const currentHash = fnv1a32(freshContent);
             await saveStoryboardToLocal(storage, job.scene.id, {
               segments: newSegments,
               typeMappings: [],
               audioStatus: new Map(),
               inlineNarrationSpeaker: null,
-              contentHash: fnv1a32(freshContent),
+              contentHash: currentHash,
             }, chapterId ?? undefined);
+            // Sync scene index contentHash to match storyboard — prevents false dirty banners
+            const { getCachedSceneIndex, writeSceneIndex } = await import("@/lib/sceneIndex");
+            const cachedIdx = getCachedSceneIndex();
+            if (cachedIdx?.entries[job.scene.id] && cachedIdx.entries[job.scene.id].contentHash !== currentHash) {
+              cachedIdx.entries[job.scene.id].contentHash = currentHash;
+              await writeSceneIndex(storage, cachedIdx);
+            }
           }
           // Clear content_dirty — analysis was just done on fresh content
           await supabase.from("book_scenes").update({ content_dirty: false }).eq("id", job.scene.id);
