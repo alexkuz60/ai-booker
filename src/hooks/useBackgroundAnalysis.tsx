@@ -188,8 +188,30 @@ export function BackgroundAnalysisProvider({
 
     if (error) throw error;
 
-    const result = data as { segments?: Segment[] };
+    const result = data as { segments?: Segment[]; coverage?: { lengthPct: number; sourcePct: number; usedFallback: boolean } };
     const newSegments = result.segments || [];
+
+    // Client-side coverage verification (DNI-1: author text integrity)
+    if (newSegments.length > 0) {
+      const segmentTextLen = newSegments.reduce((sum, s) =>
+        sum + s.phrases.reduce((ps, p) => ps + (p.text?.length || 0), 0), 0);
+      const clientCoverage = content.length > 0 ? segmentTextLen / content.length : 0;
+
+      if (clientCoverage < 0.5) {
+        const pct = Math.round(clientCoverage * 100);
+        console.error(`[BgAnalysis] Segment coverage too low: ${pct}% (${segmentTextLen}/${content.length} chars), rejecting`);
+        throw new Error(
+          isRuRef.current
+            ? `Раскадровка покрывает только ${pct}% текста — ИИ обрезал результат. Попробуйте другую модель.`
+            : `Segmentation covers only ${pct}% of text — AI truncated output. Try a different model.`
+        );
+      }
+
+      if (clientCoverage < 0.75) {
+        const pct = Math.round(clientCoverage * 100);
+        console.warn(`[BgAnalysis] Low segment coverage: ${pct}% for scene ${job.sceneId}`);
+      }
+    }
 
     // Persist directly to OPFS with contentHash for dirty detection
     const currentContentHash = fnv1a32(content);
