@@ -1162,26 +1162,20 @@ export function StoryboardPanel({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-          {mergeChecked.size >= 2 && (
-            <>
-              <SegmentTypeBadge
-                segmentType="narrator"
-                isRu={isRu}
-                onChange={(newType) => {
-                  const firstChecked = segments.find(s => mergeChecked.has(s.segment_id));
-                  if (firstChecked) updateSegmentType(firstChecked.segment_id, newType);
+          {segments.length > 0 && (
+            <label className="ml-auto flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground select-none">
+              <Checkbox
+                checked={mergeChecked.size > 0 && mergeChecked.size === segments.length}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setMergeChecked(new Set(segments.map(s => s.segment_id)));
+                  } else {
+                    setMergeChecked(new Set());
+                  }
                 }}
               />
-              <SpeakerBadge
-                speaker={null}
-                characters={characters}
-                isRu={isRu}
-                onChange={(newSpeaker) => {
-                  const firstChecked = segments.find(s => mergeChecked.has(s.segment_id));
-                  if (firstChecked) updateSpeaker(firstChecked.segment_id, newSpeaker);
-                }}
-              />
-            </>
+              {isRu ? "Все" : "All"}
+            </label>
           )}
           {dialogueCount > 0 && (
             <Button
