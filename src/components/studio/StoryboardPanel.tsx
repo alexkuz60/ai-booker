@@ -298,9 +298,11 @@ export function StoryboardPanel({
           applySegments(local.segments);
           // LOCAL-ONLY: detect dirty via contentHash comparison (K3)
           if (local.contentHash) {
-            const { isSceneDirty } = await import("@/lib/sceneIndex");
+            const { isSceneDirty, getContentHash } = await import("@/lib/sceneIndex");
             if (sceneIdRef.current !== sid) return;
-            setContentDirty(isSceneDirty(sid, local.contentHash));
+            const dirty = isSceneDirty(sid, local.contentHash);
+            console.debug(`[Storyboard] dirtyCheck sceneId=${sid} storyboardHash=${local.contentHash} indexHash=${getContentHash(sid)} → dirty=${dirty}`);
+            setContentDirty(dirty);
           }
           setLoading(false);
           return;

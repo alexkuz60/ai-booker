@@ -13,6 +13,7 @@ export async function logAiUsage(params: {
   tokensInput?: number | null;
   tokensOutput?: number | null;
   errorMessage?: string | null;
+  provider?: string;
 }) {
   try {
     const supabase = createClient(
@@ -20,10 +21,17 @@ export async function logAiUsage(params: {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    // Derive provider from model prefix if not explicitly provided
+    const resolvedProvider = params.provider
+      || (params.modelId.startsWith("proxyapi/") ? "proxyapi"
+        : params.modelId.startsWith("openrouter/") ? "openrouter"
+        : params.modelId.startsWith("dotpoint/") ? "dotpoint"
+        : "lovable");
+
     await supabase.from("proxy_api_logs").insert({
       user_id: params.userId,
       model_id: params.modelId,
-      provider: "lovable",
+      provider: resolvedProvider,
       request_type: params.requestType,
       status: params.status,
       latency_ms: params.latencyMs,

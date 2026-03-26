@@ -140,6 +140,9 @@ export function BackgroundAnalysisProvider({
     const content = localScene?.content ?? null;
     if (!content) throw new Error(isRuRef.current ? "Текст сцены не найден" : "Scene text not found");
 
+    // Diagnostic: log content identity to detect "same content for different scenes" bug
+    console.info(`[BgAnalysis] 🔍 sceneId=${job.sceneId} contentLen=${content.length} first80="${content.slice(0, 80).replace(/\n/g, "↵")}"`);
+
     if (content.trim().length < 50) {
       throw new Error(
         isRuRef.current
@@ -190,6 +193,8 @@ export function BackgroundAnalysisProvider({
 
     const result = data as { segments?: Segment[]; coverage?: { lengthPct: number; sourcePct: number; usedFallback: boolean } };
     const newSegments = result.segments || [];
+    const totalPhrases = newSegments.reduce((a, s) => a + (s.phrases?.length || 0), 0);
+    console.info(`[BgAnalysis] ✅ sceneId=${job.sceneId} → ${newSegments.length} segments, ${totalPhrases} phrases, fallback=${result.coverage?.usedFallback}, coverage: len=${result.coverage?.lengthPct}% src=${result.coverage?.sourcePct}%`);
 
     // Warn user if server used fallback segmentation (AI truncated)
     if (result.coverage?.usedFallback) {
