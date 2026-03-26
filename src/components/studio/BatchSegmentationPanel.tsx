@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { ModelPoolManager, type PoolTask, type PoolStats, logPoolStats } from "@/lib/modelPoolManager";
-import { enrichBodyWithKeys } from "@/lib/invokeWithFallback";
+import { enrichBodyWithKeys, invokeWithFallback } from "@/lib/invokeWithFallback";
 import { toast } from "sonner";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { readSceneContentFromLocal } from "@/lib/localSceneContent";
@@ -194,15 +194,16 @@ export function BatchSegmentationPanel({
         updateJob(job.scene.id, { status: "analyzing" });
         try {
           const freshContent = await resolveFreshSceneContent(job.scene);
-          const baseBody: Record<string, unknown> = {
+          const { data, error } = await invokeWithFallback({
+            functionName: "segment-scene",
+            body: {
               scene_id: job.scene.id,
               content: freshContent,
               language: isRu ? "ru" : "en",
               model,
-            };
-          const enrichedBody = enrichBodyWithKeys(baseBody, model, userApiKeys);
-          const { data, error } = await supabase.functions.invoke("segment-scene", {
-            body: enrichedBody,
+            },
+            userApiKeys: userApiKeys,
+            isRu,
           });
           if (error) throw error;
           const newSegments: Segment[] = data?.segments ?? [];
