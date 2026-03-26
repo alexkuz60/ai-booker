@@ -687,10 +687,17 @@ export function StoryboardPanel({
     if (!targetSeg) return;
     const oldType = targetSeg.segment_type;
 
-    const shouldPropagate = TYPE_PROPAGATION_PAIRS[oldType] === newType;
-    const affectedIds = shouldPropagate
-      ? segments.filter(s => s.segment_type === oldType).map(s => s.segment_id)
-      : [segmentId];
+    // Bulk: if target is among checked segments, apply to all checked
+    const bulkChecked = mergeChecked.size > 1 && mergeChecked.has(segmentId);
+    let affectedIds: string[];
+    if (bulkChecked) {
+      affectedIds = segments.filter(s => mergeChecked.has(s.segment_id)).map(s => s.segment_id);
+    } else {
+      const shouldPropagate = TYPE_PROPAGATION_PAIRS[oldType] === newType;
+      affectedIds = shouldPropagate
+        ? segments.filter(s => s.segment_type === oldType).map(s => s.segment_id)
+        : [segmentId];
+    }
 
     const updatedSegments = segments.map(seg =>
       affectedIds.includes(seg.segment_id) ? { ...seg, segment_type: newType } : seg
@@ -709,7 +716,7 @@ export function StoryboardPanel({
     syncTypeMappings(updatedSegments);
     persist(buildSnapshot(updatedSegments));
     onSegmented?.(sceneId!);
-  }, [isRu, segments, sceneId, syncTypeMappings, persist, buildSnapshot, onSegmented]);
+  }, [isRu, segments, sceneId, mergeChecked, syncTypeMappings, persist, buildSnapshot, onSegmented]);
 
   const updateSpeaker = useCallback(async (segmentId: string, newSpeaker: string | null) => {
     const targetSeg = segments.find(s => s.segment_id === segmentId);
@@ -1156,15 +1163,25 @@ export function StoryboardPanel({
             </AlertDialogContent>
           </AlertDialog>
           {mergeChecked.size >= 2 && (
-            <SpeakerBadge
-              speaker={null}
-              characters={characters}
-              isRu={isRu}
-              onChange={(newSpeaker) => {
-                const firstChecked = segments.find(s => mergeChecked.has(s.segment_id));
-                if (firstChecked) updateSpeaker(firstChecked.segment_id, newSpeaker);
-              }}
-            />
+            <>
+              <SegmentTypeBadge
+                segmentType="narrator"
+                isRu={isRu}
+                onChange={(newType) => {
+                  const firstChecked = segments.find(s => mergeChecked.has(s.segment_id));
+                  if (firstChecked) updateSegmentType(firstChecked.segment_id, newType);
+                }}
+              />
+              <SpeakerBadge
+                speaker={null}
+                characters={characters}
+                isRu={isRu}
+                onChange={(newSpeaker) => {
+                  const firstChecked = segments.find(s => mergeChecked.has(s.segment_id));
+                  if (firstChecked) updateSpeaker(firstChecked.segment_id, newSpeaker);
+                }}
+              />
+            </>
           )}
           {dialogueCount > 0 && (
             <Button
