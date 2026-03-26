@@ -36,6 +36,8 @@ function toStudioScenePointers(
     scene_type?: string | null;
     mood?: string | null;
     bpm?: number | null;
+    char_count?: number;
+    content?: string;
   }>,
 ) {
   return scenes.map((scene) => ({
@@ -45,6 +47,7 @@ function toStudioScenePointers(
     scene_type: scene.scene_type || "mixed",
     mood: scene.mood || "",
     bpm: scene.bpm || 120,
+    char_count: scene.char_count ?? scene.content?.length,
   }));
 }
 
@@ -249,11 +252,16 @@ const Studio = () => {
           const localContent = localScene?.content;
 
           if (localContent === undefined || localContent === scene.content) {
+            // Even if content hasn't changed, ensure char_count is set
+            if (!scene.char_count && localContent) {
+              changed = true;
+              return { ...scene, char_count: localContent.length };
+            }
             return scene;
           }
 
           changed = true;
-          return { ...scene, content: localContent };
+          return { ...scene, content: localContent, char_count: localContent.length };
         });
 
         return changed ? { ...prev, scenes } : prev;
