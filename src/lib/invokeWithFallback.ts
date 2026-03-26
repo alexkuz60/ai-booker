@@ -33,6 +33,25 @@ interface InvokeResult<T = unknown> {
   error: any;
 }
 
+async function extractFunctionErrorMessage(result: { data: unknown; error: any }): Promise<string> {
+  const baseMessage = String(result.error?.message || result.error || "");
+  const response = result.error?.context;
+  if (!response || typeof response.text !== "function") return baseMessage;
+
+  try {
+    const raw = await response.clone().text();
+    if (!raw) return baseMessage;
+    try {
+      const parsed = JSON.parse(raw);
+      return String(parsed?.error || parsed?.message || raw || baseMessage);
+    } catch {
+      return raw;
+    }
+  } catch {
+    return baseMessage;
+  }
+}
+
 /**
  * Invoke an edge function with automatic cascading fallback.
  * Only triggers fallback when:
@@ -68,6 +87,9 @@ export async function invokeWithFallback<T = unknown>(
     !originalModel.startsWith("dotpoint/");
 
   if (!needsFallback || !isLovableProvider) {
+    if (firstResult.error) {
+      firstResult.error.message = await extractFunctionErrorMessage(firstResult);
+    }
     return firstResult as InvokeResult<T>;
   }
 
@@ -80,11 +102,17 @@ export async function invokeWithFallback<T = unknown>(
 
     const result = await supabase.functions.invoke(functionName, { body: fb.body });
     if (!isRetryableError(result)) {
+      if (result.error) {
+        result.error.message = await extractFunctionErrorMessage(result);
+      }
       return result as InvokeResult<T>;
     }
   }
 
   // All fallbacks exhausted — return last error
+  if (firstResult.error) {
+    firstResult.error.message = await extractFunctionErrorMessage(firstResult);
+  }
   return firstResult as InvokeResult<T>;
 }
 

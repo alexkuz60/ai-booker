@@ -110,6 +110,48 @@ function buildFallbackSegments(content: string, lang: "ru" | "en"): AISegment[] 
   return segments.length > 0 ? segments : [{ type: "narrator", text: content }];
 }
 
+function extractUpstreamErrorMessage(
+  errText: string,
+  status: number,
+  model: string,
+  lang: "ru" | "en",
+): string {
+  let rawMessage = "";
+
+  try {
+    const parsed = JSON.parse(errText);
+    rawMessage = String(
+      parsed?.error?.message ||
+      parsed?.error?.detail ||
+      parsed?.detail ||
+      parsed?.message ||
+      "",
+    );
+  } catch {
+    rawMessage = errText;
+  }
+
+  const normalized = rawMessage.trim();
+  const insufficientBalance = /insufficient balance|payment required|credits?/i.test(normalized);
+  const rateLimited = /rate.?limit|too many requests|429/i.test(normalized);
+
+  if (status === 402 || insufficientBalance) {
+    return lang === "ru"
+      ? `Модель ${model} недоступна: у провайдера недостаточно баланса (402). Смените модель или пополните баланс этого провайдера.`
+      : `Model ${model} is unavailable: provider balance is insufficient (402). Switch models or top up that provider.`;
+  }
+
+  if (status === 429 || rateLimited) {
+    return lang === "ru"
+      ? `Модель ${model} временно упёрлась в лимит запросов (429). Повторите позже или переключитесь на другую модель.`
+      : `Model ${model} hit the rate limit (429). Try again later or switch to another model.`;
+  }
+
+  return normalized || (lang === "ru"
+    ? `Ошибка AI-провайдера (${status}) для модели ${model}`
+    : `AI provider error (${status}) for model ${model}`);
+}
+
 /**
  * Repair a truncated JSON array by finding the last complete object and closing the array.
  * Returns parsed array or null if repair fails.
@@ -243,11 +285,12 @@ Deno.serve(async (req) => {
       if (!res.ok) {
         const errText = await res.text();
         console.error("AI gateway error:", res.status, errText);
+        const parsedMessage = extractUpstreamErrorMessage(errText, res.status, usedModel, lang);
         if (userId) {
-          logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "error", latencyMs: lat, errorMessage: `AI error: ${res.status}` });
+          logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "error", latencyMs: lat, errorMessage: parsedMessage });
         }
         const statusCode = (res.status === 402 || res.status === 429) ? res.status : 502;
-        throw Object.assign(new Error(`AI error: ${res.status}`), { statusCode });
+        throw Object.assign(new Error(parsedMessage), { statusCode });
       }
 
       const data = await res.json();
