@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { logAiUsage } from "../_shared/logAiUsage.ts";
 import { resolveAiEndpoint, extractProviderFields } from "../_shared/providerRouting.ts";
+import { modelParams } from "../_shared/modelParams.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -87,9 +88,6 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
   const isReasoningModel = usedModel.includes("gpt-5") || usedModel.includes("o3") || usedModel.includes("o4") || usedModel.includes("gemini-2.5-pro");
   const aiStart = Date.now();
 
-  // Models that require max_completion_tokens instead of max_tokens
-  const useMaxCompletionTokens = /gpt-5|o1|o3|o4/.test(usedModel);
-
   // Build two variants: with tools (preferred) and without (fallback for reasoning models)
   const toolsPayload = {
     model: usedModel,
@@ -97,8 +95,7 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    temperature: 0.3,
-    ...(useMaxCompletionTokens ? { max_completion_tokens: 16384 } : { max_tokens: 16384 }),
+    ...modelParams(usedModel, { maxTokens: 16384, temperature: 0.3 }),
     tools: [{
       type: "function",
       function: {
@@ -140,8 +137,7 @@ async function callAI(systemPrompt: string, userPrompt: string, lang: "ru" | "en
       { role: "system", content: systemPrompt + jsonPromptSuffix },
       { role: "user", content: userPrompt + "\n\nRespond with ONLY the JSON object, nothing else." },
     ],
-    temperature: 0.3,
-    ...(useMaxCompletionTokens ? { max_completion_tokens: 16384 } : { max_tokens: 16384 }),
+    ...modelParams(usedModel, { maxTokens: 16384, temperature: 0.3 }),
   };
   // For OpenAI non-reasoning models, request structured JSON output
   // (Gemini models don't reliably support response_format through the gateway)
