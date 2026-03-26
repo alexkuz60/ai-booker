@@ -53,6 +53,14 @@
 | B14 | Хардкод `source/book.pdf` — DOCX/FB2 не работает | ✅ Исправлено |
 | B15 | Stale scene data after merge/delete in Parser | ✅ Исправлено |
 | B16 | Автозапуск анализа при выборе главы в навигаторе | ✅ Исправлено |
+| B17 | Фантомные персонажи после перезагрузки книги | ✅ Исправлено |
+| B18 | Ложные dirty-маркеры после ручных правок раскадровки | ✅ Исправлено |
+
+### М. Ложные dirty-маркеры после правок раскадровки — ✅ РЕШЕНО (B18)
+- Проблема: `StoryboardSnapshot` не включал `contentHash` → при `persist()` после ручных правок (слияние фраз, смена спикера) хеш терялся из `storyboard.json`. При перезагрузке `ChapterNavigator` сравнивал `undefined` с хешем из `scene_index` → ложный dirty-маркер «Сделайте переанализ».
+- Инвариант: `contentHash` **ОБЯЗАН** присутствовать в каждом `StoryboardSnapshot` и сохраняться при ЛЮБЫХ ручных правках. См. ARCHITECTURE.md §1.11.
+- Решение: добавлен `contentHash?: number` в `StoryboardSnapshot`, `contentHashRef` в `StoryboardPanel`, `buildSnapshot()` всегда включает текущий хеш.
+- Файлы: `useStoryboardPersistence.ts`, `StoryboardPanel.tsx`.
 
 ### Н. Восстановление сессии после перезагрузки ПК — ✅ РЕШЕНО (B15-old)
 - Браузеры восстанавливают `sessionStorage` после перезапуска → стейл `ACTIVE_BOOK_KEY` открывал вчерашнюю книгу.
