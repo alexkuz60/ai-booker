@@ -122,7 +122,11 @@
 - [x] Персистентность микшера: гибридная (localStorage + cloud user_settings per scene)
 - [x] Спектроанализатор (FFT): 3 режима визуализации (bars, line, mirror)
 - [x] Пропагация типов блоков: narrator↔first_person автосмена всех блоков в сцене
+- [x] Пропагация спикеров: только системные типы (narrator, epigraph, lyric, footnote); inner_thought и first_person исключены
+- [x] Автоназначение системного спикера при смене типа (narrator→Рассказчик, footnote→Комментатор) и автоочистка при обратной смене
 - [x] Автоочистка пустых треков после переназначения типов
+- [x] Массовые действия: мультивыбор сегментов, чекбокс «Все», групповая смена типа/спикера
+- [x] Маршрутизация таймлайна: системные типы всегда на трек системного персонажа, игнорируя typeMappings
 - [x] Atmosphere Engine: ручная генерация SFX/Music/Ambience (ElevenLabs)
 - [x] Atmosphere Engine: AI Prompt Builder (auto-atmosphere по метаданным сцены)
 - [x] Atmosphere Engine: таблица `scene_atmospheres` + сохранение/удаление слоёв

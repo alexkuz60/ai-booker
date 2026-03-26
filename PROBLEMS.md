@@ -59,8 +59,8 @@
 ### М. Ложные dirty-маркеры после правок раскадровки — ✅ РЕШЕНО (B18)
 - Проблема: `StoryboardSnapshot` не включал `contentHash` → при `persist()` после ручных правок (слияние фраз, смена спикера) хеш терялся из `storyboard.json`. При перезагрузке `ChapterNavigator` сравнивал `undefined` с хешем из `scene_index` → ложный dirty-маркер «Сделайте переанализ».
 - Инвариант: `contentHash` **ОБЯЗАН** присутствовать в каждом `StoryboardSnapshot` и сохраняться при ЛЮБЫХ ручных правках. См. ARCHITECTURE.md §1.11.
-- Решение: добавлен `contentHash?: number` в `StoryboardSnapshot`, `contentHashRef` в `StoryboardPanel`, `buildSnapshot()` всегда включает текущий хеш.
-- Файлы: `useStoryboardPersistence.ts`, `StoryboardPanel.tsx`.
+- Решение: добавлен `contentHash?: number` в `StoryboardSnapshot`, `contentHashRef` в `StoryboardPanel`, `buildSnapshot()` всегда включает текущий хеш. Dirty-маркеры переведены на явные флаги `dirtyScenes[]` в `scene_index.json` — устанавливаются Парсером только при изменении contentHash для сцен с существующей раскадровкой (DNI-1), сбрасываются Студией при переанализе. Runtime-сравнение хешей больше не используется.
+- Файлы: `useStoryboardPersistence.ts`, `StoryboardPanel.tsx`, `sceneIndex.ts`.
 
 ### Н. Восстановление сессии после перезагрузки ПК — ✅ РЕШЕНО (B15-old)
 - Браузеры восстанавливают `sessionStorage` после перезапуска → стейл `ACTIVE_BOOK_KEY` открывал вчерашнюю книгу.
