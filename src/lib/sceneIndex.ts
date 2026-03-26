@@ -27,6 +27,9 @@ export interface SceneIndexData {
   storyboarded: string[];
   /** Scene IDs that have character mapping data in OPFS */
   characterMapped: string[];
+  /** Scene IDs whose content was changed in Parser AFTER storyboard analysis.
+   *  Set ONLY by Parser (structure sync), cleared ONLY by Studio (successful re-analysis). */
+  dirtyScenes: string[];
 }
 
 const INDEX_PATH = "scene_index.json";
@@ -118,12 +121,31 @@ export function buildSceneIndex(
   const storyboarded = (existingIndex?.storyboarded ?? []).filter(id => validIds.has(id));
   const characterMapped = (existingIndex?.characterMapped ?? []).filter(id => validIds.has(id));
 
+  // Detect content changes: mark storyboarded scenes as dirty if their contentHash changed
+  const prevDirty = new Set((existingIndex?.dirtyScenes ?? []).filter(id => validIds.has(id)));
+  if (existingIndex) {
+    for (const [sceneId, entry] of Object.entries(entries)) {
+      const oldEntry = existingIndex.entries[sceneId];
+      if (!oldEntry) continue;
+      // Only mark dirty if scene had a storyboard AND content hash changed
+      if (
+        storyboarded.includes(sceneId) &&
+        oldEntry.contentHash !== 0 &&
+        entry.contentHash !== 0 &&
+        oldEntry.contentHash !== entry.contentHash
+      ) {
+        prevDirty.add(sceneId);
+      }
+    }
+  }
+
   return {
     version: 2,
     updatedAt: new Date().toISOString(),
     entries,
     storyboarded,
     characterMapped,
+    dirtyScenes: [...prevDirty],
   };
 }
 
@@ -171,13 +193,43 @@ export function getContentHash(sceneId: string): number {
   return _cachedIndex?.entries[sceneId]?.contentHash ?? 0;
 }
 
+// ─── Explicit dirty flag management ────────────────────────
+
 /**
- * Check if a scene's storyboard is dirty (content changed since analysis).
- * Compare index contentHash with the hash stored in storyboard data.
+ * Check if a scene is dirty (content changed in Parser after storyboard analysis).
+ * Uses EXPLICIT flag set by Parser, NOT hash comparison.
  */
-export function isSceneDirty(sceneId: string, storyboardContentHash?: number): boolean {
-  if (!storyboardContentHash) return false; // No storyboard = not dirty (just unanalyzed)
-  const currentHash = getContentHash(sceneId);
-  if (currentHash === 0) return false; // No content hash available
-  return currentHash !== storyboardContentHash;
+export function isSceneDirty(sceneId: string): boolean {
+  return _cachedIndex?.dirtyScenes?.includes(sceneId) ?? false;
+}
+
+/**
+ * Mark a scene as dirty. Called ONLY from Parser (structure sync).
+ */
+export async function markSceneDirty(
+  storage: ProjectStorage,
+  sceneId: string,
+): Promise<void> {
+  if (!_cachedIndex) return;
+  if (!_cachedIndex.dirtyScenes) _cachedIndex.dirtyScenes = [];
+  if (!_cachedIndex.dirtyScenes.includes(sceneId)) {
+    _cachedIndex.dirtyScenes.push(sceneId);
+    await writeSceneIndex(storage, _cachedIndex);
+  }
+}
+
+/**
+ * Clear dirty flag for a scene. Called ONLY from Studio after successful re-analysis.
+ */
+export async function unmarkSceneDirty(
+  storage: ProjectStorage,
+  sceneId: string,
+): Promise<void> {
+  if (!_cachedIndex) return;
+  if (!_cachedIndex.dirtyScenes) return;
+  const idx = _cachedIndex.dirtyScenes.indexOf(sceneId);
+  if (idx >= 0) {
+    _cachedIndex.dirtyScenes.splice(idx, 1);
+    await writeSceneIndex(storage, _cachedIndex);
+  }
 }
