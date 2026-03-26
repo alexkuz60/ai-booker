@@ -18,6 +18,27 @@ import type { Segment } from "@/components/studio/storyboard/types";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import { toast } from "sonner";
 
+const MODEL_RETRY_PATTERNS = [
+  /429/i,
+  /402/i,
+  /rate.?limit/i,
+  /too many requests/i,
+  /payment required/i,
+  /credit/i,
+  /quota/i,
+  /неполную раскадровк/i,
+  /incomplete segmentation/i,
+  /truncated output/i,
+  /обрезал результат/i,
+  /covers only \d+%/i,
+  /покрывает только \d+%/i,
+];
+
+function shouldRetryWithAnotherModel(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return MODEL_RETRY_PATTERNS.some((pattern) => pattern.test(message));
+}
+
 export type AnalysisJobStatus = "pending" | "running" | "done" | "error";
 
 export interface AnalysisJob {
@@ -268,6 +289,32 @@ export function BackgroundAnalysisProvider({
     return newSegments;
   }, []);
 
+  const processSceneWithModelFallback = useCallback(async (
+    job: AnalysisJobRequest,
+    useEnrichBody: boolean,
+  ): Promise<Segment[]> => {
+    const candidates = Array.from(new Set(poolRef.current("screenwriter").filter(Boolean)));
+    const models = candidates.length > 0 ? candidates : [modelRef.current("screenwriter")];
+    let lastError: Error | null = null;
+
+    for (let i = 0; i < models.length; i++) {
+      const modelId = models[i];
+      try {
+        if (models.length > 1) {
+          console.info(`[BgAnalysis] Trying model ${i + 1}/${models.length} for scene ${job.sceneId}: ${modelId}`);
+        }
+        return await processScene(job, modelId, useEnrichBody);
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        const canRetry = i < models.length - 1 && shouldRetryWithAnotherModel(lastError);
+        if (!canRetry) throw lastError;
+        console.warn(`[BgAnalysis] Retrying scene ${job.sceneId} with next model after ${modelId}: ${lastError.message}`);
+      }
+    }
+
+    throw lastError ?? new Error("Model fallback failed");
+  }, [processScene]);
+
   // ── Queue mode (no pool) ──────────────────────────────────────────────
 
   const processNext = useCallback(async () => {
@@ -280,8 +327,7 @@ export function BackgroundAnalysisProvider({
     updateJob(job.sceneId, { status: "running" });
 
     try {
-      const model = modelRef.current("screenwriter");
-      const newSegments = await processScene(job, model, false);
+      const newSegments = await processSceneWithModelFallback(job, false);
 
       if (cancelledRef.current) return;
 
@@ -308,7 +354,7 @@ export function BackgroundAnalysisProvider({
       activeRef.current--;
       processNext();
     }
-  }, [updateJob, processScene]);
+  }, [updateJob, processSceneWithModelFallback]);
 
   // ── Pool mode ─────────────────────────────────────────────────────────
 

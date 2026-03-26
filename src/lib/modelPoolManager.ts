@@ -60,6 +60,12 @@ const RETRYABLE_PATTERNS = [
   /payment required/i,
   /credit/i,
   /quota/i,
+  /неполную раскадровк/i,
+  /incomplete segmentation/i,
+  /truncated output/i,
+  /обрезал результат/i,
+  /covers only \d+%/i,
+  /покрывает только \d+%/i,
 ];
 
 const MAX_RETRIES = 2;
