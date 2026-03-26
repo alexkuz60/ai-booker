@@ -196,13 +196,9 @@ export function BatchSegmentationPanel({
               inlineNarrationSpeaker: null,
               contentHash: currentHash,
             }, chapterId ?? undefined);
-            // Sync scene index contentHash to match storyboard — prevents false dirty banners
-            const { getCachedSceneIndex, writeSceneIndex } = await import("@/lib/sceneIndex");
-            const cachedIdx = getCachedSceneIndex();
-            if (cachedIdx?.entries[job.scene.id] && cachedIdx.entries[job.scene.id].contentHash !== currentHash) {
-              cachedIdx.entries[job.scene.id].contentHash = currentHash;
-              await writeSceneIndex(storage, cachedIdx);
-            }
+            // Clear explicit dirty flag — analysis done on fresh content
+            const { unmarkSceneDirty } = await import("@/lib/sceneIndex");
+            await unmarkSceneDirty(storage, job.scene.id);
           }
           // Clear content_dirty — analysis was just done on fresh content
           await supabase.from("book_scenes").update({ content_dirty: false }).eq("id", job.scene.id);
@@ -309,13 +305,9 @@ export function BatchSegmentationPanel({
               inlineNarrationSpeaker: null,
               contentHash: currentHash,
             }, chapterId ?? undefined);
-            // Sync scene index contentHash to match storyboard — prevents false dirty banners
-            const { getCachedSceneIndex, writeSceneIndex } = await import("@/lib/sceneIndex");
-            const cachedIdx = getCachedSceneIndex();
-            if (cachedIdx?.entries[job.scene.id] && cachedIdx.entries[job.scene.id].contentHash !== currentHash) {
-              cachedIdx.entries[job.scene.id].contentHash = currentHash;
-              await writeSceneIndex(storage, cachedIdx);
-            }
+            // Clear explicit dirty flag — analysis done on fresh content
+            const { unmarkSceneDirty } = await import("@/lib/sceneIndex");
+            await unmarkSceneDirty(storage, job.scene.id);
           }
           // Clear content_dirty — analysis was just done on fresh content
           await supabase.from("book_scenes").update({ content_dirty: false }).eq("id", job.scene.id);

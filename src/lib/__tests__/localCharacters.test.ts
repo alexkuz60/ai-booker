@@ -84,6 +84,7 @@ function setupSceneIndex(sceneIds: string[], characterMapped: string[] = []) {
     entries,
     storyboarded: [],
     characterMapped,
+    dirtyScenes: [],
   });
 }
 

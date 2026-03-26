@@ -263,14 +263,9 @@ export function BackgroundAnalysisProvider({
       contentHash: currentContentHash,
     }, job.chapterId ?? undefined);
 
-    // Sync scene index contentHash to match storyboard — prevents false dirty banners
-    // (e.g. after Parser re-extract with slightly different whitespace)
-    const { getCachedSceneIndex, writeSceneIndex } = await import("@/lib/sceneIndex");
-    const cachedIdx = getCachedSceneIndex();
-    if (cachedIdx?.entries[job.sceneId] && cachedIdx.entries[job.sceneId].contentHash !== currentContentHash) {
-      cachedIdx.entries[job.sceneId].contentHash = currentContentHash;
-      await writeSceneIndex(s, cachedIdx);
-    }
+    // Clear explicit dirty flag — analysis was just done on fresh content
+    const { unmarkSceneDirty } = await import("@/lib/sceneIndex");
+    await unmarkSceneDirty(s, job.sceneId);
 
     // Clear content_dirty in DB (best-effort, not source of truth)
     await supabase.from("book_scenes").update({ content_dirty: false }).eq("id", job.sceneId);
