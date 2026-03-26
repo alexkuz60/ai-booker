@@ -322,8 +322,13 @@ Deno.serve(async (req) => {
     const coverageRatio = segmentTextTotal / content.length;
     const sourceCoverage = getCoverageFromSource(sourceNorm, segments);
 
-    if (!usedFallbackSegmentation && (coverageRatio < 0.5 || sourceCoverage < 0.55)) {
-      console.warn(`Invalid segmentation. Length coverage=${Math.round(coverageRatio * 100)}%, source coverage=${Math.round(sourceCoverage * 100)}%, segments=${segments.length}`);
+    // Strict threshold: AI must cover ≥80% of source text.
+    // Lower coverage means truncated output (often due to token limits).
+    const COVERAGE_THRESHOLD = 0.80;
+    const SOURCE_COVERAGE_THRESHOLD = 0.75;
+
+    if (!usedFallbackSegmentation && (coverageRatio < COVERAGE_THRESHOLD || sourceCoverage < SOURCE_COVERAGE_THRESHOLD)) {
+      console.warn(`Insufficient segmentation coverage. Length=${Math.round(coverageRatio * 100)}%, source=${Math.round(sourceCoverage * 100)}%, segments=${segments.length}, contentLen=${content.length}`);
       if (userId) {
         logAiUsage({
           userId,
@@ -333,7 +338,7 @@ Deno.serve(async (req) => {
           latencyMs: aiLatency,
           tokensInput: usage?.prompt_tokens,
           tokensOutput: usage?.completion_tokens,
-          errorMessage: `Invalid segmentation: len=${Math.round(coverageRatio * 100)}% source=${Math.round(sourceCoverage * 100)}%`,
+          errorMessage: `Truncated segmentation: len=${Math.round(coverageRatio * 100)}% source=${Math.round(sourceCoverage * 100)}%`,
         });
       }
       segments = buildFallbackSegments(content, lang);
@@ -391,7 +396,15 @@ Deno.serve(async (req) => {
       inline_narrations: seg.inline_narrations,
     }));
 
-    return new Response(JSON.stringify({ segments: lightResult }), {
+    // Include coverage metrics so client can independently verify
+    return new Response(JSON.stringify({
+      segments: lightResult,
+      coverage: {
+        lengthPct: Math.round(coverageRatio * 100),
+        sourcePct: Math.round(sourceCoverage * 100),
+        usedFallback: usedFallbackSegmentation,
+      },
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
