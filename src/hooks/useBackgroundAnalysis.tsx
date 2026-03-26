@@ -7,7 +7,7 @@
  * - Pool mode: ModelPoolManager with round-robin across multiple models, retry on 429/402
  */
 
-import { createContext, useContext, useCallback, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeWithFallback, enrichBodyWithKeys, getMissingExplicitProviderError } from "@/lib/invokeWithFallback";
 import { fnv1a32 } from "@/lib/contentHash";
@@ -273,6 +273,7 @@ export function BackgroundAnalysisProvider({
 
   const processNext = useCallback(async () => {
     if (cancelledRef.current) return;
+    if (!modelsReadyRef.current) return;
     if (activeRef.current >= MAX_CONCURRENCY) return;
     const job = queueRef.current.shift();
     if (!job) return;
@@ -281,9 +282,6 @@ export function BackgroundAnalysisProvider({
     updateJob(job.sceneId, { status: "running" });
 
     try {
-      if (!modelsReadyRef.current) {
-        throw new Error(isRuRef.current ? "AI роли ещё загружаются — повторите через секунду" : "AI roles are still loading — try again in a second");
-      }
       const model = modelRef.current("screenwriter");
       const newSegments = await processScene(job, model, false);
 
@@ -317,9 +315,7 @@ export function BackgroundAnalysisProvider({
   // ── Pool mode ─────────────────────────────────────────────────────────
 
   const runPoolBatch = useCallback(async (requests: AnalysisJobRequest[]) => {
-    if (!modelsReadyRef.current) {
-      throw new Error(isRuRef.current ? "AI роли ещё загружаются — пакетный анализ отложен" : "AI roles are still loading — batch analysis was delayed");
-    }
+    if (!modelsReadyRef.current) return;
     const effectivePool = poolRef.current("screenwriter");
     const manager = new ModelPoolManager(effectivePool, keysRef.current, 2);
     poolRunningRef.current = true;
@@ -391,16 +387,33 @@ export function BackgroundAnalysisProvider({
 
   // ── Submit ────────────────────────────────────────────────────────────
 
-  const submit = useCallback((requests: AnalysisJobRequest[]) => {
-    if (!modelsReadyRef.current) {
-      toast.error(
-        isRuRef.current
-          ? "AI роли ещё не загрузились. Повторите запуск через секунду."
-          : "AI roles have not loaded yet. Retry in a second."
-      );
+  const startQueuedJobs = useCallback(() => {
+    if (!modelsReadyRef.current || cancelledRef.current) return;
+
+    const usePool =
+      isPoolEnabledRef.current("screenwriter") &&
+      poolRef.current("screenwriter").length > 1;
+
+    if (usePool && queueRef.current.length > 1 && !poolRunningRef.current && activeRef.current === 0) {
+      const batch = queueRef.current.splice(0, queueRef.current.length);
+      if (batch.length === 0) return;
+      setIsPoolMode(true);
+      void runPoolBatch(batch).catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error("[BgAnalysis] Failed to start pool batch:", message);
+        toast.error(message);
+      });
       return;
     }
 
+    setIsPoolMode(false);
+    const availableSlots = Math.max(0, MAX_CONCURRENCY - activeRef.current);
+    for (let i = 0; i < availableSlots; i++) {
+      void processNext();
+    }
+  }, [runPoolBatch, processNext]);
+
+  const submit = useCallback((requests: AnalysisJobRequest[]) => {
     cancelledRef.current = false;
 
     // Register jobs in state
@@ -409,7 +422,7 @@ export function BackgroundAnalysisProvider({
       const next = new Map(prev);
       for (const r of requests) {
         const existing = next.get(r.sceneId);
-        if (existing?.status === "running") continue;
+        if (existing?.status === "running" || existing?.status === "pending") continue;
         next.set(r.sceneId, {
           sceneId: r.sceneId,
           sceneTitle: r.sceneTitle,
@@ -422,25 +435,14 @@ export function BackgroundAnalysisProvider({
 
     if (newRequests.length === 0) return;
 
-    const usePool = isPoolEnabledRef.current("screenwriter") && poolRef.current("screenwriter").length > 1;
+    queueRef.current.push(...newRequests);
+    startQueuedJobs();
+  }, [startQueuedJobs]);
 
-    if (usePool && newRequests.length > 1 && !poolRunningRef.current) {
-      // Pool mode for batch (2+ scenes)
-      setIsPoolMode(true);
-      void runPoolBatch(newRequests).catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error("[BgAnalysis] Failed to start pool batch:", message);
-        toast.error(message);
-      });
-    } else {
-      // Queue mode: single scene or pool already running or no pool
-      setIsPoolMode(false);
-      queueRef.current.push(...newRequests);
-      for (let i = 0; i < MAX_CONCURRENCY; i++) {
-        void processNext();
-      }
-    }
-  }, [runPoolBatch, processNext]);
+  useEffect(() => {
+    if (!modelsReady) return;
+    startQueuedJobs();
+  }, [modelsReady, startQueuedJobs]);
 
   // ── Cancel ────────────────────────────────────────────────────────────
 
