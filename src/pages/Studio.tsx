@@ -70,7 +70,7 @@ const Studio = () => {
   const { isRu } = useLanguage();
   const { user } = useAuth();
   const userApiKeys = useUserApiKeys();
-  const { getModelForRole, getModelForBatch, getEffectivePool, isPoolEnabled } = useAiRoles(userApiKeys);
+  const { getModelForRole, getModelForBatch, getEffectivePool, isPoolEnabled, loaded: aiRolesLoaded } = useAiRoles(userApiKeys);
   const {
     chapter, setChapter,
     selectedSceneIdx, setSelectedSceneIdx,
@@ -542,6 +542,7 @@ const Studio = () => {
       userApiKeys={userApiKeys}
       isRu={isRu}
       onSceneSegmented={onSegmented}
+      modelsReady={aiRolesLoaded}
     >
       <motion.div
         initial={{ opacity: 0 }}

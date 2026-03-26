@@ -74,6 +74,7 @@ export function BackgroundAnalysisProvider({
   userApiKeys,
   isRu,
   onSceneSegmented,
+  modelsReady,
 }: {
   children: ReactNode;
   storage: ProjectStorage | null;
@@ -83,6 +84,7 @@ export function BackgroundAnalysisProvider({
   userApiKeys: Record<string, string>;
   isRu: boolean;
   onSceneSegmented?: (sceneId: string) => void;
+  modelsReady: boolean;
 }) {
   const [jobs, setJobs] = useState<Map<string, AnalysisJob>>(new Map());
   const [completionToken, setCompletionToken] = useState(0);
@@ -108,6 +110,8 @@ export function BackgroundAnalysisProvider({
   isRuRef.current = isRu;
   const onSegmentedRef = useRef(onSceneSegmented);
   onSegmentedRef.current = onSceneSegmented;
+  const modelsReadyRef = useRef(modelsReady);
+  modelsReadyRef.current = modelsReady;
 
   const updateJob = useCallback((sceneId: string, patch: Partial<AnalysisJob>) => {
     setJobs(prev => {
@@ -277,6 +281,9 @@ export function BackgroundAnalysisProvider({
     updateJob(job.sceneId, { status: "running" });
 
     try {
+      if (!modelsReadyRef.current) {
+        throw new Error(isRuRef.current ? "AI роли ещё загружаются — повторите через секунду" : "AI roles are still loading — try again in a second");
+      }
       const model = modelRef.current("screenwriter");
       const newSegments = await processScene(job, model, false);
 
@@ -310,6 +317,9 @@ export function BackgroundAnalysisProvider({
   // ── Pool mode ─────────────────────────────────────────────────────────
 
   const runPoolBatch = useCallback(async (requests: AnalysisJobRequest[]) => {
+    if (!modelsReadyRef.current) {
+      throw new Error(isRuRef.current ? "AI роли ещё загружаются — пакетный анализ отложен" : "AI roles are still loading — batch analysis was delayed");
+    }
     const effectivePool = poolRef.current("screenwriter");
     const manager = new ModelPoolManager(effectivePool, keysRef.current, 2);
     poolRunningRef.current = true;
@@ -382,6 +392,15 @@ export function BackgroundAnalysisProvider({
   // ── Submit ────────────────────────────────────────────────────────────
 
   const submit = useCallback((requests: AnalysisJobRequest[]) => {
+    if (!modelsReadyRef.current) {
+      toast.error(
+        isRuRef.current
+          ? "AI роли ещё не загрузились. Повторите запуск через секунду."
+          : "AI roles have not loaded yet. Retry in a second."
+      );
+      return;
+    }
+
     cancelledRef.current = false;
 
     // Register jobs in state
@@ -408,13 +427,17 @@ export function BackgroundAnalysisProvider({
     if (usePool && newRequests.length > 1 && !poolRunningRef.current) {
       // Pool mode for batch (2+ scenes)
       setIsPoolMode(true);
-      runPoolBatch(newRequests);
+      void runPoolBatch(newRequests).catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error("[BgAnalysis] Failed to start pool batch:", message);
+        toast.error(message);
+      });
     } else {
       // Queue mode: single scene or pool already running or no pool
       setIsPoolMode(false);
       queueRef.current.push(...newRequests);
       for (let i = 0; i < MAX_CONCURRENCY; i++) {
-        processNext();
+        void processNext();
       }
     }
   }, [runPoolBatch, processNext]);

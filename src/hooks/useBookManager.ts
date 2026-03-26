@@ -180,32 +180,32 @@ export function useBookManager({
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(delBookId);
 
     try {
-      // Use cached mapping first
+      // Use cached mapping first, but NEVER trust it blindly.
+      // Re-validate every candidate by project.json.bookId before deletion.
       const cachedProjects = library.localProjectNamesByBookId.get(delBookId) || [];
 
       if (storageBackend === "opfs") {
-        // Safety net: scan ALL OPFS projects to find any with matching bookId
-        // This catches cases where the cached mapping was stale/incomplete
         const allProjectNames = await OPFSStorage.listProjects();
-        const projectsToDelete = new Set(cachedProjects);
+        const candidateProjects = new Set([...cachedProjects, ...allProjectNames]);
+        const projectsToDelete: string[] = [];
 
-        for (const projectName of allProjectNames) {
-          if (projectsToDelete.has(projectName)) continue;
+        for (const projectName of candidateProjects) {
           try {
             const store = await OPFSStorage.openOrCreate(projectName);
             const meta = await store.readJSON<{ bookId?: string }>("project.json").catch(() => null);
-            if (meta?.bookId === delBookId) {
-              projectsToDelete.add(projectName);
-              console.info("[deleteBook] Found uncached OPFS project for bookId:", delBookId, "→", projectName);
-            }
+            const toc = await store.readJSON<{ bookId?: string }>(paths.structureToc()).catch(() => null);
+            const resolvedBookId = meta?.bookId || toc?.bookId || null;
+            if (resolvedBookId !== delBookId) continue;
+            projectsToDelete.push(projectName);
+            console.info("[deleteBook] Confirmed OPFS project for bookId:", delBookId, "→", projectName);
           } catch {
             // Skip unreadable projects
           }
         }
 
-        if (projectsToDelete.size > 0) {
-          console.info("[deleteBook] Deleting OPFS projects:", [...projectsToDelete]);
-          await Promise.all([...projectsToDelete].map((name) => OPFSStorage.deleteProject(name)));
+        if (projectsToDelete.length > 0) {
+          console.info("[deleteBook] Deleting OPFS projects:", projectsToDelete);
+          await Promise.all(projectsToDelete.map((name) => OPFSStorage.deleteProject(name)));
         }
       }
 
