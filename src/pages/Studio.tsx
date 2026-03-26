@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { readStructureFromLocal, type LocalChapterData } from "@/lib/localSync";
+import { readStructureFromLocal } from "@/lib/localSync";
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Clock, Loader2 } from "lucide-react";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
@@ -27,6 +27,41 @@ import { readSceneContentFromLocal } from "@/lib/localSceneContent";
 import { getCachedSceneIndex } from "@/lib/sceneIndex";
 import { BackgroundAnalysisProvider } from "@/hooks/useBackgroundAnalysis";
 import { useAiRoles } from "@/hooks/useAiRoles";
+
+function toStudioScenePointers(
+  scenes: Array<{
+    id?: string;
+    scene_number: number;
+    title: string;
+    scene_type?: string | null;
+    mood?: string | null;
+    bpm?: number | null;
+  }>,
+) {
+  return scenes.map((scene) => ({
+    id: scene.id,
+    scene_number: scene.scene_number,
+    title: scene.title,
+    scene_type: scene.scene_type || "mixed",
+    mood: scene.mood || "",
+    bpm: scene.bpm || 120,
+  }));
+}
+
+function getStudioScenePointerSignature(
+  scenes: Array<{
+    id?: string;
+    scene_number: number;
+    title: string;
+    scene_type?: string | null;
+    mood?: string | null;
+    bpm?: number | null;
+  }>,
+) {
+  return scenes
+    .map((scene) => `${scene.id ?? ""}:${scene.scene_number}:${scene.title}:${scene.scene_type ?? ""}:${scene.mood ?? ""}:${scene.bpm ?? ""}`)
+    .join("|");
+}
 
 const Studio = () => {
   const { isRu } = useLanguage();
@@ -72,6 +107,10 @@ const Studio = () => {
   const [selectedSceneIndices, setSelectedSceneIndices] = useState<Set<number>>(new Set());
 
   const selectedScene = chapter && selectedSceneIdx !== null ? chapter.scenes[selectedSceneIdx] : null;
+  const chapterScenePointerSignature = useMemo(
+    () => getStudioScenePointerSignature(chapter?.scenes ?? []),
+    [chapter?.scenes],
+  );
   const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
     isRu,
     currentBookId: bookId,
@@ -92,40 +131,71 @@ const Studio = () => {
     setPlaylistDurations(m);
   }, []);
 
-  // LOCAL-ONLY: resolve bookId and scene IDs from OPFS, not DB (K3)
+  // LOCAL-ONLY: reconcile chapter pointer against canonical OPFS structure.
+  // DNI-7: scene IDs are unstable and must be revised immediately after TOC edits.
   useEffect(() => {
     if (!chapter || !storage) return;
-    const needIds = chapter.scenes.some(s => !s.id);
-    const needBookId = !bookId;
-    if (!needIds && !needBookId) return;
 
     let cancelled = false;
+    const sourceChapterId = chapter.chapterId;
+    const sourceChapterTitle = chapter.chapterTitle;
+    const sourceSignature = chapterScenePointerSignature;
+
     (async () => {
       try {
         const local = await readStructureFromLocal(storage);
         if (cancelled || !local?.structure) return;
 
-        if (needBookId && local.structure.bookId) {
+        if (local.structure.bookId && local.structure.bookId !== bookId) {
           setBookId(local.structure.bookId);
         }
 
-        if (needIds) {
-          // Find chapter index by chapterId
-          let chapterIndex: number | null = null;
-          for (const [idx, id] of local.chapterIdMap.entries()) {
-            if (id === chapter.chapterId) { chapterIndex = idx; break; }
+        let chapterIndex: number | null = null;
+        for (const [idx, id] of local.chapterIdMap.entries()) {
+          if (id === sourceChapterId) {
+            chapterIndex = idx;
+            break;
           }
-          if (chapterIndex === null) return;
+        }
+        if (chapterIndex === null && sourceChapterTitle) {
+          chapterIndex = local.structure.toc.findIndex(
+            (entry, idx) => entry.title === sourceChapterTitle && local.chapterResults.has(idx),
+          );
+        }
+        if (chapterIndex === null || chapterIndex < 0) return;
 
-          const result = local.chapterResults.get(chapterIndex);
-          if (!result?.scenes?.length) return;
+        const result = local.chapterResults.get(chapterIndex);
+        const resolvedChapterId = local.chapterIdMap.get(chapterIndex);
+        const tocEntry = local.structure.toc[chapterIndex];
+        if (!result || !resolvedChapterId || !tocEntry) return;
 
-          const updated = { ...chapter, scenes: chapter.scenes.map(s => {
-            if (s.id) return s;
-            const match = result.scenes.find(ls => ls.scene_number === s.scene_number);
-            return match && (match as any).id ? { ...s, id: (match as any).id } : s;
-          })};
-          if (!cancelled) setChapter(updated);
+        const canonicalChapter = {
+          chapterId: resolvedChapterId,
+          chapterTitle: tocEntry.title,
+          bookTitle: local.structure.title || chapter.bookTitle,
+          bookId: local.structure.bookId || chapter.bookId,
+          scenes: toStudioScenePointers(result.scenes),
+        };
+        const canonicalSignature = getStudioScenePointerSignature(canonicalChapter.scenes);
+
+        if (!cancelled) {
+          setChapter((prev) => {
+            if (!prev) return prev;
+            const sameBranch =
+              (sourceChapterId && prev.chapterId === sourceChapterId) ||
+              (!sourceChapterId && prev.chapterTitle === sourceChapterTitle);
+            if (!sameBranch) return prev;
+            if (getStudioScenePointerSignature(prev.scenes) !== sourceSignature) return prev;
+
+            const alreadyCanonical =
+              prev.chapterId === canonicalChapter.chapterId &&
+              prev.chapterTitle === canonicalChapter.chapterTitle &&
+              prev.bookTitle === canonicalChapter.bookTitle &&
+              (prev.bookId ?? null) === (canonicalChapter.bookId ?? null) &&
+              getStudioScenePointerSignature(prev.scenes) === canonicalSignature;
+
+            return alreadyCanonical ? prev : canonicalChapter;
+          });
         }
       } catch (err) {
         console.warn("[Studio] Failed to resolve IDs from OPFS:", err);
@@ -133,53 +203,14 @@ const Studio = () => {
     })();
 
     return () => { cancelled = true; };
-  }, [chapter?.chapterId, chapter?.scenes.some(s => !s.id), bookId, storage, setChapter]);
+  }, [storage, chapter?.chapterId, chapter?.chapterTitle, chapter?.bookTitle, chapter?.bookId, chapterScenePointerSignature, bookId, setChapter]);
 
-  // Cross-page navigation: if chapter has no scenes (e.g. from Narrators link),
-  // hydrate full scene list from OPFS structure data.
   useEffect(() => {
-    if (!storage || !chapter?.chapterId || chapter.scenes.length > 0) return;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const local = await readStructureFromLocal(storage);
-        if (cancelled || !local?.structure) return;
-
-        // Find chapter index by chapterId
-        let chapterIndex: number | null = null;
-        for (const [idx, id] of local.chapterIdMap.entries()) {
-          if (id === chapter.chapterId) { chapterIndex = idx; break; }
-        }
-        if (chapterIndex === null) return;
-
-        const result = local.chapterResults.get(chapterIndex);
-        const tocEntry = local.structure.toc[chapterIndex];
-        if (!result?.scenes?.length || !tocEntry) return;
-
-        const hydrated = {
-          chapterId: chapter.chapterId,
-          chapterTitle: tocEntry.title,
-          bookTitle: local.structure.title || chapter.bookTitle,
-          bookId: local.structure.bookId || chapter.bookId,
-          scenes: result.scenes.map(s => ({
-            id: (s as any).id,
-            scene_number: s.scene_number,
-            title: s.title,
-            scene_type: s.scene_type || "mixed",
-            mood: s.mood || "",
-            bpm: s.bpm || 120,
-          })),
-        };
-
-        if (!cancelled) setChapter(hydrated);
-      } catch (err) {
-        console.error("[Studio] Failed to hydrate chapter from OPFS:", err);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [storage, chapter?.chapterId, chapter?.scenes?.length, setChapter]);
+    if (!chapter) return;
+    if (selectedSceneIdx === null) return;
+    if (selectedSceneIdx >= 0 && selectedSceneIdx < chapter.scenes.length) return;
+    setSelectedSceneIdx(chapter.scenes.length > 0 ? 0 : null);
+  }, [chapter?.scenes.length, selectedSceneIdx, setSelectedSceneIdx]);
 
   // Hydrate chapter scene content from OPFS using robust scene lookup.
   // This avoids relying on sessionStorage snapshots or a single chapter file path.
@@ -187,6 +218,8 @@ const Studio = () => {
     if (!storage || !chapter?.scenes?.length) return;
 
     let cancelled = false;
+    const sourceChapterId = chapter.chapterId;
+    const sourceSignature = chapterScenePointerSignature;
 
     (async () => {
       const resolvedScenes = await Promise.all(
@@ -207,7 +240,8 @@ const Studio = () => {
       if (cancelled) return;
 
       setChapter((prev) => {
-        if (!prev || prev.chapterId !== chapter.chapterId) return prev;
+        if (!prev || prev.chapterId !== sourceChapterId) return prev;
+        if (getStudioScenePointerSignature(prev.scenes) !== sourceSignature) return prev;
 
         let changed = false;
         const scenes = prev.scenes.map((scene, index) => {
@@ -229,7 +263,7 @@ const Studio = () => {
     return () => {
       cancelled = true;
     };
-  }, [storage, chapter?.chapterId, chapter?.scenes.map((scene) => `${scene.id ?? "no-id"}:${scene.scene_number}:${scene.title}`).join("|"), setChapter]);
+  }, [storage, chapter?.chapterId, chapterScenePointerSignature, setChapter]);
 
   // LOCAL-ONLY: segmented scene IDs come exclusively from OPFS scene_index
   useEffect(() => {

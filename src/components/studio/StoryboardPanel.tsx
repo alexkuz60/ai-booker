@@ -280,6 +280,7 @@ export function StoryboardPanel({
     try {
       if (hasStorage) {
         const local = await loadFromLocal(sid);
+        if (sceneIdRef.current !== sid) return;
         if (local && local.segments.length > 0) {
           const firstPhrase = local.segments[0]?.phrases?.[0]?.text?.slice(0, 80) || "(empty)";
           console.debug(`[Storyboard] Loaded ${local.segments.length} segments from OPFS, first phrase: "${firstPhrase}"`);
@@ -293,10 +294,12 @@ export function StoryboardPanel({
           setAudioStatus(new Map(Object.entries(local.audioStatus || {})));
           // Preserve contentHash from analysis — survives all subsequent edits
           contentHashRef.current = local.contentHash;
+          if (sceneIdRef.current !== sid) return;
           applySegments(local.segments);
           // LOCAL-ONLY: detect dirty via contentHash comparison (K3)
           if (local.contentHash) {
             const { isSceneDirty } = await import("@/lib/sceneIndex");
+            if (sceneIdRef.current !== sid) return;
             setContentDirty(isSceneDirty(sid, local.contentHash));
           }
           setLoading(false);
@@ -305,6 +308,7 @@ export function StoryboardPanel({
         console.debug(`[Storyboard] No OPFS data for sceneId=${sid} — showing empty state`);
       }
 
+      if (sceneIdRef.current !== sid) return;
       typeMappingsRef.current = [];
       contentHashRef.current = undefined;
       setInlineNarrationSpeaker(null);
@@ -312,10 +316,13 @@ export function StoryboardPanel({
       setSegments([]);
       setLoaded(true);
     } catch (err) {
+      if (sceneIdRef.current !== sid) return;
       console.error("Failed to load segments:", err);
       toast.error(isRu ? "Ошибка загрузки сегментов" : "Failed to load segments");
     }
-    setLoading(false);
+    if (sceneIdRef.current === sid) {
+      setLoading(false);
+    }
   }, [isRu, hasStorage, loadFromLocal, applySegments, characters]);
 
   // ─── Segment Operations ───────────────────────────────────
