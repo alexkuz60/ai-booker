@@ -87,7 +87,9 @@ function getNormalizedLengthCoverage(sourceNorm: string, segments: AISegment[]):
 
 function buildFallbackSegments(content: string, lang: "ru" | "en"): AISegment[] {
   const phrases = splitPhrases(content).filter(Boolean);
+  console.log(`[Fallback] content=${content.length} chars, phrases=${phrases.length}`);
   if (phrases.length === 0) {
+    console.warn("[Fallback] No phrases found, returning single segment");
     return [{ type: lang === "ru" ? "inner_thought" : "narrator", text: content }];
   }
 
@@ -104,6 +106,7 @@ function buildFallbackSegments(content: string, lang: "ru" | "en"): AISegment[] 
     });
   }
 
+  console.log(`[Fallback] Produced ${segments.length} segments from ${phrases.length} phrases`);
   return segments.length > 0 ? segments : [{ type: "narrator", text: content }];
 }
 
