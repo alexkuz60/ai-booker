@@ -707,12 +707,20 @@ export function StoryboardPanel({
       footnote: "Комментатор",
     };
     const systemSpeaker = SYSTEM_TYPE_SPEAKER[newType] ?? null;
+    const SYSTEM_SPEAKERS = new Set(Object.values(SYSTEM_TYPE_SPEAKER));
 
-    const updatedSegments = segments.map(seg =>
-      affectedIds.includes(seg.segment_id)
-        ? { ...seg, segment_type: newType, ...(systemSpeaker ? { speaker: systemSpeaker } : {}) }
-        : seg
-    );
+    const updatedSegments = segments.map(seg => {
+      if (!affectedIds.includes(seg.segment_id)) return seg;
+      const updated: typeof seg = { ...seg, segment_type: newType };
+      if (systemSpeaker) {
+        // Switching TO system type → assign system speaker
+        updated.speaker = systemSpeaker;
+      } else if (SYSTEM_SPEAKERS.has(seg.speaker ?? "")) {
+        // Switching FROM system type to non-system → clear system speaker
+        updated.speaker = null;
+      }
+      return updated;
+    });
     setSegments(updatedSegments);
 
     if (affectedIds.length > 1) {
