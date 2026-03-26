@@ -16,6 +16,27 @@ import { readSceneContentFromLocal } from "@/lib/localSceneContent";
 import { saveStoryboardToLocal } from "@/lib/storyboardSync";
 import type { Segment } from "@/components/studio/storyboard/types";
 
+const MODEL_RETRY_PATTERNS = [
+  /429/i,
+  /402/i,
+  /rate.?limit/i,
+  /too many requests/i,
+  /payment required/i,
+  /credit/i,
+  /quota/i,
+  /неполную раскадровк/i,
+  /incomplete segmentation/i,
+  /truncated output/i,
+  /обрезал результат/i,
+  /covers only \d+%/i,
+  /покрывает только \d+%/i,
+];
+
+function shouldRetryWithAnotherModel(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return MODEL_RETRY_PATTERNS.some((pattern) => pattern.test(message));
+}
+
 interface SceneInfo {
   id: string;
   title: string;
@@ -208,7 +229,7 @@ export function BatchSegmentationPanel({
   // ── Classic fixed-concurrency batch ───────────────────────────────────
 
   const runClassicBatch = useCallback(async (pendingJobs: SceneJob[]) => {
-    const model = getModelForBatch("screenwriter");
+    const models = Array.from(new Set(effectivePool.length > 0 ? effectivePool : [getModelForBatch("screenwriter")]));
     const queue = [...pendingJobs];
     let idx = 0;
 
@@ -219,39 +240,56 @@ export function BatchSegmentationPanel({
         updateJob(job.scene.id, { status: "analyzing" });
         try {
           const freshContent = await resolveFreshSceneContent(job.scene);
-          const { data, error } = await invokeWithFallback({
-            functionName: "segment-scene",
-            body: {
-              scene_id: job.scene.id,
-              content: freshContent,
-              language: isRu ? "ru" : "en",
-              model,
-            },
-            userApiKeys: userApiKeys,
-            isRu,
-          });
-          if (error) throw error;
-          const classicResult = data as { segments?: Segment[]; coverage?: { lengthPct: number; sourcePct: number; usedFallback: boolean } };
-          const newSegments: Segment[] = classicResult?.segments ?? [];
+          let classicResult: { segments?: Segment[]; coverage?: { lengthPct: number; sourcePct: number; usedFallback: boolean } } | null = null;
+          let newSegments: Segment[] = [];
+          let lastError: Error | null = null;
 
-          // Warn if server used fallback segmentation
-          if (classicResult?.coverage?.usedFallback) {
-            console.warn(`[BatchClassic] Fallback segmentation for scene ${job.scene.id}: source=${classicResult.coverage.sourcePct}%`);
-          }
+          for (let modelIndex = 0; modelIndex < models.length; modelIndex++) {
+            const model = models[modelIndex];
+            try {
+              const { data, error } = await invokeWithFallback({
+                functionName: "segment-scene",
+                body: {
+                  scene_id: job.scene.id,
+                  content: freshContent,
+                  language: isRu ? "ru" : "en",
+                  model,
+                },
+                userApiKeys: userApiKeys,
+                isRu,
+              });
+              if (error) throw error;
+              classicResult = data as { segments?: Segment[]; coverage?: { lengthPct: number; sourcePct: number; usedFallback: boolean } };
+              newSegments = classicResult?.segments ?? [];
 
-          // Client-side coverage check (DNI-1) — skip if server already fell back
-          if (newSegments.length > 0 && !classicResult?.coverage?.usedFallback) {
-            const segTextLen = newSegments.reduce((sum: number, s: Segment) =>
-              sum + s.phrases.reduce((ps: number, p: { text?: string }) => ps + (p.text?.length || 0), 0), 0);
-            const coverage = freshContent.length > 0 ? segTextLen / freshContent.length : 0;
-            if (coverage < 0.5) {
-              throw new Error(
-                isRu
-                  ? `Покрытие ${Math.round(coverage * 100)}% — ИИ обрезал результат`
-                  : `Coverage ${Math.round(coverage * 100)}% — AI truncated output`
-              );
+              if (classicResult?.coverage?.usedFallback) {
+                console.warn(`[BatchClassic] Fallback segmentation for scene ${job.scene.id}: source=${classicResult.coverage.sourcePct}%`);
+              }
+
+              if (newSegments.length > 0 && !classicResult?.coverage?.usedFallback) {
+                const segTextLen = newSegments.reduce((sum: number, s: Segment) =>
+                  sum + s.phrases.reduce((ps: number, p: { text?: string }) => ps + (p.text?.length || 0), 0), 0);
+                const coverage = freshContent.length > 0 ? segTextLen / freshContent.length : 0;
+                if (coverage < 0.5) {
+                  throw new Error(
+                    isRu
+                      ? `Покрытие ${Math.round(coverage * 100)}% — ИИ обрезал результат`
+                      : `Coverage ${Math.round(coverage * 100)}% — AI truncated output`
+                  );
+                }
+              }
+
+              lastError = null;
+              break;
+            } catch (err: any) {
+              lastError = err instanceof Error ? err : new Error(String(err));
+              const canRetry = modelIndex < models.length - 1 && shouldRetryWithAnotherModel(lastError);
+              if (!canRetry) throw lastError;
+              console.warn(`[BatchClassic] Retrying scene ${job.scene.id} with next model after ${model}: ${lastError.message}`);
             }
           }
+
+          if (lastError) throw lastError;
 
           // Persist to OPFS so StoryboardPanel can read it
           if (storage) {
@@ -279,7 +317,7 @@ export function BatchSegmentationPanel({
       () => worker(),
     );
     await Promise.all(workers);
-  }, [getModelForRole, concurrency, isRu, updateJob, onSceneSegmented, resolveFreshSceneContent, userApiKeys]);
+  }, [effectivePool, getModelForBatch, concurrency, isRu, updateJob, onSceneSegmented, resolveFreshSceneContent, userApiKeys, storage, chapterId]);
 
   // ── Extract characters from segmentation results (LOCAL-FIRST) ──────
 
