@@ -113,12 +113,17 @@ export function buildSceneIndex(
     });
   });
 
+  // Prune stale scene IDs that no longer exist in the structure
+  const validIds = new Set(Object.keys(entries));
+  const storyboarded = (existingIndex?.storyboarded ?? []).filter(id => validIds.has(id));
+  const characterMapped = (existingIndex?.characterMapped ?? []).filter(id => validIds.has(id));
+
   return {
     version: 2,
     updatedAt: new Date().toISOString(),
     entries,
-    storyboarded: existingIndex?.storyboarded ?? [],
-    characterMapped: existingIndex?.characterMapped ?? [],
+    storyboarded,
+    characterMapped,
   };
 }
 
