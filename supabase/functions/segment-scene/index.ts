@@ -86,6 +86,13 @@ function getNormalizedLengthCoverage(sourceNorm: string, segments: AISegment[]):
   return segmentNorm.length / sourceNorm.length;
 }
 
+/** Raw character coverage: total segment text length / source text length (no normalization) */
+function getRawCharCoverage(sourceText: string, segments: AISegment[]): number {
+  if (!sourceText) return 0;
+  const totalSegLen = segments.reduce((sum, s) => sum + (s.text?.length || 0), 0);
+  return totalSegLen / sourceText.length;
+}
+
 function buildFallbackSegments(content: string, lang: "ru" | "en"): AISegment[] {
   const phrases = splitPhrases(content).filter(Boolean);
   console.log(`[Fallback] content=${content.length} chars, phrases=${phrases.length}`);
@@ -368,15 +375,23 @@ Deno.serve(async (req) => {
     const sourceNorm = normalizeText(content);
     const coverageRatio = getNormalizedLengthCoverage(sourceNorm, segments);
     const sourceCoverage = getOrderedCoverageFromSource(sourceNorm, segments);
+    const rawCoverage = getRawCharCoverage(content, segments);
 
     // Coverage thresholds: AI must cover a reasonable portion of source text.
     // Too strict thresholds (e.g. 80%) discard good AI results (74% with 23 segments)
     // and replace them with crude paragraph fallback, losing speaker/type info.
     const COVERAGE_THRESHOLD = 0.60;
     const SOURCE_COVERAGE_THRESHOLD = 0.55;
+    const RAW_COVERAGE_THRESHOLD = 0.45; // must match client's 0.5 with margin
 
-    if (!usedFallbackSegmentation && (coverageRatio < COVERAGE_THRESHOLD || sourceCoverage < SOURCE_COVERAGE_THRESHOLD)) {
-      console.warn(`Insufficient segmentation coverage. Length=${Math.round(coverageRatio * 100)}%, source=${Math.round(sourceCoverage * 100)}%, segments=${segments.length}, contentLen=${content.length}`);
+    console.log(`[Coverage] normalized=${Math.round(coverageRatio * 100)}% source=${Math.round(sourceCoverage * 100)}% raw=${Math.round(rawCoverage * 100)}% segments=${segments.length} contentLen=${content.length} first80="${content.slice(0, 80).replace(/\n/g, "↵")}"`);
+
+    if (!usedFallbackSegmentation && (
+      coverageRatio < COVERAGE_THRESHOLD ||
+      sourceCoverage < SOURCE_COVERAGE_THRESHOLD ||
+      rawCoverage < RAW_COVERAGE_THRESHOLD
+    )) {
+      console.warn(`Insufficient segmentation coverage. Length=${Math.round(coverageRatio * 100)}%, source=${Math.round(sourceCoverage * 100)}%, raw=${Math.round(rawCoverage * 100)}%, segments=${segments.length}, contentLen=${content.length}`);
       if (userId) {
         logAiUsage({
           userId,
@@ -386,7 +401,7 @@ Deno.serve(async (req) => {
           latencyMs: aiLatency,
           tokensInput: usage?.prompt_tokens,
           tokensOutput: usage?.completion_tokens,
-          errorMessage: `Truncated segmentation: len=${Math.round(coverageRatio * 100)}% source=${Math.round(sourceCoverage * 100)}%`,
+          errorMessage: `Truncated segmentation: len=${Math.round(coverageRatio * 100)}% source=${Math.round(sourceCoverage * 100)}% raw=${Math.round(rawCoverage * 100)}%`,
         });
       }
       segments = buildFallbackSegments(content, lang);
@@ -450,6 +465,7 @@ Deno.serve(async (req) => {
       coverage: {
         lengthPct: Math.round(coverageRatio * 100),
         sourcePct: Math.round(sourceCoverage * 100),
+        rawPct: Math.round(rawCoverage * 100),
         usedFallback: usedFallbackSegmentation,
       },
     }), {

@@ -411,6 +411,7 @@ const Studio = () => {
         });
 
         if (!cancelled && localScene?.content) {
+          console.info(`[Studio] 📖 Loaded content for sceneId=${selectedScene.id} sceneNum=${selectedScene.scene_number} len=${localScene.content.length} first80="${localScene.content.slice(0, 80).replace(/\n/g, "↵")}"`);
           setSceneContent(localScene.content);
         }
       }
