@@ -375,8 +375,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Log successful AI call
-    if (userId) {
+    // Log successful AI call (skip if already logged as error due to coverage failure)
+    if (userId && !usedFallbackSegmentation) {
       logAiUsage({ userId, modelId: usedModel, requestType: "segment-scene", status: "success", latencyMs: aiLatency, tokensInput: usage?.prompt_tokens, tokensOutput: usage?.completion_tokens });
     }
 
