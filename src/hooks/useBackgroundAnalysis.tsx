@@ -10,6 +10,7 @@
 import { createContext, useContext, useCallback, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeWithFallback, enrichBodyWithKeys } from "@/lib/invokeWithFallback";
+import { fnv1a32 } from "@/lib/contentHash";
 import { readSceneContentFromLocal } from "@/lib/localSceneContent";
 import { saveStoryboardToLocal, deleteStoryboardFromLocal } from "@/lib/storyboardSync";
 import { ModelPoolManager, type PoolTask, type PoolStats, logPoolStats } from "@/lib/modelPoolManager";
