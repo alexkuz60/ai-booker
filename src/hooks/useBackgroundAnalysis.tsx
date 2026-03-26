@@ -7,12 +7,12 @@
  * - Pool mode: ModelPoolManager with round-robin across multiple models, retry on 429/402
  */
 
-import { createContext, useContext, useCallback, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeWithFallback, enrichBodyWithKeys, getMissingExplicitProviderError } from "@/lib/invokeWithFallback";
 import { fnv1a32 } from "@/lib/contentHash";
 import { readSceneContentFromLocal } from "@/lib/localSceneContent";
-import { saveStoryboardToLocal, deleteStoryboardFromLocal } from "@/lib/storyboardSync";
+import { saveStoryboardToLocal } from "@/lib/storyboardSync";
 import { ModelPoolManager, type PoolTask, type PoolStats, logPoolStats } from "@/lib/modelPoolManager";
 import type { Segment } from "@/components/studio/storyboard/types";
 import type { ProjectStorage } from "@/lib/projectStorage";
@@ -68,6 +68,7 @@ const MAX_CONCURRENCY = 3;
 export function BackgroundAnalysisProvider({
   children,
   storage,
+  aiReady,
   getModelForRole,
   getEffectivePool,
   isPoolEnabled,
@@ -77,6 +78,7 @@ export function BackgroundAnalysisProvider({
 }: {
   children: ReactNode;
   storage: ProjectStorage | null;
+  aiReady: boolean;
   getModelForRole: (role: string) => string;
   getEffectivePool: (role: string) => string[];
   isPoolEnabled: (role: string) => boolean;
@@ -108,6 +110,8 @@ export function BackgroundAnalysisProvider({
   isRuRef.current = isRu;
   const onSegmentedRef = useRef(onSceneSegmented);
   onSegmentedRef.current = onSceneSegmented;
+  const aiReadyRef = useRef(aiReady);
+  aiReadyRef.current = aiReady;
 
   const updateJob = useCallback((sceneId: string, patch: Partial<AnalysisJob>) => {
     setJobs(prev => {
@@ -151,9 +155,6 @@ export function BackgroundAnalysisProvider({
       );
     }
 
-    // Clear existing storyboard
-    await deleteStoryboardFromLocal(s, job.sceneId, job.chapterId ?? undefined);
-
     // Call AI
     let data: any;
     let error: any;
@@ -193,22 +194,24 @@ export function BackgroundAnalysisProvider({
 
     const result = data as { segments?: Segment[]; coverage?: { lengthPct: number; sourcePct: number; usedFallback: boolean } };
     const newSegments = result.segments || [];
-    const totalPhrases = newSegments.reduce((a, s) => a + (s.phrases?.length || 0), 0);
-    console.info(`[BgAnalysis] ✅ sceneId=${job.sceneId} → ${newSegments.length} segments, ${totalPhrases} phrases, fallback=${result.coverage?.usedFallback}, coverage: len=${result.coverage?.lengthPct}% src=${result.coverage?.sourcePct}%`);
 
-    // Warn user if server used fallback segmentation (AI truncated)
     if (result.coverage?.usedFallback) {
-      console.warn(`[BgAnalysis] Server used fallback segmentation for scene ${job.sceneId}: len=${result.coverage.lengthPct}% source=${result.coverage.sourcePct}%`);
-      const { toast } = await import("sonner");
-      toast.warning(
+      throw new Error(
         isRuRef.current
-          ? `Сцена "${job.sceneTitle || job.sceneId}": модель обрезала результат (${result.coverage.sourcePct}%). Использована грубая нарезка. Попробуйте другую модель.`
-          : `Scene "${job.sceneTitle || job.sceneId}": model truncated output (${result.coverage.sourcePct}%). Fallback segmentation used. Try a different model.`
+          ? `Модель вернула неполную раскадровку (${result.coverage.sourcePct}% текста). Грубая подмена отключена — выберите рабочую модель и повторите анализ.`
+          : `Model returned incomplete segmentation (${result.coverage.sourcePct}% of text). Crude fallback is disabled — choose a working model and retry.`,
       );
     }
 
+    if (newSegments.length === 0) {
+      throw new Error(isRuRef.current ? "Модель не вернула ни одного блока" : "Model returned no segments");
+    }
+
+    const totalPhrases = newSegments.reduce((a, s) => a + (s.phrases?.length || 0), 0);
+    console.info(`[BgAnalysis] ✅ sceneId=${job.sceneId} → ${newSegments.length} segments, ${totalPhrases} phrases, fallback=${result.coverage?.usedFallback}, coverage: len=${result.coverage?.lengthPct}% src=${result.coverage?.sourcePct}%`);
+
     // Client-side coverage verification (DNI-1: author text integrity)
-    if (newSegments.length > 0 && !result.coverage?.usedFallback) {
+    if (newSegments.length > 0) {
       const segmentTextLen = newSegments.reduce((sum, s) =>
         sum + s.phrases.reduce((ps, p) => ps + (p.text?.length || 0), 0), 0);
       const clientCoverage = content.length > 0 ? segmentTextLen / content.length : 0;
@@ -383,6 +386,7 @@ export function BackgroundAnalysisProvider({
 
   const startQueuedJobs = useCallback(() => {
     if (cancelledRef.current) return;
+    if (!aiReadyRef.current) return;
 
     const usePool =
       isPoolEnabledRef.current("screenwriter") &&
@@ -432,6 +436,12 @@ export function BackgroundAnalysisProvider({
     queueRef.current.push(...newRequests);
     startQueuedJobs();
   }, [startQueuedJobs]);
+
+  useEffect(() => {
+    if (!aiReady) return;
+    if (queueRef.current.length === 0) return;
+    startQueuedJobs();
+  }, [aiReady, startQueuedJobs]);
 
   // ── Cancel ────────────────────────────────────────────────────────────
 

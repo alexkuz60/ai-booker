@@ -70,7 +70,7 @@ const Studio = () => {
   const { isRu } = useLanguage();
   const { user } = useAuth();
   const userApiKeys = useUserApiKeys();
-  const { getModelForRole, getModelForBatch, getEffectivePool, isPoolEnabled } = useAiRoles(userApiKeys);
+  const { loaded: aiReady, getModelForRole, getModelForBatch, getEffectivePool, isPoolEnabled } = useAiRoles(userApiKeys);
   const {
     chapter, setChapter,
     selectedSceneIdx, setSelectedSceneIdx,
@@ -536,6 +536,7 @@ const Studio = () => {
   return (
     <BackgroundAnalysisProvider
       storage={storage}
+      aiReady={aiReady}
       getModelForRole={getModelForBatch}
       getEffectivePool={getEffectivePool}
       isPoolEnabled={isPoolEnabled}
