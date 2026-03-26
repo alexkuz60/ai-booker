@@ -553,6 +553,7 @@ export function StoryboardPanel({
     setMergeChecked(new Set());
     setContentDirty(false);
     typeMappingsRef.current = [];
+    contentHashRef.current = undefined; // Will be set by background analysis on completion
     setInlineNarrationSpeaker(null);
 
     // Submit to background service
