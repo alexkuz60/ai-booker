@@ -251,9 +251,15 @@ Deno.serve(async (req) => {
 
     const systemPrompt = (await resolveTaskPromptWithOverrides("screenwriter:segment_scene", lang)) || "You are a literary text analyst.";
 
+    // User prompt: short instruction + content (detailed rules are in systemPrompt)
     const userPrompt = lang === "ru"
-      ? `Сегментируй следующую сцену. ВАЖНО: разбей ВЕСЬ текст от начала до конца на отдельные блоки по типу (диалог, повествование, мысли, монолог и т.д.). Определи говорящего для каждой реплики. НЕ сливай текст в один блок.\nВерни ТОЛЬКО JSON-массив объектов: [{"type":"...","speaker":"...","text":"...","inline_narrations":[]}]\nБез markdown, без пояснений.\n\n${content}`
-      : `Segment the following scene. IMPORTANT: split the ENTIRE text from start to finish into separate blocks by type (dialogue, narration, thoughts, monologue, etc.). Identify the speaker for each spoken line. Do NOT merge text into a single block.\nReturn ONLY a JSON array of segment objects: [{"type":"...","speaker":"...","text":"...","inline_narrations":[]}]\nNo markdown, no explanations.\n\n${content}`;
+      ? `Сегментируй следующую сцену. Верни ТОЛЬКО JSON-массив. Без markdown.\n\n${content}`
+      : `Segment the following scene. Return ONLY a JSON array. No markdown.\n\n${content}`;
+
+    // Adaptive maxTokens: output ≈ 3× input (JSON overhead), clamped to [4096, 32768]
+    const estimatedInputTokens = Math.ceil(content.length / 3.5);
+    const adaptiveMaxTokens = Math.min(32768, Math.max(4096, estimatedInputTokens * 3));
+    console.info(`[segment-scene] content=${content.length}ch ≈${estimatedInputTokens}tok → maxTokens=${adaptiveMaxTokens}`);
 
     // Helper to call AI and parse segments
     async function callAiForSegments(): Promise<{ segments: AISegment[]; usage: any; latency: number }> {
@@ -264,7 +270,7 @@ Deno.serve(async (req) => {
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        ...modelParams(resolved.model, { maxTokens: 65536, temperature: 0.1 }),
+        ...modelParams(resolved.model, { maxTokens: adaptiveMaxTokens, temperature: 0.1 }),
       };
 
       const res = await fetch(resolved.endpoint, {
