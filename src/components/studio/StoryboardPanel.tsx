@@ -115,7 +115,7 @@ export function StoryboardPanel({
     );
   }, [characters]);
 
-  /** Build a snapshot for OPFS persistence */
+  /** Build a snapshot for OPFS persistence — always preserves contentHash */
   const buildSnapshot = useCallback(
     (segs?: Segment[], audio?: Map<string, { status: string; durationMs: number }>, speaker?: string | null): StoryboardSnapshot => {
       const nextSegments = segs ?? segments;
@@ -128,6 +128,7 @@ export function StoryboardPanel({
         typeMappings: nextTypeMappings,
         audioStatus: audio ?? audioStatus,
         inlineNarrationSpeaker: nextSpeaker,
+        contentHash: contentHashRef.current,
       };
     },
     [segments, audioStatus, inlineNarrationSpeaker, deriveCurrentTypeMappings],
