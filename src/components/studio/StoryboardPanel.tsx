@@ -767,7 +767,7 @@ export function StoryboardPanel({
     }
 
     onSegmented?.(sceneId!);
-  }, [isRu, segments, sceneId, storage, syncTypeMappings, persist, buildSnapshot, onSegmented]);
+  }, [isRu, segments, sceneId, storage, syncTypeMappings, persist, buildSnapshot, onSegmented, mergeChecked]);
 
   // ─── Synthesis ────────────────────────────────────────────
 
