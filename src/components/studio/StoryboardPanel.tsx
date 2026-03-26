@@ -715,10 +715,17 @@ export function StoryboardPanel({
     const targetSeg = segments.find(s => s.segment_id === segmentId);
     if (!targetSeg) return;
 
-    const shouldPropagate = PROPAGATE_TYPES.has(targetSeg.segment_type);
-    const affectedIds = shouldPropagate
-      ? segments.filter(s => s.segment_type === targetSeg.segment_type).map(s => s.segment_id)
-      : [segmentId];
+    // If the changed segment is among checked segments, apply to ALL checked
+    const bulkChecked = mergeChecked.size > 1 && mergeChecked.has(segmentId);
+    let affectedIds: string[];
+    if (bulkChecked) {
+      affectedIds = segments.filter(s => mergeChecked.has(s.segment_id)).map(s => s.segment_id);
+    } else {
+      const shouldPropagate = PROPAGATE_TYPES.has(targetSeg.segment_type);
+      affectedIds = shouldPropagate
+        ? segments.filter(s => s.segment_type === targetSeg.segment_type).map(s => s.segment_id)
+        : [segmentId];
+    }
 
     const updatedSegments = segments.map(seg =>
       affectedIds.includes(seg.segment_id) ? { ...seg, speaker: newSpeaker } : seg
