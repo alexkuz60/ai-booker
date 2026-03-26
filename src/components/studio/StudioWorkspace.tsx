@@ -112,6 +112,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, s
         <TabsContent value="storyboard" className="flex-1 mt-4 min-h-0">
           <div className="rounded-lg border border-border bg-card/50 h-full">
             <StoryboardPanel
+              key={selectedSceneId ?? "no-scene"}
               sceneId={selectedSceneId ?? null}
               sceneContent={selectedSceneContent ?? null}
               sceneNumber={selectedSceneNumber ?? null}
