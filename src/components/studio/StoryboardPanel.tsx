@@ -675,7 +675,7 @@ export function StoryboardPanel({
     typeMappingsRef.current = deriveCurrentTypeMappings(updatedSegments);
   }, [deriveCurrentTypeMappings]);
 
-  const PROPAGATE_TYPES = new Set(["narrator", "first_person", "inner_thought", "epigraph", "lyric", "footnote"]);
+  const PROPAGATE_TYPES = new Set(["narrator", "epigraph", "lyric", "footnote"]);
 
   const TYPE_PROPAGATION_PAIRS: Record<string, string> = {
     narrator: "first_person",
