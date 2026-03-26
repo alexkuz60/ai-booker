@@ -2,6 +2,7 @@ import { splitPhrases } from "../_shared/splitPhrases.ts";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
 import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
 import { resolveTaskPromptWithOverrides } from "../_shared/taskPrompts.ts";
+import { modelParams } from "../_shared/modelParams.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -247,28 +248,16 @@ Deno.serve(async (req) => {
       ? `Сегментируй следующую сцену. ВАЖНО: разбей ВЕСЬ текст от начала до конца на отдельные блоки по типу (диалог, повествование, мысли, монолог и т.д.). Определи говорящего для каждой реплики. НЕ сливай текст в один блок.\nВерни ТОЛЬКО JSON-массив объектов: [{"type":"...","speaker":"...","text":"...","inline_narrations":[]}]\nБез markdown, без пояснений.\n\n${content}`
       : `Segment the following scene. IMPORTANT: split the ENTIRE text from start to finish into separate blocks by type (dialogue, narration, thoughts, monologue, etc.). Identify the speaker for each spoken line. Do NOT merge text into a single block.\nReturn ONLY a JSON array of segment objects: [{"type":"...","speaker":"...","text":"...","inline_narrations":[]}]\nNo markdown, no explanations.\n\n${content}`;
 
-    // max_tokens is a ceiling, not a reservation — you only pay for actually generated tokens.
-    const maxTokens = 65536;
-
-    // Use max_completion_tokens for newer models, max_tokens for others
-    const isNewModel = /gpt-5|o1|o3|o4/i.test(resolved.model);
-    const tokenParam = isNewModel
-      ? { max_completion_tokens: maxTokens }
-      : { max_tokens: maxTokens };
-
     // Helper to call AI and parse segments
     async function callAiForSegments(): Promise<{ segments: AISegment[]; usage: any; latency: number }> {
       const start = Date.now();
-      // Some models (e.g. openai/gpt-5-mini, gpt-5) reject non-default temperature
-      const supportsTemperature = !/gpt-5/i.test(resolved.model);
       const bodyObj: Record<string, unknown> = {
         model: resolved.model,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        ...(supportsTemperature ? { temperature: 0.1 } : {}),
-        ...tokenParam,
+        ...modelParams(resolved.model, { maxTokens: 65536, temperature: 0.1 }),
       };
 
       const res = await fetch(resolved.endpoint, {

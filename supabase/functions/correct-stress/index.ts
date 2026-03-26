@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
+import { modelParams } from "../_shared/modelParams.ts";
 import { resolveTaskPromptWithOverrides } from "../_shared/taskPrompts.ts";
 
 const corsHeaders = {
@@ -285,7 +286,7 @@ Deno.serve(async (req) => {
             },
           }],
           tool_choice: { type: "function", function: { name: "report_ambiguous_words" } },
-          temperature: 0.3,
+          ...modelParams(resolved.model, { temperature: 0.3 }),
         }),
       });
 

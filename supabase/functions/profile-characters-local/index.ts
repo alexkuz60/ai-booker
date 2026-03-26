@@ -10,6 +10,7 @@
  */
 import { logAiUsage } from "../_shared/logAiUsage.ts";
 import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
+import { modelParams } from "../_shared/modelParams.ts";
 import { resolveTaskPromptWithOverrides } from "../_shared/taskPrompts.ts";
 
 const corsHeaders = {
@@ -151,23 +152,20 @@ interface AiCallOpts {
 }
 
 async function callAiWithRetry(opts: AiCallOpts): Promise<{ profiles: ProfileResult[]; usage?: { prompt_tokens?: number; completion_tokens?: number } }> {
-  const { endpoint, apiKeyValue, usedModel, systemPrompt, jsonSuffix, charBlocksText, skipTemp, useMaxCompletionTokens, maxTokens } = opts;
+  const { endpoint, apiKeyValue, usedModel, systemPrompt, jsonSuffix, charBlocksText, maxTokens } = opts;
 
-  const buildBody = (includeTemp: boolean, tokenLimit?: number) => JSON.stringify({
+  const buildBody = (tokenLimit?: number) => JSON.stringify({
     model: usedModel,
     messages: [
       { role: "system", content: systemPrompt + jsonSuffix },
       { role: "user", content: `## Characters to profile:\n\n${charBlocksText}\n\nRespond with ONLY the JSON object.` },
     ],
-    ...(includeTemp && !skipTemp ? { temperature: 0.3 } : {}),
-    ...(useMaxCompletionTokens
-      ? { max_completion_tokens: tokenLimit || maxTokens }
-      : { max_tokens: tokenLimit || maxTokens }),
+    ...modelParams(usedModel, { maxTokens: tokenLimit || maxTokens, temperature: 0.3 }),
   });
 
   const headers = { "Content-Type": "application/json", Authorization: `Bearer ${apiKeyValue}` };
 
-  let aiRes = await fetch(endpoint, { method: "POST", headers, body: buildBody(true) });
+  let aiRes = await fetch(endpoint, { method: "POST", headers, body: buildBody() });
 
   // Retry on 400
   if (aiRes.status === 400) {
@@ -176,9 +174,9 @@ async function callAiWithRetry(opts: AiCallOpts): Promise<{ profiles: ProfileRes
 
     if (/max_tokens|max_completion_tokens/i.test(errBody)) {
       // Reduce to 8192
-      aiRes = await fetch(endpoint, { method: "POST", headers, body: buildBody(false, 8192) });
-    } else if (!skipTemp) {
-      aiRes = await fetch(endpoint, { method: "POST", headers, body: buildBody(false) });
+      aiRes = await fetch(endpoint, { method: "POST", headers, body: buildBody(8192) });
+    } else {
+      aiRes = await fetch(endpoint, { method: "POST", headers, body: buildBody() });
     }
   }
 

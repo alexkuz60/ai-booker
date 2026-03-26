@@ -10,6 +10,7 @@
 import { resolveAiEndpoint, extractProviderFields } from "../_shared/providerRouting.ts";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
 
+import { modelParams } from "../_shared/modelParams.ts";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -96,8 +97,7 @@ Return JSON (no markdown fences):
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
         ],
-        temperature: 0.3,
-        max_tokens: 4096,
+        ...modelParams(resolvedModel, { maxTokens: 4096, temperature: 0.3 }),
       }),
     });
 

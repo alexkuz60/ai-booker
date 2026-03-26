@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
 import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
+import { modelParams } from "../_shared/modelParams.ts";
 import { resolveTaskPromptWithOverrides } from "../_shared/taskPrompts.ts";
 
 const corsHeaders = {
@@ -152,7 +153,7 @@ Deno.serve(async (req) => {
           { role: "system", content: systemPrompt },
           { role: "user", content: `Analyze these ${batch.length} dialogue segments (language: ${lang}):\n\n${userContent}` },
         ],
-        temperature: 0.1,
+        ...modelParams(resolved.model, { temperature: 0.1 }),
       }),
     });
 
