@@ -83,10 +83,11 @@ export async function saveStoryboardToLocal(
       console.error(`[StoryboardSync] REFUSING to save to unresolved path for scene ${sceneId}. ChapterId missing.`);
       return;
     }
+    const firstPhrase = data.segments[0]?.phrases?.[0]?.text?.slice(0, 60) || "(empty)";
+    console.info(`[StoryboardSync] 💾 WRITE sceneId=${sceneId} path=${filePath} segs=${data.segments.length} first="${firstPhrase}"`);
     await storage.writeJSON(filePath, payload);
     await markStoryboarded(storage, sceneId);
     await touchProjectUpdatedAt(storage);
-    console.debug(`[StoryboardSync] Saved scene ${sceneId} → ${filePath}: ${data.segments.length} segments`);
   } catch (err) {
     console.warn("[StoryboardSync] Failed to save:", err);
   }
@@ -105,7 +106,10 @@ export async function readStoryboardFromLocal(
       console.warn(`[StoryboardSync] Cannot read storyboard: chapterId unresolved for scene ${sceneId}`);
       return null;
     }
-    return await storage.readJSON<LocalStoryboardData>(filePath);
+    const result = await storage.readJSON<LocalStoryboardData>(filePath);
+    const firstPhrase = result?.segments?.[0]?.phrases?.[0]?.text?.slice(0, 60) || "(empty)";
+    console.info(`[StoryboardSync] 📖 READ sceneId=${sceneId} path=${filePath} segs=${result?.segments?.length ?? 0} first="${firstPhrase}"`);
+    return result;
   } catch {
     return null;
   }
