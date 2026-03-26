@@ -206,7 +206,7 @@ export function BatchSegmentationPanel({
             isRu,
           });
           if (error) throw error;
-          const newSegments: Segment[] = data?.segments ?? [];
+          const newSegments: Segment[] = (data as any)?.segments ?? [];
           // Persist to OPFS so StoryboardPanel can read it
           if (storage) {
             await saveStoryboardToLocal(storage, job.scene.id, {
