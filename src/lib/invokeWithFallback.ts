@@ -9,6 +9,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { getModelRegistryEntry } from "@/config/modelRegistry";
 import { toast } from "sonner";
 
+const PROVIDER_LABELS: Record<string, string> = {
+  openrouter: "OpenRouter",
+  proxyapi: "ProxyAPI",
+  dotpoint: "DotPoint",
+};
+
 export interface FallbackOptions {
   /** Edge function name */
   functionName: string;
@@ -39,6 +45,14 @@ export async function invokeWithFallback<T = unknown>(
   const { functionName, body, userApiKeys, isRu = false } = opts;
   const modelField = opts.modelField || "model";
   const originalModel = String(body[modelField] || "");
+
+  const missingProviderError = getMissingExplicitProviderError(originalModel, body, userApiKeys, isRu);
+  if (missingProviderError) {
+    return {
+      data: null,
+      error: missingProviderError,
+    };
+  }
 
   // Enrich first call with matching API keys so the edge function
   // can route to the correct provider without falling back to Lovable AI.
@@ -195,4 +209,34 @@ export function enrichBodyWithKeys(
     };
   }
   return body;
+}
+
+export function getMissingExplicitProviderError(
+  model: string,
+  body: Record<string, unknown>,
+  userApiKeys: Record<string, string>,
+  isRu = false,
+): Error | null {
+  const provider = getExplicitProvider(model);
+  if (!provider) return null;
+
+  const hasInlineKey = provider === "openrouter"
+    ? Boolean(body.apiKey || body.user_api_key || body.openrouter_api_key)
+    : Boolean(body.apiKey || body.user_api_key);
+
+  if (hasInlineKey || userApiKeys[provider]) return null;
+
+  const providerLabel = PROVIDER_LABELS[provider] || provider;
+  return new Error(
+    isRu
+      ? `Для модели ${model} не найден API-ключ ${providerLabel}. Запрос остановлен, чтобы не откатываться на Lovable AI.`
+      : `Missing ${providerLabel} API key for model ${model}. Request was stopped to avoid falling back to Lovable AI.`,
+  );
+}
+
+function getExplicitProvider(model: string): string | null {
+  if (model.startsWith("openrouter/")) return "openrouter";
+  if (model.startsWith("proxyapi/")) return "proxyapi";
+  if (model.startsWith("dotpoint/")) return "dotpoint";
+  return null;
 }
