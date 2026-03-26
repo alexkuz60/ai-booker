@@ -114,10 +114,27 @@ export async function syncStructureToLocal(
 
     await Promise.all([...staleDeletes, ...sceneWrites]);
 
-    // 4. Build and write scene index
+    // 4. Build and write scene index (prunes stale scene IDs)
     const existingIndex = await readSceneIndex(storage);
     const sceneIndex = buildSceneIndex(data.chapterIdMap, sanitizedResults, existingIndex);
     await writeSceneIndex(storage, sceneIndex);
+
+    // 5. Clean up OPFS files for scenes that no longer exist
+    if (existingIndex) {
+      const validSceneIds = new Set(Object.keys(sceneIndex.entries));
+      const staleSceneIds = Object.keys(existingIndex.entries).filter(id => !validSceneIds.has(id));
+      if (staleSceneIds.length > 0) {
+        const staleCleanups: Promise<void>[] = [];
+        for (const staleId of staleSceneIds) {
+          const entry = existingIndex.entries[staleId];
+          if (!entry?.chapterId) continue;
+          const scenePath = `chapters/${entry.chapterId}/scenes/${staleId}`;
+          staleCleanups.push(storage.delete(scenePath).catch(() => undefined));
+        }
+        await Promise.all(staleCleanups);
+        console.debug(`[LocalSync] Cleaned up ${staleSceneIds.length} stale scene(s):`, staleSceneIds);
+      }
+    }
 
     console.debug(`[LocalSync] Structure saved: ${data.toc.length} chapters, ${data.chapterResults.size} results`);
   } catch (err) {
