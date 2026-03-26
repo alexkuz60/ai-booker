@@ -189,16 +189,18 @@ export function BackgroundAnalysisProvider({
     const result = data as { segments?: Segment[] };
     const newSegments = result.segments || [];
 
-    // Persist directly to OPFS
+    // Persist directly to OPFS with contentHash for dirty detection
+    const currentContentHash = fnv1a32(content);
     await saveStoryboardToLocal(s, job.sceneId, {
       segments: newSegments,
       typeMappings: [],
       audioStatus: new Map(),
       inlineNarrationSpeaker: null,
+      contentHash: currentContentHash,
     }, job.chapterId ?? undefined);
 
-    // Clear content_dirty
-    supabase.from("book_scenes").update({ content_dirty: false }).eq("id", job.sceneId);
+    // Clear content_dirty in DB (best-effort, not source of truth)
+    await supabase.from("book_scenes").update({ content_dirty: false }).eq("id", job.sceneId);
 
     // Extract speakers to local characters
     if (newSegments.length > 0) {
