@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { ModelPoolManager, type PoolTask, type PoolStats, logPoolStats } from "@/lib/modelPoolManager";
-import { enrichBodyWithKeys, invokeWithFallback } from "@/lib/invokeWithFallback";
+import { enrichBodyWithKeys, getMissingExplicitProviderError, invokeWithFallback } from "@/lib/invokeWithFallback";
 import { fnv1a32 } from "@/lib/contentHash";
 import { toast } from "sonner";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
@@ -136,6 +136,8 @@ export function BatchSegmentationPanel({
             language: isRu ? "ru" : "en",
             model: modelId,
           };
+        const missingProviderError = getMissingExplicitProviderError(modelId, baseBody, userApiKeys, isRu);
+        if (missingProviderError) throw missingProviderError;
         const enrichedBody = enrichBodyWithKeys(baseBody, modelId, userApiKeys);
         const { data, error } = await supabase.functions.invoke("segment-scene", {
           body: enrichedBody,
