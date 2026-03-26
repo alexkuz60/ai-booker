@@ -231,10 +231,16 @@ export function BatchSegmentationPanel({
             isRu,
           });
           if (error) throw error;
-          const newSegments: Segment[] = (data as any)?.segments ?? [];
+          const classicResult = data as { segments?: Segment[]; coverage?: { lengthPct: number; sourcePct: number; usedFallback: boolean } };
+          const newSegments: Segment[] = classicResult?.segments ?? [];
 
-          // Client-side coverage check (DNI-1: author text integrity)
-          if (newSegments.length > 0) {
+          // Warn if server used fallback segmentation
+          if (classicResult?.coverage?.usedFallback) {
+            console.warn(`[BatchClassic] Fallback segmentation for scene ${job.scene.id}: source=${classicResult.coverage.sourcePct}%`);
+          }
+
+          // Client-side coverage check (DNI-1) — skip if server already fell back
+          if (newSegments.length > 0 && !classicResult?.coverage?.usedFallback) {
             const segTextLen = newSegments.reduce((sum: number, s: Segment) =>
               sum + s.phrases.reduce((ps: number, p: { text?: string }) => ps + (p.text?.length || 0), 0), 0);
             const coverage = freshContent.length > 0 ? segTextLen / freshContent.length : 0;
