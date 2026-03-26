@@ -249,19 +249,11 @@ export function ChapterNavigator({
         setRenderStatus(map);
       }
 
-      // LOCAL-ONLY dirty detection: compare contentHash in storyboard vs scene index
+      // LOCAL-ONLY dirty detection: explicit flags in scene index
       const { isSceneDirty } = await import("@/lib/sceneIndex");
-      const { readStoryboardFromLocal } = await import("@/lib/storyboardSync");
       const nextDirtyIds = new Set<string>();
-      if (projectStorage) {
-        await Promise.all(sceneIds.map(async (sid) => {
-          try {
-            const sb = await readStoryboardFromLocal(projectStorage, sid);
-            if (sb?.contentHash && isSceneDirty(sid, sb.contentHash)) {
-              nextDirtyIds.add(sid);
-            }
-          } catch { /* skip */ }
-        }));
+      for (const sid of sceneIds) {
+        if (isSceneDirty(sid)) nextDirtyIds.add(sid);
       }
       for (const clearedId of clearedDirtySceneIds ?? []) {
         nextDirtyIds.delete(clearedId);

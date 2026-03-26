@@ -303,10 +303,10 @@ export function StoryboardPanel({
           if (isStale()) return;
           applySegments(local.segments);
           if (local.contentHash) {
-            const { isSceneDirty, getContentHash } = await import("@/lib/sceneIndex");
+            const { isSceneDirty } = await import("@/lib/sceneIndex");
             if (isStale()) return;
-            const dirty = isSceneDirty(sid, local.contentHash);
-            console.debug(`[Storyboard] dirtyCheck sceneId=${sid} storyboardHash=${local.contentHash} indexHash=${getContentHash(sid)} → dirty=${dirty}`);
+            const dirty = isSceneDirty(sid);
+            console.debug(`[Storyboard] dirtyCheck sceneId=${sid} → dirty=${dirty}`);
             setContentDirty(dirty);
           }
           setLoading(false);
