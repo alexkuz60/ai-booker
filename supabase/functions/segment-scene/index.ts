@@ -44,21 +44,26 @@ function normalizeText(value: string): string {
     .trim();
 }
 
+/**
+ * Word-level overlap: what fraction of the source words appear in the segments?
+ * Unlike the old approach (whole-segment substring matching), this correctly
+ * handles AI re-segmentation that splits/merges original paragraphs.
+ */
 function getCoverageFromSource(sourceNorm: string, segments: AISegment[]): number {
   if (!sourceNorm) return 0;
-  const combined = normalizeText(segments.map((s) => s.text || "").join(" "));
-  if (!combined) return 0;
+
+  const sourceWords = sourceNorm.split(/\s+/).filter(Boolean);
+  if (sourceWords.length === 0) return 0;
+
+  const segText = normalizeText(segments.map((s) => s.text || "").join(" "));
+  const segWords = new Set(segText.split(/\s+/).filter(Boolean));
 
   let matched = 0;
-  for (const seg of segments) {
-    const normalizedSeg = normalizeText(seg.text || "");
-    if (!normalizedSeg) continue;
-    if (sourceNorm.includes(normalizedSeg)) {
-      matched += normalizedSeg.length;
-    }
+  for (const w of sourceWords) {
+    if (segWords.has(w)) matched++;
   }
 
-  return Math.min(1, matched / Math.max(sourceNorm.length, 1));
+  return matched / sourceWords.length;
 }
 
 function buildFallbackSegments(content: string, lang: "ru" | "en"): AISegment[] {
