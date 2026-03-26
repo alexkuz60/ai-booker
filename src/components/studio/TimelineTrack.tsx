@@ -166,7 +166,7 @@ export function TimelineTrack({
             className={`absolute top-1 bottom-1 rounded-sm transition-all cursor-pointer overflow-hidden ${
               isError
                 ? "opacity-90 hover:opacity-100 ring-2 ring-destructive ring-offset-1 ring-offset-background"
-                : clip.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-50 hover:opacity-70"
+                : clip.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-60 hover:opacity-80"
             } ${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background opacity-100 z-10" : ""} ${isSynthesizing ? "synth-oscilloscope" : ""}`}
             style={{
               left: `${clip.start * zoom * 4}px`,
