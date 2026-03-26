@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, Fragment } from "react";
 import { motion } from "framer-motion";
 import {
   FileText, Layers, PlayCircle, Zap, AlertCircle, Loader2, ChevronDown, Clock, RefreshCw, Palette, StopCircle,
-  Trash2, Hash, SpellCheck, Footprints, PencilLine, Merge, ArrowDownToLine, ArrowUpToLine
+  Trash2, Hash, SpellCheck, Footprints, PencilLine, Merge, ArrowDownToLine, ArrowUpToLine, AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -312,6 +312,32 @@ function SceneCards({
                       <span className="text-[10px] text-muted-foreground font-mono ml-1">
                         {sceneDur}
                       </span>
+                      {(() => {
+                        const charCount = content.length;
+                        const isLong = charCount >= 8000;
+                        const isVeryLong = charCount >= 12000;
+                        return (
+                          <span
+                            className={`text-[10px] font-mono ml-1 inline-flex items-center gap-0.5 ${
+                              isVeryLong
+                                ? "text-destructive"
+                                : isLong
+                                ? "text-amber-400"
+                                : "text-muted-foreground"
+                            }`}
+                            title={
+                              isVeryLong
+                                ? (isRu ? "Очень длинная сцена — ИИ почти наверняка обрежет результат. Рекомендуется разделить." : "Very long scene — AI will almost certainly truncate. Consider splitting.")
+                                : isLong
+                                ? (isRu ? "Длинная сцена — ИИ может обрезать результат раскадровки. Рекомендуется разделить." : "Long scene — AI may truncate storyboard output. Consider splitting.")
+                                : ""
+                            }
+                          >
+                            {isLong && <AlertTriangle className="h-3 w-3" />}
+                            {charCount.toLocaleString()}{isRu ? " зн" : " ch"}
+                          </span>
+                        );
+                      })()}
                       <Checkbox
                         checked={mergeChecked.has(i)}
                         onCheckedChange={() => toggleMergeCheck(i)}
