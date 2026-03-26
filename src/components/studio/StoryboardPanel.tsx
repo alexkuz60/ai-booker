@@ -699,8 +699,19 @@ export function StoryboardPanel({
         : [segmentId];
     }
 
+    // Auto-assign system speaker when switching to a system type
+    const SYSTEM_TYPE_SPEAKER: Record<string, string> = {
+      narrator: "Рассказчик",
+      epigraph: "Рассказчик",
+      lyric: "Рассказчик",
+      footnote: "Комментатор",
+    };
+    const systemSpeaker = SYSTEM_TYPE_SPEAKER[newType] ?? null;
+
     const updatedSegments = segments.map(seg =>
-      affectedIds.includes(seg.segment_id) ? { ...seg, segment_type: newType } : seg
+      affectedIds.includes(seg.segment_id)
+        ? { ...seg, segment_type: newType, ...(systemSpeaker ? { speaker: systemSpeaker } : {}) }
+        : seg
     );
     setSegments(updatedSegments);
 
