@@ -180,6 +180,21 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
     [getModelForRole, pools]
   );
 
+  /**
+   * Resolved model for batch/queue operations.
+   * If a pool is configured, returns the first pool model (user's explicit choice).
+   * Otherwise falls back to the standard role primary model.
+   * This prevents using the default Lovable AI model when user has configured alternatives.
+   */
+  const getModelForBatch = useCallback(
+    (roleId: AiRoleId): string => {
+      const pool = pools[roleId];
+      if (pool && pool.length > 0) return pool[0];
+      return getModelForRole(roleId);
+    },
+    [getModelForRole, pools]
+  );
+
   /** Full resolved map */
   const resolvedModels = useMemo(() => {
     const result: Record<AiRoleId, string> = { ...defaults };
