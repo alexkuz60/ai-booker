@@ -280,17 +280,22 @@ interface SceneIndexData {
   }>;
   storyboarded: string[];     // sceneId[] с данными раскадровки
   characterMapped: string[];  // sceneId[] с маппингом персонажей
+  dirtyScenes: string[];      // sceneId[] с устаревшей раскадровкой (contentHash изменился)
 }
 ```
 
 **Использование:**
 - `resolveChapterId(sceneId)` — in-memory O(1) резолвинг для `projectPaths.ts`
 - `isStoryboarded(sceneId)` — без IO-операций
-- `isSceneDirty(sceneId, storyboardHash)` — сравнение хешей для dirty-маркера
+- `dirtyScenes` — явный список сцен, требующих переанализа (устанавливается Парсером при изменении contentHash, сбрасывается Студией при переанализе или ручной правке)
 
 #### contentHash — FNV-1a 32-bit
 
-Каждая сцена при записи в `chapters/{cid}/content.json` получает хеш контента (`fnv1a32`). При открытии раскадровки сравнивается хеш из `scene_index.json` и `storyboard.json.contentHash`. Расхождение → dirty-маркер в UI → рекомендация переанализировать.
+Каждая сцена при записи в `chapters/{cid}/content.json` получает хеш контента (`fnv1a32`). Хеш используется для **двух целей**:
+
+1. **Парсер (DNI-1):** при изменении текста сцены (inline-правка) Парсер пересчитывает `contentHash` в `scene_index.json`. Если для этой сцены уже существует раскадровка (`storyboarded`), сцена добавляется в `dirtyScenes[]`. Dirty-маркер означает: «текст изменился после последней раскадровки» → рекомендация переанализировать.
+
+2. **Студия (фиксация версии):** при AI-анализе (сегментации) текущий `contentHash` записывается в `storyboard.json`. Это фиксирует, на основе какой версии текста была создана раскадровка.
 
 **Критический инвариант:** `contentHash` **ОБЯЗАН** сохраняться в `StoryboardSnapshot` при ЛЮБЫХ ручных правках раскадровки (слияние фраз, смена спикера, изменение типа сегмента и т.д.). Если `buildSnapshot()` не включает `contentHash` — при следующей загрузке страницы все раскадровки будут помечены как dirty (ложное срабатывание).
 
@@ -298,7 +303,9 @@ interface SceneIndexData {
 1. AI-анализ → `fnv1a32(content)` → `saveStoryboardToLocal(..., { contentHash })` → `storyboard.json`
 2. Загрузка из OPFS → `contentHashRef.current = localData.contentHash`
 3. Любая ручная правка → `buildSnapshot()` включает `contentHashRef.current` → `persist(snapshot)` → hash сохраняется
-4. Перезагрузка страницы → `readStoryboardFromLocal()` → hash присутствует → сравнение с `scene_index` → нет ложного dirty
+4. Перезагрузка страницы → `readStoryboardFromLocal()` → hash присутствует → dirty не срабатывает
+
+**Dirty-маркер НЕ использует runtime-сравнение хешей.** Сравнение `scene_index.contentHash` vs `storyboard.json.contentHash` при каждом переключении сцен устарело. Вместо этого используется явный список `dirtyScenes[]` в индексе, который устанавливается только при записи нового `contentHash` для уже имеющей раскадровку сцены. Валидация хеша в Студии выполняется через строгую проверку на `null` (`!== null && !== undefined`), что предотвращает игнорирование корректного хеша `0`.
 
 **Файлы:**
 | Файл | Назначение |
