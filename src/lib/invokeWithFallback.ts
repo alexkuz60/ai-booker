@@ -82,18 +82,15 @@ export async function invokeWithFallback<T = unknown>(
 
   // Check if we need fallback
   const needsFallback = isRetryableError(firstResult);
-  const isLovableProvider = !originalModel.startsWith("openrouter/") &&
-    !originalModel.startsWith("proxyapi/") &&
-    !originalModel.startsWith("dotpoint/");
 
-  if (!needsFallback || !isLovableProvider) {
+  if (!needsFallback) {
     if (firstResult.error) {
       firstResult.error.message = await extractFunctionErrorMessage(firstResult);
     }
     return firstResult as InvokeResult<T>;
   }
 
-  // Build fallback chain
+  // Build fallback chain (excludes the original provider to avoid re-trying the same one)
   const fallbacks = buildFallbackChain(originalModel, userApiKeys, modelField, body);
 
   for (const fb of fallbacks) {
@@ -145,9 +142,10 @@ function buildFallbackChain(
 ): FallbackEntry[] {
   const chain: FallbackEntry[] = [];
   const cleanModel = originalModel.replace(/^(openrouter|proxyapi|dotpoint|lovable)\//, "");
+  const originalProvider = getExplicitProvider(originalModel);
 
-  // 1. OpenRouter
-  if (userApiKeys["openrouter"]) {
+  // 1. OpenRouter (skip if original was openrouter)
+  if (originalProvider !== "openrouter" && userApiKeys["openrouter"]) {
     const orModel = `openrouter/${cleanModel}`;
     const entry = getModelRegistryEntry(orModel);
     chain.push({
@@ -163,8 +161,8 @@ function buildFallbackChain(
     });
   }
 
-  // 2. ProxyAPI
-  if (userApiKeys["proxyapi"]) {
+  // 2. ProxyAPI (skip if original was proxyapi)
+  if (originalProvider !== "proxyapi" && userApiKeys["proxyapi"]) {
     const paModel = `proxyapi/${cleanModel}`;
     const entry = getModelRegistryEntry(paModel);
     chain.push({
@@ -180,8 +178,8 @@ function buildFallbackChain(
     });
   }
 
-  // 3. DotPoint
-  if (userApiKeys["dotpoint"]) {
+  // 3. DotPoint (skip if original was dotpoint)
+  if (originalProvider !== "dotpoint" && userApiKeys["dotpoint"]) {
     chain.push({
       label: "DotPoint",
       body: {
