@@ -180,9 +180,33 @@ export function useBookManager({
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(delBookId);
 
     try {
-      const localProjects = library.localProjectNamesByBookId.get(delBookId) || [];
-      if (storageBackend === "opfs" && localProjects.length > 0) {
-        await Promise.all(localProjects.map((projectName) => OPFSStorage.deleteProject(projectName)));
+      // Use cached mapping first
+      const cachedProjects = library.localProjectNamesByBookId.get(delBookId) || [];
+
+      if (storageBackend === "opfs") {
+        // Safety net: scan ALL OPFS projects to find any with matching bookId
+        // This catches cases where the cached mapping was stale/incomplete
+        const allProjectNames = await OPFSStorage.listProjects();
+        const projectsToDelete = new Set(cachedProjects);
+
+        for (const projectName of allProjectNames) {
+          if (projectsToDelete.has(projectName)) continue;
+          try {
+            const store = await OPFSStorage.openOrCreate(projectName);
+            const meta = await store.readJSON<{ bookId?: string }>("project.json").catch(() => null);
+            if (meta?.bookId === delBookId) {
+              projectsToDelete.add(projectName);
+              console.info("[deleteBook] Found uncached OPFS project for bookId:", delBookId, "→", projectName);
+            }
+          } catch {
+            // Skip unreadable projects
+          }
+        }
+
+        if (projectsToDelete.size > 0) {
+          console.info("[deleteBook] Deleting OPFS projects:", [...projectsToDelete]);
+          await Promise.all([...projectsToDelete].map((name) => OPFSStorage.deleteProject(name)));
+        }
       }
 
       // Also delete from server if it exists there
