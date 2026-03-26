@@ -306,6 +306,7 @@ export function StoryboardPanel({
       }
 
       typeMappingsRef.current = [];
+      contentHashRef.current = undefined;
       setInlineNarrationSpeaker(null);
       setAudioStatus(new Map());
       setSegments([]);
