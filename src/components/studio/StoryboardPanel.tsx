@@ -73,9 +73,10 @@ export function StoryboardPanel({
   const { loadFromLocal, persist, persistNow, clearLocal, pushToDb, hasStorage } = useStoryboardPersistence(sceneId, chapterId);
   const [segments, setSegments] = useState<Segment[]>([]);
 
-  // Track current sceneId to detect stale async results
+  // Track current sceneId + request generation to reject stale async hydrations
   const sceneIdRef = useRef(sceneId);
   sceneIdRef.current = sceneId;
+  const loadGenerationRef = useRef(0);
   const [loading, setLoading] = useState(false);
   const [synthesizing, setSynthesizing] = useState(false);
   const [synthProgress, setSynthProgress] = useState("");
@@ -276,13 +277,16 @@ export function StoryboardPanel({
   }, []);
 
   const loadSegments = useCallback(async (sid: string) => {
-    console.debug(`[Storyboard] loadSegments called for sceneId=${sid}, hasStorage=${hasStorage}`);
+    const generation = ++loadGenerationRef.current;
+    const isStale = () => sceneIdRef.current !== sid || loadGenerationRef.current !== generation;
+
+    console.debug(`[Storyboard] loadSegments called for sceneId=${sid}, hasStorage=${hasStorage}, gen=${generation}`);
     setLoading(true);
     setAnalysisPending(false);
     try {
       if (hasStorage) {
         const local = await loadFromLocal(sid);
-        if (sceneIdRef.current !== sid) return;
+        if (isStale()) return;
         if (local && local.segments.length > 0) {
           const firstPhrase = local.segments[0]?.phrases?.[0]?.text?.slice(0, 80) || "(empty)";
           console.debug(`[Storyboard] Loaded ${local.segments.length} segments from OPFS, first phrase: "${firstPhrase}"`);
@@ -294,14 +298,13 @@ export function StoryboardPanel({
           );
           setInlineNarrationSpeaker(local.inlineNarrationSpeaker);
           setAudioStatus(new Map(Object.entries(local.audioStatus || {})));
-          // Preserve contentHash from analysis — survives all subsequent edits
+          audioStatusRef.current = new Map(Object.entries(local.audioStatus || {}));
           contentHashRef.current = local.contentHash;
-          if (sceneIdRef.current !== sid) return;
+          if (isStale()) return;
           applySegments(local.segments);
-          // LOCAL-ONLY: detect dirty via contentHash comparison (K3)
           if (local.contentHash) {
             const { isSceneDirty, getContentHash } = await import("@/lib/sceneIndex");
-            if (sceneIdRef.current !== sid) return;
+            if (isStale()) return;
             const dirty = isSceneDirty(sid, local.contentHash);
             console.debug(`[Storyboard] dirtyCheck sceneId=${sid} storyboardHash=${local.contentHash} indexHash=${getContentHash(sid)} → dirty=${dirty}`);
             setContentDirty(dirty);
@@ -312,19 +315,20 @@ export function StoryboardPanel({
         console.debug(`[Storyboard] No OPFS data for sceneId=${sid} — showing empty state`);
       }
 
-      if (sceneIdRef.current !== sid) return;
+      if (isStale()) return;
       typeMappingsRef.current = [];
       contentHashRef.current = undefined;
       setInlineNarrationSpeaker(null);
       setAudioStatus(new Map());
+      audioStatusRef.current = new Map();
       setSegments([]);
       setLoaded(true);
     } catch (err) {
-      if (sceneIdRef.current !== sid) return;
+      if (isStale()) return;
       console.error("Failed to load segments:", err);
       toast.error(isRu ? "Ошибка загрузки сегментов" : "Failed to load segments");
     }
-    if (sceneIdRef.current === sid) {
+    if (!isStale()) {
       setLoading(false);
     }
   }, [isRu, hasStorage, loadFromLocal, applySegments, characters]);
