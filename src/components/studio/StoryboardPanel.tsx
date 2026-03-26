@@ -95,6 +95,8 @@ export function StoryboardPanel({
   const [staleAudioSegIds, setStaleAudioSegIds] = useState<Set<string>>(new Set());
   const [cleaningMetadata, setCleaningMetadata] = useState(false);
   const [contentDirty, setContentDirty] = useState(false);
+  /** Preserved contentHash from analysis — survives all edits */
+  const contentHashRef = useRef<number | undefined>(undefined);
   const [stressReviewOpen, setStressReviewOpen] = useState(false);
   const [stressSuggestions, setStressSuggestions] = useState<StressSuggestion[]>([]);
   const autoAnalyzeAttemptedRef = useRef<string | null>(null);
