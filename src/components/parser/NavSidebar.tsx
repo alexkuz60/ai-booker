@@ -158,9 +158,6 @@ export default function NavSidebar({
               onToggleNode(nodeKey);
             }
             onSelectChapter(idx, e);
-            if (status === "pending" && !isParent && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-              onAnalyzeChapter(idx);
-            }
           }}
           style={{ paddingLeft }}
           className={`w-full flex items-center gap-2 pr-4 py-2 text-left text-sm transition-colors ${
