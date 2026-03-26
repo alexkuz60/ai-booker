@@ -213,16 +213,17 @@ export function useTimelineClips(
               trackId = `char-${characterMap.get(speakerKey)}`;
             }
           } else {
-            const sceneTypeMappings = typeMappings?.get(sceneId);
-            const mappedCharId = sceneTypeMappings?.get(seg.segment_type);
-
-            if (mappedCharId) {
-              trackId = `char-${mappedCharId}`;
+            // System types ALWAYS route to system characters (narrator→Рассказчик, footnote→Комментатор)
+            const sysCharName = SYSTEM_TYPE_TO_CHAR[seg.segment_type];
+            if (sysCharName && characterMap.has(sysCharName)) {
+              trackId = `char-${characterMap.get(sysCharName)}`;
             } else {
-              // Auto-route system types to system characters
-              const sysCharName = SYSTEM_TYPE_TO_CHAR[seg.segment_type];
-              if (sysCharName && characterMap.has(sysCharName)) {
-                trackId = `char-${characterMap.get(sysCharName)}`;
+              // Non-system types: check explicit scene_type_mappings first
+              const sceneTypeMappings = typeMappings?.get(sceneId);
+              const mappedCharId = sceneTypeMappings?.get(seg.segment_type);
+
+              if (mappedCharId) {
+                trackId = `char-${mappedCharId}`;
               } else {
                 const speakerKey = seg.speaker?.toLowerCase();
                 if (speakerKey && characterMap.has(speakerKey)) {
