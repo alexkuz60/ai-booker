@@ -167,17 +167,15 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
   );
 
   /**
-   * Effective pool for batch operations: pool models + primary model (deduplicated).
-   * If no pool configured, returns [primaryModel] for single-model fallback.
+   * Effective pool for batch operations.
+   * If pool is explicitly configured → use ONLY pool models (user's explicit choice).
+   * If no pool configured → fallback to [primaryModel] for single-model mode.
    */
   const getEffectivePool = useCallback(
     (roleId: AiRoleId): string[] => {
-      const primary = getModelForRole(roleId);
       const pool = pools[roleId];
-      if (!pool || pool.length === 0) return [primary];
-      // Ensure primary is included, deduplicate
-      const set = new Set([primary, ...pool]);
-      return [...set];
+      if (pool && pool.length > 0) return [...pool];
+      return [getModelForRole(roleId)];
     },
     [getModelForRole, pools]
   );
