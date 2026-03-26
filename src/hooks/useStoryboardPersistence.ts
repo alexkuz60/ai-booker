@@ -62,13 +62,23 @@ export function useStoryboardPersistence(sceneId: string | null, chapterId?: str
    */
   const persistNow = useCallback(async (snapshot: StoryboardSnapshot) => {
     if (!storage || !sceneId) {
-      console.warn(`[StoryboardPersist] persistNow skipped: storage=${!!storage} sceneId=${sceneId}`);
+      console.warn(`[StoryboardPersist] ⚠️ persistNow SKIPPED: storage=${!!storage} sceneId=${sceneId}`);
       return;
     }
     latestSnapshotRef.current = snapshot;
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    console.debug(`[StoryboardPersist] persistNow → sceneId=${sceneId}, chapterId=${chapterId}, segments=${snapshot.segments.length}`);
+    console.warn(`[StoryboardPersist] 💾 persistNow START → sceneId=${sceneId}, chapterId=${chapterId}, segments=${snapshot.segments.length}`);
     await saveStoryboardToLocal(storage, sceneId, snapshot, chapterId ?? undefined);
+    // Verify the write by reading back
+    const readBack = await readStoryboardFromLocal(storage, sceneId, chapterId ?? undefined);
+    if (!readBack || readBack.segments.length !== snapshot.segments.length) {
+      console.error(
+        `[StoryboardPersist] ❌ WRITE VERIFICATION FAILED: wrote ${snapshot.segments.length} segments, ` +
+        `read back ${readBack?.segments.length ?? 0}. SceneId=${sceneId}, chapterId=${chapterId}`
+      );
+    } else {
+      console.warn(`[StoryboardPersist] ✅ persistNow VERIFIED: ${readBack.segments.length} segments for sceneId=${sceneId}`);
+    }
   }, [storage, sceneId, chapterId]);
 
   // Clear latestSnapshotRef when sceneId changes to prevent cross-contamination.
@@ -86,10 +96,10 @@ export function useStoryboardPersistence(sceneId: string | null, chapterId?: str
       }
       const latest = latestSnapshotRef.current;
       if (storage && sceneId && latest) {
-        console.info(`[StoryboardPersist] 🧹 cleanup WRITE sceneId=${sceneId} segs=${latest.segments.length}`);
+        console.warn(`[StoryboardPersist] 🧹 cleanup WRITE sceneId=${sceneId} segs=${latest.segments.length}`);
         void saveStoryboardToLocal(storage, sceneId, latest, chapterId ?? undefined);
       } else {
-        console.debug(`[StoryboardPersist] 🧹 cleanup SKIP sceneId=${sceneId} hasLatest=${!!latest}`);
+        console.warn(`[StoryboardPersist] 🧹 cleanup SKIP sceneId=${sceneId} hasLatest=${!!latest} hasStorage=${!!storage}`);
       }
     };
   }, [storage, sceneId, chapterId]);
