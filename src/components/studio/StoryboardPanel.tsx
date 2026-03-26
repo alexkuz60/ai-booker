@@ -388,7 +388,9 @@ export function StoryboardPanel({
 
       setSegments(updated);
       setMergeChecked(new Set());
+      console.warn(`[Storyboard] 🔀 MERGE: ${segments.length} → ${updated.length} segments, persisting...`);
       await persistNow(buildSnapshot(updated, newAudioStatus));
+      console.warn(`[Storyboard] 🔀 MERGE persisted for sceneId=${sceneId}`);
       // Studio edit is newer than Parser — clear dirty flag in index
       if (contentDirty && storage && sceneId) {
         setContentDirty(false);

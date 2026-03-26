@@ -96,10 +96,10 @@ export function useStoryboardPersistence(sceneId: string | null, chapterId?: str
       }
       const latest = latestSnapshotRef.current;
       if (storage && sceneId && latest) {
-        console.info(`[StoryboardPersist] 🧹 cleanup WRITE sceneId=${sceneId} segs=${latest.segments.length}`);
+        console.warn(`[StoryboardPersist] 🧹 cleanup WRITE sceneId=${sceneId} segs=${latest.segments.length}`);
         void saveStoryboardToLocal(storage, sceneId, latest, chapterId ?? undefined);
       } else {
-        console.debug(`[StoryboardPersist] 🧹 cleanup SKIP sceneId=${sceneId} hasLatest=${!!latest}`);
+        console.warn(`[StoryboardPersist] 🧹 cleanup SKIP sceneId=${sceneId} hasLatest=${!!latest} hasStorage=${!!storage}`);
       }
     };
   }, [storage, sceneId, chapterId]);
