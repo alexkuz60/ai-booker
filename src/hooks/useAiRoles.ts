@@ -218,6 +218,7 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
     resolvedModels,
     overrides,
     getModelForRole,
+    getModelForBatch,
     getPromptForRole,
     setModelForRole,
     resetAll,
