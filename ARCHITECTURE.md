@@ -110,7 +110,7 @@
 | Файл | Назначение |
 |------|------------|
 | `src/lib/projectStorage.ts` | Интерфейс `ProjectStorage` + классы `LocalFSStorage`, `OPFSStorage` |
-| `src/lib/projectPaths.ts` | **Централизованный резолвер путей** — V1/V2 адаптация, все пути через `paths.*` |
+| `src/lib/projectPaths.ts` | **Централизованный резолвер путей** — V2 иерархическая структура, все пути через `paths.*` |
 | `src/lib/sceneIndex.ts` | **Индекс сцен** — sceneId→chapterId маппинг, dirty-маркеры, storyboarded/characterMapped |
 | `src/lib/contentHash.ts` | **FNV-1a 32-bit хеш** — контроль целостности контента сцен |
 | `src/lib/projectMigrator.ts` | **V1→V2 миграция** — автоматическая при открытии проекта (`ensureV2Layout`) |
@@ -202,7 +202,7 @@ interface ProjectStorage {
 | `handleFileSelect` (загрузка файла) | project.json + toc.json + chapters.json + source/book.{ext} + scene_index.json | Local |
 | Анализ главы завершён | `chapters/{chapterId}/content.json` + scene_index.json (хеши контента) | Local |
 | Ручная правка TOC (уровень, заголовок, страница) | toc.json + chapters.json | Local |
-| Удаление/слияние глав | toc.json + удаление директории chapters/{chapterId}/ | Local |
+| Удаление/слияние глав | toc.json + удаление директории chapters/{chapterId}/ + очистка stale scene dirs и scene_index (storyboarded/characterMapped) | Local |
 | `openSavedBook` | Wipe OPFS → deploy server copy → React state | Local + React state |
 | Кнопка «На сервер» | chapters + scenes + parts + characters + storyboards + UI state | Supabase |
 
@@ -314,7 +314,7 @@ await storage.readJSON(paths.characterIndex());
 await storage.readJSON(`storyboard/scene_${sceneId}.json`);
 ```
 
-Резолвер автоматически адаптирует пути к активному layout (V1/V2). V2 пути включают chapterId, который резолвится из scene_index через `resolveChapterId()`.
+Резолвер генерирует V2-пути, включающие chapterId, который резолвится из scene_index через `resolveChapterId()`.
 
 ### 1.12 Миграция V1 → V2
 
@@ -731,7 +731,7 @@ Edge-функции получают `model` и `apiKey` от клиента. Л
 | `AiRolePresets` | `src/components/profile/tabs/AiRolePresets.tsx` | Пресеты с сохранением конфигурации пулов |
 | Pool в Extraction | `src/hooks/useCharacterExtraction.ts` | Распределение глав по моделям пула |
 | Pool в Profiling | `src/hooks/useCharacterProfiles.ts` | Батчинг персонажей + инкрементальное применение профилей |
-| Pool в Segmentation | `src/components/studio/BatchSegmentationPanel.tsx` | Пакетная раскадровка сцен через пул |
+| Pool в Segmentation | `src/hooks/useBackgroundAnalysis.tsx` | Пакетная раскадровка сцен через пул (BackgroundAnalysisProvider) |
 
 **Поведение:**
 - Пул активируется при `effectivePool.length > 1` (основная модель + дополнительные)
