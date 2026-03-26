@@ -45,25 +45,44 @@ function normalizeText(value: string): string {
 }
 
 /**
- * Word-level overlap: what fraction of the source words appear in the segments?
- * Unlike the old approach (whole-segment substring matching), this correctly
- * handles AI re-segmentation that splits/merges original paragraphs.
+ * Ordered word coverage: how much of the source survives in the returned
+ * segments while preserving the original sequence.
+ *
+ * This stays tolerant to re-splitting into different blocks/paragraphs, but
+ * rejects the dangerous "bag of words" behavior where a short fragment with
+ * common words could look artificially valid.
  */
-function getCoverageFromSource(sourceNorm: string, segments: AISegment[]): number {
+function getOrderedCoverageFromSource(sourceNorm: string, segments: AISegment[]): number {
   if (!sourceNorm) return 0;
 
   const sourceWords = sourceNorm.split(/\s+/).filter(Boolean);
   if (sourceWords.length === 0) return 0;
 
-  const segText = normalizeText(segments.map((s) => s.text || "").join(" "));
-  const segWords = new Set(segText.split(/\s+/).filter(Boolean));
+  const segmentWords = normalizeText(segments.map((s) => s.text || "").join(" "))
+    .split(/\s+/)
+    .filter(Boolean);
+  if (segmentWords.length === 0) return 0;
 
+  let sourceIndex = 0;
+  let segmentIndex = 0;
   let matched = 0;
-  for (const w of sourceWords) {
-    if (segWords.has(w)) matched++;
+
+  while (sourceIndex < sourceWords.length && segmentIndex < segmentWords.length) {
+    if (sourceWords[sourceIndex] === segmentWords[segmentIndex]) {
+      matched++;
+      segmentIndex++;
+    }
+    sourceIndex++;
   }
 
   return matched / sourceWords.length;
+}
+
+function getNormalizedLengthCoverage(sourceNorm: string, segments: AISegment[]): number {
+  if (!sourceNorm) return 0;
+  const segmentNorm = normalizeText(segments.map((s) => s.text || "").join(" "));
+  if (!segmentNorm) return 0;
+  return segmentNorm.length / sourceNorm.length;
 }
 
 function buildFallbackSegments(content: string, lang: "ru" | "en"): AISegment[] {
@@ -193,7 +212,7 @@ Deno.serve(async (req) => {
       : { max_tokens: maxTokens };
 
     // Helper to call AI and parse segments
-    async function callAiForSegments(useJsonFormat: boolean): Promise<{ segments: AISegment[]; usage: any; latency: number }> {
+    async function callAiForSegments(): Promise<{ segments: AISegment[]; usage: any; latency: number }> {
       const start = Date.now();
       // Some models (e.g. openai/gpt-5-mini, gpt-5) reject non-default temperature
       const supportsTemperature = !/gpt-5/i.test(resolved.model);
@@ -206,9 +225,6 @@ Deno.serve(async (req) => {
         ...(supportsTemperature ? { temperature: 0.1 } : {}),
         ...tokenParam,
       };
-      if (useJsonFormat) {
-        bodyObj.response_format = { type: "json_object" };
-      }
 
       const res = await fetch(resolved.endpoint, {
         method: "POST",
@@ -298,8 +314,7 @@ Deno.serve(async (req) => {
     let usedFallbackSegmentation = false;
 
     try {
-      // First attempt: with response_format json
-      const r = await callAiForSegments(true);
+      const r = await callAiForSegments();
       segments = r.segments; usage = r.usage; aiLatency = r.latency;
     } catch (e: any) {
       if (e.statusCode === 402 || e.statusCode === 429) {
@@ -307,25 +322,17 @@ Deno.serve(async (req) => {
           status: e.statusCode, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      // Retry without response_format (some models don't support it)
-      console.warn("First attempt failed, retrying without response_format:", e.message);
-      try {
-        const r = await callAiForSegments(false);
-        segments = r.segments; usage = r.usage; aiLatency = r.latency;
-      } catch (e2: any) {
-        console.error("AI segmentation failed, using fallback segmentation:", e2.message);
-        segments = buildFallbackSegments(content, lang);
-        usage = null;
-        aiLatency = Date.now() - aiStart;
-        usedFallbackSegmentation = true;
-      }
+      console.error("AI segmentation failed, using fallback segmentation:", e.message);
+      segments = buildFallbackSegments(content, lang);
+      usage = null;
+      aiLatency = Date.now() - aiStart;
+      usedFallbackSegmentation = true;
     }
 
     // ── Validation: ensure segments belong to this source text ──
     const sourceNorm = normalizeText(content);
-    const segmentTextTotal = segments.reduce((sum, s) => sum + (s.text?.length || 0), 0);
-    const coverageRatio = segmentTextTotal / content.length;
-    const sourceCoverage = getCoverageFromSource(sourceNorm, segments);
+    const coverageRatio = getNormalizedLengthCoverage(sourceNorm, segments);
+    const sourceCoverage = getOrderedCoverageFromSource(sourceNorm, segments);
 
     // Strict threshold: AI must cover ≥80% of source text.
     // Lower coverage means truncated output (often due to token limits).
