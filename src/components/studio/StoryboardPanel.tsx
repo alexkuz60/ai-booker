@@ -389,9 +389,10 @@ export function StoryboardPanel({
       setSegments(updated);
       setMergeChecked(new Set());
       await persistNow(buildSnapshot(updated, newAudioStatus));
-      // Studio edit is newer than Parser — clear dirty flag
-      if (contentDirty) {
+      // Studio edit is newer than Parser — clear dirty flag in index
+      if (contentDirty && storage && sceneId) {
         setContentDirty(false);
+        import("@/lib/sceneIndex").then(m => m.unmarkSceneDirty(storage, sceneId));
         supabase.from("book_scenes").update({ content_dirty: false }).eq("id", sceneId);
       }
       toast.success(isRu ? "Блоки объединены" : "Segments merged");
@@ -421,8 +422,9 @@ export function StoryboardPanel({
       setSegments(updated);
       setMergeChecked(new Set());
       await persistNow(buildSnapshot(updated));
-      if (contentDirty) {
+      if (contentDirty && storage && sceneId) {
         setContentDirty(false);
+        import("@/lib/sceneIndex").then(m => m.unmarkSceneDirty(storage, sceneId));
         supabase.from("book_scenes").update({ content_dirty: false }).eq("id", sceneId);
       }
       toast.success(isRu ? `Удалено ${toDelete.length} блок(ов)` : `Deleted ${toDelete.length} segment(s)`);
@@ -475,8 +477,9 @@ export function StoryboardPanel({
 
       setSegments(updated);
       await persistNow(buildSnapshot(updated));
-      if (contentDirty) {
+      if (contentDirty && storage && sceneId) {
         setContentDirty(false);
+        import("@/lib/sceneIndex").then(m => m.unmarkSceneDirty(storage, sceneId));
         supabase.from("book_scenes").update({ content_dirty: false }).eq("id", sceneId);
       }
       toast.success(isRu ? "Блок разделён" : "Segment split");
