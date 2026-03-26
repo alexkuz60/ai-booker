@@ -7,7 +7,7 @@
  * - Pool mode: ModelPoolManager with round-robin across multiple models, retry on 429/402
  */
 
-import { createContext, useContext, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useCallback, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeWithFallback, enrichBodyWithKeys, getMissingExplicitProviderError } from "@/lib/invokeWithFallback";
 import { fnv1a32 } from "@/lib/contentHash";
@@ -74,7 +74,6 @@ export function BackgroundAnalysisProvider({
   userApiKeys,
   isRu,
   onSceneSegmented,
-  modelsReady,
 }: {
   children: ReactNode;
   storage: ProjectStorage | null;
@@ -84,7 +83,6 @@ export function BackgroundAnalysisProvider({
   userApiKeys: Record<string, string>;
   isRu: boolean;
   onSceneSegmented?: (sceneId: string) => void;
-  modelsReady: boolean;
 }) {
   const [jobs, setJobs] = useState<Map<string, AnalysisJob>>(new Map());
   const [completionToken, setCompletionToken] = useState(0);
@@ -110,8 +108,6 @@ export function BackgroundAnalysisProvider({
   isRuRef.current = isRu;
   const onSegmentedRef = useRef(onSceneSegmented);
   onSegmentedRef.current = onSceneSegmented;
-  const modelsReadyRef = useRef(modelsReady);
-  modelsReadyRef.current = modelsReady;
 
   const updateJob = useCallback((sceneId: string, patch: Partial<AnalysisJob>) => {
     setJobs(prev => {
@@ -273,7 +269,6 @@ export function BackgroundAnalysisProvider({
 
   const processNext = useCallback(async () => {
     if (cancelledRef.current) return;
-    if (!modelsReadyRef.current) return;
     if (activeRef.current >= MAX_CONCURRENCY) return;
     const job = queueRef.current.shift();
     if (!job) return;
@@ -315,7 +310,6 @@ export function BackgroundAnalysisProvider({
   // ── Pool mode ─────────────────────────────────────────────────────────
 
   const runPoolBatch = useCallback(async (requests: AnalysisJobRequest[]) => {
-    if (!modelsReadyRef.current) return;
     const effectivePool = poolRef.current("screenwriter");
     const manager = new ModelPoolManager(effectivePool, keysRef.current, 2);
     poolRunningRef.current = true;
@@ -388,7 +382,7 @@ export function BackgroundAnalysisProvider({
   // ── Submit ────────────────────────────────────────────────────────────
 
   const startQueuedJobs = useCallback(() => {
-    if (!modelsReadyRef.current || cancelledRef.current) return;
+    if (cancelledRef.current) return;
 
     const usePool =
       isPoolEnabledRef.current("screenwriter") &&
@@ -438,11 +432,6 @@ export function BackgroundAnalysisProvider({
     queueRef.current.push(...newRequests);
     startQueuedJobs();
   }, [startQueuedJobs]);
-
-  useEffect(() => {
-    if (!modelsReady) return;
-    startQueuedJobs();
-  }, [modelsReady, startQueuedJobs]);
 
   // ── Cancel ────────────────────────────────────────────────────────────
 
