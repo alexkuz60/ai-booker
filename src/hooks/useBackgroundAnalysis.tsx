@@ -191,8 +191,19 @@ export function BackgroundAnalysisProvider({
     const result = data as { segments?: Segment[]; coverage?: { lengthPct: number; sourcePct: number; usedFallback: boolean } };
     const newSegments = result.segments || [];
 
+    // Warn user if server used fallback segmentation (AI truncated)
+    if (result.coverage?.usedFallback) {
+      console.warn(`[BgAnalysis] Server used fallback segmentation for scene ${job.sceneId}: len=${result.coverage.lengthPct}% source=${result.coverage.sourcePct}%`);
+      const { toast } = await import("sonner");
+      toast.warning(
+        isRuRef.current
+          ? `Сцена "${job.sceneTitle || job.sceneId}": модель обрезала результат (${result.coverage.sourcePct}%). Использована грубая нарезка. Попробуйте другую модель.`
+          : `Scene "${job.sceneTitle || job.sceneId}": model truncated output (${result.coverage.sourcePct}%). Fallback segmentation used. Try a different model.`
+      );
+    }
+
     // Client-side coverage verification (DNI-1: author text integrity)
-    if (newSegments.length > 0) {
+    if (newSegments.length > 0 && !result.coverage?.usedFallback) {
       const segmentTextLen = newSegments.reduce((sum, s) =>
         sum + s.phrases.reduce((ps, p) => ps + (p.text?.length || 0), 0), 0);
       const clientCoverage = content.length > 0 ? segmentTextLen / content.length : 0;
