@@ -87,7 +87,9 @@ function getNormalizedLengthCoverage(sourceNorm: string, segments: AISegment[]):
 
 function buildFallbackSegments(content: string, lang: "ru" | "en"): AISegment[] {
   const phrases = splitPhrases(content).filter(Boolean);
+  console.log(`[Fallback] content=${content.length} chars, phrases=${phrases.length}`);
   if (phrases.length === 0) {
+    console.warn("[Fallback] No phrases found, returning single segment");
     return [{ type: lang === "ru" ? "inner_thought" : "narrator", text: content }];
   }
 
@@ -104,6 +106,7 @@ function buildFallbackSegments(content: string, lang: "ru" | "en"): AISegment[] 
     });
   }
 
+  console.log(`[Fallback] Produced ${segments.length} segments from ${phrases.length} phrases`);
   return segments.length > 0 ? segments : [{ type: "narrator", text: content }];
 }
 
@@ -334,10 +337,11 @@ Deno.serve(async (req) => {
     const coverageRatio = getNormalizedLengthCoverage(sourceNorm, segments);
     const sourceCoverage = getOrderedCoverageFromSource(sourceNorm, segments);
 
-    // Strict threshold: AI must cover ≥80% of source text.
-    // Lower coverage means truncated output (often due to token limits).
-    const COVERAGE_THRESHOLD = 0.80;
-    const SOURCE_COVERAGE_THRESHOLD = 0.75;
+    // Coverage thresholds: AI must cover a reasonable portion of source text.
+    // Too strict thresholds (e.g. 80%) discard good AI results (74% with 23 segments)
+    // and replace them with crude paragraph fallback, losing speaker/type info.
+    const COVERAGE_THRESHOLD = 0.60;
+    const SOURCE_COVERAGE_THRESHOLD = 0.55;
 
     if (!usedFallbackSegmentation && (coverageRatio < COVERAGE_THRESHOLD || sourceCoverage < SOURCE_COVERAGE_THRESHOLD)) {
       console.warn(`Insufficient segmentation coverage. Length=${Math.round(coverageRatio * 100)}%, source=${Math.round(sourceCoverage * 100)}%, segments=${segments.length}, contentLen=${content.length}`);
