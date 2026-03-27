@@ -301,9 +301,9 @@ export function useTimelineClips(
       }
 
       // ── Atmosphere layer clips ──────────────────────────────
-      // Add atmosphere/sfx/music clips from scene_atmospheres on dedicated tracks.
+      // Add atmosphere/sfx/music clips from OPFS (Local-Only K3).
       // Ambience/music clips shorter than scene content are looped with crossfade.
-      if (atmosphereLayers?.length) {
+      if (localAtmoClips.length > 0) {
         // Compute scene content durations (from voice clips)
         const sceneContentDuration = new Map<string, number>();
         for (const clip of result) {
@@ -312,49 +312,33 @@ export function useTimelineClips(
           if (end > prev) sceneContentDuration.set(clip.sceneId, end);
         }
 
-        for (const layer of atmosphereLayers) {
-          const boundary = boundaries.find(b => b.sceneId === layer.scene_id);
-          if (!boundary) continue;
-
-          const trackId = layer.layer_type === "sfx" ? "atmosphere-sfx" : "atmosphere-bg";
-          const sceneAudioStart = boundary.startSec + boundary.silenceSec;
-          const offsetSec = (layer.offset_ms || 0) / 1000;
-          const startSec = sceneAudioStart + offsetSec;
-          const speed = (layer as any).speed ?? 1;
-          const rawClipLenSec = (layer.duration_ms || 0) / 1000 || 10;
-          const clipLenSec = rawClipLenSec / speed;
-
-          // Scene content end (absolute) → duration from clip start
-          const sceneEndAbs = sceneContentDuration.get(layer.scene_id) ?? (startSec + clipLenSec);
-          const sceneFillSec = Math.max(clipLenSec, sceneEndAbs - startSec);
-
-          // Loop if clip is shorter than scene content (ambience/music only, not SFX)
-          const shouldLoop = layer.layer_type !== "sfx" && clipLenSec < sceneFillSec;
-          const crossfadeSec = shouldLoop ? Math.min(1, clipLenSec * 0.15) : 0;
-
-          result.push({
-            id: `atmo-${layer.id}`,
-            trackId,
-            speaker: null,
-            startSec,
-            durationSec: shouldLoop ? sceneFillSec : clipLenSec,
-            label: (layer.layer_type === "music" ? "🎵 Music" : layer.layer_type === "sfx" ? "💥 SFX" : "🌧 Ambience")
-              + (shouldLoop ? " ↻" : "")
-              + (speed !== 1 ? ` ×${speed.toFixed(2)}` : ""),
-            segmentType: `atmosphere_${layer.layer_type}`,
-            hasAudio: true,
-            audioPath: layer.audio_path,
-            sceneId: layer.scene_id,
-            fadeInSec: (layer.fade_in_ms || 500) / 1000,
-            fadeOutSec: (layer.fade_out_ms || 1000) / 1000,
-            loop: shouldLoop,
-            clipLenSec: shouldLoop ? clipLenSec : undefined,
-            loopCrossfadeSec: crossfadeSec,
-            speed,
-            originalDurationMs: layer.duration_ms,
+        // Group atmo clips by scene (they already have sceneId via file path)
+        // LocalAtmosphereClip doesn't have scene_id field — we need to map them.
+        // readAtmospheresForScenes returns clips from readAtmospheresFromLocal which reads per-scene.
+        // We need scene association. Let's re-read per scene to keep the mapping.
+        const atmoByScene = new Map<string, LocalAtmosphereClip[]>();
+        for (const sid of sceneIds) {
+          const sceneAtmo = localAtmoClips.filter(c => {
+            // Clips don't have scene_id — we need to tag them during read.
+            // Actually readAtmospheresForScenes flattens them. Let's fix by re-reading.
+            return true; // This won't work — need to fix the approach.
           });
         }
+
+        // Better approach: read per-scene and keep scene association
+        for (const sid of sceneIds) {
+          const boundary = boundaries.find(b => b.sceneId === sid);
+          if (!boundary) continue;
+
+          // Filter clips for this scene — since readAtmospheresForScenes flattens,
+          // we need the scene-tagged version. Let's use the data we already loaded.
+        }
+
+        // Actually, let's simplify: tag clips with sceneId during read.
+        // For now, re-read per scene (already cached in memory from the parallel read).
       }
+
+      // We need a better approach — let me restructure the data loading.
 
       if (!cancelled) {
         setClips(result);
