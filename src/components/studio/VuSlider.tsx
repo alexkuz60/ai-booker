@@ -6,7 +6,7 @@
  *   "pan"    — split L/R meter bars from center
  */
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 
 interface VuSliderProps {
   mode: "volume" | "pan";
@@ -30,6 +30,13 @@ function dbToLinear(db: number): number {
   return (db + 60) / 60;
 }
 
+/** Convert volume 0–100 to dB string */
+function volumeToDb(v: number): string {
+  if (v <= 0) return "-∞ dB";
+  const db = 20 * Math.log10(v / 100);
+  return `${db.toFixed(1)} dB`;
+}
+
 export function VuSlider({
   mode,
   value,
@@ -42,6 +49,7 @@ export function VuSlider({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
   const smoothedRef = useRef<{ l: number; r: number }>({ l: 0, r: 0 });
 
   // Store meterDb in a ref so the draw loop doesn't need to restart on every change
@@ -154,6 +162,7 @@ export function VuSlider({
       if (disabled) return;
       e.preventDefault();
       dragging.current = true;
+      setIsDragging(true);
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
       onChange(getValueFromX(e.clientX));
     },
@@ -170,9 +179,13 @@ export function VuSlider({
 
   const handlePointerUp = useCallback(() => {
     dragging.current = false;
+    setIsDragging(false);
   }, []);
 
   const thumbRatio = mode === "volume" ? value / 100 : (value + 100) / 200;
+
+  const defaultTitle = mode === "volume" ? `${value}%` : `${value > 0 ? "R" : value < 0 ? "L" : "C"} ${Math.abs(value)}`;
+  const dragTitle = mode === "volume" ? volumeToDb(value) : defaultTitle;
 
   return (
     <div
@@ -182,7 +195,7 @@ export function VuSlider({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      title={label ?? (mode === "volume" ? `${value}%` : `${value > 0 ? "R" : value < 0 ? "L" : "C"} ${Math.abs(value)}`)}
+      title={label ?? (isDragging ? dragTitle : defaultTitle)}
     >
       {/* Canvas background (meter) */}
       <canvas
