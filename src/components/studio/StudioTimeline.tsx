@@ -1044,7 +1044,7 @@ export function StudioTimeline({
                 })}
                 {dragGuideX !== null && (
                   <div
-                    className="absolute top-0 bottom-0 pointer-events-none z-30"
+                    className="absolute top-0 bottom-0 pointer-events-none z-40"
                     style={{ left: `${dragGuideX}px`, width: '1px', backgroundColor: 'hsl(var(--accent))' }}
                   />
                 )}
