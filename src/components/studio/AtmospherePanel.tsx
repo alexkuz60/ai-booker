@@ -916,9 +916,10 @@ function AutoAtmospherePanel({
 interface AtmospherePanelProps {
   isRu: boolean;
   sceneId?: string | null;
+  storage?: import("@/lib/projectStorage").ProjectStorage | null;
 }
 
-export function AtmospherePanel({ isRu, sceneId }: AtmospherePanelProps) {
+export function AtmospherePanel({ isRu, sceneId, storage }: AtmospherePanelProps) {
   const i = t(isRu);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
