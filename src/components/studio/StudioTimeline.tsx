@@ -985,7 +985,6 @@ export function StudioTimeline({
                 style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
                 onClick={(e) => {
                   if (suppressClickRef.current) {
-                    suppressClickRef.current = false;
                     return;
                   }
                   const rect = e.currentTarget.getBoundingClientRect();
