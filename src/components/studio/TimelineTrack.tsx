@@ -12,7 +12,7 @@ import {
   ContextMenuSeparator,
   ContextMenuLabel,
 } from "@/components/ui/context-menu";
-import { Music, Waves } from "lucide-react";
+import { Music, Waves, Trash2 } from "lucide-react";
 import { PreviewableMenuItem, stopAudioPreview } from "./PreviewableMenuItem";
 
 interface TimelineTrackProps {
@@ -32,6 +32,7 @@ interface TimelineTrackProps {
   storageAtmosphere?: StorageAudioFile[];
   storageSfx?: StorageAudioFile[];
   onInsertAudio?: (file: StorageAudioFile, atSec: number, layerType: "ambience" | "sfx") => void;
+  onDeleteAtmoClip?: (clipId: string) => void;
   isRu?: boolean;
   trackHeight?: number;
 }
@@ -112,6 +113,7 @@ export function TimelineTrack({
   storageAtmosphere,
   storageSfx,
   onInsertAudio,
+  onDeleteAtmoClip,
   isRu,
   trackHeight,
 }: TimelineTrackProps) {
@@ -221,7 +223,67 @@ export function TimelineTrack({
           </div>
         );
 
-        // Only wrap audio clips with context menu
+        // Atmosphere/SFX clips — context menu with delete
+        const isAtmoClip = clip.id.startsWith("atmo-");
+        if (isAtmoClip && onDeleteAtmoClip) {
+          return (
+            <ContextMenu key={i}>
+              <ContextMenuTrigger asChild>
+                {clipElement}
+              </ContextMenuTrigger>
+              <ContextMenuContent className="w-52">
+                <ContextMenuLabel className="text-xs truncate">{clip.label}</ContextMenuLabel>
+                <ContextMenuSeparator />
+                {onSetFade && (
+                  <>
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger>
+                        🔺 Fade In {clip.fadeInSec > 0 ? `(${clip.fadeInSec}s)` : ""}
+                      </ContextMenuSubTrigger>
+                      <ContextMenuSubContent>
+                        {FADE_OPTIONS.map(opt => (
+                          <ContextMenuItem
+                            key={opt.value}
+                            onClick={() => onSetFade(clip.id, opt.value, clip.fadeOutSec)}
+                            className={clip.fadeInSec === opt.value ? "bg-accent" : ""}
+                          >
+                            {opt.label}
+                          </ContextMenuItem>
+                        ))}
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger>
+                        🔻 Fade Out {clip.fadeOutSec > 0 ? `(${clip.fadeOutSec}s)` : ""}
+                      </ContextMenuSubTrigger>
+                      <ContextMenuSubContent>
+                        {FADE_OPTIONS.map(opt => (
+                          <ContextMenuItem
+                            key={opt.value}
+                            onClick={() => onSetFade(clip.id, clip.fadeInSec, opt.value)}
+                            className={clip.fadeOutSec === opt.value ? "bg-accent" : ""}
+                          >
+                            {opt.label}
+                          </ContextMenuItem>
+                        ))}
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
+                    <ContextMenuSeparator />
+                  </>
+                )}
+                <ContextMenuItem
+                  onClick={() => onDeleteAtmoClip(clip.id)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-2" />
+                  {isRu ? "Удалить" : "Delete"}
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
+          );
+        }
+
+        // Voice clips with audio — context menu with fades
         if (clip.hasAudio && onSetFade) {
           return (
             <ContextMenu key={i}>
