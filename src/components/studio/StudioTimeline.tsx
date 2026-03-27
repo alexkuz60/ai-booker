@@ -1027,6 +1027,7 @@ export function StudioTimeline({
                     onPasteAtmoClip={atmoManip.pasteClip}
                     onMoveAtmoClip={atmoManip.moveClip}
                     onResizeAtmoClip={atmoManip.resizeClip}
+                    onResetAtmoClipSpeed={atmoManip.resetClipSpeed}
                     hasClipboard={!!atmoManip.clipboard}
                     isRu={isRu}
                     trackHeight={dynamicTrackHeight}
