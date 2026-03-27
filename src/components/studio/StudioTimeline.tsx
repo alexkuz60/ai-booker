@@ -538,12 +538,18 @@ export function StudioTimeline({
   }, [fitZoom, player.positionSec]);
 
   // ── Atmo clip manipulation (copy/paste/move/resize) ───────
+  // Save mixer state before refreshing clips to prevent volume reset
+  const onMixChangeRef = useRef<(() => void) | null>(null);
   const atmoManip = useAtmoClipManipulation({
     sceneId,
     isRu,
     zoom,
     positionSec: player.positionSec,
-    onRefresh: () => setLocalRefresh(prev => prev + 1),
+    onRefresh: () => {
+      // Flush mixer state BEFORE clip refresh changes engineTrackIds
+      onMixChangeRef.current?.();
+      setLocalRefresh(prev => prev + 1);
+    },
     getSceneStartSec: () => {
       const boundary = sceneBoundariesRef.current?.find(b => b.sceneId === sceneId);
       return boundary ? boundary.startSec + boundary.silenceSec : 0;
