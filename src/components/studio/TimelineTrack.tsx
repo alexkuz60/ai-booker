@@ -183,6 +183,7 @@ export function TimelineTrack({
     const onMove = (ev: MouseEvent) => {
       const delta = ev.clientX - startX;
       setDragDeltaPx(delta);
+      // Show guide line at the clip's current (moving) left edge
       onDragGuideX?.(clipStartPx + delta);
     };
     const onUp = (ev: MouseEvent) => {
