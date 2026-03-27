@@ -1027,7 +1027,7 @@ export function StudioTimeline({
                     isRu={isRu}
                     trackHeight={dynamicTrackHeight}
                     isSelected={isTrackSelected}
-                    onDragGuideX={(x) => { if (x !== null) suppressClickRef.current = true; setDragGuideX(x); if (x === null) setTimeout(() => { suppressClickRef.current = false; }, 0); }}
+                    onDragGuideX={(x) => { if (x !== null) suppressClickRef.current = true; setDragGuideX(x); }}
                     onDragEndSeek={(sec) => { player.seek(sec); centerPlayhead(sec); }}
                   />
                   );
