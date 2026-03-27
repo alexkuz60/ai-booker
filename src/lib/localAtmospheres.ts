@@ -8,6 +8,7 @@
 
 import type { ProjectStorage } from "@/lib/projectStorage";
 import { paths } from "@/lib/projectPaths";
+import { readSceneIndex } from "@/lib/sceneIndex";
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -45,7 +46,14 @@ export async function readAtmospheresFromLocal(
   chapterId?: string,
 ): Promise<LocalAtmosphereData | null> {
   try {
-    const data = await storage.readJSON<LocalAtmosphereData>(atmoPath(sceneId, chapterId));
+    let p = atmoPath(sceneId, chapterId);
+    // If scene index cache is empty, re-read it (same fallback as storyboardSync)
+    if (p.includes("__unresolved__")) {
+      await readSceneIndex(storage);
+      p = atmoPath(sceneId, chapterId);
+      if (p.includes("__unresolved__")) return null;
+    }
+    const data = await storage.readJSON<LocalAtmosphereData>(p);
     return data ?? null;
   } catch {
     return null;
