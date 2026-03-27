@@ -123,7 +123,17 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
 
       const localIndex = new Map<string, string[]>();
       const dedupedBooks = Array.from(byDedupeKey.values()).map((candidate) => {
-        localIndex.set(candidate.record.id, projectsByDedupeKey.get(candidate.dedupeKey) || [candidate.projectName]);
+        const allProjects = projectsByDedupeKey.get(candidate.dedupeKey) || [candidate.projectName];
+        localIndex.set(candidate.record.id, allProjects);
+
+        // ── Diagnostic: warn about duplicate OPFS folders for the same bookId ──
+        if (allProjects.length > 1) {
+          console.warn(
+            `[Library] ⚠️ DUPLICATE OPFS folders for bookId=${candidate.record.id}: [${allProjects.join(", ")}]. ` +
+            `This can cause content swap bugs. The freshest folder will be used.`
+          );
+        }
+
         return candidate.record;
       });
 
