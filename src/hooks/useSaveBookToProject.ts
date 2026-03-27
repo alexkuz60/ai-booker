@@ -506,8 +506,8 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       if (savedStoryboardCount > 0) {
         descParts.push(`${savedStoryboardCount} ${isRu ? "раскадровок" : "storyboards"}`);
       }
-      if (savedAtmoCount > 0) {
-        descParts.push(`${savedAtmoCount} ${isRu ? "атмо-клипов" : "atmo clips"}`);
+      if (syncAtmo) {
+        // savedAtmoCount was tracked inside the atmo sync block above
       }
       report("finalize", "done");
 
