@@ -623,8 +623,9 @@ export function StudioTimeline({
   // Track selected for plugin editing — can be char, atmo, or sfx track
   const [selectedPluginTrackId, setSelectedPluginTrackId] = useState<string | null>(null);
 
-  // ── Drag guide line (vertical position indicator across all tracks) ──
+  // ── Drag guide line + start line (vertical position indicators across all tracks) ──
   const [dragGuideX, setDragGuideX] = useState<number | null>(null);
+  const [dragStartLineX, setDragStartLineX] = useState<number | null>(null);
   // Safety: clear drag guide on any mouseup (in case track callback missed)
   useEffect(() => {
     const onMouseUp = () => {
