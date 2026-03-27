@@ -1,6 +1,12 @@
 import { useState, useCallback, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { ProjectStorage } from "@/lib/projectStorage";
+import {
+  readAtmospheresFromLocal,
+  updateAtmosphereClip,
+  addAtmosphereClip,
+  type LocalAtmosphereClip,
+} from "@/lib/localAtmospheres";
 
 export interface AtmoClipboard {
   sceneId: string;
@@ -22,6 +28,8 @@ interface UseAtmoClipManipulationOpts {
   onRefresh: () => void;
   /** Scene boundaries to compute offset relative to scene start */
   getSceneStartSec: () => number;
+  /** OPFS storage handle */
+  storage: ProjectStorage | null | undefined;
 }
 
 export function useAtmoClipManipulation({
@@ -31,6 +39,7 @@ export function useAtmoClipManipulation({
   positionSec,
   onRefresh,
   getSceneStartSec,
+  storage,
 }: UseAtmoClipManipulationOpts) {
   const [clipboard, setClipboard] = useState<AtmoClipboard | null>(null);
   const clipboardRef = useRef(clipboard);
@@ -38,39 +47,37 @@ export function useAtmoClipManipulation({
 
   // ── Copy ──────────────────────────────────────────────────
   const copyClip = useCallback(async (clipId: string) => {
+    if (!storage || !sceneId) return;
     const atmoId = clipId.replace(/^atmo-/, "");
-    const { data, error } = await supabase
-      .from("scene_atmospheres")
-      .select("scene_id, layer_type, audio_path, duration_ms, volume, fade_in_ms, fade_out_ms, prompt_used, speed")
-      .eq("id", atmoId)
-      .maybeSingle();
-    if (error || !data) return;
+    const data = await readAtmospheresFromLocal(storage, sceneId);
+    const clip = data?.clips.find(c => c.id === atmoId);
+    if (!clip) return;
     setClipboard({
-      sceneId: data.scene_id,
-      layerType: data.layer_type,
-      audioPath: data.audio_path,
-      durationMs: data.duration_ms,
-      volume: data.volume,
-      fadeInMs: data.fade_in_ms,
-      fadeOutMs: data.fade_out_ms,
-      promptUsed: data.prompt_used,
-      speed: data.speed ?? 1,
+      sceneId,
+      layerType: clip.layer_type,
+      audioPath: clip.audio_path,
+      durationMs: clip.duration_ms,
+      volume: clip.volume,
+      fadeInMs: clip.fade_in_ms,
+      fadeOutMs: clip.fade_out_ms,
+      promptUsed: clip.prompt_used,
+      speed: clip.speed ?? 1,
     });
     toast.info(isRu ? "Клип скопирован" : "Clip copied");
-  }, [isRu]);
+  }, [isRu, sceneId, storage]);
 
   // ── Paste at transport position ───────────────────────────
   const pasteClip = useCallback(async () => {
     const cb = clipboardRef.current;
-    if (!cb || !sceneId) {
+    if (!cb || !sceneId || !storage) {
       toast.warning(isRu ? "Нечего вставлять" : "Nothing to paste");
       return;
     }
     const sceneStart = getSceneStartSec();
     const offsetMs = Math.max(0, Math.round((positionSec - sceneStart) * 1000));
 
-    const { error } = await supabase.from("scene_atmospheres").insert({
-      scene_id: sceneId,
+    const newClip: LocalAtmosphereClip = {
+      id: crypto.randomUUID(),
       layer_type: cb.layerType,
       audio_path: cb.audioPath,
       duration_ms: cb.durationMs,
@@ -80,55 +87,37 @@ export function useAtmoClipManipulation({
       prompt_used: cb.promptUsed,
       offset_ms: offsetMs,
       speed: cb.speed,
-    });
-    if (error) {
-      toast.error(isRu ? "Ошибка вставки" : "Paste error", { description: error.message });
-      return;
-    }
+      created_at: new Date().toISOString(),
+    };
+
+    await addAtmosphereClip(storage, sceneId, newClip);
     toast.success(isRu ? "Клип вставлен" : "Clip pasted");
     onRefresh();
-  }, [sceneId, isRu, positionSec, getSceneStartSec, onRefresh]);
+  }, [sceneId, isRu, positionSec, getSceneStartSec, onRefresh, storage]);
 
   // ── Move clip (update offset_ms) ──────────────────────────
   const moveClip = useCallback(async (clipId: string, newStartSec: number) => {
+    if (!storage || !sceneId) return;
     const atmoId = clipId.replace(/^atmo-/, "");
     const sceneStart = getSceneStartSec();
     const offsetMs = Math.max(0, Math.round((newStartSec - sceneStart) * 1000));
 
-    const { error } = await supabase
-      .from("scene_atmospheres")
-      .update({ offset_ms: offsetMs })
-      .eq("id", atmoId);
-    if (error) {
-      toast.error(isRu ? "Ошибка перемещения" : "Move error", { description: error.message });
-      return;
-    }
+    await updateAtmosphereClip(storage, sceneId, atmoId, { offset_ms: offsetMs });
     onRefresh();
-  }, [isRu, getSceneStartSec, onRefresh]);
+  }, [sceneId, getSceneStartSec, onRefresh, storage]);
 
   // ── Resize clip (update speed) ──────────────────────────────
-  // originalDurationMs = raw file duration, originalSpeed = current speed
-  // newDurationSec = desired visual duration after resize
   const resizeClip = useCallback(async (clipId: string, newDurationSec: number, originalDurationMs: number, originalSpeed: number) => {
+    if (!storage || !sceneId) return;
     const atmoId = clipId.replace(/^atmo-/, "");
-    // Original visual duration = rawDuration / currentSpeed
     const rawDurationSec = originalDurationMs / 1000;
-    // New speed = rawDuration / newVisualDuration
     const newSpeed = rawDurationSec / newDurationSec;
-    // Clamp speed to 0.5–1.5 range (±50%)
     const clampedSpeed = Math.max(0.5, Math.min(1.5, newSpeed));
 
-    const { error } = await supabase
-      .from("scene_atmospheres")
-      .update({ speed: clampedSpeed })
-      .eq("id", atmoId);
-    if (error) {
-      toast.error(isRu ? "Ошибка изменения" : "Resize error", { description: error.message });
-      return;
-    }
+    await updateAtmosphereClip(storage, sceneId, atmoId, { speed: clampedSpeed });
     toast.info(isRu ? `Скорость: ×${clampedSpeed.toFixed(2)}` : `Speed: ×${clampedSpeed.toFixed(2)}`);
     onRefresh();
-  }, [isRu, onRefresh]);
+  }, [sceneId, isRu, onRefresh, storage]);
 
   return { clipboard, copyClip, pasteClip, moveClip, resizeClip };
 }
