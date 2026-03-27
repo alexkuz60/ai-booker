@@ -379,20 +379,55 @@ export function StudioTimeline({
   // ── Audio player ──────────────────────────────────────────
   const player = useTimelinePlayer(timelineClips);
 
-  // ── Spacebar play/pause ──────────────────────────────────
+  // ── Atmo clip manipulation (copy/paste/move/resize) ───────
+  const atmoManip = useAtmoClipManipulation({
+    sceneId,
+    isRu,
+    zoom,
+    positionSec: player.positionSec,
+    onRefresh: () => setLocalRefresh(prev => prev + 1),
+    getSceneStartSec: () => {
+      const boundary = sceneBoundariesRef.current?.find(b => b.sceneId === sceneId);
+      return boundary ? boundary.startSec + boundary.silenceSec : 0;
+    },
+  });
+
+  // ── Spacebar play/pause + Ctrl+C/V for atmo clips ────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code !== "Space") return;
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if ((e.target as HTMLElement)?.isContentEditable) return;
-      e.preventDefault();
-      if (player.state === "playing") player.pause();
-      else player.play();
+
+      if (e.code === "Space") {
+        e.preventDefault();
+        if (player.state === "playing") player.pause();
+        else player.play();
+        return;
+      }
+
+      // Ctrl+C — copy selected atmo clip
+      if ((e.ctrlKey || e.metaKey) && e.code === "KeyC") {
+        const selectedAtmo = checkedSegmentIds ? [...checkedSegmentIds].find(id => id.startsWith("atmo-")) : null;
+        if (selectedAtmo) {
+          e.preventDefault();
+          atmoManip.copyClip(selectedAtmo);
+        }
+        return;
+      }
+
+      // Ctrl+V — paste atmo clip at transport position
+      if ((e.ctrlKey || e.metaKey) && e.code === "KeyV") {
+        if (atmoManip.clipboard) {
+          e.preventDefault();
+          atmoManip.pasteClip();
+        }
+        return;
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [player]);
+  }, [player, checkedSegmentIds, atmoManip]);
 
   // ── Seek to selected segment's clip start ─────────────────
   const prevSelectedRef = useRef<string | null>(null);
