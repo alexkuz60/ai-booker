@@ -141,6 +141,7 @@ export function TimelineTrack({
   isSelected: isTrackSelected,
   onDragGuideX,
   onDragStartLineX,
+  onResizeSpeedHint,
   onDragEndSeek,
   onClipSeek,
 }: TimelineTrackProps) {
