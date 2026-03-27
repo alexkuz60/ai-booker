@@ -150,8 +150,6 @@ export function StoryboardPanel({
     if (next.has(segId)) next.delete(segId); else next.add(segId);
     setMergeChecked(next);
   }, [mergeChecked, setMergeChecked]);
-    });
-  }, []);
 
   // Find consecutive groups of checked segments (≥2 adjacent)
   const mergeGroups = useMemo(() => {
