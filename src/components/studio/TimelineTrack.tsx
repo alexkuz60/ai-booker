@@ -253,8 +253,10 @@ export function TimelineTrack({
         const isDragging = draggingClipId === clip.id;
         const isResizing = resizingClipId === clip.id;
 
-        const effectiveLeftPx = clip.start * zoom * 4 + (isDragging ? dragDeltaPx : 0);
-        const effectiveWidthPx = (clip.end - clip.start) * zoom * 4 + (isResizing ? resizeDeltaPx : 0);
+        const optimisticOffsetSec = optimisticOffsets.get(clip.id) ?? 0;
+        const optimisticResizeSec = optimisticResizes.get(clip.id) ?? 0;
+        const effectiveLeftPx = (clip.start + optimisticOffsetSec) * zoom * 4 + (isDragging ? dragDeltaPx : 0);
+        const effectiveWidthPx = (clip.end - clip.start + optimisticResizeSec) * zoom * 4 + (isResizing ? resizeDeltaPx : 0);
         const widthPx = Math.max(8, effectiveWidthPx);
 
         const isSelected = selectedSegmentId && clip.id === selectedSegmentId;
