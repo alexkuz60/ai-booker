@@ -25,6 +25,7 @@ import { TimelineTrack } from "./TimelineTrack";
 import { Playhead } from "./TimelinePlayhead";
 import { ChannelPluginsPanel, type ClipInfo } from "./ChannelPluginsPanel";
 import { buildCharacterNameMap, deriveStoryboardCharacterIds, deriveStoryboardTypeMappings } from "@/lib/storyboardCharacterRouting";
+import { useAtmoClipManipulation } from "@/hooks/useAtmoClipManipulation";
 
 // ─── Types ──────────────────────────────────────────────────
 
