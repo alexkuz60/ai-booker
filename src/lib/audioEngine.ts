@@ -972,6 +972,8 @@ class AudioEngine {
   // ─── Track management ──────────────────────────────────
 
   async loadTracks(configs: TrackConfig[], onProgress?: (p: LoadProgress) => void): Promise<LoadTracksResult> {
+    // Preserve current position across reload (stop() resets to 0)
+    const savedPosition = this.positionSec;
     this.stop();
     for (const t of this.tracks.values()) t.dispose();
     this.tracks.clear();
