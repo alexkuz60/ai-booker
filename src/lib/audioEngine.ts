@@ -1063,6 +1063,11 @@ class AudioEngine {
     this.transport.cancel();
     for (const t of this.tracks.values()) t.schedule();
 
+    // Restore transport position that was saved before stop()
+    if (savedPosition > 0 && savedPosition <= this._totalDuration) {
+      this.transport.seconds = savedPosition;
+    }
+
     this.notify();
     return { total: configs.length, loaded: loadedCount, dropped };
   }
