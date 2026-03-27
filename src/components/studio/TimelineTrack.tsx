@@ -167,6 +167,8 @@ export function TimelineTrack({
   }
 
   const trackRef = useRef<HTMLDivElement>(null);
+  /** Suppress clip onClick immediately after a drag ends */
+  const dragJustEndedRef = useRef(false);
 
   const handleDragStart = useCallback((e: React.MouseEvent, clipId: string) => {
     e.stopPropagation();
@@ -190,6 +192,9 @@ export function TimelineTrack({
       setDraggingClipId(null);
       setDragDeltaPx(0);
       onDragGuideX?.(null);
+      // Suppress the upcoming click event from firing onClipSeek with stale position
+      dragJustEndedRef.current = true;
+      requestAnimationFrame(() => { dragJustEndedRef.current = false; });
       if (Math.abs(deltaSec) > 0.1 && onMoveAtmoClip) {
         setOptimisticOffsets(prev => new Map(prev).set(clipId, deltaSec));
         const rc2 = realClips?.find(c => c.id === clipId);
@@ -312,7 +317,7 @@ export function TimelineTrack({
                     : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
             }}
             title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${clip.speed !== 1 ? ` ×${clip.speed.toFixed(2)}` : ""}${clip.loop && clip.clipLenSec ? ` loop×${Math.ceil(clip.durationSec / clip.clipLenSec)}` : ""}${isError ? " ❌ Ошибка синтеза" : clip.hasAudio ? " 🔊" : ""}${isSynthesizing ? " ⏳" : ""}${hasFades ? ` | fade ${clip.fadeInSec.toFixed(2)}s / ${clip.fadeOutSec.toFixed(2)}s` : ""}`}
-            onClick={() => { onToggleCheck?.(clip.id); onClipSeek?.(clip.start + optimisticOffsetSec); }}
+            onClick={() => { if (dragJustEndedRef.current) return; onToggleCheck?.(clip.id); onClipSeek?.(clip.start + optimisticOffsetSec); }}
             onDoubleClick={() => onSelectSegment?.(clip.id)}
             onMouseDown={(e) => {
               // Only allow drag on atmo clips with left button, not on resize handle
