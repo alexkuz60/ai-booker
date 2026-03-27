@@ -46,6 +46,8 @@ interface TimelineTrackProps {
   onDragGuideX?: (x: number | null) => void;
   /** Report drag origin X position (px from track left) — shown as a "start" line */
   onDragStartLineX?: (x: number | null) => void;
+  /** Report resize speed hint (null when not resizing) */
+  onResizeSpeedHint?: (hint: string | null) => void;
   /** Called when drag ends with the clip's new start time in seconds */
   onDragEndSeek?: (sec: number) => void;
   /** Called on single click on any clip — seek transport to clip start */
@@ -139,6 +141,7 @@ export function TimelineTrack({
   isSelected: isTrackSelected,
   onDragGuideX,
   onDragStartLineX,
+  onResizeSpeedHint,
   onDragEndSeek,
   onClipSeek,
 }: TimelineTrackProps) {
@@ -224,17 +227,23 @@ export function TimelineTrack({
     e.preventDefault();
     const startX = e.clientX;
     const rc = realClips?.find(c => c.id === clipId);
-    const originalRightPx = rc ? (rc.startSec + rc.durationSec + (optimisticOffsets.get(clipId) ?? 0) + (optimisticResizes.get(clipId) ?? 0)) * zoom * 4 : 0;
+    const clipDurationSec = rc ? rc.durationSec + (optimisticResizes.get(clipId) ?? 0) : 0;
+    const originalRightPx = rc ? (rc.startSec + clipDurationSec + (optimisticOffsets.get(clipId) ?? 0)) * zoom * 4 : 0;
+    const originalDurationMs = rc?.originalDurationMs ?? Math.round(clipDurationSec * 1000);
+    const rawDurationSec = originalDurationMs / 1000;
     setResizingClipId(clipId);
     setResizeDeltaPx(0);
-    // Show start line at original right edge
     onDragStartLineX?.(originalRightPx);
 
     const onMove = (ev: MouseEvent) => {
       const delta = ev.clientX - startX;
       setResizeDeltaPx(delta);
-      // Guide line at the current right edge
       onDragGuideX?.(originalRightPx + delta);
+      // Compute and report speed hint
+      const deltaSec = delta / (zoom * 4);
+      const newDuration = Math.max(0.5, clipDurationSec + deltaSec);
+      const newSpeed = Math.max(0.5, Math.min(1.5, rawDurationSec / newDuration));
+      onResizeSpeedHint?.(`×${newSpeed.toFixed(2)}`);
     };
     const onUp = (ev: MouseEvent) => {
       window.removeEventListener("mousemove", onMove);
@@ -244,6 +253,7 @@ export function TimelineTrack({
       setResizeDeltaPx(0);
       onDragGuideX?.(null);
       onDragStartLineX?.(null);
+      onResizeSpeedHint?.(null);
       if (Math.abs(deltaSec) > 0.05 && onResizeAtmoClip) {
         const clip = clips.find(c => c.id === clipId);
         if (clip) {
@@ -255,7 +265,7 @@ export function TimelineTrack({
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [zoom, onResizeAtmoClip, realClips, optimisticOffsets, optimisticResizes, onDragGuideX, onDragStartLineX]);
+  }, [zoom, onResizeAtmoClip, realClips, optimisticOffsets, optimisticResizes, onDragGuideX, onDragStartLineX, onResizeSpeedHint]);
 
   const clips = realClips && realClips.length > 0
     ? realClips.map(c => {

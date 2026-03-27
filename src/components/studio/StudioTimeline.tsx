@@ -626,6 +626,7 @@ export function StudioTimeline({
   // ── Drag guide line + start line (vertical position indicators across all tracks) ──
   const [dragGuideX, setDragGuideX] = useState<number | null>(null);
   const [dragStartLineX, setDragStartLineX] = useState<number | null>(null);
+  const [resizeSpeedHint, setResizeSpeedHint] = useState<string | null>(null);
   // Safety: clear drag guide on any mouseup (in case track callback missed)
   useEffect(() => {
     const onMouseUp = () => {
@@ -1032,7 +1033,8 @@ export function StudioTimeline({
                     isSelected={isTrackSelected}
                     onDragGuideX={setDragGuideX}
                     onDragStartLineX={setDragStartLineX}
-                    onDragEndSeek={(sec) => { setDragGuideX(null); setDragStartLineX(null); player.seek(sec); centerPlayhead(sec); }}
+                    onResizeSpeedHint={setResizeSpeedHint}
+                    onDragEndSeek={(sec) => { setDragGuideX(null); setDragStartLineX(null); setResizeSpeedHint(null); player.seek(sec); centerPlayhead(sec); }}
                     onClipSeek={(sec) => { player.seek(sec); centerPlayhead(sec); }}
                   />
                   );
@@ -1049,7 +1051,17 @@ export function StudioTimeline({
                   <div
                     className="absolute top-0 bottom-0 pointer-events-none z-[45]"
                     style={{ left: `${dragGuideX}px`, width: '0px', borderLeft: '1px dashed #facc15' }}
-                  />
+                  >
+                    {/* Speed hint label during resize */}
+                    {resizeSpeedHint && (
+                      <div
+                        className="absolute top-1 left-2 text-[10px] font-mono font-bold whitespace-nowrap px-1 py-0.5 rounded"
+                        style={{ backgroundColor: 'rgba(250, 204, 21, 0.9)', color: '#000' }}
+                      >
+                        {resizeSpeedHint}
+                      </div>
+                    )}
+                  </div>
                 )}
                 <Playhead positionSec={player.positionSec} zoom={zoom} />
               </div>
