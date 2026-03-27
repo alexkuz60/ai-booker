@@ -104,6 +104,7 @@ export function SyncProgressDialog({
   steps,
   phase,
   errorMessage,
+  mode = "save",
   confirmOptions,
 }: SyncProgressDialogProps) {
   const doneCount = steps.filter((s) => s.status === "done" || s.status === "skipped").length;
