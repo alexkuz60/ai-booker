@@ -457,6 +457,15 @@ export function TimelineTrack({
                     <ContextMenuSeparator />
                   </>
                 )}
+                {onResetAtmoClipSpeed && clip.speed !== 1 && (
+                  <>
+                    <ContextMenuItem onClick={() => onResetAtmoClipSpeed(clip.id)}>
+                      <RotateCcw className="h-3.5 w-3.5 mr-2" />
+                      {isRu ? "Сброс скорости" : "Reset speed"} <span className="ml-auto text-[10px] text-muted-foreground">×{clip.speed?.toFixed(2)}</span>
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                  </>
+                )}
                 <ContextMenuItem
                   onClick={() => onDeleteAtmoClip(clip.id)}
                   className="text-destructive focus:text-destructive"
