@@ -173,6 +173,26 @@ export function StudioTimeline({
     setLocalRefresh(prev => prev + 1);
   }, [sceneId, user, isRu]);
 
+  // Handler for deleting atmosphere/sfx clips
+  const handleDeleteAtmoClip = useCallback(async (clipId: string) => {
+    // clipId format: "atmo-{uuid}"
+    const atmoId = clipId.replace(/^atmo-/, "");
+    if (!atmoId) return;
+
+    const { error } = await supabase
+      .from("scene_atmospheres")
+      .delete()
+      .eq("id", atmoId);
+
+    if (error) {
+      toast.error(isRu ? "Ошибка удаления" : "Delete error", { description: error.message });
+      return;
+    }
+
+    toast.success(isRu ? "Клип удалён" : "Clip deleted");
+    setLocalRefresh(prev => prev + 1);
+  }, [isRu]);
+
   // ── Scene render state ────────────────────────────────────
   const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
   const isRendering = renderProgress !== null && renderProgress.phase !== "done" && renderProgress.phase !== "error";
