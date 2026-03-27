@@ -42,6 +42,8 @@ interface TimelineTrackProps {
   isRu?: boolean;
   trackHeight?: number;
   isSelected?: boolean;
+  /** Report drag guide X position (px from track left) or null when drag ends */
+  onDragGuideX?: (x: number | null) => void;
 }
 
 const FADE_OPTIONS = [
@@ -129,6 +131,7 @@ export function TimelineTrack({
   isRu,
   trackHeight,
   isSelected: isTrackSelected,
+  onDragGuideX,
 }: TimelineTrackProps) {
   const showFades = zoom >= 2; // 200%+
   const isInsertableTrack = track.type === "atmosphere" || track.type === "sfx";
@@ -163,11 +166,16 @@ export function TimelineTrack({
     e.stopPropagation();
     e.preventDefault();
     const startX = e.clientX;
+    const rc = realClips?.find(c => c.id === clipId);
+    const clipStartPx = rc ? (rc.startSec + (optimisticOffsets.get(clipId) ?? 0)) * zoom * 4 : 0;
     setDraggingClipId(clipId);
     setDragDeltaPx(0);
+    onDragGuideX?.(clipStartPx);
 
     const onMove = (ev: MouseEvent) => {
-      setDragDeltaPx(ev.clientX - startX);
+      const delta = ev.clientX - startX;
+      setDragDeltaPx(delta);
+      onDragGuideX?.(clipStartPx + delta);
     };
     const onUp = (ev: MouseEvent) => {
       window.removeEventListener("mousemove", onMove);
@@ -175,18 +183,18 @@ export function TimelineTrack({
       const deltaSec = (ev.clientX - startX) / (zoom * 4);
       setDraggingClipId(null);
       setDragDeltaPx(0);
+      onDragGuideX?.(null);
       if (Math.abs(deltaSec) > 0.1 && onMoveAtmoClip) {
-        // Store optimistic offset so clip stays visually in place until refresh
         setOptimisticOffsets(prev => new Map(prev).set(clipId, deltaSec));
-        const clip = clips.find(c => c.id === clipId);
-        if (clip) {
-          onMoveAtmoClip(clipId, Math.max(0, clip.start + deltaSec));
+        const rc2 = realClips?.find(c => c.id === clipId);
+        if (rc2) {
+          onMoveAtmoClip(clipId, Math.max(0, rc2.startSec + deltaSec));
         }
       }
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [zoom, onMoveAtmoClip]);
+  }, [zoom, onMoveAtmoClip, realClips, optimisticOffsets, onDragGuideX]);
 
   const handleResizeStart = useCallback((e: React.MouseEvent, clipId: string) => {
     e.stopPropagation();
