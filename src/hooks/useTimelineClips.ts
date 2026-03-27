@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { readStoryboardFromLocal } from "@/lib/storyboardSync";
+import { readAtmospheresForScenes, type LocalAtmosphereClip } from "@/lib/localAtmospheres";
 
 const CHARS_PER_SEC = 14;
 
@@ -103,7 +104,8 @@ export function useTimelineClips(
 
     (async () => {
       // Local storyboard is the only source of truth for runtime text/segmentation data.
-      const [localStoryboards, { data: sceneData }, { data: atmosphereLayers }] = await Promise.all([
+      // Atmosphere clips also come from OPFS (Local-Only K3).
+      const [localStoryboards, { data: sceneData }, localAtmoClips] = await Promise.all([
         Promise.all(
           sceneIds.map(async (sceneId) => ({
             sceneId,
@@ -114,11 +116,7 @@ export function useTimelineClips(
           .from("book_scenes")
           .select("id, silence_sec")
           .in("id", sceneIds),
-        supabase
-          .from("scene_atmospheres")
-          .select("id, scene_id, layer_type, audio_path, duration_ms, volume, fade_in_ms, fade_out_ms, offset_ms, speed")
-          .in("scene_id", sceneIds)
-          .order("created_at"),
+        readAtmospheresForScenes(storage, sceneIds),
       ]);
 
       const segments = localStoryboards.flatMap(({ sceneId, data }) =>
