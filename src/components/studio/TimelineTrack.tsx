@@ -178,7 +178,7 @@ export function TimelineTrack({
     const clipStartPx = rc ? (rc.startSec + (optimisticOffsets.get(clipId) ?? 0)) * zoom * 4 : 0;
     setDraggingClipId(clipId);
     setDragDeltaPx(0);
-    onDragGuideX?.(clipStartPx);
+    // Don't show guide line immediately — only once mouse actually moves
 
     const onMove = (ev: MouseEvent) => {
       const delta = ev.clientX - startX;
