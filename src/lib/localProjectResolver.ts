@@ -68,6 +68,11 @@ export async function resolveLocalStorageForBook(
       .filter((projectName) => existingProjects.has(projectName));
 
     if (projectNames.length) {
+      if (projectNames.length > 1) {
+        console.warn(
+          `[Resolver] ⚠️ MULTIPLE OPFS projects for bookId=${targetBookId}: [${projectNames.join(", ")}]. Picking freshest.`
+        );
+      }
       try {
         const ranked = (
           await Promise.all(

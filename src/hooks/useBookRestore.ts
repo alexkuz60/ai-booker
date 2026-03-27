@@ -116,7 +116,7 @@ export function useBookRestore({
       sessionStorage.setItem(ACTIVE_BOOK_KEY, savedBookId);
       setStep("workspace");
 
-      void syncStructureToLocal(storage, {
+      await syncStructureToLocal(storage, {
         bookId: savedBookId,
         title: structure.title,
         fileName: structure.fileName,

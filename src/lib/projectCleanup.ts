@@ -53,6 +53,25 @@ export async function wipeProjectBrowserState(
     }
   }
 
+  // 1b. Verify deletion — scan for any surviving folders with the same bookId
+  try {
+    const surviving = await OPFSStorage.listProjects();
+    for (const projectName of surviving) {
+      try {
+        const store = await OPFSStorage.openOrCreate(projectName);
+        const meta = await store.readJSON<{ bookId?: string }>("project.json");
+        if (meta?.bookId === bookId) {
+          console.warn(`[Wipe] ⚠️ ZOMBIE folder detected after wipe: ${projectName} (bookId=${bookId}). Force-deleting.`);
+          await OPFSStorage.deleteProject(projectName);
+        }
+      } catch {
+        // Can't read project.json — skip
+      }
+    }
+  } catch {
+    // listProjects failed — non-critical
+  }
+
   // 2. Clear sessionStorage
   for (const key of SESSION_KEYS_TO_CLEAR) {
     try { sessionStorage.removeItem(key); } catch {}
