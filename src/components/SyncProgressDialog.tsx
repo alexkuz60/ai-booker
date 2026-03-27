@@ -219,8 +219,9 @@ export function SyncProgressDialog({
             <>
               <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
               <Button onClick={onConfirm}>
-                <CloudUpload className="h-4 w-4 mr-1.5" />
-                {isRu ? "Сохранить" : "Save"}
+                {mode === "restore"
+                  ? <><CloudDownload className="h-4 w-4 mr-1.5" />{isRu ? "Загрузить" : "Download"}</>
+                  : <><CloudUpload className="h-4 w-4 mr-1.5" />{isRu ? "Сохранить" : "Save"}</>}
               </Button>
             </>
           )}
