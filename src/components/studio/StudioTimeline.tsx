@@ -1040,8 +1040,8 @@ export function StudioTimeline({
                 {/* Start line — where drag began */}
                 {dragStartLineX !== null && (
                   <div
-                    className="absolute top-0 bottom-0 pointer-events-none z-30"
-                    style={{ left: `${dragStartLineX}px`, width: '1px', borderLeft: '1px dashed hsl(var(--muted-foreground) / 0.5)' }}
+                    className="absolute top-0 bottom-0 pointer-events-none z-[45]"
+                    style={{ left: `${dragStartLineX}px`, width: '0px', borderLeft: '1px dashed hsl(var(--muted-foreground))' }}
                   />
                 )}
                 {/* Guide line — current clip position during drag */}
