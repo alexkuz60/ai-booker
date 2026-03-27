@@ -981,10 +981,6 @@ export function StudioTimeline({
                 className="relative cursor-crosshair"
                 style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
                 onClick={(e) => {
-                  if (suppressClickRef.current) {
-                    suppressClickRef.current = false;
-                    return;
-                  }
                   const rect = e.currentTarget.getBoundingClientRect();
                   const x = e.clientX - rect.left;
                   const sec = x / (zoom * 4);
@@ -1033,9 +1029,9 @@ export function StudioTimeline({
                     isRu={isRu}
                     trackHeight={dynamicTrackHeight}
                     isSelected={isTrackSelected}
-                    onDragGuideX={(x) => { if (x !== null) suppressClickRef.current = true; setDragGuideX(x); }}
-                    onDragEndSeek={(sec) => { suppressClickRef.current = true; setDragGuideX(null); player.seek(sec); centerPlayhead(sec); }}
-                    onClipSeek={(sec) => { suppressClickRef.current = true; player.seek(sec); centerPlayhead(sec); }}
+                    onDragGuideX={setDragGuideX}
+                    onDragEndSeek={(sec) => { setDragGuideX(null); player.seek(sec); centerPlayhead(sec); }}
+                    onClipSeek={(sec) => { player.seek(sec); centerPlayhead(sec); }}
                   />
                   );
                 })}
