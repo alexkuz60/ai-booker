@@ -70,6 +70,8 @@ interface StudioTimelineProps {
   onSelectCharacter?: (characterId: string | null) => void;
   selectedSegmentId?: string | null;
   onSelectSegment?: (segmentId: string | null) => void;
+  checkedSegmentIds?: Set<string>;
+  onCheckedSegmentIdsChange?: (ids: Set<string>) => void;
   synthesizingSegmentIds?: Set<string>;
   errorSegmentIds?: Set<string>;
   clipsRefreshToken?: number;
@@ -85,6 +87,8 @@ export function StudioTimeline({
   onSelectCharacter,
   selectedSegmentId,
   onSelectSegment,
+  checkedSegmentIds,
+  onCheckedSegmentIdsChange,
   synthesizingSegmentIds,
   errorSegmentIds,
   clipsRefreshToken = 0,
@@ -894,6 +898,13 @@ export function StudioTimeline({
                     clips={clipsByTrack.get(track.id)}
                     selectedSegmentId={selectedSegmentId}
                     onSelectSegment={onSelectSegment}
+                    checkedSegmentIds={checkedSegmentIds}
+                    onToggleCheck={(segId) => {
+                      if (!onCheckedSegmentIdsChange) return;
+                      const next = new Set(checkedSegmentIds);
+                      if (next.has(segId)) next.delete(segId); else next.add(segId);
+                      onCheckedSegmentIdsChange(next);
+                    }}
                     synthesizingSegmentIds={synthesizingSegmentIds}
                     errorSegmentIds={errorSegmentIds}
                     onSetFade={handleSetFade}

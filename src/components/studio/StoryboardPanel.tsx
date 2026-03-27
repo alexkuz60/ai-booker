@@ -46,6 +46,8 @@ export function StoryboardPanel({
   onSegmented,
   selectedSegmentId,
   onSelectSegment,
+  checkedSegmentIds: externalChecked,
+  onCheckedSegmentIdsChange: onExternalCheckedChange,
   onSynthesizingChange,
   onErrorSegmentsChange,
   silenceSec,
@@ -62,6 +64,8 @@ export function StoryboardPanel({
   onSegmented?: (sceneId: string) => void;
   selectedSegmentId?: string | null;
   onSelectSegment?: (segmentId: string | null) => void;
+  checkedSegmentIds?: Set<string>;
+  onCheckedSegmentIdsChange?: (ids: Set<string>) => void;
   onSynthesizingChange?: (ids: Set<string>) => void;
   onErrorSegmentsChange?: (ids: Set<string>) => void;
   silenceSec?: number;
@@ -91,7 +95,9 @@ export function StoryboardPanel({
   const [currentlySynthesizingIds, setCurrentlySynthesizingIds] = useState<Set<string>>(new Set());
   const [inlineNarrationSpeaker, setInlineNarrationSpeaker] = useState<string | null>(null);
   const [recalcRunning, setRecalcRunning] = useState(false);
-  const [mergeChecked, setMergeChecked] = useState<Set<string>>(new Set());
+  const [internalChecked, setInternalChecked] = useState<Set<string>>(new Set());
+  const mergeChecked = externalChecked ?? internalChecked;
+  const setMergeChecked = onExternalCheckedChange ?? setInternalChecked;
   const [merging, setMerging] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [staleAudioSegIds, setStaleAudioSegIds] = useState<Set<string>>(new Set());
@@ -140,12 +146,10 @@ export function StoryboardPanel({
   useEffect(() => { setMergeChecked(new Set()); }, [sceneId]);
 
   const toggleMergeCheck = useCallback((segId: string) => {
-    setMergeChecked(prev => {
-      const next = new Set(prev);
-      if (next.has(segId)) next.delete(segId); else next.add(segId);
-      return next;
-    });
-  }, []);
+    const next = new Set(mergeChecked);
+    if (next.has(segId)) next.delete(segId); else next.add(segId);
+    setMergeChecked(next);
+  }, [mergeChecked, setMergeChecked]);
 
   // Find consecutive groups of checked segments (≥2 adjacent)
   const mergeGroups = useMemo(() => {
