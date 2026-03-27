@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Loader2, Upload, Trash2, ChevronDown, ChevronRight, FolderClosed, Waves,
-  Play, Square, Check, Pencil,
+  Play, Square, Check, Pencil, DatabaseBackup,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -288,6 +288,12 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
                 <Waves className="h-5 w-5 shrink-0" />
                 <span className="text-base font-semibold">{isRu ? "Импульсы (IR)" : "Impulses (IR)"}</span>
                 <Badge variant="outline" className="ml-1 h-5 px-1.5 text-xs">{impulses.length}</Badge>
+                {cachedIds.size > 0 && (
+                  <Badge variant="outline" className="ml-1 h-5 px-1.5 text-xs border-amber-400/40 text-amber-400">
+                    <DatabaseBackup className="h-3 w-3 mr-0.5" />
+                    {cachedIds.size}
+                  </Badge>
+                )}
                 {ownCount > 0 && (
                   <span className="text-xs text-muted-foreground ml-1">
                     ({isRu ? `своих: ${ownCount}` : `own: ${ownCount}`})
@@ -401,7 +407,15 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
                           ? <Square className="h-3 w-3 fill-current" />
                           : <Play className="h-3 w-3 fill-current" />}
                       </Button>
-                      <span className={cn("text-sm truncate flex-1 min-w-0", isCached && "text-yellow-400/90")}>{imp.name}</span>
+                      <span className={cn("text-sm truncate flex-1 min-w-0", isCached && "text-amber-400/90")}>{imp.name}</span>
+                      {isCached && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <DatabaseBackup className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                          </TooltipTrigger>
+                          <TooltipContent>{isRu ? 'Кэшировано локально' : 'Cached locally'}</TooltipContent>
+                        </Tooltip>
+                      )}
                       <Badge variant="outline" className="text-[10px] shrink-0">
                         {CAT_LABELS[lang][imp.category as ImpulseCategory] || imp.category}
                       </Badge>
