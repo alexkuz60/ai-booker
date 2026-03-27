@@ -541,7 +541,6 @@ export function StudioTimeline({
 
   // ── Atmo clip manipulation (copy/paste/move/resize) ───────
   // Save mixer state before refreshing clips to prevent volume reset
-  const onMixChangeRef = useRef<(() => void) | null>(null);
   const atmoManip = useAtmoClipManipulation({
     sceneId,
     isRu,
