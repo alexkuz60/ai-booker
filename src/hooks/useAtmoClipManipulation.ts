@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -106,17 +106,17 @@ export function useAtmoClipManipulation({
     onRefresh();
   }, [isRu, getSceneStartSec, onRefresh]);
 
-  // ── Resize clip (update duration_ms + speed) ──────────────
-  // speedRatio: 1.0 = original, 0.5 = half speed (2x longer), 1.5 = 1.5x speed (shorter)
+  // ── Resize clip (update speed) ──────────────────────────────
+  // originalDurationMs = raw file duration, originalSpeed = current speed
+  // newDurationSec = desired visual duration after resize
   const resizeClip = useCallback(async (clipId: string, newDurationSec: number, originalDurationMs: number, originalSpeed: number) => {
     const atmoId = clipId.replace(/^atmo-/, "");
-    // Compute new speed based on ratio of original to new duration
-    const originalPlayDurationSec = (originalDurationMs / 1000) / originalSpeed;
-    const newSpeed = originalPlayDurationSec / newDurationSec;
+    // Original visual duration = rawDuration / currentSpeed
+    const rawDurationSec = originalDurationMs / 1000;
+    // New speed = rawDuration / newVisualDuration
+    const newSpeed = rawDurationSec / newDurationSec;
     // Clamp speed to 0.5–1.5 range (±50%)
     const clampedSpeed = Math.max(0.5, Math.min(1.5, newSpeed));
-    const finalDurationSec = originalPlayDurationSec / clampedSpeed;
-    const newDurationMs = Math.round(finalDurationSec * 1000 * clampedSpeed);
 
     const { error } = await supabase
       .from("scene_atmospheres")
@@ -126,6 +126,7 @@ export function useAtmoClipManipulation({
       toast.error(isRu ? "Ошибка изменения" : "Resize error", { description: error.message });
       return;
     }
+    toast.info(isRu ? `Скорость: ×${clampedSpeed.toFixed(2)}` : `Speed: ×${clampedSpeed.toFixed(2)}`);
     onRefresh();
   }, [isRu, onRefresh]);
 
