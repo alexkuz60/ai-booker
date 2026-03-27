@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Loader2, Upload, Trash2, ChevronDown, ChevronRight, FolderClosed, Waves,
-  Play, Square, Check, Pencil,
+  Play, Square, Check, Pencil, DatabaseBackup,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
