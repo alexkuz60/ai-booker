@@ -119,5 +119,14 @@ export function useAtmoClipManipulation({
     onRefresh();
   }, [sceneId, isRu, onRefresh, storage]);
 
-  return { clipboard, copyClip, pasteClip, moveClip, resizeClip };
+  // ── Reset clip speed to 1× ────────────────────────────────
+  const resetClipSpeed = useCallback(async (clipId: string) => {
+    if (!storage || !sceneId) return;
+    const atmoId = clipId.replace(/^atmo-/, "");
+    await updateAtmosphereClip(storage, sceneId, atmoId, { speed: 1 });
+    toast.info(isRu ? "Скорость сброшена: ×1.00" : "Speed reset: ×1.00");
+    onRefresh();
+  }, [sceneId, isRu, onRefresh, storage]);
+
+  return { clipboard, copyClip, pasteClip, moveClip, resizeClip, resetClipSpeed };
 }
