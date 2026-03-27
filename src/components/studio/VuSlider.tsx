@@ -184,8 +184,7 @@ export function VuSlider({
 
   const thumbRatio = mode === "volume" ? value / 100 : (value + 100) / 200;
 
-  const defaultTitle = mode === "volume" ? `${value}%` : `${value > 0 ? "R" : value < 0 ? "L" : "C"} ${Math.abs(value)}`;
-  const dragTitle = mode === "volume" ? volumeToDb(value) : defaultTitle;
+  const titleText = label ?? (mode === "volume" ? volumeToDb(value) : `${value > 0 ? "R" : value < 0 ? "L" : "C"} ${Math.abs(value)}`);
 
   return (
     <div
@@ -195,7 +194,7 @@ export function VuSlider({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      title={label ?? (isDragging ? dragTitle : defaultTitle)}
+      title={titleText}
     >
       {/* Canvas background (meter) */}
       <canvas
