@@ -627,6 +627,15 @@ export function StudioTimeline({
   const [dragGuideX, setDragGuideX] = useState<number | null>(null);
   /** Suppress parent click after drag ends */
   const suppressClickRef = useRef(false);
+  // Safety: clear drag guide on any mouseup (in case track callback missed)
+  useEffect(() => {
+    const onMouseUp = () => {
+      // Delay slightly so that onDragEndSeek fires first
+      setTimeout(() => setDragGuideX(prev => prev !== null ? null : prev), 50);
+    };
+    window.addEventListener("mouseup", onMouseUp);
+    return () => window.removeEventListener("mouseup", onMouseUp);
+  }, []);
 
   // Sync selectedCharacterId → selectedPluginTrackId for backwards compat
   useEffect(() => {
@@ -1027,8 +1036,8 @@ export function StudioTimeline({
                     isRu={isRu}
                     trackHeight={dynamicTrackHeight}
                     isSelected={isTrackSelected}
-                    onDragGuideX={(x) => { if (x !== null) suppressClickRef.current = true; setDragGuideX(x); }}
-                    onDragEndSeek={(sec) => { suppressClickRef.current = true; player.seek(sec); centerPlayhead(sec); }}
+                    onDragGuideX={setDragGuideX}
+                    onDragEndSeek={(sec) => { suppressClickRef.current = true; setDragGuideX(null); player.seek(sec); centerPlayhead(sec); }}
                   />
                   );
                 })}
