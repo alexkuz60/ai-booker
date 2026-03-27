@@ -46,6 +46,8 @@ interface TimelineTrackProps {
   onDragGuideX?: (x: number | null) => void;
   /** Report drag origin X position (px from track left) — shown as a "start" line */
   onDragStartLineX?: (x: number | null) => void;
+  /** Report resize speed hint (null when not resizing) */
+  onResizeSpeedHint?: (hint: string | null) => void;
   /** Called when drag ends with the clip's new start time in seconds */
   onDragEndSeek?: (sec: number) => void;
   /** Called on single click on any clip — seek transport to clip start */
