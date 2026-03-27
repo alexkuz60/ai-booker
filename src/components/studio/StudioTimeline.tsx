@@ -114,8 +114,9 @@ export function StudioTimeline({
     let durationMs = 10_000; // fallback 10s
     try {
       const { fetchAudioAssetWithCache } = await import("@/lib/audioAssetCache");
-      const category = layerType === "sfx" ? "sfx" as const : "atmosphere" as const;
-      const buf = await fetchAudioAssetWithCache(category, file.path);
+      // Use file's actual storage category (not layer type) so cache key matches StorageTab checks
+      const cacheCategory = file.category === "sfx" ? "sfx" as const : "atmosphere" as const;
+      const buf = await fetchAudioAssetWithCache(cacheCategory, file.path);
       const ctx = new AudioContext();
       const decoded = await ctx.decodeAudioData(buf.slice(0));
       durationMs = Math.round(decoded.duration * 1000);
