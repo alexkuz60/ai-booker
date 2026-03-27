@@ -972,8 +972,9 @@ class AudioEngine {
   // ─── Track management ──────────────────────────────────
 
   async loadTracks(configs: TrackConfig[], onProgress?: (p: LoadProgress) => void): Promise<LoadTracksResult> {
-    // Preserve current position across reload (stop() resets to 0)
-    const savedPosition = this.positionSec;
+    // Preserve actual transport position across reloads triggered by timeline edits.
+    const savedPosition = this.transport.seconds;
+    const previousState = this._state;
     this.stop();
     for (const t of this.tracks.values()) t.dispose();
     this.tracks.clear();
@@ -1064,8 +1065,9 @@ class AudioEngine {
     for (const t of this.tracks.values()) t.schedule();
 
     // Restore transport position that was saved before stop()
-    if (savedPosition > 0 && savedPosition <= this._totalDuration) {
-      this.transport.seconds = savedPosition;
+    if (savedPosition > 0) {
+      this.transport.seconds = Math.min(savedPosition, this.getEffectiveTotalDuration());
+      this._state = previousState === "playing" ? "paused" : previousState;
     }
 
     this.notify();
@@ -1827,10 +1829,7 @@ class AudioEngine {
   get totalDuration(): number { return this.getEffectiveTotalDuration(); }
   get trackCount(): number { return this.tracks.size; }
 
-  get positionSec(): number {
-    if (this._state === "stopped") return 0;
-    return this.transport.seconds;
-  }
+  get positionSec(): number { return this.transport.seconds; }
 
   getSnapshot(): EngineSnapshot {
     return {
@@ -1866,7 +1865,13 @@ class AudioEngine {
       // Only check end condition after a few frames (avoid false stop at t=0)
       const endAt = this.getEffectiveTotalDuration();
       if (tickCount > 5 && endAt > 0 && this.transport.seconds >= endAt) {
-        this.stop();
+        this.transport.pause();
+        for (const t of this.tracks.values()) {
+          try { t.player.stop(); } catch { /* not started */ }
+        }
+        this._state = "paused";
+        this.stopPositionLoop();
+        this.notify();
         return;
       }
       this.notify();
