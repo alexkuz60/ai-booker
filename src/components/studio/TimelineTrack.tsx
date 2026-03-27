@@ -234,7 +234,14 @@ export function TimelineTrack({
       }}
     >
       {clips.filter(c => c.start < c.end).map((clip, i) => {
-        const widthPx = (clip.end - clip.start) * zoom * 4;
+        const isAtmoClip = clip.id.startsWith("atmo-");
+        const isDragging = draggingClipId === clip.id;
+        const isResizing = resizingClipId === clip.id;
+
+        const effectiveLeftPx = clip.start * zoom * 4 + (isDragging ? dragDeltaPx : 0);
+        const effectiveWidthPx = (clip.end - clip.start) * zoom * 4 + (isResizing ? resizeDeltaPx : 0);
+        const widthPx = Math.max(8, effectiveWidthPx);
+
         const isSelected = selectedSegmentId && clip.id === selectedSegmentId;
         const isChecked = checkedSegmentIds?.has(clip.id);
         const isSynthesizing = synthesizingSegmentIds?.has(clip.id);
@@ -248,13 +255,13 @@ export function TimelineTrack({
 
         const clipElement = (
           <div
-            className={`absolute top-1 bottom-1 rounded-sm transition-all cursor-pointer overflow-hidden ${
+            className={`absolute top-1 bottom-1 rounded-sm transition-none cursor-pointer overflow-hidden ${
               isError
                 ? "opacity-90 hover:opacity-100 ring-2 ring-destructive ring-offset-1 ring-offset-background"
                 : clip.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-60 hover:opacity-80"
-            } ${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background opacity-100 z-10" : ""} ${isChecked && !isSelected ? "ring-2 ring-accent-foreground/50 ring-offset-1 ring-offset-background opacity-100" : ""} ${isSynthesizing ? "synth-oscilloscope" : ""}`}
+            } ${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background opacity-100 z-10" : ""} ${isChecked && !isSelected ? "ring-2 ring-accent-foreground/50 ring-offset-1 ring-offset-background opacity-100" : ""} ${isSynthesizing ? "synth-oscilloscope" : ""} ${isDragging || isResizing ? "z-30 shadow-lg ring-2 ring-primary/50" : ""}`}
             style={{
-              left: `${clip.start * zoom * 4}px`,
+              left: `${Math.max(0, effectiveLeftPx)}px`,
               width: `${widthPx}px`,
               backgroundColor: isError ? "hsl(var(--destructive))" : track.color,
               backgroundImage: isSynthesizing
@@ -265,9 +272,17 @@ export function TimelineTrack({
                     ? undefined
                     : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
             }}
-            title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${clip.loop && clip.clipLenSec ? ` loop×${Math.ceil(clip.durationSec / clip.clipLenSec)}` : ""}${isError ? " ❌ Ошибка синтеза" : clip.hasAudio ? " 🔊" : ""}${isSynthesizing ? " ⏳" : ""}${hasFades ? ` | fade ${clip.fadeInSec.toFixed(2)}s / ${clip.fadeOutSec.toFixed(2)}s` : ""}`}
+            title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${clip.speed !== 1 ? ` ×${clip.speed.toFixed(2)}` : ""}${clip.loop && clip.clipLenSec ? ` loop×${Math.ceil(clip.durationSec / clip.clipLenSec)}` : ""}${isError ? " ❌ Ошибка синтеза" : clip.hasAudio ? " 🔊" : ""}${isSynthesizing ? " ⏳" : ""}${hasFades ? ` | fade ${clip.fadeInSec.toFixed(2)}s / ${clip.fadeOutSec.toFixed(2)}s` : ""}`}
             onClick={() => onToggleCheck?.(clip.id)}
             onDoubleClick={() => onSelectSegment?.(clip.id)}
+            onMouseDown={(e) => {
+              // Only allow drag on atmo clips with left button, not on resize handle
+              if (!isAtmoClip || e.button !== 0 || !onMoveAtmoClip) return;
+              const rect = e.currentTarget.getBoundingClientRect();
+              const rightEdge = rect.right - 6;
+              if (e.clientX >= rightEdge && onResizeAtmoClip) return; // resize zone
+              handleDragStart(e, clip.id);
+            }}
           >
             {/* Loop iteration markers */}
             {clip.loop && clip.clipLenSec && clip.clipLenSec > 0 && (() => {
@@ -297,6 +312,17 @@ export function TimelineTrack({
               <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body relative z-[1]">
                 {isError ? "❌ " : isSynthesizing ? "⏳ " : clip.hasAudio ? "🔊 " : ""}{clip.label}
               </span>
+            )}
+
+            {/* Resize handle on right edge for atmo clips */}
+            {isAtmoClip && onResizeAtmoClip && (
+              <div
+                className="absolute top-0 bottom-0 right-0 w-1.5 cursor-ew-resize hover:bg-white/30 z-[2]"
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  handleResizeStart(e, clip.id);
+                }}
+              />
             )}
           </div>
         );
