@@ -623,6 +623,9 @@ export function StudioTimeline({
   // Track selected for plugin editing — can be char, atmo, or sfx track
   const [selectedPluginTrackId, setSelectedPluginTrackId] = useState<string | null>(null);
 
+  // ── Drag guide line (vertical position indicator across all tracks) ──
+  const [dragGuideX, setDragGuideX] = useState<number | null>(null);
+
   // Sync selectedCharacterId → selectedPluginTrackId for backwards compat
   useEffect(() => {
     if (selectedCharacterId) setSelectedPluginTrackId(`char-${selectedCharacterId}`);
@@ -1018,9 +1021,16 @@ export function StudioTimeline({
                     isRu={isRu}
                     trackHeight={dynamicTrackHeight}
                     isSelected={isTrackSelected}
+                    onDragGuideX={setDragGuideX}
                   />
                   );
                 })}
+                {dragGuideX !== null && (
+                  <div
+                    className="absolute top-0 bottom-0 pointer-events-none z-30"
+                    style={{ left: `${dragGuideX}px`, width: '1px', backgroundColor: 'hsl(var(--accent))' }}
+                  />
+                )}
                 <Playhead positionSec={player.positionSec} zoom={zoom} />
               </div>
             </div>
