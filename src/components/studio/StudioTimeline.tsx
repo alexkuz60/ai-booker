@@ -476,7 +476,7 @@ export function StudioTimeline({
     return containerWidth / (duration * 4);
   }, [containerWidth, duration]);
 
-  const SCENE_ZOOM_PRESETS = [90, 100, 125, 150, 200, 300] as const;
+  const SCENE_ZOOM_PRESETS = [90, 100, 200, 300, 400, 500] as const;
   const [sceneZoomPercent, setSceneZoomPercent] = useState<number>(100);
   const [zoomOverride, setZoomOverride] = useState<number | null>(null);
   const zoom = zoomOverride ?? fitZoom;
