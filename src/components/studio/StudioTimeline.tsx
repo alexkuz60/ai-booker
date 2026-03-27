@@ -1022,6 +1022,7 @@ export function StudioTimeline({
                     trackHeight={dynamicTrackHeight}
                     isSelected={isTrackSelected}
                     onDragGuideX={setDragGuideX}
+                    onDragEndSeek={(sec) => { player.seek(sec); centerPlayhead(sec); }}
                   />
                   );
                 })}
