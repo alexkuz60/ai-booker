@@ -136,6 +136,7 @@ export function TimelineTrack({
   onPasteAtmoClip,
   onMoveAtmoClip,
   onResizeAtmoClip,
+  onResetAtmoClipSpeed,
   hasClipboard,
   isRu,
   trackHeight,
