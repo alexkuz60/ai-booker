@@ -632,7 +632,72 @@ export async function deployFromServer({
     report("storyboards", "error");
   }
 
-  // ── 8b. Download IR impulses into global OPFS cache ───────
+  // ── 8a. Restore atmosphere clips from DB to OPFS ──────────
+  report("atmospheres", "running");
+  let restoredAtmoCount = 0;
+  try {
+    const allSceneIdsForAtmo = allScenes.map(s => s.id);
+    if (allSceneIdsForAtmo.length > 0) {
+      type RawAtmo = {
+        id: string;
+        scene_id: string;
+        layer_type: string;
+        audio_path: string;
+        duration_ms: number;
+        volume: number;
+        fade_in_ms: number;
+        fade_out_ms: number;
+        offset_ms: number;
+        prompt_used: string;
+        speed: number;
+        created_at: string;
+      };
+      const serverAtmo = await fetchChunked<RawAtmo>(
+        "scene_atmospheres",
+        "id, scene_id, layer_type, audio_path, duration_ms, volume, fade_in_ms, fade_out_ms, offset_ms, prompt_used, speed, created_at",
+        "scene_id",
+        allSceneIdsForAtmo,
+        500,
+      );
+
+      if (serverAtmo.length > 0) {
+        const { saveAtmospheresToLocal, type LocalAtmosphereClip } = await import("@/lib/localAtmospheres");
+
+        // Group by scene_id
+        const atmoByScene = new Map<string, LocalAtmosphereClip[]>();
+        for (const a of serverAtmo) {
+          const list = atmoByScene.get(a.scene_id) || [];
+          list.push({
+            id: a.id,
+            layer_type: a.layer_type,
+            audio_path: a.audio_path,
+            duration_ms: a.duration_ms,
+            volume: a.volume,
+            fade_in_ms: a.fade_in_ms,
+            fade_out_ms: a.fade_out_ms,
+            offset_ms: a.offset_ms,
+            prompt_used: a.prompt_used,
+            speed: a.speed ?? 1,
+            created_at: a.created_at,
+          });
+          atmoByScene.set(a.scene_id, list);
+        }
+
+        const atmoWrites: Promise<void>[] = [];
+        for (const [sid, clips] of atmoByScene) {
+          const chId = sceneToChapter.get(sid);
+          atmoWrites.push(saveAtmospheresToLocal(storage, sid, clips, chId));
+        }
+        await Promise.all(atmoWrites);
+        restoredAtmoCount = serverAtmo.length;
+        console.log(`[Deploy] Restored ${restoredAtmoCount} atmosphere clips`);
+      }
+    }
+  } catch (err) {
+    console.warn("[Deploy] Failed to restore atmospheres:", err);
+  }
+  report("atmospheres", restoredAtmoCount > 0 ? "done" : "skipped", restoredAtmoCount > 0 ? `${restoredAtmoCount}` : undefined);
+
   if (downloadImpulses) {
     report("download_ir", "running");
     try {
