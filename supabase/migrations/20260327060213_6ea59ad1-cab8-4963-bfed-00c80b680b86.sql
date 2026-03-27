@@ -1,0 +1,1 @@
+ALTER TABLE public.scene_atmospheres ADD COLUMN IF NOT EXISTS speed real NOT NULL DEFAULT 1.0;
