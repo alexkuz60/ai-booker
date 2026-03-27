@@ -32,6 +32,7 @@ interface TimelineTrackProps {
   storageAtmosphere?: StorageAudioFile[];
   storageSfx?: StorageAudioFile[];
   onInsertAudio?: (file: StorageAudioFile, atSec: number, layerType: "ambience" | "sfx") => void;
+  onDeleteAtmoClip?: (clipId: string) => void;
   isRu?: boolean;
   trackHeight?: number;
 }
@@ -112,6 +113,7 @@ export function TimelineTrack({
   storageAtmosphere,
   storageSfx,
   onInsertAudio,
+  onDeleteAtmoClip,
   isRu,
   trackHeight,
 }: TimelineTrackProps) {
