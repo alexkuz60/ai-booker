@@ -1,11 +1,9 @@
 import { useEffect, useCallback, useRef, useMemo } from "react";
 import { getAudioEngine } from "@/lib/audioEngine";
-import { useCloudSettings } from "@/hooks/useCloudSettings";
 
 /**
- * Persisted channel-plugin state per scene — saved to localStorage + cloud (user_settings).
- * Stores EQ (low/mid/high + bypass), Compressor (threshold/ratio/knee/attack/release + bypass),
- * and Limiter (threshold + bypass) per track.
+ * Persisted channel-plugin state per scene — saved to localStorage ONLY.
+ * DB sync happens exclusively during "Push to Server" / "Restore from Server".
  */
 interface PersistedTrackPlugins {
   eq: { low: number; mid: number; high: number; bypassed: boolean };
@@ -14,7 +12,6 @@ interface PersistedTrackPlugins {
 }
 
 type ScenePluginsState = Record<string, PersistedTrackPlugins>;
-type AllPluginsStates = Record<string, ScenePluginsState>;
 
 function localKey(sceneId: string) {
   return `plugins-state-${sceneId}`;
@@ -36,8 +33,8 @@ function saveLocal(sceneId: string, state: ScenePluginsState) {
 }
 
 /**
- * Restores channel-plugin state from localStorage/cloud when sceneId changes,
- * and auto-saves changes to both localStorage and cloud.
+ * Restores channel-plugin state from localStorage when sceneId changes,
+ * and auto-saves changes to localStorage only (no cloud writes).
  */
 export function usePluginsPersistence(sceneId: string | null, trackIds: string[]) {
   const engine = getAudioEngine();
@@ -48,33 +45,25 @@ export function usePluginsPersistence(sceneId: string | null, trackIds: string[]
   const trackIdsRef = useRef(trackIds);
   trackIdsRef.current = trackIds;
 
-  const { value: cloudStates, update: saveCloudStates, loaded: cloudLoaded } =
-    useCloudSettings<AllPluginsStates>("plugins_states", {});
-
-  const cloudStatesRef = useRef(cloudStates);
-  cloudStatesRef.current = cloudStates;
-
   // Restore plugin state when scene changes
   useEffect(() => {
-    if (!sceneId || trackIds.length === 0 || !cloudLoaded) return;
+    if (!sceneId || trackIds.length === 0) return;
     if (restoredForRef.current === sceneId) return;
     restoredForRef.current = sceneId;
 
-    const saved = loadLocal(sceneId) ?? cloudStatesRef.current[sceneId] ?? null;
+    const saved = loadLocal(sceneId);
     if (!saved) return;
 
     for (const trackId of trackIds) {
       const p = saved[trackId];
       if (!p) continue;
 
-      // EQ
       if (p.eq) {
         engine.setTrackEqLow(trackId, p.eq.low);
         engine.setTrackEqMid(trackId, p.eq.mid);
         engine.setTrackEqHigh(trackId, p.eq.high);
         engine.setTrackEqBypassed(trackId, p.eq.bypassed);
       }
-      // Compressor
       if (p.comp) {
         engine.setTrackCompThreshold(trackId, p.comp.threshold);
         engine.setTrackCompRatio(trackId, p.comp.ratio);
@@ -83,15 +72,14 @@ export function usePluginsPersistence(sceneId: string | null, trackIds: string[]
         engine.setTrackCompRelease(trackId, p.comp.release);
         engine.setTrackPreFxBypassed(trackId, p.comp.bypassed);
       }
-      // Limiter
       if (p.limiter) {
         engine.setTrackLimiterThreshold(trackId, p.limiter.threshold);
         engine.setTrackLimiterBypassed(trackId, p.limiter.bypassed);
       }
     }
-  }, [sceneId, trackIdsKey, engine, cloudLoaded]);
+  }, [sceneId, trackIdsKey, engine]);
 
-  // Debounced save
+  // Debounced save to localStorage only
   const scheduleSave = useCallback(() => {
     if (!sceneId) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -118,9 +106,8 @@ export function usePluginsPersistence(sceneId: string | null, trackIds: string[]
 
       if (Object.keys(state).length === 0) return;
       saveLocal(sceneId, state);
-      saveCloudStates((prev) => ({ ...prev, [sceneId]: state }));
     }, 300);
-  }, [sceneId, engine, saveCloudStates]);
+  }, [sceneId, engine]);
 
   useEffect(() => {
     return () => {

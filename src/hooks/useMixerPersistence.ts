@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useEffect, useCallback, useRef, useMemo } from "react";
 import { getAudioEngine } from "@/lib/audioEngine";
-import { useCloudSettings } from "@/hooks/useCloudSettings";
 
 /**
- * Persisted mixer state per scene — saved to localStorage + cloud (user_settings).
- * Stores volume, pan, preFxBypassed, reverbBypassed per track.
+ * Persisted mixer state per scene — saved to localStorage ONLY.
+ * DB sync happens exclusively during "Push to Server" / "Restore from Server".
  */
 interface PersistedTrackMix {
   volume: number;
@@ -14,9 +13,6 @@ interface PersistedTrackMix {
 }
 
 type SceneMixerState = Record<string, PersistedTrackMix>;
-
-/** All scenes' mixer states keyed by sceneId */
-type AllMixerStates = Record<string, SceneMixerState>;
 
 function localKey(sceneId: string) {
   return `mixer-state-${sceneId}`;
@@ -38,35 +34,26 @@ function saveLocal(sceneId: string, state: SceneMixerState) {
 }
 
 /**
- * Restores mixer state from localStorage/cloud when sceneId changes,
- * and auto-saves changes to both localStorage and cloud.
+ * Restores mixer state from localStorage when sceneId changes,
+ * and auto-saves changes to localStorage only (no cloud writes).
  */
 export function useMixerPersistence(sceneId: string | null, trackIds: string[]) {
   const engine = getAudioEngine();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restoredForRef = useRef<string | null>(null);
 
-  // Stable trackIds key for dependency tracking
   const trackIdsKey = useMemo(() => trackIds.join(","), [trackIds]);
   const trackIdsRef = useRef(trackIds);
   trackIdsRef.current = trackIds;
 
-  // Cloud-synced state for ALL scenes' mixer settings
-  const { value: cloudStates, update: saveCloudStates, loaded: cloudLoaded } =
-    useCloudSettings<AllMixerStates>("mixer_states", {});
-
-  const cloudStatesRef = useRef(cloudStates);
-  cloudStatesRef.current = cloudStates;
-
-  // Restore mixer state when scene changes or track IDs change (e.g. after clip move/refresh)
+  // Restore mixer state when scene changes or track IDs change
   const restoreKey = `${sceneId}|${trackIdsKey}`;
   useEffect(() => {
-    if (!sceneId || trackIds.length === 0 || !cloudLoaded) return;
+    if (!sceneId || trackIds.length === 0) return;
     if (restoredForRef.current === restoreKey) return;
     restoredForRef.current = restoreKey;
 
-    // Try localStorage first (faster), fallback to cloud
-    const saved = loadLocal(sceneId) ?? cloudStatesRef.current[sceneId] ?? null;
+    const saved = loadLocal(sceneId);
     if (saved) {
       for (const trackId of trackIds) {
         const mix = saved[trackId];
@@ -77,9 +64,9 @@ export function useMixerPersistence(sceneId: string | null, trackIds: string[]) 
         engine.setTrackReverbBypassed(trackId, mix.reverbBypassed);
       }
     }
-  }, [sceneId, restoreKey, engine, cloudLoaded]);
+  }, [sceneId, restoreKey, engine]);
 
-  // Debounced save to both localStorage and cloud
+  // Debounced save to localStorage only
   const scheduleSave = useCallback(() => {
     if (!sceneId) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -98,11 +85,9 @@ export function useMixerPersistence(sceneId: string | null, trackIds: string[]) 
         }
       }
       if (Object.keys(state).length === 0) return;
-
       saveLocal(sceneId, state);
-      saveCloudStates((prev) => ({ ...prev, [sceneId]: state }));
     }, 300);
-  }, [sceneId, engine, saveCloudStates]);
+  }, [sceneId, engine]);
 
   // Cleanup
   useEffect(() => {
