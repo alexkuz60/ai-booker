@@ -985,6 +985,7 @@ export function StudioTimeline({
                 style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
                 onClick={(e) => {
                   if (suppressClickRef.current) {
+                    suppressClickRef.current = false;
                     return;
                   }
                   const rect = e.currentTarget.getBoundingClientRect();
@@ -1036,7 +1037,7 @@ export function StudioTimeline({
                     trackHeight={dynamicTrackHeight}
                     isSelected={isTrackSelected}
                     onDragGuideX={(x) => { if (x !== null) suppressClickRef.current = true; setDragGuideX(x); }}
-                    onDragEndSeek={(sec) => { suppressClickRef.current = true; setTimeout(() => { suppressClickRef.current = false; }, 2000); setDragGuideX(null); player.seek(sec); centerPlayhead(sec); }}
+                    onDragEndSeek={(sec) => { suppressClickRef.current = true; setDragGuideX(null); player.seek(sec); centerPlayhead(sec); }}
                     onClipSeek={(sec) => { suppressClickRef.current = true; player.seek(sec); centerPlayhead(sec); }}
                   />
                   );

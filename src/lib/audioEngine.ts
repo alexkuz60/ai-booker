@@ -972,6 +972,8 @@ class AudioEngine {
   // ─── Track management ──────────────────────────────────
 
   async loadTracks(configs: TrackConfig[], onProgress?: (p: LoadProgress) => void): Promise<LoadTracksResult> {
+    // Preserve current position across reload (stop() resets to 0)
+    const savedPosition = this.positionSec;
     this.stop();
     for (const t of this.tracks.values()) t.dispose();
     this.tracks.clear();
@@ -1060,6 +1062,11 @@ class AudioEngine {
 
     this.transport.cancel();
     for (const t of this.tracks.values()) t.schedule();
+
+    // Restore transport position that was saved before stop()
+    if (savedPosition > 0 && savedPosition <= this._totalDuration) {
+      this.transport.seconds = savedPosition;
+    }
 
     this.notify();
     return { total: configs.length, loaded: loadedCount, dropped };
