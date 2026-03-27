@@ -538,6 +538,7 @@ export function StudioTimeline({
       const boundary = sceneBoundariesRef.current?.find(b => b.sceneId === sceneId);
       return boundary ? boundary.startSec + boundary.silenceSec : 0;
     },
+    storage,
   });
 
   // ── Ctrl+C/V for atmo clips ───────────────────────────────
