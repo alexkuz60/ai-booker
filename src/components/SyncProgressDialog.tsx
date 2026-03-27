@@ -120,9 +120,13 @@ export function SyncProgressDialog({
         >
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
-            <CloudUpload className="h-5 w-5 text-primary" />
+            {mode === "restore"
+              ? <CloudDownload className="h-5 w-5 text-primary" />
+              : <CloudUpload className="h-5 w-5 text-primary" />}
             {phase === "confirm"
-              ? (isRu ? "Сохранить на сервер?" : "Save to server?")
+              ? mode === "restore"
+                ? (isRu ? "Загрузить с сервера?" : "Download from server?")
+                : (isRu ? "Сохранить на сервер?" : "Save to server?")
               : phase === "done"
                 ? (isRu ? "Синхронизация завершена" : "Sync complete")
                 : phase === "error"
@@ -131,9 +135,13 @@ export function SyncProgressDialog({
           </AlertDialogTitle>
           {phase === "confirm" && (
             <AlertDialogDescription>
-              {isRu
-                ? "Текущее состояние проекта будет загружено на сервер как резервная копия. Это может занять некоторое время."
-                : "Current project state will be uploaded to the server as a backup. This may take a moment."}
+              {mode === "restore"
+                ? (isRu
+                  ? "Серверная версия проекта будет загружена и заменит локальные данные. Это может занять некоторое время."
+                  : "Server version of the project will be downloaded and replace local data. This may take a moment.")
+                : (isRu
+                  ? "Текущее состояние проекта будет загружено на сервер как резервная копия. Это может занять некоторое время."
+                  : "Current project state will be uploaded to the server as a backup. This may take a moment.")}
             </AlertDialogDescription>
           )}
           {phase === "confirm" && confirmOptions && confirmOptions.length > 0 && (
