@@ -582,13 +582,20 @@ export function StudioTimeline({
   type TimelineView = "tracks" | "plugins";
   const [timelineView, setTimelineView] = useState<TimelineView>("tracks");
 
-  // Selected track clips for channel plugins
+  // Track selected for plugin editing — can be char, atmo, or sfx track
+  const [selectedPluginTrackId, setSelectedPluginTrackId] = useState<string | null>(null);
+
+  // Sync selectedCharacterId → selectedPluginTrackId for backwards compat
+  useEffect(() => {
+    if (selectedCharacterId) setSelectedPluginTrackId(`char-${selectedCharacterId}`);
+  }, [selectedCharacterId]);
+
+  // Selected track clips for channel plugins (works for any track type)
   const pluginsClips = useMemo((): ClipInfo[] => {
-    if (!selectedCharacterId) return [];
-    const charTrackId = `char-${selectedCharacterId}`;
-    const trackInfo = charTracks.find(t => t.id === charTrackId);
+    if (!selectedPluginTrackId) return [];
+    const trackInfo = allTracks.find(t => t.id === selectedPluginTrackId);
     return timelineClips
-      .filter(c => c.trackId === charTrackId)
+      .filter(c => c.trackId === selectedPluginTrackId)
       .map(c => ({
         id: c.id,
         label: c.label || c.segmentType || c.id,
@@ -598,7 +605,7 @@ export function StudioTimeline({
         charColor: trackInfo?.color,
         hasAudio: c.hasAudio && !!c.audioPath,
       }));
-  }, [selectedCharacterId, timelineClips, charTracks]);
+  }, [selectedPluginTrackId, timelineClips, allTracks]);
 
   // ALL scene clips across all character tracks (for Panner3D multi-character view)
   const allSceneClips = useMemo((): ClipInfo[] => {
@@ -618,14 +625,14 @@ export function StudioTimeline({
   }, [timelineClips, charTracks]);
 
   const pluginsTrackLabel = useMemo(() => {
-    if (!selectedCharacterId) return undefined;
-    return charTracks.find(t => t.id === `char-${selectedCharacterId}`)?.label;
-  }, [selectedCharacterId, charTracks]);
+    if (!selectedPluginTrackId) return undefined;
+    return allTracks.find(t => t.id === selectedPluginTrackId)?.label;
+  }, [selectedPluginTrackId, allTracks]);
 
   const pluginsTrackColor = useMemo(() => {
-    if (!selectedCharacterId) return undefined;
-    return charTracks.find(t => t.id === `char-${selectedCharacterId}`)?.color;
-  }, [selectedCharacterId, charTracks]);
+    if (!selectedPluginTrackId) return undefined;
+    return allTracks.find(t => t.id === selectedPluginTrackId)?.color;
+  }, [selectedPluginTrackId, allTracks]);
 
   // Per-clip plugin toggle/update handlers (delegated to useClipPluginConfigs)
   const handleTogglePlugin = useCallback((clipId: string, plugin: "eq" | "comp" | "limiter" | "panner3d" | "convolver") => {
