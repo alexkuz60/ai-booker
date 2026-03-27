@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { Users, Wind, Headphones, Film, Wand2, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ interface StudioWorkspaceProps {
 }
 
 export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, selectedSceneNumber, selectedSceneTitle, chapterId, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter, activeTab: externalTab, onTabChange, selectedSegmentId, onSelectSegment, checkedSegmentIds, onCheckedSegmentIdsChange, onSynthesizingChange, onErrorSegmentsChange, silenceSec, onSilenceSecChange, onRecalcDone, onVoiceSaved, userApiKeys = {}, clipsRefreshToken = 0 }: StudioWorkspaceProps) {
+  const { storage } = useProjectStorageContext();
   const [activeTab, setActiveTabLocal] = useState(() => externalTab || sessionStorage.getItem("studio_active_tab") || "storyboard");
   const charactersPanelRef = useRef<CharactersPanelHandle | null>(null);
   const [castingExternal, setCastingExternal] = useState(false);
@@ -155,7 +157,7 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, s
 
         <TabsContent value="atmosphere" className="flex-1 mt-4 min-h-0">
           <div className="rounded-lg border border-border bg-card/50 h-full overflow-hidden">
-            <AtmospherePanel isRu={isRu} sceneId={selectedSceneId} />
+            <AtmospherePanel isRu={isRu} sceneId={selectedSceneId} storage={storage} />
           </div>
         </TabsContent>
 

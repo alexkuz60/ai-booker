@@ -89,6 +89,10 @@ export const paths = {
   ttsClip: (segmentId: string, sceneId?: string, chapterId?: string) =>
     `chapters/${requireChapterId(sceneId ?? "", chapterId)}/scenes/${sceneId}/audio/tts/${segmentId}.mp3`,
 
+  /** Scene atmosphere/sfx clip metadata */
+  sceneAtmospheres: (sceneId: string, chapterId?: string) =>
+    `chapters/${requireChapterId(sceneId, chapterId)}/scenes/${sceneId}/atmospheres.json`,
+
   /** Atmosphere audio layer */
   atmosphereClip: (fileName: string, sceneId?: string, chapterId?: string) =>
     `chapters/${requireChapterId(sceneId ?? "", chapterId)}/scenes/${sceneId}/audio/atmosphere/${fileName}`,
