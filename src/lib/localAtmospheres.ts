@@ -68,10 +68,14 @@ export async function saveAtmospheresToLocal(
   clips: LocalAtmosphereClip[],
   chapterId?: string,
 ): Promise<void> {
-  const p = atmoPath(sceneId, chapterId);
+  let p = atmoPath(sceneId, chapterId);
   if (p.includes("__unresolved__")) {
-    console.error("[localAtmospheres] Cannot save — unresolved chapterId for scene", sceneId);
-    return;
+    await readSceneIndex(storage);
+    p = atmoPath(sceneId, chapterId);
+    if (p.includes("__unresolved__")) {
+      console.error("[localAtmospheres] Cannot save — unresolved chapterId for scene", sceneId);
+      return;
+    }
   }
   const data: LocalAtmosphereData = {
     sceneId,
