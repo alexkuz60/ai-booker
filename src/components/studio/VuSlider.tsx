@@ -6,7 +6,7 @@
  *   "pan"    — split L/R meter bars from center
  */
 
-import { useRef, useEffect, useCallback, useState } from "react";
+import { useRef, useEffect, useCallback } from "react";
 
 interface VuSliderProps {
   mode: "volume" | "pan";
@@ -49,7 +49,7 @@ export function VuSlider({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
-  const [isDragging, setIsDragging] = useState(false);
+  
   const smoothedRef = useRef<{ l: number; r: number }>({ l: 0, r: 0 });
 
   // Store meterDb in a ref so the draw loop doesn't need to restart on every change
@@ -162,7 +162,6 @@ export function VuSlider({
       if (disabled) return;
       e.preventDefault();
       dragging.current = true;
-      setIsDragging(true);
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
       onChange(getValueFromX(e.clientX));
     },
@@ -179,13 +178,11 @@ export function VuSlider({
 
   const handlePointerUp = useCallback(() => {
     dragging.current = false;
-    setIsDragging(false);
   }, []);
 
   const thumbRatio = mode === "volume" ? value / 100 : (value + 100) / 200;
 
-  const defaultTitle = mode === "volume" ? `${value}%` : `${value > 0 ? "R" : value < 0 ? "L" : "C"} ${Math.abs(value)}`;
-  const dragTitle = mode === "volume" ? volumeToDb(value) : defaultTitle;
+  const titleText = label ?? (mode === "volume" ? volumeToDb(value) : `${value > 0 ? "R" : value < 0 ? "L" : "C"} ${Math.abs(value)}`);
 
   return (
     <div
@@ -195,7 +192,7 @@ export function VuSlider({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      title={label ?? (isDragging ? dragTitle : defaultTitle)}
+      title={titleText}
     >
       {/* Canvas background (meter) */}
       <canvas
