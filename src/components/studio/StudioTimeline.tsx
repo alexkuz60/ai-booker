@@ -105,23 +105,8 @@ export function StudioTimeline({
 
   // Handler for inserting audio from storage into atmosphere/sfx track
   const handleInsertAudio = useCallback(async (file: StorageAudioFile, atSec: number, layerType: "ambience" | "sfx" = "ambience") => {
-    if (!sceneId || !user) {
+    if (!sceneId || !user || !storage) {
       toast.error(isRu ? "Нет активной сцены" : "No active scene");
-      return;
-    }
-
-    // Verify scene exists in DB (local-first: may not be synced yet)
-    const { data: sceneRow } = await supabase
-      .from("book_scenes")
-      .select("id")
-      .eq("id", sceneId)
-      .maybeSingle();
-
-    if (!sceneRow) {
-      toast.error(
-        isRu ? "Сцена не синхронизирована" : "Scene not synced",
-        { description: isRu ? "Сначала сохраните книгу на сервер" : "Push the book to server first" },
-      );
       return;
     }
 
@@ -148,8 +133,9 @@ export function StudioTimeline({
     const sceneStartSec = boundary ? boundary.startSec + boundary.silenceSec : 0;
     const offsetMs = Math.max(0, Math.round((atSec - sceneStartSec) * 1000));
 
-    const { error } = await supabase.from("scene_atmospheres").insert({
-      scene_id: sceneId,
+    const { addAtmosphereClip } = await import("@/lib/localAtmospheres");
+    await addAtmosphereClip(storage, sceneId, {
+      id: crypto.randomUUID(),
       layer_type: layerType,
       audio_path: file.path,
       duration_ms: durationMs,
@@ -158,41 +144,31 @@ export function StudioTimeline({
       fade_out_ms: layerType === "sfx" ? 0 : 1000,
       prompt_used: file.name,
       offset_ms: offsetMs,
+      speed: 1,
+      created_at: new Date().toISOString(),
     });
-
-    if (error) {
-      toast.error(isRu ? "Ошибка вставки" : "Insert error", { description: error.message });
-      return;
-    }
 
     toast.success(
       isRu ? `Добавлено: ${file.name}` : `Added: ${file.name}`,
-      { description: isRu ? `${layerType} · ${(durationMs / 1000).toFixed(1)}s` : `${layerType} · ${(durationMs / 1000).toFixed(1)}s` },
+      { description: `${layerType} · ${(durationMs / 1000).toFixed(1)}s` },
     );
 
     // Trigger timeline clip refresh
     setLocalRefresh(prev => prev + 1);
-  }, [sceneId, user, isRu]);
+  }, [sceneId, user, isRu, storage]);
 
   // Handler for deleting atmosphere/sfx clips
   const handleDeleteAtmoClip = useCallback(async (clipId: string) => {
-    // clipId format: "atmo-{uuid}"
+    if (!storage || !sceneId) return;
     const atmoId = clipId.replace(/^atmo-/, "");
     if (!atmoId) return;
 
-    const { error } = await supabase
-      .from("scene_atmospheres")
-      .delete()
-      .eq("id", atmoId);
-
-    if (error) {
-      toast.error(isRu ? "Ошибка удаления" : "Delete error", { description: error.message });
-      return;
-    }
+    const { deleteAtmosphereClip } = await import("@/lib/localAtmospheres");
+    await deleteAtmosphereClip(storage, sceneId, atmoId);
 
     toast.success(isRu ? "Клип удалён" : "Clip deleted");
     setLocalRefresh(prev => prev + 1);
-  }, [isRu]);
+  }, [isRu, storage, sceneId]);
 
   // ── Scene render state ────────────────────────────────────
   const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
