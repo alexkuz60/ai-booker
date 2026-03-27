@@ -318,7 +318,7 @@ export function TimelineTrack({
                     : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
             }}
             title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${clip.speed !== 1 ? ` ×${clip.speed.toFixed(2)}` : ""}${clip.loop && clip.clipLenSec ? ` loop×${Math.ceil(clip.durationSec / clip.clipLenSec)}` : ""}${isError ? " ❌ Ошибка синтеза" : clip.hasAudio ? " 🔊" : ""}${isSynthesizing ? " ⏳" : ""}${hasFades ? ` | fade ${clip.fadeInSec.toFixed(2)}s / ${clip.fadeOutSec.toFixed(2)}s` : ""}`}
-            onClick={() => { if (dragJustEndedRef.current) return; onToggleCheck?.(clip.id); onClipSeek?.(clip.start + optimisticOffsetSec); }}
+            onClick={(e) => { e.stopPropagation(); if (dragJustEndedRef.current) return; onToggleCheck?.(clip.id); onClipSeek?.(clip.start + optimisticOffsetSec); }}
             onDoubleClick={() => onSelectSegment?.(clip.id)}
             onMouseDown={(e) => {
               // Only allow drag on atmo clips with left button, not on resize handle
