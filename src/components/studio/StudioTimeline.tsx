@@ -636,18 +636,18 @@ export function StudioTimeline({
 
   // Per-clip plugin toggle/update handlers (delegated to useClipPluginConfigs)
   const handleTogglePlugin = useCallback((clipId: string, plugin: "eq" | "comp" | "limiter" | "panner3d" | "convolver") => {
-    const charTrackId = selectedCharacterId ? `char-${selectedCharacterId}` : "";
-    clipPlugins.togglePlugin(clipId, charTrackId, plugin);
+    const trackId = selectedPluginTrackId ?? "";
+    clipPlugins.togglePlugin(clipId, trackId, plugin);
     onPluginsChange();
     onMixChange();
-  }, [clipPlugins, selectedCharacterId, onPluginsChange, onMixChange]);
+  }, [clipPlugins, selectedPluginTrackId, onPluginsChange, onMixChange]);
 
   const handleUpdateParams = useCallback((clipId: string, plugin: "eq" | "comp" | "limiter" | "panner3d" | "convolver", params: any) => {
-    const charTrackId = selectedCharacterId ? `char-${selectedCharacterId}` : "";
-    clipPlugins.updatePluginParams(clipId, charTrackId, plugin, params);
+    const trackId = selectedPluginTrackId ?? "";
+    clipPlugins.updatePluginParams(clipId, trackId, plugin, params);
     onPluginsChange();
     onMixChange();
-  }, [clipPlugins, selectedCharacterId, onPluginsChange, onMixChange]);
+  }, [clipPlugins, selectedPluginTrackId, onPluginsChange, onMixChange]);
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("studio-timeline-collapsed") === "true"; } catch { return false; }
