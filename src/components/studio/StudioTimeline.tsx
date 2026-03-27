@@ -110,20 +110,16 @@ export function StudioTimeline({
       return;
     }
 
-    // Get audio duration by decoding a signed URL
+    // Get audio duration by decoding a signed URL + cache the asset in OPFS
     let durationMs = 10_000; // fallback 10s
     try {
-      const { data: urlData } = await supabase.storage
-        .from("user-media")
-        .createSignedUrl(file.path, 120);
-      if (urlData?.signedUrl) {
-        const resp = await fetch(urlData.signedUrl);
-        const buf = await resp.arrayBuffer();
-        const ctx = new AudioContext();
-        const decoded = await ctx.decodeAudioData(buf);
-        durationMs = Math.round(decoded.duration * 1000);
-        ctx.close();
-      }
+      const { fetchAudioAssetWithCache } = await import("@/lib/audioAssetCache");
+      const category = layerType === "sfx" ? "sfx" as const : "atmosphere" as const;
+      const buf = await fetchAudioAssetWithCache(category, file.path);
+      const ctx = new AudioContext();
+      const decoded = await ctx.decodeAudioData(buf.slice(0));
+      durationMs = Math.round(decoded.duration * 1000);
+      ctx.close();
     } catch {
       // use fallback duration
     }
