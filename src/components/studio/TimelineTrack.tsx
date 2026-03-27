@@ -237,31 +237,36 @@ export function TimelineTrack({
     setResizeDeltaPx(0);
     onDragStartLineX?.(originalRightPx);
 
+    // Duration limits based on speed clamp 0.5–1.5
+    const minDurationSec = rawDurationSec / 1.5; // speed 1.5x → shortest
+    const maxDurationSec = rawDurationSec / 0.5; // speed 0.5x → longest
+
     const onMove = (ev: MouseEvent) => {
-      const delta = ev.clientX - startX;
-      setResizeDeltaPx(delta);
-      onDragGuideX?.(originalRightPx + delta);
-      // Compute and report speed hint
-      const deltaSec = delta / (zoom * 4);
-      const newDuration = Math.max(0.5, clipDurationSec + deltaSec);
-      const newSpeed = Math.max(0.5, Math.min(1.5, rawDurationSec / newDuration));
+      const rawDelta = ev.clientX - startX;
+      const rawDeltaSec = rawDelta / (zoom * 4);
+      const clampedDuration = Math.max(minDurationSec, Math.min(maxDurationSec, clipDurationSec + rawDeltaSec));
+      const clampedDeltaPx = (clampedDuration - clipDurationSec) * zoom * 4;
+      setResizeDeltaPx(clampedDeltaPx);
+      onDragGuideX?.(originalRightPx + clampedDeltaPx);
+      const newSpeed = Math.max(0.5, Math.min(1.5, rawDurationSec / clampedDuration));
       onResizeSpeedHint?.(`×${newSpeed.toFixed(2)}`);
     };
     const onUp = (ev: MouseEvent) => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
-      const deltaSec = (ev.clientX - startX) / (zoom * 4);
+      const rawDeltaSec = (ev.clientX - startX) / (zoom * 4);
+      const clampedDuration = Math.max(minDurationSec, Math.min(maxDurationSec, clipDurationSec + rawDeltaSec));
       setResizingClipId(null);
       setResizeDeltaPx(0);
       onDragGuideX?.(null);
       onDragStartLineX?.(null);
       onResizeSpeedHint?.(null);
+      const deltaSec = clampedDuration - clipDurationSec;
       if (Math.abs(deltaSec) > 0.05 && onResizeAtmoClip) {
         const clip = clips.find(c => c.id === clipId);
         if (clip) {
-          const newDuration = Math.max(0.5, clip.durationSec + deltaSec);
-          setOptimisticResizes(prev => new Map(prev).set(clipId, newDuration - clip.durationSec));
-          onResizeAtmoClip(clipId, newDuration, clip.originalDurationMs ?? Math.round(clip.durationSec * 1000), clip.speed ?? 1);
+          setOptimisticResizes(prev => new Map(prev).set(clipId, deltaSec));
+          onResizeAtmoClip(clipId, clampedDuration, clip.originalDurationMs ?? Math.round(clip.durationSec * 1000), clip.speed ?? 1);
         }
       }
     };
