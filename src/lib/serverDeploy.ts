@@ -661,7 +661,8 @@ export async function deployFromServer({
       );
 
       if (serverAtmo.length > 0) {
-        const { saveAtmospheresToLocal, type LocalAtmosphereClip } = await import("@/lib/localAtmospheres");
+        const { saveAtmospheresToLocal } = await import("@/lib/localAtmospheres");
+        type LocalAtmoClip = import("@/lib/localAtmospheres").LocalAtmosphereClip;
 
         // Group by scene_id
         const atmoByScene = new Map<string, LocalAtmosphereClip[]>();
