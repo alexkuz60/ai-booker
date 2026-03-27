@@ -217,7 +217,7 @@ export function TimelineTrack({
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [zoom, onMoveAtmoClip, realClips, optimisticOffsets, onDragGuideX, onDragEndSeek]);
+  }, [zoom, onMoveAtmoClip, realClips, optimisticOffsets, onDragGuideX, onDragStartLineX, onDragEndSeek]);
 
   const handleResizeStart = useCallback((e: React.MouseEvent, clipId: string) => {
     e.stopPropagation();
