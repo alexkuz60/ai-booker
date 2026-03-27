@@ -356,6 +356,67 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       }
       report("storyboard", savedStoryboardCount > 0 ? "done" : "skipped", savedStoryboardCount > 0 ? `${savedStoryboardCount}` : undefined);
 
+      // ── 4c. Push atmosphere clips from OPFS to scene_atmospheres ──
+      report("atmospheres", "running");
+      let savedAtmoCount = 0;
+      if (storage) {
+        try {
+          const { readAtmospheresFromLocal } = await import("@/lib/localAtmospheres");
+          // Collect all scene IDs from results
+          const allSceneIds: string[] = [];
+          for (const idx of leafIndices) {
+            const result = normalizedResults.get(idx);
+            if (!result) continue;
+            for (const sc of result.scenes) {
+              if (sc.id) allSceneIds.push(sc.id);
+            }
+          }
+
+          // Delete existing atmospheres for these scenes
+          if (allSceneIds.length > 0) {
+            for (let i = 0; i < allSceneIds.length; i += 100) {
+              const chunk = allSceneIds.slice(i, i + 100);
+              await supabase
+                .from("scene_atmospheres")
+                .delete()
+                .in("scene_id", chunk);
+            }
+          }
+
+          // Read from OPFS and insert to DB
+          const atmoInserts: Array<Record<string, unknown>> = [];
+          for (const sid of allSceneIds) {
+            const data = await readAtmospheresFromLocal(storage, sid);
+            if (!data?.clips.length) continue;
+            for (const c of data.clips) {
+              atmoInserts.push({
+                id: c.id,
+                scene_id: sid,
+                layer_type: c.layer_type,
+                audio_path: c.audio_path,
+                duration_ms: c.duration_ms,
+                volume: c.volume,
+                fade_in_ms: c.fade_in_ms,
+                fade_out_ms: c.fade_out_ms,
+                offset_ms: c.offset_ms,
+                prompt_used: c.prompt_used,
+                speed: c.speed,
+              });
+            }
+          }
+
+          if (atmoInserts.length > 0) {
+            const { error: atmoErr } = await supabase.from("scene_atmospheres").insert(atmoInserts as any);
+            if (atmoErr) console.warn("[SaveToServer] atmospheres insert:", atmoErr);
+            else savedAtmoCount = atmoInserts.length;
+          }
+          console.log(`[SaveToServer] Pushed ${savedAtmoCount} atmosphere clips`);
+        } catch (e) {
+          console.warn("[SaveToServer] Atmosphere push failed:", e);
+        }
+      }
+      report("atmospheres", savedAtmoCount > 0 ? "done" : "skipped", savedAtmoCount > 0 ? `${savedAtmoCount}` : undefined);
+
       // ── 5. Upload source file to server if not already there ──
       report("source_file", "running");
       if (storage) {
