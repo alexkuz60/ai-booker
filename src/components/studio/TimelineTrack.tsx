@@ -44,6 +44,8 @@ interface TimelineTrackProps {
   isSelected?: boolean;
   /** Report drag guide X position (px from track left) or null when drag ends */
   onDragGuideX?: (x: number | null) => void;
+  /** Called when drag ends with the clip's new start time in seconds */
+  onDragEndSeek?: (sec: number) => void;
 }
 
 const FADE_OPTIONS = [
@@ -132,6 +134,7 @@ export function TimelineTrack({
   trackHeight,
   isSelected: isTrackSelected,
   onDragGuideX,
+  onDragEndSeek,
 }: TimelineTrackProps) {
   const showFades = zoom >= 2; // 200%+
   const isInsertableTrack = track.type === "atmosphere" || track.type === "sfx";
@@ -188,13 +191,19 @@ export function TimelineTrack({
         setOptimisticOffsets(prev => new Map(prev).set(clipId, deltaSec));
         const rc2 = realClips?.find(c => c.id === clipId);
         if (rc2) {
-          onMoveAtmoClip(clipId, Math.max(0, rc2.startSec + deltaSec));
+          const newStart = Math.max(0, rc2.startSec + deltaSec);
+          onMoveAtmoClip(clipId, newStart);
+          onDragEndSeek?.(newStart);
         }
+      } else {
+        // No meaningful move — still seek to current clip start
+        const rc2 = realClips?.find(c => c.id === clipId);
+        if (rc2) onDragEndSeek?.(rc2.startSec + (optimisticOffsets.get(clipId) ?? 0));
       }
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [zoom, onMoveAtmoClip, realClips, optimisticOffsets, onDragGuideX]);
+  }, [zoom, onMoveAtmoClip, realClips, optimisticOffsets, onDragGuideX, onDragEndSeek]);
 
   const handleResizeStart = useCallback((e: React.MouseEvent, clipId: string) => {
     e.stopPropagation();
