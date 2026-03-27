@@ -215,6 +215,8 @@ export function TimelineTrack({
           fadeOutSec: fades?.fadeOutSec ?? c.fadeOutSec ?? 0,
           loop: c.loop ?? false,
           clipLenSec: c.clipLenSec,
+          speed: c.speed ?? 1,
+          originalDurationMs: c.originalDurationMs,
         };
       })
     : [];
