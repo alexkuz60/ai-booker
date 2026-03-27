@@ -80,6 +80,7 @@ const Studio = () => {
 
   const [sceneContent, setSceneContent] = useState<string | null>(null);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
+  const [checkedSegmentIds, setCheckedSegmentIds] = useState<Set<string>>(new Set());
   const handleSelectSegmentFromTimeline = useCallback((segmentId: string | null) => {
     setSelectedSegmentId(segmentId);
     if (segmentId) setActiveTab("storyboard");
@@ -596,6 +597,8 @@ const Studio = () => {
                   onTabChange={setActiveTab}
                   selectedSegmentId={selectedSegmentId}
                   onSelectSegment={setSelectedSegmentId}
+                  checkedSegmentIds={checkedSegmentIds}
+                  onCheckedSegmentIdsChange={setCheckedSegmentIds}
                   onSynthesizingChange={setSynthesizingSegmentIds}
                   onErrorSegmentsChange={setErrorSegmentIds}
                   silenceSec={silenceSec}
@@ -618,6 +621,8 @@ const Studio = () => {
             onSelectCharacter={setSelectedCharacterId}
             selectedSegmentId={selectedSegmentId}
             onSelectSegment={handleSelectSegmentFromTimeline}
+            checkedSegmentIds={checkedSegmentIds}
+            onCheckedSegmentIdsChange={setCheckedSegmentIds}
             synthesizingSegmentIds={synthesizingSegmentIds}
             errorSegmentIds={errorSegmentIds}
             clipsRefreshToken={clipsRefreshToken}
