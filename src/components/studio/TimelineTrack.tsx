@@ -223,11 +223,18 @@ export function TimelineTrack({
     e.stopPropagation();
     e.preventDefault();
     const startX = e.clientX;
+    const rc = realClips?.find(c => c.id === clipId);
+    const originalRightPx = rc ? (rc.startSec + rc.durationSec + (optimisticOffsets.get(clipId) ?? 0) + (optimisticResizes.get(clipId) ?? 0)) * zoom * 4 : 0;
     setResizingClipId(clipId);
     setResizeDeltaPx(0);
+    // Show start line at original right edge
+    onDragStartLineX?.(originalRightPx);
 
     const onMove = (ev: MouseEvent) => {
-      setResizeDeltaPx(ev.clientX - startX);
+      const delta = ev.clientX - startX;
+      setResizeDeltaPx(delta);
+      // Guide line at the current right edge
+      onDragGuideX?.(originalRightPx + delta);
     };
     const onUp = (ev: MouseEvent) => {
       window.removeEventListener("mousemove", onMove);
@@ -235,6 +242,8 @@ export function TimelineTrack({
       const deltaSec = (ev.clientX - startX) / (zoom * 4);
       setResizingClipId(null);
       setResizeDeltaPx(0);
+      onDragGuideX?.(null);
+      onDragStartLineX?.(null);
       if (Math.abs(deltaSec) > 0.05 && onResizeAtmoClip) {
         const clip = clips.find(c => c.id === clipId);
         if (clip) {
@@ -246,7 +255,7 @@ export function TimelineTrack({
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [zoom, onResizeAtmoClip]);
+  }, [zoom, onResizeAtmoClip, realClips, optimisticOffsets, optimisticResizes, onDragGuideX, onDragStartLineX]);
 
   const clips = realClips && realClips.length > 0
     ? realClips.map(c => {
