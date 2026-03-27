@@ -288,6 +288,12 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
                 <Waves className="h-5 w-5 shrink-0" />
                 <span className="text-base font-semibold">{isRu ? "Импульсы (IR)" : "Impulses (IR)"}</span>
                 <Badge variant="outline" className="ml-1 h-5 px-1.5 text-xs">{impulses.length}</Badge>
+                {cachedIds.size > 0 && (
+                  <Badge variant="outline" className="ml-1 h-5 px-1.5 text-xs border-amber-400/40 text-amber-400">
+                    <DatabaseBackup className="h-3 w-3 mr-0.5" />
+                    {cachedIds.size}
+                  </Badge>
+                )}
                 {ownCount > 0 && (
                   <span className="text-xs text-muted-foreground ml-1">
                     ({isRu ? `своих: ${ownCount}` : `own: ${ownCount}`})
