@@ -206,6 +206,7 @@ export function TimelineTrack({
         const clip = clips.find(c => c.id === clipId);
         if (clip) {
           const newDuration = Math.max(0.5, clip.durationSec + deltaSec);
+          setOptimisticResizes(prev => new Map(prev).set(clipId, newDuration - clip.durationSec));
           onResizeAtmoClip(clipId, newDuration, clip.originalDurationMs ?? Math.round(clip.durationSec * 1000), clip.speed ?? 1);
         }
       }
