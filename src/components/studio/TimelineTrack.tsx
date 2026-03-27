@@ -34,6 +34,11 @@ interface TimelineTrackProps {
   storageSfx?: StorageAudioFile[];
   onInsertAudio?: (file: StorageAudioFile, atSec: number, layerType: "ambience" | "sfx") => void;
   onDeleteAtmoClip?: (clipId: string) => void;
+  onCopyAtmoClip?: (clipId: string) => void;
+  onPasteAtmoClip?: () => void;
+  onMoveAtmoClip?: (clipId: string, newStartSec: number) => void;
+  onResizeAtmoClip?: (clipId: string, newDurationSec: number, originalDurationMs: number, originalSpeed: number) => void;
+  hasClipboard?: boolean;
   isRu?: boolean;
   trackHeight?: number;
 }
