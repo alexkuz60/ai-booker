@@ -41,6 +41,7 @@ interface TimelineTrackProps {
   hasClipboard?: boolean;
   isRu?: boolean;
   trackHeight?: number;
+  isSelected?: boolean;
 }
 
 const FADE_OPTIONS = [
@@ -127,6 +128,7 @@ export function TimelineTrack({
   hasClipboard,
   isRu,
   trackHeight,
+  isSelected: isTrackSelected,
 }: TimelineTrackProps) {
   const showFades = zoom >= 2; // 200%+
   const isInsertableTrack = track.type === "atmosphere" || track.type === "sfx";
@@ -239,7 +241,7 @@ export function TimelineTrack({
   const heightStyle = trackHeight ? `${trackHeight}px` : '2.5rem';
   const trackContent = (
     <div
-      className="flex border-b border-border/50 relative"
+      className={`flex border-b border-border/50 relative transition-colors ${isTrackSelected ? "bg-accent/20" : ""}`}
       style={{ width: `${duration * zoom * 4}px`, height: heightStyle }}
       onContextMenu={(e) => {
         if (isInsertableTrack) {
