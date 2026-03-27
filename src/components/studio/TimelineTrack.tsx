@@ -166,8 +166,8 @@ export function TimelineTrack({
     e.stopPropagation();
     e.preventDefault();
     const startX = e.clientX;
-    const clip0 = clips.find(c => c.id === clipId);
-    const clipStartPx = clip0 ? (clip0.start + (optimisticOffsets.get(clipId) ?? 0)) * zoom * 4 : 0;
+    const rc = realClips?.find(c => c.id === clipId);
+    const clipStartPx = rc ? (rc.startSec + (optimisticOffsets.get(clipId) ?? 0)) * zoom * 4 : 0;
     setDraggingClipId(clipId);
     setDragDeltaPx(0);
     onDragGuideX?.(clipStartPx);
@@ -186,15 +186,15 @@ export function TimelineTrack({
       onDragGuideX?.(null);
       if (Math.abs(deltaSec) > 0.1 && onMoveAtmoClip) {
         setOptimisticOffsets(prev => new Map(prev).set(clipId, deltaSec));
-        const clip = clips.find(c => c.id === clipId);
-        if (clip) {
-          onMoveAtmoClip(clipId, Math.max(0, clip.start + deltaSec));
+        const rc2 = realClips?.find(c => c.id === clipId);
+        if (rc2) {
+          onMoveAtmoClip(clipId, Math.max(0, rc2.startSec + deltaSec));
         }
       }
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [zoom, onMoveAtmoClip, clips, optimisticOffsets, onDragGuideX]);
+  }, [zoom, onMoveAtmoClip, realClips, optimisticOffsets, onDragGuideX]);
 
   const handleResizeStart = useCallback((e: React.MouseEvent, clipId: string) => {
     e.stopPropagation();
