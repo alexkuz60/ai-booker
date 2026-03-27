@@ -44,6 +44,8 @@ interface TimelineTrackProps {
   isSelected?: boolean;
   /** Report drag guide X position (px from track left) or null when drag ends */
   onDragGuideX?: (x: number | null) => void;
+  /** Report drag origin X position (px from track left) — shown as a "start" line */
+  onDragStartLineX?: (x: number | null) => void;
   /** Called when drag ends with the clip's new start time in seconds */
   onDragEndSeek?: (sec: number) => void;
   /** Called on single click on any clip — seek transport to clip start */
@@ -136,6 +138,7 @@ export function TimelineTrack({
   trackHeight,
   isSelected: isTrackSelected,
   onDragGuideX,
+  onDragStartLineX,
   onDragEndSeek,
   onClipSeek,
 }: TimelineTrackProps) {
@@ -178,7 +181,8 @@ export function TimelineTrack({
     const clipStartPx = rc ? (rc.startSec + (optimisticOffsets.get(clipId) ?? 0)) * zoom * 4 : 0;
     setDraggingClipId(clipId);
     setDragDeltaPx(0);
-    // Don't show guide line immediately — only once mouse actually moves
+    // Show start-line at clip's original position
+    onDragStartLineX?.(clipStartPx);
 
     const onMove = (ev: MouseEvent) => {
       const delta = ev.clientX - startX;
@@ -193,6 +197,7 @@ export function TimelineTrack({
       setDraggingClipId(null);
       setDragDeltaPx(0);
       onDragGuideX?.(null);
+      onDragStartLineX?.(null);
       // Suppress the upcoming click event from firing onClipSeek with stale position
       dragJustEndedRef.current = true;
       requestAnimationFrame(() => { dragJustEndedRef.current = false; });
@@ -212,7 +217,7 @@ export function TimelineTrack({
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [zoom, onMoveAtmoClip, realClips, optimisticOffsets, onDragGuideX, onDragEndSeek]);
+  }, [zoom, onMoveAtmoClip, realClips, optimisticOffsets, onDragGuideX, onDragStartLineX, onDragEndSeek]);
 
   const handleResizeStart = useCallback((e: React.MouseEvent, clipId: string) => {
     e.stopPropagation();

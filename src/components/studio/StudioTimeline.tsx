@@ -623,8 +623,9 @@ export function StudioTimeline({
   // Track selected for plugin editing — can be char, atmo, or sfx track
   const [selectedPluginTrackId, setSelectedPluginTrackId] = useState<string | null>(null);
 
-  // ── Drag guide line (vertical position indicator across all tracks) ──
+  // ── Drag guide line + start line (vertical position indicators across all tracks) ──
   const [dragGuideX, setDragGuideX] = useState<number | null>(null);
+  const [dragStartLineX, setDragStartLineX] = useState<number | null>(null);
   // Safety: clear drag guide on any mouseup (in case track callback missed)
   useEffect(() => {
     const onMouseUp = () => {
@@ -1030,11 +1031,20 @@ export function StudioTimeline({
                     trackHeight={dynamicTrackHeight}
                     isSelected={isTrackSelected}
                     onDragGuideX={setDragGuideX}
-                    onDragEndSeek={(sec) => { setDragGuideX(null); player.seek(sec); centerPlayhead(sec); }}
+                    onDragStartLineX={setDragStartLineX}
+                    onDragEndSeek={(sec) => { setDragGuideX(null); setDragStartLineX(null); player.seek(sec); centerPlayhead(sec); }}
                     onClipSeek={(sec) => { player.seek(sec); centerPlayhead(sec); }}
                   />
                   );
                 })}
+                {/* Start line — where drag began */}
+                {dragStartLineX !== null && (
+                  <div
+                    className="absolute top-0 bottom-0 pointer-events-none z-30"
+                    style={{ left: `${dragStartLineX}px`, width: '1px', borderLeft: '1px dashed hsl(var(--muted-foreground) / 0.5)' }}
+                  />
+                )}
+                {/* Guide line — current clip position during drag */}
                 {dragGuideX !== null && (
                   <div
                     className="absolute top-0 bottom-0 pointer-events-none z-40"
