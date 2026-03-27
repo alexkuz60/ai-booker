@@ -110,20 +110,16 @@ export function StudioTimeline({
       return;
     }
 
-    // Get audio duration by decoding a signed URL
+    // Get audio duration by decoding a signed URL + cache the asset in OPFS
     let durationMs = 10_000; // fallback 10s
     try {
-      const { data: urlData } = await supabase.storage
-        .from("user-media")
-        .createSignedUrl(file.path, 120);
-      if (urlData?.signedUrl) {
-        const resp = await fetch(urlData.signedUrl);
-        const buf = await resp.arrayBuffer();
-        const ctx = new AudioContext();
-        const decoded = await ctx.decodeAudioData(buf);
-        durationMs = Math.round(decoded.duration * 1000);
-        ctx.close();
-      }
+      const { fetchAudioAssetWithCache } = await import("@/lib/audioAssetCache");
+      const category = layerType === "sfx" ? "sfx" as const : "atmosphere" as const;
+      const buf = await fetchAudioAssetWithCache(category, file.path);
+      const ctx = new AudioContext();
+      const decoded = await ctx.decodeAudioData(buf.slice(0));
+      durationMs = Math.round(decoded.duration * 1000);
+      ctx.close();
     } catch {
       // use fallback duration
     }
@@ -586,13 +582,20 @@ export function StudioTimeline({
   type TimelineView = "tracks" | "plugins";
   const [timelineView, setTimelineView] = useState<TimelineView>("tracks");
 
-  // Selected track clips for channel plugins
+  // Track selected for plugin editing — can be char, atmo, or sfx track
+  const [selectedPluginTrackId, setSelectedPluginTrackId] = useState<string | null>(null);
+
+  // Sync selectedCharacterId → selectedPluginTrackId for backwards compat
+  useEffect(() => {
+    if (selectedCharacterId) setSelectedPluginTrackId(`char-${selectedCharacterId}`);
+  }, [selectedCharacterId]);
+
+  // Selected track clips for channel plugins (works for any track type)
   const pluginsClips = useMemo((): ClipInfo[] => {
-    if (!selectedCharacterId) return [];
-    const charTrackId = `char-${selectedCharacterId}`;
-    const trackInfo = charTracks.find(t => t.id === charTrackId);
+    if (!selectedPluginTrackId) return [];
+    const trackInfo = allTracks.find(t => t.id === selectedPluginTrackId);
     return timelineClips
-      .filter(c => c.trackId === charTrackId)
+      .filter(c => c.trackId === selectedPluginTrackId)
       .map(c => ({
         id: c.id,
         label: c.label || c.segmentType || c.id,
@@ -602,7 +605,7 @@ export function StudioTimeline({
         charColor: trackInfo?.color,
         hasAudio: c.hasAudio && !!c.audioPath,
       }));
-  }, [selectedCharacterId, timelineClips, charTracks]);
+  }, [selectedPluginTrackId, timelineClips, allTracks]);
 
   // ALL scene clips across all character tracks (for Panner3D multi-character view)
   const allSceneClips = useMemo((): ClipInfo[] => {
@@ -622,29 +625,29 @@ export function StudioTimeline({
   }, [timelineClips, charTracks]);
 
   const pluginsTrackLabel = useMemo(() => {
-    if (!selectedCharacterId) return undefined;
-    return charTracks.find(t => t.id === `char-${selectedCharacterId}`)?.label;
-  }, [selectedCharacterId, charTracks]);
+    if (!selectedPluginTrackId) return undefined;
+    return allTracks.find(t => t.id === selectedPluginTrackId)?.label;
+  }, [selectedPluginTrackId, allTracks]);
 
   const pluginsTrackColor = useMemo(() => {
-    if (!selectedCharacterId) return undefined;
-    return charTracks.find(t => t.id === `char-${selectedCharacterId}`)?.color;
-  }, [selectedCharacterId, charTracks]);
+    if (!selectedPluginTrackId) return undefined;
+    return allTracks.find(t => t.id === selectedPluginTrackId)?.color;
+  }, [selectedPluginTrackId, allTracks]);
 
   // Per-clip plugin toggle/update handlers (delegated to useClipPluginConfigs)
   const handleTogglePlugin = useCallback((clipId: string, plugin: "eq" | "comp" | "limiter" | "panner3d" | "convolver") => {
-    const charTrackId = selectedCharacterId ? `char-${selectedCharacterId}` : "";
-    clipPlugins.togglePlugin(clipId, charTrackId, plugin);
+    const trackId = selectedPluginTrackId ?? "";
+    clipPlugins.togglePlugin(clipId, trackId, plugin);
     onPluginsChange();
     onMixChange();
-  }, [clipPlugins, selectedCharacterId, onPluginsChange, onMixChange]);
+  }, [clipPlugins, selectedPluginTrackId, onPluginsChange, onMixChange]);
 
   const handleUpdateParams = useCallback((clipId: string, plugin: "eq" | "comp" | "limiter" | "panner3d" | "convolver", params: any) => {
-    const charTrackId = selectedCharacterId ? `char-${selectedCharacterId}` : "";
-    clipPlugins.updatePluginParams(clipId, charTrackId, plugin, params);
+    const trackId = selectedPluginTrackId ?? "";
+    clipPlugins.updatePluginParams(clipId, trackId, plugin, params);
     onPluginsChange();
     onMixChange();
-  }, [clipPlugins, selectedCharacterId, onPluginsChange, onMixChange]);
+  }, [clipPlugins, selectedPluginTrackId, onPluginsChange, onMixChange]);
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("studio-timeline-collapsed") === "true"; } catch { return false; }
@@ -868,7 +871,9 @@ export function StudioTimeline({
             </div>
             {allTracks.map((track) => {
               const charId = track.id.startsWith("char-") ? track.id.slice(5) : null;
-              const isSelected = charId != null && charId === selectedCharacterId;
+              const isSelected = charId != null
+                ? charId === selectedCharacterId
+                : selectedPluginTrackId === track.id;
               const engineClipIds = timelineClips
                 .filter(c => c.trackId === track.id && c.hasAudio && !!c.audioPath)
                 .map(c => c.id);
@@ -893,7 +898,15 @@ export function StudioTimeline({
                   onToggleFx={() => { clipPlugins.toggleTrackFx(trackClipIds, track.id); onPluginsChange(); onMixChange(); }}
                   onToggleRv={() => { clipPlugins.toggleTrackRv(trackClipIds, track.id); onPluginsChange(); onMixChange(); }}
                   onClick={() => {
-                    if (charId && onSelectCharacter) onSelectCharacter(isSelected ? null : charId);
+                    if (charId && onSelectCharacter) {
+                      const deselect = isSelected;
+                      onSelectCharacter(deselect ? null : charId);
+                      setSelectedPluginTrackId(deselect ? null : track.id);
+                    } else {
+                      const deselect = selectedPluginTrackId === track.id;
+                      setSelectedPluginTrackId(deselect ? null : track.id);
+                      if (onSelectCharacter) onSelectCharacter(null);
+                    }
                   }}
                 />
               );
@@ -907,7 +920,7 @@ export function StudioTimeline({
                 allSceneClips={allSceneClips}
                 trackLabel={pluginsTrackLabel}
                 trackColor={pluginsTrackColor}
-                trackId={selectedCharacterId ? `char-${selectedCharacterId}` : undefined}
+                trackId={selectedPluginTrackId ?? undefined}
                 clipConfigs={clipPlugins.configs}
                 onTogglePlugin={handleTogglePlugin}
                 onUpdateParams={handleUpdateParams}
