@@ -540,6 +540,36 @@ export function StudioTimeline({
     },
   });
 
+  // ── Ctrl+C/V for atmo clips ───────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if ((e.target as HTMLElement)?.isContentEditable) return;
+
+      // Ctrl+C — copy selected atmo clip
+      if ((e.ctrlKey || e.metaKey) && e.code === "KeyC") {
+        const selectedAtmo = checkedSegmentIds ? [...checkedSegmentIds].find(id => id.startsWith("atmo-")) : null;
+        if (selectedAtmo) {
+          e.preventDefault();
+          atmoManip.copyClip(selectedAtmo);
+        }
+        return;
+      }
+
+      // Ctrl+V — paste atmo clip at transport position
+      if ((e.ctrlKey || e.metaKey) && e.code === "KeyV") {
+        if (atmoManip.clipboard) {
+          e.preventDefault();
+          atmoManip.pasteClip();
+        }
+        return;
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [checkedSegmentIds, atmoManip]);
+
   // ── Horizontal scroll sync with playback ──────────────────
   const userScrollingRef = useRef(false);
   const userScrollTimerRef = useRef<ReturnType<typeof setTimeout>>();
