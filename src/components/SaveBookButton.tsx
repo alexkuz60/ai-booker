@@ -55,13 +55,13 @@ export function SaveBookButton({
   const handleConfirm = useCallback(async () => {
     setPhase("running");
     try {
-      await onClick(handleProgress);
+      await onClick(handleProgress, { syncAtmo });
       setPhase("done");
     } catch (e) {
       setErrorMessage(e instanceof Error ? e.message : String(e));
       setPhase("error");
     }
-  }, [onClick, handleProgress]);
+  }, [onClick, handleProgress, syncAtmo]);
 
   return (
     <div className="flex items-center gap-1">
