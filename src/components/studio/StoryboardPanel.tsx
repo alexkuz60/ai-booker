@@ -146,10 +146,10 @@ export function StoryboardPanel({
   useEffect(() => { setMergeChecked(new Set()); }, [sceneId]);
 
   const toggleMergeCheck = useCallback((segId: string) => {
-    setMergeChecked(prev => {
-      const next = new Set(prev);
-      if (next.has(segId)) next.delete(segId); else next.add(segId);
-      return next;
+    const next = new Set(mergeChecked);
+    if (next.has(segId)) next.delete(segId); else next.add(segId);
+    setMergeChecked(next);
+  }, [mergeChecked, setMergeChecked]);
     });
   }, []);
 
