@@ -379,19 +379,6 @@ export function StudioTimeline({
   // ── Audio player ──────────────────────────────────────────
   const player = useTimelinePlayer(timelineClips);
 
-  // ── Atmo clip manipulation (copy/paste/move/resize) ───────
-  const atmoManip = useAtmoClipManipulation({
-    sceneId,
-    isRu,
-    zoom,
-    positionSec: player.positionSec,
-    onRefresh: () => setLocalRefresh(prev => prev + 1),
-    getSceneStartSec: () => {
-      const boundary = sceneBoundariesRef.current?.find(b => b.sceneId === sceneId);
-      return boundary ? boundary.startSec + boundary.silenceSec : 0;
-    },
-  });
-
   // ── Spacebar play/pause + Ctrl+C/V for atmo clips ────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
