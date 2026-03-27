@@ -12,18 +12,11 @@ interface SaveBookButtonProps {
   isRu: boolean;
   loading?: boolean;
   disabled?: boolean;
-  onClick: (onProgress?: SyncProgressCallback) => void | Promise<void>;
+  onClick: (onProgress?: SyncProgressCallback, opts?: { syncAtmo?: boolean }) => void | Promise<void>;
   showDownloadZip?: boolean;
   onDownloadZip?: () => void | Promise<void>;
   showImportZip?: boolean;
   onImportZip?: (file: File) => void | Promise<void>;
-  /** Optional checkboxes shown in the sync confirm dialog */
-  confirmOptions?: Array<{
-    id: string;
-    label: string;
-    checked: boolean;
-    onChange: (checked: boolean) => void;
-  }>;
 }
 
 export function SaveBookButton({
@@ -35,9 +28,9 @@ export function SaveBookButton({
   onDownloadZip,
   showImportZip,
   onImportZip,
-  confirmOptions,
 }: SaveBookButtonProps) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const [syncAtmo, setSyncAtmo] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [steps, setSteps] = useState<SyncStep[]>([]);
   const [phase, setPhase] = useState<"confirm" | "running" | "done" | "error">("confirm");
