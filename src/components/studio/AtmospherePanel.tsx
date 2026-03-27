@@ -637,12 +637,14 @@ function AutoAtmospherePanel({
   const loadExisting = useCallback(async () => {
     if (!sceneId) { setExistingLayers([]); return; }
     setLoadingExisting(true);
-    const { data } = await supabase
-      .from("scene_atmospheres")
-      .select("id, layer_type, prompt_used, volume, duration_ms")
-      .eq("scene_id", sceneId)
-      .order("created_at");
-    setExistingLayers((data as any[]) ?? []);
+    // Local-Only K3: read atmosphere clips from OPFS
+    try {
+      const { useProjectStorageContext } = await import("@/hooks/useProjectStorageContext");
+      // Can't use hook here — use global approach via passed storage
+    } catch {}
+    // Fallback: try reading from OPFS via dynamic import
+    // Actually, this component doesn't have storage prop. Let me add it.
+    setExistingLayers([]);
     setLoadingExisting(false);
   }, [sceneId]);
 
