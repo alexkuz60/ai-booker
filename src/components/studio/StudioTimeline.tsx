@@ -871,7 +871,9 @@ export function StudioTimeline({
             </div>
             {allTracks.map((track) => {
               const charId = track.id.startsWith("char-") ? track.id.slice(5) : null;
-              const isSelected = charId != null && charId === selectedCharacterId;
+              const isSelected = charId != null
+                ? charId === selectedCharacterId
+                : selectedPluginTrackId === track.id;
               const engineClipIds = timelineClips
                 .filter(c => c.trackId === track.id && c.hasAudio && !!c.audioPath)
                 .map(c => c.id);
@@ -896,7 +898,15 @@ export function StudioTimeline({
                   onToggleFx={() => { clipPlugins.toggleTrackFx(trackClipIds, track.id); onPluginsChange(); onMixChange(); }}
                   onToggleRv={() => { clipPlugins.toggleTrackRv(trackClipIds, track.id); onPluginsChange(); onMixChange(); }}
                   onClick={() => {
-                    if (charId && onSelectCharacter) onSelectCharacter(isSelected ? null : charId);
+                    if (charId && onSelectCharacter) {
+                      const deselect = isSelected;
+                      onSelectCharacter(deselect ? null : charId);
+                      setSelectedPluginTrackId(deselect ? null : track.id);
+                    } else {
+                      const deselect = selectedPluginTrackId === track.id;
+                      setSelectedPluginTrackId(deselect ? null : track.id);
+                      if (onSelectCharacter) onSelectCharacter(null);
+                    }
                   }}
                 />
               );
