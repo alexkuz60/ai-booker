@@ -1037,18 +1037,18 @@ export function StudioTimeline({
                   />
                   );
                 })}
-                {/* Start line — where drag began */}
+                {/* Start line — where drag/resize began (yellow dashed) */}
                 {dragStartLineX !== null && (
                   <div
                     className="absolute top-0 bottom-0 pointer-events-none z-[45]"
-                    style={{ left: `${dragStartLineX}px`, width: '0px', borderLeft: '1px dashed hsl(var(--muted-foreground))' }}
+                    style={{ left: `${dragStartLineX}px`, width: '0px', borderLeft: '1px dashed #eab308' }}
                   />
                 )}
-                {/* Guide line — current clip position during drag */}
+                {/* Guide line — current position during drag/resize (yellow dashed) */}
                 {dragGuideX !== null && (
                   <div
-                    className="absolute top-0 bottom-0 pointer-events-none z-40"
-                    style={{ left: `${dragGuideX}px`, width: '1px', backgroundColor: 'hsl(var(--accent))' }}
+                    className="absolute top-0 bottom-0 pointer-events-none z-[45]"
+                    style={{ left: `${dragGuideX}px`, width: '0px', borderLeft: '1px dashed #facc15' }}
                   />
                 )}
                 <Playhead positionSec={player.positionSec} zoom={zoom} />
