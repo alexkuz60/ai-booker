@@ -932,6 +932,7 @@ export function StudioTimeline({
                     storageAtmosphere={storageAudio.atmosphere}
                     storageSfx={storageAudio.sfx}
                     onInsertAudio={handleInsertAudio}
+                    onDeleteAtmoClip={handleDeleteAtmoClip}
                     isRu={isRu}
                     trackHeight={dynamicTrackHeight}
                   />
