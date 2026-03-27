@@ -327,8 +327,7 @@ export function TimelineTrack({
           </div>
         );
 
-        // Atmosphere/SFX clips — context menu with delete
-        const isAtmoClip = clip.id.startsWith("atmo-");
+        // Atmosphere/SFX clips — context menu with delete/copy/paste
         if (isAtmoClip && onDeleteAtmoClip) {
           return (
             <ContextMenu key={i}>
@@ -338,6 +337,19 @@ export function TimelineTrack({
               <ContextMenuContent className="w-52">
                 <ContextMenuLabel className="text-xs truncate">{clip.label}</ContextMenuLabel>
                 <ContextMenuSeparator />
+                {onCopyAtmoClip && (
+                  <ContextMenuItem onClick={() => onCopyAtmoClip(clip.id)}>
+                    <Copy className="h-3.5 w-3.5 mr-2" />
+                    {isRu ? "Копировать" : "Copy"} <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+C</span>
+                  </ContextMenuItem>
+                )}
+                {onPasteAtmoClip && hasClipboard && (
+                  <ContextMenuItem onClick={() => onPasteAtmoClip()}>
+                    <ClipboardPaste className="h-3.5 w-3.5 mr-2" />
+                    {isRu ? "Вставить" : "Paste"} <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+V</span>
+                  </ContextMenuItem>
+                )}
+                {(onCopyAtmoClip || (onPasteAtmoClip && hasClipboard)) && <ContextMenuSeparator />}
                 {onSetFade && (
                   <>
                     <ContextMenuSub>
