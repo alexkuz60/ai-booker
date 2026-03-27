@@ -499,6 +499,9 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       if (savedStoryboardCount > 0) {
         descParts.push(`${savedStoryboardCount} ${isRu ? "раскадровок" : "storyboards"}`);
       }
+      if (savedAtmoCount > 0) {
+        descParts.push(`${savedAtmoCount} ${isRu ? "атмо-клипов" : "atmo clips"}`);
+      }
       report("finalize", "done");
 
       toast({
