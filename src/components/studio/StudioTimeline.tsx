@@ -977,6 +977,11 @@ export function StudioTimeline({
                     storageSfx={storageAudio.sfx}
                     onInsertAudio={handleInsertAudio}
                     onDeleteAtmoClip={handleDeleteAtmoClip}
+                    onCopyAtmoClip={atmoManip.copyClip}
+                    onPasteAtmoClip={atmoManip.pasteClip}
+                    onMoveAtmoClip={atmoManip.moveClip}
+                    onResizeAtmoClip={atmoManip.resizeClip}
+                    hasClipboard={!!atmoManip.clipboard}
                     isRu={isRu}
                     trackHeight={dynamicTrackHeight}
                   />
