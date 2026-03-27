@@ -356,13 +356,14 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       }
       report("storyboard", savedStoryboardCount > 0 ? "done" : "skipped", savedStoryboardCount > 0 ? `${savedStoryboardCount}` : undefined);
 
-      // ── 4c. Push atmosphere clips from OPFS to scene_atmospheres (with dedup) ──
+      // ── 4c. Push atmosphere clips from OPFS to scene_atmospheres (ID-only dedup) ──
+      // Atmo clips are immutable after creation — all mixing is non-destructive via Tone.js.
+      // Only sync new/deleted clips by ID, skip existing ones entirely.
       report("atmospheres", "running");
       let savedAtmoCount = 0;
       if (storage) {
         try {
           const { readAtmospheresFromLocal } = await import("@/lib/localAtmospheres");
-          // Collect all scene IDs from results
           const allSceneIds: string[] = [];
           for (const idx of leafIndices) {
             const result = normalizedResults.get(idx);
@@ -372,81 +373,38 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
             }
           }
 
-          // Read local clips from OPFS
+          // Read local clip IDs + data from OPFS
           const localClipMap = new Map<string, Record<string, unknown>>();
-          const localClipsByScene = new Map<string, string[]>();
           for (const sid of allSceneIds) {
             const data = await readAtmospheresFromLocal(storage, sid);
-            const ids: string[] = [];
-            if (data?.clips.length) {
-              for (const c of data.clips) {
-                ids.push(c.id);
-                localClipMap.set(c.id, {
-                  id: c.id,
-                  scene_id: sid,
-                  layer_type: c.layer_type,
-                  audio_path: c.audio_path,
-                  duration_ms: c.duration_ms,
-                  volume: c.volume,
-                  fade_in_ms: c.fade_in_ms,
-                  fade_out_ms: c.fade_out_ms,
-                  offset_ms: c.offset_ms,
-                  prompt_used: c.prompt_used,
-                  speed: c.speed,
-                });
-              }
+            if (!data?.clips.length) continue;
+            for (const c of data.clips) {
+              localClipMap.set(c.id, {
+                id: c.id, scene_id: sid, layer_type: c.layer_type,
+                audio_path: c.audio_path, duration_ms: c.duration_ms,
+                volume: c.volume, fade_in_ms: c.fade_in_ms, fade_out_ms: c.fade_out_ms,
+                offset_ms: c.offset_ms, prompt_used: c.prompt_used, speed: c.speed,
+              });
             }
-            localClipsByScene.set(sid, ids);
           }
 
-          // Fetch existing server clips for comparison
+          // Fetch existing server clip IDs
           const serverClipIds = new Set<string>();
-          const serverClipFingerprints = new Map<string, string>();
-          if (allSceneIds.length > 0) {
-            for (let i = 0; i < allSceneIds.length; i += 200) {
-              const chunk = allSceneIds.slice(i, i + 200);
-              const { data: existing } = await supabase
-                .from("scene_atmospheres")
-                .select("id, audio_path, offset_ms, speed, volume, fade_in_ms, fade_out_ms")
-                .in("scene_id", chunk);
-              if (existing) {
-                for (const row of existing) {
-                  serverClipIds.add(row.id);
-                  // Simple fingerprint for change detection
-                  serverClipFingerprints.set(row.id,
-                    `${row.audio_path}|${row.offset_ms}|${row.speed}|${row.volume}|${row.fade_in_ms}|${row.fade_out_ms}`);
-                }
-              }
-            }
+          for (let i = 0; i < allSceneIds.length; i += 200) {
+            const chunk = allSceneIds.slice(i, i + 200);
+            const { data: existing } = await supabase
+              .from("scene_atmospheres").select("id").in("scene_id", chunk);
+            if (existing) for (const row of existing) serverClipIds.add(row.id);
           }
 
-          // Determine which clips to insert, update, or delete
-          const toInsert: Array<Record<string, unknown>> = [];
-          const toUpdate: Array<Record<string, unknown>> = [];
-          const toDeleteIds: string[] = [];
+          // Insert only new clips (not on server yet)
+          const toInsert = [...localClipMap.entries()]
+            .filter(([id]) => !serverClipIds.has(id))
+            .map(([, data]) => data);
 
-          // Find clips to insert or update
-          for (const [clipId, clipData] of localClipMap) {
-            if (!serverClipIds.has(clipId)) {
-              toInsert.push(clipData);
-            } else {
-              const d = clipData as any;
-              const localFp = `${d.audio_path}|${d.offset_ms}|${d.speed}|${d.volume}|${d.fade_in_ms}|${d.fade_out_ms}`;
-              if (serverClipFingerprints.get(clipId) !== localFp) {
-                toUpdate.push(clipData);
-              }
-              // else: unchanged — skip
-            }
-          }
+          // Delete only removed clips (on server but not locally)
+          const toDeleteIds = [...serverClipIds].filter(id => !localClipMap.has(id));
 
-          // Find server clips that no longer exist locally
-          for (const serverId of serverClipIds) {
-            if (!localClipMap.has(serverId)) {
-              toDeleteIds.push(serverId);
-            }
-          }
-
-          // Execute operations
           if (toDeleteIds.length > 0) {
             for (let i = 0; i < toDeleteIds.length; i += 100) {
               await supabase.from("scene_atmospheres").delete().in("id", toDeleteIds.slice(i, i + 100));
@@ -456,14 +414,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
             const { error } = await supabase.from("scene_atmospheres").insert(toInsert as any);
             if (error) console.warn("[SaveToServer] atmospheres insert:", error);
           }
-          for (const upd of toUpdate) {
-            const { id, ...rest } = upd as any;
-            await supabase.from("scene_atmospheres").update(rest).eq("id", id);
-          }
 
-          savedAtmoCount = toInsert.length + toUpdate.length + toDeleteIds.length;
-          const skipped = localClipMap.size - toInsert.length - toUpdate.length;
-          console.log(`[SaveToServer] Atmo sync: +${toInsert.length} ~${toUpdate.length} -${toDeleteIds.length} =${skipped} skipped`);
+          savedAtmoCount = toInsert.length + toDeleteIds.length;
+          const skipped = localClipMap.size - toInsert.length;
+          console.log(`[SaveToServer] Atmo sync: +${toInsert.length} -${toDeleteIds.length} =${skipped} skipped`);
         } catch (e) {
           console.warn("[SaveToServer] Atmosphere push failed:", e);
         }
