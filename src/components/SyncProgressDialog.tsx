@@ -11,7 +11,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { CloudUpload, Check, Loader2, AlertCircle, X } from "lucide-react";
+import { CloudUpload, CloudDownload, Check, Loader2, AlertCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface SyncStep {
