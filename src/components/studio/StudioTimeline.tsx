@@ -492,9 +492,6 @@ export function StudioTimeline({
   const clipPlugins = useClipPluginConfigs(sceneId ?? null);
   clipPluginsRef.current = clipPlugins.configs;
 
-  // Wire mixer save ref for pre-refresh flush
-  onMixChangeRef.current = onMixChange;
-
   // ── Layout / zoom ─────────────────────────────────────────
   const tracksContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
