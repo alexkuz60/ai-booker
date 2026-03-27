@@ -46,6 +46,8 @@ interface TimelineTrackProps {
   onDragGuideX?: (x: number | null) => void;
   /** Called when drag ends with the clip's new start time in seconds */
   onDragEndSeek?: (sec: number) => void;
+  /** Called on single click on any clip — seek transport to clip start */
+  onClipSeek?: (startSec: number) => void;
 }
 
 const FADE_OPTIONS = [
@@ -135,6 +137,7 @@ export function TimelineTrack({
   isSelected: isTrackSelected,
   onDragGuideX,
   onDragEndSeek,
+  onClipSeek,
 }: TimelineTrackProps) {
   const showFades = zoom >= 2; // 200%+
   const isInsertableTrack = track.type === "atmosphere" || track.type === "sfx";
@@ -309,7 +312,7 @@ export function TimelineTrack({
                     : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
             }}
             title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${clip.speed !== 1 ? ` ×${clip.speed.toFixed(2)}` : ""}${clip.loop && clip.clipLenSec ? ` loop×${Math.ceil(clip.durationSec / clip.clipLenSec)}` : ""}${isError ? " ❌ Ошибка синтеза" : clip.hasAudio ? " 🔊" : ""}${isSynthesizing ? " ⏳" : ""}${hasFades ? ` | fade ${clip.fadeInSec.toFixed(2)}s / ${clip.fadeOutSec.toFixed(2)}s` : ""}`}
-            onClick={() => onToggleCheck?.(clip.id)}
+            onClick={() => { onToggleCheck?.(clip.id); onClipSeek?.(clip.start + optimisticOffsetSec); }}
             onDoubleClick={() => onSelectSegment?.(clip.id)}
             onMouseDown={(e) => {
               // Only allow drag on atmo clips with left button, not on resize handle
