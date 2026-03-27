@@ -116,12 +116,20 @@ export async function updateAtmosphereClip(
 
 // ── Batch read for multiple scenes ──────────────────────────
 
+/** Clip with scene association for timeline use */
+export interface TaggedAtmosphereClip extends LocalAtmosphereClip {
+  scene_id: string;
+}
+
 export async function readAtmospheresForScenes(
   storage: ProjectStorage,
   sceneIds: string[],
-): Promise<LocalAtmosphereClip[]> {
+): Promise<TaggedAtmosphereClip[]> {
   const results = await Promise.all(
-    sceneIds.map(sid => readAtmospheresFromLocal(storage, sid)),
+    sceneIds.map(async sid => {
+      const data = await readAtmospheresFromLocal(storage, sid);
+      return (data?.clips ?? []).map(c => ({ ...c, scene_id: sid }));
+    }),
   );
-  return results.flatMap(r => r?.clips ?? []);
+  return results.flat();
 }
