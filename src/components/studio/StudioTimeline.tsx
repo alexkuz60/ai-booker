@@ -379,42 +379,20 @@ export function StudioTimeline({
   // ── Audio player ──────────────────────────────────────────
   const player = useTimelinePlayer(timelineClips);
 
-  // ── Spacebar play/pause + Ctrl+C/V for atmo clips ────────
+  // ── Spacebar play/pause ──────────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if ((e.target as HTMLElement)?.isContentEditable) return;
-
-      if (e.code === "Space") {
-        e.preventDefault();
-        if (player.state === "playing") player.pause();
-        else player.play();
-        return;
-      }
-
-      // Ctrl+C — copy selected atmo clip
-      if ((e.ctrlKey || e.metaKey) && e.code === "KeyC") {
-        const selectedAtmo = checkedSegmentIds ? [...checkedSegmentIds].find(id => id.startsWith("atmo-")) : null;
-        if (selectedAtmo) {
-          e.preventDefault();
-          atmoManip.copyClip(selectedAtmo);
-        }
-        return;
-      }
-
-      // Ctrl+V — paste atmo clip at transport position
-      if ((e.ctrlKey || e.metaKey) && e.code === "KeyV") {
-        if (atmoManip.clipboard) {
-          e.preventDefault();
-          atmoManip.pasteClip();
-        }
-        return;
-      }
+      e.preventDefault();
+      if (player.state === "playing") player.pause();
+      else player.play();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [player, checkedSegmentIds, atmoManip]);
+  }, [player]);
 
   // ── Seek to selected segment's clip start ─────────────────
   const prevSelectedRef = useRef<string | null>(null);
