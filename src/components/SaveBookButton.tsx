@@ -85,7 +85,14 @@ export function SaveBookButton({
         steps={steps}
         phase={phase}
         errorMessage={errorMessage}
-        confirmOptions={confirmOptions}
+        confirmOptions={[
+          {
+            id: "sync_atmo",
+            label: isRu ? "Синхронизировать атмо/SFX клипы" : "Sync atmosphere/SFX clips",
+            checked: syncAtmo,
+            onChange: setSyncAtmo,
+          },
+        ]}
       />
 
       {showDownloadZip && onDownloadZip && (
