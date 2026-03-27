@@ -181,7 +181,8 @@ export function TimelineTrack({
     const clipStartPx = rc ? (rc.startSec + (optimisticOffsets.get(clipId) ?? 0)) * zoom * 4 : 0;
     setDraggingClipId(clipId);
     setDragDeltaPx(0);
-    // Don't show guide line immediately — only once mouse actually moves
+    // Show start-line at clip's original position
+    onDragStartLineX?.(clipStartPx);
 
     const onMove = (ev: MouseEvent) => {
       const delta = ev.clientX - startX;
@@ -196,6 +197,7 @@ export function TimelineTrack({
       setDraggingClipId(null);
       setDragDeltaPx(0);
       onDragGuideX?.(null);
+      onDragStartLineX?.(null);
       // Suppress the upcoming click event from firing onClipSeek with stale position
       dragJustEndedRef.current = true;
       requestAnimationFrame(() => { dragJustEndedRef.current = false; });
