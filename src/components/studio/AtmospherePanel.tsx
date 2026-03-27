@@ -640,15 +640,21 @@ function AutoAtmospherePanel({
     if (!sceneId) { setExistingLayers([]); return; }
     setLoadingExisting(true);
     // Local-Only K3: read atmosphere clips from OPFS
-    try {
-      const { useProjectStorageContext } = await import("@/hooks/useProjectStorageContext");
-      // Can't use hook here — use global approach via passed storage
-    } catch {}
-    // Fallback: try reading from OPFS via dynamic import
-    // Actually, this component doesn't have storage prop. Let me add it.
-    setExistingLayers([]);
+    if (storage) {
+      const { readAtmospheresFromLocal } = await import("@/lib/localAtmospheres");
+      const data = await readAtmospheresFromLocal(storage, sceneId);
+      setExistingLayers((data?.clips ?? []).map(c => ({
+        id: c.id,
+        layer_type: c.layer_type,
+        prompt_used: c.prompt_used,
+        volume: c.volume,
+        duration_ms: c.duration_ms,
+      })));
+    } else {
+      setExistingLayers([]);
+    }
     setLoadingExisting(false);
-  }, [sceneId]);
+  }, [sceneId, storage]);
 
   useState(() => { loadExisting(); });
 
@@ -731,10 +737,13 @@ function AutoAtmospherePanel({
         const fileName = `${slug}-${Date.now()}.mp3`;
         const path = await saveToStorage(sound.blob, category, fileName);
 
-        const { data: inserted } = await supabase
-          .from("scene_atmospheres")
-          .insert({
-            scene_id: sceneId,
+        // Local-Only K3: write to OPFS instead of DB
+        let insertedId: string | undefined;
+        if (storage) {
+          const { addAtmosphereClip } = await import("@/lib/localAtmospheres");
+          const newId = crypto.randomUUID();
+          await addAtmosphereClip(storage, sceneId, {
+            id: newId,
             layer_type: layer.layer_type,
             audio_path: path,
             prompt_used: layer.prompt,
@@ -742,9 +751,12 @@ function AutoAtmospherePanel({
             volume: layer.volume,
             fade_in_ms: layer.fade_in_ms,
             fade_out_ms: layer.fade_out_ms,
-          } as any)
-          .select("id")
-          .single();
+            offset_ms: 0,
+            speed: 1,
+            created_at: new Date().toISOString(),
+          });
+          insertedId = newId;
+        }
 
         results.push({
           id: crypto.randomUUID(),
@@ -752,7 +764,7 @@ function AutoAtmospherePanel({
           category,
           sound,
           savedPath: path,
-          sceneAtmosphereId: (inserted as any)?.id,
+          sceneAtmosphereId: insertedId,
         });
       }
 
@@ -769,10 +781,14 @@ function AutoAtmospherePanel({
   }, [sceneId, pendingLayers, isRu, onGenerated, loadExisting]);
 
   const handleDeleteLayer = useCallback(async (layerId: string) => {
-    await supabase.from("scene_atmospheres").delete().eq("id", layerId);
+    // Local-Only K3: delete from OPFS
+    if (storage && sceneId) {
+      const { deleteAtmosphereClip } = await import("@/lib/localAtmospheres");
+      await deleteAtmosphereClip(storage, sceneId, layerId);
+    }
     setExistingLayers(prev => prev.filter(l => l.id !== layerId));
     toast.success(isRu ? "Слой удалён" : "Layer deleted");
-  }, [isRu]);
+  }, [isRu, storage, sceneId]);
 
   if (!sceneId) {
     return (
