@@ -898,6 +898,13 @@ export function StudioTimeline({
                     clips={clipsByTrack.get(track.id)}
                     selectedSegmentId={selectedSegmentId}
                     onSelectSegment={onSelectSegment}
+                    checkedSegmentIds={checkedSegmentIds}
+                    onToggleCheck={(segId) => {
+                      if (!onCheckedSegmentIdsChange) return;
+                      const next = new Set(checkedSegmentIds);
+                      if (next.has(segId)) next.delete(segId); else next.add(segId);
+                      onCheckedSegmentIdsChange(next);
+                    }}
                     synthesizingSegmentIds={synthesizingSegmentIds}
                     errorSegmentIds={errorSegmentIds}
                     onSetFade={handleSetFade}
