@@ -35,6 +35,8 @@ interface SyncProgressDialogProps {
   steps: SyncStep[];
   phase: "confirm" | "running" | "done" | "error";
   errorMessage?: string;
+  /** "save" (default) = push to server, "restore" = download from server */
+  mode?: "save" | "restore";
   /** Optional checkboxes shown in confirm phase */
   confirmOptions?: Array<{
     id: string;
