@@ -13,7 +13,7 @@ import {
   ContextMenuSeparator,
   ContextMenuLabel,
 } from "@/components/ui/context-menu";
-import { Music, Waves, Trash2, Copy, ClipboardPaste } from "lucide-react";
+import { Music, Waves, Trash2, Copy, ClipboardPaste, RotateCcw } from "lucide-react";
 import { PreviewableMenuItem, stopAudioPreview } from "./PreviewableMenuItem";
 
 interface TimelineTrackProps {
@@ -38,6 +38,7 @@ interface TimelineTrackProps {
   onPasteAtmoClip?: () => void;
   onMoveAtmoClip?: (clipId: string, newStartSec: number) => void;
   onResizeAtmoClip?: (clipId: string, newDurationSec: number, originalDurationMs: number, originalSpeed: number) => void;
+  onResetAtmoClipSpeed?: (clipId: string) => void;
   hasClipboard?: boolean;
   isRu?: boolean;
   trackHeight?: number;
