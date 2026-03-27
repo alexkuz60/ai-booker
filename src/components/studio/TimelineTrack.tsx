@@ -1,3 +1,4 @@
+import { useState, useRef, useCallback } from "react";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 import type { TimelineTrackData } from "./StudioTimeline";
 import type { StorageAudioFile } from "@/hooks/useStorageAudioList";
@@ -12,7 +13,7 @@ import {
   ContextMenuSeparator,
   ContextMenuLabel,
 } from "@/components/ui/context-menu";
-import { Music, Waves, Trash2 } from "lucide-react";
+import { Music, Waves, Trash2, Copy, ClipboardPaste } from "lucide-react";
 import { PreviewableMenuItem, stopAudioPreview } from "./PreviewableMenuItem";
 
 interface TimelineTrackProps {
