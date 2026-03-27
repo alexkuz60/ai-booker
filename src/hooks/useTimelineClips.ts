@@ -328,9 +328,9 @@ export function useTimelineClips(
           const sceneEndAbs = sceneContentDuration.get(layer.scene_id) ?? (startSec + clipLenSec);
           const sceneFillSec = Math.max(clipLenSec, sceneEndAbs - startSec);
 
-          // Loop if clip is shorter than scene content (ambience/music only, not SFX)
-          const shouldLoop = layer.layer_type !== "sfx" && clipLenSec < sceneFillSec;
-          const crossfadeSec = shouldLoop ? Math.min(1, clipLenSec * 0.15) : 0;
+          // No auto-loop: user controls speed & position manually; looping only at render time
+          const shouldLoop = false;
+          const crossfadeSec = 0;
 
           result.push({
             id: `atmo-${layer.id}`,
