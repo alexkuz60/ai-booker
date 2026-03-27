@@ -920,7 +920,7 @@ export function StudioTimeline({
                 allSceneClips={allSceneClips}
                 trackLabel={pluginsTrackLabel}
                 trackColor={pluginsTrackColor}
-                trackId={selectedCharacterId ? `char-${selectedCharacterId}` : undefined}
+                trackId={selectedPluginTrackId ?? undefined}
                 clipConfigs={clipPlugins.configs}
                 onTogglePlugin={handleTogglePlugin}
                 onUpdateParams={handleUpdateParams}
