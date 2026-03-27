@@ -625,6 +625,8 @@ export function StudioTimeline({
 
   // ── Drag guide line (vertical position indicator across all tracks) ──
   const [dragGuideX, setDragGuideX] = useState<number | null>(null);
+  /** Suppress parent click after drag ends */
+  const suppressClickRef = useRef(false);
 
   // Sync selectedCharacterId → selectedPluginTrackId for backwards compat
   useEffect(() => {
@@ -973,6 +975,10 @@ export function StudioTimeline({
                 className="relative cursor-crosshair"
                 style={{ width: `${duration * zoom * 4}px`, minWidth: "100%" }}
                 onClick={(e) => {
+                  if (suppressClickRef.current) {
+                    suppressClickRef.current = false;
+                    return;
+                  }
                   const rect = e.currentTarget.getBoundingClientRect();
                   const x = e.clientX - rect.left;
                   const sec = x / (zoom * 4);
@@ -1022,7 +1028,7 @@ export function StudioTimeline({
                     trackHeight={dynamicTrackHeight}
                     isSelected={isTrackSelected}
                     onDragGuideX={setDragGuideX}
-                    onDragEndSeek={(sec) => { player.seek(sec); centerPlayhead(sec); }}
+                    onDragEndSeek={(sec) => { suppressClickRef.current = true; player.seek(sec); centerPlayhead(sec); }}
                   />
                   );
                 })}
