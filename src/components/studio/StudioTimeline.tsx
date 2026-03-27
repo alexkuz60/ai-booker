@@ -981,7 +981,12 @@ export function StudioTimeline({
                 <div className="sticky top-0 z-20 bg-background">
                   <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} renderPercent={rulerRenderPercent} isRendering={isRendering} />
                 </div>
-                {allTracks.map((track) => (
+                {allTracks.map((track) => {
+                  const charId = track.id.startsWith("char-") ? track.id.slice(5) : null;
+                  const isTrackSelected = charId != null
+                    ? charId === selectedCharacterId
+                    : selectedPluginTrackId === track.id;
+                  return (
                   <TimelineTrack
                     key={track.id}
                     track={track}
@@ -1012,8 +1017,10 @@ export function StudioTimeline({
                     hasClipboard={!!atmoManip.clipboard}
                     isRu={isRu}
                     trackHeight={dynamicTrackHeight}
+                    isSelected={isTrackSelected}
                   />
-                ))}
+                  );
+                })}
                 <Playhead positionSec={player.positionSec} zoom={zoom} />
               </div>
             </div>
