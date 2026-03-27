@@ -407,7 +407,15 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
                           ? <Square className="h-3 w-3 fill-current" />
                           : <Play className="h-3 w-3 fill-current" />}
                       </Button>
-                      <span className={cn("text-sm truncate flex-1 min-w-0", isCached && "text-yellow-400/90")}>{imp.name}</span>
+                      <span className={cn("text-sm truncate flex-1 min-w-0", isCached && "text-amber-400/90")}>{imp.name}</span>
+                      {isCached && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <DatabaseBackup className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                          </TooltipTrigger>
+                          <TooltipContent>{isRu ? 'Кэшировано локально' : 'Cached locally'}</TooltipContent>
+                        </Tooltip>
+                      )}
                       <Badge variant="outline" className="text-[10px] shrink-0">
                         {CAT_LABELS[lang][imp.category as ImpulseCategory] || imp.category}
                       </Badge>
