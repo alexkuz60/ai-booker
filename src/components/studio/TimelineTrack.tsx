@@ -120,6 +120,11 @@ export function TimelineTrack({
   storageSfx,
   onInsertAudio,
   onDeleteAtmoClip,
+  onCopyAtmoClip,
+  onPasteAtmoClip,
+  onMoveAtmoClip,
+  onResizeAtmoClip,
+  hasClipboard,
   isRu,
   trackHeight,
 }: TimelineTrackProps) {
@@ -129,6 +134,71 @@ export function TimelineTrack({
 
   // Track right-click position to compute insert time
   const clickXRef = { current: 0 };
+
+  // ── Drag state for atmo clips ─────────────────────────────
+  const [draggingClipId, setDraggingClipId] = useState<string | null>(null);
+  const [dragDeltaPx, setDragDeltaPx] = useState(0);
+  // ── Resize state for atmo clips ───────────────────────────
+  const [resizingClipId, setResizingClipId] = useState<string | null>(null);
+  const [resizeDeltaPx, setResizeDeltaPx] = useState(0);
+
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  const handleDragStart = useCallback((e: React.MouseEvent, clipId: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const startX = e.clientX;
+    setDraggingClipId(clipId);
+    setDragDeltaPx(0);
+
+    const onMove = (ev: MouseEvent) => {
+      setDragDeltaPx(ev.clientX - startX);
+    };
+    const onUp = (ev: MouseEvent) => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      const deltaSec = (ev.clientX - startX) / (zoom * 4);
+      setDraggingClipId(null);
+      setDragDeltaPx(0);
+      if (Math.abs(deltaSec) > 0.1 && onMoveAtmoClip) {
+        // Find clip start from clips array
+        const clip = clips.find(c => c.id === clipId);
+        if (clip) {
+          onMoveAtmoClip(clipId, Math.max(0, clip.start + deltaSec));
+        }
+      }
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [zoom, onMoveAtmoClip]);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent, clipId: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const startX = e.clientX;
+    setResizingClipId(clipId);
+    setResizeDeltaPx(0);
+
+    const onMove = (ev: MouseEvent) => {
+      setResizeDeltaPx(ev.clientX - startX);
+    };
+    const onUp = (ev: MouseEvent) => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      const deltaSec = (ev.clientX - startX) / (zoom * 4);
+      setResizingClipId(null);
+      setResizeDeltaPx(0);
+      if (Math.abs(deltaSec) > 0.05 && onResizeAtmoClip) {
+        const clip = clips.find(c => c.id === clipId);
+        if (clip) {
+          const newDuration = Math.max(0.5, clip.durationSec + deltaSec);
+          onResizeAtmoClip(clipId, newDuration, clip.originalDurationMs ?? Math.round(clip.durationSec * 1000), clip.speed ?? 1);
+        }
+      }
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [zoom, onResizeAtmoClip]);
 
   const clips = realClips && realClips.length > 0
     ? realClips.map(c => {
