@@ -407,7 +407,7 @@ export function ImpulsesSection({ isRu, userId }: ImpulsesSectionProps) {
                           ? <Square className="h-3 w-3 fill-current" />
                           : <Play className="h-3 w-3 fill-current" />}
                       </Button>
-                      <span className={cn("text-sm truncate flex-1 min-w-0", isCached && "text-amber-400/90")}>{imp.name}</span>
+                      <span className="text-sm truncate flex-1 min-w-0">{imp.name}</span>
                       {isCached && (
                         <Tooltip>
                           <TooltipTrigger asChild>
