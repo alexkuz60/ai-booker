@@ -46,6 +46,8 @@ export function StoryboardPanel({
   onSegmented,
   selectedSegmentId,
   onSelectSegment,
+  checkedSegmentIds: externalChecked,
+  onCheckedSegmentIdsChange: onExternalCheckedChange,
   onSynthesizingChange,
   onErrorSegmentsChange,
   silenceSec,
@@ -62,6 +64,8 @@ export function StoryboardPanel({
   onSegmented?: (sceneId: string) => void;
   selectedSegmentId?: string | null;
   onSelectSegment?: (segmentId: string | null) => void;
+  checkedSegmentIds?: Set<string>;
+  onCheckedSegmentIdsChange?: (ids: Set<string>) => void;
   onSynthesizingChange?: (ids: Set<string>) => void;
   onErrorSegmentsChange?: (ids: Set<string>) => void;
   silenceSec?: number;
