@@ -47,6 +47,10 @@ export interface TimelineClip {
   clipLenSec?: number;
   /** Crossfade between loop iterations (seconds) */
   loopCrossfadeSec?: number;
+  /** Playback speed multiplier (1.0 = normal) */
+  speed?: number;
+  /** Original duration_ms from DB (for resize calculations) */
+  originalDurationMs?: number;
 }
 
 export interface SceneBoundary {
@@ -112,7 +116,7 @@ export function useTimelineClips(
           .in("id", sceneIds),
         supabase
           .from("scene_atmospheres")
-          .select("id, scene_id, layer_type, audio_path, duration_ms, volume, fade_in_ms, fade_out_ms, offset_ms")
+          .select("id, scene_id, layer_type, audio_path, duration_ms, volume, fade_in_ms, fade_out_ms, offset_ms, speed")
           .in("scene_id", sceneIds)
           .order("created_at"),
       ]);
@@ -318,7 +322,9 @@ export function useTimelineClips(
           const sceneAudioStart = boundary.startSec + boundary.silenceSec;
           const offsetSec = (layer.offset_ms || 0) / 1000;
           const startSec = sceneAudioStart + offsetSec;
-          const clipLenSec = (layer.duration_ms || 0) / 1000 || 10;
+          const speed = (layer as any).speed ?? 1;
+          const rawClipLenSec = (layer.duration_ms || 0) / 1000 || 10;
+          const clipLenSec = rawClipLenSec / speed;
 
           // Scene content end (absolute) → duration from clip start
           const sceneEndAbs = sceneContentDuration.get(layer.scene_id) ?? (startSec + clipLenSec);
@@ -335,7 +341,8 @@ export function useTimelineClips(
             startSec,
             durationSec: shouldLoop ? sceneFillSec : clipLenSec,
             label: (layer.layer_type === "music" ? "🎵 Music" : layer.layer_type === "sfx" ? "💥 SFX" : "🌧 Ambience")
-              + (shouldLoop ? " ↻" : ""),
+              + (shouldLoop ? " ↻" : "")
+              + (speed !== 1 ? ` ×${speed.toFixed(2)}` : ""),
             segmentType: `atmosphere_${layer.layer_type}`,
             hasAudio: true,
             audioPath: layer.audio_path,
@@ -345,6 +352,8 @@ export function useTimelineClips(
             loop: shouldLoop,
             clipLenSec: shouldLoop ? clipLenSec : undefined,
             loopCrossfadeSec: crossfadeSec,
+            speed,
+            originalDurationMs: layer.duration_ms,
           });
         }
       }

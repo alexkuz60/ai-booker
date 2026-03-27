@@ -1,3 +1,4 @@
+import { useState, useRef, useCallback } from "react";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 import type { TimelineTrackData } from "./StudioTimeline";
 import type { StorageAudioFile } from "@/hooks/useStorageAudioList";
@@ -12,7 +13,7 @@ import {
   ContextMenuSeparator,
   ContextMenuLabel,
 } from "@/components/ui/context-menu";
-import { Music, Waves, Trash2 } from "lucide-react";
+import { Music, Waves, Trash2, Copy, ClipboardPaste } from "lucide-react";
 import { PreviewableMenuItem, stopAudioPreview } from "./PreviewableMenuItem";
 
 interface TimelineTrackProps {
@@ -33,6 +34,11 @@ interface TimelineTrackProps {
   storageSfx?: StorageAudioFile[];
   onInsertAudio?: (file: StorageAudioFile, atSec: number, layerType: "ambience" | "sfx") => void;
   onDeleteAtmoClip?: (clipId: string) => void;
+  onCopyAtmoClip?: (clipId: string) => void;
+  onPasteAtmoClip?: () => void;
+  onMoveAtmoClip?: (clipId: string, newStartSec: number) => void;
+  onResizeAtmoClip?: (clipId: string, newDurationSec: number, originalDurationMs: number, originalSpeed: number) => void;
+  hasClipboard?: boolean;
   isRu?: boolean;
   trackHeight?: number;
 }
@@ -114,6 +120,11 @@ export function TimelineTrack({
   storageSfx,
   onInsertAudio,
   onDeleteAtmoClip,
+  onCopyAtmoClip,
+  onPasteAtmoClip,
+  onMoveAtmoClip,
+  onResizeAtmoClip,
+  hasClipboard,
   isRu,
   trackHeight,
 }: TimelineTrackProps) {
@@ -123,6 +134,71 @@ export function TimelineTrack({
 
   // Track right-click position to compute insert time
   const clickXRef = { current: 0 };
+
+  // ── Drag state for atmo clips ─────────────────────────────
+  const [draggingClipId, setDraggingClipId] = useState<string | null>(null);
+  const [dragDeltaPx, setDragDeltaPx] = useState(0);
+  // ── Resize state for atmo clips ───────────────────────────
+  const [resizingClipId, setResizingClipId] = useState<string | null>(null);
+  const [resizeDeltaPx, setResizeDeltaPx] = useState(0);
+
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  const handleDragStart = useCallback((e: React.MouseEvent, clipId: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const startX = e.clientX;
+    setDraggingClipId(clipId);
+    setDragDeltaPx(0);
+
+    const onMove = (ev: MouseEvent) => {
+      setDragDeltaPx(ev.clientX - startX);
+    };
+    const onUp = (ev: MouseEvent) => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      const deltaSec = (ev.clientX - startX) / (zoom * 4);
+      setDraggingClipId(null);
+      setDragDeltaPx(0);
+      if (Math.abs(deltaSec) > 0.1 && onMoveAtmoClip) {
+        // Find clip start from clips array
+        const clip = clips.find(c => c.id === clipId);
+        if (clip) {
+          onMoveAtmoClip(clipId, Math.max(0, clip.start + deltaSec));
+        }
+      }
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [zoom, onMoveAtmoClip]);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent, clipId: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const startX = e.clientX;
+    setResizingClipId(clipId);
+    setResizeDeltaPx(0);
+
+    const onMove = (ev: MouseEvent) => {
+      setResizeDeltaPx(ev.clientX - startX);
+    };
+    const onUp = (ev: MouseEvent) => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      const deltaSec = (ev.clientX - startX) / (zoom * 4);
+      setResizingClipId(null);
+      setResizeDeltaPx(0);
+      if (Math.abs(deltaSec) > 0.05 && onResizeAtmoClip) {
+        const clip = clips.find(c => c.id === clipId);
+        if (clip) {
+          const newDuration = Math.max(0.5, clip.durationSec + deltaSec);
+          onResizeAtmoClip(clipId, newDuration, clip.originalDurationMs ?? Math.round(clip.durationSec * 1000), clip.speed ?? 1);
+        }
+      }
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [zoom, onResizeAtmoClip]);
 
   const clips = realClips && realClips.length > 0
     ? realClips.map(c => {
@@ -139,6 +215,8 @@ export function TimelineTrack({
           fadeOutSec: fades?.fadeOutSec ?? c.fadeOutSec ?? 0,
           loop: c.loop ?? false,
           clipLenSec: c.clipLenSec,
+          speed: c.speed ?? 1,
+          originalDurationMs: c.originalDurationMs,
         };
       })
     : [];
@@ -156,7 +234,14 @@ export function TimelineTrack({
       }}
     >
       {clips.filter(c => c.start < c.end).map((clip, i) => {
-        const widthPx = (clip.end - clip.start) * zoom * 4;
+        const isAtmoClip = clip.id.startsWith("atmo-");
+        const isDragging = draggingClipId === clip.id;
+        const isResizing = resizingClipId === clip.id;
+
+        const effectiveLeftPx = clip.start * zoom * 4 + (isDragging ? dragDeltaPx : 0);
+        const effectiveWidthPx = (clip.end - clip.start) * zoom * 4 + (isResizing ? resizeDeltaPx : 0);
+        const widthPx = Math.max(8, effectiveWidthPx);
+
         const isSelected = selectedSegmentId && clip.id === selectedSegmentId;
         const isChecked = checkedSegmentIds?.has(clip.id);
         const isSynthesizing = synthesizingSegmentIds?.has(clip.id);
@@ -170,13 +255,13 @@ export function TimelineTrack({
 
         const clipElement = (
           <div
-            className={`absolute top-1 bottom-1 rounded-sm transition-all cursor-pointer overflow-hidden ${
+            className={`absolute top-1 bottom-1 rounded-sm transition-none cursor-pointer overflow-hidden ${
               isError
                 ? "opacity-90 hover:opacity-100 ring-2 ring-destructive ring-offset-1 ring-offset-background"
                 : clip.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-60 hover:opacity-80"
-            } ${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background opacity-100 z-10" : ""} ${isChecked && !isSelected ? "ring-2 ring-accent-foreground/50 ring-offset-1 ring-offset-background opacity-100" : ""} ${isSynthesizing ? "synth-oscilloscope" : ""}`}
+            } ${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background opacity-100 z-10" : ""} ${isChecked && !isSelected ? "ring-2 ring-accent-foreground/50 ring-offset-1 ring-offset-background opacity-100" : ""} ${isSynthesizing ? "synth-oscilloscope" : ""} ${isDragging || isResizing ? "z-30 shadow-lg ring-2 ring-primary/50" : ""}`}
             style={{
-              left: `${clip.start * zoom * 4}px`,
+              left: `${Math.max(0, effectiveLeftPx)}px`,
               width: `${widthPx}px`,
               backgroundColor: isError ? "hsl(var(--destructive))" : track.color,
               backgroundImage: isSynthesizing
@@ -187,9 +272,17 @@ export function TimelineTrack({
                     ? undefined
                     : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
             }}
-            title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${clip.loop && clip.clipLenSec ? ` loop×${Math.ceil(clip.durationSec / clip.clipLenSec)}` : ""}${isError ? " ❌ Ошибка синтеза" : clip.hasAudio ? " 🔊" : ""}${isSynthesizing ? " ⏳" : ""}${hasFades ? ` | fade ${clip.fadeInSec.toFixed(2)}s / ${clip.fadeOutSec.toFixed(2)}s` : ""}`}
+            title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${clip.speed !== 1 ? ` ×${clip.speed.toFixed(2)}` : ""}${clip.loop && clip.clipLenSec ? ` loop×${Math.ceil(clip.durationSec / clip.clipLenSec)}` : ""}${isError ? " ❌ Ошибка синтеза" : clip.hasAudio ? " 🔊" : ""}${isSynthesizing ? " ⏳" : ""}${hasFades ? ` | fade ${clip.fadeInSec.toFixed(2)}s / ${clip.fadeOutSec.toFixed(2)}s` : ""}`}
             onClick={() => onToggleCheck?.(clip.id)}
             onDoubleClick={() => onSelectSegment?.(clip.id)}
+            onMouseDown={(e) => {
+              // Only allow drag on atmo clips with left button, not on resize handle
+              if (!isAtmoClip || e.button !== 0 || !onMoveAtmoClip) return;
+              const rect = e.currentTarget.getBoundingClientRect();
+              const rightEdge = rect.right - 6;
+              if (e.clientX >= rightEdge && onResizeAtmoClip) return; // resize zone
+              handleDragStart(e, clip.id);
+            }}
           >
             {/* Loop iteration markers */}
             {clip.loop && clip.clipLenSec && clip.clipLenSec > 0 && (() => {
@@ -220,11 +313,21 @@ export function TimelineTrack({
                 {isError ? "❌ " : isSynthesizing ? "⏳ " : clip.hasAudio ? "🔊 " : ""}{clip.label}
               </span>
             )}
+
+            {/* Resize handle on right edge for atmo clips */}
+            {isAtmoClip && onResizeAtmoClip && (
+              <div
+                className="absolute top-0 bottom-0 right-0 w-1.5 cursor-ew-resize hover:bg-white/30 z-[2]"
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  handleResizeStart(e, clip.id);
+                }}
+              />
+            )}
           </div>
         );
 
-        // Atmosphere/SFX clips — context menu with delete
-        const isAtmoClip = clip.id.startsWith("atmo-");
+        // Atmosphere/SFX clips — context menu with delete/copy/paste
         if (isAtmoClip && onDeleteAtmoClip) {
           return (
             <ContextMenu key={i}>
@@ -234,6 +337,19 @@ export function TimelineTrack({
               <ContextMenuContent className="w-52">
                 <ContextMenuLabel className="text-xs truncate">{clip.label}</ContextMenuLabel>
                 <ContextMenuSeparator />
+                {onCopyAtmoClip && (
+                  <ContextMenuItem onClick={() => onCopyAtmoClip(clip.id)}>
+                    <Copy className="h-3.5 w-3.5 mr-2" />
+                    {isRu ? "Копировать" : "Copy"} <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+C</span>
+                  </ContextMenuItem>
+                )}
+                {onPasteAtmoClip && hasClipboard && (
+                  <ContextMenuItem onClick={() => onPasteAtmoClip()}>
+                    <ClipboardPaste className="h-3.5 w-3.5 mr-2" />
+                    {isRu ? "Вставить" : "Paste"} <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+V</span>
+                  </ContextMenuItem>
+                )}
+                {(onCopyAtmoClip || (onPasteAtmoClip && hasClipboard)) && <ContextMenuSeparator />}
                 {onSetFade && (
                   <>
                     <ContextMenuSub>

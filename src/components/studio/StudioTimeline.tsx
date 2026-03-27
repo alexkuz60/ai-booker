@@ -25,6 +25,7 @@ import { TimelineTrack } from "./TimelineTrack";
 import { Playhead } from "./TimelinePlayhead";
 import { ChannelPluginsPanel, type ClipInfo } from "./ChannelPluginsPanel";
 import { buildCharacterNameMap, deriveStoryboardCharacterIds, deriveStoryboardTypeMappings } from "@/lib/storyboardCharacterRouting";
+import { useAtmoClipManipulation } from "@/hooks/useAtmoClipManipulation";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -526,6 +527,49 @@ export function StudioTimeline({
     }
   }, [fitZoom, player.positionSec]);
 
+  // ── Atmo clip manipulation (copy/paste/move/resize) ───────
+  const atmoManip = useAtmoClipManipulation({
+    sceneId,
+    isRu,
+    zoom,
+    positionSec: player.positionSec,
+    onRefresh: () => setLocalRefresh(prev => prev + 1),
+    getSceneStartSec: () => {
+      const boundary = sceneBoundariesRef.current?.find(b => b.sceneId === sceneId);
+      return boundary ? boundary.startSec + boundary.silenceSec : 0;
+    },
+  });
+
+  // ── Ctrl+C/V for atmo clips ───────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if ((e.target as HTMLElement)?.isContentEditable) return;
+
+      // Ctrl+C — copy selected atmo clip
+      if ((e.ctrlKey || e.metaKey) && e.code === "KeyC") {
+        const selectedAtmo = checkedSegmentIds ? [...checkedSegmentIds].find(id => id.startsWith("atmo-")) : null;
+        if (selectedAtmo) {
+          e.preventDefault();
+          atmoManip.copyClip(selectedAtmo);
+        }
+        return;
+      }
+
+      // Ctrl+V — paste atmo clip at transport position
+      if ((e.ctrlKey || e.metaKey) && e.code === "KeyV") {
+        if (atmoManip.clipboard) {
+          e.preventDefault();
+          atmoManip.pasteClip();
+        }
+        return;
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [checkedSegmentIds, atmoManip]);
+
   // ── Horizontal scroll sync with playback ──────────────────
   const userScrollingRef = useRef(false);
   const userScrollTimerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -933,6 +977,11 @@ export function StudioTimeline({
                     storageSfx={storageAudio.sfx}
                     onInsertAudio={handleInsertAudio}
                     onDeleteAtmoClip={handleDeleteAtmoClip}
+                    onCopyAtmoClip={atmoManip.copyClip}
+                    onPasteAtmoClip={atmoManip.pasteClip}
+                    onMoveAtmoClip={atmoManip.moveClip}
+                    onResizeAtmoClip={atmoManip.resizeClip}
+                    hasClipboard={!!atmoManip.clipboard}
                     isRu={isRu}
                     trackHeight={dynamicTrackHeight}
                   />

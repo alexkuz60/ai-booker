@@ -510,6 +510,7 @@ export type Database = {
           offset_ms: number
           prompt_used: string
           scene_id: string
+          speed: number
           volume: number
         }
         Insert: {
@@ -523,6 +524,7 @@ export type Database = {
           offset_ms?: number
           prompt_used?: string
           scene_id: string
+          speed?: number
           volume?: number
         }
         Update: {
@@ -536,6 +538,7 @@ export type Database = {
           offset_ms?: number
           prompt_used?: string
           scene_id?: string
+          speed?: number
           volume?: number
         }
         Relationships: [
