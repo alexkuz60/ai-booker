@@ -11,7 +11,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { CloudUpload, Check, Loader2, AlertCircle, X } from "lucide-react";
+import { CloudUpload, CloudDownload, Check, Loader2, AlertCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface SyncStep {
@@ -35,6 +35,8 @@ interface SyncProgressDialogProps {
   steps: SyncStep[];
   phase: "confirm" | "running" | "done" | "error";
   errorMessage?: string;
+  /** "save" (default) = push to server, "restore" = download from server */
+  mode?: "save" | "restore";
   /** Optional checkboxes shown in confirm phase */
   confirmOptions?: Array<{
     id: string;
@@ -102,6 +104,7 @@ export function SyncProgressDialog({
   steps,
   phase,
   errorMessage,
+  mode = "save",
   confirmOptions,
 }: SyncProgressDialogProps) {
   const doneCount = steps.filter((s) => s.status === "done" || s.status === "skipped").length;
@@ -117,9 +120,13 @@ export function SyncProgressDialog({
         >
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
-            <CloudUpload className="h-5 w-5 text-primary" />
+            {mode === "restore"
+              ? <CloudDownload className="h-5 w-5 text-primary" />
+              : <CloudUpload className="h-5 w-5 text-primary" />}
             {phase === "confirm"
-              ? (isRu ? "Сохранить на сервер?" : "Save to server?")
+              ? mode === "restore"
+                ? (isRu ? "Загрузить с сервера?" : "Download from server?")
+                : (isRu ? "Сохранить на сервер?" : "Save to server?")
               : phase === "done"
                 ? (isRu ? "Синхронизация завершена" : "Sync complete")
                 : phase === "error"
@@ -128,9 +135,13 @@ export function SyncProgressDialog({
           </AlertDialogTitle>
           {phase === "confirm" && (
             <AlertDialogDescription>
-              {isRu
-                ? "Текущее состояние проекта будет загружено на сервер как резервная копия. Это может занять некоторое время."
-                : "Current project state will be uploaded to the server as a backup. This may take a moment."}
+              {mode === "restore"
+                ? (isRu
+                  ? "Серверная версия проекта будет загружена и заменит локальные данные. Это может занять некоторое время."
+                  : "Server version of the project will be downloaded and replace local data. This may take a moment.")
+                : (isRu
+                  ? "Текущее состояние проекта будет загружено на сервер как резервная копия. Это может занять некоторое время."
+                  : "Current project state will be uploaded to the server as a backup. This may take a moment.")}
             </AlertDialogDescription>
           )}
           {phase === "confirm" && confirmOptions && confirmOptions.length > 0 && (
@@ -208,8 +219,9 @@ export function SyncProgressDialog({
             <>
               <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
               <Button onClick={onConfirm}>
-                <CloudUpload className="h-4 w-4 mr-1.5" />
-                {isRu ? "Сохранить" : "Save"}
+                {mode === "restore"
+                  ? <><CloudDownload className="h-4 w-4 mr-1.5" />{isRu ? "Загрузить" : "Download"}</>
+                  : <><CloudUpload className="h-4 w-4 mr-1.5" />{isRu ? "Сохранить" : "Save"}</>}
               </Button>
             </>
           )}

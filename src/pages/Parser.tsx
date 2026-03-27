@@ -777,6 +777,7 @@ export default function Parser() {
         steps={restoreSteps}
         phase={restorePhase}
         errorMessage={restoreError}
+        mode="restore"
         confirmOptions={[
           {
             id: "download_ir",
