@@ -58,11 +58,12 @@ export function useMixerPersistence(sceneId: string | null, trackIds: string[]) 
   const cloudStatesRef = useRef(cloudStates);
   cloudStatesRef.current = cloudStates;
 
-  // Restore mixer state when scene changes
+  // Restore mixer state when scene changes or track IDs change (e.g. after clip move/refresh)
+  const restoreKey = `${sceneId}|${trackIdsKey}`;
   useEffect(() => {
     if (!sceneId || trackIds.length === 0 || !cloudLoaded) return;
-    if (restoredForRef.current === sceneId) return;
-    restoredForRef.current = sceneId;
+    if (restoredForRef.current === restoreKey) return;
+    restoredForRef.current = restoreKey;
 
     // Try localStorage first (faster), fallback to cloud
     const saved = loadLocal(sceneId) ?? cloudStatesRef.current[sceneId] ?? null;
@@ -76,7 +77,7 @@ export function useMixerPersistence(sceneId: string | null, trackIds: string[]) 
         engine.setTrackReverbBypassed(trackId, mix.reverbBypassed);
       }
     }
-  }, [sceneId, trackIdsKey, engine, cloudLoaded]);
+  }, [sceneId, restoreKey, engine, cloudLoaded]);
 
   // Debounced save to both localStorage and cloud
   const scheduleSave = useCallback(() => {
