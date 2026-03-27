@@ -167,6 +167,8 @@ export function TimelineTrack({
   }
 
   const trackRef = useRef<HTMLDivElement>(null);
+  /** Suppress clip onClick immediately after a drag ends */
+  const dragJustEndedRef = useRef(false);
 
   const handleDragStart = useCallback((e: React.MouseEvent, clipId: string) => {
     e.stopPropagation();
@@ -190,6 +192,9 @@ export function TimelineTrack({
       setDraggingClipId(null);
       setDragDeltaPx(0);
       onDragGuideX?.(null);
+      // Suppress the upcoming click event from firing onClipSeek with stale position
+      dragJustEndedRef.current = true;
+      requestAnimationFrame(() => { dragJustEndedRef.current = false; });
       if (Math.abs(deltaSec) > 0.1 && onMoveAtmoClip) {
         setOptimisticOffsets(prev => new Map(prev).set(clipId, deltaSec));
         const rc2 = realClips?.find(c => c.id === clipId);
