@@ -95,7 +95,9 @@ export function StoryboardPanel({
   const [currentlySynthesizingIds, setCurrentlySynthesizingIds] = useState<Set<string>>(new Set());
   const [inlineNarrationSpeaker, setInlineNarrationSpeaker] = useState<string | null>(null);
   const [recalcRunning, setRecalcRunning] = useState(false);
-  const [mergeChecked, setMergeChecked] = useState<Set<string>>(new Set());
+  const [internalChecked, setInternalChecked] = useState<Set<string>>(new Set());
+  const mergeChecked = externalChecked ?? internalChecked;
+  const setMergeChecked = onExternalCheckedChange ?? setInternalChecked;
   const [merging, setMerging] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [staleAudioSegIds, setStaleAudioSegIds] = useState<Set<string>>(new Set());

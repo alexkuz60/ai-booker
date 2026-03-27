@@ -22,6 +22,8 @@ interface TimelineTrackProps {
   clips?: TimelineClip[];
   selectedSegmentId?: string | null;
   onSelectSegment?: (segmentId: string | null) => void;
+  checkedSegmentIds?: Set<string>;
+  onToggleCheck?: (segmentId: string) => void;
   synthesizingSegmentIds?: Set<string>;
   errorSegmentIds?: Set<string>;
   onSetFade?: (clipId: string, fadeInSec: number, fadeOutSec: number) => void;
@@ -101,6 +103,8 @@ export function TimelineTrack({
   clips: realClips,
   selectedSegmentId,
   onSelectSegment,
+  checkedSegmentIds,
+  onToggleCheck,
   synthesizingSegmentIds,
   errorSegmentIds,
   onSetFade,
