@@ -138,9 +138,22 @@ export function TimelineTrack({
   // ── Drag state for atmo clips ─────────────────────────────
   const [draggingClipId, setDraggingClipId] = useState<string | null>(null);
   const [dragDeltaPx, setDragDeltaPx] = useState(0);
+  // ── Optimistic offsets (sec) applied after drag until clips refresh ──
+  const [optimisticOffsets, setOptimisticOffsets] = useState<Map<string, number>>(new Map());
+  const prevClipsRef = useRef(realClips);
+  // Clear optimistic offsets when clips data actually refreshes
+  if (realClips !== prevClipsRef.current) {
+    prevClipsRef.current = realClips;
+    if (optimisticOffsets.size > 0) setOptimisticOffsets(new Map());
+  }
   // ── Resize state for atmo clips ───────────────────────────
   const [resizingClipId, setResizingClipId] = useState<string | null>(null);
   const [resizeDeltaPx, setResizeDeltaPx] = useState(0);
+  // Optimistic resize deltas (sec)
+  const [optimisticResizes, setOptimisticResizes] = useState<Map<string, number>>(new Map());
+  if (realClips !== prevClipsRef.current && optimisticResizes.size > 0) {
+    setOptimisticResizes(new Map());
+  }
 
   const trackRef = useRef<HTMLDivElement>(null);
 
@@ -161,7 +174,8 @@ export function TimelineTrack({
       setDraggingClipId(null);
       setDragDeltaPx(0);
       if (Math.abs(deltaSec) > 0.1 && onMoveAtmoClip) {
-        // Find clip start from clips array
+        // Store optimistic offset so clip stays visually in place until refresh
+        setOptimisticOffsets(prev => new Map(prev).set(clipId, deltaSec));
         const clip = clips.find(c => c.id === clipId);
         if (clip) {
           onMoveAtmoClip(clipId, Math.max(0, clip.start + deltaSec));
@@ -192,6 +206,7 @@ export function TimelineTrack({
         const clip = clips.find(c => c.id === clipId);
         if (clip) {
           const newDuration = Math.max(0.5, clip.durationSec + deltaSec);
+          setOptimisticResizes(prev => new Map(prev).set(clipId, newDuration - clip.durationSec));
           onResizeAtmoClip(clipId, newDuration, clip.originalDurationMs ?? Math.round(clip.durationSec * 1000), clip.speed ?? 1);
         }
       }
@@ -238,8 +253,10 @@ export function TimelineTrack({
         const isDragging = draggingClipId === clip.id;
         const isResizing = resizingClipId === clip.id;
 
-        const effectiveLeftPx = clip.start * zoom * 4 + (isDragging ? dragDeltaPx : 0);
-        const effectiveWidthPx = (clip.end - clip.start) * zoom * 4 + (isResizing ? resizeDeltaPx : 0);
+        const optimisticOffsetSec = optimisticOffsets.get(clip.id) ?? 0;
+        const optimisticResizeSec = optimisticResizes.get(clip.id) ?? 0;
+        const effectiveLeftPx = (clip.start + optimisticOffsetSec) * zoom * 4 + (isDragging ? dragDeltaPx : 0);
+        const effectiveWidthPx = (clip.end - clip.start + optimisticResizeSec) * zoom * 4 + (isResizing ? resizeDeltaPx : 0);
         const widthPx = Math.max(8, effectiveWidthPx);
 
         const isSelected = selectedSegmentId && clip.id === selectedSegmentId;
