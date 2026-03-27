@@ -614,10 +614,12 @@ function AutoAtmospherePanel({
   isRu,
   sceneId,
   onGenerated,
+  storage,
 }: {
   isRu: boolean;
   sceneId: string | null;
   onGenerated: (items: HistoryItem[]) => void;
+  storage?: import("@/lib/projectStorage").ProjectStorage | null;
 }) {
   const { getModelForRole } = useAiRoles();
   const i = t(isRu);
