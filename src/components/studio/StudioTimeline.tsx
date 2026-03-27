@@ -487,6 +487,7 @@ export function StudioTimeline({
     }
     return [...ids];
   }, [allTracks, timelineClips]);
+  const onMixChangeRef = useRef<(() => void) | null>(null);
   const { scheduleSave: onMixChange } = useMixerPersistence(sceneId ?? null, engineTrackIds);
   onMixChangeRef.current = onMixChange;
   const { scheduleSave: onPluginsChange } = usePluginsPersistence(sceneId ?? null, engineTrackIds);
