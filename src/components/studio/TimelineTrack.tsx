@@ -156,6 +156,7 @@ export function TimelineTrack({
       {clips.filter(c => c.start < c.end).map((clip, i) => {
         const widthPx = (clip.end - clip.start) * zoom * 4;
         const isSelected = selectedSegmentId && clip.id === selectedSegmentId;
+        const isChecked = checkedSegmentIds?.has(clip.id);
         const isSynthesizing = synthesizingSegmentIds?.has(clip.id);
         const isError = errorSegmentIds?.has(clip.id);
 
@@ -171,7 +172,7 @@ export function TimelineTrack({
               isError
                 ? "opacity-90 hover:opacity-100 ring-2 ring-destructive ring-offset-1 ring-offset-background"
                 : clip.hasAudio ? "opacity-90 hover:opacity-100" : "opacity-60 hover:opacity-80"
-            } ${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background opacity-100 z-10" : ""} ${isSynthesizing ? "synth-oscilloscope" : ""}`}
+            } ${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background opacity-100 z-10" : ""} ${isChecked && !isSelected ? "ring-2 ring-accent-foreground/50 ring-offset-1 ring-offset-background opacity-100" : ""} ${isSynthesizing ? "synth-oscilloscope" : ""}`}
             style={{
               left: `${clip.start * zoom * 4}px`,
               width: `${widthPx}px`,
@@ -185,6 +186,7 @@ export function TimelineTrack({
                     : "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.08) 3px, rgba(255,255,255,0.08) 6px)",
             }}
             title={`${clip.label} (${(clip.end - clip.start).toFixed(1)}s)${clip.loop && clip.clipLenSec ? ` loop×${Math.ceil(clip.durationSec / clip.clipLenSec)}` : ""}${isError ? " ❌ Ошибка синтеза" : clip.hasAudio ? " 🔊" : ""}${isSynthesizing ? " ⏳" : ""}${hasFades ? ` | fade ${clip.fadeInSec.toFixed(2)}s / ${clip.fadeOutSec.toFixed(2)}s` : ""}`}
+            onClick={() => onToggleCheck?.(clip.id)}
             onDoubleClick={() => onSelectSegment?.(clip.id)}
           >
             {/* Loop iteration markers */}
