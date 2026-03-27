@@ -92,8 +92,9 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
    * Used for cross-device sync / backup.
    * Handles first-push: creates books row if it doesn't exist yet.
    */
-  const saveBook = useCallback(async (onProgress?: SyncProgressCallback) => {
+  const saveBook = useCallback(async (onProgress?: SyncProgressCallback, opts?: { syncAtmo?: boolean }) => {
     const report = onProgress || progressRef.current || (() => {});
+    const syncAtmo = opts?.syncAtmo ?? false;
     if (!currentBookId) {
       toast({
         title: isRu ? "Нечего сохранять" : "Nothing to save",
@@ -359,8 +360,10 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       // ── 4c. Push atmosphere clips from OPFS to scene_atmospheres (ID-only dedup) ──
       // Atmo clips are immutable after creation — all mixing is non-destructive via Tone.js.
       // Only sync new/deleted clips by ID, skip existing ones entirely.
+      if (!syncAtmo) {
+        report("atmospheres", "skipped");
+      } else {
       report("atmospheres", "running");
-      let savedAtmoCount = 0;
       if (storage) {
         try {
           const { readAtmospheresFromLocal } = await import("@/lib/localAtmospheres");
