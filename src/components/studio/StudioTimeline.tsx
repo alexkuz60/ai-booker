@@ -625,12 +625,9 @@ export function StudioTimeline({
 
   // ── Drag guide line (vertical position indicator across all tracks) ──
   const [dragGuideX, setDragGuideX] = useState<number | null>(null);
-  /** Suppress parent click after drag ends */
-  const suppressClickRef = useRef(false);
   // Safety: clear drag guide on any mouseup (in case track callback missed)
   useEffect(() => {
     const onMouseUp = () => {
-      // Delay slightly so that onDragEndSeek fires first
       setTimeout(() => setDragGuideX(prev => prev !== null ? null : prev), 50);
     };
     window.addEventListener("mouseup", onMouseUp);
