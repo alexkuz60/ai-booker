@@ -246,6 +246,7 @@ export function buildSyncSteps(isRu: boolean): SyncStep[] {
     { id: "parts", label: isRu ? "Части книги" : "Book parts", status: "pending" },
     { id: "characters", label: isRu ? "Персонажи" : "Characters", status: "pending" },
     { id: "storyboard", label: isRu ? "Раскадровка сцен" : "Scene storyboards", status: "pending" },
+    { id: "atmospheres", label: isRu ? "Атмосфера / SFX" : "Atmosphere / SFX", status: "pending" },
     { id: "source_file", label: isRu ? "Исходный файл" : "Source file", status: "pending" },
     { id: "browser_state", label: isRu ? "Состояние браузера" : "Browser state", status: "pending" },
     { id: "finalize", label: isRu ? "Завершение" : "Finalizing", status: "pending" },
