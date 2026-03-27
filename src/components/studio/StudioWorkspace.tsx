@@ -25,6 +25,8 @@ interface StudioWorkspaceProps {
   onTabChange?: (tab: string) => void;
   selectedSegmentId?: string | null;
   onSelectSegment?: (segmentId: string | null) => void;
+  checkedSegmentIds?: Set<string>;
+  onCheckedSegmentIdsChange?: (ids: Set<string>) => void;
   onSynthesizingChange?: (ids: Set<string>) => void;
   onErrorSegmentsChange?: (ids: Set<string>) => void;
   silenceSec?: number;
@@ -36,7 +38,7 @@ interface StudioWorkspaceProps {
   clipsRefreshToken?: number;
 }
 
-export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, selectedSceneNumber, selectedSceneTitle, chapterId, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter, activeTab: externalTab, onTabChange, selectedSegmentId, onSelectSegment, onSynthesizingChange, onErrorSegmentsChange, silenceSec, onSilenceSecChange, onRecalcDone, onVoiceSaved, userApiKeys = {}, clipsRefreshToken = 0 }: StudioWorkspaceProps) {
+export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, selectedSceneNumber, selectedSceneTitle, chapterId, bookId, chapterSceneIds, onSegmented, selectedCharacterId, onSelectCharacter, activeTab: externalTab, onTabChange, selectedSegmentId, onSelectSegment, checkedSegmentIds, onCheckedSegmentIdsChange, onSynthesizingChange, onErrorSegmentsChange, silenceSec, onSilenceSecChange, onRecalcDone, onVoiceSaved, userApiKeys = {}, clipsRefreshToken = 0 }: StudioWorkspaceProps) {
   const [activeTab, setActiveTabLocal] = useState(() => externalTab || sessionStorage.getItem("studio_active_tab") || "storyboard");
   const charactersPanelRef = useRef<CharactersPanelHandle | null>(null);
   const [castingExternal, setCastingExternal] = useState(false);
@@ -123,6 +125,8 @@ export function StudioWorkspace({ isRu, selectedSceneId, selectedSceneContent, s
               onSegmented={onSegmented}
               selectedSegmentId={selectedSegmentId ?? null}
               onSelectSegment={onSelectSegment}
+              checkedSegmentIds={checkedSegmentIds}
+              onCheckedSegmentIdsChange={onCheckedSegmentIdsChange}
               onSynthesizingChange={onSynthesizingChange}
               onErrorSegmentsChange={onErrorSegmentsChange}
               silenceSec={silenceSec}

@@ -70,6 +70,8 @@ interface StudioTimelineProps {
   onSelectCharacter?: (characterId: string | null) => void;
   selectedSegmentId?: string | null;
   onSelectSegment?: (segmentId: string | null) => void;
+  checkedSegmentIds?: Set<string>;
+  onCheckedSegmentIdsChange?: (ids: Set<string>) => void;
   synthesizingSegmentIds?: Set<string>;
   errorSegmentIds?: Set<string>;
   clipsRefreshToken?: number;
@@ -85,6 +87,8 @@ export function StudioTimeline({
   onSelectCharacter,
   selectedSegmentId,
   onSelectSegment,
+  checkedSegmentIds,
+  onCheckedSegmentIdsChange,
   synthesizingSegmentIds,
   errorSegmentIds,
   clipsRefreshToken = 0,
