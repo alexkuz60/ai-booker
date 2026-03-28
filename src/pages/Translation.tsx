@@ -280,7 +280,7 @@ export default function Translation() {
               </div>
             </ResizablePanel>
 
-            <ResizableHandle />
+            <ResizableHandle withHandle />
 
             {/* Bilingual storyboard area */}
             <ResizablePanel defaultSize={panelSizes.inner[1] ?? 75} minSize={40}>
