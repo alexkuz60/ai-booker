@@ -19,6 +19,15 @@ import { Badge } from "@/components/ui/badge";
 import { SEGMENT_CONFIG } from "@/components/studio/storyboard/constants";
 import { cn } from "@/lib/utils";
 
+// Module-level cache: sceneId → { segments: [...] }
+// Prevents re-reading OPFS on every remount / navigation return
+const radarCache = new Map<string, {
+  segments: { segmentId: string; radar: RadarScores; critiqueNotes?: string[] }[];
+}>();
+
+// Per-segment fallback cache: "sceneId:segmentId" → computed scores
+const computedCache = new Map<string, { scores: RadarScores; notes: string[] }>();
+
 interface QualityMonitorPanelProps {
   storage: ProjectStorage | null;
   sceneId: string | null;
@@ -55,13 +64,26 @@ export function QualityMonitorPanel({
       return;
     }
 
+    const segKey = `${sceneId}:${selectedSegment.segmentId}`;
+
+    // 0. Check in-memory computed cache (survives remount)
+    const cached = computedCache.get(segKey);
+    if (cached) {
+      const scores = { ...cached.scores, weighted: computeWeightedScore(cached.scores, weights) };
+      setSegmentScores(scores);
+      setCritiqueNotes(cached.notes);
+      setComputing(false);
+      return;
+    }
+
     let cancelled = false;
     setComputing(true);
 
     (async () => {
       try {
-        // 1. Try loading pre-computed scores from radar.json
-        if (storage && sceneId && chapterId) {
+        // 1. Try radar.json cache, then OPFS
+        let radarSegments = sceneId ? radarCache.get(sceneId)?.segments : undefined;
+        if (!radarSegments && storage && sceneId && chapterId) {
           const radarPath = `chapters/${chapterId}/scenes/${sceneId}/radar.json`;
           const radarData = await storage.readJSON<{
             segments?: {
@@ -70,19 +92,23 @@ export function QualityMonitorPanel({
               critiqueNotes?: string[];
             }[];
           }>(radarPath);
+          if (radarData?.segments) {
+            radarSegments = radarData.segments;
+            radarCache.set(sceneId, { segments: radarSegments });
+          }
+        }
 
-          if (!cancelled && radarData?.segments) {
-            const saved = radarData.segments.find(
-              (s) => s.segmentId === selectedSegment.segmentId,
-            );
-            if (saved?.radar && saved.radar.weighted > 0) {
-              // Recompute weighted with current user weights
-              const scores = { ...saved.radar, weighted: computeWeightedScore(saved.radar, weights) };
-              setSegmentScores(scores);
-              setCritiqueNotes(saved.critiqueNotes ?? []);
-              setComputing(false);
-              return;
-            }
+        if (!cancelled && radarSegments) {
+          const saved = radarSegments.find(
+            (s) => s.segmentId === selectedSegment.segmentId,
+          );
+          if (saved?.radar && saved.radar.weighted > 0) {
+            const scores = { ...saved.radar, weighted: computeWeightedScore(saved.radar, weights) };
+            computedCache.set(segKey, { scores: saved.radar, notes: saved.critiqueNotes ?? [] });
+            setSegmentScores(scores);
+            setCritiqueNotes(saved.critiqueNotes ?? []);
+            setComputing(false);
+            return;
           }
         }
 
@@ -113,6 +139,7 @@ export function QualityMonitorPanel({
           weighted: 0,
         };
         scores.weighted = computeWeightedScore(scores, weights);
+        computedCache.set(segKey, { scores: { ...scores }, notes: [] });
         setSegmentScores(scores);
         setCritiqueNotes([]);
       } catch (err) {
