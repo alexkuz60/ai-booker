@@ -75,21 +75,38 @@ export interface CreateTranslationOpts {
   targetLanguage: "en" | "ru";
   /** Chapter indices to include (only fully storyboarded) */
   chapterIndices: number[];
+  /** Progress callback: step label + fraction 0..1 */
+  onProgress?: (label: string, fraction: number) => void;
+}
+
+/** Check if a translation project already exists in OPFS */
+export async function translationProjectExists(
+  sourceProjectName: string,
+  targetLanguage: "en" | "ru",
+): Promise<boolean> {
+  const langSuffix = targetLanguage.toUpperCase();
+  const projectName = `${sourceProjectName}_${langSuffix}`;
+  const existing = await OPFSStorage.listProjects();
+  return existing.includes(projectName);
 }
 
 export async function createTranslationProject(
   opts: CreateTranslationOpts,
 ): Promise<ProjectStorage> {
-  const { sourceStorage, sourceMeta, targetLanguage, chapterIndices } = opts;
+  const { sourceStorage, sourceMeta, targetLanguage, chapterIndices, onProgress } = opts;
+  const progress = onProgress ?? (() => {});
 
   // 1. Derive project name
   const langSuffix = targetLanguage.toUpperCase();
   const projectName = `${sourceStorage.projectName}_${langSuffix}`;
 
+  progress("Creating project…", 0);
+
   // 2. Create OPFS project
   const store = await OPFSStorage.openOrCreate(projectName);
 
   // 3. Write project.json with translation metadata
+  progress("Writing metadata…", 0.05);
   const translationMeta: ProjectMeta & { layoutVersion: number } = {
     version: PROJECT_META_VERSION,
     bookId: sourceMeta.bookId, // same bookId for cross-reference
@@ -106,6 +123,7 @@ export async function createTranslationProject(
   await ensureV2Layout(store);
 
   // 4. Copy structure/toc.json
+  progress("Copying structure…", 0.1);
   const toc = await sourceStorage.readJSON<{ toc: TocChapter[]; parts: unknown[] }>(
     paths.structureToc(),
   );
@@ -119,7 +137,15 @@ export async function createTranslationProject(
     await store.writeJSON(paths.structureChapters(), chaptersMap);
   }
 
-  // 6. Copy scene_index.json — filtered to selected chapters only
+  // 6. Copy characters.json (for later name/description translation)
+  progress("Copying characters…", 0.15);
+  const characters = await sourceStorage.readJSON(paths.characterIndex());
+  if (characters) {
+    await store.writeJSON(paths.characterIndex(), characters);
+  }
+
+  // 7. Copy scene_index.json — filtered to selected chapters only
+  progress("Copying scene index…", 0.2);
   const sceneIndex = await sourceStorage.readJSON<SceneIndexData>(paths.sceneIndex());
   if (sceneIndex) {
     const selectedIndices = new Set(chapterIndices);
@@ -146,13 +172,18 @@ export async function createTranslationProject(
     await store.writeJSON(paths.sceneIndex(), translationIndex);
   }
 
-  // 7. Copy chapter content + storyboard structure (with empty translation text)
+  // 8. Copy chapter content + storyboard structure
   const chapterIdMapRaw = chaptersMap as Record<string, string> | null;
   if (!chapterIdMapRaw) return store;
 
-  for (const chapterIdx of chapterIndices) {
+  const totalChapters = chapterIndices.length;
+  for (let ci = 0; ci < totalChapters; ci++) {
+    const chapterIdx = chapterIndices[ci];
     const chapterId = chapterIdMapRaw[String(chapterIdx)];
     if (!chapterId) continue;
+
+    const frac = 0.25 + (ci / totalChapters) * 0.7;
+    progress(`Chapter ${ci + 1}/${totalChapters}…`, frac);
 
     // Copy content.json (scene structure)
     const content = await sourceStorage.readJSON(paths.chapterContent(chapterId));
@@ -160,7 +191,7 @@ export async function createTranslationProject(
       await store.writeJSON(paths.chapterContent(chapterId), content);
     }
 
-    // Copy storyboard data for each scene (segment structure only, text blanked)
+    // Copy storyboard data for each scene (segment structure only, audio cleared)
     if (!sceneIndex) continue;
     const sceneIds = Object.entries(sceneIndex.entries)
       .filter(([, e]) => e.chapterId === chapterId)
@@ -171,7 +202,7 @@ export async function createTranslationProject(
       const sb = await sourceStorage.readJSON<LocalStoryboardData>(sbPath);
       if (!sb) continue;
 
-      // Clone storyboard: keep segment structure, clear phrase text for translation
+      // Clone storyboard: keep segment structure + original text for bilingual view
       const translationSb: LocalStoryboardData = {
         ...sb,
         updatedAt: new Date().toISOString(),
@@ -179,7 +210,6 @@ export async function createTranslationProject(
           ...seg,
           phrases: seg.phrases.map((ph) => ({
             ...ph,
-            // Keep original text as reference, add empty translation field
             text: ph.text, // original stays for bilingual view
           })),
         })),
@@ -187,8 +217,16 @@ export async function createTranslationProject(
         audioStatus: {},
       };
       await store.writeJSON(sbPath, translationSb);
+
+      // Copy scene-level character map if exists
+      const charMapPath = `chapters/${chapterId}/scenes/${sceneId}/characters.json`;
+      const charMap = await sourceStorage.readJSON(charMapPath);
+      if (charMap) {
+        await store.writeJSON(charMapPath, charMap);
+      }
     }
   }
 
+  progress("Done", 1);
   return store;
 }
