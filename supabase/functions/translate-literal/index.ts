@@ -197,5 +197,6 @@ function parseSegmentedResponse(
 function cleanTranslation(text: string): string {
   return text
     .replace(/^\[.*?\]\s*/, "") // remove [type, speaker] prefix if echoed
+    .replace(/^---\s*Segment\s*\d+\s*---\s*/i, "") // remove marker remnants
     .trim();
 }
