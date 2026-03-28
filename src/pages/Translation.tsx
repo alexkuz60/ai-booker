@@ -25,9 +25,13 @@ import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { SaveBookButton } from "@/components/SaveBookButton";
 import { AiRolesButton } from "@/components/AiRolesButton";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
+import { useAiRoles } from "@/hooks/useAiRoles";
+import { useTranslationStorage } from "@/hooks/useTranslationStorage";
+import { useSegmentTranslation } from "@/hooks/useSegmentTranslation";
 import { paths } from "@/lib/projectPaths";
 import type { TocChapter } from "@/pages/parser/types";
 import type { SceneIndexData } from "@/lib/sceneIndex";
+import type { Segment } from "@/components/studio/storyboard/types";
 import type { AiRoleId } from "@/config/aiRoles";
 import {
   Select,
@@ -52,6 +56,7 @@ export default function Translation() {
   const { setPageHeader } = usePageHeader();
   const { storage, meta, isOpen } = useProjectStorageContext();
   const apiKeys = useUserApiKeys();
+  const { getModelForRole } = useAiRoles(apiKeys);
 
   const bookId = meta?.bookId ?? null;
   const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
@@ -75,6 +80,74 @@ export default function Translation() {
   const [selectedChapterIdx, setSelectedChapterIdx] = useState<number | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
 
+  // Translation storage (mirror OPFS project)
+  const { translationStorage, exists: transProjectExists, refresh: refreshTransStorage } =
+    useTranslationStorage(storage, meta);
+
+  // Compute source/target langs
+  const sourceLang = meta?.language ?? "ru";
+  const targetLang = sourceLang === "ru" ? "en" : "ru";
+
+  // Translation model
+  const translationModel = getModelForRole("art_translator");
+
+  // Segment translation hook
+  const {
+    translateSegments: doTranslateSegments,
+    translating,
+    progressLabel,
+  } = useSegmentTranslation({
+    sourceStorage: storage,
+    translationStorage,
+    model: translationModel,
+    userApiKeys: apiKeys,
+    sourceLang,
+    targetLang,
+    isRu,
+  });
+
+  // Reload counter to force BilingualSegmentsView refresh after translation
+  const [bilingualTick, setBilingualTick] = useState(0);
+
+  const selectedChapter = chapters.find((c) => c.index === selectedChapterIdx) ?? null;
+
+  // Translate segments handler (refreshes view after completion)
+  const handleTranslateSegments = useCallback(async (segments: Segment[]) => {
+    if (!selectedSceneId || !selectedChapter?.chapterId) return;
+    const result = await doTranslateSegments(segments, selectedSceneId, selectedChapter.chapterId);
+    if (result) {
+      setBilingualTick(t => t + 1); // force refresh
+    }
+  }, [doTranslateSegments, selectedSceneId, selectedChapter]);
+
+  // Translate entire chapter
+  const handleTranslateChapter = useCallback(async () => {
+    if (!storage || !selectedChapter || !translationStorage) return;
+
+    const sceneIndex = await storage.readJSON<SceneIndexData>(paths.sceneIndex());
+    if (!sceneIndex) return;
+
+    // Collect all scenes for this chapter
+    const chapterSceneIds = Object.entries(sceneIndex.entries)
+      .filter(([, e]) => e.chapterIndex === selectedChapter.index)
+      .map(([id]) => id);
+
+    toast.info(isRu
+      ? `Перевод ${chapterSceneIds.length} сцен главы…`
+      : `Translating ${chapterSceneIds.length} scenes in chapter…`);
+
+    for (const sceneId of chapterSceneIds) {
+      const sbPath = paths.storyboard(sceneId, selectedChapter.chapterId);
+      const sbData = await storage.readJSON<{ segments?: Segment[] }>(sbPath);
+      if (!sbData?.segments?.length) continue;
+
+      await doTranslateSegments(sbData.segments, sceneId, selectedChapter.chapterId);
+    }
+
+    setBilingualTick(t => t + 1);
+    toast.success(isRu ? "Глава переведена" : "Chapter translated");
+  }, [storage, selectedChapter, translationStorage, doTranslateSegments, isRu]);
+
   const handleCreateTranslation = useCallback(async () => {
     if (!storage || !meta || !readiness) return;
     const readyIndices = Array.from(readiness.readyChapters.keys());
@@ -85,32 +158,32 @@ export default function Translation() {
       return;
     }
 
-    const targetLang = (meta.language === "ru" ? "en" : "ru") as "en" | "ru";
+    const tLang = (meta.language === "ru" ? "en" : "ru") as "en" | "ru";
 
-    // Check if translation project already exists
-    const exists = await translationProjectExists(storage.projectName, targetLang);
+    const exists = await translationProjectExists(storage.projectName, tLang);
     if (exists) {
       toast.error(isRu
-        ? `Проект перевода "${storage.projectName}_${targetLang.toUpperCase()}" уже существует`
-        : `Translation project "${storage.projectName}_${targetLang.toUpperCase()}" already exists`);
+        ? `Проект перевода "${storage.projectName}_${tLang.toUpperCase()}" уже существует`
+        : `Translation project "${storage.projectName}_${tLang.toUpperCase()}" already exists`);
       return;
     }
 
     setCreating(true);
     setCreateProgress(isRu ? "Подготовка…" : "Preparing…");
     try {
-      const translationStore = await createTranslationProject({
+      await createTranslationProject({
         sourceStorage: storage,
         sourceMeta: meta,
-        targetLanguage: targetLang,
+        targetLanguage: tLang,
         chapterIndices: readyIndices,
         onProgress: (label) => setCreateProgress(label),
       });
       toast.success(
         isRu
-          ? `Проект перевода «${translationStore.projectName}» создан (${readyIndices.length} глав)`
-          : `Translation project "${translationStore.projectName}" created (${readyIndices.length} chapters)`,
+          ? `Проект перевода создан (${readyIndices.length} глав)`
+          : `Translation project created (${readyIndices.length} chapters)`,
       );
+      refreshTransStorage();
     } catch (err) {
       console.error("[Translation] create error:", err);
       toast.error(isRu ? "Ошибка создания проекта перевода" : "Failed to create translation project");
@@ -118,16 +191,33 @@ export default function Translation() {
       setCreating(false);
       setCreateProgress(null);
     }
-  }, [storage, meta, readiness, isRu]);
+  }, [storage, meta, readiness, isRu, refreshTransStorage]);
 
   const headerRight = useMemo(() => {
     if (!isOpen || !meta) return undefined;
     return (
       <div className="flex items-center gap-2">
+        {/* Chapter-level translate button */}
+        {transProjectExists && selectedChapter && (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={handleTranslateChapter}
+            disabled={translating}
+            className="h-7 text-xs px-3 gap-1.5"
+          >
+            {translating ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Languages className="h-3.5 w-3.5" />
+            )}
+            {isRu ? "Перевести главу" : "Translate chapter"}
+          </Button>
+        )}
         <Button
           size="sm"
           onClick={handleCreateTranslation}
-          disabled={creating || !readiness || readiness.readyChapters.size === 0}
+          disabled={creating || !readiness || readiness.readyChapters.size === 0 || transProjectExists}
           className="h-7 text-xs px-3"
         >
           {creating ? (
@@ -137,9 +227,11 @@ export default function Translation() {
           )}
           {creating && createProgress
             ? createProgress
-            : isRu
-              ? `Перевод (${meta.language === "ru" ? "→ EN" : "→ RU"})`
-              : `Translate (${meta.language === "ru" ? "→ EN" : "→ RU"})`}
+            : transProjectExists
+              ? isRu ? "Проект создан" : "Project exists"
+              : isRu
+                ? `Перевод (${meta.language === "ru" ? "→ EN" : "→ RU"})`
+                : `Translate (${meta.language === "ru" ? "→ EN" : "→ RU"})`}
         </Button>
         <SaveBookButton
           isRu={isRu}
@@ -159,7 +251,7 @@ export default function Translation() {
         />
       </div>
     );
-  }, [isOpen, meta, creating, readiness, isRu, handleCreateTranslation, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip]);
+  }, [isOpen, meta, creating, readiness, isRu, handleCreateTranslation, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, transProjectExists, selectedChapter, handleTranslateChapter, translating, apiKeys]);
 
   const headerRightRef = useRef(headerRight);
   headerRightRef.current = headerRight;
@@ -220,9 +312,6 @@ export default function Translation() {
     return () => { cancelled = true; };
   }, [storage, isOpen]);
 
-
-  const selectedChapter = chapters.find((c) => c.index === selectedChapterIdx) ?? null;
-
   // ── No project open ────────────────────────────────────
   if (!isOpen || !meta) {
     return (
@@ -248,7 +337,7 @@ export default function Translation() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
     >
-      {/* ── Header: chapter selector + readiness + create button ── */}
+      {/* ── Header: chapter selector + readiness ── */}
       <div className="border-b px-4 py-2 flex items-center gap-3 shrink-0 flex-wrap">
         <Select
           value={selectedChapterIdx != null ? String(selectedChapterIdx) : undefined}
@@ -277,6 +366,11 @@ export default function Translation() {
               {readiness.totalReady} / {readiness.totalScenes}
             </Badge>
             {checking && <Loader2 className="h-3 w-3 animate-spin" />}
+            {transProjectExists && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-primary border-primary/30">
+                {isRu ? "Проект перевода" : "Translation project"} ✓
+              </Badge>
+            )}
           </div>
         )}
       </div>
@@ -327,12 +421,16 @@ export default function Translation() {
                 </div>
               {selectedSceneId ? (
                 <ScrollArea className="h-full">
-                  <div className="p-3">
+                  <div className="p-3" key={`${selectedSceneId}-${bilingualTick}`}>
                     <BilingualSegmentsView
-                      storage={storage}
+                      sourceStorage={storage}
+                      translationStorage={translationStorage}
                       sceneId={selectedSceneId}
                       chapterId={selectedChapter?.chapterId ?? null}
                       isRu={isRu}
+                      onTranslateSegments={transProjectExists ? handleTranslateSegments : undefined}
+                      translating={translating}
+                      progressLabel={progressLabel}
                     />
                   </div>
                 </ScrollArea>
@@ -362,7 +460,7 @@ export default function Translation() {
             </div>
             <div className="flex-1 min-h-0">
               <QualityMonitorPanel
-                storage={storage}
+                storage={translationStorage}
                 sceneId={selectedSceneId}
                 chapterId={selectedChapter?.chapterId ?? null}
                 isRu={isRu}
