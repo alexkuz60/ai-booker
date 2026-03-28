@@ -18,7 +18,7 @@ import {
 import { TranslationChapterNav } from "@/components/translation/TranslationChapterNav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { TranslationChapterNav } from "@/components/translation/TranslationChapterNav";
+import { paths } from "@/lib/projectPaths";
 import { paths } from "@/lib/projectPaths";
 import type { TocChapter } from "@/pages/parser/types";
 import type { SceneIndexData } from "@/lib/sceneIndex";
