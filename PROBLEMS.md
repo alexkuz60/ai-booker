@@ -1,7 +1,7 @@
 # Архив решённых проблем и багов
 
 > Этот файл — **read-only архив**. Новые задачи добавляются в `TODO.md`.
-> Актуальная дата: 2026-03-27.
+> Актуальная дата: 2026-03-28.
 
 ---
 
@@ -95,6 +95,31 @@
 - Проблема: оптимистичные дельты ресайза (`optimisticResizes`) не очищались при обновлении данных из OPFS. `prevClipsRef.current` обновлялся ДО проверки на изменение клипов → условие сброса `optimisticResizes` было недостижимо → старые дельты накладывались на новые реальные длительности.
 - Решение: консолидация очистки — `prevClipsRef.current`, `optimisticOffsets` и `optimisticResizes` сбрасываются в едином блоке `if (realClips !== prevClipsRef.current)`.
 - Файл: `src/components/studio/TimelineTrack.tsx`.
+
+---
+
+### П. Чистка мёртвого кода студии (2026-03-28) — ✅ РЕШЕНО
+
+Удалено 13 единиц dead code из 10 файлов. Перечень для возможного отката:
+
+| Файл | Удалённый импорт/экспорт |
+|------|--------------------------|
+| `StudioTimeline.tsx` | `Plus` (lucide), `SetStateAction` (react), пустая кнопка-заглушка (строки 933-934) |
+| `TrackMixerStrip.tsx` | `useRef` |
+| `ChannelPluginsPanel.tsx` | `getAudioEngine` |
+| `CharactersPanel.tsx` | `readSceneContentFromLocal` |
+| `StoryboardPanel.tsx` | `Json`, `Database` (types), `readCharactersFromLocal`, `readSceneContentFromLocal` |
+| `AtmospherePanel.tsx` | `Switch`, `Label` |
+| `MasterMeterPanel.tsx` | `Button`, `MasterMeterData` |
+| `FinishedChaptersPanel.tsx` | `Loader2` |
+| `CastingCandidatesPanel.tsx` | `useMemo` |
+| `audioEngine.ts` | `resetAudioEngine()` — функция-экспорт, нигде не вызывалась |
+
+Также ранее удалены «велосипеды» (заменены на Tone.js-native):
+- Ручной loop через RAF `seek()` → `transport.loop/loopStart/loopEnd`
+- End-of-timeline polling в RAF → `transport.scheduleOnce()`
+- `Math.log10` в VuSlider/sceneRenderer/chapterRenderer → `Tone.gainToDb()`/`Tone.dbToGain()`
+- `addTrack` polling → `Tone.loaded()`
 
 ---
 
