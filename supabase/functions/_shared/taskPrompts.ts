@@ -431,6 +431,9 @@ Be evidence-based — cite specific text fragments.`,
 Будь доказателен — ссылайся на конкретные фрагменты.`,
   },
 };
+
+/**
+ * Resolve a task prompt by ID and language (default fallback only).
  * Returns the prompt text string, or null if not found.
  */
 export function resolveTaskPrompt(
