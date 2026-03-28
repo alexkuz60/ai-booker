@@ -255,12 +255,20 @@ export default function Translation() {
         )}
       </div>
 
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
+      <ResizablePanelGroup
+        direction="horizontal"
+        className="flex-1"
+        onLayout={(sizes) => setPanelSizes((prev) => ({ ...prev, main: sizes }))}
+      >
         {/* Left: Bilingual storyboard + scene nav (70%) */}
-        <ResizablePanel defaultSize={70} minSize={40}>
-          <div className="h-full flex overflow-hidden">
-              {/* Scene navigator sidebar */}
-              <div className="w-48 shrink-0 border-r bg-muted/30">
+        <ResizablePanel defaultSize={panelSizes.main[0] ?? 70} minSize={40}>
+          <ResizablePanelGroup
+            direction="horizontal"
+            onLayout={(sizes) => setPanelSizes((prev) => ({ ...prev, inner: sizes }))}
+          >
+            {/* Scene navigator sidebar */}
+            <ResizablePanel defaultSize={panelSizes.inner[0] ?? 25} minSize={12} maxSize={40}>
+              <div className="h-full border-r bg-muted/30">
                 <TranslationChapterNav
                   storage={storage}
                   chapterId={selectedChapter?.chapterId ?? null}
@@ -270,61 +278,61 @@ export default function Translation() {
                   isRu={isRu}
                 />
               </div>
+            </ResizablePanel>
 
-              {/* Bilingual storyboard area */}
-              <div className="flex-1 overflow-hidden">
-                {selectedSceneId ? (
-                  <ScrollArea className="h-full">
-                    <div className="p-4 space-y-3">
-                      {/* Bilingual accordion placeholder */}
-                      <Accordion type="multiple" defaultValue={["translation"]}>
-                        <AccordionItem value="original">
-                          <AccordionTrigger className="text-xs font-medium py-2">
-                            {isRu ? "🇷🇺 Оригинал" : "🇷🇺 Original"}
-                          </AccordionTrigger>
-                          <AccordionContent>
-                            <div className="text-xs text-muted-foreground italic p-3 rounded-md bg-muted/30 border border-dashed border-muted-foreground/20">
-                              {isRu
-                                ? "Сегменты оригинала (read-only) будут отображаться здесь"
-                                : "Original segments (read-only) will be displayed here"}
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
+            <ResizableHandle />
 
-                        <AccordionItem value="translation">
-                          <AccordionTrigger className="text-xs font-medium py-2">
-                            {meta.language === "ru" ? "🇬🇧 Translation" : "🇷🇺 Перевод"}
-                          </AccordionTrigger>
-                          <AccordionContent>
-                            <div className="text-xs text-muted-foreground italic p-3 rounded-md bg-muted/30 border border-dashed border-muted-foreground/20">
-                              {isRu
-                                ? "Редактируемые сегменты перевода будут отображаться здесь"
-                                : "Editable translation segments will be displayed here"}
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
-                      </Accordion>
-                    </div>
-                  </ScrollArea>
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground">
-                    <BookOpen className="h-10 w-10 opacity-20" />
-                    <p className="text-xs">
-                      {isRu ? "Выберите сцену для просмотра" : "Select a scene to view"}
-                    </p>
+            {/* Bilingual storyboard area */}
+            <ResizablePanel defaultSize={panelSizes.inner[1] ?? 75} minSize={40}>
+              {selectedSceneId ? (
+                <ScrollArea className="h-full">
+                  <div className="p-4 space-y-3">
+                    <Accordion type="multiple" defaultValue={["translation"]}>
+                      <AccordionItem value="original">
+                        <AccordionTrigger className="text-xs font-medium py-2">
+                          {isRu ? "🇷🇺 Оригинал" : "🇷🇺 Original"}
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="text-xs text-muted-foreground italic p-3 rounded-md bg-muted/30 border border-dashed border-muted-foreground/20">
+                            {isRu
+                              ? "Сегменты оригинала (read-only) будут отображаться здесь"
+                              : "Original segments (read-only) will be displayed here"}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="translation">
+                        <AccordionTrigger className="text-xs font-medium py-2">
+                          {meta.language === "ru" ? "🇬🇧 Translation" : "🇷🇺 Перевод"}
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="text-xs text-muted-foreground italic p-3 rounded-md bg-muted/30 border border-dashed border-muted-foreground/20">
+                            {isRu
+                              ? "Редактируемые сегменты перевода будут отображаться здесь"
+                              : "Editable translation segments will be displayed here"}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
                   </div>
-                )}
-              </div>
-          </div>
+                </ScrollArea>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                  <BookOpen className="h-10 w-10 opacity-20" />
+                  <p className="text-xs">
+                    {isRu ? "Выберите сцену для просмотра" : "Select a scene to view"}
+                  </p>
+                </div>
+              )}
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </ResizablePanel>
 
         <ResizableHandle withHandle />
 
         {/* Right: Quality monitoring (30%) */}
-        <ResizablePanel defaultSize={30} minSize={20}>
+        <ResizablePanel defaultSize={panelSizes.main[1] ?? 30} minSize={20}>
           <div className="h-full flex flex-col">
-
-            {/* Quality monitor placeholder */}
             <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-muted-foreground">
               <Radar className="h-10 w-10 opacity-30" />
               <h2 className="text-sm font-semibold text-foreground/70">
