@@ -194,6 +194,22 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [player]);
 
+  // ── Loop region sync ──────────────────────────────────────
+  useEffect(() => {
+    if (!loopStartClipId) { player.clearLoopRegion(); return; }
+    const startClip = fadedClips.find(c => c.id === loopStartClipId);
+    if (!startClip) { player.clearLoopRegion(); return; }
+    const minStart = startClip.startSec;
+    let maxEnd = startClip.startSec + startClip.durationSec;
+    if (loopEndClipId) {
+      const endClip = fadedClips.find(c => c.id === loopEndClipId);
+      if (endClip) {
+        maxEnd = Math.max(maxEnd, endClip.startSec + endClip.durationSec);
+      }
+    }
+    player.setLoopRegion(minStart, maxEnd);
+  }, [loopStartClipId, loopEndClipId, fadedClips, player]);
+
   const handleFadeIn = useCallback((trackId: string, fadeDurationSec: number) => {
     pushUndo();
     const affected = fadedClips.filter(c => c.trackId === trackId);
