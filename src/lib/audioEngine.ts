@@ -1863,6 +1863,18 @@ class AudioEngine {
     }
   }
 
+  /** Subscribe to master plugin state changes (bypass toggles). */
+  subscribePluginState(listener: () => void): () => void {
+    this.pluginListeners.add(listener);
+    return () => this.pluginListeners.delete(listener);
+  }
+
+  private notifyPluginListeners(): void {
+    for (const fn of this.pluginListeners) {
+      try { fn(); } catch { /* listener error */ }
+    }
+  }
+
   private startPositionLoop(): void {
     this.stopPositionLoop();
     // Give the transport a brief head-start before checking end condition
