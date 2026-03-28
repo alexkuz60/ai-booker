@@ -200,12 +200,33 @@ export function BilingualSegmentsView({
           const Icon = config.icon;
           const fullText = seg.phrases.map((p) => p.text).join(" ");
           const isSegTranslating = translatingIds.has(seg.segment_id);
+          const isSelected = selectedSegmentId === seg.segment_id;
+
+          const handleSelect = () => {
+            if (isSelected) {
+              onSelectSegment?.(null);
+            } else {
+              onSelectSegment?.({
+                segmentId: seg.segment_id,
+                originalText: fullText,
+                translatedText,
+                segmentType: seg.segment_type,
+                speaker: seg.speaker ?? null,
+              });
+            }
+          };
 
           return (
             <AccordionItem
               key={seg.segment_id}
               value={seg.segment_id}
-              className="border rounded-md bg-muted/10 overflow-hidden"
+              className={cn(
+                "border rounded-md overflow-hidden cursor-pointer transition-colors",
+                isSelected
+                  ? "bg-primary/5 border-primary/40 ring-1 ring-primary/20"
+                  : "bg-muted/10 hover:border-muted-foreground/30",
+              )}
+              onClick={handleSelect}
             >
               {/* Segment header */}
               <AccordionTrigger className="px-3 py-1.5 text-xs hover:no-underline gap-2">
