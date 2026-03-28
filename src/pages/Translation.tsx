@@ -60,6 +60,12 @@ export default function Translation() {
   const [checking, setChecking] = useState(false);
   const [creating, setCreating] = useState(false);
 
+  // Panel size persistence
+  const { value: panelSizes, update: setPanelSizes } = useCloudSettings<{
+    main: number[];
+    inner: number[];
+  }>("translation-panel-sizes", { main: [70, 30], inner: [25, 75] });
+
   // Chapter navigation
   const [chapters, setChapters] = useState<ChapterEntry[]>([]);
   const [selectedChapterIdx, setSelectedChapterIdx] = useState<number | null>(null);
