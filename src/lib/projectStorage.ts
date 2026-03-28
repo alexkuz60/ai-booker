@@ -61,6 +61,12 @@ export interface ProjectMeta {
   language: "ru" | "en";
   /** File format of the source book — strict type from fileFormatUtils */
   fileFormat?: "pdf" | "docx";
+
+  // ─── Art Translation linkage ─────────────────────────────
+  /** OPFS project name of the source (original) project. Present only in translation projects. */
+  sourceProjectName?: string;
+  /** Target language for translation. Present only in translation projects. */
+  targetLanguage?: "en" | "ru";
 }
 
 export const PROJECT_META_VERSION = 1;
