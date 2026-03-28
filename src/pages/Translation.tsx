@@ -11,11 +11,11 @@ import { Languages, Radar, BookOpen } from "lucide-react";
 
 export default function Translation() {
   const { isRu } = useLanguage();
-  const { setHeader } = usePageHeader();
+  const { setPageHeader } = usePageHeader();
 
   useEffect(() => {
-    setHeader(isRu ? "Арт-перевод" : "Art Translation");
-  }, [isRu, setHeader]);
+    setPageHeader({ title: isRu ? "Арт-перевод" : "Art Translation" });
+  }, [isRu, setPageHeader]);
 
   return (
     <motion.div
