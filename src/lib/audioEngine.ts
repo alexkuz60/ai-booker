@@ -169,10 +169,10 @@ type StateListener = (snapshot: EngineSnapshot) => void;
 
 // ─── Utility ────────────────────────────────────────────────
 
-/** Convert 0-100 linear volume to dB (-Infinity…0) */
+/** Convert 0-100 linear volume to dB (-Infinity…0) using Tone.js native */
 function volumeToDB(v: number): number {
   if (v <= 0) return -Infinity;
-  return 20 * Math.log10(v / 100);
+  return Tone.gainToDb(v / 100);
 }
 
 // ─── EngineTrack ────────────────────────────────────────────
@@ -1164,14 +1164,11 @@ class AudioEngine {
     const end = config.startSec + config.durationSec;
     if (end > this._totalDuration) this._totalDuration = end;
 
-    await new Promise<void>((resolve) => {
-      const check = () => {
-        if (track.player.loaded) resolve();
-        else setTimeout(check, 50);
-      };
-      check();
-      setTimeout(resolve, 30_000);
-    });
+    // Wait for buffer to load using Tone.loaded() instead of manual polling
+    await Promise.race([
+      Tone.loaded(),
+      new Promise<void>((resolve) => setTimeout(resolve, 30_000)),
+    ]);
 
     track.schedule();
     this.notify();
@@ -1899,26 +1896,37 @@ class AudioEngine {
     }
   }
 
+  /** Schedule auto-stop at end of timeline using Tone transport.scheduleOnce */
+  private _endScheduleId: number | null = null;
+
+  private scheduleEndStop(): void {
+    this.clearEndStop();
+    const endAt = this.getEffectiveTotalDuration();
+    if (endAt <= 0) return;
+    this._endScheduleId = this.transport.scheduleOnce(() => {
+      if (this._state !== "playing") return;
+      this.transport.pause();
+      for (const t of this.tracks.values()) {
+        try { t.player.stop(); } catch { /* not started */ }
+      }
+      this._state = "paused";
+      this.stopPositionLoop();
+      this.notify();
+    }, endAt);
+  }
+
+  private clearEndStop(): void {
+    if (this._endScheduleId !== null) {
+      this.transport.clear(this._endScheduleId);
+      this._endScheduleId = null;
+    }
+  }
+
   private startPositionLoop(): void {
     this.stopPositionLoop();
-    // Give the transport a brief head-start before checking end condition
-    let tickCount = 0;
+    this.scheduleEndStop();
     const tick = () => {
       if (this._state !== "playing") return;
-      tickCount++;
-
-      // Only check end condition after a few frames (avoid false stop at t=0)
-      const endAt = this.getEffectiveTotalDuration();
-      if (tickCount > 5 && endAt > 0 && this.transport.seconds >= endAt) {
-        this.transport.pause();
-        for (const t of this.tracks.values()) {
-          try { t.player.stop(); } catch { /* not started */ }
-        }
-        this._state = "paused";
-        this.stopPositionLoop();
-        this.notify();
-        return;
-      }
       this.notify();
       this.rafId = requestAnimationFrame(tick);
     };
