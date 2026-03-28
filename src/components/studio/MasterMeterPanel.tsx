@@ -5,10 +5,8 @@
  */
 
 import { useRef, useEffect, useState, useCallback } from "react";
-import type { MasterMeterData } from "@/lib/audioEngine";
 import { getAudioEngine } from "@/lib/audioEngine";
 import { Sliders, Power } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 // ─── Helpers ────────────────────────────────────────────────
 
