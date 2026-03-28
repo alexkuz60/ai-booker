@@ -61,6 +61,10 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     const loadAll = async () => {
       const configs: TrackConfig[] = [];
 
+      // Load saved mixer state for per-track volume/pan restoration
+      const sceneId = audioClips[0]?.sceneId;
+      const savedMix = sceneId ? loadMixerState(sceneId) : null;
+
       const urlResults = await Promise.all(
         audioClips.map(async (clip) => {
           const { data, error } = await supabase.storage
@@ -83,13 +87,19 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
         const isOverlay = clip.id.includes("_narrator_");
         const isAtmo = clip.segmentType?.startsWith("atmosphere_");
 
+        // Use saved per-track volume/pan if available, otherwise master volume
+        const trackMix = savedMix?.[clip.id];
+        const trackVolume = trackMix?.volume ?? volume;
+        const trackPan = trackMix?.pan ?? undefined;
+
         configs.push({
           id: clip.id,
           url,
           startSec: clip.startSec,
           durationSec: clip.durationSec,
           overlay: isOverlay,
-          volume: volume,
+          volume: trackVolume,
+          pan: trackPan,
           bus: isAtmo ? (clip.segmentType === "atmosphere_sfx" ? "sfx" : "atmosphere") : "voice",
           fadeInSec: clip.fadeInSec ?? 0,
           fadeOutSec: clip.fadeOutSec ?? 0,
