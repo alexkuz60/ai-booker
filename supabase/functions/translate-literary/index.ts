@@ -139,7 +139,18 @@ Deno.serve(async (req) => {
       );
     }
 
-    const data = await response.json();
+    const rawBody = await response.text();
+    let data: any;
+    try {
+      data = JSON.parse(rawBody);
+    } catch {
+      // Provider returned truncated/malformed JSON
+      console.error("translate-literary: malformed provider response:", rawBody.slice(0, 300));
+      return new Response(
+        JSON.stringify({ error: "AI provider returned malformed response", details: rawBody.slice(0, 300) }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
     const latencyMs = Date.now() - start;
     const rawContent = data.choices?.[0]?.message?.content || "";
     const tokensInput = data.usage?.prompt_tokens ?? null;
