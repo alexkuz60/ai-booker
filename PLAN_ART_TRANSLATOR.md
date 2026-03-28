@@ -165,7 +165,7 @@ Score = Σ(wi · axiScore_i), где i ∈ {semantic, sentiment, rhythm, phoneti
 | **F4** | ~~Билингва-аккордеоны + навигатор глав~~ (перенесено в F1) | ✅ Готово |
 | **F5** | Эмбеддинг-сервис: `phoneticFeatures.ts` (ритмика+фонетика), `embeddingClient.ts` (семантика через OpenRouter/ProxyAPI), `qualityRadar.ts` (оркестратор 5 осей) | ✅ Готово |
 | **F6** | Критик (✅ critique-translation EF) + цикл итераций (✅ translationPipeline.ts — orchestrator: literal→literary→radar→critique→re-iterate) | ✅ Готово |
-| **F7** | Quality Radar UI (recharts) + детализация по осям | 🔲 Планируется |
+| **F7** | Quality Radar UI: `QualityRadarChart` (recharts RadarChart, цветовая индикация, пресеты весов), `RadarAxisDetail` (drill-down по сегментам), `QualityMonitorPanel` (загрузка radar.json, агрегация, segment breakdown) | ✅ Готово |
 | **F8** | Батчинг (глава целиком) + пул моделей | 🔲 Планируется |
 | **F9** | TTS-интеграция переведённой версии | 🔲 Планируется |
 
