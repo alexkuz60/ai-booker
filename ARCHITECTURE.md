@@ -615,6 +615,34 @@ assert(storedBookId === targetBookId, "bookId mismatch — aborting write");
 
 ---
 
+### 1.13 Аудио-движок (AudioEngine / Tone.js)
+
+**Принцип: максимально использовать встроенные возможности Tone.js.**
+
+Web Audio API в браузере значительно сложнее для real-time обработки, чем нативные десктопные приложения: AudioContext может быть suspended, есть ограничения на количество одновременных источников, latency зависит от браузера/ОС, а планирование событий через `setTimeout`/`requestAnimationFrame` не обеспечивает sample-accurate точность.
+
+**Tone.js** — зрелая библиотека с многолетним опытом решения этих проблем. Перед реализацией любого аудио-функционала **ОБЯЗАТЕЛЬНО** проверять, есть ли готовое решение в Tone.js API:
+
+| Задача | Tone.js решение | ❌ Не делать |
+|--------|----------------|-------------|
+| Зацикливание региона | `transport.loop`, `loopStart`, `loopEnd` | Ручной seek в RAF-тике |
+| Планирование клипов | `transport.schedule()`, `scheduleOnce()` | `setTimeout` / `setInterval` |
+| Кроссфейды | `Player.fadeIn`, `Player.fadeOut` | Ручное управление gain-нодой |
+| Мастер-эффекты | `EQ3`, `Compressor`, `Limiter`, `Reverb` | Низкоуровневые WebAudio ноды |
+| Метрономная точность | `Transport` scheduling | `requestAnimationFrame` для аудио-событий |
+| Контроль громкости | `Channel.volume` (dB) | Ручной `GainNode.gain.value` |
+
+**RAF (`requestAnimationFrame`) допустим ТОЛЬКО для:**
+- Визуального обновления UI (VU-метры, позиция playhead, прогресс)
+- Проверки условия окончания воспроизведения (end-of-timeline)
+
+**Файлы:**
+- `src/lib/audioEngine.ts` — singleton `AudioEngine` на базе Tone.js
+- `src/hooks/useTimelinePlayer.ts` — React-обёртка над движком
+- `src/hooks/useMixerPersistence.ts` — сохранение/восстановление микшерных настроек
+
+---
+
 ## 2. Модульная архитектура Парсера
 
 ### 2.1 Декомпозиция хуков
