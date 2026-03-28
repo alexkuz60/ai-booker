@@ -1037,7 +1037,7 @@ export function StudioTimeline({
                 }}
               >
                 <div className="sticky top-0 z-20 bg-background">
-                  <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} renderPercent={rulerRenderPercent} isRendering={isRendering} />
+                  <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} renderPercent={rulerRenderPercent} isRendering={isRendering} loopRegion={player.loopRegion} loopEnabled={player.loopEnabled} />
                 </div>
                 {allTracks.map((track) => {
                   const charId = track.id.startsWith("char-") ? track.id.slice(5) : null;
