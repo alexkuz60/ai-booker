@@ -18,7 +18,7 @@ import {
   type TranslationReadiness,
 } from "@/lib/translationProject";
 import { TranslationChapterNav } from "@/components/translation/TranslationChapterNav";
-import { BilingualSegmentsView } from "@/components/translation/BilingualSegmentsView";
+import { BilingualSegmentsView, type SelectedSegmentData } from "@/components/translation/BilingualSegmentsView";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
@@ -79,7 +79,7 @@ export default function Translation() {
   const [chapters, setChapters] = useState<ChapterEntry[]>([]);
   const [selectedChapterIdx, setSelectedChapterIdx] = useState<number | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
-
+  const [selectedSegment, setSelectedSegment] = useState<SelectedSegmentData | null>(null);
   // Translation storage (mirror OPFS project)
   const { translationStorage, exists: transProjectExists, refresh: refreshTransStorage } =
     useTranslationStorage(storage, meta);
@@ -344,6 +344,7 @@ export default function Translation() {
           onValueChange={(v) => {
             setSelectedChapterIdx(Number(v));
             setSelectedSceneId(null);
+            setSelectedSegment(null);
           }}
         >
           <SelectTrigger className="w-[280px] h-8 text-xs">
@@ -401,7 +402,7 @@ export default function Translation() {
                     chapterId={selectedChapter?.chapterId ?? null}
                     chapterIndex={selectedChapterIdx}
                     selectedSceneId={selectedSceneId}
-                    onSelectScene={setSelectedSceneId}
+                    onSelectScene={(id) => { setSelectedSceneId(id); setSelectedSegment(null); }}
                     isRu={isRu}
                   />
                 </div>
@@ -431,6 +432,8 @@ export default function Translation() {
                       onTranslateSegments={transProjectExists ? handleTranslateSegments : undefined}
                       translating={translating}
                       progressLabel={progressLabel}
+                      selectedSegmentId={selectedSegment?.segmentId ?? null}
+                      onSelectSegment={setSelectedSegment}
                     />
                   </div>
                 </ScrollArea>
@@ -464,6 +467,10 @@ export default function Translation() {
                 sceneId={selectedSceneId}
                 chapterId={selectedChapter?.chapterId ?? null}
                 isRu={isRu}
+                selectedSegment={selectedSegment}
+                sourceLang={(sourceLang as "ru" | "en")}
+                targetLang={(targetLang as "ru" | "en")}
+                userApiKeys={apiKeys}
               />
             </div>
           </div>
