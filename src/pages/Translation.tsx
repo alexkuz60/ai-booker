@@ -56,7 +56,7 @@ export default function Translation() {
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
   const { storage, meta, isOpen } = useProjectStorageContext();
-  const { apiKeys } = useUserApiKeys();
+  const apiKeys = useUserApiKeys();
 
   const bookId = meta?.bookId ?? null;
   const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
