@@ -112,42 +112,44 @@ export default function Translation() {
 
   const selectedChapter = chapters.find((c) => c.index === selectedChapterIdx) ?? null;
 
-  // Translate segments handler (refreshes view after completion)
+  // Batch translation hook (full pipeline: literal → literary → radar → critique)
+  const {
+    translateSceneFull,
+    translateChapterBatch,
+    progress: batchProgress,
+    abort: abortBatch,
+  } = useTranslationBatch({
+    sourceStorage: storage,
+    translationStorage,
+    userApiKeys: apiKeys,
+    sourceLang,
+    targetLang,
+    isRu,
+    getModelForRole,
+    getEffectivePool,
+    onSceneComplete: () => setBilingualTick(t => t + 1),
+  });
+
+  // Translate segments handler (literal only — quick per-segment)
   const handleTranslateSegments = useCallback(async (segments: Segment[]) => {
     if (!selectedSceneId || !selectedChapter?.chapterId) return;
     const result = await doTranslateSegments(segments, selectedSceneId, selectedChapter.chapterId);
     if (result) {
-      setBilingualTick(t => t + 1); // force refresh
+      setBilingualTick(t => t + 1);
     }
   }, [doTranslateSegments, selectedSceneId, selectedChapter]);
 
-  // Translate entire chapter
+  // Full pipeline for current scene
+  const handleTranslateSceneFull = useCallback(async () => {
+    if (!selectedSceneId || !selectedChapter?.chapterId) return;
+    await translateSceneFull(selectedSceneId, selectedChapter.chapterId);
+  }, [translateSceneFull, selectedSceneId, selectedChapter]);
+
+  // Batch translate entire chapter
   const handleTranslateChapter = useCallback(async () => {
-    if (!storage || !selectedChapter || !translationStorage) return;
-
-    const sceneIndex = await storage.readJSON<SceneIndexData>(paths.sceneIndex());
-    if (!sceneIndex) return;
-
-    // Collect all scenes for this chapter
-    const chapterSceneIds = Object.entries(sceneIndex.entries)
-      .filter(([, e]) => e.chapterIndex === selectedChapter.index)
-      .map(([id]) => id);
-
-    toast.info(isRu
-      ? `Перевод ${chapterSceneIds.length} сцен главы…`
-      : `Translating ${chapterSceneIds.length} scenes in chapter…`);
-
-    for (const sceneId of chapterSceneIds) {
-      const sbPath = paths.storyboard(sceneId, selectedChapter.chapterId);
-      const sbData = await storage.readJSON<{ segments?: Segment[] }>(sbPath);
-      if (!sbData?.segments?.length) continue;
-
-      await doTranslateSegments(sbData.segments, sceneId, selectedChapter.chapterId);
-    }
-
-    setBilingualTick(t => t + 1);
-    toast.success(isRu ? "Глава переведена" : "Chapter translated");
-  }, [storage, selectedChapter, translationStorage, doTranslateSegments, isRu]);
+    if (!selectedChapter) return;
+    await translateChapterBatch(selectedChapter.index, selectedChapter.chapterId);
+  }, [translateChapterBatch, selectedChapter]);
 
   const handleCreateTranslation = useCallback(async () => {
     if (!storage || !meta || !readiness) return;
