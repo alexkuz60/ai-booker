@@ -1975,16 +1975,4 @@ export function getAudioEngine(): AudioEngine {
   return AudioEngine.getInstance();
 }
 
-/** Destroy the current engine and create a fresh one. Returns the new instance. */
-export function resetAudioEngine(): AudioEngine {
-  const w = window as unknown as { __audioEngine?: AudioEngine };
-  try {
-    AudioEngine.getInstance().dispose();
-  } catch { /* ignore */ }
-  delete w.__audioEngine;
-  const newEngine = AudioEngine.getInstance();
-  window.dispatchEvent(new Event("audio-engine-reset"));
-  return newEngine;
-}
-
 export default AudioEngine;
