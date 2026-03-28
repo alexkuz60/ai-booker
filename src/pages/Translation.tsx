@@ -7,7 +7,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { Languages, Radar, BookOpen, ChevronDown } from "lucide-react";
+import { Languages, Radar, BookOpen, Plus, CheckCircle2, Loader2 } from "lucide-react";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { toast } from "sonner";
 import {
@@ -15,7 +15,9 @@ import {
   createTranslationProject,
   type TranslationReadiness,
 } from "@/lib/translationProject";
-import { TranslationReadinessPanel } from "@/components/translation/TranslationReadinessPanel";
+import { TranslationChapterNav } from "@/components/translation/TranslationChapterNav";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { TranslationChapterNav } from "@/components/translation/TranslationChapterNav";
 import { paths } from "@/lib/projectPaths";
 import type { TocChapter } from "@/pages/parser/types";
