@@ -6,7 +6,7 @@
  *   "pan"    — split L/R meter bars from center
  */
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import * as Tone from "tone";
 
 interface VuSliderProps {
