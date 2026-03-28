@@ -299,15 +299,23 @@ export default function Translation() {
           >
             {/* Scene navigator sidebar */}
             <ResizablePanel defaultSize={panelSizes.inner[0] ?? 25} minSize={12} maxSize={40}>
-              <div className="h-full border-r bg-muted/30">
-                <TranslationChapterNav
-                  storage={storage}
-                  chapterId={selectedChapter?.chapterId ?? null}
-                  chapterIndex={selectedChapterIdx}
-                  selectedSceneId={selectedSceneId}
-                  onSelectScene={setSelectedSceneId}
-                  isRu={isRu}
-                />
+              <div className="h-full border-r bg-muted/30 flex flex-col">
+                <div className="shrink-0 border-b px-3 py-1.5 flex items-center gap-1.5 bg-muted/50">
+                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                    {isRu ? "Сцены" : "Scenes"}
+                  </span>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <TranslationChapterNav
+                    storage={storage}
+                    chapterId={selectedChapter?.chapterId ?? null}
+                    chapterIndex={selectedChapterIdx}
+                    selectedSceneId={selectedSceneId}
+                    onSelectScene={setSelectedSceneId}
+                    isRu={isRu}
+                  />
+                </div>
               </div>
             </ResizablePanel>
 
@@ -315,6 +323,13 @@ export default function Translation() {
 
             {/* Bilingual storyboard area */}
             <ResizablePanel defaultSize={panelSizes.inner[1] ?? 75} minSize={40}>
+              <div className="h-full flex flex-col">
+                <div className="shrink-0 border-b px-3 py-1.5 flex items-center gap-1.5 bg-muted/50">
+                  <Languages className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                    {isRu ? "Билингва" : "Bilingual"}
+                  </span>
+                </div>
               {selectedSceneId ? (
                 <ScrollArea className="h-full">
                   <div className="p-4 space-y-3">
@@ -356,6 +371,7 @@ export default function Translation() {
                   </p>
                 </div>
               )}
+              </div>
             </ResizablePanel>
           </ResizablePanelGroup>
         </ResizablePanel>
@@ -365,6 +381,12 @@ export default function Translation() {
         {/* Right: Quality monitoring (30%) */}
         <ResizablePanel defaultSize={panelSizes.main[1] ?? 30} minSize={20}>
           <div className="h-full flex flex-col">
+            <div className="shrink-0 border-b px-3 py-1.5 flex items-center gap-1.5 bg-muted/50">
+              <Radar className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                {isRu ? "Мониторинг" : "Monitor"}
+              </span>
+            </div>
             <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-muted-foreground">
               <Radar className="h-10 w-10 opacity-30" />
               <h2 className="text-sm font-semibold text-foreground/70">
