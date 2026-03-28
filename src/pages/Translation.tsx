@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useCloudSettings } from "@/hooks/useCloudSettings";
 import {
   ResizablePanelGroup,
   ResizablePanel,
