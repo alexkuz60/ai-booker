@@ -438,15 +438,15 @@ export function StudioTimeline({
     return map;
   }, [timelineClips]);
 
-  // ── Loop region from selected + checked clips ─────────────
+  // ── Loop region from checked clips (Ctrl+click multi-select) ──
   useEffect(() => {
-    if (!selectedSegmentId || !checkedSegmentIds || checkedSegmentIds.size === 0) {
+    if (!checkedSegmentIds || checkedSegmentIds.size === 0) {
       player.clearLoopRegion();
       return;
     }
-    // Collect all relevant clip IDs: selected + checked
+    // Include selectedSegmentId if present
     const allIds = new Set(checkedSegmentIds);
-    allIds.add(selectedSegmentId);
+    if (selectedSegmentId) allIds.add(selectedSegmentId);
 
     let minStart = Infinity;
     let maxEnd = -Infinity;
