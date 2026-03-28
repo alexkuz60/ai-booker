@@ -17,6 +17,14 @@ import {
 } from "@/components/ui/accordion";
 import { Textarea } from "@/components/ui/textarea";
 
+export interface SelectedSegmentData {
+  segmentId: string;
+  originalText: string;
+  translatedText: string;
+  segmentType: string;
+  speaker: string | null;
+}
+
 interface Props {
   /** Source project storage (original text) */
   sourceStorage: ProjectStorage | null;
@@ -31,6 +39,10 @@ interface Props {
   translating?: boolean;
   /** Translation progress label */
   progressLabel?: string | null;
+  /** Currently selected segment id */
+  selectedSegmentId?: string | null;
+  /** Callback when user selects a segment for radar inspection */
+  onSelectSegment?: (data: SelectedSegmentData | null) => void;
 }
 
 interface SegmentWithTranslation {
@@ -53,6 +65,8 @@ export function BilingualSegmentsView({
   onTranslateSegments,
   translating = false,
   progressLabel,
+  selectedSegmentId,
+  onSelectSegment,
 }: Props) {
   const [items, setItems] = useState<SegmentWithTranslation[]>([]);
   const [loading, setLoading] = useState(false);
