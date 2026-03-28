@@ -171,13 +171,24 @@ function parseSegmentedResponse(
   content: string,
   originalSegments: SegmentInput[],
 ): { original: string; translation: string }[] {
-  // Try marker-based split
-  const markerParts = content.split(/---\s*Segment\s*\d+\s*---/i).filter((s) => s.trim());
+  // Try marker-based split — allow trailing "---" to be optional
+  const markerRegex = /---\s*Segment\s*\d+\s*(?:---)?/gi;
+  const markerParts = content.split(markerRegex).filter((s) => s.trim());
 
   if (markerParts.length >= originalSegments.length) {
     return originalSegments.map((seg, i) => ({
       original: seg.text,
       translation: cleanTranslation(markerParts[i]),
+    }));
+  }
+
+  // Fallback: try numbered lines like "1." or "1)"
+  const numberedRegex = /(?:^|\n)\s*\d+[\.\)]\s*/;
+  const numberedParts = content.split(numberedRegex).filter((s) => s.trim());
+  if (numberedParts.length >= originalSegments.length) {
+    return originalSegments.map((seg, i) => ({
+      original: seg.text,
+      translation: cleanTranslation(numberedParts[i]),
     }));
   }
 
