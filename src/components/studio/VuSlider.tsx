@@ -49,6 +49,7 @@ export function VuSlider({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
   
   const smoothedRef = useRef<{ l: number; r: number }>({ l: 0, r: 0 });
 
