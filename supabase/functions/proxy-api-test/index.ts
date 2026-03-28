@@ -26,7 +26,8 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Not authenticated" }), { status: 401, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
     }
 
-    const { action, model_id } = await req.json();
+    const reqBody = await req.json();
+    const { action, model_id, input } = reqBody;
     const { data: apiKeys } = await supabase.rpc("get_my_api_keys").single();
     const proxyapiKey = (apiKeys as any)?.proxyapi;
 
