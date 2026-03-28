@@ -1,101 +1,112 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Radar as RadarIcon, Activity, BarChart3 } from "lucide-react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { Radar as RadarIcon, Activity, BarChart3, MousePointerClick } from "lucide-react";
 import type { ProjectStorage } from "@/lib/projectStorage";
-import type { RadarAxis, RadarScores, RadarWeights } from "@/lib/qualityRadar";
-import { DEFAULT_WEIGHTS, computeWeightedScore } from "@/lib/qualityRadar";
-import type { TranslationSceneResult, TranslationSegmentResult } from "@/lib/translationPipeline";
+import type { RadarScores, RadarWeights, RadarAxis } from "@/lib/qualityRadar";
+import {
+  DEFAULT_WEIGHTS,
+  computeWeightedScore,
+  computeProgrammaticAxes,
+  computeSemanticScore,
+  AXIS_LABELS,
+  getScoreLevel,
+  SCORE_COLORS,
+} from "@/lib/qualityRadar";
+import type { SelectedSegmentData } from "@/components/translation/BilingualSegmentsView";
 import { QualityRadarChart } from "./QualityRadarChart";
 import { RadarAxisDetail } from "./RadarAxisDetail";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { SEGMENT_CONFIG } from "@/components/studio/storyboard/constants";
+import { cn } from "@/lib/utils";
 
 interface QualityMonitorPanelProps {
   storage: ProjectStorage | null;
   sceneId: string | null;
   chapterId: string | null;
   isRu: boolean;
+  /** Currently selected segment from bilingual view */
+  selectedSegment?: SelectedSegmentData | null;
+  sourceLang?: "ru" | "en";
+  targetLang?: "ru" | "en";
+  userApiKeys?: Record<string, string>;
 }
 
-/**
- * Reads radar.json from translation project OPFS to display quality scores.
- * radar.json is saved by translationPipeline after each run.
- */
 export function QualityMonitorPanel({
   storage,
   sceneId,
   chapterId,
   isRu,
+  selectedSegment,
+  sourceLang = "ru",
+  targetLang = "en",
+  userApiKeys = {},
 }: QualityMonitorPanelProps) {
-  const [sceneResult, setSceneResult] = useState<TranslationSceneResult | null>(null);
   const [weights, setWeights] = useState<RadarWeights>(DEFAULT_WEIGHTS);
   const [selectedAxis, setSelectedAxis] = useState<RadarAxis | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [segmentScores, setSegmentScores] = useState<RadarScores | null>(null);
+  const [computing, setComputing] = useState(false);
 
-  // Load radar.json for the selected scene
+  // Compute radar scores on-the-fly when a segment is selected
   useEffect(() => {
-    if (!storage || !sceneId || !chapterId) {
-      setSceneResult(null);
-      setSelectedAxis(null);
+    if (!selectedSegment?.translatedText || !selectedSegment?.originalText) {
+      setSegmentScores(null);
       return;
     }
 
     let cancelled = false;
-    setLoading(true);
+    setComputing(true);
 
     (async () => {
       try {
-        // Try reading from the translation project's scene folder
-        const radarPath = `chapters/${chapterId}/scenes/${sceneId}/radar.json`;
-        const data = await storage.readJSON<TranslationSceneResult>(radarPath);
-        if (!cancelled) setSceneResult(data ?? null);
-      } catch {
-        if (!cancelled) setSceneResult(null);
+        // Programmatic axes (instant, no API)
+        const { rhythm, phonetic } = computeProgrammaticAxes(
+          selectedSegment.originalText,
+          selectedSegment.translatedText,
+          sourceLang,
+          targetLang,
+        );
+
+        // Semantic axis (API-based, may return null)
+        const semantic = await computeSemanticScore(
+          selectedSegment.originalText,
+          selectedSegment.translatedText,
+          userApiKeys,
+        );
+
+        if (cancelled) return;
+
+        const scores: RadarScores = {
+          semantic: semantic ?? 0,
+          sentiment: 0, // requires LLM critique (future)
+          rhythm,
+          phonetic,
+          cultural: 0, // requires LLM critique (future)
+          weighted: 0,
+        };
+        scores.weighted = computeWeightedScore(scores, weights);
+        setSegmentScores(scores);
+      } catch (err) {
+        console.error("[QualityMonitor] compute error:", err);
+        if (!cancelled) setSegmentScores(null);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setComputing(false);
       }
     })();
 
     return () => { cancelled = true; };
-  }, [storage, sceneId, chapterId]);
+  }, [selectedSegment?.segmentId, selectedSegment?.originalText, selectedSegment?.translatedText, sourceLang, targetLang, userApiKeys]);
 
-  // Compute aggregate radar from segments
-  const aggregateScores: RadarScores | null = React.useMemo(() => {
-    if (!sceneResult?.segments?.length) return null;
-    const segs = sceneResult.segments.filter((s) => s.radar);
-    if (segs.length === 0) return null;
-
-    const avg = (axis: keyof Omit<RadarScores, "weighted">) =>
-      segs.reduce((sum, s) => sum + (s.radar[axis] ?? 0), 0) / segs.length;
-
-    const scores = {
-      semantic: avg("semantic"),
-      sentiment: avg("sentiment"),
-      rhythm: avg("rhythm"),
-      phonetic: avg("phonetic"),
-      cultural: avg("cultural"),
-      weighted: 0,
-    };
-    scores.weighted = computeWeightedScore(scores, weights);
-    return scores;
-  }, [sceneResult, weights]);
+  // Recompute weighted when weights change
+  const displayScores = useMemo(() => {
+    if (!segmentScores) return null;
+    return { ...segmentScores, weighted: computeWeightedScore(segmentScores, weights) };
+  }, [segmentScores, weights]);
 
   const handleWeightsChange = useCallback((_preset: string, w: RadarWeights) => {
     setWeights(w);
   }, []);
 
-  // Axis detail view
-  if (selectedAxis && sceneResult) {
-    return (
-      <RadarAxisDetail
-        axis={selectedAxis}
-        segments={sceneResult.segments}
-        onBack={() => setSelectedAxis(null)}
-        isRu={isRu}
-      />
-    );
-  }
-
-  // Empty state — no scene selected
+  // No scene selected
   if (!sceneId) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground p-6">
@@ -109,80 +120,119 @@ export function QualityMonitorPanel({
     );
   }
 
-  // Empty state — no radar data yet
-  if (!sceneResult && !loading) {
+  // Scene selected but no segment
+  if (!selectedSegment) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground p-6">
-        <Activity className="h-8 w-8 opacity-20" />
+        <MousePointerClick className="h-8 w-8 opacity-20" />
         <p className="text-xs text-center">
           {isRu
-            ? "Запустите перевод сцены для получения оценки качества"
-            : "Run scene translation to get quality scores"}
+            ? "Кликните на сегмент для оценки качества перевода"
+            : "Click a segment to evaluate translation quality"}
         </p>
       </div>
     );
   }
 
+  // Segment selected but no translation
+  if (!selectedSegment.translatedText) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground p-6">
+        <Activity className="h-8 w-8 opacity-20" />
+        <p className="text-xs text-center">
+          {isRu
+            ? "Сначала переведите этот сегмент"
+            : "Translate this segment first"}
+        </p>
+      </div>
+    );
+  }
+
+  const segConfig = SEGMENT_CONFIG[selectedSegment.segmentType as keyof typeof SEGMENT_CONFIG] ?? SEGMENT_CONFIG.narrator;
+  const SegIcon = segConfig.icon;
+
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
-        {/* Scene aggregate radar */}
-        <QualityRadarChart
-          scores={aggregateScores}
-          weights={weights}
-          onWeightsChange={handleWeightsChange}
-          onAxisClick={setSelectedAxis}
-          isRu={isRu}
-        />
-
-        {/* Segment breakdown */}
-        {sceneResult && sceneResult.segments.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5 px-1">
-              <BarChart3 className="h-3 w-3 text-muted-foreground" />
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-                {isRu ? "По сегментам" : "By segment"}
+        {/* Segment info header */}
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <Badge
+              variant="outline"
+              className={cn("text-[10px] gap-1 py-0 shrink-0", segConfig.color)}
+            >
+              <SegIcon className="h-3 w-3" />
+              {isRu ? segConfig.label_ru : segConfig.label_en}
+            </Badge>
+            {selectedSegment.speaker && (
+              <span className="text-[10px] text-muted-foreground truncate">
+                {selectedSegment.speaker}
               </span>
-              <Badge variant="secondary" className="text-[9px] px-1 py-0 ml-auto">
-                {sceneResult.segments.length}
-              </Badge>
-            </div>
-            <div className="space-y-1">
-              {sceneResult.segments.map((seg) => {
-                const w = seg.radar?.weighted ?? 0;
-                const level = w >= 0.85 ? "green" : w >= 0.70 ? "yellow" : "red";
-                const color = level === "green" ? "hsl(142, 71%, 45%)" : level === "yellow" ? "hsl(48, 96%, 53%)" : "hsl(0, 84%, 60%)";
-                return (
-                  <div
-                    key={seg.segmentId}
-                    className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 transition-colors"
-                  >
-                    <div
-                      className="h-2 w-2 rounded-full shrink-0"
-                      style={{ backgroundColor: color }}
-                    />
-                    <span className="text-[10px] text-muted-foreground truncate flex-1">
-                      {seg.original.slice(0, 50)}
-                      {seg.original.length > 50 ? "…" : ""}
-                    </span>
-                    <span
-                      className="text-[10px] font-mono font-bold shrink-0"
-                      style={{ color }}
-                    >
-                      {(w * 100).toFixed(0)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+            )}
           </div>
+          <p className="text-[10px] text-muted-foreground/70 line-clamp-2 leading-relaxed">
+            {selectedSegment.originalText.slice(0, 120)}
+            {selectedSegment.originalText.length > 120 ? "…" : ""}
+          </p>
+        </div>
+
+        {/* Radar chart */}
+        {computing ? (
+          <div className="flex items-center justify-center py-8 text-muted-foreground gap-2">
+            <Activity className="h-4 w-4 animate-pulse" />
+            <span className="text-xs">{isRu ? "Вычисление…" : "Computing…"}</span>
+          </div>
+        ) : (
+          <QualityRadarChart
+            scores={displayScores}
+            weights={weights}
+            onWeightsChange={handleWeightsChange}
+            onAxisClick={setSelectedAxis}
+            isRu={isRu}
+          />
         )}
 
-        {/* Iteration info */}
-        {sceneResult && sceneResult.segments.some((s) => s.iterations > 1) && (
-          <div className="text-[10px] text-muted-foreground text-center border-t pt-2">
-            {isRu ? "Итерации редактирования:" : "Edit iterations:"}{" "}
-            {Math.max(...sceneResult.segments.map((s) => s.iterations))}
+        {/* Axis scores breakdown */}
+        {displayScores && !computing && (
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide px-1">
+              {isRu ? "Оси оценки" : "Score axes"}
+            </span>
+            {(["semantic", "sentiment", "rhythm", "phonetic", "cultural"] as RadarAxis[]).map((axis) => {
+              const val = displayScores[axis];
+              const level = getScoreLevel(val);
+              const color = SCORE_COLORS[level];
+              const label = AXIS_LABELS[axis];
+              const isActive = val > 0;
+              return (
+                <div
+                  key={axis}
+                  className={cn(
+                    "flex items-center gap-2 px-2 py-1 rounded transition-colors",
+                    isActive ? "hover:bg-muted/50" : "opacity-40",
+                  )}
+                >
+                  <div
+                    className="h-2 w-2 rounded-full shrink-0"
+                    style={{ backgroundColor: isActive ? color : "hsl(var(--muted-foreground))" }}
+                  />
+                  <span className="text-[10px] text-muted-foreground flex-1">
+                    {isRu ? label.ru : label.en}
+                  </span>
+                  <span
+                    className="text-[10px] font-mono font-bold shrink-0"
+                    style={{ color: isActive ? color : undefined }}
+                  >
+                    {isActive ? `${(val * 100).toFixed(0)}%` : "—"}
+                  </span>
+                </div>
+              );
+            })}
+            <p className="text-[9px] text-muted-foreground/50 px-2 pt-1 italic">
+              {isRu
+                ? "Тональность и культурный код — после критики (следующий этап)"
+                : "Sentiment & cultural code — after critique (next phase)"}
+            </p>
           </div>
         )}
       </div>
