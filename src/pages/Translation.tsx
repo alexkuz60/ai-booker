@@ -367,7 +367,7 @@ export default function Translation() {
             </Badge>
             {checking && <Loader2 className="h-3 w-3 animate-spin" />}
             {transProjectExists && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-emerald-500 border-emerald-500/30">
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-primary border-primary/30">
                 {isRu ? "Проект перевода" : "Translation project"} ✓
               </Badge>
             )}
