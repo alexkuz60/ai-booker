@@ -10,9 +10,11 @@ interface AiRolesButtonProps {
   apiKeys: Record<string, string>;
   onModelChanged?: (roleId: AiRoleId) => void;
   bookTitle?: string;
+  /** If provided, only these role IDs will be shown */
+  roleFilter?: AiRoleId[];
 }
 
-export function AiRolesButton({ isRu, apiKeys, onModelChanged, bookTitle }: AiRolesButtonProps) {
+export function AiRolesButton({ isRu, apiKeys, onModelChanged, bookTitle, roleFilter }: AiRolesButtonProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -31,7 +33,7 @@ export function AiRolesButton({ isRu, apiKeys, onModelChanged, bookTitle }: AiRo
             </SheetTitle>
           </SheetHeader>
           <div className="mt-4">
-            <AiRolesTab apiKeys={apiKeys} isRu={isRu} onModelChanged={onModelChanged} bookTitle={bookTitle} />
+            <AiRolesTab apiKeys={apiKeys} isRu={isRu} onModelChanged={onModelChanged} bookTitle={bookTitle} roleFilter={roleFilter} />
           </div>
         </SheetContent>
       </Sheet>

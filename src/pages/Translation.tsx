@@ -23,9 +23,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { SaveBookButton } from "@/components/SaveBookButton";
+import { AiRolesButton } from "@/components/AiRolesButton";
+import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { paths } from "@/lib/projectPaths";
 import type { TocChapter } from "@/pages/parser/types";
 import type { SceneIndexData } from "@/lib/sceneIndex";
+import type { AiRoleId } from "@/config/aiRoles";
 import {
   Select,
   SelectContent,
@@ -47,10 +50,13 @@ interface ChapterEntry {
   title: string;
 }
 
+const TRANSLATION_ROLES: AiRoleId[] = ["art_translator", "literary_editor", "translation_critic"];
+
 export default function Translation() {
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
   const { storage, meta, isOpen } = useProjectStorageContext();
+  const apiKeys = useUserApiKeys();
 
   const bookId = meta?.bookId ?? null;
   const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
@@ -149,6 +155,12 @@ export default function Translation() {
           onDownloadZip={downloadZip}
           showImportZip={!isProjectOpen}
           onImportZip={importZip}
+        />
+        <AiRolesButton
+          isRu={isRu}
+          apiKeys={apiKeys}
+          bookTitle={meta?.title}
+          roleFilter={TRANSLATION_ROLES}
         />
       </div>
     );
