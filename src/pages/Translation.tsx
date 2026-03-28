@@ -43,6 +43,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { QualityMonitorPanel } from "@/components/translation/QualityMonitorPanel";
 
 interface ChapterEntry {
   index: number;
