@@ -28,9 +28,9 @@ import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { useTranslationStorage } from "@/hooks/useTranslationStorage";
 import { useSegmentTranslation } from "@/hooks/useSegmentTranslation";
+import { useTranslationBatch } from "@/hooks/useTranslationBatch";
 import { paths } from "@/lib/projectPaths";
 import type { TocChapter } from "@/pages/parser/types";
-import type { SceneIndexData } from "@/lib/sceneIndex";
 import type { Segment } from "@/components/studio/storyboard/types";
 import type { AiRoleId } from "@/config/aiRoles";
 import {
