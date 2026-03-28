@@ -8,7 +8,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { Languages, Radar, BookOpen, Plus, Loader2 } from "lucide-react";
+import { Languages, Radar, BookOpen, Plus, Loader2, FileText } from "lucide-react";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { toast } from "sonner";
 import {
