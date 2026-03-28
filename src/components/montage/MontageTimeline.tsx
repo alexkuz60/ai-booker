@@ -38,6 +38,27 @@ interface MontageTimelineProps {
 }
 
 export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chapterId, isRu, onSplitAtScene, hasParts }: MontageTimelineProps) {
+  // ── Loop region selection ──────────────────────────────────
+  const [loopStartClipId, setLoopStartClipId] = useState<string | null>(null);
+  const [loopEndClipId, setLoopEndClipId] = useState<string | null>(null);
+
+  // Compute loop region from selected clips
+  useEffect(() => {
+    if (!loopStartClipId) { player.clearLoopRegion(); return; }
+    const startClip = fadedClips.find(c => c.id === loopStartClipId);
+    if (!startClip) { player.clearLoopRegion(); return; }
+    const minStart = startClip.startSec;
+    let maxEnd = startClip.startSec + startClip.durationSec;
+    if (loopEndClipId) {
+      const endClip = fadedClips.find(c => c.id === loopEndClipId);
+      if (endClip) {
+        maxEnd = Math.max(maxEnd, endClip.startSec + endClip.durationSec);
+      }
+    }
+    player.setLoopRegion(minStart, maxEnd);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loopStartClipId, loopEndClipId, fadedClips]);
+
   // ── Trim & Fade overrides ──────────────────────────────────
   const [trimOverrides, setTrimOverrides] = useState<Map<string, { offsetSec: number; newDurationSec: number }>>(new Map());
   const [fadeOverrides, setFadeOverrides] = useState<Map<string, { fadeInSec: number; fadeOutSec: number }>>(new Map());
