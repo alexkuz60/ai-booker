@@ -864,6 +864,10 @@ class AudioEngine {
   private rafId = 0;
   private transport = Tone.getTransport();
 
+  // Loop region
+  private _loopStart: number | null = null;
+  private _loopEnd: number | null = null;
+
   private constructor() {
     this.instanceId = ++_engineInstanceId;
     this.masterBus = new Tone.Channel({ volume: volumeToDB(this._volume) });
@@ -969,6 +973,22 @@ class AudioEngine {
     this._timelineDurationHint = Math.max(0, Number.isFinite(totalSec) ? totalSec : 0);
     this.notify();
   }
+
+  // ─── Loop region ──────────────────────────────────────────
+
+  /** Set a loop region. When playing and position reaches endSec, seek back to startSec. */
+  setLoopRegion(startSec: number, endSec: number): void {
+    this._loopStart = Math.max(0, startSec);
+    this._loopEnd = Math.max(this._loopStart + 0.1, endSec);
+  }
+
+  clearLoopRegion(): void {
+    this._loopStart = null;
+    this._loopEnd = null;
+  }
+
+  get loopStart(): number | null { return this._loopStart; }
+  get loopEnd(): number | null { return this._loopEnd; }
 
   // ─── Track management ──────────────────────────────────
 
