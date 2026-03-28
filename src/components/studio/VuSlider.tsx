@@ -7,6 +7,7 @@
  */
 
 import { useRef, useEffect, useCallback } from "react";
+import * as Tone from "tone";
 
 interface VuSliderProps {
   mode: "volume" | "pan";
@@ -33,8 +34,7 @@ function dbToLinear(db: number): number {
 /** Convert volume 0–100 to dB string */
 function volumeToDb(v: number): string {
   if (v <= 0) return "-∞ dB";
-  const db = 20 * Math.log10(v / 100);
-  return `${db.toFixed(1)} dB`;
+  return `${Tone.gainToDb(v / 100).toFixed(1)} dB`;
 }
 
 export function VuSlider({
