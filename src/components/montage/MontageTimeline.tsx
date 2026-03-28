@@ -690,9 +690,25 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
                         return (
                           <div
                             key={clip.id}
-                            className="absolute top-1 bottom-1 rounded-sm opacity-80 hover:opacity-100 transition-opacity"
+                            className={`absolute top-1 bottom-1 rounded-sm transition-opacity cursor-pointer ${
+                              clip.id === loopStartClipId || clip.id === loopEndClipId
+                                ? "opacity-100 ring-1 ring-accent"
+                                : "opacity-80 hover:opacity-100"
+                            }`}
                             style={{ left: `${left}px`, width: `${width}px`, backgroundColor: track.color }}
                             title={`${clip.label} (${clip.durationSec.toFixed(1)}s)`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (e.ctrlKey || e.metaKey) {
+                                // Ctrl+Click: set as loop end (furthest clip)
+                                setLoopEndClipId(prev => prev === clip.id ? null : clip.id);
+                              } else {
+                                // Normal click: set loop start, seek, clear end
+                                setLoopStartClipId(prev => prev === clip.id ? null : clip.id);
+                                setLoopEndClipId(null);
+                                player.seek(clip.startSec);
+                              }
+                            }}
                           >
                             {width > 50 && (
                               <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">
