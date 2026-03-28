@@ -4,6 +4,7 @@
  */
 import {
   Languages, SpellCheck, Clapperboard, Megaphone, UserSearch, AudioWaveform,
+  BookOpen, Pen, ShieldCheck,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import type { AiRoleId } from "@/config/aiRoles";
@@ -15,12 +16,15 @@ const ROLE_VISUALS: Record<AiRoleId, {
   /** Tailwind text color class — uses semantic/utility palette */
   color: string;
 }> = {
-  translator:     { icon: Languages,      color: "text-sky-400" },
-  proofreader:    { icon: SpellCheck,      color: "text-emerald-400" },
-  screenwriter:   { icon: Clapperboard,    color: "text-amber-400" },
-  director:       { icon: Megaphone,       color: "text-purple-400" },
-  profiler:       { icon: UserSearch,      color: "text-rose-400" },
-  sound_engineer: { icon: AudioWaveform,   color: "text-cyan-400" },
+  translator:          { icon: Languages,      color: "text-sky-400" },
+  proofreader:         { icon: SpellCheck,      color: "text-emerald-400" },
+  screenwriter:        { icon: Clapperboard,    color: "text-amber-400" },
+  director:            { icon: Megaphone,       color: "text-purple-400" },
+  profiler:            { icon: UserSearch,      color: "text-rose-400" },
+  sound_engineer:      { icon: AudioWaveform,   color: "text-cyan-400" },
+  art_translator:      { icon: BookOpen,        color: "text-indigo-400" },
+  literary_editor:     { icon: Pen,             color: "text-orange-400" },
+  translation_critic:  { icon: ShieldCheck,     color: "text-teal-400" },
 };
 
 interface RoleBadgeProps {
