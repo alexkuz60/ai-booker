@@ -26,7 +26,8 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Not authenticated" }), { status: 401, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
     }
 
-    const { action, model_id } = await req.json();
+    const reqBody = await req.json();
+    const { action, model_id, input } = reqBody;
     const { data: apiKeys } = await supabase.rpc("get_my_api_keys").single();
     const proxyapiKey = (apiKeys as any)?.proxyapi;
 
@@ -97,6 +98,51 @@ Deno.serve(async (req) => {
         const latency = Date.now() - start;
         await supabase.from("proxy_api_logs").insert({ user_id: user.id, model_id, provider: "proxyapi", request_type: "test", status: "timeout", latency_ms: latency, error_message: String(err) });
         return new Response(JSON.stringify({ status: "timeout", latency_ms: latency }), { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
+      }
+    }
+
+    // ── Embeddings ──
+    if (action === "embeddings" && model_id) {
+      const realModel = stripProviderPrefix(resolveProxyApiModel(model_id));
+      const testUrl = getFullUrlForType("embedding");
+      const start = Date.now();
+      try {
+        const embInput = input || "test";
+        const resp = await fetch(testUrl, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${proxyapiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ model: realModel, input: embInput }),
+          signal: AbortSignal.timeout(30_000),
+        });
+        const latency = Date.now() - start;
+        if (resp.ok) {
+          const json = await resp.json();
+          const dims = json.data?.[0]?.embedding?.length || 0;
+          const tokensIn = json.usage?.prompt_tokens || 0;
+          await supabase.from("proxy_api_logs").insert({
+            user_id: user.id, model_id, provider: "proxyapi",
+            request_type: "embeddings", status: "success", latency_ms: latency,
+            tokens_input: tokensIn, tokens_output: 0,
+          });
+          return new Response(JSON.stringify({
+            status: "success", latency_ms: latency, dimensions: dims,
+            data: json.data, usage: json.usage,
+          }), { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
+        }
+        const errText = await resp.text();
+        await supabase.from("proxy_api_logs").insert({
+          user_id: user.id, model_id, provider: "proxyapi",
+          request_type: "embeddings", status: "error", latency_ms: latency,
+          error_message: `${resp.status}: ${errText.slice(0, 500)}`,
+        });
+        return new Response(JSON.stringify({ status: "error", latency_ms: latency, error: `HTTP ${resp.status}` }), {
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      } catch (err) {
+        const latency = Date.now() - start;
+        return new Response(JSON.stringify({ status: "timeout", latency_ms: latency, error: String(err) }), {
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        });
       }
     }
 
