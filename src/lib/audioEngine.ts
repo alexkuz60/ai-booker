@@ -1902,9 +1902,19 @@ class AudioEngine {
     const tick = () => {
       if (this._state !== "playing") return;
       tickCount++;
+
+      const pos = this.transport.seconds;
+
+      // Loop region: when position reaches loopEnd, seek back to loopStart
+      if (tickCount > 3 && this._loopStart !== null && this._loopEnd !== null && pos >= this._loopEnd) {
+        this.seek(this._loopStart);
+        // seek already restarts positionLoop when playing, so return
+        return;
+      }
+
       // Only check end condition after a few frames (avoid false stop at t=0)
       const endAt = this.getEffectiveTotalDuration();
-      if (tickCount > 5 && endAt > 0 && this.transport.seconds >= endAt) {
+      if (tickCount > 5 && endAt > 0 && pos >= endAt) {
         this.transport.pause();
         for (const t of this.tracks.values()) {
           try { t.player.stop(); } catch { /* not started */ }
