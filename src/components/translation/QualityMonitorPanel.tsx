@@ -19,6 +19,15 @@ import { Badge } from "@/components/ui/badge";
 import { SEGMENT_CONFIG } from "@/components/studio/storyboard/constants";
 import { cn } from "@/lib/utils";
 
+// Module-level cache: sceneId → { segments: [...] }
+// Prevents re-reading OPFS on every remount / navigation return
+const radarCache = new Map<string, {
+  segments: { segmentId: string; radar: RadarScores; critiqueNotes?: string[] }[];
+}>();
+
+// Per-segment fallback cache: "sceneId:segmentId" → computed scores
+const computedCache = new Map<string, { scores: RadarScores; notes: string[] }>();
+
 interface QualityMonitorPanelProps {
   storage: ProjectStorage | null;
   sceneId: string | null;
