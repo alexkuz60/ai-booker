@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { QualityMonitorPanel } from "@/components/translation/QualityMonitorPanel";
+import { TranslationProgressPanel } from "@/components/translation/TranslationProgressPanel";
 
 interface ChapterEntry {
   index: number;
@@ -56,7 +57,7 @@ export default function Translation() {
   const { setPageHeader } = usePageHeader();
   const { storage, meta, isOpen } = useProjectStorageContext();
   const apiKeys = useUserApiKeys();
-  const { getModelForRole } = useAiRoles(apiKeys);
+  const { getModelForRole, getEffectivePool } = useAiRoles(apiKeys);
 
   const bookId = meta?.bookId ?? null;
   const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
