@@ -44,7 +44,12 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       updatedAt?: string;
       language?: string;
       fileFormat?: string;
+      sourceProjectName?: string;
+      targetLanguage?: string;
     }>("project.json");
+
+    // Skip mirror translation projects — they are not independent books
+    if (meta?.sourceProjectName && meta?.targetLanguage) return null;
 
     const needStructure = !meta?.bookId || !meta?.title || !meta?.fileFormat;
     const structure = needStructure
