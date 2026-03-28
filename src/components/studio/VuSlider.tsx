@@ -217,6 +217,18 @@ export function VuSlider({
       >
         <div className="w-px h-[60%] rounded-full" style={{ backgroundColor: "hsla(0, 70%, 65%, 0.8)" }} />
       </div>
+
+      {/* Floating tooltip during drag */}
+      {isDragging && (
+        <div
+          className="absolute -top-6 px-1 py-0.5 rounded bg-popover text-popover-foreground text-[9px] font-mono tabular-nums whitespace-nowrap shadow-md border border-border pointer-events-none z-50"
+          style={{
+            left: `calc(${thumbRatio * 100}% - 20px)`,
+          }}
+        >
+          {titleText}
+        </div>
+      )}
     </div>
   );
 }
