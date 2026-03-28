@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -18,6 +18,8 @@ import {
 import { TranslationChapterNav } from "@/components/translation/TranslationChapterNav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
+import { SaveBookButton } from "@/components/SaveBookButton";
 import { paths } from "@/lib/projectPaths";
 import type { TocChapter } from "@/pages/parser/types";
 import type { SceneIndexData } from "@/lib/sceneIndex";
