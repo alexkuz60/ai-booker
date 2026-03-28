@@ -163,8 +163,8 @@ Score = Σ(wi · axiScore_i), где i ∈ {semantic, sentiment, rhythm, phoneti
 | **F2** | Создание проекта-перевода (копирование структуры OPFS + characters + progress + overwrite protection) | ✅ Готово |
 | **F3** | AI-роли (✅ aiRoles.ts) + task prompts (✅ aiTaskPrompts.ts + server mirror) + Edge Functions (✅ translate-literal, ✅ translate-literary) | ✅ Готово |
 | **F4** | ~~Билингва-аккордеоны + навигатор глав~~ (перенесено в F1) | ✅ Готово |
-| **F5** | Эмбеддинг-сервис: `phoneticFeatures.ts` (ритмика+фонетика), `embeddingClient.ts` (семантика через OpenRouter/ProxyAPI), `qualityRadar.ts` (оркестратор 5 осей) | 🔧 В работе |
-| **F6** | Критик + цикл итераций + critique-translation Edge Function | 🔲 Планируется |
+| **F5** | Эмбеддинг-сервис: `phoneticFeatures.ts` (ритмика+фонетика), `embeddingClient.ts` (семантика через OpenRouter/ProxyAPI), `qualityRadar.ts` (оркестратор 5 осей) | ✅ Готово |
+| **F6** | Критик (✅ critique-translation EF) + цикл итераций (клиентская логика — планируется) | 🔧 Частично |
 | **F7** | Quality Radar UI (recharts) + детализация по осям | 🔲 Планируется |
 | **F8** | Батчинг (глава целиком) + пул моделей | 🔲 Планируется |
 | **F9** | TTS-интеграция переведённой версии | 🔲 Планируется |
