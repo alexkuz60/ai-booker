@@ -161,7 +161,7 @@ Score = Σ(wi · axiScore_i), где i ∈ {semantic, sentiment, rhythm, phoneti
 |------|-----------|--------|
 | **F1** | Каркас: меню, маршрут, страница, ProjectMeta, ресайз-панели, навигатор глав, билингва-аккордеоны (read-only оригинал + редактируемый перевод), бейджи типов сегментов из раскадровки | ✅ Готово |
 | **F2** | Создание проекта-перевода (копирование структуры OPFS + characters + progress + overwrite protection) | ✅ Готово |
-| **F3** | AI-роли (✅ aiRoles.ts) + task prompts (✅ aiTaskPrompts.ts + server mirror) + Edge Functions (translate-literal, translate-literary) | 🔧 Частично (EF не созданы) |
+| **F3** | AI-роли (✅ aiRoles.ts) + task prompts (✅ aiTaskPrompts.ts + server mirror) + Edge Functions (✅ translate-literal, ✅ translate-literary) | ✅ Готово |
 | **F4** | ~~Билингва-аккордеоны + навигатор глав~~ (перенесено в F1) | ✅ Готово |
 | **F5** | Эмбеддинг-сервис: `phoneticFeatures.ts` (ритмика+фонетика), `embeddingClient.ts` (семантика через OpenRouter/ProxyAPI), `qualityRadar.ts` (оркестратор 5 осей) | 🔧 В работе |
 | **F6** | Критик + цикл итераций + critique-translation Edge Function | 🔲 Планируется |
