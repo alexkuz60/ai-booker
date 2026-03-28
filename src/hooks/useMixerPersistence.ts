@@ -14,11 +14,11 @@ interface PersistedTrackMix {
 
 type SceneMixerState = Record<string, PersistedTrackMix>;
 
-function localKey(sceneId: string) {
+export function localKey(sceneId: string) {
   return `mixer-state-${sceneId}`;
 }
 
-function loadLocal(sceneId: string): SceneMixerState | null {
+export function loadLocal(sceneId: string): SceneMixerState | null {
   try {
     const raw = localStorage.getItem(localKey(sceneId));
     return raw ? JSON.parse(raw) : null;
