@@ -134,9 +134,11 @@ export default function Translation() {
           ) : (
             <Plus className="h-3.5 w-3.5 mr-1.5" />
           )}
-          {isRu
-            ? `Перевод (${meta.language === "ru" ? "→ EN" : "→ RU"})`
-            : `Translate (${meta.language === "ru" ? "→ EN" : "→ RU"})`}
+          {creating && createProgress
+            ? createProgress
+            : isRu
+              ? `Перевод (${meta.language === "ru" ? "→ EN" : "→ RU"})`
+              : `Translate (${meta.language === "ru" ? "→ EN" : "→ RU"})`}
         </Button>
         <SaveBookButton
           isRu={isRu}
