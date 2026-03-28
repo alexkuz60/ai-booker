@@ -136,7 +136,7 @@ export default function Translation() {
 
                   {readiness.readyChapters.size > 0 && (
                     <div className="space-y-1">
-                      <p className="text-xs font-medium text-green-600 dark:text-green-400 flex items-center gap-1">
+                      <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                         <CheckCircle2 className="h-3 w-3" />
                         {isRu
                           ? `Глав готово: ${readiness.readyChapters.size}`
