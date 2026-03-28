@@ -288,7 +288,7 @@ export default function Translation() {
               {selectedSceneId ? (
                 <ScrollArea className="h-full">
                   <div className="p-4 space-y-3">
-                    <Accordion type="multiple" defaultValue={["translation"]}>
+                    <Accordion type="multiple" defaultValue={["original", "translation"]}>
                       <AccordionItem value="original">
                         <AccordionTrigger className="text-xs font-medium py-2">
                           {isRu ? "🇷🇺 Оригинал" : "🇷🇺 Original"}
