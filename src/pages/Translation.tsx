@@ -402,7 +402,7 @@ export default function Translation() {
                     chapterId={selectedChapter?.chapterId ?? null}
                     chapterIndex={selectedChapterIdx}
                     selectedSceneId={selectedSceneId}
-                    onSelectScene={setSelectedSceneId}
+                    onSelectScene={(id) => { setSelectedSceneId(id); setSelectedSegment(null); }}
                     isRu={isRu}
                   />
                 </div>
@@ -432,6 +432,8 @@ export default function Translation() {
                       onTranslateSegments={transProjectExists ? handleTranslateSegments : undefined}
                       translating={translating}
                       progressLabel={progressLabel}
+                      selectedSegmentId={selectedSegment?.segmentId ?? null}
+                      onSelectSegment={setSelectedSegment}
                     />
                   </div>
                 </ScrollArea>
@@ -465,6 +467,10 @@ export default function Translation() {
                 sceneId={selectedSceneId}
                 chapterId={selectedChapter?.chapterId ?? null}
                 isRu={isRu}
+                selectedSegment={selectedSegment}
+                sourceLang={(sourceLang as "ru" | "en")}
+                targetLang={(targetLang as "ru" | "en")}
+                userApiKeys={apiKeys}
               />
             </div>
           </div>
