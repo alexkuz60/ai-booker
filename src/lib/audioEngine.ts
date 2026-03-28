@@ -1909,7 +1909,7 @@ class AudioEngine {
 
       // Only check end condition after a few frames (avoid false stop at t=0)
       const endAt = this.getEffectiveTotalDuration();
-      if (tickCount > 5 && endAt > 0 && pos >= endAt) {
+      if (tickCount > 5 && endAt > 0 && this.transport.seconds >= endAt) {
         this.transport.pause();
         for (const t of this.tracks.values()) {
           try { t.player.stop(); } catch { /* not started */ }
