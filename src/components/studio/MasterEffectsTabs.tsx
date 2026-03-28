@@ -393,14 +393,14 @@ export function MasterEffectsTabs({ isRu }: MasterEffectsTabsProps) {
     try { localStorage.setItem("master-fx-tab", activeTab); } catch {}
   }, [activeTab]);
 
-  // Sync from MasterMeterPanel bypass states (poll every 500ms)
+  // Sync bypass states reactively via engine plugin listener (no polling)
   useEffect(() => {
-    const iv = setInterval(() => {
+    const unsub = engine.subscribePluginState(() => {
       const s = engine.getMasterPluginState();
       setPluginStates({ eq: s.eqBypassed, filter: s.filterBypassed, mbc: s.mbcBypassed, comp: s.compBypassed, limit: s.limiterBypassed, reverb: s.reverbBypassed });
       setMasterBypassed(s.chainBypassed);
-    }, 500);
-    return () => clearInterval(iv);
+    });
+    return unsub;
   }, [engine]);
 
   const togglePlugin = useCallback((id: "eq" | "filter" | "mbc" | "comp" | "limit" | "reverb") => {
