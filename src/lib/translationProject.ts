@@ -140,7 +140,7 @@ export async function createTranslationProject(
       updatedAt: new Date().toISOString(),
       entries: filteredEntries,
       storyboarded: filteredStoryboarded,
-      charactermapped: [], // fresh start for translation
+      characterMapped: [], // fresh start for translation
       dirtyScenes: [],
     };
     await store.writeJSON(paths.sceneIndex(), translationIndex);
