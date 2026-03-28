@@ -930,8 +930,6 @@ export function StudioTimeline({
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7">
-          </Button>
         </div>
       </div>
 
