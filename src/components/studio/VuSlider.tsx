@@ -6,7 +6,7 @@
  *   "pan"    — split L/R meter bars from center
  */
 
-import { useRef, useEffect, useCallback, useState } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import * as Tone from "tone";
 
 interface VuSliderProps {
@@ -49,7 +49,6 @@ export function VuSlider({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
-  const [isDragging, setIsDragging] = useState(false);
   
   const smoothedRef = useRef<{ l: number; r: number }>({ l: 0, r: 0 });
 
@@ -163,7 +162,6 @@ export function VuSlider({
       if (disabled) return;
       e.preventDefault();
       dragging.current = true;
-      setIsDragging(true);
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
       onChange(getValueFromX(e.clientX));
     },
@@ -180,7 +178,6 @@ export function VuSlider({
 
   const handlePointerUp = useCallback(() => {
     dragging.current = false;
-    setIsDragging(false);
   }, []);
 
   const thumbRatio = mode === "volume" ? value / 100 : (value + 100) / 200;
@@ -190,12 +187,11 @@ export function VuSlider({
   return (
     <div
       ref={containerRef}
-      className={`relative select-none ${disabled ? "opacity-40 pointer-events-none" : "cursor-pointer"} ${className}`}
+      className={`group relative select-none ${disabled ? "opacity-40 pointer-events-none" : "cursor-pointer"} ${className}`}
       style={{ height: `${SLIDER_H}px` }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      title={titleText}
     >
       {/* Canvas background (meter) */}
       <canvas
@@ -218,17 +214,15 @@ export function VuSlider({
         <div className="w-px h-[60%] rounded-full" style={{ backgroundColor: "hsla(0, 70%, 65%, 0.8)" }} />
       </div>
 
-      {/* Floating tooltip during drag */}
-      {isDragging && (
-        <div
-          className="absolute -top-6 px-1 py-0.5 rounded bg-popover text-popover-foreground text-[9px] font-mono tabular-nums whitespace-nowrap shadow-md border border-border pointer-events-none z-50"
-          style={{
-            left: `calc(${thumbRatio * 100}% - 20px)`,
-          }}
-        >
-          {titleText}
-        </div>
-      )}
+      {/* Tooltip — visible on hover/active */}
+      <div
+        className="absolute -top-6 px-1 py-0.5 rounded bg-popover text-popover-foreground text-[9px] font-mono tabular-nums whitespace-nowrap shadow-md border border-border pointer-events-none z-50 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity"
+        style={{
+          left: `clamp(0px, calc(${thumbRatio * 100}% - 20px), calc(100% - 40px))`,
+        }}
+      >
+        {titleText}
+      </div>
     </div>
   );
 }
