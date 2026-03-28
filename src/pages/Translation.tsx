@@ -156,6 +156,12 @@ export default function Translation() {
           showImportZip={!isProjectOpen}
           onImportZip={importZip}
         />
+        <AiRolesButton
+          isRu={isRu}
+          apiKeys={apiKeys}
+          bookTitle={meta?.title}
+          roleFilter={TRANSLATION_ROLES}
+        />
       </div>
     );
   }, [isOpen, meta, creating, readiness, isRu, handleCreateTranslation, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip]);
