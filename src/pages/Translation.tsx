@@ -8,7 +8,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { Languages, Radar, BookOpen, Plus, Loader2, FileText } from "lucide-react";
+import { Languages, Radar, BookOpen, Plus, Loader2, FileText, Wand2 } from "lucide-react";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { toast } from "sonner";
 import {
@@ -28,9 +28,9 @@ import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { useTranslationStorage } from "@/hooks/useTranslationStorage";
 import { useSegmentTranslation } from "@/hooks/useSegmentTranslation";
+import { useTranslationBatch } from "@/hooks/useTranslationBatch";
 import { paths } from "@/lib/projectPaths";
 import type { TocChapter } from "@/pages/parser/types";
-import type { SceneIndexData } from "@/lib/sceneIndex";
 import type { Segment } from "@/components/studio/storyboard/types";
 import type { AiRoleId } from "@/config/aiRoles";
 import {
@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { QualityMonitorPanel } from "@/components/translation/QualityMonitorPanel";
+import { TranslationProgressPanel } from "@/components/translation/TranslationProgressPanel";
 
 interface ChapterEntry {
   index: number;
@@ -56,7 +57,7 @@ export default function Translation() {
   const { setPageHeader } = usePageHeader();
   const { storage, meta, isOpen } = useProjectStorageContext();
   const apiKeys = useUserApiKeys();
-  const { getModelForRole } = useAiRoles(apiKeys);
+  const { getModelForRole, getEffectivePool } = useAiRoles(apiKeys);
 
   const bookId = meta?.bookId ?? null;
   const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
@@ -111,42 +112,44 @@ export default function Translation() {
 
   const selectedChapter = chapters.find((c) => c.index === selectedChapterIdx) ?? null;
 
-  // Translate segments handler (refreshes view after completion)
+  // Batch translation hook (full pipeline: literal → literary → radar → critique)
+  const {
+    translateSceneFull,
+    translateChapterBatch,
+    progress: batchProgress,
+    abort: abortBatch,
+  } = useTranslationBatch({
+    sourceStorage: storage,
+    translationStorage,
+    userApiKeys: apiKeys,
+    sourceLang,
+    targetLang,
+    isRu,
+    getModelForRole,
+    getEffectivePool,
+    onSceneComplete: () => setBilingualTick(t => t + 1),
+  });
+
+  // Translate segments handler (literal only — quick per-segment)
   const handleTranslateSegments = useCallback(async (segments: Segment[]) => {
     if (!selectedSceneId || !selectedChapter?.chapterId) return;
     const result = await doTranslateSegments(segments, selectedSceneId, selectedChapter.chapterId);
     if (result) {
-      setBilingualTick(t => t + 1); // force refresh
+      setBilingualTick(t => t + 1);
     }
   }, [doTranslateSegments, selectedSceneId, selectedChapter]);
 
-  // Translate entire chapter
+  // Full pipeline for current scene
+  const handleTranslateSceneFull = useCallback(async () => {
+    if (!selectedSceneId || !selectedChapter?.chapterId) return;
+    await translateSceneFull(selectedSceneId, selectedChapter.chapterId);
+  }, [translateSceneFull, selectedSceneId, selectedChapter]);
+
+  // Batch translate entire chapter
   const handleTranslateChapter = useCallback(async () => {
-    if (!storage || !selectedChapter || !translationStorage) return;
-
-    const sceneIndex = await storage.readJSON<SceneIndexData>(paths.sceneIndex());
-    if (!sceneIndex) return;
-
-    // Collect all scenes for this chapter
-    const chapterSceneIds = Object.entries(sceneIndex.entries)
-      .filter(([, e]) => e.chapterIndex === selectedChapter.index)
-      .map(([id]) => id);
-
-    toast.info(isRu
-      ? `Перевод ${chapterSceneIds.length} сцен главы…`
-      : `Translating ${chapterSceneIds.length} scenes in chapter…`);
-
-    for (const sceneId of chapterSceneIds) {
-      const sbPath = paths.storyboard(sceneId, selectedChapter.chapterId);
-      const sbData = await storage.readJSON<{ segments?: Segment[] }>(sbPath);
-      if (!sbData?.segments?.length) continue;
-
-      await doTranslateSegments(sbData.segments, sceneId, selectedChapter.chapterId);
-    }
-
-    setBilingualTick(t => t + 1);
-    toast.success(isRu ? "Глава переведена" : "Chapter translated");
-  }, [storage, selectedChapter, translationStorage, doTranslateSegments, isRu]);
+    if (!selectedChapter) return;
+    await translateChapterBatch(selectedChapter.index, selectedChapter.chapterId);
+  }, [translateChapterBatch, selectedChapter]);
 
   const handleCreateTranslation = useCallback(async () => {
     if (!storage || !meta || !readiness) return;
@@ -197,16 +200,16 @@ export default function Translation() {
     if (!isOpen || !meta) return undefined;
     return (
       <div className="flex items-center gap-2">
-        {/* Chapter-level translate button */}
+        {/* Chapter-level full pipeline batch */}
         {transProjectExists && selectedChapter && (
           <Button
             size="sm"
             variant="secondary"
             onClick={handleTranslateChapter}
-            disabled={translating}
+            disabled={translating || batchProgress.running}
             className="h-7 text-xs px-3 gap-1.5"
           >
-            {translating ? (
+            {batchProgress.running ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <Languages className="h-3.5 w-3.5" />
@@ -251,7 +254,7 @@ export default function Translation() {
         />
       </div>
     );
-  }, [isOpen, meta, creating, readiness, isRu, handleCreateTranslation, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, transProjectExists, selectedChapter, handleTranslateChapter, translating, apiKeys]);
+  }, [isOpen, meta, creating, readiness, isRu, handleCreateTranslation, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, transProjectExists, selectedChapter, handleTranslateChapter, translating, batchProgress, apiKeys]);
 
   const headerRightRef = useRef(headerRight);
   headerRightRef.current = headerRight;
@@ -419,6 +422,23 @@ export default function Translation() {
                   <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                     {isRu ? "Билингва" : "Bilingual"}
                   </span>
+                  {/* Scene full pipeline button */}
+                  {transProjectExists && selectedSceneId && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleTranslateSceneFull}
+                      disabled={translating || batchProgress.running}
+                      className="h-6 text-[10px] px-2 gap-1 ml-auto"
+                    >
+                      {batchProgress.running && batchProgress.scenesTotal === 1 ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Wand2 className="h-3 w-3" />
+                      )}
+                      {isRu ? "Полный пайплайн" : "Full pipeline"}
+                    </Button>
+                  )}
                 </div>
               {selectedSceneId ? (
                 <ScrollArea className="h-full">
@@ -461,18 +481,28 @@ export default function Translation() {
                 {isRu ? "Мониторинг" : "Monitor"}
               </span>
             </div>
-            <div className="flex-1 min-h-0">
-              <QualityMonitorPanel
-                storage={translationStorage}
-                sceneId={selectedSceneId}
-                chapterId={selectedChapter?.chapterId ?? null}
-                isRu={isRu}
-                selectedSegment={selectedSegment}
-                sourceLang={(sourceLang as "ru" | "en")}
-                targetLang={(targetLang as "ru" | "en")}
-                userApiKeys={apiKeys}
-              />
-            </div>
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="p-3 space-y-3">
+                {/* Batch progress panel */}
+                {(batchProgress.running || batchProgress.scenesTotal > 0) && (
+                  <TranslationProgressPanel
+                    progress={batchProgress}
+                    onAbort={abortBatch}
+                    isRu={isRu}
+                  />
+                )}
+                <QualityMonitorPanel
+                  storage={translationStorage}
+                  sceneId={selectedSceneId}
+                  chapterId={selectedChapter?.chapterId ?? null}
+                  isRu={isRu}
+                  selectedSegment={selectedSegment}
+                  sourceLang={(sourceLang as "ru" | "en")}
+                  targetLang={(targetLang as "ru" | "en")}
+                  userApiKeys={apiKeys}
+                />
+              </div>
+            </ScrollArea>
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
