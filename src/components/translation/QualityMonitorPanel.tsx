@@ -45,11 +45,13 @@ export function QualityMonitorPanel({
   const [selectedAxis, setSelectedAxis] = useState<RadarAxis | null>(null);
   const [segmentScores, setSegmentScores] = useState<RadarScores | null>(null);
   const [computing, setComputing] = useState(false);
+  const [critiqueNotes, setCritiqueNotes] = useState<string[]>([]);
 
-  // Compute radar scores on-the-fly when a segment is selected
+  // Try loading saved radar from storage first; fallback to on-the-fly compute
   useEffect(() => {
     if (!selectedSegment?.translatedText || !selectedSegment?.originalText) {
       setSegmentScores(null);
+      setCritiqueNotes([]);
       return;
     }
 
@@ -58,7 +60,35 @@ export function QualityMonitorPanel({
 
     (async () => {
       try {
-        // Programmatic axes (instant, no API)
+        // 1. Try loading pre-computed scores from radar.json
+        if (storage && sceneId && chapterId) {
+          const radarPath = `chapters/${chapterId}/scenes/${sceneId}/radar.json`;
+          const radarData = await storage.readJSON<{
+            segments?: {
+              segmentId: string;
+              radar: RadarScores;
+              critiqueNotes?: string[];
+            }[];
+          }>(radarPath);
+
+          if (!cancelled && radarData?.segments) {
+            const saved = radarData.segments.find(
+              (s) => s.segmentId === selectedSegment.segmentId,
+            );
+            if (saved?.radar && saved.radar.weighted > 0) {
+              // Recompute weighted with current user weights
+              const scores = { ...saved.radar, weighted: computeWeightedScore(saved.radar, weights) };
+              setSegmentScores(scores);
+              setCritiqueNotes(saved.critiqueNotes ?? []);
+              setComputing(false);
+              return;
+            }
+          }
+        }
+
+        if (cancelled) return;
+
+        // 2. Fallback: compute on the fly (programmatic + semantic only)
         const { rhythm, phonetic } = computeProgrammaticAxes(
           selectedSegment.originalText,
           selectedSegment.translatedText,
@@ -66,7 +96,6 @@ export function QualityMonitorPanel({
           targetLang,
         );
 
-        // Semantic axis (API-based, may return null)
         const semantic = await computeSemanticScore(
           selectedSegment.originalText,
           selectedSegment.translatedText,
@@ -77,24 +106,28 @@ export function QualityMonitorPanel({
 
         const scores: RadarScores = {
           semantic: semantic ?? 0,
-          sentiment: 0, // requires LLM critique (future)
+          sentiment: 0,
           rhythm,
           phonetic,
-          cultural: 0, // requires LLM critique (future)
+          cultural: 0,
           weighted: 0,
         };
         scores.weighted = computeWeightedScore(scores, weights);
         setSegmentScores(scores);
+        setCritiqueNotes([]);
       } catch (err) {
         console.error("[QualityMonitor] compute error:", err);
-        if (!cancelled) setSegmentScores(null);
+        if (!cancelled) {
+          setSegmentScores(null);
+          setCritiqueNotes([]);
+        }
       } finally {
         if (!cancelled) setComputing(false);
       }
     })();
 
     return () => { cancelled = true; };
-  }, [selectedSegment?.segmentId, selectedSegment?.originalText, selectedSegment?.translatedText, sourceLang, targetLang, userApiKeys]);
+  }, [selectedSegment?.segmentId, selectedSegment?.originalText, selectedSegment?.translatedText, storage, sceneId, chapterId, sourceLang, targetLang, userApiKeys]);
 
   // Recompute weighted when weights change
   const displayScores = useMemo(() => {
