@@ -7,16 +7,39 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { Languages, Radar, BookOpen, Plus, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Languages, Radar, BookOpen, ChevronDown } from "lucide-react";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   checkTranslationReadiness,
   createTranslationProject,
   type TranslationReadiness,
 } from "@/lib/translationProject";
+import { TranslationReadinessPanel } from "@/components/translation/TranslationReadinessPanel";
+import { TranslationChapterNav } from "@/components/translation/TranslationChapterNav";
+import { paths } from "@/lib/projectPaths";
+import type { TocChapter } from "@/pages/parser/types";
+import type { SceneIndexData } from "@/lib/sceneIndex";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+
+interface ChapterEntry {
+  index: number;
+  chapterId: string;
+  title: string;
+}
 
 export default function Translation() {
   const { isRu } = useLanguage();
@@ -27,9 +50,43 @@ export default function Translation() {
   const [checking, setChecking] = useState(false);
   const [creating, setCreating] = useState(false);
 
+  // Chapter navigation
+  const [chapters, setChapters] = useState<ChapterEntry[]>([]);
+  const [selectedChapterIdx, setSelectedChapterIdx] = useState<number | null>(null);
+  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
+
   useEffect(() => {
     setPageHeader({ title: isRu ? "Арт-перевод" : "Art Translation" });
   }, [isRu, setPageHeader]);
+
+  // Load chapters list
+  useEffect(() => {
+    if (!storage || !isOpen) {
+      setChapters([]);
+      setSelectedChapterIdx(null);
+      return;
+    }
+    let cancelled = false;
+
+    (async () => {
+      const tocData = await storage.readJSON<{ toc: TocChapter[] }>(paths.structureToc());
+      const chaptersMapRaw = await storage.readJSON<Record<string, string>>(paths.structureChapters());
+      if (cancelled || !tocData?.toc || !chaptersMapRaw) return;
+
+      const entries: ChapterEntry[] = tocData.toc.map((ch, i) => ({
+        index: i,
+        chapterId: chaptersMapRaw[String(i)] ?? "",
+        title: ch.title || `${isRu ? "Глава" : "Chapter"} ${i + 1}`,
+      })).filter((e) => e.chapterId);
+
+      setChapters(entries);
+      if (entries.length > 0 && selectedChapterIdx == null) {
+        setSelectedChapterIdx(entries[0].index);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [storage, isOpen, isRu]);
 
   // Check readiness when project is open
   useEffect(() => {
@@ -62,9 +119,7 @@ export default function Translation() {
 
     setCreating(true);
     try {
-      // Determine target language (flip source)
       const targetLang = meta.language === "ru" ? "en" : "ru";
-
       const translationStore = await createTranslationProject({
         sourceStorage: storage,
         sourceMeta: meta,
@@ -84,6 +139,8 @@ export default function Translation() {
       setCreating(false);
     }
   }, [storage, meta, readiness, isRu]);
+
+  const selectedChapter = chapters.find((c) => c.index === selectedChapterIdx) ?? null;
 
   // ── No project open ────────────────────────────────────
   if (!isOpen || !meta) {
@@ -111,83 +168,96 @@ export default function Translation() {
       transition={{ duration: 0.3 }}
     >
       <ResizablePanelGroup direction="horizontal" className="flex-1">
-        {/* Left: Source storyboard + navigator */}
-        <ResizablePanel defaultSize={50} minSize={30}>
+        {/* Left: Bilingual storyboard + scene nav (70%) */}
+        <ResizablePanel defaultSize={70} minSize={40}>
           <div className="h-full flex flex-col">
-            {/* Readiness header */}
-            <div className="border-b px-4 py-3 space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-foreground">
-                  {isRu ? "Готовность к переводу" : "Translation Readiness"}
-                </h2>
-                {checking && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-              </div>
+            {/* ── Header: chapter selector + readiness summary ── */}
+            <div className="border-b px-4 py-2 flex items-center gap-3">
+              <Select
+                value={selectedChapterIdx != null ? String(selectedChapterIdx) : undefined}
+                onValueChange={(v) => {
+                  setSelectedChapterIdx(Number(v));
+                  setSelectedSceneId(null);
+                }}
+              >
+                <SelectTrigger className="w-[280px] h-8 text-xs">
+                  <SelectValue placeholder={isRu ? "Выберите главу…" : "Select chapter…"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {chapters.map((ch) => (
+                    <SelectItem key={ch.index} value={String(ch.index)} className="text-xs">
+                      {ch.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               {readiness && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>
-                      {isRu ? "Сцен размечено:" : "Scenes storyboarded:"}
-                    </span>
-                    <Badge variant={readiness.totalReady === readiness.totalScenes ? "default" : "secondary"}>
-                      {readiness.totalReady} / {readiness.totalScenes}
-                    </Badge>
-                  </div>
-
-                  {readiness.readyChapters.size > 0 && (
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3" />
-                        {isRu
-                          ? `Глав готово: ${readiness.readyChapters.size}`
-                          : `Chapters ready: ${readiness.readyChapters.size}`}
-                      </p>
-                    </div>
-                  )}
-
-                  {readiness.notReadyChapters.size > 0 && (
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        {isRu
-                          ? `Глав не готово: ${readiness.notReadyChapters.size} (нужна раскадровка в Студии)`
-                          : `Chapters not ready: ${readiness.notReadyChapters.size} (need storyboarding in Studio)`}
-                      </p>
-                    </div>
-                  )}
-
-                  <Button
-                    size="sm"
-                    onClick={handleCreateTranslation}
-                    disabled={creating || readiness.readyChapters.size === 0}
-                    className="w-full mt-2"
-                  >
-                    {creating ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Plus className="h-4 w-4 mr-2" />
-                    )}
-                    {isRu
-                      ? `Создать проект перевода (${meta.language === "ru" ? "→ EN" : "→ RU"})`
-                      : `Create translation project (${meta.language === "ru" ? "→ EN" : "→ RU"})`}
-                  </Button>
-                </div>
+                <span className="text-xs text-muted-foreground ml-auto whitespace-nowrap">
+                  {isRu ? "Готово:" : "Ready:"}{" "}
+                  {readiness.readyChapters.size}/{chapters.length}{" "}
+                  {isRu ? "глав" : "ch."}
+                </span>
               )}
             </div>
 
-            {/* Storyboard placeholder */}
-            <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-muted-foreground">
-              <BookOpen className="h-12 w-12 opacity-30" />
-              <h2 className="text-lg font-semibold text-foreground/70">
-                {isRu ? "Раскадровка оригинала" : "Source Storyboard"}
-              </h2>
-              <p className="text-sm text-center max-w-md">
-                {isRu
-                  ? "Навигатор глав и сегментированный текст оригинала. Билингвальный просмотр оригинал/перевод."
-                  : "Chapter navigator and segmented source text. Bilingual original/translation view."}
-              </p>
-              <div className="mt-4 px-4 py-2 rounded-md border border-dashed border-muted-foreground/30 text-xs">
-                {isRu ? "Фаза 1 — каркас" : "Phase 1 — scaffold"}
+            {/* ── Body: scene nav + bilingual content ── */}
+            <div className="flex-1 flex overflow-hidden">
+              {/* Scene navigator sidebar */}
+              <div className="w-48 shrink-0 border-r bg-muted/30">
+                <TranslationChapterNav
+                  storage={storage}
+                  chapterId={selectedChapter?.chapterId ?? null}
+                  chapterIndex={selectedChapterIdx}
+                  selectedSceneId={selectedSceneId}
+                  onSelectScene={setSelectedSceneId}
+                  isRu={isRu}
+                />
+              </div>
+
+              {/* Bilingual storyboard area */}
+              <div className="flex-1 overflow-hidden">
+                {selectedSceneId ? (
+                  <ScrollArea className="h-full">
+                    <div className="p-4 space-y-3">
+                      {/* Bilingual accordion placeholder */}
+                      <Accordion type="multiple" defaultValue={["translation"]}>
+                        <AccordionItem value="original">
+                          <AccordionTrigger className="text-xs font-medium py-2">
+                            {isRu ? "🇷🇺 Оригинал" : "🇷🇺 Original"}
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="text-xs text-muted-foreground italic p-3 rounded-md bg-muted/30 border border-dashed border-muted-foreground/20">
+                              {isRu
+                                ? "Сегменты оригинала (read-only) будут отображаться здесь"
+                                : "Original segments (read-only) will be displayed here"}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+
+                        <AccordionItem value="translation">
+                          <AccordionTrigger className="text-xs font-medium py-2">
+                            {meta.language === "ru" ? "🇬🇧 Translation" : "🇷🇺 Перевод"}
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="text-xs text-muted-foreground italic p-3 rounded-md bg-muted/30 border border-dashed border-muted-foreground/20">
+                              {isRu
+                                ? "Редактируемые сегменты перевода будут отображаться здесь"
+                                : "Editable translation segments will be displayed here"}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                    </div>
+                  </ScrollArea>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                    <BookOpen className="h-10 w-10 opacity-20" />
+                    <p className="text-xs">
+                      {isRu ? "Выберите сцену для просмотра" : "Select a scene to view"}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -195,42 +265,42 @@ export default function Translation() {
 
         <ResizableHandle withHandle />
 
-        {/* Right: Quality monitoring */}
-        <ResizablePanel defaultSize={50} minSize={30}>
-          <div className="h-full flex flex-col items-center justify-center gap-4 p-8 text-muted-foreground">
-            <Radar className="h-12 w-12 opacity-30" />
-            <h2 className="text-lg font-semibold text-foreground/70">
-              {isRu ? "Мониторинг качества" : "Quality Monitor"}
-            </h2>
-            <p className="text-sm text-center max-w-md">
-              {isRu
-                ? "Многовекторный радар качества перевода, выбор синонимов, критическая оценка и варианты перевода."
-                : "Multi-vector translation quality radar, synonym selection, critical assessment and translation variants."}
-            </p>
-            <ul className="mt-4 text-xs space-y-1 text-left">
-              <li className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                {isRu ? "Семантика" : "Semantics"}
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                {isRu ? "Сентимент" : "Sentiment"}
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                {isRu ? "Ритмика" : "Rhythm"}
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                {isRu ? "Фонетика" : "Phonetics"}
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                {isRu ? "Культурный код" : "Cultural code"}
-              </li>
-            </ul>
-            <div className="mt-4 px-4 py-2 rounded-md border border-dashed border-muted-foreground/30 text-xs">
-              {isRu ? "Фаза 2 — Quality Radar" : "Phase 2 — Quality Radar"}
+        {/* Right: Readiness + Quality monitoring (30%) */}
+        <ResizablePanel defaultSize={30} minSize={20}>
+          <div className="h-full flex flex-col">
+            {/* Readiness panel */}
+            <TranslationReadinessPanel
+              readiness={readiness}
+              checking={checking}
+              creating={creating}
+              meta={meta}
+              isRu={isRu}
+              onCreateTranslation={handleCreateTranslation}
+            />
+
+            {/* Quality monitor placeholder */}
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-muted-foreground">
+              <Radar className="h-10 w-10 opacity-30" />
+              <h2 className="text-sm font-semibold text-foreground/70">
+                {isRu ? "Мониторинг качества" : "Quality Monitor"}
+              </h2>
+              <ul className="text-xs space-y-1 text-left">
+                {[
+                  isRu ? "Семантика" : "Semantics",
+                  isRu ? "Сентимент" : "Sentiment",
+                  isRu ? "Ритмика" : "Rhythm",
+                  isRu ? "Фонетика" : "Phonetics",
+                  isRu ? "Культурный код" : "Cultural code",
+                ].map((label) => (
+                  <li key={label} className="flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                    {label}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-2 px-3 py-1.5 rounded-md border border-dashed border-muted-foreground/30 text-xs">
+                {isRu ? "Фаза 2 — Quality Radar" : "Phase 2 — Quality Radar"}
+              </div>
             </div>
           </div>
         </ResizablePanel>
