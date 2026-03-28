@@ -43,6 +43,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { QualityMonitorPanel } from "@/components/translation/QualityMonitorPanel";
 
 interface ChapterEntry {
   index: number;
@@ -387,28 +388,13 @@ export default function Translation() {
                 {isRu ? "Мониторинг" : "Monitor"}
               </span>
             </div>
-            <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-muted-foreground">
-              <Radar className="h-10 w-10 opacity-30" />
-              <h2 className="text-sm font-semibold text-foreground/70">
-                {isRu ? "Мониторинг качества" : "Quality Monitor"}
-              </h2>
-              <ul className="text-xs space-y-1 text-left">
-                {[
-                  isRu ? "Семантика" : "Semantics",
-                  isRu ? "Сентимент" : "Sentiment",
-                  isRu ? "Ритмика" : "Rhythm",
-                  isRu ? "Фонетика" : "Phonetics",
-                  isRu ? "Культурный код" : "Cultural code",
-                ].map((label) => (
-                  <li key={label} className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                    {label}
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-2 px-3 py-1.5 rounded-md border border-dashed border-muted-foreground/30 text-xs">
-                {isRu ? "Фаза 2 — Quality Radar" : "Phase 2 — Quality Radar"}
-              </div>
+            <div className="flex-1 min-h-0">
+              <QualityMonitorPanel
+                storage={storage}
+                sceneId={selectedSceneId}
+                chapterId={selectedChapter?.chapterId ?? null}
+                isRu={isRu}
+              />
             </div>
           </div>
         </ResizablePanel>
