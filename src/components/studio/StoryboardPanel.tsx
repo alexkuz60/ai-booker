@@ -883,7 +883,6 @@ export function StoryboardPanel({
       toast.success(isRu ? "Блок пересинтезирован" : "Segment re-synthesized");
       onErrorSegmentsChange?.(new Set());
       onSegmented?.(sceneId);
-      await new Promise(r => setTimeout(r, 500));
       await refreshAudioStatusFromDb(segments.map(s => s.segment_id));
     } catch (err: any) {
       console.error("Re-synth failed:", err);
