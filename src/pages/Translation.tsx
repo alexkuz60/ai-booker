@@ -257,7 +257,6 @@ export default function Translation() {
                   </div>
                 )}
               </div>
-            </div>
           </div>
         </ResizablePanel>
 
