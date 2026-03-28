@@ -64,7 +64,37 @@ export default function Translation() {
   const [selectedChapterIdx, setSelectedChapterIdx] = useState<number | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
 
-  // ── headerRight: +Translate + Save buttons ──
+  const handleCreateTranslation = useCallback(async () => {
+    if (!storage || !meta || !readiness) return;
+    const readyIndices = Array.from(readiness.readyChapters.keys());
+    if (readyIndices.length === 0) {
+      toast.error(isRu
+        ? "Нет глав, готовых к переводу. Выполните раскадровку в Студии."
+        : "No chapters ready for translation. Complete storyboarding in Studio.");
+      return;
+    }
+    setCreating(true);
+    try {
+      const targetLang = meta.language === "ru" ? "en" : "ru";
+      const translationStore = await createTranslationProject({
+        sourceStorage: storage,
+        sourceMeta: meta,
+        targetLanguage: targetLang as "en" | "ru",
+        chapterIndices: readyIndices,
+      });
+      toast.success(
+        isRu
+          ? `Проект перевода "${translationStore.projectName}" создан (${readyIndices.length} глав)`
+          : `Translation project "${translationStore.projectName}" created (${readyIndices.length} chapters)`,
+      );
+    } catch (err) {
+      console.error("[Translation] create error:", err);
+      toast.error(isRu ? "Ошибка создания проекта перевода" : "Failed to create translation project");
+    } finally {
+      setCreating(false);
+    }
+  }, [storage, meta, readiness, isRu]);
+
   const headerRight = useMemo(() => {
     if (!isOpen || !meta) return undefined;
     return (
