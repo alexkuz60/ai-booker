@@ -1930,6 +1930,7 @@ class AudioEngine {
     this.masterFFT.dispose();
     this.masterBus.dispose();
     this.listeners.clear();
+    this.pluginListeners.clear();
     AudioEngine.instance = null;
   }
 }
