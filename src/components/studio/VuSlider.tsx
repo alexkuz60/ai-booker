@@ -163,6 +163,7 @@ export function VuSlider({
       if (disabled) return;
       e.preventDefault();
       dragging.current = true;
+      setIsDragging(true);
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
       onChange(getValueFromX(e.clientX));
     },
@@ -179,6 +180,7 @@ export function VuSlider({
 
   const handlePointerUp = useCallback(() => {
     dragging.current = false;
+    setIsDragging(false);
   }, []);
 
   const thumbRatio = mode === "volume" ? value / 100 : (value + 100) / 200;
