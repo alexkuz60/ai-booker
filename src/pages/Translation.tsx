@@ -481,18 +481,28 @@ export default function Translation() {
                 {isRu ? "Мониторинг" : "Monitor"}
               </span>
             </div>
-            <div className="flex-1 min-h-0">
-              <QualityMonitorPanel
-                storage={translationStorage}
-                sceneId={selectedSceneId}
-                chapterId={selectedChapter?.chapterId ?? null}
-                isRu={isRu}
-                selectedSegment={selectedSegment}
-                sourceLang={(sourceLang as "ru" | "en")}
-                targetLang={(targetLang as "ru" | "en")}
-                userApiKeys={apiKeys}
-              />
-            </div>
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="p-3 space-y-3">
+                {/* Batch progress panel */}
+                {(batchProgress.running || batchProgress.scenesTotal > 0) && (
+                  <TranslationProgressPanel
+                    progress={batchProgress}
+                    onAbort={abortBatch}
+                    isRu={isRu}
+                  />
+                )}
+                <QualityMonitorPanel
+                  storage={translationStorage}
+                  sceneId={selectedSceneId}
+                  chapterId={selectedChapter?.chapterId ?? null}
+                  isRu={isRu}
+                  selectedSegment={selectedSegment}
+                  sourceLang={(sourceLang as "ru" | "en")}
+                  targetLang={(targetLang as "ru" | "en")}
+                  userApiKeys={apiKeys}
+                />
+              </div>
+            </ScrollArea>
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
