@@ -6,6 +6,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import * as Tone from "tone";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 import { getAudioEngine } from "./audioEngine";
 import type { ClipPluginConfig, SceneClipConfigs } from "@/hooks/useClipPluginConfigs";
@@ -323,8 +324,8 @@ async function scheduleBus(
 
     // ── Gain + Pan ──
     const gainNode = ctx.createGain();
-    const dbVal = volume <= 0 ? -100 : 20 * Math.log10(volume / 100);
-    gainNode.gain.value = Math.pow(10, dbVal / 20);
+    const dbVal = volume <= 0 ? -100 : Tone.gainToDb(volume / 100);
+    gainNode.gain.value = Tone.dbToGain(dbVal);
 
     const panner = ctx.createStereoPanner();
     panner.pan.value = pan;

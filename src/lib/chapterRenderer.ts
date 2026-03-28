@@ -11,6 +11,7 @@
  * NO normalisation is applied — the signal is captured as-is.
  */
 import { supabase } from "@/integrations/supabase/client";
+import * as Tone from "tone";
 
 import { getAudioEngine } from "./audioEngine";
 import { fetchWithStemCache } from "./stemCache";
@@ -448,8 +449,8 @@ export async function renderChapter(opts: {
       const volume = (mixState && mixState.volume > 0) ? mixState.volume : 100;
       const pan = mixState?.pan ?? 0;
 
-      const gainDb = volume <= 0 ? -Infinity : 20 * Math.log10(volume / 100);
-      const gainLinear = volume <= 0 ? 0 : Math.pow(10, gainDb / 20);
+      const gainDb = volume <= 0 ? -Infinity : Tone.gainToDb(volume / 100);
+      const gainLinear = volume <= 0 ? 0 : Tone.dbToGain(gainDb);
 
       const gainNode = offlineCtx.createGain();
       gainNode.gain.value = gainLinear;
@@ -506,11 +507,11 @@ export async function renderChapter(opts: {
       }
 
       const targetPeak = Math.pow(10, -0.5 / 20); // -0.5 dB ≈ 0.9441
-      console.log(`[ChapterRenderer] Peak: ${globalPeak.toFixed(6)} (${globalPeak > 0 ? (20 * Math.log10(globalPeak)).toFixed(2) : '-inf'} dB), target: ${targetPeak.toFixed(6)} (-0.5 dB)`);
+      console.log(`[ChapterRenderer] Peak: ${globalPeak.toFixed(6)} (${globalPeak > 0 ? Tone.gainToDb(globalPeak).toFixed(2) : '-inf'} dB), target: ${targetPeak.toFixed(6)} (-0.5 dB)`);
 
       if (globalPeak > 0) {
         const gain = targetPeak / globalPeak;
-        console.log(`[ChapterRenderer] Normalizing: gain = ${gain.toFixed(6)} (${(20 * Math.log10(gain)).toFixed(2)} dB delta)`);
+        console.log(`[ChapterRenderer] Normalizing: gain = ${gain.toFixed(6)} (${Tone.gainToDb(gain).toFixed(2)} dB delta)`);
         for (let ch = 0; ch < numCh; ch++) {
           const data = renderedBuffer.getChannelData(ch);
           for (let i = 0; i < len; i++) {
