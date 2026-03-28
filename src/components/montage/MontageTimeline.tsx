@@ -502,6 +502,17 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
               </button>
               <input type="range" min={0} max={100} value={player.volume} onChange={e => player.changeVolume(Number(e.target.value))} className="w-[72px] h-0.5 accent-primary cursor-pointer volume-slider-sm" />
             </div>
+            {/* Loop toggle */}
+            <Button
+              variant={player.loopEnabled ? "secondary" : "ghost"}
+              size="icon"
+              className={`h-7 w-7 ${player.loopEnabled ? "text-accent-foreground" : ""}`}
+              onClick={player.toggleLoop}
+              disabled={!player.loopRegion}
+              title={isRu ? "Зацикливание региона" : "Loop region"}
+            >
+              <Repeat className="h-3.5 w-3.5" />
+            </Button>
 
             {/* Insert silence */}
             <Popover>
@@ -644,6 +655,8 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
                       player.loadProgress.done < player.loadProgress.total
                     }
                     loadLabel={player.loadProgress?.currentLabel || undefined}
+                    loopRegion={player.loopRegion}
+                    loopEnabled={player.loopEnabled}
                   />
                 </div>
 
