@@ -8,7 +8,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { Languages, Radar, BookOpen, Plus, Loader2, FileText } from "lucide-react";
+import { Languages, Radar, BookOpen, Plus, Loader2, FileText, Wand2 } from "lucide-react";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { toast } from "sonner";
 import {
@@ -422,6 +422,23 @@ export default function Translation() {
                   <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                     {isRu ? "Билингва" : "Bilingual"}
                   </span>
+                  {/* Scene full pipeline button */}
+                  {transProjectExists && selectedSceneId && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleTranslateSceneFull}
+                      disabled={translating || batchProgress.running}
+                      className="h-6 text-[10px] px-2 gap-1 ml-auto"
+                    >
+                      {batchProgress.running && batchProgress.scenesTotal === 1 ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Wand2 className="h-3 w-3" />
+                      )}
+                      {isRu ? "Полный пайплайн" : "Full pipeline"}
+                    </Button>
+                  )}
                 </div>
               {selectedSceneId ? (
                 <ScrollArea className="h-full">
