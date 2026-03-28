@@ -12,7 +12,10 @@ export type AiRoleId =
   | "screenwriter"
   | "director"
   | "profiler"
-  | "sound_engineer";
+  | "sound_engineer"
+  | "art_translator"
+  | "literary_editor"
+  | "translation_critic";
 
 export interface AiRoleDefinition {
   id: AiRoleId;
