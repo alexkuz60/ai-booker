@@ -136,6 +136,60 @@ export const AI_ROLES: Record<AiRoleId, AiRoleDefinition> = {
       "and background music. Consider the emotional tone, setting, and pacing of each scene. " +
       "Output concise English prompts optimized for AI sound generation.",
   },
+
+  art_translator: {
+    id: "art_translator",
+    labelRu: "Арт-переводчик",
+    labelEn: "Art Translator",
+    descriptionRu: "Дословный и литературный перевод сегментов",
+    descriptionEn: "Literal and literary segment translation",
+    defaultModelAdmin: "google/gemini-2.5-flash",
+    defaultModelUser: "google/gemini-2.5-flash",
+    tier: "standard",
+    poolable: true,
+    systemPrompt:
+      "You are a professional literary translator specializing in audiobook adaptation. " +
+      "Translate segments preserving the author's style, rhythm, and emotional tone. " +
+      "Maintain SSML compatibility and BPM-appropriate phrasing for TTS synthesis. " +
+      "First produce a faithful literal translation, then refine it into natural, " +
+      "idiomatic prose in the target language. Output ONLY the translation.",
+  },
+
+  literary_editor: {
+    id: "literary_editor",
+    labelRu: "Литредактор",
+    labelEn: "Literary Editor",
+    descriptionRu: "Стилистическая доводка, ритмика, культурная адаптация",
+    descriptionEn: "Stylistic refinement, rhythm, cultural adaptation",
+    defaultModelAdmin: "google/gemini-2.5-pro",
+    defaultModelUser: "google/gemini-2.5-pro",
+    tier: "heavy",
+    poolable: true,
+    systemPrompt:
+      "You are an expert literary editor for translated audiobooks. " +
+      "Refine translations for naturalness, rhythm, and cultural resonance. " +
+      "Ensure the text flows well when read aloud: check cadence, breath points, " +
+      "and dramatic pacing. Preserve the author's voice while making the translation " +
+      "feel native. Adapt cultural references where necessary. Output the refined text only.",
+  },
+
+  translation_critic: {
+    id: "translation_critic",
+    labelRu: "Критик перевода",
+    labelEn: "Translation Critic",
+    descriptionRu: "Оценка качества перевода по 5 осям Quality Radar",
+    descriptionEn: "Translation quality assessment via 5-axis Quality Radar",
+    defaultModelAdmin: "google/gemini-2.5-flash",
+    defaultModelUser: "google/gemini-2.5-flash",
+    tier: "standard",
+    poolable: true,
+    systemPrompt:
+      "You are a translation quality assessor for audiobook productions. " +
+      "Evaluate translations across 5 axes: semantic accuracy, tonal fidelity, " +
+      "rhythmic consistency (BPM/phrasing), phonetic naturalness, and cultural adaptation. " +
+      "Score each axis 0-100 and provide specific, actionable feedback. " +
+      "Flag segments that need re-translation. Be precise and evidence-based.",
+  },
 };
 
 /** Ordered list for UI display */
@@ -146,6 +200,9 @@ export const AI_ROLE_LIST: AiRoleDefinition[] = [
   AI_ROLES.director,
   AI_ROLES.profiler,
   AI_ROLES.sound_engineer,
+  AI_ROLES.art_translator,
+  AI_ROLES.literary_editor,
+  AI_ROLES.translation_critic,
 ];
 
 /** Tier labels for UI */
