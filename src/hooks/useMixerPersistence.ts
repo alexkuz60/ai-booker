@@ -46,7 +46,8 @@ export function useMixerPersistence(sceneId: string | null, trackIds: string[]) 
   const trackIdsRef = useRef(trackIds);
   trackIdsRef.current = trackIds;
 
-  // Restore mixer state when scene changes or track IDs change
+  // Restore mixer state when scene changes or track IDs change.
+  // Engine tracks may not exist yet (async loading), so retry until applied.
   const restoreKey = `${sceneId}|${trackIdsKey}`;
   useEffect(() => {
     if (!sceneId || trackIds.length === 0) return;
@@ -54,17 +55,39 @@ export function useMixerPersistence(sceneId: string | null, trackIds: string[]) 
     restoredForRef.current = restoreKey;
 
     const saved = loadLocal(sceneId);
-    if (saved) {
+    if (!saved) return;
+
+    const applyMix = () => {
+      let pending = 0;
       for (const trackId of trackIds) {
         const mix = saved[trackId];
         if (!mix) continue;
+        // Check if engine track exists (getTrackMixState returns null for missing tracks)
+        const current = engine.getTrackMixState(trackId);
+        if (!current) { pending++; continue; }
         engine.setTrackVolume(trackId, mix.volume);
         engine.setTrackPan(trackId, mix.pan);
         engine.setTrackPreFxBypassed(trackId, mix.preFxBypassed);
         engine.setTrackReverbBypassed(trackId, mix.reverbBypassed);
       }
-    }
-  }, [sceneId, restoreKey, engine]);
+      return pending;
+    };
+
+    // Immediate attempt
+    const pending = applyMix();
+    if (pending === 0) return;
+
+    // Retry for tracks that haven't loaded yet (atmo/sfx load asynchronously)
+    let attempts = 0;
+    const maxAttempts = 20; // ~2 seconds total
+    const retryInterval = setInterval(() => {
+      attempts++;
+      const still = applyMix();
+      if (still === 0 || attempts >= maxAttempts) clearInterval(retryInterval);
+    }, 100);
+
+    return () => clearInterval(retryInterval);
+  }, [sceneId, restoreKey, engine, trackIds]);
 
   // Debounced save to localStorage only
   const scheduleSave = useCallback(() => {
