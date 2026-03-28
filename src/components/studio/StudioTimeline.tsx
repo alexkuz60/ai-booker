@@ -438,6 +438,33 @@ export function StudioTimeline({
     return map;
   }, [timelineClips]);
 
+  // ── Loop region from selected + checked clips ─────────────
+  useEffect(() => {
+    if (!selectedSegmentId || !checkedSegmentIds || checkedSegmentIds.size === 0) {
+      player.clearLoopRegion();
+      return;
+    }
+    // Collect all relevant clip IDs: selected + checked
+    const allIds = new Set(checkedSegmentIds);
+    allIds.add(selectedSegmentId);
+
+    let minStart = Infinity;
+    let maxEnd = -Infinity;
+    for (const id of allIds) {
+      const clip = timelineClips.find(c => c.id === id);
+      if (clip) {
+        minStart = Math.min(minStart, clip.startSec);
+        maxEnd = Math.max(maxEnd, clip.startSec + clip.durationSec);
+      }
+    }
+
+    if (minStart < Infinity && maxEnd > minStart) {
+      player.setLoopRegion(minStart, maxEnd);
+    } else {
+      player.clearLoopRegion();
+    }
+  }, [selectedSegmentId, checkedSegmentIds, timelineClips, player.setLoopRegion, player.clearLoopRegion]);
+
   // ── Duration ──────────────────────────────────────────────
   const estimateDuration = sceneDurationSec && sceneDurationSec > 0 ? sceneDurationSec : 60;
   const duration = player.totalDuration > 0 ? player.totalDuration : estimateDuration;
