@@ -167,42 +167,40 @@ export default function Translation() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
     >
+      {/* ── Header: chapter selector + readiness summary ── */}
+      <div className="border-b px-4 py-2 flex items-center gap-3 shrink-0">
+        <Select
+          value={selectedChapterIdx != null ? String(selectedChapterIdx) : undefined}
+          onValueChange={(v) => {
+            setSelectedChapterIdx(Number(v));
+            setSelectedSceneId(null);
+          }}
+        >
+          <SelectTrigger className="w-[280px] h-8 text-xs">
+            <SelectValue placeholder={isRu ? "Выберите главу…" : "Select chapter…"} />
+          </SelectTrigger>
+          <SelectContent>
+            {chapters.map((ch) => (
+              <SelectItem key={ch.index} value={String(ch.index)} className="text-xs">
+                {ch.title}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {readiness && (
+          <span className="text-xs text-muted-foreground ml-auto whitespace-nowrap">
+            {isRu ? "Готово:" : "Ready:"}{" "}
+            {readiness.readyChapters.size}/{chapters.length}{" "}
+            {isRu ? "глав" : "ch."}
+          </span>
+        )}
+      </div>
+
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         {/* Left: Bilingual storyboard + scene nav (70%) */}
         <ResizablePanel defaultSize={70} minSize={40}>
-          <div className="h-full flex flex-col">
-            {/* ── Header: chapter selector + readiness summary ── */}
-            <div className="border-b px-4 py-2 flex items-center gap-3">
-              <Select
-                value={selectedChapterIdx != null ? String(selectedChapterIdx) : undefined}
-                onValueChange={(v) => {
-                  setSelectedChapterIdx(Number(v));
-                  setSelectedSceneId(null);
-                }}
-              >
-                <SelectTrigger className="w-[280px] h-8 text-xs">
-                  <SelectValue placeholder={isRu ? "Выберите главу…" : "Select chapter…"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {chapters.map((ch) => (
-                    <SelectItem key={ch.index} value={String(ch.index)} className="text-xs">
-                      {ch.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {readiness && (
-                <span className="text-xs text-muted-foreground ml-auto whitespace-nowrap">
-                  {isRu ? "Готово:" : "Ready:"}{" "}
-                  {readiness.readyChapters.size}/{chapters.length}{" "}
-                  {isRu ? "глав" : "ch."}
-                </span>
-              )}
-            </div>
-
-            {/* ── Body: scene nav + bilingual content ── */}
-            <div className="flex-1 flex overflow-hidden">
+          <div className="h-full flex overflow-hidden">
               {/* Scene navigator sidebar */}
               <div className="w-48 shrink-0 border-r bg-muted/30">
                 <TranslationChapterNav
@@ -259,7 +257,6 @@ export default function Translation() {
                   </div>
                 )}
               </div>
-            </div>
           </div>
         </ResizablePanel>
 
