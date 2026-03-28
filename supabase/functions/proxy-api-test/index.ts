@@ -107,8 +107,7 @@ Deno.serve(async (req) => {
       const testUrl = getFullUrlForType("embedding");
       const start = Date.now();
       try {
-        const bodyJson = await req.json().catch(() => ({}));
-        const input = bodyJson.input || "test";
+        const embInput = input || "test";
         const resp = await fetch(testUrl, {
           method: "POST",
           headers: { Authorization: `Bearer ${proxyapiKey}`, "Content-Type": "application/json" },
