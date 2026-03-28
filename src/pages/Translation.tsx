@@ -18,7 +18,7 @@ import {
   type TranslationReadiness,
 } from "@/lib/translationProject";
 import { TranslationChapterNav } from "@/components/translation/TranslationChapterNav";
-import { BilingualSegmentsView } from "@/components/translation/BilingualSegmentsView";
+import { BilingualSegmentsView, type SelectedSegmentData } from "@/components/translation/BilingualSegmentsView";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
@@ -79,7 +79,7 @@ export default function Translation() {
   const [chapters, setChapters] = useState<ChapterEntry[]>([]);
   const [selectedChapterIdx, setSelectedChapterIdx] = useState<number | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
-
+  const [selectedSegment, setSelectedSegment] = useState<SelectedSegmentData | null>(null);
   // Translation storage (mirror OPFS project)
   const { translationStorage, exists: transProjectExists, refresh: refreshTransStorage } =
     useTranslationStorage(storage, meta);
