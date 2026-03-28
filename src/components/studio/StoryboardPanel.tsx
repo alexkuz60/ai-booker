@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Json, Database } from "@/integrations/supabase/types";
+
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
-import { readCharactersFromLocal } from "@/lib/localSync";
+
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { useStoryboardPersistence, type StoryboardSnapshot } from "@/hooks/useStoryboardPersistence";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
-import { readSceneContentFromLocal } from "@/lib/localSceneContent";
+
 import { useBackgroundAnalysis } from "@/hooks/useBackgroundAnalysis";
 import { Loader2, Sparkles, BookOpen, AudioLines, CheckCircle2, XCircle, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck, AlertTriangle, X } from "lucide-react";
 import { RoleBadge } from "@/components/ui/RoleBadge";

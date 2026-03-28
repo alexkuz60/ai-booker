@@ -15,7 +15,7 @@ import { CastingCandidatesPanel, type CastingCharacter } from "@/components/stud
 import { suggestVoiceCandidates, ACCENTUATION_YANDEX_ROLE, detectAccentuation, type VoiceCandidate } from "@/config/psychotypeVoicePresets";
 import { useLocalCharacters } from "@/hooks/useLocalCharacters";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
-import { readSceneContentFromLocal } from "@/lib/localSceneContent";
+
 import { readStoryboardFromLocal } from "@/lib/storyboardSync";
 import { deriveStoryboardCharacterIds, deriveStoryboardTypeMappings } from "@/lib/storyboardCharacterRouting";
 import type { CharacterIndex } from "@/pages/parser/types";
