@@ -149,8 +149,23 @@ export async function runTranslationPipeline(
   for (let si = 0; si < totalSegs; si++) {
     checkAbort();
     const seg = segments[si];
-    const originalText = seg.phrases.map(p => p.text).join(" ");
-    const literalText = literalResults[si] ?? originalText;
+    const originalText = seg.phrases.map(p => p.text).join(" ").trim();
+    const literalText = (literalResults[si] || "").trim() || originalText;
+
+    // Skip segments with no text content
+    if (!originalText) {
+      results.push({
+        segmentId: seg.segment_id,
+        original: "",
+        literal: "",
+        literary: "",
+        critiqueNotes: [],
+        radarHistory: [],
+        radar: { semantic: 0, sentiment: 0, rhythm: 0, phonetic: 0, cultural: 0, weighted: 0 },
+        iterations: 0,
+      });
+      continue;
+    }
 
     let currentLiterary = "";
     let critiqueNotes: string[] = [];
