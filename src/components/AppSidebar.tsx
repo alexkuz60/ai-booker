@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen, LogOut, Shield, MessageCircle, Scissors, Waves } from "lucide-react";
+import { Home, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen, LogOut, Shield, MessageCircle, Scissors, Waves, Languages } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useTheme } from "next-themes";
@@ -30,6 +30,10 @@ const mainNav = [
   { title: "Монтаж", titleEn: "Montage", url: "/montage", icon: Scissors },
   { title: "Дикторы", titleEn: "Narrators", url: "/narrators", icon: Mic2 },
   { title: "Звуки", titleEn: "Soundscape", url: "/soundscape", icon: Waves },
+];
+
+const extraNav = [
+  { title: "Арт-перевод", titleEn: "Translation", url: "/translation", icon: Languages },
 ];
 
 export function AppSidebar() {
@@ -81,6 +85,38 @@ export function AppSidebar() {
                     <NavLink
                       to={item.url}
                       end={item.url === "/"}
+                      className="hover:bg-accent/50"
+                      activeClassName="bg-accent text-accent-foreground"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {!collapsed && (
+                        <span className="font-body text-sm">
+                          {lang === "ru" ? item.title : item.titleEn}
+                        </span>
+                      )}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <Separator className="mx-3 my-1" />
+
+        {/* Extra: Translation */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {extraNav.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    tooltip={collapsed ? (lang === "ru" ? item.title : item.titleEn) : undefined}
+                  >
+                    <NavLink
+                      to={item.url}
                       className="hover:bg-accent/50"
                       activeClassName="bg-accent text-accent-foreground"
                     >
