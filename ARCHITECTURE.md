@@ -634,12 +634,15 @@ Web Audio API в браузере значительно сложнее для r
 
 **RAF (`requestAnimationFrame`) допустим ТОЛЬКО для:**
 - Визуального обновления UI (VU-метры, позиция playhead, прогресс)
-- Проверки условия окончания воспроизведения (end-of-timeline)
+
+**Конвертация громкости:** `Tone.gainToDb()` / `Tone.dbToGain()` — единственный способ. Ручной `20 * Math.log10(x)` запрещён (стандартизировано в sceneRenderer, chapterRenderer, VuSlider, audioEngine).
 
 **Файлы:**
 - `src/lib/audioEngine.ts` — singleton `AudioEngine` на базе Tone.js
 - `src/hooks/useTimelinePlayer.ts` — React-обёртка над движком
 - `src/hooks/useMixerPersistence.ts` — сохранение/восстановление микшерных настроек
+- `src/hooks/usePluginsPersistence.ts` — канальные плагины (EQ/Comp/Limiter) в localStorage
+- `src/hooks/useClipPluginConfigs.ts` — per-clip плагины (EQ/Comp/Limiter/Panner3D/Convolver) в Supabase
 
 ---
 
