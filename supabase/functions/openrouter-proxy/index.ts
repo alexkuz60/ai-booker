@@ -131,13 +131,7 @@ Deno.serve(async (req) => {
 
     // ── Embeddings ──
     if (action === "embeddings" && model_id) {
-      const { input } = await req.json().catch(() => ({ input: undefined }));
-      const body = await (async () => {
-        // body was already parsed above, re-read from the original request is not possible
-        // so we accept input from the same JSON body
-        return { input: input || "test", model: model_id };
-      })();
-
+      const embInput = input || "test";
       const start = Date.now();
       try {
         const resp = await fetch("https://openrouter.ai/api/v1/embeddings", {
@@ -148,7 +142,7 @@ Deno.serve(async (req) => {
             "HTTP-Referer": "https://booker-studio.lovable.app",
             "X-Title": "BookerStudio",
           },
-          body: JSON.stringify({ model: model_id, input: body.input }),
+          body: JSON.stringify({ model: model_id, input: embInput }),
           signal: AbortSignal.timeout(30_000),
         });
         const latency = Date.now() - start;
