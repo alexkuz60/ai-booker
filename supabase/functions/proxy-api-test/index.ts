@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
         const resp = await fetch(testUrl, {
           method: "POST",
           headers: { Authorization: `Bearer ${proxyapiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ model: realModel, input }),
+          body: JSON.stringify({ model: realModel, input: embInput }),
           signal: AbortSignal.timeout(30_000),
         });
         const latency = Date.now() - start;
