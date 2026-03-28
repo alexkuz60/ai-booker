@@ -1,5 +1,10 @@
 import { SCENE_SILENCE_SEC, type SceneBoundary } from "@/hooks/useTimelineClips";
 
+interface LoopRegion {
+  startSec: number;
+  endSec: number;
+}
+
 interface TimelineRulerProps {
   zoom: number;
   duration: number;
@@ -15,9 +20,13 @@ interface TimelineRulerProps {
   isLoading?: boolean;
   /** Label of currently loading item */
   loadLabel?: string;
+  /** Loop region to highlight */
+  loopRegion?: LoopRegion | null;
+  /** Whether loop mode is active */
+  loopEnabled?: boolean;
 }
 
-export function TimelineRuler({ zoom, duration, sceneBoundaries, renderPercent, isRendering, loadPercent, isLoading, loadLabel }: TimelineRulerProps) {
+export function TimelineRuler({ zoom, duration, sceneBoundaries, renderPercent, isRendering, loadPercent, isLoading, loadLabel, loopRegion, loopEnabled }: TimelineRulerProps) {
   const marks: number[] = [];
   const step = Math.max(1, Math.round(10 / zoom));
   for (let t = 0; t <= duration; t += step) marks.push(t);
@@ -37,6 +46,19 @@ export function TimelineRuler({ zoom, duration, sceneBoundaries, renderPercent, 
 
   return (
     <div className="flex items-end h-6 border-b border-border relative" style={{ width: `${totalWidthPx}px` }}>
+      {/* Loop region highlight */}
+      {loopRegion && loopEnabled && (
+        <div
+          className="absolute top-0 bottom-0 pointer-events-none z-[5]"
+          style={{
+            left: `${loopRegion.startSec * zoom * 4}px`,
+            width: `${(loopRegion.endSec - loopRegion.startSec) * zoom * 4}px`,
+            background: "hsl(var(--accent) / 0.18)",
+            borderLeft: "2px solid hsl(var(--accent) / 0.7)",
+            borderRight: "2px solid hsl(var(--accent) / 0.7)",
+          }}
+        />
+      )}
       {/* Scene silence gap markers */}
       {sceneBoundaries?.map((boundary) => {
         const silenceDuration = boundary.silenceSec ?? SCENE_SILENCE_SEC;
