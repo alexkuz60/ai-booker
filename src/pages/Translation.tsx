@@ -1,13 +1,13 @@
 import { motion } from "framer-motion";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { Languages, Radar, BookOpen, Plus, CheckCircle2, Loader2 } from "lucide-react";
+import { Languages, Radar, BookOpen, Plus, Loader2 } from "lucide-react";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { toast } from "sonner";
 import {
@@ -18,6 +18,8 @@ import {
 import { TranslationChapterNav } from "@/components/translation/TranslationChapterNav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
+import { SaveBookButton } from "@/components/SaveBookButton";
 import { paths } from "@/lib/projectPaths";
 import type { TocChapter } from "@/pages/parser/types";
 import type { SceneIndexData } from "@/lib/sceneIndex";
@@ -47,6 +49,12 @@ export default function Translation() {
   const { setPageHeader } = usePageHeader();
   const { storage, meta, isOpen } = useProjectStorageContext();
 
+  const bookId = meta?.bookId ?? null;
+  const { saveBook, saving: savingBook, isProjectOpen, downloadZip, importZip } = useSaveBookToProject({
+    isRu,
+    currentBookId: bookId,
+  });
+
   const [readiness, setReadiness] = useState<TranslationReadiness | null>(null);
   const [checking, setChecking] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -56,9 +64,80 @@ export default function Translation() {
   const [selectedChapterIdx, setSelectedChapterIdx] = useState<number | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
 
+  const handleCreateTranslation = useCallback(async () => {
+    if (!storage || !meta || !readiness) return;
+    const readyIndices = Array.from(readiness.readyChapters.keys());
+    if (readyIndices.length === 0) {
+      toast.error(isRu
+        ? "Нет глав, готовых к переводу. Выполните раскадровку в Студии."
+        : "No chapters ready for translation. Complete storyboarding in Studio.");
+      return;
+    }
+    setCreating(true);
+    try {
+      const targetLang = meta.language === "ru" ? "en" : "ru";
+      const translationStore = await createTranslationProject({
+        sourceStorage: storage,
+        sourceMeta: meta,
+        targetLanguage: targetLang as "en" | "ru",
+        chapterIndices: readyIndices,
+      });
+      toast.success(
+        isRu
+          ? `Проект перевода "${translationStore.projectName}" создан (${readyIndices.length} глав)`
+          : `Translation project "${translationStore.projectName}" created (${readyIndices.length} chapters)`,
+      );
+    } catch (err) {
+      console.error("[Translation] create error:", err);
+      toast.error(isRu ? "Ошибка создания проекта перевода" : "Failed to create translation project");
+    } finally {
+      setCreating(false);
+    }
+  }, [storage, meta, readiness, isRu]);
+
+  const headerRight = useMemo(() => {
+    if (!isOpen || !meta) return undefined;
+    return (
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          onClick={handleCreateTranslation}
+          disabled={creating || !readiness || readiness.readyChapters.size === 0}
+          className="h-7 text-xs px-3"
+        >
+          {creating ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+          ) : (
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+          )}
+          {isRu
+            ? `Перевод (${meta.language === "ru" ? "→ EN" : "→ RU"})`
+            : `Translate (${meta.language === "ru" ? "→ EN" : "→ RU"})`}
+        </Button>
+        <SaveBookButton
+          isRu={isRu}
+          onClick={saveBook}
+          loading={savingBook}
+          disabled={!bookId}
+          showDownloadZip={isProjectOpen}
+          onDownloadZip={downloadZip}
+          showImportZip={!isProjectOpen}
+          onImportZip={importZip}
+        />
+      </div>
+    );
+  }, [isOpen, meta, creating, readiness, isRu, handleCreateTranslation, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip]);
+
+  const headerRightRef = useRef(headerRight);
+  headerRightRef.current = headerRight;
+
   useEffect(() => {
-    setPageHeader({ title: isRu ? "Арт-перевод" : "Art Translation" });
-  }, [isRu, setPageHeader]);
+    setPageHeader({
+      title: isRu ? "Арт-перевод" : "Art Translation",
+      headerRight: headerRightRef.current,
+    });
+    return () => setPageHeader({});
+  }, [isRu, setPageHeader, headerRight]);
 
   // Load chapters list
   useEffect(() => {
@@ -108,38 +187,6 @@ export default function Translation() {
     return () => { cancelled = true; };
   }, [storage, isOpen]);
 
-  const handleCreateTranslation = useCallback(async () => {
-    if (!storage || !meta || !readiness) return;
-    const readyIndices = Array.from(readiness.readyChapters.keys());
-    if (readyIndices.length === 0) {
-      toast.error(isRu
-        ? "Нет глав, готовых к переводу. Выполните раскадровку в Студии."
-        : "No chapters ready for translation. Complete storyboarding in Studio.");
-      return;
-    }
-
-    setCreating(true);
-    try {
-      const targetLang = meta.language === "ru" ? "en" : "ru";
-      const translationStore = await createTranslationProject({
-        sourceStorage: storage,
-        sourceMeta: meta,
-        targetLanguage: targetLang as "en" | "ru",
-        chapterIndices: readyIndices,
-      });
-
-      toast.success(
-        isRu
-          ? `Проект перевода "${translationStore.projectName}" создан (${readyIndices.length} глав)`
-          : `Translation project "${translationStore.projectName}" created (${readyIndices.length} chapters)`,
-      );
-    } catch (err) {
-      console.error("[Translation] create error:", err);
-      toast.error(isRu ? "Ошибка создания проекта перевода" : "Failed to create translation project");
-    } finally {
-      setCreating(false);
-    }
-  }, [storage, meta, readiness, isRu]);
 
   const selectedChapter = chapters.find((c) => c.index === selectedChapterIdx) ?? null;
 
@@ -191,38 +238,12 @@ export default function Translation() {
 
         {/* Readiness info */}
         {readiness && (
-          <div className="flex items-center gap-3 ml-auto">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>{isRu ? "Сцен размечено:" : "Storyboarded:"}</span>
-              <Badge variant={readiness.totalReady === readiness.totalScenes ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
-                {readiness.totalReady} / {readiness.totalScenes}
-              </Badge>
-            </div>
-
-            {readiness.readyChapters.size > 0 && (
-              <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3" />
-                {isRu ? `Глав: ${readiness.readyChapters.size}` : `Ch: ${readiness.readyChapters.size}`}
-              </span>
-            )}
-
-            {checking && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-
-            <Button
-              size="sm"
-              onClick={handleCreateTranslation}
-              disabled={creating || readiness.readyChapters.size === 0}
-              className="h-7 text-xs px-3"
-            >
-              {creating ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-              ) : (
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
-              )}
-              {isRu
-                ? `Перевод (${meta.language === "ru" ? "→ EN" : "→ RU"})`
-                : `Translate (${meta.language === "ru" ? "→ EN" : "→ RU"})`}
-            </Button>
+          <div className="flex items-center gap-2 ml-auto text-xs text-muted-foreground">
+            <span>{isRu ? "Сцен:" : "Scenes:"}</span>
+            <Badge variant={readiness.totalReady === readiness.totalScenes ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+              {readiness.totalReady} / {readiness.totalScenes}
+            </Badge>
+            {checking && <Loader2 className="h-3 w-3 animate-spin" />}
           </div>
         )}
       </div>
