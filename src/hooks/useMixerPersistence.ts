@@ -47,7 +47,9 @@ export function useMixerPersistence(sceneId: string | null, trackIds: string[]) 
   trackIdsRef.current = trackIds;
 
   // Restore mixer state when scene changes or track IDs change.
-  // Engine tracks may not exist yet (async loading), so retry until applied.
+  // Primary restore happens via initial TrackConfig values in useTimelinePlayer.
+  // This effect handles re-applying state when track composition changes within
+  // an already-loaded scene (e.g. clip added/removed but engine tracks persist).
   const restoreKey = `${sceneId}|${trackIdsKey}`;
   useEffect(() => {
     if (!sceneId || trackIds.length === 0) return;
@@ -57,36 +59,16 @@ export function useMixerPersistence(sceneId: string | null, trackIds: string[]) 
     const saved = loadLocal(sceneId);
     if (!saved) return;
 
-    const applyMix = () => {
-      let pending = 0;
-      for (const trackId of trackIds) {
-        const mix = saved[trackId];
-        if (!mix) continue;
-        // Check if engine track exists (getTrackMixState returns null for missing tracks)
-        const current = engine.getTrackMixState(trackId);
-        if (!current) { pending++; continue; }
-        engine.setTrackVolume(trackId, mix.volume);
-        engine.setTrackPan(trackId, mix.pan);
-        engine.setTrackPreFxBypassed(trackId, mix.preFxBypassed);
-        engine.setTrackReverbBypassed(trackId, mix.reverbBypassed);
-      }
-      return pending;
-    };
-
-    // Immediate attempt
-    const pending = applyMix();
-    if (pending === 0) return;
-
-    // Retry for tracks that haven't loaded yet (atmo/sfx load asynchronously)
-    let attempts = 0;
-    const maxAttempts = 20; // ~2 seconds total
-    const retryInterval = setInterval(() => {
-      attempts++;
-      const still = applyMix();
-      if (still === 0 || attempts >= maxAttempts) clearInterval(retryInterval);
-    }, 100);
-
-    return () => clearInterval(retryInterval);
+    for (const trackId of trackIds) {
+      const mix = saved[trackId];
+      if (!mix) continue;
+      const current = engine.getTrackMixState(trackId);
+      if (!current) continue; // track not in engine yet — initial values handle this
+      engine.setTrackVolume(trackId, mix.volume);
+      engine.setTrackPan(trackId, mix.pan);
+      engine.setTrackPreFxBypassed(trackId, mix.preFxBypassed);
+      engine.setTrackReverbBypassed(trackId, mix.reverbBypassed);
+    }
   }, [sceneId, restoreKey, engine, trackIds]);
 
   // Debounced save to localStorage only
