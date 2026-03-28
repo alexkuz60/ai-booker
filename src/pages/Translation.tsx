@@ -344,6 +344,7 @@ export default function Translation() {
           onValueChange={(v) => {
             setSelectedChapterIdx(Number(v));
             setSelectedSceneId(null);
+            setSelectedSegment(null);
           }}
         >
           <SelectTrigger className="w-[280px] h-8 text-xs">
