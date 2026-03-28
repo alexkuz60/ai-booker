@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { ZoomIn, ZoomOut, Maximize2, Play, Pause, Square, Volume2, VolumeX, ChevronUp, ChevronDown, Loader2, RefreshCw, AlertTriangle, Scissors, Plus } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2, Play, Pause, Square, Volume2, VolumeX, ChevronUp, ChevronDown, Loader2, RefreshCw, AlertTriangle, Scissors, Plus, Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -38,6 +38,10 @@ interface MontageTimelineProps {
 }
 
 export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chapterId, isRu, onSplitAtScene, hasParts }: MontageTimelineProps) {
+  // ── Loop region selection ──────────────────────────────────
+  const [loopStartClipId, setLoopStartClipId] = useState<string | null>(null);
+  const [loopEndClipId, setLoopEndClipId] = useState<string | null>(null);
+
   // ── Trim & Fade overrides ──────────────────────────────────
   const [trimOverrides, setTrimOverrides] = useState<Map<string, { offsetSec: number; newDurationSec: number }>>(new Map());
   const [fadeOverrides, setFadeOverrides] = useState<Map<string, { fadeInSec: number; fadeOutSec: number }>>(new Map());
@@ -189,6 +193,22 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [player]);
+
+  // ── Loop region sync ──────────────────────────────────────
+  useEffect(() => {
+    if (!loopStartClipId) { player.clearLoopRegion(); return; }
+    const startClip = fadedClips.find(c => c.id === loopStartClipId);
+    if (!startClip) { player.clearLoopRegion(); return; }
+    const minStart = startClip.startSec;
+    let maxEnd = startClip.startSec + startClip.durationSec;
+    if (loopEndClipId) {
+      const endClip = fadedClips.find(c => c.id === loopEndClipId);
+      if (endClip) {
+        maxEnd = Math.max(maxEnd, endClip.startSec + endClip.durationSec);
+      }
+    }
+    player.setLoopRegion(minStart, maxEnd);
+  }, [loopStartClipId, loopEndClipId, fadedClips, player]);
 
   const handleFadeIn = useCallback((trackId: string, fadeDurationSec: number) => {
     pushUndo();
@@ -502,6 +522,17 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
               </button>
               <input type="range" min={0} max={100} value={player.volume} onChange={e => player.changeVolume(Number(e.target.value))} className="w-[72px] h-0.5 accent-primary cursor-pointer volume-slider-sm" />
             </div>
+            {/* Loop toggle */}
+            <Button
+              variant={player.loopEnabled ? "secondary" : "ghost"}
+              size="icon"
+              className={`h-7 w-7 ${player.loopEnabled ? "text-accent-foreground" : ""}`}
+              onClick={player.toggleLoop}
+              disabled={!player.loopRegion}
+              title={isRu ? "Зацикливание региона" : "Loop region"}
+            >
+              <Repeat className="h-3.5 w-3.5" />
+            </Button>
 
             {/* Insert silence */}
             <Popover>
@@ -644,6 +675,8 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
                       player.loadProgress.done < player.loadProgress.total
                     }
                     loadLabel={player.loadProgress?.currentLabel || undefined}
+                    loopRegion={player.loopRegion}
+                    loopEnabled={player.loopEnabled}
                   />
                 </div>
 
@@ -657,9 +690,25 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
                         return (
                           <div
                             key={clip.id}
-                            className="absolute top-1 bottom-1 rounded-sm opacity-80 hover:opacity-100 transition-opacity"
+                            className={`absolute top-1 bottom-1 rounded-sm transition-opacity cursor-pointer ${
+                              clip.id === loopStartClipId || clip.id === loopEndClipId
+                                ? "opacity-100 ring-1 ring-accent"
+                                : "opacity-80 hover:opacity-100"
+                            }`}
                             style={{ left: `${left}px`, width: `${width}px`, backgroundColor: track.color }}
                             title={`${clip.label} (${clip.durationSec.toFixed(1)}s)`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (e.ctrlKey || e.metaKey) {
+                                // Ctrl+Click: set as loop end (furthest clip)
+                                setLoopEndClipId(prev => prev === clip.id ? null : clip.id);
+                              } else {
+                                // Normal click: set loop start, seek, clear end
+                                setLoopStartClipId(prev => prev === clip.id ? null : clip.id);
+                                setLoopEndClipId(null);
+                                player.seek(clip.startSec);
+                              }
+                            }}
                           >
                             {width > 50 && (
                               <span className="text-[9px] text-primary-foreground px-1.5 truncate block mt-0.5 font-body">

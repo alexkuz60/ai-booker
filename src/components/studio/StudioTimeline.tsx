@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo, type SetStateAction } from "react";
 import { getAudioEngine } from "@/lib/audioEngine";
 
-import { ChevronUp, ChevronDown, Plus, Film, Play, Pause, Square, Volume2, VolumeX, PanelLeftClose, PanelLeftOpen, Download, Loader2, SlidersHorizontal } from "lucide-react";
+import { ChevronUp, ChevronDown, Plus, Film, Play, Pause, Square, Volume2, VolumeX, PanelLeftClose, PanelLeftOpen, Download, Loader2, SlidersHorizontal, Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -438,6 +438,33 @@ export function StudioTimeline({
     return map;
   }, [timelineClips]);
 
+  // ── Loop region from selected + checked clips ─────────────
+  useEffect(() => {
+    if (!selectedSegmentId || !checkedSegmentIds || checkedSegmentIds.size === 0) {
+      player.clearLoopRegion();
+      return;
+    }
+    // Collect all relevant clip IDs: selected + checked
+    const allIds = new Set(checkedSegmentIds);
+    allIds.add(selectedSegmentId);
+
+    let minStart = Infinity;
+    let maxEnd = -Infinity;
+    for (const id of allIds) {
+      const clip = timelineClips.find(c => c.id === id);
+      if (clip) {
+        minStart = Math.min(minStart, clip.startSec);
+        maxEnd = Math.max(maxEnd, clip.startSec + clip.durationSec);
+      }
+    }
+
+    if (minStart < Infinity && maxEnd > minStart) {
+      player.setLoopRegion(minStart, maxEnd);
+    } else {
+      player.clearLoopRegion();
+    }
+  }, [selectedSegmentId, checkedSegmentIds, timelineClips, player.setLoopRegion, player.clearLoopRegion]);
+
   // ── Duration ──────────────────────────────────────────────
   const estimateDuration = sceneDurationSec && sceneDurationSec > 0 ? sceneDurationSec : 60;
   const duration = player.totalDuration > 0 ? player.totalDuration : estimateDuration;
@@ -835,6 +862,17 @@ export function StudioTimeline({
                 title={`${player.volume}%`}
               />
             </div>
+            {/* Loop toggle */}
+            <Button
+              variant={player.loopEnabled ? "secondary" : "ghost"}
+              size="icon"
+              className={`h-7 w-7 ${player.loopEnabled ? "text-accent-foreground" : ""}`}
+              onClick={player.toggleLoop}
+              disabled={!player.loopRegion}
+              title={isRu ? "Зацикливание региона (выберите клипы Ctrl+клик)" : "Loop region (select clips with Ctrl+click)"}
+            >
+              <Repeat className="h-3.5 w-3.5" />
+            </Button>
           </div>
 
           {/* Scene label */}
@@ -999,7 +1037,7 @@ export function StudioTimeline({
                 }}
               >
                 <div className="sticky top-0 z-20 bg-background">
-                  <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} renderPercent={rulerRenderPercent} isRendering={isRendering} />
+                  <TimelineRuler zoom={zoom} duration={duration} sceneBoundaries={sceneBoundaries} renderPercent={rulerRenderPercent} isRendering={isRendering} loopRegion={player.loopRegion} loopEnabled={player.loopEnabled} />
                 </div>
                 {allTracks.map((track) => {
                   const charId = track.id.startsWith("char-") ? track.id.slice(5) : null;

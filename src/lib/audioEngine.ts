@@ -864,6 +864,10 @@ class AudioEngine {
   private rafId = 0;
   private transport = Tone.getTransport();
 
+  // Loop region
+  private _loopStart: number | null = null;
+  private _loopEnd: number | null = null;
+
   private constructor() {
     this.instanceId = ++_engineInstanceId;
     this.masterBus = new Tone.Channel({ volume: volumeToDB(this._volume) });
@@ -969,6 +973,22 @@ class AudioEngine {
     this._timelineDurationHint = Math.max(0, Number.isFinite(totalSec) ? totalSec : 0);
     this.notify();
   }
+
+  // ─── Loop region ──────────────────────────────────────────
+
+  /** Set a loop region. When playing and position reaches endSec, seek back to startSec. */
+  setLoopRegion(startSec: number, endSec: number): void {
+    this._loopStart = Math.max(0, startSec);
+    this._loopEnd = Math.max(this._loopStart + 0.1, endSec);
+  }
+
+  clearLoopRegion(): void {
+    this._loopStart = null;
+    this._loopEnd = null;
+  }
+
+  get loopStart(): number | null { return this._loopStart; }
+  get loopEnd(): number | null { return this._loopEnd; }
 
   // ─── Track management ──────────────────────────────────
 
@@ -1882,9 +1902,19 @@ class AudioEngine {
     const tick = () => {
       if (this._state !== "playing") return;
       tickCount++;
+
+      const pos = this.transport.seconds;
+
+      // Loop region: when position reaches loopEnd, seek back to loopStart
+      if (tickCount > 3 && this._loopStart !== null && this._loopEnd !== null && pos >= this._loopEnd) {
+        this.seek(this._loopStart);
+        // seek already restarts positionLoop when playing, so return
+        return;
+      }
+
       // Only check end condition after a few frames (avoid false stop at t=0)
       const endAt = this.getEffectiveTotalDuration();
-      if (tickCount > 5 && endAt > 0 && this.transport.seconds >= endAt) {
+      if (tickCount > 5 && endAt > 0 && pos >= endAt) {
         this.transport.pause();
         for (const t of this.tracks.values()) {
           try { t.player.stop(); } catch { /* not started */ }

@@ -226,6 +226,45 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     []
   );
 
+  // ── Loop region ──────────────────────────────────────────
+  const [loopEnabled, setLoopEnabled] = useState(false);
+  const [loopRegion, setLoopRegionState] = useState<{ startSec: number; endSec: number } | null>(null);
+
+  const setLoopRegion = useCallback((startSec: number, endSec: number) => {
+    setLoopRegionState({ startSec, endSec });
+    if (loopEnabled) {
+      getAudioEngine().setLoopRegion(startSec, endSec);
+    }
+  }, [loopEnabled]);
+
+  const toggleLoop = useCallback(() => {
+    setLoopEnabled(prev => {
+      const next = !prev;
+      const eng = getAudioEngine();
+      if (next && loopRegion) {
+        eng.setLoopRegion(loopRegion.startSec, loopRegion.endSec);
+      } else {
+        eng.clearLoopRegion();
+      }
+      return next;
+    });
+  }, [loopRegion]);
+
+  const clearLoopRegion = useCallback(() => {
+    setLoopRegionState(null);
+    getAudioEngine().clearLoopRegion();
+  }, []);
+
+  // Sync engine loop state when region changes
+  useEffect(() => {
+    const eng = getAudioEngine();
+    if (loopEnabled && loopRegion) {
+      eng.setLoopRegion(loopRegion.startSec, loopRegion.endSec);
+    } else {
+      eng.clearLoopRegion();
+    }
+  }, [loopEnabled, loopRegion]);
+
   return {
     state,
     positionSec,
@@ -240,5 +279,10 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     stop,
     seek,
     retryFailed,
+    loopEnabled,
+    loopRegion,
+    toggleLoop,
+    setLoopRegion,
+    clearLoopRegion,
   };
 }
