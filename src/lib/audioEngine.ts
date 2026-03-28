@@ -1938,6 +1938,7 @@ class AudioEngine {
       cancelAnimationFrame(this.rafId);
       this.rafId = 0;
     }
+    this.clearEndStop();
   }
 
   // ─── Cleanup ───────────────────────────────────────────
