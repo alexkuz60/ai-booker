@@ -167,8 +167,8 @@ export default function Translation() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
     >
-      {/* ── Header: chapter selector + readiness summary ── */}
-      <div className="border-b px-4 py-2 flex items-center gap-3 shrink-0">
+      {/* ── Header: chapter selector + readiness + create button ── */}
+      <div className="border-b px-4 py-2 flex items-center gap-3 shrink-0 flex-wrap">
         <Select
           value={selectedChapterIdx != null ? String(selectedChapterIdx) : undefined}
           onValueChange={(v) => {
@@ -188,12 +188,41 @@ export default function Translation() {
           </SelectContent>
         </Select>
 
+        {/* Readiness info */}
         {readiness && (
-          <span className="text-xs text-muted-foreground ml-auto whitespace-nowrap">
-            {isRu ? "Готово:" : "Ready:"}{" "}
-            {readiness.readyChapters.size}/{chapters.length}{" "}
-            {isRu ? "глав" : "ch."}
-          </span>
+          <div className="flex items-center gap-3 ml-auto">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>{isRu ? "Сцен размечено:" : "Storyboarded:"}</span>
+              <Badge variant={readiness.totalReady === readiness.totalScenes ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+                {readiness.totalReady} / {readiness.totalScenes}
+              </Badge>
+            </div>
+
+            {readiness.readyChapters.size > 0 && (
+              <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3" />
+                {isRu ? `Глав: ${readiness.readyChapters.size}` : `Ch: ${readiness.readyChapters.size}`}
+              </span>
+            )}
+
+            {checking && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+
+            <Button
+              size="sm"
+              onClick={handleCreateTranslation}
+              disabled={creating || readiness.readyChapters.size === 0}
+              className="h-7 text-xs px-3"
+            >
+              {creating ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+              ) : (
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              {isRu
+                ? `Перевод (${meta.language === "ru" ? "→ EN" : "→ RU"})`
+                : `Translate (${meta.language === "ru" ? "→ EN" : "→ RU"})`}
+            </Button>
+          </div>
         )}
       </div>
 
@@ -262,18 +291,9 @@ export default function Translation() {
 
         <ResizableHandle withHandle />
 
-        {/* Right: Readiness + Quality monitoring (30%) */}
+        {/* Right: Quality monitoring (30%) */}
         <ResizablePanel defaultSize={30} minSize={20}>
           <div className="h-full flex flex-col">
-            {/* Readiness panel */}
-            <TranslationReadinessPanel
-              readiness={readiness}
-              checking={checking}
-              creating={creating}
-              meta={meta}
-              isRu={isRu}
-              onCreateTranslation={handleCreateTranslation}
-            />
 
             {/* Quality monitor placeholder */}
             <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-muted-foreground">
