@@ -860,6 +860,7 @@ class AudioEngine {
   private _volume = 80;
   private _state: EngineState = "stopped";
   private listeners = new Set<StateListener>();
+  private pluginListeners = new Set<() => void>();
   private rafId = 0;
   private transport = Tone.getTransport();
 
@@ -1665,31 +1666,37 @@ class AudioEngine {
   setMasterEqBypassed(b: boolean): void {
     this._masterEqBypassed = b;
     this.applyMasterEqBypass();
+    this.notifyPluginListeners();
   }
 
   setMasterFilterBypassed(b: boolean): void {
     this._masterFilterBypassed = b;
     this.applyMasterFilterBypass();
+    this.notifyPluginListeners();
   }
 
   setMasterMBCBypassed(b: boolean): void {
     this._masterMBCBypassed = b;
     this.applyMasterMBCBypass();
+    this.notifyPluginListeners();
   }
 
   setMasterCompBypassed(b: boolean): void {
     this._masterCompBypassed = b;
     this.applyMasterCompBypass();
+    this.notifyPluginListeners();
   }
 
   setMasterLimiterBypassed(b: boolean): void {
     this._masterLimiterBypassed = b;
     this.applyMasterLimiterBypass();
+    this.notifyPluginListeners();
   }
 
   setMasterReverbBypassed(b: boolean): void {
     this._masterReverbBypassed = b;
     this.applyMasterReverbBypass();
+    this.notifyPluginListeners();
   }
 
   setMasterChainBypassed(b: boolean): void {
@@ -1700,6 +1707,7 @@ class AudioEngine {
     this.applyMasterCompBypass();
     this.applyMasterLimiterBypass();
     this.applyMasterReverbBypass();
+    this.notifyPluginListeners();
   }
 
   // ─── Master Plugin Parameter Setters ─────────────────────
