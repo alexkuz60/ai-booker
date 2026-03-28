@@ -210,8 +210,8 @@ interface ProjectMeta {
 | Фаза | Содержание | Статус |
 |------|-----------|--------|
 | **F1** | Каркас: меню, маршрут, страница, ProjectMeta, ресайз-панели, навигатор глав, билингва-аккордеоны (read-only оригинал + редактируемый перевод), бейджи типов сегментов из раскадровки | ✅ Готово |
-| **F2** | Создание проекта-перевода (копирование структуры OPFS) | 🔲 Планируется |
-| **F3** | AI-роли (✅ aiRoles.ts) + task prompts + Edge Functions (translate-literal, translate-literary) | 🔧 Частично |
+| **F2** | Создание проекта-перевода (копирование структуры OPFS + characters + progress + overwrite protection) | ✅ Готово |
+| **F3** | AI-роли (✅ aiRoles.ts) + task prompts (✅ aiTaskPrompts.ts + server mirror) + Edge Functions (translate-literal, translate-literary) | 🔧 Частично (EF не созданы) |
 | **F4** | ~~Билингва-аккордеоны + навигатор глав~~ (перенесено в F1) | ✅ Готово |
 | **F5** | Эмбеддинг-сервис (Gemini + фонетический) | 🔲 Планируется |
 | **F6** | Критик + цикл итераций + critique-translation Edge Function | 🔲 Планируется |
