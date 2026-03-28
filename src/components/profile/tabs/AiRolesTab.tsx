@@ -30,6 +30,8 @@ interface AiRolesTabProps {
   onModelChanged?: (roleId: AiRoleId) => void;
   /** Current book title for preset naming */
   bookTitle?: string;
+  /** If provided, only these role IDs will be shown */
+  roleFilter?: AiRoleId[];
 }
 
 const TIER_ICONS = {
@@ -58,7 +60,7 @@ function saveCollapsed(set: Set<string>) {
   } catch {}
 }
 
-export function AiRolesTab({ apiKeys, isRu, onModelChanged, bookTitle }: AiRolesTabProps) {
+export function AiRolesTab({ apiKeys, isRu, onModelChanged, bookTitle, roleFilter }: AiRolesTabProps) {
   const {
     resolvedModels,
     overrides,
@@ -146,7 +148,7 @@ export function AiRolesTab({ apiKeys, isRu, onModelChanged, bookTitle }: AiRoles
       </div>
 
       <div className="grid gap-3">
-        {AI_ROLE_LIST.map((role) => {
+        {AI_ROLE_LIST.filter((role) => !roleFilter || roleFilter.includes(role.id)).map((role) => {
           const TierIcon = TIER_ICONS[role.tier];
           const tierColor = TIER_COLORS[role.tier];
           const currentModel = overrides[role.id] || resolvedModels[role.id];
