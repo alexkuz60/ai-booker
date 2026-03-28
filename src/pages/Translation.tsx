@@ -17,6 +17,7 @@ import {
   type TranslationReadiness,
 } from "@/lib/translationProject";
 import { TranslationChapterNav } from "@/components/translation/TranslationChapterNav";
+import { OriginalSegmentsView } from "@/components/translation/OriginalSegmentsView";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
@@ -293,11 +294,12 @@ export default function Translation() {
                           {isRu ? "🇷🇺 Оригинал" : "🇷🇺 Original"}
                         </AccordionTrigger>
                         <AccordionContent>
-                          <div className="text-xs text-muted-foreground italic p-3 rounded-md bg-muted/30 border border-dashed border-muted-foreground/20">
-                            {isRu
-                              ? "Сегменты оригинала (read-only) будут отображаться здесь"
-                              : "Original segments (read-only) will be displayed here"}
-                          </div>
+                          <OriginalSegmentsView
+                            storage={storage}
+                            sceneId={selectedSceneId}
+                            chapterId={selectedChapter?.chapterId ?? null}
+                            isRu={isRu}
+                          />
                         </AccordionContent>
                       </AccordionItem>
 
