@@ -200,16 +200,16 @@ export default function Translation() {
     if (!isOpen || !meta) return undefined;
     return (
       <div className="flex items-center gap-2">
-        {/* Chapter-level translate button */}
+        {/* Chapter-level full pipeline batch */}
         {transProjectExists && selectedChapter && (
           <Button
             size="sm"
             variant="secondary"
             onClick={handleTranslateChapter}
-            disabled={translating}
+            disabled={translating || batchProgress.running}
             className="h-7 text-xs px-3 gap-1.5"
           >
-            {translating ? (
+            {batchProgress.running ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <Languages className="h-3.5 w-3.5" />
@@ -254,7 +254,7 @@ export default function Translation() {
         />
       </div>
     );
-  }, [isOpen, meta, creating, readiness, isRu, handleCreateTranslation, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, transProjectExists, selectedChapter, handleTranslateChapter, translating, apiKeys]);
+  }, [isOpen, meta, creating, readiness, isRu, handleCreateTranslation, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, transProjectExists, selectedChapter, handleTranslateChapter, translating, batchProgress, apiKeys]);
 
   const headerRightRef = useRef(headerRight);
   headerRightRef.current = headerRight;
