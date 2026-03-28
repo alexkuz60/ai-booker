@@ -37,12 +37,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { QualityMonitorPanel } from "@/components/translation/QualityMonitorPanel";
 
 interface ChapterEntry {
