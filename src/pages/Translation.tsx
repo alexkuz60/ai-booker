@@ -333,35 +333,13 @@ export default function Translation() {
                 </div>
               {selectedSceneId ? (
                 <ScrollArea className="h-full">
-                  <div className="p-4 space-y-3">
-                    <Accordion type="multiple" defaultValue={["original", "translation"]}>
-                      <AccordionItem value="original">
-                        <AccordionTrigger className="text-xs font-medium py-2">
-                          {isRu ? "🇷🇺 Оригинал" : "🇷🇺 Original"}
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <OriginalSegmentsView
-                            storage={storage}
-                            sceneId={selectedSceneId}
-                            chapterId={selectedChapter?.chapterId ?? null}
-                            isRu={isRu}
-                          />
-                        </AccordionContent>
-                      </AccordionItem>
-
-                      <AccordionItem value="translation">
-                        <AccordionTrigger className="text-xs font-medium py-2">
-                          {meta.language === "ru" ? "🇬🇧 Translation" : "🇷🇺 Перевод"}
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <div className="text-xs text-muted-foreground italic p-3 rounded-md bg-muted/30 border border-dashed border-muted-foreground/20">
-                            {isRu
-                              ? "Редактируемые сегменты перевода будут отображаться здесь"
-                              : "Editable translation segments will be displayed here"}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
+                  <div className="p-3">
+                    <BilingualSegmentsView
+                      storage={storage}
+                      sceneId={selectedSceneId}
+                      chapterId={selectedChapter?.chapterId ?? null}
+                      isRu={isRu}
+                    />
                   </div>
                 </ScrollArea>
               ) : (
