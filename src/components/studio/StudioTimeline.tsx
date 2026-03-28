@@ -862,6 +862,17 @@ export function StudioTimeline({
                 title={`${player.volume}%`}
               />
             </div>
+            {/* Loop toggle */}
+            <Button
+              variant={player.loopEnabled ? "secondary" : "ghost"}
+              size="icon"
+              className={`h-7 w-7 ${player.loopEnabled ? "text-accent-foreground" : ""}`}
+              onClick={player.toggleLoop}
+              disabled={!player.loopRegion}
+              title={isRu ? "Зацикливание региона (выберите клипы Ctrl+клик)" : "Loop region (select clips with Ctrl+click)"}
+            >
+              <Repeat className="h-3.5 w-3.5" />
+            </Button>
           </div>
 
           {/* Scene label */}
