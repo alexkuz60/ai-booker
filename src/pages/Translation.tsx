@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import {
   checkTranslationReadiness,
   createTranslationProject,
+  translationProjectExists,
   type TranslationReadiness,
 } from "@/lib/translationProject";
 import { TranslationChapterNav } from "@/components/translation/TranslationChapterNav";
@@ -60,6 +61,7 @@ export default function Translation() {
   const [readiness, setReadiness] = useState<TranslationReadiness | null>(null);
   const [checking, setChecking] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [createProgress, setCreateProgress] = useState<string | null>(null);
 
   // Panel size persistence
   const { value: panelSizes, update: setPanelSizes } = useCloudSettings<{
@@ -81,18 +83,31 @@ export default function Translation() {
         : "No chapters ready for translation. Complete storyboarding in Studio.");
       return;
     }
+
+    const targetLang = (meta.language === "ru" ? "en" : "ru") as "en" | "ru";
+
+    // Check if translation project already exists
+    const exists = await translationProjectExists(storage.projectName, targetLang);
+    if (exists) {
+      toast.error(isRu
+        ? `Проект перевода "${storage.projectName}_${targetLang.toUpperCase()}" уже существует`
+        : `Translation project "${storage.projectName}_${targetLang.toUpperCase()}" already exists`);
+      return;
+    }
+
     setCreating(true);
+    setCreateProgress(isRu ? "Подготовка…" : "Preparing…");
     try {
-      const targetLang = meta.language === "ru" ? "en" : "ru";
       const translationStore = await createTranslationProject({
         sourceStorage: storage,
         sourceMeta: meta,
-        targetLanguage: targetLang as "en" | "ru",
+        targetLanguage: targetLang,
         chapterIndices: readyIndices,
+        onProgress: (label) => setCreateProgress(label),
       });
       toast.success(
         isRu
-          ? `Проект перевода "${translationStore.projectName}" создан (${readyIndices.length} глав)`
+          ? `Проект перевода «${translationStore.projectName}» создан (${readyIndices.length} глав)`
           : `Translation project "${translationStore.projectName}" created (${readyIndices.length} chapters)`,
       );
     } catch (err) {
@@ -100,6 +115,7 @@ export default function Translation() {
       toast.error(isRu ? "Ошибка создания проекта перевода" : "Failed to create translation project");
     } finally {
       setCreating(false);
+      setCreateProgress(null);
     }
   }, [storage, meta, readiness, isRu]);
 
@@ -118,9 +134,11 @@ export default function Translation() {
           ) : (
             <Plus className="h-3.5 w-3.5 mr-1.5" />
           )}
-          {isRu
-            ? `Перевод (${meta.language === "ru" ? "→ EN" : "→ RU"})`
-            : `Translate (${meta.language === "ru" ? "→ EN" : "→ RU"})`}
+          {creating && createProgress
+            ? createProgress
+            : isRu
+              ? `Перевод (${meta.language === "ru" ? "→ EN" : "→ RU"})`
+              : `Translate (${meta.language === "ru" ? "→ EN" : "→ RU"})`}
         </Button>
         <SaveBookButton
           isRu={isRu}
