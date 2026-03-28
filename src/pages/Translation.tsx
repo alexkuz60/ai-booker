@@ -238,38 +238,12 @@ export default function Translation() {
 
         {/* Readiness info */}
         {readiness && (
-          <div className="flex items-center gap-3 ml-auto">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>{isRu ? "Сцен размечено:" : "Storyboarded:"}</span>
-              <Badge variant={readiness.totalReady === readiness.totalScenes ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
-                {readiness.totalReady} / {readiness.totalScenes}
-              </Badge>
-            </div>
-
-            {readiness.readyChapters.size > 0 && (
-              <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3" />
-                {isRu ? `Глав: ${readiness.readyChapters.size}` : `Ch: ${readiness.readyChapters.size}`}
-              </span>
-            )}
-
-            {checking && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-
-            <Button
-              size="sm"
-              onClick={handleCreateTranslation}
-              disabled={creating || readiness.readyChapters.size === 0}
-              className="h-7 text-xs px-3"
-            >
-              {creating ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-              ) : (
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
-              )}
-              {isRu
-                ? `Перевод (${meta.language === "ru" ? "→ EN" : "→ RU"})`
-                : `Translate (${meta.language === "ru" ? "→ EN" : "→ RU"})`}
-            </Button>
+          <div className="flex items-center gap-2 ml-auto text-xs text-muted-foreground">
+            <span>{isRu ? "Сцен:" : "Scenes:"}</span>
+            <Badge variant={readiness.totalReady === readiness.totalScenes ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+              {readiness.totalReady} / {readiness.totalScenes}
+            </Badge>
+            {checking && <Loader2 className="h-3 w-3 animate-spin" />}
           </div>
         )}
       </div>
