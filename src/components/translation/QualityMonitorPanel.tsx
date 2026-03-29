@@ -42,6 +42,27 @@ const stageCache = new Map<string, {
   critique: CritiqueRadarFile | null;
 }>();
 
+const radarInvalidationListeners = new Set<() => void>();
+
+function emitRadarInvalidation() {
+  radarInvalidationListeners.forEach((listener) => listener());
+}
+
+function useRadarInvalidationRevision() {
+  const [revision, setRevision] = useState(0);
+
+  useEffect(() => {
+    const listener = () => setRevision((current) => current + 1);
+    radarInvalidationListeners.add(listener);
+
+    return () => {
+      radarInvalidationListeners.delete(listener);
+    };
+  }, []);
+
+  return revision;
+}
+
 /** Invalidate caches for a scene so the monitor re-reads from storage */
 export function invalidateRadarCache(sceneId: string, segmentId?: string) {
   stageCache.delete(sceneId);
@@ -54,6 +75,7 @@ export function invalidateRadarCache(sceneId: string, segmentId?: string) {
       if (key.startsWith(`${sceneId}:`)) computedCache.delete(key);
     }
   }
+  emitRadarInvalidation();
 }
 
 /** Normalize radar scores: if any axis > 1, assume 0-100 scale and convert to 0-1 */
@@ -93,6 +115,7 @@ export function QualityMonitorPanel({
   userApiKeys = {},
   onScoreChange,
 }: QualityMonitorPanelProps) {
+  const cacheRevision = useRadarInvalidationRevision();
   const [weights, setWeights] = useState<RadarWeights>(DEFAULT_WEIGHTS);
   const [selectedAxis, setSelectedAxis] = useState<RadarAxis | null>(null);
   const [segmentScores, setSegmentScores] = useState<RadarScores | null>(null);
@@ -247,7 +270,7 @@ export function QualityMonitorPanel({
     })();
 
     return () => { cancelled = true; };
-  }, [selectedSegment?.segmentId, selectedSegment?.originalText, selectedSegment?.translatedText, storage, sceneId, chapterId, sourceLang, targetLang, userApiKeys, weights]);
+  }, [selectedSegment?.segmentId, selectedSegment?.originalText, selectedSegment?.translatedText, storage, sceneId, chapterId, sourceLang, targetLang, userApiKeys, weights, cacheRevision]);
 
   // Load stage radar files for layer overlays
   useEffect(() => {
@@ -303,7 +326,7 @@ export function QualityMonitorPanel({
       }
     })();
     return () => { cancelled = true; };
-  }, [storage, sceneId, chapterId, selectedSegment?.segmentId]);
+  }, [storage, sceneId, chapterId, selectedSegment?.segmentId, cacheRevision]);
 
   // Recompute weighted when weights change
   const displayScores = useMemo(() => {
