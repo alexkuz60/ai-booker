@@ -436,7 +436,7 @@ export default function Translation() {
                         onTranslateSegments={transProjectExists ? handleTranslateSegments : undefined}
                         onLiteraryEdit={transProjectExists ? handleLiteraryEdit : undefined}
                         onCritique={transProjectExists ? handleCritique : undefined}
-                        translating={translating}
+                        translating={translating || batchProgress.running}
                         progressLabel={progressLabel}
                         selectedSegmentId={selectedSegment?.segmentId ?? null}
                         onSelectSegment={setSelectedSegment}
