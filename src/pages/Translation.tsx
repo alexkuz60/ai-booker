@@ -111,7 +111,28 @@ export default function Translation() {
     isRu,
   });
 
-  // Reload counter to force BilingualSegmentsView refresh after translation
+  // Literary edit hook
+  const literaryModel = getModelForRole("literary_editor");
+  const { editSegment, editing: literaryEditing } = useSegmentLiteraryEdit({
+    translationStorage,
+    model: literaryModel,
+    userApiKeys: apiKeys,
+    sourceLang,
+    targetLang,
+    isRu,
+  });
+
+  // Critique hook
+  const critiqueModel = getModelForRole("translation_critic");
+  const { critiqueSegment, critiquing: segCritiquing } = useSegmentCritique({
+    translationStorage,
+    model: critiqueModel,
+    userApiKeys: apiKeys,
+    sourceLang,
+    targetLang,
+    isRu,
+  });
+
   const [bilingualTick, setBilingualTick] = useState(0);
 
   const selectedChapter = chapters.find((c) => c.index === selectedChapterIdx) ?? null;
