@@ -309,6 +309,32 @@ export function QualityMonitorPanel({
           </p>
         </div>
 
+        {/* Layer toggle */}
+        {availableLayers.length > 0 && !computing && (
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] text-muted-foreground uppercase tracking-wide">
+              {isRu ? "Слои" : "Layers"}
+            </span>
+            <ToggleGroup
+              type="multiple"
+              size="sm"
+              value={visibleLayers}
+              onValueChange={(val) => setVisibleLayers(val as RadarLayer[])}
+              className="gap-0.5"
+            >
+              {availableLayers.map((layer) => (
+                <ToggleGroupItem
+                  key={layer}
+                  value={layer}
+                  className="h-5 text-[9px] px-1.5 data-[state=on]:bg-primary/20"
+                >
+                  {LAYER_LABELS[layer]?.[isRu ? "ru" : "en"] ?? layer}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
+        )}
+
         {/* Radar chart */}
         {computing ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground gap-2">
@@ -318,6 +344,8 @@ export function QualityMonitorPanel({
         ) : (
           <QualityRadarChart
             scores={displayScores}
+            layers={layerScores}
+            visibleLayers={visibleLayers}
             weights={weights}
             onWeightsChange={handleWeightsChange}
             onAxisClick={setSelectedAxis}
