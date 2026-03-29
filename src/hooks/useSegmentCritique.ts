@@ -9,6 +9,7 @@ import type { ProjectStorage } from "@/lib/projectStorage";
 import type { LocalStoryboardData } from "@/lib/storyboardSync";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
 import { computeProgrammaticAxes } from "@/lib/qualityRadar";
+import { invalidateRadarCache } from "@/components/translation/QualityMonitorPanel";
 import {
   readCritiqueRadar,
   writeCritiqueRadar,
