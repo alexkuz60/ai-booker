@@ -147,8 +147,8 @@ export function QualityMonitorPanel({
             (s) => s.segmentId === selectedSegment.segmentId,
           );
           if (saved?.radar && saved.radar.weighted > 0) {
-            const scores = { ...saved.radar, weighted: computeWeightedScore(saved.radar, weights) };
-            computedCache.set(segKey, { scores: saved.radar, notes: saved.critiqueNotes ?? [] });
+            const scores = { ...normalizeRadar(saved.radar), weighted: computeWeightedScore(normalizeRadar(saved.radar), weights) };
+            computedCache.set(segKey, { scores: normalizeRadar(saved.radar), notes: saved.critiqueNotes ?? [] });
             setSegmentScores(scores);
             setCritiqueNotes(saved.critiqueNotes ?? []);
             setComputing(false);
@@ -174,9 +174,10 @@ export function QualityMonitorPanel({
                 .filter(([k]) => k !== "weighted")
                 .some(([, v]) => (v as number) > 0);
               if (hasData) {
+                const normRadar = normalizeRadar(bestSeg.radar);
                 const notes = bestSeg.critiqueNotes ?? [];
-                const scores = { ...bestSeg.radar, weighted: computeWeightedScore(bestSeg.radar, weights) };
-                computedCache.set(segKey, { scores: bestSeg.radar, notes });
+                const scores = { ...normRadar, weighted: computeWeightedScore(normRadar, weights) };
+                computedCache.set(segKey, { scores: normRadar, notes });
                 setSegmentScores(scores);
                 setCritiqueNotes(notes);
                 setComputing(false);
