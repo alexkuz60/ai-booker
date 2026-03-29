@@ -10,7 +10,7 @@ import type { LocalStoryboardData } from "@/lib/storyboardSync";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
 import { computeProgrammaticAxes, computeSemanticScore } from "@/lib/qualityRadar";
 import { readStageRadar, readCritiqueRadar, writeStageRadar, writeCritiqueRadar, type StageSegmentRadar } from "@/lib/radarStages";
-import { invalidateRadarCache } from "@/components/translation/QualityMonitorPanel";
+import { invalidateRadarCache } from "@/lib/radarCache";
 import { toast } from "sonner";
 
 interface TranslationResult {
