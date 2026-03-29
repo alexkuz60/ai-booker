@@ -70,8 +70,9 @@ export function QualityMonitorPanel({
   }>({});
   const [availableLayers, setAvailableLayers] = useState<RadarLayer[]>([]);
 
+  // Auto-enable all available layers (except 3R which is always-on background)
   useEffect(() => {
-    setVisibleLayers((prev) => prev.filter((layer) => layer !== "3R" && availableLayers.includes(layer)));
+    setVisibleLayers(availableLayers.filter((layer) => layer !== "3R"));
   }, [availableLayers]);
 
   // Load scores from staged radar → legacy radar → compute on-the-fly
