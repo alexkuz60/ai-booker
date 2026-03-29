@@ -69,6 +69,8 @@ export function BilingualSegmentsView({
   chapterId,
   isRu,
   onTranslateSegments,
+  onLiteraryEdit,
+  onCritique,
   translating = false,
   progressLabel,
   selectedSegmentId,
@@ -77,6 +79,9 @@ export function BilingualSegmentsView({
   const [items, setItems] = useState<SegmentWithTranslation[]>([]);
   const [loading, setLoading] = useState(false);
   const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set());
+  const [segmentStages, setSegmentStages] = useState<Map<string, RadarStage | null>>(new Map());
+  const [editingIds, setEditingIds] = useState<Set<string>>(new Set());
+  const [critiquingIds, setCritiquingIds] = useState<Set<string>>(new Set());
 
   // Load source segments + any existing translations
   useEffect(() => {
