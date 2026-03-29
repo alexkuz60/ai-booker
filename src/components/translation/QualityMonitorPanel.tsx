@@ -162,13 +162,14 @@ export function QualityMonitorPanel({
                 .filter(([k]) => k !== "weighted")
                 .some(([, v]) => (v as number) > 0);
               if (hasData) {
-              const notes = bestSeg.critiqueNotes ?? [];
-              const scores = { ...bestSeg.radar, weighted: computeWeightedScore(bestSeg.radar, weights) };
-              computedCache.set(segKey, { scores: bestSeg.radar, notes });
-              setSegmentScores(scores);
-              setCritiqueNotes(notes);
-              setComputing(false);
-              return;
+                const notes = bestSeg.critiqueNotes ?? [];
+                const scores = { ...bestSeg.radar, weighted: computeWeightedScore(bestSeg.radar, weights) };
+                computedCache.set(segKey, { scores: bestSeg.radar, notes });
+                setSegmentScores(scores);
+                setCritiqueNotes(notes);
+                setComputing(false);
+                return;
+              }
             }
           }
         }
