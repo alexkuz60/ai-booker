@@ -159,6 +159,7 @@ export function QualityRadarChart({
                 fillOpacity={0.12}
                 strokeWidth={1.5}
                 strokeDasharray="4 3"
+                shape={<SkipZeroRadarShape dataKey="layer3R" stroke={LAYER_COLORS["3R"].stroke} fill={LAYER_COLORS["3R"].fill} fillOpacity={0.12} strokeWidth={1.5} strokeDasharray="4 3" />}
               />
             )}
 
