@@ -12,21 +12,34 @@ import {
   SCORE_COLORS,
 } from "@/lib/qualityRadar";
 import type { SelectedSegmentData } from "@/components/translation/BilingualSegmentsView";
-import { QualityRadarChart } from "./QualityRadarChart";
+import { QualityRadarChart, type RadarLayer } from "./QualityRadarChart";
 import { RadarAxisDetail } from "./RadarAxisDetail";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { SEGMENT_CONFIG } from "@/components/studio/storyboard/constants";
 import { cn } from "@/lib/utils";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  readAllStages,
+  LAYER_LABELS,
+  type StageRadarFile,
+  type CritiqueRadarFile,
+} from "@/lib/radarStages";
 
 // Module-level cache: sceneId → { segments: [...] }
-// Prevents re-reading OPFS on every remount / navigation return
 const radarCache = new Map<string, {
   segments: { segmentId: string; radar: RadarScores; critiqueNotes?: string[] }[];
 }>();
 
 // Per-segment fallback cache: "sceneId:segmentId" → computed scores
 const computedCache = new Map<string, { scores: RadarScores; notes: string[] }>();
+
+// Stage files cache: sceneId → stages
+const stageCache = new Map<string, {
+  literal: StageRadarFile | null;
+  literary: StageRadarFile | null;
+  critique: CritiqueRadarFile | null;
+}>();
 
 interface QualityMonitorPanelProps {
   storage: ProjectStorage | null;
