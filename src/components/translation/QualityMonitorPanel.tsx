@@ -50,6 +50,18 @@ export function invalidateRadarCache(sceneId: string, segmentId?: string) {
   }
 }
 
+/** Normalize radar scores: if any axis > 1, assume 0-100 scale and convert to 0-1 */
+function normalizeRadar(radar: RadarScores): RadarScores {
+  const axes: (keyof RadarScores)[] = ["semantic", "sentiment", "rhythm", "phonetic", "cultural", "weighted"];
+  const needsNorm = axes.some(a => radar[a] > 1);
+  if (!needsNorm) return radar;
+  const norm: RadarScores = { ...radar };
+  for (const a of axes) {
+    norm[a] = Math.max(0, Math.min(1, radar[a] / 100));
+  }
+  return norm;
+}
+
 interface QualityMonitorPanelProps {
   storage: ProjectStorage | null;
   sceneId: string | null;
@@ -135,8 +147,8 @@ export function QualityMonitorPanel({
             (s) => s.segmentId === selectedSegment.segmentId,
           );
           if (saved?.radar && saved.radar.weighted > 0) {
-            const scores = { ...saved.radar, weighted: computeWeightedScore(saved.radar, weights) };
-            computedCache.set(segKey, { scores: saved.radar, notes: saved.critiqueNotes ?? [] });
+            const scores = { ...normalizeRadar(saved.radar), weighted: computeWeightedScore(normalizeRadar(saved.radar), weights) };
+            computedCache.set(segKey, { scores: normalizeRadar(saved.radar), notes: saved.critiqueNotes ?? [] });
             setSegmentScores(scores);
             setCritiqueNotes(saved.critiqueNotes ?? []);
             setComputing(false);
@@ -162,9 +174,10 @@ export function QualityMonitorPanel({
                 .filter(([k]) => k !== "weighted")
                 .some(([, v]) => (v as number) > 0);
               if (hasData) {
+                const normRadar = normalizeRadar(bestSeg.radar);
                 const notes = bestSeg.critiqueNotes ?? [];
-                const scores = { ...bestSeg.radar, weighted: computeWeightedScore(bestSeg.radar, weights) };
-                computedCache.set(segKey, { scores: bestSeg.radar, notes });
+                const scores = { ...normRadar, weighted: computeWeightedScore(normRadar, weights) };
+                computedCache.set(segKey, { scores: normRadar, notes });
                 setSegmentScores(scores);
                 setCritiqueNotes(notes);
                 setComputing(false);
@@ -241,19 +254,19 @@ export function QualityMonitorPanel({
 
         const litSeg = stages.literal?.segments.find(s => s.segmentId === segId);
         if (litSeg?.radar) {
-          newLayers["3R"] = litSeg.radar;
+          newLayers["3R"] = normalizeRadar(litSeg.radar);
           available.push("3R");
         }
 
         const liteSeg = stages.literary?.segments.find(s => s.segmentId === segId);
         if (liteSeg?.radar) {
-          newLayers["5R"] = liteSeg.radar;
+          newLayers["5R"] = normalizeRadar(liteSeg.radar);
           available.push("5R");
         }
 
         const critSeg = stages.critique?.segments.find(s => s.segmentId === segId);
         if (critSeg?.radar) {
-          newLayers["5R+Alt"] = critSeg.radar;
+          newLayers["5R+Alt"] = normalizeRadar(critSeg.radar);
           available.push("5R+Alt");
         }
 
