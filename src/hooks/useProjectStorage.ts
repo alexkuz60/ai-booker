@@ -339,7 +339,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
               bookId: projectMeta.bookId,
             }));
           } catch {}
-          console.info("[ProjectStorage] Restored project:", targetName, "bookId:", projectMeta.bookId, "source:", source);
+          console.info("[ProjectStorage] Restored project:", targetName, "bookId:", projectMeta.bookId);
         }
       } catch (err) {
         console.warn("[ProjectStorage] Bootstrap error:", err);
