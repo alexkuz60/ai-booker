@@ -188,21 +188,6 @@ export function QualityRadarChart({
         <ThreeAxisRadarOverlay scores={layer3R} />
       </div>
 
-      {/* Preset selector */}
-      {onWeightsChange && (
-        <div className="flex items-center gap-1.5">
-          {Object.keys(RADAR_PRESETS).map((key) => (
-            <Badge
-              key={key}
-              variant={activePreset === key ? "default" : "outline"}
-              className="cursor-pointer text-[10px] px-2 py-0"
-              onClick={() => handlePreset(key)}
-            >
-              {PRESET_LABELS[key]?.[isRu ? "ru" : "en"] ?? key}
-            </Badge>
-          ))}
-        </div>
-      )}
 
       {/* Axis score bars */}
       {!compact && scores && (

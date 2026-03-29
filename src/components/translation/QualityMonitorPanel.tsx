@@ -461,7 +461,6 @@ export function QualityMonitorPanel({
             layers={layerScores}
             visibleLayers={visibleLayers}
             weights={weights}
-            onWeightsChange={handleWeightsChange}
             onAxisClick={setSelectedAxis}
             isRu={isRu}
           />
