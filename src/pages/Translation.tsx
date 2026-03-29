@@ -69,6 +69,7 @@ export default function Translation() {
   const [checking, setChecking] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createProgress, setCreateProgress] = useState<string | null>(null);
+  const [monitorScore, setMonitorScore] = useState<number | null>(null);
 
   // Panel size persistence
   const { value: panelSizes, update: setPanelSizes } = useCloudSettings<{
@@ -481,6 +482,11 @@ export default function Translation() {
               <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                 {isRu ? "Мониторинг" : "Monitor"}
               </span>
+              {monitorScore != null && (
+                <span className="ml-auto text-[11px] font-mono font-medium text-foreground">
+                  {Math.round(monitorScore * 100)}/100
+                </span>
+              )}
             </div>
             <ScrollArea className="flex-1 min-h-0">
               <div className="p-3 space-y-3">
@@ -501,6 +507,7 @@ export default function Translation() {
                   sourceLang={(sourceLang as "ru" | "en")}
                   targetLang={(targetLang as "ru" | "en")}
                   userApiKeys={apiKeys}
+                  onScoreChange={setMonitorScore}
                 />
               </div>
             </ScrollArea>

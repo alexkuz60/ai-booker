@@ -15,8 +15,6 @@ import type { SelectedSegmentData } from "@/components/translation/BilingualSegm
 import { QualityRadarChart, type RadarLayer } from "./QualityRadarChart";
 import { RadarAxisDetail } from "./RadarAxisDetail";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { SEGMENT_CONFIG } from "@/components/studio/storyboard/constants";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -51,6 +49,8 @@ interface QualityMonitorPanelProps {
   sourceLang?: "ru" | "en";
   targetLang?: "ru" | "en";
   userApiKeys?: Record<string, string>;
+  /** Called when weighted score changes (0–1 or null) */
+  onScoreChange?: (score: number | null) => void;
 }
 
 export function QualityMonitorPanel({
@@ -62,6 +62,7 @@ export function QualityMonitorPanel({
   sourceLang = "ru",
   targetLang = "en",
   userApiKeys = {},
+  onScoreChange,
 }: QualityMonitorPanelProps) {
   const [weights, setWeights] = useState<RadarWeights>(DEFAULT_WEIGHTS);
   const [selectedAxis, setSelectedAxis] = useState<RadarAxis | null>(null);
@@ -235,6 +236,11 @@ export function QualityMonitorPanel({
     return { ...segmentScores, weighted: computeWeightedScore(segmentScores, weights) };
   }, [segmentScores, weights]);
 
+  // Notify parent about score changes
+  useEffect(() => {
+    onScoreChange?.(displayScores?.weighted ?? null);
+  }, [displayScores?.weighted, onScoreChange]);
+
   const handleWeightsChange = useCallback((_preset: string, w: RadarWeights) => {
     setWeights(w);
   }, []);
@@ -281,33 +287,10 @@ export function QualityMonitorPanel({
     );
   }
 
-  const segConfig = SEGMENT_CONFIG[selectedSegment.segmentType as keyof typeof SEGMENT_CONFIG] ?? SEGMENT_CONFIG.narrator;
-  const SegIcon = segConfig.icon;
 
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
-        {/* Segment info header */}
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <Badge
-              variant="outline"
-              className={cn("text-[10px] gap-1 py-0 shrink-0", segConfig.color)}
-            >
-              <SegIcon className="h-3 w-3" />
-              {isRu ? segConfig.label_ru : segConfig.label_en}
-            </Badge>
-            {selectedSegment.speaker && (
-              <span className="text-[10px] text-muted-foreground truncate">
-                {selectedSegment.speaker}
-              </span>
-            )}
-          </div>
-          <p className="text-[10px] text-muted-foreground/70 line-clamp-2 leading-relaxed">
-            {selectedSegment.originalText.slice(0, 120)}
-            {selectedSegment.originalText.length > 120 ? "…" : ""}
-          </p>
-        </div>
 
         {/* Layer toggle */}
         {availableLayers.length > 0 && !computing && (
