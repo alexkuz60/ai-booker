@@ -53,6 +53,8 @@ interface Opts {
   getEffectivePool: (role: AiRoleId) => string[];
   /** Callback after scene translated (e.g. refresh UI) */
   onSceneComplete?: (sceneId: string) => void;
+  /** Callback after each segment is processed (for live UI updates) */
+  onSegmentComplete?: (segmentId: string) => void;
 }
 
 const EMPTY_PROGRESS: BatchTranslationProgress = {
@@ -66,7 +68,7 @@ export function useTranslationBatch(opts: Opts): UseTranslationBatchReturn {
   const {
     sourceStorage, translationStorage, userApiKeys,
     sourceLang, targetLang, isRu,
-    getModelForRole, getEffectivePool, onSceneComplete,
+    getModelForRole, getEffectivePool, onSceneComplete, onSegmentComplete,
   } = opts;
 
   const [progress, setProgress] = useState<BatchTranslationProgress>(EMPTY_PROGRESS);
@@ -106,10 +108,14 @@ export function useTranslationBatch(opts: Opts): UseTranslationBatchReturn {
         model: getModelForRole("art_translator"),
         literaryModel: getModelForRole("literary_editor"),
         critiqueModel: getModelForRole("translation_critic"),
+        skipCompleted: true,
         signal: controller.signal,
         isRu,
         onProgress: (info) => {
           setProgress(prev => ({ ...prev, currentStage: info }));
+        },
+        onSegmentComplete: (segId) => {
+          onSegmentComplete?.(segId);
         },
       });
 
@@ -129,7 +135,7 @@ export function useTranslationBatch(opts: Opts): UseTranslationBatchReturn {
       toast.error(isRu ? "Ошибка полного перевода сцены" : "Full scene translation failed");
       return null;
     }
-  }, [sourceStorage, translationStorage, userApiKeys, sourceLang, targetLang, isRu, getModelForRole, onSceneComplete]);
+  }, [sourceStorage, translationStorage, userApiKeys, sourceLang, targetLang, isRu, getModelForRole, onSceneComplete, onSegmentComplete]);
 
   // ── Chapter batch with pool ─────────────────────────────────────────────
   const translateChapterBatch = useCallback(async (
