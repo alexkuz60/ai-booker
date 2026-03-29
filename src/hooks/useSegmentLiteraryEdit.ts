@@ -117,8 +117,8 @@ export function useSegmentLiteraryEdit(opts: Opts) {
         radar: {
           semantic: 0, // Needs embedding computation — filled by monitor
           sentiment: 0,
-          rhythm: prog.rhythm * 100,
-          phonetic: prog.phonetic * 100,
+          rhythm: prog.rhythm,
+          phonetic: prog.phonetic,
           cultural: 0,
           weighted: 0,
         },
