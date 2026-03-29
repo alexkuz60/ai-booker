@@ -31,8 +31,7 @@ interface QualityRadarChartProps {
   };
   /** Which layers are visible */
   visibleLayers?: RadarLayer[];
-  weights?: RadarWeights;
-  onWeightsChange?: (preset: string, weights: RadarWeights) => void;
+  weights: RadarWeights;
   onAxisClick?: (axis: RadarAxis) => void;
   isRu: boolean;
   compact?: boolean;
@@ -55,13 +54,11 @@ export function QualityRadarChart({
   scores,
   layers,
   visibleLayers = [],
-  weights = DEFAULT_WEIGHTS,
-  onWeightsChange,
+  weights,
   onAxisClick,
   isRu,
   compact = false,
 }: QualityRadarChartProps) {
-  const [activePreset, setActivePreset] = useState("prose");
 
   const layer3R = layers?.["3R"] ?? null;
   const layer5R = layers?.["5R"] ?? null;
@@ -91,11 +88,6 @@ export function QualityRadarChart({
     }));
   }, [scores, layer3R, layer5R, layerAlt, isRu]);
 
-  const handlePreset = (key: string) => {
-    setActivePreset(key);
-    const w = RADAR_PRESETS[key];
-    if (w && onWeightsChange) onWeightsChange(key, w);
-  };
 
   const show5R = visibleLayers.includes("5R") && hasAnyAxis(layer5R);
   const showAlt = visibleLayers.includes("5R+Alt") && hasAnyAxis(layerAlt);
