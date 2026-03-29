@@ -45,7 +45,7 @@ interface QualityRadarChartProps {
 
 const AXES: RadarAxis[] = ["semantic", "sentiment", "rhythm", "phonetic", "cultural"];
 
-const LAYER_COLORS: Record<RadarLayer, { stroke: string; fill: string }> = {
+export const LAYER_COLORS: Record<RadarLayer, { stroke: string; fill: string }> = {
   "3R": { stroke: "hsl(210, 80%, 60%)", fill: "hsl(210, 80%, 60%)" },
   "5R": { stroke: "hsl(35, 90%, 55%)", fill: "hsl(35, 90%, 55%)" },
   "5R+Alt": { stroke: "hsl(160, 70%, 45%)", fill: "hsl(160, 70%, 45%)" },
@@ -91,20 +91,29 @@ export function QualityRadarChart({
 
   // Build chart data from the "primary" scores (latest stage)
   const chartData = useMemo(() => {
-    if (!scores) return AXES.map((a) => ({ axis: a, label: AXIS_LABELS[a][isRu ? "ru" : "en"], value: 0, layer3R: 0, layer5R: 0, layerAlt: 0, fullMark: 1 }));
+    if (!scores) {
+      return AXES.map((a) => ({
+        axis: a,
+        label: AXIS_LABELS[a][isRu ? "ru" : "en"],
+        value: 0,
+        primaryValue: 0,
+        layer3R: 0,
+        layer5R: 0,
+        layerAlt: 0,
+        fullMark: 1,
+      }));
+    }
     return AXES.map((a) => ({
       axis: a,
       label: AXIS_LABELS[a][isRu ? "ru" : "en"],
       value: scores[a],
+      primaryValue: layers?.["3R"]?.[a] ?? scores[a],
       layer3R: layers?.["3R"]?.[a] ?? 0,
       layer5R: layers?.["5R"]?.[a] ?? 0,
       layerAlt: layers?.["5R+Alt"]?.[a] ?? 0,
       fullMark: 1,
     }));
   }, [scores, layers, isRu]);
-
-  const weighted = scores ? computeWeightedScore(scores, weights) : 0;
-  const level: ScoreLevel = getScoreLevel(weighted);
 
   const handlePreset = (key: string) => {
     setActivePreset(key);
@@ -151,20 +160,6 @@ export function QualityRadarChart({
             />
             <PolarRadiusAxis domain={[0, 1]} tick={false} axisLine={false} />
 
-            {/* Layer: 3R (always visible when data exists) */}
-            {!!layers?.["3R"] && (
-              <Radar
-                name="3R"
-                dataKey="layer3R"
-                stroke={LAYER_COLORS["3R"].stroke}
-                fill={LAYER_COLORS["3R"].fill}
-                fillOpacity={0.12}
-                strokeWidth={1.5}
-                strokeDasharray="4 3"
-                shape={<SkipZeroRadarShape dataKey="layer3R" stroke={LAYER_COLORS["3R"].stroke} fill={LAYER_COLORS["3R"].fill} fillOpacity={0.12} strokeWidth={1.5} strokeDasharray="4 3" />}
-              />
-            )}
-
             {/* Layer: 5R (middle) */}
             {show5R && (
               <Radar
@@ -192,15 +187,16 @@ export function QualityRadarChart({
               />
             )}
 
-            {/* Primary score layer (always on top) */}
+            {/* Primary layer: always 3R when available, otherwise current score */}
             <Radar
               name="Score"
-              dataKey="value"
-              stroke={SCORE_COLORS[level]}
-              fill={SCORE_COLORS[level]}
-              fillOpacity={0.2}
-              strokeWidth={2}
-              shape={<SkipZeroRadarShape dataKey="value" stroke={SCORE_COLORS[level]} fill={SCORE_COLORS[level]} fillOpacity={0.2} strokeWidth={2} />}
+              dataKey="primaryValue"
+              stroke={LAYER_COLORS["3R"].stroke}
+              fill={LAYER_COLORS["3R"].fill}
+              fillOpacity={0.12}
+              strokeWidth={1.5}
+              strokeDasharray="4 3"
+              shape={<SkipZeroRadarShape dataKey="primaryValue" stroke={LAYER_COLORS["3R"].stroke} fill={LAYER_COLORS["3R"].fill} fillOpacity={0.12} strokeWidth={1.5} strokeDasharray="4 3" />}
             />
 
             <Tooltip
