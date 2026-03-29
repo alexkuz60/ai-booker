@@ -99,16 +99,45 @@ export function useSegmentLiteraryEdit(opts: Opts) {
         await translationStorage.writeJSON(sbPath, updated);
       }
 
-      // Compute programmatic radar axes + semantic embedding
-      const [prog, semantic] = await Promise.all([
-        Promise.resolve(computeProgrammaticAxes(
-          originalText,
-          data.text,
-          sourceLang as "ru" | "en",
-          targetLang as "ru" | "en",
-        )),
+      // Compute full 5R for literary stage so the overlay is a real pentagon
+      const prog = computeProgrammaticAxes(
+        originalText,
+        data.text,
+        sourceLang as "ru" | "en",
+        targetLang as "ru" | "en",
+      );
+      const [semantic, critique] = await Promise.all([
         computeSemanticScore(originalText, data.text, userApiKeys),
+        invokeWithFallback<{
+          scores: {
+            semantic: number;
+            sentiment: number;
+            rhythm: number;
+            phonetics: number;
+            cultural: number;
+          };
+        }>({
+          functionName: "critique-translation",
+          body: {
+            original: originalText,
+            translation: data.text,
+            type: segment.segment_type,
+            speaker: segment.speaker ?? undefined,
+            sourceLang,
+            targetLang,
+            embeddingDeltas: {
+              rhythm: prog.rhythm,
+              phonetic: prog.phonetic,
+            },
+            model,
+          },
+          userApiKeys,
+          isRu,
+        }),
       ]);
+
+      const normCritiqueAxis = (value?: number) => Math.max(0, Math.min(1, (value ?? 0) / 100));
+      const critiqueScores = critique.data?.scores;
 
       // Read existing literary radar to merge
       const existingRadar = await readStageRadar(translationStorage, chapterId, sceneId, "literary");
@@ -119,10 +148,10 @@ export function useSegmentLiteraryEdit(opts: Opts) {
         segmentId: segment.segment_id,
         radar: {
           semantic: semantic ?? 0,
-          sentiment: 0,
+          sentiment: normCritiqueAxis(critiqueScores?.sentiment),
           rhythm: prog.rhythm,
           phonetic: prog.phonetic,
-          cultural: 0,
+          cultural: normCritiqueAxis(critiqueScores?.cultural),
           weighted: 0,
         },
         critiqueNotes: data.notes,
