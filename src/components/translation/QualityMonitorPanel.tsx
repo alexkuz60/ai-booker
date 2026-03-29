@@ -121,6 +121,7 @@ export function QualityMonitorPanel({
   const cacheRevision = useRadarInvalidationRevision();
   const [weights, setWeights] = useState<RadarWeights>(DEFAULT_WEIGHTS);
   const [selectedAxis, setSelectedAxis] = useState<RadarAxis | null>(null);
+  const [activePreset, setActivePreset] = useState("prose");
   const [segmentScores, setSegmentScores] = useState<RadarScores | null>(null);
   const [computing, setComputing] = useState(false);
   const [critiqueNotes, setCritiqueNotes] = useState<string[]>([]);
