@@ -100,13 +100,13 @@ export function useSegmentLiteraryEdit(opts: Opts) {
       }
 
       // Compute full 5R for literary stage so the overlay is a real pentagon
-      const [prog, semantic, critique] = await Promise.all([
-        Promise.resolve(computeProgrammaticAxes(
-          originalText,
-          data.text,
-          sourceLang as "ru" | "en",
-          targetLang as "ru" | "en",
-        )),
+      const prog = computeProgrammaticAxes(
+        originalText,
+        data.text,
+        sourceLang as "ru" | "en",
+        targetLang as "ru" | "en",
+      );
+      const [semantic, critique] = await Promise.all([
         computeSemanticScore(originalText, data.text, userApiKeys),
         invokeWithFallback<{
           scores: {
@@ -126,8 +126,8 @@ export function useSegmentLiteraryEdit(opts: Opts) {
             sourceLang,
             targetLang,
             embeddingDeltas: {
-              rhythm: progFallback(originalText, data.text, sourceLang, targetLang).rhythm,
-              phonetic: progFallback(originalText, data.text, sourceLang, targetLang).phonetic,
+              rhythm: prog.rhythm,
+              phonetic: prog.phonetic,
             },
             model,
           },
