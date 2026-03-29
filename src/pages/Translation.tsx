@@ -200,23 +200,6 @@ export default function Translation() {
     if (!isOpen || !meta) return undefined;
     return (
       <div className="flex items-center gap-2">
-        {/* Chapter-level full pipeline batch */}
-        {transProjectExists && selectedChapter && (
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={handleTranslateChapter}
-            disabled={translating || batchProgress.running}
-            className="h-7 text-xs px-3 gap-1.5"
-          >
-            {batchProgress.running ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Languages className="h-3.5 w-3.5" />
-            )}
-            {isRu ? "Перевести главу" : "Translate chapter"}
-          </Button>
-        )}
         <Button
           size="sm"
           onClick={handleCreateTranslation}
@@ -361,6 +344,24 @@ export default function Translation() {
             ))}
           </SelectContent>
         </Select>
+
+        {/* Chapter-level full pipeline */}
+        {transProjectExists && selectedChapter && (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={handleTranslateChapter}
+            disabled={translating || batchProgress.running}
+            className="h-7 text-xs px-3 gap-1.5"
+          >
+            {batchProgress.running ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Languages className="h-3.5 w-3.5" />
+            )}
+            {isRu ? "Перевести главу" : "Translate chapter"}
+          </Button>
+        )}
 
         {/* Readiness info */}
         {readiness && (
