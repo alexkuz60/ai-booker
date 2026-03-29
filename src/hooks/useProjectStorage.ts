@@ -303,53 +303,18 @@ export function useProjectStorage(): UseProjectStorageReturn {
 
     const bootstrap = async () => {
       try {
-        let targetName: string | null = null;
-        let source = "unknown";
-
         const saved = localStorage.getItem(LAST_PROJECT_KEY);
-        if (saved) {
-          try {
-            const { name, backend: savedBackend } = JSON.parse(saved);
-            if (savedBackend === "opfs" && name) {
-              targetName = name;
-              source = "localStorage";
-            }
-          } catch {
-            console.warn("[ProjectStorage] Corrupted LAST_PROJECT_KEY, falling through to auto-detect");
-          }
-        } else {
-          console.info("[ProjectStorage] No LAST_PROJECT_KEY in localStorage, will auto-detect");
-        }
+        if (!saved) return;
 
-        // Auto-detect: if no saved key, pick the most recent source project
-        if (!targetName) {
-          const allProjects = await OPFSStorage.listProjects();
-          if (allProjects.length === 0) return;
-
-          // Prefer source projects (no targetLanguage) over translation mirrors
-          let bestName: string | null = null;
-          let bestUpdated = "";
-          for (const pName of allProjects) {
-            try {
-              const s = await OPFSStorage.openOrCreate(pName);
-              const m = await s.readJSON<ProjectMeta>("project.json");
-              if (!m) continue;
-              // Skip translation mirror projects
-              if (m.targetLanguage || m.sourceProjectName) continue;
-              if (!bestName || (m.updatedAt ?? "") > bestUpdated) {
-                bestName = pName;
-                bestUpdated = m.updatedAt ?? "";
-              }
-            } catch { /* skip unreadable */ }
+        let targetName: string | null = null;
+        try {
+          const { name, backend: savedBackend } = JSON.parse(saved);
+          if (savedBackend === "opfs" && name) {
+            targetName = name;
           }
-          // If no source project found, try any project
-          if (!bestName && allProjects.length > 0) {
-            bestName = allProjects[0];
-          }
-          targetName = bestName;
-          if (targetName) {
-            console.info("[ProjectStorage] Auto-detected OPFS project:", targetName);
-          }
+        } catch {
+          console.warn("[ProjectStorage] Corrupted LAST_PROJECT_KEY, ignoring");
+          return;
         }
 
         if (!targetName) return;
@@ -374,7 +339,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
               bookId: projectMeta.bookId,
             }));
           } catch {}
-          console.info("[ProjectStorage] Restored project:", targetName, "bookId:", projectMeta.bookId, "source:", source);
+          console.info("[ProjectStorage] Restored project:", targetName, "bookId:", projectMeta.bookId);
         }
       } catch (err) {
         console.warn("[ProjectStorage] Bootstrap error:", err);
