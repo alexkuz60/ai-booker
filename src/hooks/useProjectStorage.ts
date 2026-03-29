@@ -304,15 +304,21 @@ export function useProjectStorage(): UseProjectStorageReturn {
     const bootstrap = async () => {
       try {
         let targetName: string | null = null;
+        let source = "unknown";
 
         const saved = localStorage.getItem(LAST_PROJECT_KEY);
         if (saved) {
           try {
             const { name, backend: savedBackend } = JSON.parse(saved);
-            if (savedBackend === "opfs" && name) targetName = name;
+            if (savedBackend === "opfs" && name) {
+              targetName = name;
+              source = "localStorage";
+            }
           } catch {
-            // corrupted LAST_PROJECT_KEY — fall through to auto-detect
+            console.warn("[ProjectStorage] Corrupted LAST_PROJECT_KEY, falling through to auto-detect");
           }
+        } else {
+          console.info("[ProjectStorage] No LAST_PROJECT_KEY in localStorage, will auto-detect");
         }
 
         // Auto-detect: if no saved key, pick the most recent source project
@@ -368,7 +374,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
               bookId: projectMeta.bookId,
             }));
           } catch {}
-          console.info("[ProjectStorage] Restored project:", targetName, "bookId:", projectMeta.bookId);
+          console.info("[ProjectStorage] Restored project:", targetName, "bookId:", projectMeta.bookId, "source:", source);
         }
       } catch (err) {
         console.warn("[ProjectStorage] Bootstrap error:", err);

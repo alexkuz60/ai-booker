@@ -5,9 +5,14 @@
  * a server copy of a project into OPFS.
  *
  * Architecture: Local-Only. See ARCHITECTURE.md §1.8 step 5.
+ *
+ * IMPORTANT: Zombie scan must skip translation mirror projects
+ * (those with targetLanguage/sourceProjectName) because they share
+ * the same bookId as the source project.
  */
 
 import { OPFSStorage } from "@/lib/projectStorage";
+import type { ProjectMeta } from "@/lib/projectStorage";
 import { setCachedSceneIndex } from "@/lib/sceneIndex";
 import { clearChapterTextsCache } from "@/lib/chapterTextsCache";
 
@@ -21,8 +26,11 @@ const SESSION_KEYS_TO_CLEAR = [
 
 // ── LocalStorage keys (exact or prefix-based) ──
 
-const LOCAL_EXACT_KEYS = [
-  "booker_last_project",
+const LOCAL_EXACT_KEYS: string[] = [
+  // NOTE: booker_last_project is intentionally NOT cleared here.
+  // It is re-set by createProject/openProjectByName after the wipe.
+  // Clearing it here creates a window where bootstrap can't find any project
+  // if the subsequent create fails or the session restarts mid-wipe.
 ];
 
 const LOCAL_PREFIX_KEYS = [
@@ -53,14 +61,20 @@ export async function wipeProjectBrowserState(
     }
   }
 
-  // 1b. Verify deletion — scan for any surviving folders with the same bookId
+  // 1b. Verify deletion — scan for any surviving SOURCE folders with the same bookId.
+  // CRITICAL: Skip translation mirror projects (they share bookId but are independent).
   try {
     const surviving = await OPFSStorage.listProjects();
     for (const projectName of surviving) {
       try {
         const store = await OPFSStorage.openOrCreate(projectName);
-        const meta = await store.readJSON<{ bookId?: string }>("project.json");
+        const meta = await store.readJSON<ProjectMeta>("project.json");
         if (meta?.bookId === bookId) {
+          // Skip translation mirrors — they have targetLanguage or sourceProjectName
+          if (meta.targetLanguage || meta.sourceProjectName) {
+            console.log(`[Wipe] Skipping translation mirror: ${projectName} (bookId=${bookId})`);
+            continue;
+          }
           console.warn(`[Wipe] ⚠️ ZOMBIE folder detected after wipe: ${projectName} (bookId=${bookId}). Force-deleting.`);
           await OPFSStorage.deleteProject(projectName);
         }
@@ -105,8 +119,8 @@ export async function wipeAllBrowserState(): Promise<void> {
     try { sessionStorage.removeItem(key); } catch {}
   }
 
-  // Clear all local keys
-  for (const key of LOCAL_EXACT_KEYS) {
+  // Clear all local keys (LOCAL_EXACT_KEYS + booker_last_project for full wipe)
+  for (const key of [...LOCAL_EXACT_KEYS, "booker_last_project"]) {
     try { localStorage.removeItem(key); } catch {}
   }
 
