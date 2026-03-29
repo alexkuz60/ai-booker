@@ -51,6 +51,11 @@ export const LAYER_COLORS: Record<RadarLayer, { stroke: string; fill: string }> 
   "5R+Alt": { stroke: "hsl(160, 70%, 45%)", fill: "hsl(160, 70%, 45%)" },
 };
 
+function hasAnyAxis(scores: RadarScores | null | undefined) {
+  if (!scores) return false;
+  return AXES.some((axis) => scores[axis] > 0);
+}
+
 function projectTo3R(scores: RadarScores | null | undefined): RadarScores | null {
   if (!scores) return null;
   return {
@@ -135,9 +140,9 @@ export function QualityRadarChart({
     if (w && onWeightsChange) onWeightsChange(key, w);
   };
 
-  const show3R = !!layer3R;
-  const show5R = visibleLayers.includes("5R") && !!layer5R;
-  const showAlt = visibleLayers.includes("5R+Alt") && !!layerAlt;
+  const show3R = hasAnyAxis(layer3R);
+  const show5R = visibleLayers.includes("5R") && hasAnyAxis(layer5R);
+  const showAlt = visibleLayers.includes("5R+Alt") && hasAnyAxis(layerAlt);
 
   return (
     <div className={cn("flex flex-col items-center gap-3", compact ? "gap-2" : "gap-4")}>
@@ -199,7 +204,6 @@ export function QualityRadarChart({
                 fillOpacity={0.15}
                 strokeWidth={1.5}
                 isAnimationActive={false}
-                shape={<SkipZeroRadarShape dataKey="layer5R" stroke={LAYER_COLORS["5R"].stroke} fill={LAYER_COLORS["5R"].fill} fillOpacity={0.15} strokeWidth={1.5} />}
               />
             )}
 
@@ -215,7 +219,6 @@ export function QualityRadarChart({
                 strokeWidth={1.5}
                 strokeDasharray="2 2"
                 isAnimationActive={false}
-                shape={<SkipZeroRadarShape dataKey="layerAlt" stroke={LAYER_COLORS["5R+Alt"].stroke} fill={LAYER_COLORS["5R+Alt"].fill} fillOpacity={0.1} strokeWidth={1.5} strokeDasharray="2 2" />}
               />
             )}
 
