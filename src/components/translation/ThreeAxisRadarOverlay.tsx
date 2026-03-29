@@ -51,11 +51,10 @@ export function ThreeAxisRadarOverlay({ scores }: ThreeAxisRadarOverlayProps) {
     >
       <polygon
         fill={THREE_R_COLORS.fill}
-        fillOpacity={0.03}
+        fillOpacity={0.08}
         points={vertices}
         stroke={THREE_R_COLORS.stroke}
-        strokeDasharray="4 3"
-        strokeWidth={0.8}
+        strokeWidth={0.45}
       />
       {TRIANGLE_AXES.map((axis) => {
         const point = toPolarPoint(AXIS_INDEX[axis], scores[axis]);
@@ -65,7 +64,7 @@ export function ThreeAxisRadarOverlay({ scores }: ThreeAxisRadarOverlayProps) {
             cx={point.x}
             cy={point.y}
             fill={THREE_R_COLORS.stroke}
-            r={0.9}
+            r={0.7}
           />
         );
       })}
