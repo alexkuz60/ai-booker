@@ -187,7 +187,7 @@ export function BilingualSegmentsView({
     );
   }
 
-  const allIds = items.map((i) => i.segment.segment_id);
+  const openValue = selectedSegmentId ?? undefined;
 
   return (
     <div className="space-y-2">
@@ -215,10 +215,25 @@ export function BilingualSegmentsView({
         </div>
       )}
 
-      <Accordion type="multiple" defaultValue={allIds} className="space-y-1.5">
+      <Accordion type="single" collapsible value={openValue} onValueChange={(val) => {
+          if (!val) {
+            onSelectSegment?.(null);
+          } else {
+            const found = items.find(i => i.segment.segment_id === val);
+            if (found) {
+              const fullText = found.segment.phrases.map(p => p.text).join(" ");
+              onSelectSegment?.({
+                segmentId: found.segment.segment_id,
+                originalText: fullText,
+                translatedText: found.translatedText,
+                segmentType: found.segment.segment_type,
+                speaker: found.segment.speaker ?? null,
+              });
+            }
+          }
+        }} className="space-y-1.5">
         {items.map(({ segment: seg, translatedText, hasLiteral }) => {
           const isSelected = selectedSegmentId === seg.segment_id;
-          const fullText = seg.phrases.map((p) => p.text).join(" ");
 
           return (
             <BilingualSegmentRow
@@ -233,19 +248,6 @@ export function BilingualSegmentsView({
               isSegTranslating={translatingIds.has(seg.segment_id)}
               isSegEditing={editingIds.has(seg.segment_id)}
               isSegCritiquing={critiquingIds.has(seg.segment_id)}
-              onSelect={() => {
-                if (isSelected) {
-                  onSelectSegment?.(null);
-                } else {
-                  onSelectSegment?.({
-                    segmentId: seg.segment_id,
-                    originalText: fullText,
-                    translatedText,
-                    segmentType: seg.segment_type,
-                    speaker: seg.speaker ?? null,
-                  });
-                }
-              }}
               onTranslate={handleTranslateSegment}
               onLiteraryEdit={onLiteraryEdit ? handleLiteraryEdit : undefined}
               onCritique={onCritique ? handleCritique : undefined}

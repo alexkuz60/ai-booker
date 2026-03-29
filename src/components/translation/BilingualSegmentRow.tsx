@@ -30,7 +30,7 @@ interface Props {
   isSegTranslating: boolean;
   isSegEditing: boolean;
   isSegCritiquing: boolean;
-  onSelect: () => void;
+  
   onTranslate: (seg: Segment) => void;
   onLiteraryEdit?: (seg: Segment) => void;
   onCritique?: (seg: Segment) => void;
@@ -47,7 +47,6 @@ export function BilingualSegmentRow({
   isSegTranslating,
   isSegEditing,
   isSegCritiquing,
-  onSelect,
   onTranslate,
   onLiteraryEdit,
   onCritique,
@@ -69,7 +68,6 @@ export function BilingualSegmentRow({
           ? "bg-primary/10 border-primary ring-2 ring-primary/40 shadow-sm shadow-primary/10"
           : "bg-muted/10 hover:border-muted-foreground/30",
       )}
-      onClick={onSelect}
     >
       {/* Segment header */}
       <AccordionTrigger className="px-3 py-1.5 text-xs hover:no-underline gap-2">
