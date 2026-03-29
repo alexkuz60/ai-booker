@@ -9,7 +9,7 @@ import {
   computeSemanticScore,
 } from "@/lib/qualityRadar";
 import type { SelectedSegmentData } from "@/components/translation/BilingualSegmentsView";
-import { QualityRadarChart, type RadarLayer } from "./QualityRadarChart";
+import { QualityRadarChart, LAYER_COLORS, type RadarLayer } from "./QualityRadarChart";
 import { RadarAxisDetail } from "./RadarAxisDetail";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -370,6 +370,10 @@ export function QualityMonitorPanel({
                       : "opacity-40"
                   )}
                 >
+                  <span
+                    className="mr-1 inline-block h-1.5 w-1.5 rounded-full"
+                    style={{ backgroundColor: LAYER_COLORS[layer].stroke }}
+                  />
                   {LAYER_LABELS[layer]?.[isRu ? "ru" : "en"] ?? layer}
                 </ToggleGroupItem>
               ))}
