@@ -9,6 +9,7 @@ import {
   ResizableHandle,
 } from "@/components/ui/resizable";
 import { Languages, Radar, BookOpen, Plus, Loader2, FileText, Wand2 } from "lucide-react";
+import { getScoreLevel, SCORE_COLORS } from "@/lib/qualityRadar";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { toast } from "sonner";
 import {
@@ -483,8 +484,12 @@ export default function Translation() {
                 {isRu ? "Мониторинг" : "Monitor"}
               </span>
               {monitorScore != null && (
-                <span className="ml-auto text-[11px] font-mono font-medium text-foreground">
-                  {Math.round(monitorScore * 100)}/100
+                <span
+                  className="ml-auto text-lg font-bold tabular-nums"
+                  style={{ color: SCORE_COLORS[getScoreLevel(monitorScore)] }}
+                >
+                  {Math.round(monitorScore * 100)}
+                  <span className="text-xs font-normal text-muted-foreground"> / 100</span>
                 </span>
               )}
             </div>

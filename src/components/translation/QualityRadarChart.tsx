@@ -92,16 +92,6 @@ export function QualityRadarChart({
 
   return (
     <div className={cn("flex flex-col items-center gap-3", compact ? "gap-2" : "gap-4")}>
-      {/* Weighted score badge */}
-      <div className="flex items-center gap-2">
-        <span
-          className="text-2xl font-bold tabular-nums"
-          style={{ color: SCORE_COLORS[level] }}
-        >
-          {scores ? (weighted * 100).toFixed(0) : "—"}
-        </span>
-        <span className="text-xs text-muted-foreground">/ 100</span>
-      </div>
 
       {/* Radar chart */}
       <div className={cn("w-full", compact ? "h-[180px]" : "h-[240px]")}>
