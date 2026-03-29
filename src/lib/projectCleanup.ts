@@ -119,8 +119,8 @@ export async function wipeAllBrowserState(): Promise<void> {
     try { sessionStorage.removeItem(key); } catch {}
   }
 
-  // Clear all local keys
-  for (const key of LOCAL_EXACT_KEYS) {
+  // Clear all local keys (LOCAL_EXACT_KEYS + booker_last_project for full wipe)
+  for (const key of [...LOCAL_EXACT_KEYS, "booker_last_project"]) {
     try { localStorage.removeItem(key); } catch {}
   }
 
