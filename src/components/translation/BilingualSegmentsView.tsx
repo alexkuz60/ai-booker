@@ -37,6 +37,10 @@ interface Props {
   isRu: boolean;
   /** Translate a batch of segments */
   onTranslateSegments?: (segments: Segment[]) => Promise<void>;
+  /** Literary edit a single segment */
+  onLiteraryEdit?: (segment: Segment) => Promise<void>;
+  /** Critique a single segment */
+  onCritique?: (segment: Segment) => Promise<void>;
   /** Is currently translating */
   translating?: boolean;
   /** Translation progress label */
