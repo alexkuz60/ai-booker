@@ -68,6 +68,13 @@ export function QualityMonitorPanel({
   const [segmentScores, setSegmentScores] = useState<RadarScores | null>(null);
   const [computing, setComputing] = useState(false);
   const [critiqueNotes, setCritiqueNotes] = useState<string[]>([]);
+  const [visibleLayers, setVisibleLayers] = useState<RadarLayer[]>([]);
+  const [layerScores, setLayerScores] = useState<{
+    "3R"?: RadarScores | null;
+    "5R"?: RadarScores | null;
+    "5R+Alt"?: RadarScores | null;
+  }>({});
+  const [availableLayers, setAvailableLayers] = useState<RadarLayer[]>([]);
 
   // Try loading saved radar from storage first; fallback to on-the-fly compute
   useEffect(() => {
