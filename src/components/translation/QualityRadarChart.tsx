@@ -151,8 +151,8 @@ export function QualityRadarChart({
             />
             <PolarRadiusAxis domain={[0, 1]} tick={false} axisLine={false} />
 
-            {/* Layer: 3R (bottom) */}
-            {show3R && (
+            {/* Layer: 3R (always visible when data exists) */}
+            {!!layers?.["3R"] && (
               <Radar
                 name="3R"
                 dataKey="layer3R"
