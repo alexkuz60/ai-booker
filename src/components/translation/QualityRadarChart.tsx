@@ -109,7 +109,6 @@ export function QualityRadarChart({
 
       {/* Radar chart */}
       <div className={cn("relative w-full", compact ? "h-[180px]" : "h-[480px]")}>
-        <ThreeAxisRadarOverlay scores={layer3R} />
         <ResponsiveContainer width="100%" height="100%">
           <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="85%">
             <PolarGrid stroke="hsl(var(--muted-foreground) / 0.15)" />
@@ -186,6 +185,7 @@ export function QualityRadarChart({
             />
           </RadarChart>
         </ResponsiveContainer>
+        <ThreeAxisRadarOverlay scores={layer3R} />
       </div>
 
       {/* Preset selector */}
