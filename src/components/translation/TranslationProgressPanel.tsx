@@ -3,6 +3,7 @@
  * Shows scene progress, pipeline stage, and pool worker stats.
  */
 
+import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -18,18 +19,32 @@ interface Props {
 }
 
 export function TranslationProgressPanel({ progress, onAbort, isRu }: Props) {
+  // Hook must be before early return
+  const lastSegRef = useRef<{ index: number; total: number } | null>(null);
+
   if (!progress.running && progress.scenesTotal === 0) return null;
 
   const { scenesTotal, scenesDone, scenesFailed, currentStage, poolStats, running } = progress;
   const isDone = !running && scenesTotal > 0;
   const isSingleScene = scenesTotal === 1;
 
+  // Remember last known segment counts so they persist after pipeline ends
+  if (currentStage?.segmentIndex != null && currentStage?.totalSegments) {
+    lastSegRef.current = { index: currentStage.segmentIndex, total: currentStage.totalSegments };
+  }
+
+  const segInfo = currentStage?.segmentIndex != null && currentStage?.totalSegments
+    ? { index: currentStage.segmentIndex, total: currentStage.totalSegments }
+    : lastSegRef.current;
+
   // For single-scene: use segment-level fraction; for chapter batch: scene-level
   const pct = isSingleScene && currentStage?.fraction != null
     ? currentStage.fraction * 100
-    : scenesTotal > 0
-      ? ((scenesDone + scenesFailed) / scenesTotal) * 100
-      : 0;
+    : isSingleScene && isDone && segInfo
+      ? 100
+      : scenesTotal > 0
+        ? ((scenesDone + scenesFailed) / scenesTotal) * 100
+        : 0;
 
   // Stage label for single-scene mode
   const stageLabel = currentStage && running && isSingleScene
@@ -45,9 +60,11 @@ export function TranslationProgressPanel({ progress, onAbort, isRu }: Props) {
       })()
     : null;
 
-  // Segment counter text for single-scene
-  const segmentCounterText = currentStage && isSingleScene && currentStage.segmentIndex != null && currentStage.totalSegments
-    ? `${currentStage.segmentIndex + 1}/${currentStage.totalSegments}`
+  // Segment counter text for single-scene (uses remembered values when done/error)
+  const segmentCounterText = isSingleScene && segInfo
+    ? isDone
+      ? `${segInfo.total}/${segInfo.total}`
+      : `${segInfo.index + 1}/${segInfo.total}`
     : null;
 
   return (
