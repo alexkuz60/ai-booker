@@ -134,6 +134,9 @@ export function useSegmentLiteraryEdit(opts: Opts) {
         [...otherSegments, newSegRadar],
       );
 
+      // Invalidate monitor caches so it re-reads from OPFS
+      invalidateRadarCache(sceneId, segment.segment_id);
+
       toast.success(isRu ? "Арт-правка выполнена" : "Art edit complete");
       return { text: data.text, notes: data.notes };
     } catch (err: any) {

@@ -122,6 +122,9 @@ export function useSegmentCritique(opts: Opts) {
         [...otherSegments, newSegRadar],
       );
 
+      // Invalidate monitor caches so it re-reads from OPFS
+      invalidateRadarCache(sceneId, segment.segment_id);
+
       const verdictLabel = data.verdict === "good"
         ? (isRu ? "Хорошо" : "Good")
         : data.verdict === "acceptable"
