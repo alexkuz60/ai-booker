@@ -8,7 +8,7 @@ import type { Segment } from "@/components/studio/storyboard/types";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { LocalStoryboardData } from "@/lib/storyboardSync";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
-import { computeProgrammaticAxes } from "@/lib/qualityRadar";
+import { computeProgrammaticAxes, computeSemanticScore } from "@/lib/qualityRadar";
 import { invalidateRadarCache } from "@/components/translation/QualityMonitorPanel";
 import {
   writeStageRadar,
@@ -99,13 +99,16 @@ export function useSegmentLiteraryEdit(opts: Opts) {
         await translationStorage.writeJSON(sbPath, updated);
       }
 
-      // Compute programmatic radar axes and write radar-literary.json
-      const prog = computeProgrammaticAxes(
-        originalText,
-        data.text,
-        sourceLang as "ru" | "en",
-        targetLang as "ru" | "en",
-      );
+      // Compute programmatic radar axes + semantic embedding
+      const [prog, semantic] = await Promise.all([
+        Promise.resolve(computeProgrammaticAxes(
+          originalText,
+          data.text,
+          sourceLang as "ru" | "en",
+          targetLang as "ru" | "en",
+        )),
+        computeSemanticScore(originalText, data.text, userApiKeys),
+      ]);
 
       // Read existing literary radar to merge
       const existingRadar = await readStageRadar(translationStorage, chapterId, sceneId, "literary");
@@ -115,7 +118,7 @@ export function useSegmentLiteraryEdit(opts: Opts) {
       const newSegRadar: StageSegmentRadar = {
         segmentId: segment.segment_id,
         radar: {
-          semantic: 0, // Needs embedding computation — filled by monitor
+          semantic: semantic ?? 0,
           sentiment: 0,
           rhythm: prog.rhythm,
           phonetic: prog.phonetic,
