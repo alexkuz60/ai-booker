@@ -66,7 +66,7 @@ export function BilingualSegmentRow({
       className={cn(
         "border rounded-md overflow-hidden cursor-pointer transition-colors",
         isSelected
-          ? "bg-primary/5 border-primary/40 ring-1 ring-primary/20"
+          ? "bg-primary/10 border-primary ring-2 ring-primary/40 shadow-sm shadow-primary/10"
           : "bg-muted/10 hover:border-muted-foreground/30",
       )}
       onClick={onSelect}
