@@ -12,14 +12,12 @@ import {
   type RadarScores,
   type RadarWeights,
   type RadarAxis,
-  type ScoreLevel,
   RADAR_PRESETS,
   PRESET_LABELS,
   AXIS_LABELS,
   DEFAULT_WEIGHTS,
   getScoreLevel,
   SCORE_COLORS,
-  computeWeightedScore,
 } from "@/lib/qualityRadar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -68,6 +66,11 @@ function projectTo3R(scores: RadarScores | null | undefined): RadarScores | null
   };
 }
 
+function canProjectPrimaryTo3R(scores: RadarScores | null | undefined) {
+  if (!scores) return false;
+  return scores.sentiment <= 0 && scores.cultural <= 0;
+}
+
 /**
  * Custom Radar shape that skips axes with value=0,
  * drawing a polygon only through non-zero points.
@@ -106,7 +109,7 @@ export function QualityRadarChart({
 }: QualityRadarChartProps) {
   const [activePreset, setActivePreset] = useState("prose");
 
-  const layer3R = layers?.["3R"] ?? projectTo3R(scores);
+  const layer3R = layers?.["3R"] ?? (canProjectPrimaryTo3R(scores) ? projectTo3R(scores) : null);
   const layer5R = layers?.["5R"] ?? null;
   const layerAlt = layers?.["5R+Alt"] ?? null;
 

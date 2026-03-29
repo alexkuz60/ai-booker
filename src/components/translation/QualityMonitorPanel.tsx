@@ -115,7 +115,8 @@ export function QualityMonitorPanel({
     setVisibleLayers((prev) => prev.filter((layer) => layer !== "3R" && availableLayers.includes(layer)));
   }, [availableLayers]);
 
-  // Try loading saved radar from storage first; fallback to on-the-fly compute
+  // Try loading staged radar from storage first; fallback to legacy radar.json,
+  // then to on-the-fly compute.
   useEffect(() => {
     if (!selectedSegment?.translatedText || !selectedSegment?.originalText) {
       setSegmentScores(null);
@@ -140,40 +141,7 @@ export function QualityMonitorPanel({
 
     (async () => {
       try {
-        // 1. Try radar.json cache, then OPFS
-        let radarSegments = sceneId ? radarCache.get(sceneId)?.segments : undefined;
-        if (!radarSegments && storage && sceneId && chapterId) {
-          const radarPath = `chapters/${chapterId}/scenes/${sceneId}/radar.json`;
-          const radarData = await storage.readJSON<{
-            segments?: {
-              segmentId: string;
-              radar: RadarScores;
-              critiqueNotes?: string[];
-            }[];
-          }>(radarPath);
-          if (radarData?.segments) {
-            radarSegments = radarData.segments;
-            radarCache.set(sceneId, { segments: radarSegments });
-          }
-        }
-
-        if (!cancelled && radarSegments) {
-          const saved = radarSegments.find(
-            (s) => s.segmentId === selectedSegment.segmentId,
-          );
-          if (saved?.radar && saved.radar.weighted > 0) {
-            const scores = { ...normalizeRadar(saved.radar), weighted: computeWeightedScore(normalizeRadar(saved.radar), weights) };
-            computedCache.set(segKey, { scores: normalizeRadar(saved.radar), notes: saved.critiqueNotes ?? [] });
-            setSegmentScores(scores);
-            setCritiqueNotes(saved.critiqueNotes ?? []);
-            setComputing(false);
-            return;
-          }
-        }
-
-        if (cancelled) return;
-
-        // 1b. Try staged radar files (radar-literal / radar-literary / radar-critique)
+        // 1. Prefer staged radar files (radar-literal / radar-literary / radar-critique)
         if (storage && sceneId && chapterId) {
           const stages = stageCache.get(sceneId) ?? await readAllStages(storage, chapterId, sceneId);
           if (stages) {
@@ -198,6 +166,46 @@ export function QualityMonitorPanel({
                 setComputing(false);
                 return;
               }
+            }
+          }
+        }
+
+        if (cancelled) return;
+
+        // 1b. Legacy fallback: monolithic radar.json
+        let radarSegments = sceneId ? radarCache.get(sceneId)?.segments : undefined;
+        if (!radarSegments && storage && sceneId && chapterId) {
+          const radarPath = `chapters/${chapterId}/scenes/${sceneId}/radar.json`;
+          const radarData = await storage.readJSON<{
+            segments?: {
+              segmentId: string;
+              radar: RadarScores;
+              critiqueNotes?: string[];
+            }[];
+          }>(radarPath);
+          if (radarData?.segments) {
+            radarSegments = radarData.segments;
+            radarCache.set(sceneId, { segments: radarSegments });
+          }
+        }
+
+        if (!cancelled && radarSegments) {
+          const saved = radarSegments.find(
+            (s) => s.segmentId === selectedSegment.segmentId,
+          );
+          if (saved?.radar) {
+            const normRadar = normalizeRadar(saved.radar);
+            const hasData = Object.entries(normRadar)
+              .filter(([k]) => k !== "weighted")
+              .some(([, v]) => (v as number) > 0);
+
+            if (hasData) {
+              const scores = { ...normRadar, weighted: computeWeightedScore(normRadar, weights) };
+              computedCache.set(segKey, { scores: normRadar, notes: saved.critiqueNotes ?? [] });
+              setSegmentScores(scores);
+              setCritiqueNotes(saved.critiqueNotes ?? []);
+              setComputing(false);
+              return;
             }
           }
         }
@@ -244,7 +252,7 @@ export function QualityMonitorPanel({
     })();
 
     return () => { cancelled = true; };
-  }, [selectedSegment?.segmentId, selectedSegment?.originalText, selectedSegment?.translatedText, storage, sceneId, chapterId, sourceLang, targetLang, userApiKeys]);
+  }, [selectedSegment?.segmentId, selectedSegment?.originalText, selectedSegment?.translatedText, storage, sceneId, chapterId, sourceLang, targetLang, userApiKeys, weights]);
 
   // Load stage radar files for layer overlays
   useEffect(() => {
