@@ -1,15 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Radar as RadarIcon, Activity, BarChart3, MousePointerClick } from "lucide-react";
+import { Radar as RadarIcon, Activity, MousePointerClick } from "lucide-react";
 import type { ProjectStorage } from "@/lib/projectStorage";
-import type { RadarScores, RadarWeights, RadarAxis } from "@/lib/qualityRadar";
+import type { RadarScores, RadarWeights } from "@/lib/qualityRadar";
 import {
   DEFAULT_WEIGHTS,
   computeWeightedScore,
   computeProgrammaticAxes,
   computeSemanticScore,
-  AXIS_LABELS,
-  getScoreLevel,
-  SCORE_COLORS,
 } from "@/lib/qualityRadar";
 import type { SelectedSegmentData } from "@/components/translation/BilingualSegmentsView";
 import { QualityRadarChart, type RadarLayer } from "./QualityRadarChart";
