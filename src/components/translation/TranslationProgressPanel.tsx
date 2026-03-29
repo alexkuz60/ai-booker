@@ -21,8 +21,34 @@ export function TranslationProgressPanel({ progress, onAbort, isRu }: Props) {
   if (!progress.running && progress.scenesTotal === 0) return null;
 
   const { scenesTotal, scenesDone, scenesFailed, currentStage, poolStats, running } = progress;
-  const pct = scenesTotal > 0 ? ((scenesDone + scenesFailed) / scenesTotal) * 100 : 0;
   const isDone = !running && scenesTotal > 0;
+  const isSingleScene = scenesTotal === 1;
+
+  // For single-scene: use segment-level fraction; for chapter batch: scene-level
+  const pct = isSingleScene && currentStage?.fraction != null
+    ? currentStage.fraction * 100
+    : scenesTotal > 0
+      ? ((scenesDone + scenesFailed) / scenesTotal) * 100
+      : 0;
+
+  // Stage label for single-scene mode
+  const stageLabel = currentStage && running && isSingleScene
+    ? (() => {
+        const stageNum = currentStage.stage === "literal" || currentStage.stage === "literary" ? 1
+          : currentStage.stage === "radar" ? 2
+          : currentStage.stage === "critique" ? 3
+          : 0;
+        const stageName = isRu
+          ? (stageNum === 1 ? "Редактура" : stageNum === 2 ? "Радар" : stageNum === 3 ? "Критика" : currentStage.stage)
+          : (stageNum === 1 ? "Editing" : stageNum === 2 ? "Radar" : stageNum === 3 ? "Critique" : currentStage.stage);
+        return stageName;
+      })()
+    : null;
+
+  // Segment counter text for single-scene
+  const segmentCounterText = currentStage && isSingleScene && currentStage.segmentIndex != null && currentStage.totalSegments
+    ? `${currentStage.segmentIndex + 1}/${currentStage.totalSegments}`
+    : null;
 
   return (
     <div className="border rounded-lg bg-card/95 backdrop-blur-sm p-3 space-y-2 shadow-sm">
@@ -45,6 +71,11 @@ export function TranslationProgressPanel({ progress, onAbort, isRu }: Props) {
                 ? isRu ? "Завершено" : "Complete"
                 : ""}
           </span>
+          {running && stageLabel && (
+            <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
+              {stageLabel}
+            </Badge>
+          )}
         </div>
         {running && (
           <Button
@@ -61,11 +92,17 @@ export function TranslationProgressPanel({ progress, onAbort, isRu }: Props) {
       {/* Progress bar */}
       <Progress value={pct} className="h-1.5" />
 
-      {/* Scenes counter */}
+      {/* Counters */}
       <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-        <span>
-          {isRu ? "Сцены:" : "Scenes:"} {scenesDone}/{scenesTotal}
-        </span>
+        {isSingleScene && segmentCounterText ? (
+          <span className="tabular-nums">
+            {isRu ? "Сегменты:" : "Segments:"} {segmentCounterText}
+          </span>
+        ) : (
+          <span>
+            {isRu ? "Сцены:" : "Scenes:"} {scenesDone}/{scenesTotal}
+          </span>
+        )}
         {scenesFailed > 0 && (
           <Badge variant="destructive" className="text-[9px] px-1 py-0">
             {isRu ? `ошибок: ${scenesFailed}` : `errors: ${scenesFailed}`}
@@ -73,7 +110,7 @@ export function TranslationProgressPanel({ progress, onAbort, isRu }: Props) {
         )}
       </div>
 
-      {/* Current stage */}
+      {/* Current stage message */}
       {currentStage && running && (
         <p className="text-[10px] text-muted-foreground truncate">
           {currentStage.message}
