@@ -26,8 +26,11 @@ const SESSION_KEYS_TO_CLEAR = [
 
 // ── LocalStorage keys (exact or prefix-based) ──
 
-const LOCAL_EXACT_KEYS = [
-  "booker_last_project",
+const LOCAL_EXACT_KEYS: string[] = [
+  // NOTE: booker_last_project is intentionally NOT cleared here.
+  // It is re-set by createProject/openProjectByName after the wipe.
+  // Clearing it here creates a window where bootstrap can't find any project
+  // if the subsequent create fails or the session restarts mid-wipe.
 ];
 
 const LOCAL_PREFIX_KEYS = [
