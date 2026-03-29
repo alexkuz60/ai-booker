@@ -21,15 +21,10 @@ import {
   type CritiqueRadarFile,
 } from "@/lib/radarStages";
 
-const LITERAL_AXES: RadarAxis[] = ["semantic", "rhythm", "phonetic"];
-const FULL_AXES: RadarAxis[] = ["semantic", "sentiment", "rhythm", "phonetic", "cultural"];
+const ALL_AXES: RadarAxis[] = ["semantic", "sentiment", "rhythm", "phonetic", "cultural"];
 
-function hasAxisData(radar: RadarScores | null | undefined, axes: RadarAxis[]) {
-  return !!radar && axes.some((axis) => radar[axis] > 0);
-}
-
-function hasFullFiveRAxes(radar: RadarScores | null | undefined) {
-  return !!radar && FULL_AXES.every((axis) => radar[axis] > 0);
+function hasAnyAxis(radar: RadarScores | null | undefined) {
+  return !!radar && ALL_AXES.some((axis) => radar[axis] > 0);
 }
 
 // Module-level cache: sceneId → { segments: [...] }
@@ -277,21 +272,21 @@ export function QualityMonitorPanel({
 
         const litSeg = stages.literal?.segments.find(s => s.segmentId === segId);
         const literalRadar = litSeg?.radar ? normalizeRadar(litSeg.radar) : null;
-        if (hasAxisData(literalRadar, LITERAL_AXES)) {
+        if (hasAnyAxis(literalRadar)) {
           newLayers["3R"] = literalRadar;
           available.push("3R");
         }
 
         const liteSeg = stages.literary?.segments.find(s => s.segmentId === segId);
         const literaryRadar = liteSeg?.radar ? normalizeRadar(liteSeg.radar) : null;
-        if (hasFullFiveRAxes(literaryRadar)) {
+        if (hasAnyAxis(literaryRadar)) {
           newLayers["5R"] = literaryRadar;
           available.push("5R");
         }
 
         const critSeg = stages.critique?.segments.find(s => s.segmentId === segId);
         const critiqueRadar = critSeg?.radar ? normalizeRadar(critSeg.radar) : null;
-        if (hasFullFiveRAxes(critiqueRadar)) {
+        if (hasAnyAxis(critiqueRadar)) {
           newLayers["5R+Alt"] = critiqueRadar;
           available.push("5R+Alt");
         }

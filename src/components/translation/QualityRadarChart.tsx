@@ -54,49 +54,6 @@ function hasAnyAxis(scores: RadarScores | null | undefined) {
   return AXES.some((axis) => scores[axis] > 0);
 }
 
-function projectTo3R(scores: RadarScores | null | undefined): RadarScores | null {
-  if (!scores) return null;
-  return {
-    semantic: scores.semantic,
-    sentiment: 0,
-    rhythm: scores.rhythm,
-    phonetic: scores.phonetic,
-    cultural: 0,
-    weighted: scores.weighted,
-  };
-}
-
-function canProjectPrimaryTo3R(scores: RadarScores | null | undefined) {
-  if (!scores) return false;
-  return scores.sentiment <= 0 && scores.cultural <= 0;
-}
-
-/**
- * Custom Radar shape that skips axes with value=0,
- * drawing a polygon only through non-zero points.
- */
-function SkipZeroRadarShape({ points, dataKey, stroke, fill, fillOpacity, strokeWidth, strokeDasharray }: any) {
-  if (!points?.length) return null;
-  // Filter to only points whose corresponding data value > 0
-  const nonZero = points.filter((_: any, i: number) => {
-    // points correspond to AXES order
-    return true; // keep all for coordinate lookup
-  });
-  // Build polygon from non-zero values only
-  const validPoints = points.filter((_: any, i: number) => {
-    // Access the raw value from the point — recharts stores it in payload
-    const val = _?.payload?.[dataKey];
-    return val != null && val > 0;
-  });
-  if (validPoints.length < 2) return null;
-  const d = validPoints.map((p: any, i: number) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ") + " Z";
-  return (
-    <g>
-      <path d={d} fill={fill} fillOpacity={fillOpacity} stroke={stroke} strokeWidth={strokeWidth} strokeDasharray={strokeDasharray} />
-    </g>
-  );
-}
-
 export function QualityRadarChart({
   scores,
   layers,
@@ -109,7 +66,7 @@ export function QualityRadarChart({
 }: QualityRadarChartProps) {
   const [activePreset, setActivePreset] = useState("prose");
 
-  const layer3R = layers?.["3R"] ?? (canProjectPrimaryTo3R(scores) ? projectTo3R(scores) : null);
+  const layer3R = layers?.["3R"] ?? null;
   const layer5R = layers?.["5R"] ?? null;
   const layerAlt = layers?.["5R+Alt"] ?? null;
 
@@ -180,7 +137,7 @@ export function QualityRadarChart({
             />
             <PolarRadiusAxis domain={[0, 1]} tick={false} axisLine={false} />
 
-            {/* Layer: 3R base (always visible, drawn first as the base) */}
+            {/* Layer: 3R base (visible when data available, drawn first) */}
             {show3R && (
               <Radar
                 key="layer-3r"
@@ -192,7 +149,6 @@ export function QualityRadarChart({
                 strokeWidth={1.5}
                 strokeDasharray="4 3"
                 isAnimationActive={false}
-                shape={<SkipZeroRadarShape dataKey="layer3R" stroke={LAYER_COLORS["3R"].stroke} fill={LAYER_COLORS["3R"].fill} fillOpacity={0.12} strokeWidth={1.5} strokeDasharray="4 3" />}
               />
             )}
 
