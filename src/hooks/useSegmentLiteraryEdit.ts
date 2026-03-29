@@ -138,6 +138,9 @@ export function useSegmentLiteraryEdit(opts: Opts) {
 
       const normCritiqueAxis = (value?: number) => Math.max(0, Math.min(1, (value ?? 0) / 100));
       const critiqueScores = critique.data?.scores;
+      const literarySemantic = critiqueScores?.semantic != null
+        ? normCritiqueAxis(critiqueScores.semantic)
+        : (semantic ?? 0);
 
       // Read existing literary radar to merge
       const existingRadar = await readStageRadar(translationStorage, chapterId, sceneId, "literary");
@@ -147,7 +150,7 @@ export function useSegmentLiteraryEdit(opts: Opts) {
       const newSegRadar: StageSegmentRadar = {
         segmentId: segment.segment_id,
         radar: {
-          semantic: semantic ?? 0,
+          semantic: literarySemantic,
           sentiment: normCritiqueAxis(critiqueScores?.sentiment),
           rhythm: prog.rhythm,
           phonetic: prog.phonetic,
