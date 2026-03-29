@@ -254,19 +254,19 @@ export function QualityMonitorPanel({
 
         const litSeg = stages.literal?.segments.find(s => s.segmentId === segId);
         if (litSeg?.radar) {
-          newLayers["3R"] = litSeg.radar;
+          newLayers["3R"] = normalizeRadar(litSeg.radar);
           available.push("3R");
         }
 
         const liteSeg = stages.literary?.segments.find(s => s.segmentId === segId);
         if (liteSeg?.radar) {
-          newLayers["5R"] = liteSeg.radar;
+          newLayers["5R"] = normalizeRadar(liteSeg.radar);
           available.push("5R");
         }
 
         const critSeg = stages.critique?.segments.find(s => s.segmentId === segId);
         if (critSeg?.radar) {
-          newLayers["5R+Alt"] = critSeg.radar;
+          newLayers["5R+Alt"] = normalizeRadar(critSeg.radar);
           available.push("5R+Alt");
         }
 
