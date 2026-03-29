@@ -36,6 +36,20 @@ const stageCache = new Map<string, {
   critique: CritiqueRadarFile | null;
 }>();
 
+/** Invalidate caches for a scene so the monitor re-reads from storage */
+export function invalidateRadarCache(sceneId: string, segmentId?: string) {
+  stageCache.delete(sceneId);
+  radarCache.delete(sceneId);
+  if (segmentId) {
+    computedCache.delete(`${sceneId}:${segmentId}`);
+  } else {
+    // Clear all segments for this scene
+    for (const key of computedCache.keys()) {
+      if (key.startsWith(`${sceneId}:`)) computedCache.delete(key);
+    }
+  }
+}
+
 interface QualityMonitorPanelProps {
   storage: ProjectStorage | null;
   sceneId: string | null;
@@ -142,14 +156,20 @@ export function QualityMonitorPanel({
             const liteSeg = stages.literary?.segments.find(s => s.segmentId === selectedSegment.segmentId);
             const litSeg = stages.literal?.segments.find(s => s.segmentId === selectedSegment.segmentId);
             const bestSeg = critSeg ?? liteSeg ?? litSeg;
-            if (bestSeg?.radar && bestSeg.radar.weighted > 0) {
-              const notes = bestSeg.critiqueNotes ?? [];
-              const scores = { ...bestSeg.radar, weighted: computeWeightedScore(bestSeg.radar, weights) };
-              computedCache.set(segKey, { scores: bestSeg.radar, notes });
-              setSegmentScores(scores);
-              setCritiqueNotes(notes);
-              setComputing(false);
-              return;
+            if (bestSeg?.radar) {
+              // Check if any axis has data (weighted may be 0 for partial stages)
+              const hasData = Object.entries(bestSeg.radar)
+                .filter(([k]) => k !== "weighted")
+                .some(([, v]) => (v as number) > 0);
+              if (hasData) {
+                const notes = bestSeg.critiqueNotes ?? [];
+                const scores = { ...bestSeg.radar, weighted: computeWeightedScore(bestSeg.radar, weights) };
+                computedCache.set(segKey, { scores: bestSeg.radar, notes });
+                setSegmentScores(scores);
+                setCritiqueNotes(notes);
+                setComputing(false);
+                return;
+              }
             }
           }
         }

@@ -9,6 +9,7 @@ import type { ProjectStorage } from "@/lib/projectStorage";
 import type { LocalStoryboardData } from "@/lib/storyboardSync";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
 import { computeProgrammaticAxes } from "@/lib/qualityRadar";
+import { invalidateRadarCache } from "@/components/translation/QualityMonitorPanel";
 import {
   writeStageRadar,
   readStageRadar,
@@ -132,6 +133,9 @@ export function useSegmentLiteraryEdit(opts: Opts) {
         "literary",
         [...otherSegments, newSegRadar],
       );
+
+      // Invalidate monitor caches so it re-reads from OPFS
+      invalidateRadarCache(sceneId, segment.segment_id);
 
       toast.success(isRu ? "Арт-правка выполнена" : "Art edit complete");
       return { text: data.text, notes: data.notes };

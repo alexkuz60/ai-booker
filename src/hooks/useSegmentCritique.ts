@@ -9,6 +9,7 @@ import type { ProjectStorage } from "@/lib/projectStorage";
 import type { LocalStoryboardData } from "@/lib/storyboardSync";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
 import { computeProgrammaticAxes } from "@/lib/qualityRadar";
+import { invalidateRadarCache } from "@/components/translation/QualityMonitorPanel";
 import {
   readCritiqueRadar,
   writeCritiqueRadar,
@@ -120,6 +121,9 @@ export function useSegmentCritique(opts: Opts) {
         sceneId,
         [...otherSegments, newSegRadar],
       );
+
+      // Invalidate monitor caches so it re-reads from OPFS
+      invalidateRadarCache(sceneId, segment.segment_id);
 
       const verdictLabel = data.verdict === "good"
         ? (isRu ? "Хорошо" : "Good")

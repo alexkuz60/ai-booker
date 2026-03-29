@@ -167,14 +167,19 @@ export default function Translation() {
   // Literary edit handler (per-segment)
   const handleLiteraryEdit = useCallback(async (seg: Segment) => {
     if (!selectedSceneId || !selectedChapter?.chapterId || !storage) return;
-    // Read original text from source storage
     const srcSbPath = `chapters/${selectedChapter.chapterId}/scenes/${selectedSceneId}/storyboard.json`;
     const srcData = await storage.readJSON<any>(srcSbPath);
     const srcSeg = srcData?.segments?.find((s: any) => s.segment_id === seg.segment_id);
     const originalText = srcSeg?.phrases?.map((p: any) => p.text).join(" ") ?? "";
     const result = await editSegment(seg, selectedSceneId, selectedChapter.chapterId, originalText);
-    if (result) setBilingualTick(t => t + 1);
-  }, [editSegment, selectedSceneId, selectedChapter, storage]);
+    if (result) {
+      // Force monitor to re-read by re-selecting segment with new translated text
+      if (selectedSegment?.segmentId === seg.segment_id) {
+        setSelectedSegment({ ...selectedSegment, translatedText: result.text });
+      }
+      setBilingualTick(t => t + 1);
+    }
+  }, [editSegment, selectedSceneId, selectedChapter, storage, selectedSegment]);
 
   // Critique handler (per-segment)
   const handleCritique = useCallback(async (seg: Segment) => {
@@ -184,8 +189,14 @@ export default function Translation() {
     const srcSeg = srcData?.segments?.find((s: any) => s.segment_id === seg.segment_id);
     const originalText = srcSeg?.phrases?.map((p: any) => p.text).join(" ") ?? "";
     const result = await critiqueSegment(seg, selectedSceneId, selectedChapter.chapterId, originalText);
-    if (result) setBilingualTick(t => t + 1);
-  }, [critiqueSegment, selectedSceneId, selectedChapter, storage]);
+    if (result) {
+      // Force monitor to re-read
+      if (selectedSegment?.segmentId === seg.segment_id) {
+        setSelectedSegment(prev => prev ? { ...prev } : null);
+      }
+      setBilingualTick(t => t + 1);
+    }
+  }, [critiqueSegment, selectedSceneId, selectedChapter, storage, selectedSegment]);
 
 
   const handleTranslateSceneFull = useCallback(async () => {
@@ -501,7 +512,7 @@ export default function Translation() {
                       onTranslateSegments={transProjectExists ? handleTranslateSegments : undefined}
                       onLiteraryEdit={transProjectExists ? handleLiteraryEdit : undefined}
                       onCritique={transProjectExists ? handleCritique : undefined}
-                      translating={translating || literaryEditing || segCritiquing}
+                      translating={translating}
                       progressLabel={progressLabel}
                       selectedSegmentId={selectedSegment?.segmentId ?? null}
                       onSelectSegment={setSelectedSegment}
