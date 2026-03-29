@@ -168,7 +168,16 @@ export async function runTranslationPipeline(
 
   // ── 3. Literal translation (batch, only for unprocessed) ──────────────
   checkAbort();
-  progress({ stage: "literal", fraction: 0.05, message: isRu ? "Подстрочный перевод…" : "Literal translation…" });
+  progress({
+    stage: "literal",
+    fraction: 0.05,
+    segmentIndex: 0,
+    totalSegments: totalSegs,
+    iteration: 1,
+    message: isRu
+      ? `Подстрочный перевод 1/${totalSegs}…`
+      : `Literal translation 1/${totalSegs}…`,
+  });
 
   const literalResults = segmentsToProcess.length > 0
     ? await batchLiteralTranslation(segmentsToProcess, model, userApiKeys, sourceLang, targetLang, isRu)

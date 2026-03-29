@@ -47,7 +47,7 @@ export function TranslationProgressPanel({ progress, onAbort, isRu }: Props) {
         : 0;
 
   // Stage label for single-scene mode
-  const stageLabel = currentStage && running && isSingleScene
+  const stageLabel = currentStage && isSingleScene
     ? (() => {
         const stageNum = currentStage.stage === "literal" || currentStage.stage === "literary" ? 1
           : currentStage.stage === "radar" ? 2
@@ -56,7 +56,7 @@ export function TranslationProgressPanel({ progress, onAbort, isRu }: Props) {
         const stageName = isRu
           ? (stageNum === 1 ? "Редактура" : stageNum === 2 ? "Радар" : stageNum === 3 ? "Критика" : currentStage.stage)
           : (stageNum === 1 ? "Editing" : stageNum === 2 ? "Radar" : stageNum === 3 ? "Critique" : currentStage.stage);
-        return stageName;
+        return stageNum > 0 ? `${stageNum}: ${stageName}` : stageName;
       })()
     : null;
 
