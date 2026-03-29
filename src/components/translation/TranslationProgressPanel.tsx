@@ -19,6 +19,9 @@ interface Props {
 }
 
 export function TranslationProgressPanel({ progress, onAbort, isRu }: Props) {
+  // Hook must be before early return
+  const lastSegRef = useRef<{ index: number; total: number } | null>(null);
+
   if (!progress.running && progress.scenesTotal === 0) return null;
 
   const { scenesTotal, scenesDone, scenesFailed, currentStage, poolStats, running } = progress;
@@ -26,7 +29,6 @@ export function TranslationProgressPanel({ progress, onAbort, isRu }: Props) {
   const isSingleScene = scenesTotal === 1;
 
   // Remember last known segment counts so they persist after pipeline ends
-  const lastSegRef = useRef<{ index: number; total: number } | null>(null);
   if (currentStage?.segmentIndex != null && currentStage?.totalSegments) {
     lastSegRef.current = { index: currentStage.segmentIndex, total: currentStage.totalSegments };
   }
