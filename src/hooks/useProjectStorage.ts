@@ -303,15 +303,57 @@ export function useProjectStorage(): UseProjectStorageReturn {
 
     const bootstrap = async () => {
       try {
+        let targetName: string | null = null;
+
         const saved = localStorage.getItem(LAST_PROJECT_KEY);
-        if (!saved) return;
+        if (saved) {
+          try {
+            const { name, backend: savedBackend } = JSON.parse(saved);
+            if (savedBackend === "opfs" && name) targetName = name;
+          } catch {
+            // corrupted LAST_PROJECT_KEY — fall through to auto-detect
+          }
+        }
 
-        const { name, backend: savedBackend } = JSON.parse(saved);
-        if (savedBackend !== "opfs" || !name) return;
+        // Auto-detect: if no saved key, pick the most recent source project
+        if (!targetName) {
+          const allProjects = await OPFSStorage.listProjects();
+          if (allProjects.length === 0) return;
 
-        const store = await OPFSStorage.openOrCreate(name);
+          // Prefer source projects (no targetLanguage) over translation mirrors
+          let bestName: string | null = null;
+          let bestUpdated = "";
+          for (const pName of allProjects) {
+            try {
+              const s = await OPFSStorage.openOrCreate(pName);
+              const m = await s.readJSON<ProjectMeta>("project.json");
+              if (!m) continue;
+              // Skip translation mirror projects
+              if (m.targetLanguage || m.sourceProjectName) continue;
+              if (!bestName || (m.updatedAt ?? "") > bestUpdated) {
+                bestName = pName;
+                bestUpdated = m.updatedAt ?? "";
+              }
+            } catch { /* skip unreadable */ }
+          }
+          // If no source project found, try any project
+          if (!bestName && allProjects.length > 0) {
+            bestName = allProjects[0];
+          }
+          targetName = bestName;
+          if (targetName) {
+            console.info("[ProjectStorage] Auto-detected OPFS project:", targetName);
+          }
+        }
+
+        if (!targetName) return;
+
+        const store = await OPFSStorage.openOrCreate(targetName);
         const projectMeta = await store.readJSON<ProjectMeta>("project.json");
-        if (!projectMeta) return;
+        if (!projectMeta) {
+          console.warn("[ProjectStorage] project.json missing in", targetName);
+          return;
+        }
 
         // Migrate V1 → V2 if needed and load scene index
         await ensureV2Layout(store);
@@ -321,14 +363,15 @@ export function useProjectStorage(): UseProjectStorageReturn {
           setMeta(projectMeta);
           try {
             localStorage.setItem(LAST_PROJECT_KEY, JSON.stringify({
-              name,
+              name: targetName,
               backend,
               bookId: projectMeta.bookId,
             }));
           } catch {}
+          console.info("[ProjectStorage] Restored project:", targetName, "bookId:", projectMeta.bookId);
         }
-      } catch {
-        // ignore bootstrap errors, app can still work without restored project
+      } catch (err) {
+        console.warn("[ProjectStorage] Bootstrap error:", err);
       } finally {
         if (!cancelled) setInitialized(true);
       }
