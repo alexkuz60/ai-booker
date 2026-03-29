@@ -17,7 +17,6 @@ import { RadarAxisDetail } from "./RadarAxisDetail";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   readAllStages,
   LAYER_LABELS,
