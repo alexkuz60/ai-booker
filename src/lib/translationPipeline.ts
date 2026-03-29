@@ -26,6 +26,12 @@ import {
   type RadarWeights,
   DEFAULT_WEIGHTS,
 } from "@/lib/qualityRadar";
+import {
+  writeStageRadar,
+  writeCritiqueRadar,
+  type StageSegmentRadar,
+  type CritiqueSegmentRadar,
+} from "@/lib/radarStages";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -273,6 +279,9 @@ export async function runTranslationPipeline(
   checkAbort();
   progress({ stage: "saving", fraction: 0.95, message: isRu ? "Сохранение перевода…" : "Saving translation…" });
   await saveTranslationResults(targetStorage, sceneId, chapterId, sourceSb, results);
+
+  // ── 5. Write staged radar files ───────────────────────────────────────
+  await saveStageRadarFiles(targetStorage, sceneId, chapterId, results);
 
   const aggregateScore = results.length > 0
     ? results.reduce((sum, r) => sum + r.radar.weighted, 0) / results.length
