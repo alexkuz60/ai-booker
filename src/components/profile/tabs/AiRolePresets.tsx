@@ -64,17 +64,42 @@ export function AiRolePresets({
   const handleSave = useCallback(() => {
     const finalName = newName.trim() || bookTitle?.trim() || "";
     if (!finalName) return;
-    const preset: AiRolePreset = {
-      id: crypto.randomUUID(),
-      name: finalName,
-      bookTitle: bookTitle || undefined,
-      models: { ...resolvedModels } as AiRoleModelMap,
-      pools: currentPools && Object.keys(currentPools).length > 0
-        ? { ...currentPools }
-        : undefined,
-      createdAt: new Date().toISOString(),
-    };
-    setPresets((prev) => [...prev, preset]);
+
+    const poolsPayload = currentPools && Object.keys(currentPools).length > 0
+      ? { ...currentPools }
+      : undefined;
+
+    setPresets((prev) => {
+      // If a preset with the same name (case-insensitive) already exists — update it
+      const existingIdx = prev.findIndex(
+        (p) => p.name.trim().toLowerCase() === finalName.toLowerCase(),
+      );
+      if (existingIdx >= 0) {
+        return prev.map((p, i) =>
+          i === existingIdx
+            ? {
+                ...p,
+                models: { ...resolvedModels } as AiRoleModelMap,
+                pools: poolsPayload,
+                bookTitle: bookTitle || p.bookTitle,
+                updatedAt: new Date().toISOString(),
+              }
+            : p,
+        );
+      }
+      // Otherwise create new
+      return [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          name: finalName,
+          bookTitle: bookTitle || undefined,
+          models: { ...resolvedModels } as AiRoleModelMap,
+          pools: poolsPayload,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+    });
     setNewName("");
     setSaveOpen(false);
   }, [newName, bookTitle, resolvedModels, currentPools, setPresets]);
