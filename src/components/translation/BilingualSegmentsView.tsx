@@ -7,7 +7,7 @@ import type { Segment } from "@/components/studio/storyboard/types";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { LocalStoryboardData } from "@/lib/storyboardSync";
 import { paths } from "@/lib/projectPaths";
-import { Loader2, Languages, Wand2 } from "lucide-react";
+import { Loader2, Languages, Sparkles, Scale, Lock } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Accordion,
@@ -16,6 +16,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { type RadarStage, STAGE_LABELS, readAllStages, getSegmentStage } from "@/lib/radarStages";
 
 export interface SelectedSegmentData {
   segmentId: string;
