@@ -233,7 +233,7 @@ export function BilingualSegmentsView({
           <Button
             size="sm"
             variant="outline"
-            onClick={handleTranslateScene}
+            onClick={() => onTranslateSegments(items.map(i => i.segment))}
             disabled={translating}
             className="h-7 text-xs gap-1.5"
           >
