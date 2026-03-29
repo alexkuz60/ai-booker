@@ -138,7 +138,30 @@ export function BilingualSegmentsView({
     return () => { cancelled = true; };
   }, [sourceStorage, translationStorage, sceneId, chapterId]);
 
-  // Translate single segment
+  // Load segment stage info from radar files
+  useEffect(() => {
+    if (!translationStorage || !sceneId || !chapterId) {
+      setSegmentStages(new Map());
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const stages = await readAllStages(translationStorage, chapterId, sceneId);
+        if (cancelled) return;
+        const map = new Map<string, RadarStage | null>();
+        for (const item of items) {
+          map.set(item.segment.segment_id, getSegmentStage(item.segment.segment_id, stages));
+        }
+        setSegmentStages(map);
+      } catch {
+        if (!cancelled) setSegmentStages(new Map());
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [translationStorage, sceneId, chapterId, items]);
+
+  // Translate single segment (re-translate)
   const handleTranslateSegment = useCallback(async (seg: Segment) => {
     if (!onTranslateSegments) return;
     setTranslatingIds(prev => new Set(prev).add(seg.segment_id));
@@ -153,11 +176,35 @@ export function BilingualSegmentsView({
     }
   }, [onTranslateSegments]);
 
-  // Translate all segments of current scene
-  const handleTranslateScene = useCallback(async () => {
-    if (!onTranslateSegments || items.length === 0) return;
-    await onTranslateSegments(items.map(i => i.segment));
-  }, [onTranslateSegments, items]);
+  // Literary edit single segment
+  const handleLiteraryEdit = useCallback(async (seg: Segment) => {
+    if (!onLiteraryEdit) return;
+    setEditingIds(prev => new Set(prev).add(seg.segment_id));
+    try {
+      await onLiteraryEdit(seg);
+    } finally {
+      setEditingIds(prev => {
+        const next = new Set(prev);
+        next.delete(seg.segment_id);
+        return next;
+      });
+    }
+  }, [onLiteraryEdit]);
+
+  // Critique single segment
+  const handleCritique = useCallback(async (seg: Segment) => {
+    if (!onCritique) return;
+    setCritiquingIds(prev => new Set(prev).add(seg.segment_id));
+    try {
+      await onCritique(seg);
+    } finally {
+      setCritiquingIds(prev => {
+        const next = new Set(prev);
+        next.delete(seg.segment_id);
+        return next;
+      });
+    }
+  }, [onCritique]);
 
   if (loading) {
     return (
