@@ -424,7 +424,7 @@ async function saveTranslationResults(
   // Build a segment lookup
   const resultMap = new Map(results.map(r => [r.segmentId, r]));
 
-  // Clone storyboard with translated text
+  // Clone storyboard with translated text + stage markers
   const translatedSb: LocalStoryboardData = {
     ...sourceSb,
     updatedAt: new Date().toISOString(),
@@ -433,10 +433,11 @@ async function saveTranslationResults(
       if (!result) return seg;
 
       // Replace phrase text with literary translation
-      // Split translated text back into phrases proportionally
       const translatedPhrases = splitTranslationIntoPhrases(result.literary, seg.phrases.length);
       return {
         ...seg,
+        _literal: result.literal,
+        _literary: result.literary,
         phrases: seg.phrases.map((ph, pi) => ({
           ...ph,
           text: translatedPhrases[pi] ?? result.literary,
@@ -448,22 +449,6 @@ async function saveTranslationResults(
 
   const sbPath = `chapters/${chapterId}/scenes/${sceneId}/storyboard.json`;
   await targetStorage.writeJSON(sbPath, translatedSb);
-
-  // Save radar scores alongside storyboard
-  const radarPath = `chapters/${chapterId}/scenes/${sceneId}/radar.json`;
-  const radarData = {
-    sceneId,
-    updatedAt: new Date().toISOString(),
-    segments: results.map(r => ({
-      segmentId: r.segmentId,
-      radar: r.radar,
-      radarHistory: r.radarHistory,
-      iterations: r.iterations,
-      critiqueNotes: r.critiqueNotes,
-      literal: r.literal,
-    })),
-  };
-  await targetStorage.writeJSON(radarPath, radarData);
 }
 
 // ── Staged radar file persistence ────────────────────────────────────────────

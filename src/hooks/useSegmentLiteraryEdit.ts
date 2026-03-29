@@ -145,17 +145,31 @@ export function useSegmentLiteraryEdit(opts: Opts) {
       const otherSegments = existingSegments.filter(s => s.segmentId !== segment.segment_id);
 
       if (critique.error || !critiqueScores) {
+        // Save radar with programmatic axes only (don't delete the entry)
+        const fallbackRadar: StageSegmentRadar = {
+          segmentId: segment.segment_id,
+          radar: {
+            semantic: semantic ?? 0,
+            sentiment: 0,
+            rhythm: prog.rhythm,
+            phonetic: prog.phonetic,
+            cultural: 0,
+            weighted: 0,
+          },
+          critiqueNotes: data.notes,
+          literary: data.text,
+        };
         await writeStageRadar(
           translationStorage,
           chapterId,
           sceneId,
           "literary",
-          otherSegments,
+          [...otherSegments, fallbackRadar],
         );
         invalidateRadarCache(sceneId, segment.segment_id);
-        toast.error(isRu
-          ? "Арт-правка сохранена, но 5R не рассчитан"
-          : "Art edit saved, but 5R was not computed");
+        toast.warning(isRu
+          ? "Арт-правка сохранена, 5R частичный (без LLM-оценки)"
+          : "Art edit saved, 5R partial (no LLM scores)");
         return { text: data.text, notes: data.notes };
       }
 

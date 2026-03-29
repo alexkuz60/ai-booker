@@ -99,7 +99,7 @@ export function useSegmentCritique(opts: Opts) {
       const existingSegments = existingRadar?.segments ?? [];
       const otherSegments = existingSegments.filter(s => s.segmentId !== segment.segment_id);
 
-      // Normalize 0-100 scores from Edge Function to 0-1 for radar
+      // Normalize 0-100 LLM scores to 0-1; use programmatic rhythm/phonetic
       const norm = (v: number) => Math.max(0, Math.min(1, (v ?? 0) / 100));
 
       const newSegRadar: CritiqueSegmentRadar = {
@@ -107,8 +107,8 @@ export function useSegmentCritique(opts: Opts) {
         radar: {
           semantic: norm(data.scores.semantic),
           sentiment: norm(data.scores.sentiment),
-          rhythm: norm(data.scores.rhythm),
-          phonetic: norm(data.scores.phonetics),
+          rhythm: prog.rhythm,
+          phonetic: prog.phonetic,
           cultural: norm(data.scores.cultural),
           weighted: norm(data.overall),
         },
