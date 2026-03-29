@@ -23,33 +23,47 @@ async function resolveTranslationProjectName(
   sourceStorage: ProjectStorage,
   sourceMeta: ProjectMeta,
 ): Promise<string | null> {
-  const targetLang = sourceMeta.language === "ru" ? "en" : "ru";
-  const expectedSuffix = targetLang.toUpperCase();
-  const exactName = `${sourceStorage.projectName}_${expectedSuffix}`;
+  const sourceLang = sourceMeta.language;
+  const preferredTargetLang = sourceLang === "en" ? "ru" : "en";
+  const preferredSuffix = preferredTargetLang.toUpperCase();
+  const exactName = `${sourceStorage.projectName}_${preferredSuffix}`;
 
   if (projects.includes(exactName)) return exactName;
 
-  for (const projectName of projects) {
-    if (!projectName.endsWith(`_${expectedSuffix}`)) continue;
+  let linkedCandidate: string | null = null;
+  let sameBookCandidate: string | null = null;
 
+  for (const projectName of projects) {
     try {
       const store = await OPFSStorage.openOrCreate(projectName);
       const meta = await store.readJSON<ProjectMeta>("project.json");
       if (!meta) continue;
 
-      const sameBook = meta.bookId === sourceMeta.bookId;
-      const sameTarget = meta.targetLanguage === targetLang;
-      const linkedToCurrentSource = meta.sourceProjectName === sourceStorage.projectName;
+      const isMirrorProject = !!meta.sourceProjectName || !!meta.targetLanguage;
+      if (!isMirrorProject) continue;
 
-      if (sameTarget && (linkedToCurrentSource || sameBook)) {
+      const sameBook = meta.bookId === sourceMeta.bookId;
+      const linkedToCurrentSource = meta.sourceProjectName === sourceStorage.projectName;
+      const looksLikeMirrorName = projectName.startsWith(`${sourceStorage.projectName}_`);
+      const isPreferredTarget = meta.targetLanguage === preferredTargetLang;
+
+      if (linkedToCurrentSource && isPreferredTarget) {
         return projectName;
+      }
+
+      if (!linkedCandidate && linkedToCurrentSource) {
+        linkedCandidate = projectName;
+      }
+
+      if (!sameBookCandidate && sameBook && (isPreferredTarget || looksLikeMirrorName)) {
+        sameBookCandidate = projectName;
       }
     } catch {
       // Ignore unreadable candidates and continue scanning.
     }
   }
 
-  return null;
+  return linkedCandidate ?? sameBookCandidate ?? null;
 }
 
 export function useTranslationStorage(
