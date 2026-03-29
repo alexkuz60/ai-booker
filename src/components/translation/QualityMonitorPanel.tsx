@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Radar as RadarIcon, Activity, MousePointerClick } from "lucide-react";
 import type { ProjectStorage } from "@/lib/projectStorage";
-import type { RadarScores, RadarWeights } from "@/lib/qualityRadar";
+import type { RadarScores, RadarWeights, RadarAxis } from "@/lib/qualityRadar";
 import {
   DEFAULT_WEIGHTS,
   computeWeightedScore,
