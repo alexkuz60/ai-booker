@@ -51,6 +51,32 @@ const LAYER_COLORS: Record<RadarLayer, { stroke: string; fill: string }> = {
   "5R+Alt": { stroke: "hsl(160, 70%, 45%)", fill: "hsl(160, 70%, 45%)" },
 };
 
+/**
+ * Custom Radar shape that skips axes with value=0,
+ * drawing a polygon only through non-zero points.
+ */
+function SkipZeroRadarShape({ points, dataKey, stroke, fill, fillOpacity, strokeWidth, strokeDasharray }: any) {
+  if (!points?.length) return null;
+  // Filter to only points whose corresponding data value > 0
+  const nonZero = points.filter((_: any, i: number) => {
+    // points correspond to AXES order
+    return true; // keep all for coordinate lookup
+  });
+  // Build polygon from non-zero values only
+  const validPoints = points.filter((_: any, i: number) => {
+    // Access the raw value from the point — recharts stores it in payload
+    const val = _?.payload?.[dataKey];
+    return val != null && val > 0;
+  });
+  if (validPoints.length < 2) return null;
+  const d = validPoints.map((p: any, i: number) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ") + " Z";
+  return (
+    <g>
+      <path d={d} fill={fill} fillOpacity={fillOpacity} stroke={stroke} strokeWidth={strokeWidth} strokeDasharray={strokeDasharray} />
+    </g>
+  );
+}
+
 export function QualityRadarChart({
   scores,
   layers,
