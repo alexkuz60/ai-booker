@@ -229,14 +229,17 @@ Score = Σ(wi · axiScore_i), где i ∈ {semantic, sentiment, rhythm, phoneti
 
 ### 7.1. Персистентный кэш (OPFS)
 
-- `radar.json` — per-scene, содержит оценки всех сегментов, историю итераций, заметки критика.
-- Записывается автоматически после полного пайплайна.
+- **Раздельные файлы по стадиям**: `radar-literal.json`, `radar-literary.json`, `radar-critique.json` — per-scene.
+- Устаревший монолитный `radar.json` поддерживается для чтения через `radarStages.ts`.
+- Записывается автоматически после каждого этапа пайплайна.
+- При повторном подстрочном переводе — каскадный сброс: удаление записей сегмента из literary и critique.
 
 ### 7.2. Модульный кэш (in-memory)
 
-- `radarCache` — Map<sceneId, radar.json data> — предотвращает повторное чтение OPFS.
+- `radarCache` — Map<sceneId, radar data> — предотвращает повторное чтение OPFS.
 - `computedCache` — Map<sceneId:segmentId, { scores, notes }> — мгновенный отклик при навигации и ремаунте.
 - Оба живут на уровне модуля, переживают ремаунт компонентов и переходы между страницами.
+- `invalidateRadarCache(sceneId, segmentId)` — принудительная очистка + ревизия для перечитывания из OPFS.
 
 ## 8. Ограничения и риски
 
@@ -256,7 +259,8 @@ Score = Σ(wi · axiScore_i), где i ∈ {semantic, sentiment, rhythm, phoneti
 | **F4** | ~~Билингва-аккордеоны + навигатор глав~~ (перенесено в F1) | ✅ Готово |
 | **F5** | Эмбеддинг-сервис: `phoneticFeatures.ts` (ритмика+фонетика), `embeddingClient.ts` (семантика через OpenRouter/ProxyAPI), `qualityRadar.ts` (оркестратор 5 осей) | ✅ Готово |
 | **F6** | Критик (✅ critique-translation EF) + цикл итераций (✅ translationPipeline.ts — orchestrator: literal→literary→radar→critique→re-iterate) | ✅ Готово |
-| **F7** | Quality Radar UI: `QualityRadarChart` (recharts RadarChart, цветовая индикация, пресеты весов), `RadarAxisDetail` (drill-down по сегментам), `QualityMonitorPanel` (загрузка radar.json, двухуровневый кэш, segment breakdown) | ✅ Готово |
+| **F7** | Quality Radar UI: `QualityRadarChart` (recharts RadarChart, цветовая индикация), `RadarAxisDetail` (drill-down по сегментам), `QualityMonitorPanel` (загрузка radar.json, двухуровневый кэш, segment breakdown) | ✅ Готово |
+| **F7b** | Многослойная визуализация: 3R-треугольник (`ThreeAxisRadarOverlay`, SVG), 5R/5R+Alt (recharts Radar), строгая изоляция данных между стадиями, управление слоями + пресеты весов в едином ряду хедера | ✅ Готово |
 | **F8** | Батчинг: `useTranslationBatch` (full pipeline per scene + chapter batch с ModelPoolManager), `TranslationProgressPanel` (прогресс + воркеры пула), три уровня перевода (сегмент/сцена/глава), гибкий парсинг ответов AI, пропуск пустых сегментов | ✅ Готово |
 | **F9** | TTS-интеграция переведённой версии | 🔲 Планируется |
 
