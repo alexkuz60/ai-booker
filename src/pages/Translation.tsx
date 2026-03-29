@@ -499,7 +499,9 @@ export default function Translation() {
                       chapterId={selectedChapter?.chapterId ?? null}
                       isRu={isRu}
                       onTranslateSegments={transProjectExists ? handleTranslateSegments : undefined}
-                      translating={translating}
+                      onLiteraryEdit={transProjectExists ? handleLiteraryEdit : undefined}
+                      onCritique={transProjectExists ? handleCritique : undefined}
+                      translating={translating || literaryEditing || segCritiquing}
                       progressLabel={progressLabel}
                       selectedSegmentId={selectedSegment?.segmentId ?? null}
                       onSelectSegment={setSelectedSegment}
