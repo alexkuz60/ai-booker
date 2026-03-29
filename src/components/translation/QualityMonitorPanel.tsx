@@ -12,21 +12,34 @@ import {
   SCORE_COLORS,
 } from "@/lib/qualityRadar";
 import type { SelectedSegmentData } from "@/components/translation/BilingualSegmentsView";
-import { QualityRadarChart } from "./QualityRadarChart";
+import { QualityRadarChart, type RadarLayer } from "./QualityRadarChart";
 import { RadarAxisDetail } from "./RadarAxisDetail";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { SEGMENT_CONFIG } from "@/components/studio/storyboard/constants";
 import { cn } from "@/lib/utils";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  readAllStages,
+  LAYER_LABELS,
+  type StageRadarFile,
+  type CritiqueRadarFile,
+} from "@/lib/radarStages";
 
 // Module-level cache: sceneId → { segments: [...] }
-// Prevents re-reading OPFS on every remount / navigation return
 const radarCache = new Map<string, {
   segments: { segmentId: string; radar: RadarScores; critiqueNotes?: string[] }[];
 }>();
 
 // Per-segment fallback cache: "sceneId:segmentId" → computed scores
 const computedCache = new Map<string, { scores: RadarScores; notes: string[] }>();
+
+// Stage files cache: sceneId → stages
+const stageCache = new Map<string, {
+  literal: StageRadarFile | null;
+  literary: StageRadarFile | null;
+  critique: CritiqueRadarFile | null;
+}>();
 
 interface QualityMonitorPanelProps {
   storage: ProjectStorage | null;
@@ -55,6 +68,13 @@ export function QualityMonitorPanel({
   const [segmentScores, setSegmentScores] = useState<RadarScores | null>(null);
   const [computing, setComputing] = useState(false);
   const [critiqueNotes, setCritiqueNotes] = useState<string[]>([]);
+  const [visibleLayers, setVisibleLayers] = useState<RadarLayer[]>([]);
+  const [layerScores, setLayerScores] = useState<{
+    "3R"?: RadarScores | null;
+    "5R"?: RadarScores | null;
+    "5R+Alt"?: RadarScores | null;
+  }>({});
+  const [availableLayers, setAvailableLayers] = useState<RadarLayer[]>([]);
 
   // Try loading saved radar from storage first; fallback to on-the-fly compute
   useEffect(() => {
@@ -156,6 +176,59 @@ export function QualityMonitorPanel({
     return () => { cancelled = true; };
   }, [selectedSegment?.segmentId, selectedSegment?.originalText, selectedSegment?.translatedText, storage, sceneId, chapterId, sourceLang, targetLang, userApiKeys]);
 
+  // Load stage radar files for layer overlays
+  useEffect(() => {
+    if (!storage || !sceneId || !chapterId || !selectedSegment?.segmentId) {
+      setLayerScores({});
+      setAvailableLayers([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        let stages = stageCache.get(sceneId);
+        if (!stages) {
+          stages = await readAllStages(storage, chapterId, sceneId);
+          stageCache.set(sceneId, stages);
+        }
+        if (cancelled) return;
+
+        const segId = selectedSegment.segmentId;
+        const newLayers: typeof layerScores = {};
+        const available: RadarLayer[] = [];
+
+        const litSeg = stages.literal?.segments.find(s => s.segmentId === segId);
+        if (litSeg?.radar) {
+          newLayers["3R"] = litSeg.radar;
+          available.push("3R");
+        }
+
+        const liteSeg = stages.literary?.segments.find(s => s.segmentId === segId);
+        if (liteSeg?.radar) {
+          newLayers["5R"] = liteSeg.radar;
+          available.push("5R");
+        }
+
+        const critSeg = stages.critique?.segments.find(s => s.segmentId === segId);
+        if (critSeg?.radar) {
+          newLayers["5R+Alt"] = critSeg.radar;
+          available.push("5R+Alt");
+        }
+
+        if (!cancelled) {
+          setLayerScores(newLayers);
+          setAvailableLayers(available);
+        }
+      } catch {
+        if (!cancelled) {
+          setLayerScores({});
+          setAvailableLayers([]);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [storage, sceneId, chapterId, selectedSegment?.segmentId]);
+
   // Recompute weighted when weights change
   const displayScores = useMemo(() => {
     if (!segmentScores) return null;
@@ -236,6 +309,32 @@ export function QualityMonitorPanel({
           </p>
         </div>
 
+        {/* Layer toggle */}
+        {availableLayers.length > 0 && !computing && (
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] text-muted-foreground uppercase tracking-wide">
+              {isRu ? "Слои" : "Layers"}
+            </span>
+            <ToggleGroup
+              type="multiple"
+              size="sm"
+              value={visibleLayers}
+              onValueChange={(val) => setVisibleLayers(val as RadarLayer[])}
+              className="gap-0.5"
+            >
+              {availableLayers.map((layer) => (
+                <ToggleGroupItem
+                  key={layer}
+                  value={layer}
+                  className="h-5 text-[9px] px-1.5 data-[state=on]:bg-primary/20"
+                >
+                  {LAYER_LABELS[layer]?.[isRu ? "ru" : "en"] ?? layer}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
+        )}
+
         {/* Radar chart */}
         {computing ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground gap-2">
@@ -245,6 +344,8 @@ export function QualityMonitorPanel({
         ) : (
           <QualityRadarChart
             scores={displayScores}
+            layers={layerScores}
+            visibleLayers={visibleLayers}
             weights={weights}
             onWeightsChange={handleWeightsChange}
             onAxisClick={setSelectedAxis}
