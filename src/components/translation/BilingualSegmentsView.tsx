@@ -258,7 +258,12 @@ export function BilingualSegmentsView({
           const Icon = config.icon;
           const fullText = seg.phrases.map((p) => p.text).join(" ");
           const isSegTranslating = translatingIds.has(seg.segment_id);
-          const isSelected = selectedSegmentId === seg.segment_id;
+          const isSegEditing = editingIds.has(seg.segment_id);
+          const isSegCritiquing = critiquingIds.has(seg.segment_id);
+          const currentStage = segmentStages.get(seg.segment_id) ?? null;
+          const hasTranslation = hasLiteral || !!translatedText;
+          const hasLiterary = currentStage === "literary" || currentStage === "critique";
+          const hasCritique = currentStage === "critique";
 
           const handleSelect = () => {
             if (isSelected) {
