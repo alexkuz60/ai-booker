@@ -1,5 +1,9 @@
 import type { RadarScores } from "@/lib/qualityRadar";
-import { LAYER_COLORS } from "./QualityRadarChart";
+
+const THREE_R_COLORS = {
+  stroke: "hsl(210, 80%, 60%)",
+  fill: "hsl(210, 80%, 60%)",
+};
 
 const AXIS_INDEX: Record<"semantic" | "rhythm" | "phonetic", number> = {
   semantic: 0,
@@ -46,10 +50,10 @@ export function ThreeAxisRadarOverlay({ scores }: ThreeAxisRadarOverlayProps) {
       viewBox="0 0 100 100"
     >
       <polygon
-        fill={LAYER_COLORS["3R"].fill}
+        fill={THREE_R_COLORS.fill}
         fillOpacity={0.12}
         points={vertices}
-        stroke={LAYER_COLORS["3R"].stroke}
+        stroke={THREE_R_COLORS.stroke}
         strokeDasharray="4 3"
         strokeWidth={0.7}
       />
@@ -60,7 +64,7 @@ export function ThreeAxisRadarOverlay({ scores }: ThreeAxisRadarOverlayProps) {
             key={axis}
             cx={point.x}
             cy={point.y}
-            fill={LAYER_COLORS["3R"].stroke}
+            fill={THREE_R_COLORS.stroke}
             r={1}
           />
         );

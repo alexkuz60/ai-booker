@@ -101,7 +101,6 @@ export function QualityRadarChart({
     if (w && onWeightsChange) onWeightsChange(key, w);
   };
 
-  const show3R = hasAnyAxis(layer3R);
   const show5R = visibleLayers.includes("5R") && hasAnyAxis(layer5R);
   const showAlt = visibleLayers.includes("5R+Alt") && hasAnyAxis(layerAlt);
 
