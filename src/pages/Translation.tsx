@@ -29,6 +29,8 @@ import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { useTranslationStorage } from "@/hooks/useTranslationStorage";
 import { useSegmentTranslation } from "@/hooks/useSegmentTranslation";
+import { useSegmentLiteraryEdit } from "@/hooks/useSegmentLiteraryEdit";
+import { useSegmentCritique } from "@/hooks/useSegmentCritique";
 import { useTranslationBatch } from "@/hooks/useTranslationBatch";
 import { paths } from "@/lib/projectPaths";
 import type { TocChapter } from "@/pages/parser/types";
@@ -109,7 +111,28 @@ export default function Translation() {
     isRu,
   });
 
-  // Reload counter to force BilingualSegmentsView refresh after translation
+  // Literary edit hook
+  const literaryModel = getModelForRole("literary_editor");
+  const { editSegment, editing: literaryEditing } = useSegmentLiteraryEdit({
+    translationStorage,
+    model: literaryModel,
+    userApiKeys: apiKeys,
+    sourceLang,
+    targetLang,
+    isRu,
+  });
+
+  // Critique hook
+  const critiqueModel = getModelForRole("translation_critic");
+  const { critiqueSegment, critiquing: segCritiquing } = useSegmentCritique({
+    translationStorage,
+    model: critiqueModel,
+    userApiKeys: apiKeys,
+    sourceLang,
+    targetLang,
+    isRu,
+  });
+
   const [bilingualTick, setBilingualTick] = useState(0);
 
   const selectedChapter = chapters.find((c) => c.index === selectedChapterIdx) ?? null;
@@ -141,7 +164,30 @@ export default function Translation() {
     }
   }, [doTranslateSegments, selectedSceneId, selectedChapter]);
 
-  // Full pipeline for current scene
+  // Literary edit handler (per-segment)
+  const handleLiteraryEdit = useCallback(async (seg: Segment) => {
+    if (!selectedSceneId || !selectedChapter?.chapterId || !storage) return;
+    // Read original text from source storage
+    const srcSbPath = `chapters/${selectedChapter.chapterId}/scenes/${selectedSceneId}/storyboard.json`;
+    const srcData = await storage.readJSON<any>(srcSbPath);
+    const srcSeg = srcData?.segments?.find((s: any) => s.segment_id === seg.segment_id);
+    const originalText = srcSeg?.phrases?.map((p: any) => p.text).join(" ") ?? "";
+    const result = await editSegment(seg, selectedSceneId, selectedChapter.chapterId, originalText);
+    if (result) setBilingualTick(t => t + 1);
+  }, [editSegment, selectedSceneId, selectedChapter, storage]);
+
+  // Critique handler (per-segment)
+  const handleCritique = useCallback(async (seg: Segment) => {
+    if (!selectedSceneId || !selectedChapter?.chapterId || !storage) return;
+    const srcSbPath = `chapters/${selectedChapter.chapterId}/scenes/${selectedSceneId}/storyboard.json`;
+    const srcData = await storage.readJSON<any>(srcSbPath);
+    const srcSeg = srcData?.segments?.find((s: any) => s.segment_id === seg.segment_id);
+    const originalText = srcSeg?.phrases?.map((p: any) => p.text).join(" ") ?? "";
+    const result = await critiqueSegment(seg, selectedSceneId, selectedChapter.chapterId, originalText);
+    if (result) setBilingualTick(t => t + 1);
+  }, [critiqueSegment, selectedSceneId, selectedChapter, storage]);
+
+
   const handleTranslateSceneFull = useCallback(async () => {
     if (!selectedSceneId || !selectedChapter?.chapterId) return;
     await translateSceneFull(selectedSceneId, selectedChapter.chapterId);
@@ -453,7 +499,9 @@ export default function Translation() {
                       chapterId={selectedChapter?.chapterId ?? null}
                       isRu={isRu}
                       onTranslateSegments={transProjectExists ? handleTranslateSegments : undefined}
-                      translating={translating}
+                      onLiteraryEdit={transProjectExists ? handleLiteraryEdit : undefined}
+                      onCritique={transProjectExists ? handleCritique : undefined}
+                      translating={translating || literaryEditing || segCritiquing}
                       progressLabel={progressLabel}
                       selectedSegmentId={selectedSegment?.segmentId ?? null}
                       onSelectSegment={setSelectedSegment}
