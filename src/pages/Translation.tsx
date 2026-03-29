@@ -395,7 +395,14 @@ export default function Translation() {
                     {isRu ? "Билингва" : "Bilingual"}
                   </span>
                   {transProjectExists && selectedSceneId && (
-                    <div className="flex items-center gap-1 ml-auto">
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      {batchProgress.running && batchProgress.currentStage && (
+                        <span className="text-[10px] text-muted-foreground tabular-nums">
+                          {batchProgress.currentStage.segmentIndex != null && batchProgress.currentStage.totalSegments
+                            ? `${batchProgress.currentStage.segmentIndex + 1}/${batchProgress.currentStage.totalSegments}`
+                            : batchProgress.currentStage.message}
+                        </span>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
