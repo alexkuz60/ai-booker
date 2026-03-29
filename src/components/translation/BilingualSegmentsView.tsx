@@ -234,7 +234,6 @@ export function BilingualSegmentsView({
         }} className="space-y-1.5">
         {items.map(({ segment: seg, translatedText, hasLiteral }) => {
           const isSelected = selectedSegmentId === seg.segment_id;
-          const fullText = seg.phrases.map((p) => p.text).join(" ");
 
           return (
             <BilingualSegmentRow
@@ -249,19 +248,6 @@ export function BilingualSegmentsView({
               isSegTranslating={translatingIds.has(seg.segment_id)}
               isSegEditing={editingIds.has(seg.segment_id)}
               isSegCritiquing={critiquingIds.has(seg.segment_id)}
-              onSelect={() => {
-                if (isSelected) {
-                  onSelectSegment?.(null);
-                } else {
-                  onSelectSegment?.({
-                    segmentId: seg.segment_id,
-                    originalText: fullText,
-                    translatedText,
-                    segmentType: seg.segment_type,
-                    speaker: seg.speaker ?? null,
-                  });
-                }
-              }}
               onTranslate={handleTranslateSegment}
               onLiteraryEdit={onLiteraryEdit ? handleLiteraryEdit : undefined}
               onCritique={onCritique ? handleCritique : undefined}
