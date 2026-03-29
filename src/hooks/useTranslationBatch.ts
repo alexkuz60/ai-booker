@@ -93,6 +93,7 @@ export function useTranslationBatch(opts: Opts): UseTranslationBatchReturn {
       scenesTotal: 1,
       scenesDone: 0,
       scenesFailed: 0,
+      currentStage: { stage: "literal", fraction: 0, segmentIndex: 0, totalSegments: 0, message: isRu ? "Подготовка…" : "Preparing…" },
       running: true,
     });
 

@@ -69,6 +69,15 @@ export function AiRolePresets({
       ? { ...currentPools }
       : undefined;
 
+    // Save overrides (user-chosen models), NOT resolvedModels (which falls back to defaults)
+    const modelsToSave: AiRoleModelMap = { ...currentOverrides };
+    // Also capture any resolved non-default models that might not be in overrides
+    for (const [roleId, modelId] of Object.entries(resolvedModels)) {
+      if (modelId && !(roleId in modelsToSave)) {
+        modelsToSave[roleId as keyof AiRoleModelMap] = modelId;
+      }
+    }
+
     setPresets((prev) => {
       // If a preset with the same name (case-insensitive) already exists — update it
       const existingIdx = prev.findIndex(
@@ -79,7 +88,7 @@ export function AiRolePresets({
           i === existingIdx
             ? {
                 ...p,
-                models: { ...resolvedModels } as AiRoleModelMap,
+                models: modelsToSave,
                 pools: poolsPayload,
                 bookTitle: bookTitle || p.bookTitle,
                 updatedAt: new Date().toISOString(),
@@ -94,7 +103,7 @@ export function AiRolePresets({
           id: crypto.randomUUID(),
           name: finalName,
           bookTitle: bookTitle || undefined,
-          models: { ...resolvedModels } as AiRoleModelMap,
+          models: modelsToSave,
           pools: poolsPayload,
           createdAt: new Date().toISOString(),
         },
@@ -106,12 +115,18 @@ export function AiRolePresets({
 
   const handleUpdate = useCallback(
     (id: string) => {
+      const modelsToSave: AiRoleModelMap = { ...currentOverrides };
+      for (const [roleId, modelId] of Object.entries(resolvedModels)) {
+        if (modelId && !(roleId in modelsToSave)) {
+          modelsToSave[roleId as keyof AiRoleModelMap] = modelId;
+        }
+      }
       setPresets((prev) =>
         prev.map((p) =>
           p.id === id
             ? {
                 ...p,
-                models: { ...resolvedModels } as AiRoleModelMap,
+                models: modelsToSave,
                 pools: currentPools && Object.keys(currentPools).length > 0
                   ? { ...currentPools }
                   : undefined,
@@ -122,7 +137,7 @@ export function AiRolePresets({
         ),
       );
     },
-    [resolvedModels, currentPools, bookTitle, setPresets],
+    [currentOverrides, resolvedModels, currentPools, bookTitle, setPresets],
   );
 
   const handleDelete = useCallback(
