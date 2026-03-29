@@ -99,15 +99,18 @@ export function useSegmentCritique(opts: Opts) {
       const existingSegments = existingRadar?.segments ?? [];
       const otherSegments = existingSegments.filter(s => s.segmentId !== segment.segment_id);
 
+      // Normalize 0-100 scores from Edge Function to 0-1 for radar
+      const norm = (v: number) => Math.max(0, Math.min(1, (v ?? 0) / 100));
+
       const newSegRadar: CritiqueSegmentRadar = {
         segmentId: segment.segment_id,
         radar: {
-          semantic: data.scores.semantic,
-          sentiment: data.scores.sentiment,
-          rhythm: data.scores.rhythm,
-          phonetic: data.scores.phonetics,
-          cultural: data.scores.cultural,
-          weighted: data.overall,
+          semantic: norm(data.scores.semantic),
+          sentiment: norm(data.scores.sentiment),
+          rhythm: norm(data.scores.rhythm),
+          phonetic: norm(data.scores.phonetics),
+          cultural: norm(data.scores.cultural),
+          weighted: norm(data.overall),
         },
         critiqueNotes: data.issues?.map((iss: any) =>
           `[${iss.axis}/${iss.severity}] ${iss.suggestion}`
