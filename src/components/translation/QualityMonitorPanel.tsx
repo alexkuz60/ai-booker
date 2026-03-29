@@ -287,7 +287,7 @@ export function QualityMonitorPanel({
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-4 space-y-4">
+      <div className="px-4 pt-1 pb-4 space-y-3">
 
         {/* Layer toggle */}
         {availableLayers.length > 0 && !computing && (
