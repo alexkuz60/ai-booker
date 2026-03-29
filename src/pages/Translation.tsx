@@ -164,7 +164,30 @@ export default function Translation() {
     }
   }, [doTranslateSegments, selectedSceneId, selectedChapter]);
 
-  // Full pipeline for current scene
+  // Literary edit handler (per-segment)
+  const handleLiteraryEdit = useCallback(async (seg: Segment) => {
+    if (!selectedSceneId || !selectedChapter?.chapterId || !storage) return;
+    // Read original text from source storage
+    const srcSbPath = `chapters/${selectedChapter.chapterId}/scenes/${selectedSceneId}/storyboard.json`;
+    const srcData = await storage.readJSON<any>(srcSbPath);
+    const srcSeg = srcData?.segments?.find((s: any) => s.segment_id === seg.segment_id);
+    const originalText = srcSeg?.phrases?.map((p: any) => p.text).join(" ") ?? "";
+    const result = await editSegment(seg, selectedSceneId, selectedChapter.chapterId, originalText);
+    if (result) setBilingualTick(t => t + 1);
+  }, [editSegment, selectedSceneId, selectedChapter, storage]);
+
+  // Critique handler (per-segment)
+  const handleCritique = useCallback(async (seg: Segment) => {
+    if (!selectedSceneId || !selectedChapter?.chapterId || !storage) return;
+    const srcSbPath = `chapters/${selectedChapter.chapterId}/scenes/${selectedSceneId}/storyboard.json`;
+    const srcData = await storage.readJSON<any>(srcSbPath);
+    const srcSeg = srcData?.segments?.find((s: any) => s.segment_id === seg.segment_id);
+    const originalText = srcSeg?.phrases?.map((p: any) => p.text).join(" ") ?? "";
+    const result = await critiqueSegment(seg, selectedSceneId, selectedChapter.chapterId, originalText);
+    if (result) setBilingualTick(t => t + 1);
+  }, [critiqueSegment, selectedSceneId, selectedChapter, storage]);
+
+
   const handleTranslateSceneFull = useCallback(async () => {
     if (!selectedSceneId || !selectedChapter?.chapterId) return;
     await translateSceneFull(selectedSceneId, selectedChapter.chapterId);
