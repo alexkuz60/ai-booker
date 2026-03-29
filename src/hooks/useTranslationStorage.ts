@@ -18,6 +18,40 @@ interface UseTranslationStorageReturn {
   refresh: () => void;
 }
 
+async function resolveTranslationProjectName(
+  projects: string[],
+  sourceStorage: ProjectStorage,
+  sourceMeta: ProjectMeta,
+): Promise<string | null> {
+  const targetLang = sourceMeta.language === "ru" ? "en" : "ru";
+  const expectedSuffix = targetLang.toUpperCase();
+  const exactName = `${sourceStorage.projectName}_${expectedSuffix}`;
+
+  if (projects.includes(exactName)) return exactName;
+
+  for (const projectName of projects) {
+    if (!projectName.endsWith(`_${expectedSuffix}`)) continue;
+
+    try {
+      const store = await OPFSStorage.openOrCreate(projectName);
+      const meta = await store.readJSON<ProjectMeta>("project.json");
+      if (!meta) continue;
+
+      const sameBook = meta.bookId === sourceMeta.bookId;
+      const sameTarget = meta.targetLanguage === targetLang;
+      const linkedToCurrentSource = meta.sourceProjectName === sourceStorage.projectName;
+
+      if (sameTarget && (linkedToCurrentSource || sameBook)) {
+        return projectName;
+      }
+    } catch {
+      // Ignore unreadable candidates and continue scanning.
+    }
+  }
+
+  return null;
+}
+
 export function useTranslationStorage(
   sourceStorage: ProjectStorage | null,
   sourceMeta: ProjectMeta | null,
@@ -42,9 +76,6 @@ export function useTranslationStorage(
       return;
     }
 
-    const targetLang = (sourceMeta.language === "ru" ? "EN" : "RU");
-    const projectName = `${sourceStorage.projectName}_${targetLang}`;
-
     let cancelled = false;
     setLoading(true);
 
@@ -53,18 +84,21 @@ export function useTranslationStorage(
         const projects = await OPFSStorage.listProjects();
         if (cancelled) return;
 
-        if (projects.includes(projectName)) {
-          const store = await OPFSStorage.openOrCreate(projectName);
-          if (!cancelled && mountedRef.current) {
-            setTranslationStorage(store);
-            setExists(true);
+          const resolvedProjectName = await resolveTranslationProjectName(projects, sourceStorage, sourceMeta);
+          if (cancelled) return;
+
+          if (resolvedProjectName) {
+            const store = await OPFSStorage.openOrCreate(resolvedProjectName);
+            if (!cancelled && mountedRef.current) {
+              setTranslationStorage(store);
+              setExists(true);
+            }
+          } else {
+            if (!cancelled && mountedRef.current) {
+              setTranslationStorage(null);
+              setExists(false);
+            }
           }
-        } else {
-          if (!cancelled && mountedRef.current) {
-            setTranslationStorage(null);
-            setExists(false);
-          }
-        }
       } catch (err) {
         console.error("[useTranslationStorage] error:", err);
         if (!cancelled && mountedRef.current) {
