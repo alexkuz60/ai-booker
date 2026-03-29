@@ -1,8 +1,8 @@
 import type { RadarScores } from "@/lib/qualityRadar";
 
 const THREE_R_COLORS = {
-  stroke: "hsl(210, 80%, 60%)",
-  fill: "hsl(210, 80%, 60%)",
+  stroke: "hsl(var(--destructive))",
+  fill: "hsl(var(--destructive))",
 };
 
 const AXIS_INDEX: Record<"semantic" | "rhythm" | "phonetic", number> = {
@@ -45,17 +45,17 @@ export function ThreeAxisRadarOverlay({ scores }: ThreeAxisRadarOverlayProps) {
   return (
     <svg
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 z-0 h-full w-full"
+      className="pointer-events-none absolute inset-0 z-20 h-full w-full"
       preserveAspectRatio="xMidYMid meet"
       viewBox="0 0 100 100"
     >
       <polygon
         fill={THREE_R_COLORS.fill}
-        fillOpacity={0.12}
+        fillOpacity={0.03}
         points={vertices}
         stroke={THREE_R_COLORS.stroke}
         strokeDasharray="4 3"
-        strokeWidth={0.7}
+        strokeWidth={0.8}
       />
       {TRIANGLE_AXES.map((axis) => {
         const point = toPolarPoint(AXIS_INDEX[axis], scores[axis]);
@@ -65,7 +65,7 @@ export function ThreeAxisRadarOverlay({ scores }: ThreeAxisRadarOverlayProps) {
             cx={point.x}
             cy={point.y}
             fill={THREE_R_COLORS.stroke}
-            r={1}
+            r={0.9}
           />
         );
       })}

@@ -138,19 +138,31 @@ export function useSegmentLiteraryEdit(opts: Opts) {
 
       const normCritiqueAxis = (value?: number) => Math.max(0, Math.min(1, (value ?? 0) / 100));
       const critiqueScores = critique.data?.scores;
-      const literarySemantic = critiqueScores?.semantic != null
-        ? normCritiqueAxis(critiqueScores.semantic)
-        : (semantic ?? 0);
 
-      // Read existing literary radar to merge
+      // Read existing literary radar to merge / clean stale segment data
       const existingRadar = await readStageRadar(translationStorage, chapterId, sceneId, "literary");
       const existingSegments = existingRadar?.segments ?? [];
       const otherSegments = existingSegments.filter(s => s.segmentId !== segment.segment_id);
 
+      if (critique.error || !critiqueScores) {
+        await writeStageRadar(
+          translationStorage,
+          chapterId,
+          sceneId,
+          "literary",
+          otherSegments,
+        );
+        invalidateRadarCache(sceneId, segment.segment_id);
+        toast.error(isRu
+          ? "Арт-правка сохранена, но 5R не рассчитан"
+          : "Art edit saved, but 5R was not computed");
+        return { text: data.text, notes: data.notes };
+      }
+
       const newSegRadar: StageSegmentRadar = {
         segmentId: segment.segment_id,
         radar: {
-          semantic: literarySemantic,
+          semantic: normCritiqueAxis(critiqueScores.semantic),
           sentiment: normCritiqueAxis(critiqueScores?.sentiment),
           rhythm: prog.rhythm,
           phonetic: prog.phonetic,
