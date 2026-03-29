@@ -15,9 +15,8 @@ import type { SelectedSegmentData } from "@/components/translation/BilingualSegm
 import { QualityRadarChart, type RadarLayer } from "./QualityRadarChart";
 import { RadarAxisDetail } from "./RadarAxisDetail";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { SEGMENT_CONFIG } from "@/components/studio/storyboard/constants";
 import { cn } from "@/lib/utils";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   readAllStages,
@@ -289,8 +288,6 @@ export function QualityMonitorPanel({
     );
   }
 
-  const segConfig = SEGMENT_CONFIG[selectedSegment.segmentType as keyof typeof SEGMENT_CONFIG] ?? SEGMENT_CONFIG.narrator;
-  const SegIcon = segConfig.icon;
 
   return (
     <ScrollArea className="h-full">
