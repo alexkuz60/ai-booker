@@ -176,6 +176,59 @@ export function QualityMonitorPanel({
     return () => { cancelled = true; };
   }, [selectedSegment?.segmentId, selectedSegment?.originalText, selectedSegment?.translatedText, storage, sceneId, chapterId, sourceLang, targetLang, userApiKeys]);
 
+  // Load stage radar files for layer overlays
+  useEffect(() => {
+    if (!storage || !sceneId || !chapterId || !selectedSegment?.segmentId) {
+      setLayerScores({});
+      setAvailableLayers([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        let stages = stageCache.get(sceneId);
+        if (!stages) {
+          stages = await readAllStages(storage, chapterId, sceneId);
+          stageCache.set(sceneId, stages);
+        }
+        if (cancelled) return;
+
+        const segId = selectedSegment.segmentId;
+        const newLayers: typeof layerScores = {};
+        const available: RadarLayer[] = [];
+
+        const litSeg = stages.literal?.segments.find(s => s.segmentId === segId);
+        if (litSeg?.radar) {
+          newLayers["3R"] = litSeg.radar;
+          available.push("3R");
+        }
+
+        const liteSeg = stages.literary?.segments.find(s => s.segmentId === segId);
+        if (liteSeg?.radar) {
+          newLayers["5R"] = liteSeg.radar;
+          available.push("5R");
+        }
+
+        const critSeg = stages.critique?.segments.find(s => s.segmentId === segId);
+        if (critSeg?.radar) {
+          newLayers["5R+Alt"] = critSeg.radar;
+          available.push("5R+Alt");
+        }
+
+        if (!cancelled) {
+          setLayerScores(newLayers);
+          setAvailableLayers(available);
+        }
+      } catch {
+        if (!cancelled) {
+          setLayerScores({});
+          setAvailableLayers([]);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [storage, sceneId, chapterId, selectedSegment?.segmentId]);
+
   // Recompute weighted when weights change
   const displayScores = useMemo(() => {
     if (!segmentScores) return null;
