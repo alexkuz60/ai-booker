@@ -21,6 +21,17 @@ import {
   type CritiqueRadarFile,
 } from "@/lib/radarStages";
 
+const LITERAL_AXES: RadarAxis[] = ["semantic", "rhythm", "phonetic"];
+const FULL_AXES: RadarAxis[] = ["semantic", "sentiment", "rhythm", "phonetic", "cultural"];
+
+function hasAxisData(radar: RadarScores | null | undefined, axes: RadarAxis[]) {
+  return !!radar && axes.some((axis) => radar[axis] > 0);
+}
+
+function hasFullFiveRAxes(radar: RadarScores | null | undefined) {
+  return !!radar && FULL_AXES.every((axis) => radar[axis] > 0);
+}
+
 // Module-level cache: sceneId → { segments: [...] }
 const radarCache = new Map<string, {
   segments: { segmentId: string; radar: RadarScores; critiqueNotes?: string[] }[];
@@ -99,6 +110,10 @@ export function QualityMonitorPanel({
     "5R+Alt"?: RadarScores | null;
   }>({});
   const [availableLayers, setAvailableLayers] = useState<RadarLayer[]>([]);
+
+  useEffect(() => {
+    setVisibleLayers((prev) => prev.filter((layer) => layer !== "3R" && availableLayers.includes(layer)));
+  }, [availableLayers]);
 
   // Try loading saved radar from storage first; fallback to on-the-fly compute
   useEffect(() => {
@@ -253,20 +268,23 @@ export function QualityMonitorPanel({
         const available: RadarLayer[] = [];
 
         const litSeg = stages.literal?.segments.find(s => s.segmentId === segId);
-        if (litSeg?.radar) {
-          newLayers["3R"] = normalizeRadar(litSeg.radar);
+        const literalRadar = litSeg?.radar ? normalizeRadar(litSeg.radar) : null;
+        if (hasAxisData(literalRadar, LITERAL_AXES)) {
+          newLayers["3R"] = literalRadar;
           available.push("3R");
         }
 
         const liteSeg = stages.literary?.segments.find(s => s.segmentId === segId);
-        if (liteSeg?.radar) {
-          newLayers["5R"] = normalizeRadar(liteSeg.radar);
+        const literaryRadar = liteSeg?.radar ? normalizeRadar(liteSeg.radar) : null;
+        if (hasFullFiveRAxes(literaryRadar)) {
+          newLayers["5R"] = literaryRadar;
           available.push("5R");
         }
 
         const critSeg = stages.critique?.segments.find(s => s.segmentId === segId);
-        if (critSeg?.radar) {
-          newLayers["5R+Alt"] = normalizeRadar(critSeg.radar);
+        const critiqueRadar = critSeg?.radar ? normalizeRadar(critSeg.radar) : null;
+        if (hasFullFiveRAxes(critiqueRadar)) {
+          newLayers["5R+Alt"] = critiqueRadar;
           available.push("5R+Alt");
         }
 
