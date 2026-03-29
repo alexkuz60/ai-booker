@@ -346,8 +346,8 @@ export function QualityMonitorPanel({
     <ScrollArea className="h-full">
       <div className="px-4 pt-1 pb-4 space-y-3">
 
-        {/* Layer toggle */}
-        {availableLayers.length > 0 && !computing && (
+        {/* Layer toggle — 3R always visible, only 5R/5R+Alt togglable */}
+        {availableLayers.filter((l) => l !== "3R").length > 0 && !computing && (
           <div className="flex items-center gap-2">
             <span className="text-[9px] text-muted-foreground uppercase tracking-wide">
               {isRu ? "Слои" : "Layers"}
@@ -359,7 +359,7 @@ export function QualityMonitorPanel({
               onValueChange={(val) => setVisibleLayers(val as RadarLayer[])}
               className="gap-0.5"
             >
-              {availableLayers.map((layer) => (
+              {availableLayers.filter((l) => l !== "3R").map((layer) => (
                 <ToggleGroupItem
                   key={layer}
                   value={layer}

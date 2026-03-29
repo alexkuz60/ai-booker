@@ -112,9 +112,10 @@ export function QualityRadarChart({
     if (w && onWeightsChange) onWeightsChange(key, w);
   };
 
-  const show3R = visibleLayers.includes("3R") && layers?.["3R"];
-  const show5R = visibleLayers.includes("5R") && layers?.["5R"];
-  const showAlt = visibleLayers.includes("5R+Alt") && layers?.["5R+Alt"];
+  // 3R always shown if data exists; 5R/5R+Alt togglable
+  const show3R = !!layers?.["3R"];
+  const show5R = visibleLayers.includes("5R") && !!layers?.["5R"];
+  const showAlt = visibleLayers.includes("5R+Alt") && !!layers?.["5R+Alt"];
 
   return (
     <div className={cn("flex flex-col items-center gap-3", compact ? "gap-2" : "gap-4")}>
