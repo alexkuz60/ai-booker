@@ -156,7 +156,21 @@ export function QualityRadarChart({
             />
             <PolarRadiusAxis domain={[0, 1]} tick={false} axisLine={false} />
 
-            {/* Layer: 5R (middle) */}
+            {/* Layer: 3R base (always visible, drawn first as the base) */}
+            {show3R && (
+              <Radar
+                name="3R"
+                dataKey="layer3R"
+                stroke={LAYER_COLORS["3R"].stroke}
+                fill={LAYER_COLORS["3R"].fill}
+                fillOpacity={0.12}
+                strokeWidth={1.5}
+                strokeDasharray="4 3"
+                shape={<SkipZeroRadarShape dataKey="layer3R" stroke={LAYER_COLORS["3R"].stroke} fill={LAYER_COLORS["3R"].fill} fillOpacity={0.12} strokeWidth={1.5} strokeDasharray="4 3" />}
+              />
+            )}
+
+            {/* Layer: 5R (overlay) */}
             {show5R && (
               <Radar
                 name="5R"
@@ -180,20 +194,6 @@ export function QualityRadarChart({
                 strokeWidth={1.5}
                 strokeDasharray="2 2"
                 shape={<SkipZeroRadarShape dataKey="layerAlt" stroke={LAYER_COLORS["5R+Alt"].stroke} fill={LAYER_COLORS["5R+Alt"].fill} fillOpacity={0.1} strokeWidth={1.5} strokeDasharray="2 2" />}
-              />
-            )}
-
-            {/* Layer: 3R base (always visible, drawn last so it stays visible) */}
-            {show3R && (
-              <Radar
-                name="3R"
-                dataKey="layer3R"
-                stroke={LAYER_COLORS["3R"].stroke}
-                fill={LAYER_COLORS["3R"].fill}
-                fillOpacity={0.12}
-                strokeWidth={1.5}
-                strokeDasharray="4 3"
-                shape={<SkipZeroRadarShape dataKey="layer3R" stroke={LAYER_COLORS["3R"].stroke} fill={LAYER_COLORS["3R"].fill} fillOpacity={0.12} strokeWidth={1.5} strokeDasharray="4 3" />}
               />
             )}
 
