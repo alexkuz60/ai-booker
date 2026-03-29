@@ -363,7 +363,12 @@ export function QualityMonitorPanel({
                 <ToggleGroupItem
                   key={layer}
                   value={layer}
-                  className="h-5 text-[9px] px-1.5 data-[state=on]:bg-primary/20"
+                  className={cn(
+                    "h-5 text-[9px] px-1.5 transition-opacity",
+                    visibleLayers.includes(layer)
+                      ? "data-[state=on]:bg-primary/20 opacity-100"
+                      : "opacity-40"
+                  )}
                 >
                   {LAYER_LABELS[layer]?.[isRu ? "ru" : "en"] ?? layer}
                 </ToggleGroupItem>
