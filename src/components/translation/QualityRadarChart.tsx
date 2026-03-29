@@ -172,6 +172,7 @@ export function QualityRadarChart({
                 fill={LAYER_COLORS["5R"].fill}
                 fillOpacity={0.15}
                 strokeWidth={1.5}
+                shape={<SkipZeroRadarShape dataKey="layer5R" stroke={LAYER_COLORS["5R"].stroke} fill={LAYER_COLORS["5R"].fill} fillOpacity={0.15} strokeWidth={1.5} />}
               />
             )}
 
@@ -185,6 +186,7 @@ export function QualityRadarChart({
                 fillOpacity={0.1}
                 strokeWidth={1.5}
                 strokeDasharray="2 2"
+                shape={<SkipZeroRadarShape dataKey="layerAlt" stroke={LAYER_COLORS["5R+Alt"].stroke} fill={LAYER_COLORS["5R+Alt"].fill} fillOpacity={0.1} strokeWidth={1.5} strokeDasharray="2 2" />}
               />
             )}
 
@@ -196,6 +198,7 @@ export function QualityRadarChart({
               fill={SCORE_COLORS[level]}
               fillOpacity={0.2}
               strokeWidth={2}
+              shape={<SkipZeroRadarShape dataKey="value" stroke={SCORE_COLORS[level]} fill={SCORE_COLORS[level]} fillOpacity={0.2} strokeWidth={2} />}
             />
 
             <Tooltip
