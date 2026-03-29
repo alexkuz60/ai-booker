@@ -51,6 +51,18 @@ export const LAYER_COLORS: Record<RadarLayer, { stroke: string; fill: string }> 
   "5R+Alt": { stroke: "hsl(160, 70%, 45%)", fill: "hsl(160, 70%, 45%)" },
 };
 
+function projectTo3R(scores: RadarScores | null | undefined): RadarScores | null {
+  if (!scores) return null;
+  return {
+    semantic: scores.semantic,
+    sentiment: 0,
+    rhythm: scores.rhythm,
+    phonetic: scores.phonetic,
+    cultural: 0,
+    weighted: scores.weighted,
+  };
+}
+
 /**
  * Custom Radar shape that skips axes with value=0,
  * drawing a polygon only through non-zero points.
@@ -89,6 +101,10 @@ export function QualityRadarChart({
 }: QualityRadarChartProps) {
   const [activePreset, setActivePreset] = useState("prose");
 
+  const layer3R = layers?.["3R"] ?? projectTo3R(scores);
+  const layer5R = layers?.["5R"] ?? scores ?? null;
+  const layerAlt = layers?.["5R+Alt"] ?? null;
+
   // Build chart data from the "primary" scores (latest stage)
   const chartData = useMemo(() => {
     if (!scores) {
@@ -106,12 +122,12 @@ export function QualityRadarChart({
       axis: a,
       label: AXIS_LABELS[a][isRu ? "ru" : "en"],
       value: scores[a],
-      layer3R: layers?.["3R"]?.[a] ?? 0,
-      layer5R: layers?.["5R"]?.[a] ?? 0,
-      layerAlt: layers?.["5R+Alt"]?.[a] ?? 0,
+      layer3R: layer3R?.[a] ?? 0,
+      layer5R: layer5R?.[a] ?? 0,
+      layerAlt: layerAlt?.[a] ?? 0,
       fullMark: 1,
     }));
-  }, [scores, layers, isRu]);
+  }, [scores, layer3R, layer5R, layerAlt, isRu]);
 
   const handlePreset = (key: string) => {
     setActivePreset(key);
@@ -119,9 +135,9 @@ export function QualityRadarChart({
     if (w && onWeightsChange) onWeightsChange(key, w);
   };
 
-  const show3R = !!layers?.["3R"];
-  const show5R = visibleLayers.includes("5R") && !!layers?.["5R"];
-  const showAlt = visibleLayers.includes("5R+Alt") && !!layers?.["5R+Alt"];
+  const show3R = !!layer3R;
+  const show5R = visibleLayers.includes("5R") && !!layer5R;
+  const showAlt = visibleLayers.includes("5R+Alt") && !!layerAlt;
 
   return (
     <div className={cn("flex flex-col items-center gap-3", compact ? "gap-2" : "gap-4")}>
@@ -159,6 +175,7 @@ export function QualityRadarChart({
             {/* Layer: 3R base (always visible, drawn first as the base) */}
             {show3R && (
               <Radar
+                key="layer-3r"
                 name="3R"
                 dataKey="layer3R"
                 stroke={LAYER_COLORS["3R"].stroke}
@@ -166,6 +183,7 @@ export function QualityRadarChart({
                 fillOpacity={0.12}
                 strokeWidth={1.5}
                 strokeDasharray="4 3"
+                isAnimationActive={false}
                 shape={<SkipZeroRadarShape dataKey="layer3R" stroke={LAYER_COLORS["3R"].stroke} fill={LAYER_COLORS["3R"].fill} fillOpacity={0.12} strokeWidth={1.5} strokeDasharray="4 3" />}
               />
             )}
@@ -173,12 +191,14 @@ export function QualityRadarChart({
             {/* Layer: 5R (overlay) */}
             {show5R && (
               <Radar
+                key="layer-5r"
                 name="5R"
                 dataKey="layer5R"
                 stroke={LAYER_COLORS["5R"].stroke}
                 fill={LAYER_COLORS["5R"].fill}
                 fillOpacity={0.15}
                 strokeWidth={1.5}
+                isAnimationActive={false}
                 shape={<SkipZeroRadarShape dataKey="layer5R" stroke={LAYER_COLORS["5R"].stroke} fill={LAYER_COLORS["5R"].fill} fillOpacity={0.15} strokeWidth={1.5} />}
               />
             )}
@@ -186,6 +206,7 @@ export function QualityRadarChart({
             {/* Layer: 5R+Alt */}
             {showAlt && (
               <Radar
+                key="layer-5r-alt"
                 name="5R+Alt"
                 dataKey="layerAlt"
                 stroke={LAYER_COLORS["5R+Alt"].stroke}
@@ -193,6 +214,7 @@ export function QualityRadarChart({
                 fillOpacity={0.1}
                 strokeWidth={1.5}
                 strokeDasharray="2 2"
+                isAnimationActive={false}
                 shape={<SkipZeroRadarShape dataKey="layerAlt" stroke={LAYER_COLORS["5R+Alt"].stroke} fill={LAYER_COLORS["5R+Alt"].fill} fillOpacity={0.1} strokeWidth={1.5} strokeDasharray="2 2" />}
               />
             )}
