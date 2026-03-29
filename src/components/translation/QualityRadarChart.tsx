@@ -21,6 +21,7 @@ import {
 } from "@/lib/qualityRadar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { ThreeAxisRadarOverlay } from "./ThreeAxisRadarOverlay";
 
 export type RadarLayer = "3R" | "5R" | "5R+Alt";
 
@@ -108,7 +109,8 @@ export function QualityRadarChart({
     <div className={cn("flex flex-col items-center gap-3", compact ? "gap-2" : "gap-4")}>
 
       {/* Radar chart */}
-      <div className={cn("w-full", compact ? "h-[180px]" : "h-[480px]")}>
+      <div className={cn("relative w-full", compact ? "h-[180px]" : "h-[480px]")}>
+        <ThreeAxisRadarOverlay scores={layer3R} />
         <ResponsiveContainer width="100%" height="100%">
           <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="85%">
             <PolarGrid stroke="hsl(var(--muted-foreground) / 0.15)" />
@@ -136,21 +138,6 @@ export function QualityRadarChart({
               }}
             />
             <PolarRadiusAxis domain={[0, 1]} tick={false} axisLine={false} />
-
-            {/* Layer: 3R base (visible when data available, drawn first) */}
-            {show3R && (
-              <Radar
-                key="layer-3r"
-                name="3R"
-                dataKey="layer3R"
-                stroke={LAYER_COLORS["3R"].stroke}
-                fill={LAYER_COLORS["3R"].fill}
-                fillOpacity={0.12}
-                strokeWidth={1.5}
-                strokeDasharray="4 3"
-                isAnimationActive={false}
-              />
-            )}
 
             {/* Layer: 5R (overlay) */}
             {show5R && (
