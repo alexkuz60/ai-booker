@@ -466,6 +466,62 @@ async function saveTranslationResults(
   await targetStorage.writeJSON(radarPath, radarData);
 }
 
+// ── Staged radar file persistence ────────────────────────────────────────────
+
+async function saveStageRadarFiles(
+  targetStorage: ProjectStorage,
+  sceneId: string,
+  chapterId: string,
+  results: TranslationSegmentResult[],
+): Promise<void> {
+  // radar-literal.json — 3R axes only (semantic, rhythm, phonetic)
+  const literalSegments: StageSegmentRadar[] = results
+    .filter(r => r.literal)
+    .map(r => ({
+      segmentId: r.segmentId,
+      radar: {
+        semantic: r.radarHistory[0]?.semantic ?? r.radar.semantic,
+        sentiment: 0,
+        rhythm: r.radarHistory[0]?.rhythm ?? r.radar.rhythm,
+        phonetic: r.radarHistory[0]?.phonetic ?? r.radar.phonetic,
+        cultural: 0,
+        weighted: 0,
+      },
+      literal: r.literal,
+    }));
+
+  // radar-literary.json — full 5R from final iteration
+  const literarySegments: StageSegmentRadar[] = results
+    .filter(r => r.literary)
+    .map(r => ({
+      segmentId: r.segmentId,
+      radar: r.radar,
+      literary: r.literary,
+      critiqueNotes: r.critiqueNotes,
+    }));
+
+  // radar-critique.json — 5R with critique data + alternatives (future)
+  const critiqueSegments: CritiqueSegmentRadar[] = results
+    .filter(r => r.critiqueNotes.length > 0)
+    .map(r => ({
+      segmentId: r.segmentId,
+      radar: r.radar,
+      literary: r.literary,
+      critiqueNotes: r.critiqueNotes,
+      alternatives: [], // Will be populated in future critique phase
+    }));
+
+  await Promise.all([
+    writeStageRadar(targetStorage, chapterId, sceneId, "literal", literalSegments),
+    literarySegments.length > 0
+      ? writeStageRadar(targetStorage, chapterId, sceneId, "literary", literarySegments)
+      : Promise.resolve(),
+    critiqueSegments.length > 0
+      ? writeCritiqueRadar(targetStorage, chapterId, sceneId, critiqueSegments)
+      : Promise.resolve(),
+  ]);
+}
+
 /**
  * Heuristic: split translated text into N phrases by sentence boundaries.
  * Falls back to even character splits.
