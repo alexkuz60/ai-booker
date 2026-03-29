@@ -112,8 +112,11 @@ export function BilingualSegmentsView({
         // Build lookup: segmentId → translated text
         const transMap = new Map<string, { text: string; hasLiteral: boolean }>();
         for (const tseg of translationSegments) {
-          const text = tseg.phrases.map(p => p.text).filter(Boolean).join(" ");
-          const hasLiteral = !!(tseg as any)._literal;
+          const literaryText = (tseg as any)._literary;
+          const literalText = (tseg as any)._literal;
+          const phrasesText = tseg.phrases.map(p => p.text).filter(Boolean).join(" ");
+          const text = literaryText || literalText || phrasesText;
+          const hasLiteral = !!literalText;
           transMap.set(tseg.segment_id, { text, hasLiteral });
         }
 
