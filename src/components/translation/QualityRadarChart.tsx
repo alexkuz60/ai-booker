@@ -94,7 +94,7 @@ export function QualityRadarChart({
     <div className={cn("flex flex-col items-center gap-3", compact ? "gap-2" : "gap-4")}>
 
       {/* Radar chart */}
-      <div className={cn("w-full", compact ? "h-[180px]" : "h-[320px]")}>
+      <div className={cn("w-full", compact ? "h-[180px]" : "h-[480px]")}>
         <ResponsiveContainer width="100%" height="100%">
           <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="65%">
             <PolarGrid stroke="hsl(var(--muted-foreground) / 0.15)" />
