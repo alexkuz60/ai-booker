@@ -398,9 +398,14 @@ export default function Translation() {
                     <div className="flex items-center gap-1.5 ml-auto">
                       {batchProgress.running && batchProgress.currentStage && (
                         <span className="text-[10px] text-muted-foreground tabular-nums">
-                          {batchProgress.currentStage.segmentIndex != null && batchProgress.currentStage.totalSegments
-                            ? `${batchProgress.currentStage.segmentIndex + 1}/${batchProgress.currentStage.totalSegments}`
-                            : batchProgress.currentStage.message}
+                          {(() => {
+                            const cs = batchProgress.currentStage;
+                            const stageNum = cs.stage === "literal" ? 1 : cs.stage === "literary" ? 1 : cs.stage === "radar" ? 2 : cs.stage === "critique" ? 3 : 0;
+                            if (cs.segmentIndex != null && cs.totalSegments && stageNum > 0) {
+                              return `${stageNum}:${cs.segmentIndex + 1}/${cs.totalSegments}`;
+                            }
+                            return cs.message;
+                          })()}
                         </span>
                       )}
                       <Button
