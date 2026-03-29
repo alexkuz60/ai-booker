@@ -32,8 +32,8 @@ interface Deps {
   doTranslateSegments: (segments: Segment[], sceneId: string, chapterId: string) => Promise<any>;
   editSegment: (seg: Segment, sceneId: string, chapterId: string, originalText: string) => Promise<any>;
   critiqueSegment: (seg: Segment, sceneId: string, chapterId: string, originalText: string) => Promise<any>;
-  translateSceneFull: (sceneId: string, chapterId: string) => Promise<void>;
-  translateChapterBatch: (chapterIndex: number, chapterId: string) => Promise<void>;
+  translateSceneFull: (sceneId: string, chapterId: string) => Promise<any>;
+  translateChapterBatch: (chapterIndex: number, chapterId: string) => Promise<any>;
   refreshTransStorage: () => void;
 }
 
