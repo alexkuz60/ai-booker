@@ -50,6 +50,18 @@ export function invalidateRadarCache(sceneId: string, segmentId?: string) {
   }
 }
 
+/** Normalize radar scores: if any axis > 1, assume 0-100 scale and convert to 0-1 */
+function normalizeRadar(radar: RadarScores): RadarScores {
+  const axes: (keyof RadarScores)[] = ["semantic", "sentiment", "rhythm", "phonetic", "cultural", "weighted"];
+  const needsNorm = axes.some(a => radar[a] > 1);
+  if (!needsNorm) return radar;
+  const norm: RadarScores = { ...radar };
+  for (const a of axes) {
+    norm[a] = Math.max(0, Math.min(1, radar[a] / 100));
+  }
+  return norm;
+}
+
 interface QualityMonitorPanelProps {
   storage: ProjectStorage | null;
   sceneId: string | null;
