@@ -24,8 +24,18 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
+export type RadarLayer = "3R" | "5R" | "5R+Alt";
+
 interface QualityRadarChartProps {
   scores: RadarScores | null;
+  /** Additional layer scores for overlay */
+  layers?: {
+    "3R"?: RadarScores | null;
+    "5R"?: RadarScores | null;
+    "5R+Alt"?: RadarScores | null;
+  };
+  /** Which layers are visible */
+  visibleLayers?: RadarLayer[];
   weights?: RadarWeights;
   onWeightsChange?: (preset: string, weights: RadarWeights) => void;
   onAxisClick?: (axis: RadarAxis) => void;
@@ -35,8 +45,16 @@ interface QualityRadarChartProps {
 
 const AXES: RadarAxis[] = ["semantic", "sentiment", "rhythm", "phonetic", "cultural"];
 
+const LAYER_COLORS: Record<RadarLayer, { stroke: string; fill: string }> = {
+  "3R": { stroke: "hsl(210, 80%, 60%)", fill: "hsl(210, 80%, 60%)" },
+  "5R": { stroke: "hsl(35, 90%, 55%)", fill: "hsl(35, 90%, 55%)" },
+  "5R+Alt": { stroke: "hsl(160, 70%, 45%)", fill: "hsl(160, 70%, 45%)" },
+};
+
 export function QualityRadarChart({
   scores,
+  layers,
+  visibleLayers = [],
   weights = DEFAULT_WEIGHTS,
   onWeightsChange,
   onAxisClick,
@@ -45,15 +63,19 @@ export function QualityRadarChart({
 }: QualityRadarChartProps) {
   const [activePreset, setActivePreset] = useState("prose");
 
+  // Build chart data from the "primary" scores (latest stage)
   const chartData = useMemo(() => {
-    if (!scores) return AXES.map((a) => ({ axis: a, label: AXIS_LABELS[a][isRu ? "ru" : "en"], value: 0, fullMark: 1 }));
+    if (!scores) return AXES.map((a) => ({ axis: a, label: AXIS_LABELS[a][isRu ? "ru" : "en"], value: 0, layer3R: 0, layer5R: 0, layerAlt: 0, fullMark: 1 }));
     return AXES.map((a) => ({
       axis: a,
       label: AXIS_LABELS[a][isRu ? "ru" : "en"],
       value: scores[a],
+      layer3R: layers?.["3R"]?.[a] ?? 0,
+      layer5R: layers?.["5R"]?.[a] ?? 0,
+      layerAlt: layers?.["5R+Alt"]?.[a] ?? 0,
       fullMark: 1,
     }));
-  }, [scores, isRu]);
+  }, [scores, layers, isRu]);
 
   const weighted = scores ? computeWeightedScore(scores, weights) : 0;
   const level: ScoreLevel = getScoreLevel(weighted);
@@ -63,6 +85,10 @@ export function QualityRadarChart({
     const w = RADAR_PRESETS[key];
     if (w && onWeightsChange) onWeightsChange(key, w);
   };
+
+  const show3R = visibleLayers.includes("3R") && layers?.["3R"];
+  const show5R = visibleLayers.includes("5R") && layers?.["5R"];
+  const showAlt = visibleLayers.includes("5R+Alt") && layers?.["5R+Alt"];
 
   return (
     <div className={cn("flex flex-col items-center gap-3", compact ? "gap-2" : "gap-4")}>
@@ -106,6 +132,46 @@ export function QualityRadarChart({
               }}
             />
             <PolarRadiusAxis domain={[0, 1]} tick={false} axisLine={false} />
+
+            {/* Layer: 3R (bottom) */}
+            {show3R && (
+              <Radar
+                name="3R"
+                dataKey="layer3R"
+                stroke={LAYER_COLORS["3R"].stroke}
+                fill={LAYER_COLORS["3R"].fill}
+                fillOpacity={0.12}
+                strokeWidth={1.5}
+                strokeDasharray="4 3"
+              />
+            )}
+
+            {/* Layer: 5R (middle) */}
+            {show5R && (
+              <Radar
+                name="5R"
+                dataKey="layer5R"
+                stroke={LAYER_COLORS["5R"].stroke}
+                fill={LAYER_COLORS["5R"].fill}
+                fillOpacity={0.15}
+                strokeWidth={1.5}
+              />
+            )}
+
+            {/* Layer: 5R+Alt */}
+            {showAlt && (
+              <Radar
+                name="5R+Alt"
+                dataKey="layerAlt"
+                stroke={LAYER_COLORS["5R+Alt"].stroke}
+                fill={LAYER_COLORS["5R+Alt"].fill}
+                fillOpacity={0.1}
+                strokeWidth={1.5}
+                strokeDasharray="2 2"
+              />
+            )}
+
+            {/* Primary score layer (always on top) */}
             <Radar
               name="Score"
               dataKey="value"
@@ -114,6 +180,7 @@ export function QualityRadarChart({
               fillOpacity={0.2}
               strokeWidth={2}
             />
+
             <Tooltip
               content={({ payload }) => {
                 if (!payload?.length) return null;
