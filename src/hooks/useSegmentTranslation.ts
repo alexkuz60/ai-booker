@@ -9,7 +9,7 @@ import type { ProjectStorage } from "@/lib/projectStorage";
 import type { LocalStoryboardData } from "@/lib/storyboardSync";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
 import { computeProgrammaticAxes, computeSemanticScore } from "@/lib/qualityRadar";
-import { readStageRadar, writeStageRadar, type StageSegmentRadar } from "@/lib/radarStages";
+import { readStageRadar, readCritiqueRadar, writeStageRadar, writeCritiqueRadar, type StageSegmentRadar } from "@/lib/radarStages";
 import { invalidateRadarCache } from "@/components/translation/QualityMonitorPanel";
 import { toast } from "sonner";
 
@@ -103,6 +103,8 @@ export function useSegmentTranslation(opts: Opts): UseSegmentTranslationReturn {
       // Persist to translation project storyboard
       setProgressLabel(isRu ? "Сохранение…" : "Saving…");
       await persistTranslations(translationStorage, sceneId, chapterId, translations);
+      // Clean stale literary/critique data for re-translated segments
+      await cleanDownstreamRadar(translationStorage, sceneId, chapterId, new Set(translations.keys()));
       await persistLiteralRadar(
         translationStorage,
         sceneId,
@@ -155,13 +157,12 @@ async function persistTranslations(
       const translatedText = translations.get(seg.segment_id);
       if (translatedText == null) return seg;
 
-      // Store literal translation in a separate field for pipeline
+      // Store literal translation; clear stale literary data
       return {
         ...seg,
         _literal: translatedText,
+        _literary: undefined,
         phrases: seg.phrases.map((ph, pi) => {
-          // For now, put full translation in first phrase, rest empty
-          // Pipeline step 2 (literary) will redistribute properly
           if (pi === 0) return { ...ph, text: translatedText };
           return { ...ph, text: "" };
         }),
@@ -170,6 +171,32 @@ async function persistTranslations(
   };
 
   await store.writeJSON(sbPath, updated);
+}
+
+/**
+ * Remove re-translated segments from literary and critique radar files
+ * so stale 5R/5R+Alt data doesn't persist after re-translation.
+ */
+async function cleanDownstreamRadar(
+  store: ProjectStorage,
+  sceneId: string,
+  chapterId: string,
+  segmentIds: Set<string>,
+): Promise<void> {
+  const [literary, critique] = await Promise.all([
+    readStageRadar(store, chapterId, sceneId, "literary"),
+    readCritiqueRadar(store, chapterId, sceneId),
+  ]);
+
+  if (literary?.segments.some(s => segmentIds.has(s.segmentId))) {
+    const kept = literary.segments.filter(s => !segmentIds.has(s.segmentId));
+    await writeStageRadar(store, chapterId, sceneId, "literary", kept);
+  }
+
+  if (critique?.segments.some(s => segmentIds.has(s.segmentId))) {
+    const kept = critique.segments.filter(s => !segmentIds.has(s.segmentId));
+    await writeCritiqueRadar(store, chapterId, sceneId, kept);
+  }
 }
 
 async function persistLiteralRadar(
