@@ -29,6 +29,8 @@ import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { useTranslationStorage } from "@/hooks/useTranslationStorage";
 import { useSegmentTranslation } from "@/hooks/useSegmentTranslation";
+import { useSegmentLiteraryEdit } from "@/hooks/useSegmentLiteraryEdit";
+import { useSegmentCritique } from "@/hooks/useSegmentCritique";
 import { useTranslationBatch } from "@/hooks/useTranslationBatch";
 import { paths } from "@/lib/projectPaths";
 import type { TocChapter } from "@/pages/parser/types";
