@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import {
   RadarChart,
   PolarGrid,
@@ -12,14 +12,10 @@ import {
   type RadarScores,
   type RadarWeights,
   type RadarAxis,
-  RADAR_PRESETS,
-  PRESET_LABELS,
   AXIS_LABELS,
-  DEFAULT_WEIGHTS,
   getScoreLevel,
   SCORE_COLORS,
 } from "@/lib/qualityRadar";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ThreeAxisRadarOverlay } from "./ThreeAxisRadarOverlay";
 
