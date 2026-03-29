@@ -2,22 +2,15 @@ import { useEffect, useState, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { SEGMENT_CONFIG } from "@/components/studio/storyboard/constants";
 import type { Segment } from "@/components/studio/storyboard/types";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { LocalStoryboardData } from "@/lib/storyboardSync";
 import { paths } from "@/lib/projectPaths";
-import { Loader2, Languages, Sparkles, Scale, Lock } from "lucide-react";
+import { Loader2, Languages } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Textarea } from "@/components/ui/textarea";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { type RadarStage, STAGE_LABELS, readAllStages, getSegmentStage } from "@/lib/radarStages";
+import { Accordion } from "@/components/ui/accordion";
+import { type RadarStage, readAllStages, getSegmentStage } from "@/lib/radarStages";
+import { BilingualSegmentRow } from "./BilingualSegmentRow";
 
 export interface SelectedSegmentData {
   segmentId: string;
@@ -28,40 +21,26 @@ export interface SelectedSegmentData {
 }
 
 interface Props {
-  /** Source project storage (original text) */
   sourceStorage: ProjectStorage | null;
-  /** Translation project storage (translated text) */
   translationStorage: ProjectStorage | null;
   sceneId: string | null;
   chapterId: string | null;
   isRu: boolean;
-  /** Translate a batch of segments */
   onTranslateSegments?: (segments: Segment[]) => Promise<void>;
-  /** Literary edit a single segment */
   onLiteraryEdit?: (segment: Segment) => Promise<void>;
-  /** Critique a single segment */
   onCritique?: (segment: Segment) => Promise<void>;
-  /** Is currently translating */
   translating?: boolean;
-  /** Translation progress label */
   progressLabel?: string | null;
-  /** Currently selected segment id */
   selectedSegmentId?: string | null;
-  /** Callback when user selects a segment for radar inspection */
   onSelectSegment?: (data: SelectedSegmentData | null) => void;
 }
 
 interface SegmentWithTranslation {
   segment: Segment;
   translatedText: string;
-  /** Has literal translation stored */
   hasLiteral: boolean;
 }
 
-/**
- * Bilingual view: each segment is an accordion item.
- * Original text (read-only) + translation (from translation project) below.
- */
 export function BilingualSegmentsView({
   sourceStorage,
   translationStorage,
@@ -94,13 +73,11 @@ export function BilingualSegmentsView({
 
     (async () => {
       try {
-        // Read source storyboard
         const sourceData = await sourceStorage.readJSON<LocalStoryboardData>(
           paths.storyboard(sceneId, chapterId),
         );
         const segments = sourceData?.segments ?? [];
 
-        // Read translation storyboard (if exists)
         let translationSegments: Segment[] = [];
         if (translationStorage) {
           const transData = await translationStorage.readJSON<LocalStoryboardData>(
@@ -109,7 +86,6 @@ export function BilingualSegmentsView({
           translationSegments = transData?.segments ?? [];
         }
 
-        // Build lookup: segmentId → translated text
         const transMap = new Map<string, { text: string; hasLiteral: boolean }>();
         for (const tseg of translationSegments) {
           const literaryText = (tseg as any)._literary;
@@ -164,48 +140,33 @@ export function BilingualSegmentsView({
     return () => { cancelled = true; };
   }, [translationStorage, sceneId, chapterId, items]);
 
-  // Translate single segment (re-translate)
   const handleTranslateSegment = useCallback(async (seg: Segment) => {
     if (!onTranslateSegments) return;
     setTranslatingIds(prev => new Set(prev).add(seg.segment_id));
     try {
       await onTranslateSegments([seg]);
     } finally {
-      setTranslatingIds(prev => {
-        const next = new Set(prev);
-        next.delete(seg.segment_id);
-        return next;
-      });
+      setTranslatingIds(prev => { const next = new Set(prev); next.delete(seg.segment_id); return next; });
     }
   }, [onTranslateSegments]);
 
-  // Literary edit single segment
   const handleLiteraryEdit = useCallback(async (seg: Segment) => {
     if (!onLiteraryEdit) return;
     setEditingIds(prev => new Set(prev).add(seg.segment_id));
     try {
       await onLiteraryEdit(seg);
     } finally {
-      setEditingIds(prev => {
-        const next = new Set(prev);
-        next.delete(seg.segment_id);
-        return next;
-      });
+      setEditingIds(prev => { const next = new Set(prev); next.delete(seg.segment_id); return next; });
     }
   }, [onLiteraryEdit]);
 
-  // Critique single segment
   const handleCritique = useCallback(async (seg: Segment) => {
     if (!onCritique) return;
     setCritiquingIds(prev => new Set(prev).add(seg.segment_id));
     try {
       await onCritique(seg);
     } finally {
-      setCritiquingIds(prev => {
-        const next = new Set(prev);
-        next.delete(seg.segment_id);
-        return next;
-      });
+      setCritiquingIds(prev => { const next = new Set(prev); next.delete(seg.segment_id); return next; });
     }
   }, [onCritique]);
 
@@ -230,7 +191,6 @@ export function BilingualSegmentsView({
 
   return (
     <div className="space-y-2">
-      {/* Scene-level translate button */}
       {onTranslateSegments && (
         <div className="flex items-center justify-between">
           <Button
@@ -257,180 +217,39 @@ export function BilingualSegmentsView({
 
       <Accordion type="multiple" defaultValue={allIds} className="space-y-1.5">
         {items.map(({ segment: seg, translatedText, hasLiteral }) => {
-          const config = SEGMENT_CONFIG[seg.segment_type] ?? SEGMENT_CONFIG.narrator;
-          const Icon = config.icon;
-          const fullText = seg.phrases.map((p) => p.text).join(" ");
-          const isSegTranslating = translatingIds.has(seg.segment_id);
-          const isSegEditing = editingIds.has(seg.segment_id);
-          const isSegCritiquing = critiquingIds.has(seg.segment_id);
-          const currentStage = segmentStages.get(seg.segment_id) ?? null;
-          const hasTranslation = hasLiteral || !!translatedText;
-          const hasLiterary = currentStage === "literary" || currentStage === "critique";
-          const hasCritique = currentStage === "critique";
-
           const isSelected = selectedSegmentId === seg.segment_id;
-
-          const handleSelect = () => {
-            if (isSelected) {
-              onSelectSegment?.(null);
-            } else {
-              onSelectSegment?.({
-                segmentId: seg.segment_id,
-                originalText: fullText,
-                translatedText,
-                segmentType: seg.segment_type,
-                speaker: seg.speaker ?? null,
-              });
-            }
-          };
+          const fullText = seg.phrases.map((p) => p.text).join(" ");
 
           return (
-            <AccordionItem
+            <BilingualSegmentRow
               key={seg.segment_id}
-              value={seg.segment_id}
-              className={cn(
-                "border rounded-md overflow-hidden cursor-pointer transition-colors",
-                isSelected
-                  ? "bg-primary/5 border-primary/40 ring-1 ring-primary/20"
-                  : "bg-muted/10 hover:border-muted-foreground/30",
-              )}
-              onClick={handleSelect}
-            >
-              {/* Segment header */}
-              <AccordionTrigger className="px-3 py-1.5 text-xs hover:no-underline gap-2">
-                <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
-                  <Badge
-                    variant="outline"
-                    className={cn("text-[10px] gap-1 py-0 shrink-0", config.color)}
-                  >
-                    <Icon className="h-3 w-3" />
-                    {isRu ? config.label_ru : config.label_en}
-                  </Badge>
-                  {seg.speaker && (
-                    <span className="text-[10px] text-muted-foreground truncate">
-                      {seg.speaker}
-                    </span>
-                  )}
-
-                  {/* ── Stage action buttons ── */}
-                  <div className="flex items-center gap-0.5 ml-auto mr-1 shrink-0" onClick={e => e.stopPropagation()}>
-                    {/* 1. Translate (re-translate) */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => { e.stopPropagation(); handleTranslateSegment(seg); }}
-                          disabled={translating || isSegTranslating}
-                          className={cn(
-                            "h-5 w-5 p-0",
-                            hasTranslation && "text-primary",
-                          )}
-                        >
-                          {isSegTranslating
-                            ? <Loader2 className="h-3 w-3 animate-spin" />
-                            : <Languages className="h-3 w-3" />}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="text-[10px]">
-                        {hasTranslation
-                          ? (isRu ? "Перевести заново" : "Re-translate")
-                          : (isRu ? "Перевести" : "Translate")}
-                      </TooltipContent>
-                    </Tooltip>
-
-                    {/* 2. Art Edit (literary) — locked if no translation */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => { e.stopPropagation(); handleLiteraryEdit(seg); }}
-                          disabled={!hasTranslation || translating || isSegEditing}
-                          className={cn(
-                            "h-5 w-5 p-0",
-                            hasLiterary && "text-amber-500",
-                          )}
-                        >
-                          {isSegEditing
-                            ? <Loader2 className="h-3 w-3 animate-spin" />
-                            : !hasTranslation
-                              ? <Lock className="h-3 w-3 opacity-40" />
-                              : <Sparkles className="h-3 w-3" />}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="text-[10px]">
-                        {!hasTranslation
-                          ? (isRu ? "Сначала переведите" : "Translate first")
-                          : (isRu ? "Арт-правка" : "Art Edit")}
-                      </TooltipContent>
-                    </Tooltip>
-
-                    {/* 3. Critique — locked if no literary edit */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => { e.stopPropagation(); handleCritique(seg); }}
-                          disabled={!hasLiterary || translating || isSegCritiquing}
-                          className={cn(
-                            "h-5 w-5 p-0",
-                            hasCritique && "text-emerald-500",
-                          )}
-                        >
-                          {isSegCritiquing
-                            ? <Loader2 className="h-3 w-3 animate-spin" />
-                            : !hasLiterary
-                              ? <Lock className="h-3 w-3 opacity-40" />
-                              : <Scale className="h-3 w-3" />}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="text-[10px]">
-                        {!hasLiterary
-                          ? (isRu ? "Сначала арт-правка" : "Art edit first")
-                          : (isRu ? "Оценка" : "Critique")}
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-
-                  <span className="text-[10px] text-muted-foreground/50 shrink-0">
-                    #{seg.segment_number}
-                  </span>
-                </div>
-              </AccordionTrigger>
-
-              <AccordionContent className="px-3 pb-3 pt-0 space-y-2">
-                {/* ── Original text (read-only) ── */}
-                <div className="space-y-1">
-                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-                    {isRu ? "Оригинал" : "Original"}
-                  </span>
-                  <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-wrap select-text rounded-md bg-muted/30 border border-border/30 p-2">
-                    {fullText}
-                  </p>
-                </div>
-
-                {/* ── Translation ── */}
-                <div className="space-y-1">
-                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-                    {isRu ? "Перевод" : "Translation"}
-                  </span>
-
-                  {translatedText ? (
-                    <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap select-text rounded-md bg-primary/5 border border-primary/20 p-2">
-                      {translatedText}
-                    </p>
-                  ) : (
-                    <div className="text-xs text-muted-foreground italic rounded-md bg-muted/20 border border-dashed border-muted-foreground/20 p-2 min-h-[2.5rem]">
-                      {isRu
-                        ? "Нажмите ▶ для подстрочного перевода"
-                        : "Click ▶ to translate"}
-                    </div>
-                  )}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
+              segment={seg}
+              translatedText={translatedText}
+              hasLiteral={hasLiteral}
+              currentStage={segmentStages.get(seg.segment_id) ?? null}
+              isSelected={isSelected}
+              isRu={isRu}
+              translating={translating}
+              isSegTranslating={translatingIds.has(seg.segment_id)}
+              isSegEditing={editingIds.has(seg.segment_id)}
+              isSegCritiquing={critiquingIds.has(seg.segment_id)}
+              onSelect={() => {
+                if (isSelected) {
+                  onSelectSegment?.(null);
+                } else {
+                  onSelectSegment?.({
+                    segmentId: seg.segment_id,
+                    originalText: fullText,
+                    translatedText,
+                    segmentType: seg.segment_type,
+                    speaker: seg.speaker ?? null,
+                  });
+                }
+              }}
+              onTranslate={handleTranslateSegment}
+              onLiteraryEdit={onLiteraryEdit ? handleLiteraryEdit : undefined}
+              onCritique={onCritique ? handleCritique : undefined}
+            />
           );
         })}
       </Accordion>

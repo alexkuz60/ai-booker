@@ -17,12 +17,14 @@ import { RadarAxisDetail } from "./RadarAxisDetail";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { readAllStages, LAYER_LABELS } from "@/lib/radarStages";
 import {
-  readAllStages,
-  LAYER_LABELS,
-  type StageRadarFile,
-  type CritiqueRadarFile,
-} from "@/lib/radarStages";
+  radarCache,
+  computedCache,
+  stageCache,
+  normalizeRadar,
+  useRadarInvalidationRevision,
+} from "@/lib/radarCache";
 
 const ALL_AXES: RadarAxis[] = ["semantic", "sentiment", "rhythm", "phonetic", "cultural"];
 
@@ -30,80 +32,15 @@ function hasAnyAxis(radar: RadarScores | null | undefined) {
   return !!radar && ALL_AXES.some((axis) => radar[axis] > 0);
 }
 
-// Module-level cache: sceneId → { segments: [...] }
-const radarCache = new Map<string, {
-  segments: { segmentId: string; radar: RadarScores; critiqueNotes?: string[] }[];
-}>();
-
-// Per-segment fallback cache: "sceneId:segmentId" → computed scores
-const computedCache = new Map<string, { scores: RadarScores; notes: string[] }>();
-
-// Stage files cache: sceneId → stages
-const stageCache = new Map<string, {
-  literal: StageRadarFile | null;
-  literary: StageRadarFile | null;
-  critique: CritiqueRadarFile | null;
-}>();
-
-const radarInvalidationListeners = new Set<() => void>();
-
-function emitRadarInvalidation() {
-  radarInvalidationListeners.forEach((listener) => listener());
-}
-
-function useRadarInvalidationRevision() {
-  const [revision, setRevision] = useState(0);
-
-  useEffect(() => {
-    const listener = () => setRevision((current) => current + 1);
-    radarInvalidationListeners.add(listener);
-
-    return () => {
-      radarInvalidationListeners.delete(listener);
-    };
-  }, []);
-
-  return revision;
-}
-
-/** Invalidate caches for a scene so the monitor re-reads from storage */
-export function invalidateRadarCache(sceneId: string, segmentId?: string) {
-  stageCache.delete(sceneId);
-  radarCache.delete(sceneId);
-  if (segmentId) {
-    computedCache.delete(`${sceneId}:${segmentId}`);
-  } else {
-    // Clear all segments for this scene
-    for (const key of computedCache.keys()) {
-      if (key.startsWith(`${sceneId}:`)) computedCache.delete(key);
-    }
-  }
-  emitRadarInvalidation();
-}
-
-/** Normalize radar scores: if any axis > 1, assume 0-100 scale and convert to 0-1 */
-function normalizeRadar(radar: RadarScores): RadarScores {
-  const axes: (keyof RadarScores)[] = ["semantic", "sentiment", "rhythm", "phonetic", "cultural", "weighted"];
-  const needsNorm = axes.some(a => radar[a] > 1);
-  if (!needsNorm) return radar;
-  const norm: RadarScores = { ...radar };
-  for (const a of axes) {
-    norm[a] = Math.max(0, Math.min(1, radar[a] / 100));
-  }
-  return norm;
-}
-
 interface QualityMonitorPanelProps {
   storage: ProjectStorage | null;
   sceneId: string | null;
   chapterId: string | null;
   isRu: boolean;
-  /** Currently selected segment from bilingual view */
   selectedSegment?: SelectedSegmentData | null;
   sourceLang?: "ru" | "en";
   targetLang?: "ru" | "en";
   userApiKeys?: Record<string, string>;
-  /** Called when weighted score changes (0–1 or null) */
   onScoreChange?: (score: number | null) => void;
 }
 
@@ -137,8 +74,7 @@ export function QualityMonitorPanel({
     setVisibleLayers((prev) => prev.filter((layer) => layer !== "3R" && availableLayers.includes(layer)));
   }, [availableLayers]);
 
-  // Try loading staged radar from storage first; fallback to legacy radar.json,
-  // then to on-the-fly compute.
+  // Load scores from staged radar → legacy radar → compute on-the-fly
   useEffect(() => {
     if (!selectedSegment?.translatedText || !selectedSegment?.originalText) {
       setSegmentScores(null);
@@ -148,7 +84,6 @@ export function QualityMonitorPanel({
 
     const segKey = `${sceneId}:${selectedSegment.segmentId}`;
 
-    // 0. Check in-memory computed cache (survives remount)
     const cached = computedCache.get(segKey);
     if (cached) {
       const scores = { ...cached.scores, weighted: computeWeightedScore(cached.scores, weights) };
@@ -163,18 +98,16 @@ export function QualityMonitorPanel({
 
     (async () => {
       try {
-        // 1. Prefer staged radar files (radar-literal / radar-literary / radar-critique)
+        // 1. Staged radar files
         if (storage && sceneId && chapterId) {
           const stages = stageCache.get(sceneId) ?? await readAllStages(storage, chapterId, sceneId);
           if (stages) {
             stageCache.set(sceneId, stages);
-            // Pick the highest available stage for this segment
             const critSeg = stages.critique?.segments.find(s => s.segmentId === selectedSegment.segmentId);
             const liteSeg = stages.literary?.segments.find(s => s.segmentId === selectedSegment.segmentId);
             const litSeg = stages.literal?.segments.find(s => s.segmentId === selectedSegment.segmentId);
             const bestSeg = critSeg ?? liteSeg ?? litSeg;
             if (bestSeg?.radar) {
-              // Check if any axis has data (weighted may be 0 for partial stages)
               const hasData = Object.entries(bestSeg.radar)
                 .filter(([k]) => k !== "weighted")
                 .some(([, v]) => (v as number) > 0);
@@ -194,16 +127,12 @@ export function QualityMonitorPanel({
 
         if (cancelled) return;
 
-        // 1b. Legacy fallback: monolithic radar.json
+        // 2. Legacy radar.json
         let radarSegments = sceneId ? radarCache.get(sceneId)?.segments : undefined;
         if (!radarSegments && storage && sceneId && chapterId) {
           const radarPath = `chapters/${chapterId}/scenes/${sceneId}/radar.json`;
           const radarData = await storage.readJSON<{
-            segments?: {
-              segmentId: string;
-              radar: RadarScores;
-              critiqueNotes?: string[];
-            }[];
+            segments?: { segmentId: string; radar: RadarScores; critiqueNotes?: string[] }[];
           }>(radarPath);
           if (radarData?.segments) {
             radarSegments = radarData.segments;
@@ -212,15 +141,12 @@ export function QualityMonitorPanel({
         }
 
         if (!cancelled && radarSegments) {
-          const saved = radarSegments.find(
-            (s) => s.segmentId === selectedSegment.segmentId,
-          );
+          const saved = radarSegments.find((s) => s.segmentId === selectedSegment.segmentId);
           if (saved?.radar) {
             const normRadar = normalizeRadar(saved.radar);
             const hasData = Object.entries(normRadar)
               .filter(([k]) => k !== "weighted")
               .some(([, v]) => (v as number) > 0);
-
             if (hasData) {
               const scores = { ...normRadar, weighted: computeWeightedScore(normRadar, weights) };
               computedCache.set(segKey, { scores: normRadar, notes: saved.critiqueNotes ?? [] });
@@ -234,7 +160,7 @@ export function QualityMonitorPanel({
 
         if (cancelled) return;
 
-        // 2. Fallback: compute on the fly (programmatic + semantic only)
+        // 3. Compute on the fly
         const { rhythm, phonetic } = computeProgrammaticAxes(
           selectedSegment.originalText,
           selectedSegment.translatedText,
@@ -332,13 +258,11 @@ export function QualityMonitorPanel({
     return () => { cancelled = true; };
   }, [storage, sceneId, chapterId, selectedSegment?.segmentId, cacheRevision]);
 
-  // Recompute weighted when weights change
   const displayScores = useMemo(() => {
     if (!segmentScores) return null;
     return { ...segmentScores, weighted: computeWeightedScore(segmentScores, weights) };
   }, [segmentScores, weights]);
 
-  // Notify parent about score changes
   useEffect(() => {
     onScoreChange?.(displayScores?.weighted ?? null);
   }, [displayScores?.weighted, onScoreChange]);
@@ -347,54 +271,43 @@ export function QualityMonitorPanel({
     setWeights(w);
   }, []);
 
-  // No scene selected
   if (!sceneId) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground p-6">
         <RadarIcon className="h-10 w-10 opacity-20" />
         <p className="text-xs text-center">
-          {isRu
-            ? "Выберите сцену для мониторинга качества"
-            : "Select a scene to monitor quality"}
+          {isRu ? "Выберите сцену для мониторинга качества" : "Select a scene to monitor quality"}
         </p>
       </div>
     );
   }
 
-  // Scene selected but no segment
   if (!selectedSegment) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground p-6">
         <MousePointerClick className="h-8 w-8 opacity-20" />
         <p className="text-xs text-center">
-          {isRu
-            ? "Кликните на сегмент для оценки качества перевода"
-            : "Click a segment to evaluate translation quality"}
+          {isRu ? "Кликните на сегмент для оценки качества перевода" : "Click a segment to evaluate translation quality"}
         </p>
       </div>
     );
   }
 
-  // Segment selected but no translation
   if (!selectedSegment.translatedText) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground p-6">
         <Activity className="h-8 w-8 opacity-20" />
         <p className="text-xs text-center">
-          {isRu
-            ? "Сначала переведите этот сегмент"
-            : "Translate this segment first"}
+          {isRu ? "Сначала переведите этот сегмент" : "Translate this segment first"}
         </p>
       </div>
     );
   }
 
-
   return (
     <ScrollArea className="h-full">
       <div className="px-4 pt-1 pb-4 space-y-3">
-
-        {/* Layer toggles + preset badges — always visible */}
+        {/* Layer toggles + preset badges */}
         <div className="flex items-center gap-2">
           <span className="text-[9px] text-muted-foreground uppercase tracking-wide shrink-0">
             {isRu ? "Слои" : "Layers"}
@@ -431,7 +344,6 @@ export function QualityMonitorPanel({
             })}
           </ToggleGroup>
 
-          {/* Preset badges — right-aligned */}
           <div className="ml-auto flex items-center gap-1">
             {Object.keys(RADAR_PRESETS).map((key) => (
               <Badge
@@ -449,7 +361,6 @@ export function QualityMonitorPanel({
           </div>
         </div>
 
-        {/* Radar chart */}
         {computing ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground gap-2">
             <Activity className="h-4 w-4 animate-pulse" />
@@ -465,7 +376,6 @@ export function QualityMonitorPanel({
             isRu={isRu}
           />
         )}
-
       </div>
     </ScrollArea>
   );
