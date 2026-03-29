@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import {
   RadarChart,
   PolarGrid,
@@ -12,14 +12,10 @@ import {
   type RadarScores,
   type RadarWeights,
   type RadarAxis,
-  RADAR_PRESETS,
-  PRESET_LABELS,
   AXIS_LABELS,
-  DEFAULT_WEIGHTS,
   getScoreLevel,
   SCORE_COLORS,
 } from "@/lib/qualityRadar";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ThreeAxisRadarOverlay } from "./ThreeAxisRadarOverlay";
 
@@ -35,8 +31,7 @@ interface QualityRadarChartProps {
   };
   /** Which layers are visible */
   visibleLayers?: RadarLayer[];
-  weights?: RadarWeights;
-  onWeightsChange?: (preset: string, weights: RadarWeights) => void;
+  weights: RadarWeights;
   onAxisClick?: (axis: RadarAxis) => void;
   isRu: boolean;
   compact?: boolean;
@@ -59,13 +54,11 @@ export function QualityRadarChart({
   scores,
   layers,
   visibleLayers = [],
-  weights = DEFAULT_WEIGHTS,
-  onWeightsChange,
+  weights,
   onAxisClick,
   isRu,
   compact = false,
 }: QualityRadarChartProps) {
-  const [activePreset, setActivePreset] = useState("prose");
 
   const layer3R = layers?.["3R"] ?? null;
   const layer5R = layers?.["5R"] ?? null;
@@ -95,11 +88,6 @@ export function QualityRadarChart({
     }));
   }, [scores, layer3R, layer5R, layerAlt, isRu]);
 
-  const handlePreset = (key: string) => {
-    setActivePreset(key);
-    const w = RADAR_PRESETS[key];
-    if (w && onWeightsChange) onWeightsChange(key, w);
-  };
 
   const show5R = visibleLayers.includes("5R") && hasAnyAxis(layer5R);
   const showAlt = visibleLayers.includes("5R+Alt") && hasAnyAxis(layerAlt);
@@ -188,21 +176,6 @@ export function QualityRadarChart({
         <ThreeAxisRadarOverlay scores={layer3R} />
       </div>
 
-      {/* Preset selector */}
-      {onWeightsChange && (
-        <div className="flex items-center gap-1.5">
-          {Object.keys(RADAR_PRESETS).map((key) => (
-            <Badge
-              key={key}
-              variant={activePreset === key ? "default" : "outline"}
-              className="cursor-pointer text-[10px] px-2 py-0"
-              onClick={() => handlePreset(key)}
-            >
-              {PRESET_LABELS[key]?.[isRu ? "ru" : "en"] ?? key}
-            </Badge>
-          ))}
-        </div>
-      )}
 
       {/* Axis score bars */}
       {!compact && scores && (
