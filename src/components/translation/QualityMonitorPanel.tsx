@@ -132,6 +132,30 @@ export function QualityMonitorPanel({
 
         if (cancelled) return;
 
+        // 1b. Try staged radar files (radar-literal / radar-literary / radar-critique)
+        if (storage && sceneId && chapterId) {
+          const stages = stageCache.get(sceneId) ?? await readAllStages(storage, chapterId, sceneId);
+          if (stages) {
+            stageCache.set(sceneId, stages);
+            // Pick the highest available stage for this segment
+            const critSeg = stages.critique?.segments.find(s => s.segmentId === selectedSegment.segmentId);
+            const liteSeg = stages.literary?.segments.find(s => s.segmentId === selectedSegment.segmentId);
+            const litSeg = stages.literal?.segments.find(s => s.segmentId === selectedSegment.segmentId);
+            const bestSeg = critSeg ?? liteSeg ?? litSeg;
+            if (bestSeg?.radar && bestSeg.radar.weighted > 0) {
+              const notes = bestSeg.critiqueNotes ?? [];
+              const scores = { ...bestSeg.radar, weighted: computeWeightedScore(bestSeg.radar, weights) };
+              computedCache.set(segKey, { scores: bestSeg.radar, notes });
+              setSegmentScores(scores);
+              setCritiqueNotes(notes);
+              setComputing(false);
+              return;
+            }
+          }
+        }
+
+        if (cancelled) return;
+
         // 2. Fallback: compute on the fly (programmatic + semantic only)
         const { rhythm, phonetic } = computeProgrammaticAxes(
           selectedSegment.originalText,
