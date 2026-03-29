@@ -4,10 +4,13 @@ import type { ProjectStorage } from "@/lib/projectStorage";
 import type { RadarScores, RadarWeights, RadarAxis } from "@/lib/qualityRadar";
 import {
   DEFAULT_WEIGHTS,
+  RADAR_PRESETS,
+  PRESET_LABELS,
   computeWeightedScore,
   computeProgrammaticAxes,
   computeSemanticScore,
 } from "@/lib/qualityRadar";
+import { Badge } from "@/components/ui/badge";
 import type { SelectedSegmentData } from "@/components/translation/BilingualSegmentsView";
 import { QualityRadarChart, LAYER_COLORS, type RadarLayer } from "./QualityRadarChart";
 import { RadarAxisDetail } from "./RadarAxisDetail";
@@ -390,28 +393,31 @@ export function QualityMonitorPanel({
     <ScrollArea className="h-full">
       <div className="px-4 pt-1 pb-4 space-y-3">
 
-        {/* Layer toggle — 3R always visible, only 5R/5R+Alt togglable */}
-        {availableLayers.filter((l) => l !== "3R").length > 0 && !computing && (
-          <div className="flex items-center gap-2">
-            <span className="text-[9px] text-muted-foreground uppercase tracking-wide">
-              {isRu ? "Слои" : "Layers"}
-            </span>
-            <ToggleGroup
-              type="multiple"
-              size="sm"
-              value={visibleLayers}
-              onValueChange={(val) => setVisibleLayers(val as RadarLayer[])}
-              className="gap-0.5"
-            >
-              {availableLayers.filter((l) => l !== "3R").map((layer) => (
+        {/* Layer toggles + preset badges — always visible */}
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] text-muted-foreground uppercase tracking-wide shrink-0">
+            {isRu ? "Слои" : "Layers"}
+          </span>
+          <ToggleGroup
+            type="multiple"
+            size="sm"
+            value={visibleLayers}
+            onValueChange={(val) => setVisibleLayers(val as RadarLayer[])}
+            className="gap-0.5"
+          >
+            {(["5R", "5R+Alt"] as RadarLayer[]).map((layer) => {
+              const available = availableLayers.includes(layer);
+              return (
                 <ToggleGroupItem
                   key={layer}
                   value={layer}
+                  disabled={!available}
                   className={cn(
                     "h-5 text-[9px] px-1.5 transition-opacity",
-                    visibleLayers.includes(layer)
+                    !available && "opacity-20 cursor-not-allowed",
+                    available && visibleLayers.includes(layer)
                       ? "data-[state=on]:bg-primary/20 opacity-100"
-                      : "opacity-40"
+                      : available ? "opacity-40" : ""
                   )}
                 >
                   <span
@@ -420,10 +426,27 @@ export function QualityMonitorPanel({
                   />
                   {LAYER_LABELS[layer]?.[isRu ? "ru" : "en"] ?? layer}
                 </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
+              );
+            })}
+          </ToggleGroup>
+
+          {/* Preset badges — right-aligned */}
+          <div className="ml-auto flex items-center gap-1">
+            {Object.keys(RADAR_PRESETS).map((key) => (
+              <Badge
+                key={key}
+                variant={activePreset === key ? "default" : "outline"}
+                className="cursor-pointer text-[9px] px-1.5 py-0"
+                onClick={() => {
+                  setActivePreset(key);
+                  handleWeightsChange(key, RADAR_PRESETS[key]);
+                }}
+              >
+                {PRESET_LABELS[key]?.[isRu ? "ru" : "en"] ?? key}
+              </Badge>
+            ))}
           </div>
-        )}
+        </div>
 
         {/* Radar chart */}
         {computing ? (
