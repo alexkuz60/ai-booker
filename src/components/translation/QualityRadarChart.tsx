@@ -112,8 +112,9 @@ export function QualityRadarChart({
     if (w && onWeightsChange) onWeightsChange(key, w);
   };
 
-  // 3R always shown if data exists; 5R/5R+Alt togglable
-  const show3R = !!layers?.["3R"];
+  const primaryScores = layers?.["3R"] ?? scores;
+  const primaryWeighted = primaryScores ? computeWeightedScore(primaryScores, weights) : 0;
+  const primaryLevel: ScoreLevel = getScoreLevel(primaryWeighted);
   const show5R = visibleLayers.includes("5R") && !!layers?.["5R"];
   const showAlt = visibleLayers.includes("5R+Alt") && !!layers?.["5R+Alt"];
 
