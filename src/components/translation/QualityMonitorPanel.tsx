@@ -36,6 +36,20 @@ const stageCache = new Map<string, {
   critique: CritiqueRadarFile | null;
 }>();
 
+/** Invalidate caches for a scene so the monitor re-reads from storage */
+export function invalidateRadarCache(sceneId: string, segmentId?: string) {
+  stageCache.delete(sceneId);
+  radarCache.delete(sceneId);
+  if (segmentId) {
+    computedCache.delete(`${sceneId}:${segmentId}`);
+  } else {
+    // Clear all segments for this scene
+    for (const key of computedCache.keys()) {
+      if (key.startsWith(`${sceneId}:`)) computedCache.delete(key);
+    }
+  }
+}
+
 interface QualityMonitorPanelProps {
   storage: ProjectStorage | null;
   sceneId: string | null;
