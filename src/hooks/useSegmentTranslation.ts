@@ -8,6 +8,9 @@ import type { Segment } from "@/components/studio/storyboard/types";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { LocalStoryboardData } from "@/lib/storyboardSync";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
+import { computeProgrammaticAxes, computeSemanticScore } from "@/lib/qualityRadar";
+import { readStageRadar, writeStageRadar, type StageSegmentRadar } from "@/lib/radarStages";
+import { invalidateRadarCache } from "@/components/translation/QualityMonitorPanel";
 import { toast } from "sonner";
 
 interface TranslationResult {
@@ -100,6 +103,17 @@ export function useSegmentTranslation(opts: Opts): UseSegmentTranslationReturn {
       // Persist to translation project storyboard
       setProgressLabel(isRu ? "Сохранение…" : "Saving…");
       await persistTranslations(translationStorage, sceneId, chapterId, translations);
+      await persistLiteralRadar(
+        translationStorage,
+        sceneId,
+        chapterId,
+        segments,
+        translations,
+        sourceLang,
+        targetLang,
+        userApiKeys,
+      );
+      invalidateRadarCache(sceneId);
 
       toast.success(isRu
         ? `Переведено ${segments.length} блоков`
@@ -156,4 +170,58 @@ async function persistTranslations(
   };
 
   await store.writeJSON(sbPath, updated);
+}
+
+async function persistLiteralRadar(
+  store: ProjectStorage,
+  sceneId: string,
+  chapterId: string,
+  segments: Segment[],
+  translations: Map<string, string>,
+  sourceLang: string,
+  targetLang: string,
+  userApiKeys: Record<string, string>,
+): Promise<void> {
+  const existingRadar = await readStageRadar(store, chapterId, sceneId, "literal");
+  const translatedIds = new Set(translations.keys());
+  const otherSegments = (existingRadar?.segments ?? []).filter((segment) => !translatedIds.has(segment.segmentId));
+
+  const newSegments = await Promise.all(
+    segments.map(async (segment): Promise<StageSegmentRadar | null> => {
+      const translatedText = translations.get(segment.segment_id);
+      if (!translatedText) return null;
+
+      const originalText = segment.phrases.map((phrase) => phrase.text).join(" ");
+      const [programmatic, semantic] = await Promise.all([
+        Promise.resolve(computeProgrammaticAxes(
+          originalText,
+          translatedText,
+          sourceLang as "ru" | "en",
+          targetLang as "ru" | "en",
+        )),
+        computeSemanticScore(originalText, translatedText, userApiKeys),
+      ]);
+
+      return {
+        segmentId: segment.segment_id,
+        radar: {
+          semantic: semantic ?? 0,
+          sentiment: 0,
+          rhythm: programmatic.rhythm,
+          phonetic: programmatic.phonetic,
+          cultural: 0,
+          weighted: 0,
+        },
+        literal: translatedText,
+      };
+    }),
+  );
+
+  await writeStageRadar(
+    store,
+    chapterId,
+    sceneId,
+    "literal",
+    [...otherSegments, ...newSegments.filter((segment): segment is StageSegmentRadar => !!segment)],
+  );
 }
