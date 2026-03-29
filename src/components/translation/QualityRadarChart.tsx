@@ -102,7 +102,7 @@ export function QualityRadarChart({
   const [activePreset, setActivePreset] = useState("prose");
 
   const layer3R = layers?.["3R"] ?? projectTo3R(scores);
-  const layer5R = layers?.["5R"] ?? scores ?? null;
+  const layer5R = layers?.["5R"] ?? null;
   const layerAlt = layers?.["5R+Alt"] ?? null;
 
   // Build chart data from the "primary" scores (latest stage)
