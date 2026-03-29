@@ -336,49 +336,6 @@ export function QualityMonitorPanel({
           />
         )}
 
-        {/* Axis scores breakdown */}
-        {displayScores && !computing && (
-          <div className="space-y-1.5">
-            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide px-1">
-              {isRu ? "Оси оценки" : "Score axes"}
-            </span>
-            {(["semantic", "sentiment", "rhythm", "phonetic", "cultural"] as RadarAxis[]).map((axis) => {
-              const val = displayScores[axis];
-              const level = getScoreLevel(val);
-              const color = SCORE_COLORS[level];
-              const label = AXIS_LABELS[axis];
-              const isActive = val > 0;
-              return (
-                <div
-                  key={axis}
-                  className={cn(
-                    "flex items-center gap-2 px-2 py-1 rounded transition-colors",
-                    isActive ? "hover:bg-muted/50" : "opacity-40",
-                  )}
-                >
-                  <div
-                    className="h-2 w-2 rounded-full shrink-0"
-                    style={{ backgroundColor: isActive ? color : "hsl(var(--muted-foreground))" }}
-                  />
-                  <span className="text-[10px] text-muted-foreground flex-1">
-                    {isRu ? label.ru : label.en}
-                  </span>
-                  <span
-                    className="text-[10px] font-mono font-bold shrink-0"
-                    style={{ color: isActive ? color : undefined }}
-                  >
-                    {isActive ? `${(val * 100).toFixed(0)}%` : "—"}
-                  </span>
-                </div>
-              );
-            })}
-            <p className="text-[9px] text-muted-foreground/50 px-2 pt-1 italic">
-              {isRu
-                ? "Тональность и культурный код — после критики (следующий этап)"
-                : "Sentiment & cultural code — after critique (next phase)"}
-            </p>
-          </div>
-        )}
       </div>
     </ScrollArea>
   );
