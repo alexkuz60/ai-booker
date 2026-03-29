@@ -51,6 +51,32 @@ const LAYER_COLORS: Record<RadarLayer, { stroke: string; fill: string }> = {
   "5R+Alt": { stroke: "hsl(160, 70%, 45%)", fill: "hsl(160, 70%, 45%)" },
 };
 
+/**
+ * Custom Radar shape that skips axes with value=0,
+ * drawing a polygon only through non-zero points.
+ */
+function SkipZeroRadarShape({ points, dataKey, stroke, fill, fillOpacity, strokeWidth, strokeDasharray }: any) {
+  if (!points?.length) return null;
+  // Filter to only points whose corresponding data value > 0
+  const nonZero = points.filter((_: any, i: number) => {
+    // points correspond to AXES order
+    return true; // keep all for coordinate lookup
+  });
+  // Build polygon from non-zero values only
+  const validPoints = points.filter((_: any, i: number) => {
+    // Access the raw value from the point — recharts stores it in payload
+    const val = _?.payload?.[dataKey];
+    return val != null && val > 0;
+  });
+  if (validPoints.length < 2) return null;
+  const d = validPoints.map((p: any, i: number) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ") + " Z";
+  return (
+    <g>
+      <path d={d} fill={fill} fillOpacity={fillOpacity} stroke={stroke} strokeWidth={strokeWidth} strokeDasharray={strokeDasharray} />
+    </g>
+  );
+}
+
 export function QualityRadarChart({
   scores,
   layers,
@@ -133,6 +159,7 @@ export function QualityRadarChart({
                 fillOpacity={0.12}
                 strokeWidth={1.5}
                 strokeDasharray="4 3"
+                shape={<SkipZeroRadarShape dataKey="layer3R" stroke={LAYER_COLORS["3R"].stroke} fill={LAYER_COLORS["3R"].fill} fillOpacity={0.12} strokeWidth={1.5} strokeDasharray="4 3" />}
               />
             )}
 
@@ -145,6 +172,7 @@ export function QualityRadarChart({
                 fill={LAYER_COLORS["5R"].fill}
                 fillOpacity={0.15}
                 strokeWidth={1.5}
+                shape={<SkipZeroRadarShape dataKey="layer5R" stroke={LAYER_COLORS["5R"].stroke} fill={LAYER_COLORS["5R"].fill} fillOpacity={0.15} strokeWidth={1.5} />}
               />
             )}
 
@@ -158,6 +186,7 @@ export function QualityRadarChart({
                 fillOpacity={0.1}
                 strokeWidth={1.5}
                 strokeDasharray="2 2"
+                shape={<SkipZeroRadarShape dataKey="layerAlt" stroke={LAYER_COLORS["5R+Alt"].stroke} fill={LAYER_COLORS["5R+Alt"].fill} fillOpacity={0.1} strokeWidth={1.5} strokeDasharray="2 2" />}
               />
             )}
 
@@ -169,6 +198,7 @@ export function QualityRadarChart({
               fill={SCORE_COLORS[level]}
               fillOpacity={0.2}
               strokeWidth={2}
+              shape={<SkipZeroRadarShape dataKey="value" stroke={SCORE_COLORS[level]} fill={SCORE_COLORS[level]} fillOpacity={0.2} strokeWidth={2} />}
             />
 
             <Tooltip
