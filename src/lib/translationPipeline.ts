@@ -85,6 +85,10 @@ export interface PipelineOptions {
   weights?: RadarWeights;
   /** Progress callback */
   onProgress?: (info: PipelineProgress) => void;
+  /** Called after each segment is fully processed (for live UI updates) */
+  onSegmentComplete?: (segmentId: string, result: TranslationSegmentResult) => void;
+  /** Skip segments that already have critique-stage radar data */
+  skipCompleted?: boolean;
   /** Abort signal */
   signal?: AbortSignal;
   /** Is Russian UI (for fallback toasts) */
@@ -125,6 +129,8 @@ export async function runTranslationPipeline(
     maxIterations = MAX_ITERATIONS_DEFAULT,
     weights = DEFAULT_WEIGHTS,
     onProgress,
+    onSegmentComplete,
+    skipCompleted = false,
     signal,
     isRu = false,
   } = opts;
@@ -142,21 +148,63 @@ export async function runTranslationPipeline(
   const segments = sourceSb.segments;
   const totalSegs = segments.length;
 
-  // ── 2. Literal translation (batch) ─────────────────────────────────────
+  // ── 2. Determine which segments to process ─────────────────────────────
+  let completedSegmentIds = new Set<string>();
+  if (skipCompleted) {
+    const { readCritiqueRadar } = await import("@/lib/radarStages");
+    const existingCritique = await targetStorage.readJSON<any>(
+      `chapters/${chapterId}/scenes/${sceneId}/radar-critique.json`,
+    );
+    if (existingCritique?.segments?.length) {
+      for (const s of existingCritique.segments) {
+        if (s.segmentId && s.radar?.weighted > 0) completedSegmentIds.add(s.segmentId);
+      }
+    }
+  }
+
+  const segmentsToProcess = segments.filter(
+    (seg) => !completedSegmentIds.has(seg.segment_id),
+  );
+
+  // ── 3. Literal translation (batch, only for unprocessed) ──────────────
   checkAbort();
   progress({ stage: "literal", fraction: 0.05, message: isRu ? "Подстрочный перевод…" : "Literal translation…" });
 
-  const literalResults = await batchLiteralTranslation(segments, model, userApiKeys, sourceLang, targetLang, isRu);
+  const literalResults = segmentsToProcess.length > 0
+    ? await batchLiteralTranslation(segmentsToProcess, model, userApiKeys, sourceLang, targetLang, isRu)
+    : [];
   checkAbort();
 
-  // ── 3. Per-segment: literary → radar → critique → iterate ─────────────
+  // Build a map for quick lookup
+  const literalMap = new Map<string, string>();
+  segmentsToProcess.forEach((seg, i) => {
+    literalMap.set(seg.segment_id, (literalResults[i] || "").trim());
+  });
+
+  // ── 4. Per-segment: literary → radar → critique → iterate ─────────────
   const results: TranslationSegmentResult[] = [];
 
   for (let si = 0; si < totalSegs; si++) {
     checkAbort();
     const seg = segments[si];
     const originalText = seg.phrases.map(p => p.text).join(" ").trim();
-    const literalText = (literalResults[si] || "").trim() || originalText;
+
+    // Skip already completed segments
+    if (completedSegmentIds.has(seg.segment_id)) {
+      results.push({
+        segmentId: seg.segment_id,
+        original: originalText,
+        literal: "",
+        literary: "",
+        critiqueNotes: [],
+        radarHistory: [],
+        radar: { semantic: 0, sentiment: 0, rhythm: 0, phonetic: 0, cultural: 0, weighted: 0 },
+        iterations: 0,
+      });
+      continue;
+    }
+
+    const literalText = literalMap.get(seg.segment_id) || originalText;
 
     // Skip segments with no text content
     if (!originalText) {
@@ -263,7 +311,7 @@ export async function runTranslationPipeline(
       if (iter === maxIterations - 1) break;
     }
 
-    results.push({
+    const segResult: TranslationSegmentResult = {
       segmentId: seg.segment_id,
       original: originalText,
       literal: literalText,
@@ -272,7 +320,11 @@ export async function runTranslationPipeline(
       radarHistory,
       radar: finalRadar,
       iterations: radarHistory.length,
-    });
+    };
+    results.push(segResult);
+
+    // Notify caller so UI can update live
+    onSegmentComplete?.(seg.segment_id, segResult);
   }
 
   // ── 4. Save to translation project ────────────────────────────────────
