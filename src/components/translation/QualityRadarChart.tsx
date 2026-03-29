@@ -123,7 +123,7 @@ export function QualityRadarChart({
       {/* Radar chart */}
       <div className={cn("w-full", compact ? "h-[180px]" : "h-[480px]")}>
         <ResponsiveContainer width="100%" height="100%">
-          <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="65%">
+          <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="85%">
             <PolarGrid stroke="hsl(var(--muted-foreground) / 0.15)" />
             <PolarAngleAxis
               dataKey="label"
