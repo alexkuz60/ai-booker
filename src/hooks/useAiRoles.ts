@@ -105,9 +105,11 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
   const loadPreset = useCallback(
     (models: AiRoleModelMap, presetPools?: AiRolePoolMap) => {
       takeSnapshot();
+      // Apply all preset models as overrides — preserve user's explicit choices
+      // Only filter out entries where the model is empty/undefined
       const next: AiRoleModelMap = {};
       for (const [roleId, modelId] of Object.entries(models)) {
-        if (modelId && modelId !== defaults[roleId as AiRoleId]) {
+        if (modelId) {
           next[roleId as AiRoleId] = modelId;
         }
       }
@@ -116,7 +118,7 @@ export function useAiRoles(userApiKeys: Record<string, string> = {}) {
         setPools(presetPools);
       }
     },
-    [setOverrides, setPools, defaults, takeSnapshot],
+    [setOverrides, setPools, takeSnapshot],
   );
 
   // ── Pool methods ────────────────────────────────────────────────────────
