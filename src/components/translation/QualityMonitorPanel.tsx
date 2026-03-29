@@ -344,7 +344,7 @@ export function QualityMonitorPanel({
 
   return (
     <ScrollArea className="h-full">
-      <div className="px-1.5 pt-0.5 pb-1.5 space-y-2">
+      <div className="px-4 pt-1 pb-4 space-y-3">
 
         {/* Layer toggle — 3R always visible, only 5R/5R+Alt togglable */}
         {availableLayers.filter((l) => l !== "3R").length > 0 && !computing && (
