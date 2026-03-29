@@ -265,6 +265,8 @@ export function BilingualSegmentsView({
           const hasLiterary = currentStage === "literary" || currentStage === "critique";
           const hasCritique = currentStage === "critique";
 
+          const isSelected = selectedSegmentId === seg.segment_id;
+
           const handleSelect = () => {
             if (isSelected) {
               onSelectSegment?.(null);
@@ -306,12 +308,90 @@ export function BilingualSegmentsView({
                       {seg.speaker}
                     </span>
                   )}
-                  {hasLiteral && (
-                    <Badge variant="secondary" className="text-[9px] px-1 py-0 shrink-0">
-                      {isRu ? "переведён" : "translated"}
-                    </Badge>
-                  )}
-                  <span className="text-[10px] text-muted-foreground/50 ml-auto shrink-0">
+
+                  {/* ── Stage action buttons ── */}
+                  <div className="flex items-center gap-0.5 ml-auto mr-1 shrink-0" onClick={e => e.stopPropagation()}>
+                    {/* 1. Translate (re-translate) */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => { e.stopPropagation(); handleTranslateSegment(seg); }}
+                          disabled={translating || isSegTranslating}
+                          className={cn(
+                            "h-5 w-5 p-0",
+                            hasTranslation && "text-primary",
+                          )}
+                        >
+                          {isSegTranslating
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : <Languages className="h-3 w-3" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="text-[10px]">
+                        {hasTranslation
+                          ? (isRu ? "Перевести заново" : "Re-translate")
+                          : (isRu ? "Перевести" : "Translate")}
+                      </TooltipContent>
+                    </Tooltip>
+
+                    {/* 2. Art Edit (literary) — locked if no translation */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => { e.stopPropagation(); handleLiteraryEdit(seg); }}
+                          disabled={!hasTranslation || translating || isSegEditing}
+                          className={cn(
+                            "h-5 w-5 p-0",
+                            hasLiterary && "text-amber-500",
+                          )}
+                        >
+                          {isSegEditing
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : !hasTranslation
+                              ? <Lock className="h-3 w-3 opacity-40" />
+                              : <Sparkles className="h-3 w-3" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="text-[10px]">
+                        {!hasTranslation
+                          ? (isRu ? "Сначала переведите" : "Translate first")
+                          : (isRu ? "Арт-правка" : "Art Edit")}
+                      </TooltipContent>
+                    </Tooltip>
+
+                    {/* 3. Critique — locked if no literary edit */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => { e.stopPropagation(); handleCritique(seg); }}
+                          disabled={!hasLiterary || translating || isSegCritiquing}
+                          className={cn(
+                            "h-5 w-5 p-0",
+                            hasCritique && "text-emerald-500",
+                          )}
+                        >
+                          {isSegCritiquing
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : !hasLiterary
+                              ? <Lock className="h-3 w-3 opacity-40" />
+                              : <Scale className="h-3 w-3" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="text-[10px]">
+                        {!hasLiterary
+                          ? (isRu ? "Сначала арт-правка" : "Art edit first")
+                          : (isRu ? "Оценка" : "Critique")}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+
+                  <span className="text-[10px] text-muted-foreground/50 shrink-0">
                     #{seg.segment_number}
                   </span>
                 </div>
@@ -330,30 +410,9 @@ export function BilingualSegmentsView({
 
                 {/* ── Translation ── */}
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-                      {isRu ? "Перевод" : "Translation"}
-                    </span>
-                    {onTranslateSegments && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleTranslateSegment(seg);
-                        }}
-                        disabled={translating || isSegTranslating}
-                        className="h-5 text-[10px] px-1.5 gap-1"
-                      >
-                        {isSegTranslating ? (
-                          <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                        ) : (
-                          <Wand2 className="h-2.5 w-2.5" />
-                        )}
-                        {isRu ? "Перевести" : "Translate"}
-                      </Button>
-                    )}
-                  </div>
+                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                    {isRu ? "Перевод" : "Translation"}
+                  </span>
 
                   {translatedText ? (
                     <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap select-text rounded-md bg-primary/5 border border-primary/20 p-2">
@@ -362,8 +421,8 @@ export function BilingualSegmentsView({
                   ) : (
                     <div className="text-xs text-muted-foreground italic rounded-md bg-muted/20 border border-dashed border-muted-foreground/20 p-2 min-h-[2.5rem]">
                       {isRu
-                        ? "Нажмите «Перевести» для подстрочного перевода"
-                        : "Click \"Translate\" for literal translation"}
+                        ? "Нажмите ▶ для подстрочного перевода"
+                        : "Click ▶ to translate"}
                     </div>
                   )}
                 </div>
