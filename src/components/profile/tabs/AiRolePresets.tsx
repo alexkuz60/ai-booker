@@ -143,7 +143,10 @@ export function AiRolePresets({
   return (
     <div className="flex items-center gap-1.5">
       {/* Save preset */}
-      <Popover open={saveOpen} onOpenChange={setSaveOpen}>
+      <Popover open={saveOpen} onOpenChange={(open) => {
+          if (open && !newName && bookTitle) setNewName(bookTitle);
+          setSaveOpen(open);
+        }}>
         <PopoverTrigger asChild>
           <Button
             variant="ghost"
