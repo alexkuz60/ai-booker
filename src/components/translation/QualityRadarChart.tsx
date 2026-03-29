@@ -96,7 +96,6 @@ export function QualityRadarChart({
         axis: a,
         label: AXIS_LABELS[a][isRu ? "ru" : "en"],
         value: 0,
-        primaryValue: 0,
         layer3R: 0,
         layer5R: 0,
         layerAlt: 0,
@@ -107,7 +106,6 @@ export function QualityRadarChart({
       axis: a,
       label: AXIS_LABELS[a][isRu ? "ru" : "en"],
       value: scores[a],
-      primaryValue: layers?.["3R"]?.[a] ?? scores[a],
       layer3R: layers?.["3R"]?.[a] ?? 0,
       layer5R: layers?.["5R"]?.[a] ?? 0,
       layerAlt: layers?.["5R+Alt"]?.[a] ?? 0,
@@ -121,9 +119,7 @@ export function QualityRadarChart({
     if (w && onWeightsChange) onWeightsChange(key, w);
   };
 
-  const primaryScores = layers?.["3R"] ?? scores;
-  const primaryWeighted = primaryScores ? computeWeightedScore(primaryScores, weights) : 0;
-  const primaryLevel: ScoreLevel = getScoreLevel(primaryWeighted);
+  const show3R = !!layers?.["3R"];
   const show5R = visibleLayers.includes("5R") && !!layers?.["5R"];
   const showAlt = visibleLayers.includes("5R+Alt") && !!layers?.["5R+Alt"];
 
@@ -187,17 +183,19 @@ export function QualityRadarChart({
               />
             )}
 
-            {/* Primary layer: always 3R when available, otherwise current score */}
-            <Radar
-              name="Score"
-              dataKey="primaryValue"
-              stroke={LAYER_COLORS["3R"].stroke}
-              fill={LAYER_COLORS["3R"].fill}
-              fillOpacity={0.12}
-              strokeWidth={1.5}
-              strokeDasharray="4 3"
-              shape={<SkipZeroRadarShape dataKey="primaryValue" stroke={LAYER_COLORS["3R"].stroke} fill={LAYER_COLORS["3R"].fill} fillOpacity={0.12} strokeWidth={1.5} strokeDasharray="4 3" />}
-            />
+            {/* Layer: 3R base (always visible, drawn last so it stays visible) */}
+            {show3R && (
+              <Radar
+                name="3R"
+                dataKey="layer3R"
+                stroke={LAYER_COLORS["3R"].stroke}
+                fill={LAYER_COLORS["3R"].fill}
+                fillOpacity={0.12}
+                strokeWidth={1.5}
+                strokeDasharray="4 3"
+                shape={<SkipZeroRadarShape dataKey="layer3R" stroke={LAYER_COLORS["3R"].stroke} fill={LAYER_COLORS["3R"].fill} fillOpacity={0.12} strokeWidth={1.5} strokeDasharray="4 3" />}
+              />
+            )}
 
             <Tooltip
               content={({ payload }) => {
