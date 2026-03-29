@@ -8,7 +8,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { Languages, Radar, BookOpen, Plus, Loader2, FileText, Wand2 } from "lucide-react";
+import { Languages, Radar, BookOpen, Plus, Loader2, FileText, Wand2, Square } from "lucide-react";
 import { getScoreLevel, SCORE_COLORS } from "@/lib/qualityRadar";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import {
@@ -143,6 +143,7 @@ export default function Translation() {
     getModelForRole,
     getEffectivePool,
     onSceneComplete: () => setBilingualTick(t => t + 1),
+    onSegmentComplete: () => setBilingualTick(t => t + 1),
   });
 
   // ── Extracted actions ───────────────────────────────────
@@ -394,20 +395,33 @@ export default function Translation() {
                     {isRu ? "Билингва" : "Bilingual"}
                   </span>
                   {transProjectExists && selectedSceneId && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleTranslateSceneFull}
-                      disabled={translating || batchProgress.running}
-                      className="h-6 text-[10px] px-2 gap-1 ml-auto"
-                    >
-                      {batchProgress.running && batchProgress.scenesTotal === 1 ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Wand2 className="h-3 w-3" />
+                    <div className="flex items-center gap-1 ml-auto">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleTranslateSceneFull}
+                        disabled={translating || batchProgress.running}
+                        className="h-6 text-[10px] px-2 gap-1"
+                      >
+                        {batchProgress.running && batchProgress.scenesTotal === 1 ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Wand2 className="h-3 w-3" />
+                        )}
+                        {isRu ? "Полный пайплайн" : "Full pipeline"}
+                      </Button>
+                      {batchProgress.running && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={abortBatch}
+                          className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                          title={isRu ? "Остановить" : "Stop"}
+                        >
+                          <Square className="h-3 w-3 fill-current" />
+                        </Button>
                       )}
-                      {isRu ? "Полный пайплайн" : "Full pipeline"}
-                    </Button>
+                    </div>
                   )}
                 </div>
                 {selectedSceneId ? (
