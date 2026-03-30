@@ -146,7 +146,7 @@ export default function Library() {
           {(step === "library" || step === "workspace") && (
             <LibraryView
               isRu={isRu} books={books} loadingLibrary={loadingLibrary}
-              onUpload={startNewProject} onOpen={openSavedBook} onDelete={deleteBook}
+              onUpload={startNewProject} onOpen={handleOpenBook} onDelete={deleteBook}
               onClearAll={clearAllProjects} onRename={renameBook}
               serverBooks={serverBooks} loadingServerBooks={loadingServerBooks}
               onOpenServerBook={handleRestoreClick} onDeleteServerBook={deleteServerBook}
