@@ -240,7 +240,7 @@ export function QualityRadarChart({
                   ))}
                 </div>
                 <TooltipProvider delayDuration={200}>
-                  <div className="flex items-center shrink-0">
+                  <div className="flex items-center shrink-0 w-[72px]">
                     {layers.map(({ key, value }, i) => (
                       <React.Fragment key={key}>
                         {i > 0 && <span className="text-[8px] text-muted-foreground mx-0.5">·</span>}
