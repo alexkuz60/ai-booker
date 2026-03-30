@@ -123,11 +123,19 @@ function StageNode({ stage, progress, isRu, disabled, onToggleStep, onStageClick
   const hasPartial = doneCount > 0 && !complete;
   const isEmpty = doneCount === 0;
 
+  const handleClick = () => {
+    if (!disabled && onStageClick) onStageClick(stage.id);
+  };
+
   const nodeContent = (
-    <div className={cn(
-      "flex flex-col items-center gap-1 group/node",
-      disabled && "opacity-30 pointer-events-none",
-    )}>
+    <div
+      className={cn(
+        "flex flex-col items-center gap-1 group/node",
+        disabled && "opacity-30 pointer-events-none",
+        !disabled && onStageClick && "cursor-pointer",
+      )}
+      onClick={handleClick}
+    >
       <div className={cn(
         "relative flex items-center justify-center h-8 w-8 rounded-full border-2 transition-all",
         isEmpty && "border-muted-foreground/30 bg-background",
