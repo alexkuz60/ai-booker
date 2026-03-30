@@ -64,23 +64,13 @@ export function QualityRadarChart({
   const layer5R = layers?.["5R"] ?? null;
   const layerAlt = layers?.["5R+Alt"] ?? null;
 
-  // Build chart data from the "primary" scores (latest stage)
+  // Build chart data from stages with persistent 3R baseline
   const chartData = useMemo(() => {
-    if (!scores) {
-      return AXES.map((a) => ({
-        axis: a,
-        label: AXIS_LABELS[a][isRu ? "ru" : "en"],
-        value: 0,
-        layer3R: 0,
-        layer5R: 0,
-        layerAlt: 0,
-        fullMark: 1,
-      }));
-    }
     return AXES.map((a) => ({
       axis: a,
       label: AXIS_LABELS[a][isRu ? "ru" : "en"],
-      value: scores[a],
+      value: scores?.[a] ?? 0,
+      base3R: layer3R?.[a] ?? scores?.[a] ?? 0,
       layer3R: layer3R?.[a] ?? 0,
       layer5R: layer5R?.[a] ?? 0,
       layerAlt: layerAlt?.[a] ?? 0,
@@ -89,9 +79,9 @@ export function QualityRadarChart({
   }, [scores, layer3R, layer5R, layerAlt, isRu]);
 
 
-  const show3R = hasAnyAxis(layer3R);
-  const show5R = hasAnyAxis(layer5R);
-  const showAlt = hasAnyAxis(layerAlt);
+  const show3R = chartData.some((item) => item.base3R > 0);
+  const show5R = visibleLayers.includes("5R") && hasAnyAxis(layer5R);
+  const showAlt = visibleLayers.includes("5R+Alt") && hasAnyAxis(layerAlt);
 
   const dotSize = compact ? 3 : 5;
 
@@ -128,12 +118,12 @@ export function QualityRadarChart({
             />
             <PolarRadiusAxis domain={[0, 1]} tick={false} axisLine={false} />
 
-            {/* Layer: 3R (Basis) */}
+            {/* Layer: 3R (persistent base) */}
             {show3R && (
               <Radar
                 key="layer-3r"
                 name="3R"
-                dataKey="layer3R"
+                dataKey="base3R"
                 stroke={LAYER_COLORS["3R"].stroke}
                 fill={LAYER_COLORS["3R"].fill}
                 fillOpacity={0.08}
