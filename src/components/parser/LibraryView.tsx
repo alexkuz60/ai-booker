@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { t } from "@/pages/parser/i18n";
 import type { BookRecord } from "@/pages/parser/types";
+import { PipelineTimeline, createDefaultPipeline, type PipelineStage } from "@/components/library/PipelineTimeline";
 
 interface LibraryViewProps {
   isRu: boolean;
@@ -35,6 +36,42 @@ function LibraryViewInner({
   const syncedBookIds = useMemo(() => new Set(serverBooks.map(b => b.id)), [serverBooks]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+
+  // Pipeline progress per book (keyed by bookId)
+  const [pipelineMap, setPipelineMap] = useState<Record<string, PipelineStage[]>>({});
+
+  const getPipeline = useCallback((bookId: string): PipelineStage[] => {
+    if (!pipelineMap[bookId]) {
+      // Initialize with defaults — auto-detect will fill later
+      const stages = createDefaultPipeline();
+      // If book exists locally with chapters/scenes, mark project stage done
+      const book = books.find(b => b.id === bookId);
+      if (book) {
+        stages[0].subSteps[0].done = true; // file uploaded
+        stages[0].subSteps[1].done = true; // opfs created
+        if ((book.chapter_count || 0) > 0) {
+          stages[1].subSteps[0].done = true; // toc
+        }
+        if ((book.scene_count || 0) > 0) {
+          stages[1].subSteps[1].done = true; // scenes analyzed
+        }
+      }
+      setPipelineMap(prev => ({ ...prev, [bookId]: stages }));
+      return stages;
+    }
+    return pipelineMap[bookId];
+  }, [pipelineMap, books]);
+
+  const handleToggleSubStep = useCallback((bookId: string, stageId: string, subStepId: string, done: boolean) => {
+    setPipelineMap(prev => {
+      const stages = (prev[bookId] || createDefaultPipeline()).map(stage =>
+        stage.id === stageId
+          ? { ...stage, subSteps: stage.subSteps.map(s => s.id === subStepId ? { ...s, done } : s) }
+          : stage,
+      );
+      return { ...prev, [bookId]: stages };
+    });
+  }, []);
 
   const startRename = (book: BookRecord) => {
     setEditingId(book.id);
