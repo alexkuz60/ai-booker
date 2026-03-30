@@ -568,14 +568,6 @@ export async function renderScene(
 
     if (dbError) console.error("scene_renders upsert error:", dbError);
 
-    // Auto-set pipeline flag: scene_render
-    try {
-      if (storage) {
-        const { writePipelineStep } = await import("@/hooks/usePipelineProgress");
-        await writePipelineStep(storage, "scene_render", true);
-      }
-    } catch { /* non-critical */ }
-
     // Also snapshot plugin configs into scene_playlists segments
     if (clipConfigs && Object.keys(clipConfigs).length > 0) {
       const { data: playlist } = await supabase
