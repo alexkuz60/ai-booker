@@ -453,6 +453,7 @@ function LibraryViewInner({
                     progress={getProgress(book.id)}
                     isRu={isRu}
                     onToggleStep={(stepId, done) => handleToggleStep(book.id, stepId, done)}
+                    onStageClick={(stageId) => handleTranslationStageClick(book, stageId)}
                   />
                 )))}
               </div>
