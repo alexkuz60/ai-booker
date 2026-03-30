@@ -470,8 +470,8 @@ export default function Translation() {
         <ResizablePanel defaultSize={panelSizes.main[1] ?? 30} minSize={20}>
           <div className="h-full flex flex-col">
             <div className="shrink-0 border-b px-3 py-1.5 flex items-center gap-1.5 bg-muted/50">
-              <Radar className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <Radar className="h-4 w-4 text-muted-foreground" />
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 {isRu ? "Мониторинг" : "Monitor"}
               </span>
               {monitorScore != null && (
