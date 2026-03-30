@@ -191,6 +191,24 @@ export function BilingualSegmentsView({
     );
   }
 
+  // When selectedSegmentId changes externally (e.g. chart bar click),
+  // enrich the selection with full text data from items so the monitor panel updates.
+  useEffect(() => {
+    if (!selectedSegmentId || !onSelectSegment || items.length === 0) return;
+    const found = items.find(i => i.segment.segment_id === selectedSegmentId);
+    if (!found) return;
+    const fullText = found.segment.phrases.map(p => p.text).join(" ");
+    onSelectSegment({
+      segmentId: found.segment.segment_id,
+      originalText: fullText,
+      translatedText: found.translatedText,
+      segmentType: found.segment.segment_type,
+      speaker: found.segment.speaker ?? null,
+    });
+    // Only react to external id changes, not to onSelectSegment/items reference changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSegmentId]);
+
   const openValue = selectedSegmentId ?? undefined;
 
   return (
