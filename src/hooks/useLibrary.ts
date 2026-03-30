@@ -139,9 +139,11 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       }
 
       const localIndex = new Map<string, string[]>();
+      const pMap: Record<string, PipelineProgress> = {};
       const dedupedBooks = Array.from(byDedupeKey.values()).map((candidate) => {
         const allProjects = projectsByDedupeKey.get(candidate.dedupeKey) || [candidate.projectName];
         localIndex.set(candidate.record.id, allProjects);
+        pMap[candidate.record.id] = candidate.progress;
 
         // ── Diagnostic: warn about duplicate OPFS folders for the same bookId ──
         if (allProjects.length > 1) {
@@ -155,6 +157,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       });
 
       setLocalProjectNamesByBookId(localIndex);
+      setProgressMap(pMap);
       return dedupedBooks.sort((a, b) => getTs(b.created_at) - getTs(a.created_at));
     }
 
