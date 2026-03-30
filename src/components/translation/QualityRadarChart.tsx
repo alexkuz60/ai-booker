@@ -18,6 +18,8 @@ import {
 } from "@/lib/qualityRadar";
 import { cn } from "@/lib/utils";
 import { ThreeAxisRadarOverlay } from "./ThreeAxisRadarOverlay";
+import { LAYER_LABELS } from "@/lib/radarStages";
+import { Tooltip as UiTooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 
 export type RadarLayer = "3R" | "5R" | "5R+Alt";
 
