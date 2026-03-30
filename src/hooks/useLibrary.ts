@@ -273,6 +273,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     if (step !== "library") {
       libraryLoadedRef.current = false;
       serverBooksLoadedRef.current = false;
+      setLoadingLibrary(false);
       return;
     }
 
