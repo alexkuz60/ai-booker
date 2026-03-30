@@ -8,7 +8,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { Languages, Radar, BookOpen, Loader2, FileText, Wand2, Square, CloudUpload } from "lucide-react";
+import { Languages, Radar, BookOpen, Loader2, FileText, Wand2, Square, CloudUpload, CloudDownload } from "lucide-react";
 import { getScoreLevel, SCORE_COLORS } from "@/lib/qualityRadar";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import {
@@ -87,9 +87,12 @@ export default function Translation() {
   const { translationStorage, exists: transProjectExists, refresh: refreshTransStorage } =
     useTranslationStorage(storage, meta);
 
-  const { saveTranslation, saving: savingTranslation } = useSaveTranslation({
+  const { saveTranslation, saving: savingTranslation, restoreTranslation, restoring: restoringTranslation } = useSaveTranslation({
     translationStorage,
+    sourceStorage: storage,
+    sourceMeta: meta,
     isRu,
+    onRestored: refreshTransStorage,
   });
 
   // Compute source/target langs
@@ -202,6 +205,21 @@ export default function Translation() {
             {isRu ? "Перевод → сервер" : "Save translation"}
           </Button>
         )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={restoreTranslation}
+          disabled={restoringTranslation || savingTranslation}
+          className="gap-1.5"
+          title={isRu ? "Восстановить перевод с сервера" : "Restore translation from server"}
+        >
+          {restoringTranslation ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <CloudDownload className="h-3.5 w-3.5" />
+          )}
+          {isRu ? "Перевод ← сервер" : "Restore translation"}
+        </Button>
         <SaveBookButton
           isRu={isRu}
           onClick={saveBook}
@@ -220,7 +238,7 @@ export default function Translation() {
         />
       </div>
     );
-  }, [isOpen, meta, isRu, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, apiKeys, transProjectExists, saveTranslation, savingTranslation]);
+  }, [isOpen, meta, isRu, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, apiKeys, transProjectExists, saveTranslation, savingTranslation, restoreTranslation, restoringTranslation]);
 
   const headerRightRef = useRef(headerRight);
   headerRightRef.current = headerRight;
