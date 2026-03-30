@@ -279,7 +279,7 @@ function LibraryViewInner({
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
-                  </div>
+                  </>
                 ), (
                   <div>
                     <PipelineTimeline
