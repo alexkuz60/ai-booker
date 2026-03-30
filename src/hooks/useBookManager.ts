@@ -337,6 +337,8 @@ export function useBookManager({
     step, setStep,
     books: library.books,
     loadingLibrary: library.loadingLibrary,
+    progressMap: library.progressMap,
+    setProgressMap: library.setProgressMap,
     fileName, errorMsg, bookId,
     uploadProgress: upload.uploadProgress,
     partIdMap, chapterIdMap, setChapterIdMap,
