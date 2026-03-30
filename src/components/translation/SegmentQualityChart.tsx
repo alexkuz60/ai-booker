@@ -241,7 +241,7 @@ export function SegmentQualityChart({
                       fillOpacity={layer === "3R" ? 0.5 : layer === "5R" ? 0.65 : 0.85}
                       stroke="none"
                       radius={[2, 2, 0, 0]}
-                      barSize={20}
+                      barSize={dynamicBarSize}
                       cursor="pointer"
                       onClick={(_: any, idx: number) => {
                         if (barData[idx]) handleBarClick(barData[idx]);
