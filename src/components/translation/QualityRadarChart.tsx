@@ -159,14 +159,37 @@ export function QualityRadarChart({
                 if (!payload?.length) return null;
                 const item = payload[0]?.payload;
                 if (!item) return null;
-                const val = (item.value * 100).toFixed(0);
-                const lvl = getScoreLevel(item.value);
+                const rows: { label: string; value: number; color: string }[] = [];
+                if (item.layer3R > 0) {
+                  const lvl3 = getScoreLevel(item.layer3R);
+                  rows.push({ label: "3R", value: item.layer3R, color: LAYER_COLORS["3R"].stroke });
+                }
+                if (item.layer5R > 0) {
+                  const lvl5 = getScoreLevel(item.layer5R);
+                  rows.push({ label: "5R", value: item.layer5R, color: LAYER_COLORS["5R"].stroke });
+                }
+                if (item.layerAlt > 0) {
+                  rows.push({ label: "5R+Alt", value: item.layerAlt, color: LAYER_COLORS["5R+Alt"].stroke });
+                }
+                // fallback to primary value if no layers have data
+                if (rows.length === 0 && item.value > 0) {
+                  const lvl = getScoreLevel(item.value);
+                  rows.push({ label: "", value: item.value, color: SCORE_COLORS[lvl] });
+                }
+                if (rows.length === 0) return null;
                 return (
-                  <div className="rounded-lg border bg-background px-3 py-1.5 text-xs shadow-lg">
+                  <div className="rounded-lg border bg-background px-3 py-2 text-xs shadow-lg space-y-0.5">
                     <span className="font-medium">{item.label}</span>
-                    <span className="ml-2 font-mono font-bold" style={{ color: SCORE_COLORS[lvl] }}>
-                      {val}%
-                    </span>
+                    {rows.map((r) => (
+                      <div key={r.label} className="flex items-center justify-between gap-3">
+                        {r.label && (
+                          <span className="text-muted-foreground text-[10px]">{r.label}</span>
+                        )}
+                        <span className="font-mono font-bold" style={{ color: r.color }}>
+                          {(r.value * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 );
               }}
