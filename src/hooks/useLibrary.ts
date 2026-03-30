@@ -71,6 +71,9 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       : meta?.updatedAt || structure?.updatedAt || meta?.createdAt || new Date(0).toISOString();
     const dedupeKey = `book:${resolvedId}`;
 
+    // Read pipeline progress alongside metadata
+    const progress = await readPipelineProgress(storage);
+
     return {
       record: {
         id: resolvedId,
@@ -86,6 +89,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       },
       projectName: storage.projectName,
       dedupeKey,
+      progress,
     };
   }, []);
 
