@@ -93,7 +93,7 @@ export default function Parser() {
   // ── Redirect to Library if no active book ──
   useEffect(() => {
     if (step === "library" || step === "upload") {
-      navigate("/", { replace: true });
+      navigate("/library", { replace: true });
     }
   }, [step, navigate]);
 
@@ -245,7 +245,7 @@ export default function Parser() {
       await hardResetLocalData();
       if (cancelled) return;
       handleReset();
-      navigate("/", { replace: true });
+      navigate("/library", { replace: true });
       toast({
         title: isRu ? "Локальное хранилище очищено" : "Local storage cleared",
         description: isRu
@@ -595,7 +595,7 @@ export default function Parser() {
             <AlertDialogAction onClick={() => {
               dismissServerNewer();
               // Navigate to library for restore flow
-              navigate("/");
+              navigate("/library");
             }}>
               {isRu ? "Загрузить с сервера" : "Load from server"}
             </AlertDialogAction>
