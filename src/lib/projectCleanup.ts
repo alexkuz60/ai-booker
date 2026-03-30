@@ -52,8 +52,15 @@ export async function wipeProjectBrowserState(
   localProjectNames: string[],
 ): Promise<void> {
   // 1. Delete all OPFS project folders for this bookId
+  //    Defense-in-depth: skip translation mirrors even if they ended up in the list.
   for (const projectName of localProjectNames) {
     try {
+      const store = await OPFSStorage.openOrCreate(projectName);
+      const meta = await store.readJSON<ProjectMeta>("project.json");
+      if (meta?.targetLanguage || meta?.sourceProjectName) {
+        console.log(`[Wipe] Skipping translation mirror: ${projectName}`);
+        continue;
+      }
       await OPFSStorage.deleteProject(projectName);
       console.log(`[Wipe] Deleted OPFS project: ${projectName}`);
     } catch (err) {
