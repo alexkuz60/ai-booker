@@ -9,7 +9,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProjectStorage, PipelineProgress, PipelineStepId } from "@/lib/projectStorage";
 import { createEmptyPipelineProgress } from "@/lib/projectStorage";
-import { readPipelineProgress } from "@/hooks/usePipelineProgress";
 
 interface UsePipelineProgressReturn {
   progress: PipelineProgress;
