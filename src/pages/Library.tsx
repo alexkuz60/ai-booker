@@ -48,6 +48,7 @@ export default function Library() {
     createProject,
     openProjectByName,
     pendingProjectName,
+    bumpProgressVersion,
   });
 
   // ── Navigate to Parser only after a NEW book open/upload action ──

@@ -50,6 +50,7 @@ export default function Parser() {
     initialized: projectStorageInitialized,
     meta: projectMeta,
     hardResetLocalData,
+    bumpProgressVersion,
   } = useProjectStorageContext();
   const { getModelForRole, getEffectivePool } = useAiRoles(userApiKeys);
   const { toast } = useToast();
@@ -87,7 +88,7 @@ export default function Parser() {
     partIdMap, chapterResults, setChapterResults, fileInputRef,
     openSavedBook, handleFileSelect, handleReset: bookReset, ensurePdfLoaded,
     serverNewerBookId, dismissServerNewer, acceptServerVersion,
-  } = useBookManager({ userId: user?.id, isRu, projectStorage, projectStorageInitialized, storageBackend, createProject, openProjectByName });
+  } = useBookManager({ userId: user?.id, isRu, projectStorage, projectStorageInitialized, storageBackend, createProject, openProjectByName, bumpProgressVersion });
 
   // ── Redirect to Library if no active book ──
   useEffect(() => {
