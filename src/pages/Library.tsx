@@ -173,6 +173,8 @@ export default function Library() {
               onOpenServerBook={handleRestoreClick} onDeleteServerBook={deleteServerBook}
               onStageNavigate={handleStageNavigate}
               onProjectReset={handleProjectReset}
+              progressMap={progressMap}
+              setProgressMap={setProgressMap}
             />
           )}
           {step === "upload" && (
