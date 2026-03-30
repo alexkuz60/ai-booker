@@ -184,12 +184,15 @@ function LibraryViewInner({
                 {book.file_format === "fb2" ? "FB2" : book.file_format === "docx" ? "DOCX" : (book.file_name?.match(/\.fb2$/i) ? "FB2" : book.file_name?.match(/\.(docx?)$/i) ? "DOCX" : "PDF")}
               </Badge>
             </div>
+            {/* Action buttons under the title */}
+            <div className="flex items-center gap-0.5 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {actions}
+            </div>
           </div>
           {/* Timeline takes remaining space */}
           <div className="flex-1 min-w-0">
             {timeline}
           </div>
-          {actions}
         </div>
       </CardContent>
     </Card>
