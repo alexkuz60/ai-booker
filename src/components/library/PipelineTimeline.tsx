@@ -261,7 +261,7 @@ export function PipelineTimeline({ progress, isRu, onToggleStep, onStageClick, o
         {STAGES.map((stage, idx) => (
           <div key={stage.id} className="contents">
             {idx > 0 && (
-              <Connector prevComplete={isStageComplete(STAGES[idx - 1], progress)} prevPartial={stageFraction(STAGES[idx - 1], progress) > 0} />
+              <Connector nextComplete={isStageComplete(stage, progress)} nextPartial={stageFraction(stage, progress) > 0} />
             )}
             <StageNode
               stage={stage}
