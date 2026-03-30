@@ -81,6 +81,7 @@ export function SegmentQualityChart({
   const [open, setOpen] = useState(true);
   const [activeAxis, setActiveAxis] = useState<RadarAxis>("semantic");
   const [barData, setBarData] = useState<SegmentBar[]>([]);
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   // Load radar stage data
   useEffect(() => {
