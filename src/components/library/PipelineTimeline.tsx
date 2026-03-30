@@ -211,7 +211,7 @@ function StageNode({ stage, idx, progress, isRu, onStageClick, onToggleStep }: S
 
 // ── Connector line between stages ───────────────────────
 
-function Connector({ prevComplete, prevPartial }: { prevComplete: boolean; prevPartial: boolean }) {
+function Connector({ nextComplete, nextPartial }: { nextComplete: boolean; nextPartial: boolean }) {
   return (
     <div className="flex-1 flex items-start pt-5">
       <div className={cn(
