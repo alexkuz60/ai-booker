@@ -111,9 +111,10 @@ interface StageNodeProps {
   isRu: boolean;
   disabled: boolean;
   onToggleStep?: (stepId: PipelineStepId, done: boolean) => void;
+  onStageClick?: (stageId: string) => void;
 }
 
-function StageNode({ stage, progress, isRu, disabled, onToggleStep }: StageNodeProps) {
+function StageNode({ stage, progress, isRu, disabled, onToggleStep, onStageClick }: StageNodeProps) {
   const Icon = stage.icon;
   const complete = isStageComplete(stage, progress);
   const frac = stageFraction(stage, progress);
@@ -249,9 +250,11 @@ interface Props {
   progress: PipelineProgress;
   isRu: boolean;
   onToggleStep?: (stepId: PipelineStepId, done: boolean) => void;
+  /** Called when a stage icon is clicked. stageId = "trans_project" for first, others for navigation */
+  onStageClick?: (stageId: string) => void;
 }
 
-export function TranslationTimeline({ progress, isRu, onToggleStep }: Props) {
+export function TranslationTimeline({ progress, isRu, onToggleStep, onStageClick }: Props) {
   const isActive = !!progress.storyboard_done;
 
   return (
