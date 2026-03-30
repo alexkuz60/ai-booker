@@ -184,27 +184,25 @@ export default function Translation() {
   });
 
   // ── Header ──────────────────────────────────────────────
+  const saveBookWithTranslation = useCallback(async (
+    onProgress?: any,
+    opts?: { syncAtmo?: boolean },
+  ) => {
+    await saveBook(onProgress, opts);
+    // Automatically push translation project if it exists
+    if (transProjectExists && translationStorage) {
+      try {
+        await saveTranslation();
+      } catch (err) {
+        console.error("[Translation] auto-sync translation failed:", err);
+      }
+    }
+  }, [saveBook, transProjectExists, translationStorage, saveTranslation]);
+
   const headerRight = useMemo(() => {
     if (!isOpen || !meta) return undefined;
     return (
       <div className="flex items-center gap-2">
-        {transProjectExists && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={saveTranslation}
-            disabled={savingTranslation}
-            className="gap-1.5"
-            title={isRu ? "Сохранить перевод на сервер" : "Save translation to server"}
-          >
-            {savingTranslation ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <CloudUpload className="h-3.5 w-3.5" />
-            )}
-            {isRu ? "Перевод → сервер" : "Save translation"}
-          </Button>
-        )}
         <Button
           variant="outline"
           size="sm"
@@ -222,8 +220,8 @@ export default function Translation() {
         </Button>
         <SaveBookButton
           isRu={isRu}
-          onClick={saveBook}
-          loading={savingBook}
+          onClick={saveBookWithTranslation}
+          loading={savingBook || savingTranslation}
           disabled={!bookId}
           showDownloadZip={isProjectOpen}
           onDownloadZip={downloadZip}
@@ -238,7 +236,7 @@ export default function Translation() {
         />
       </div>
     );
-  }, [isOpen, meta, isRu, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, apiKeys, transProjectExists, saveTranslation, savingTranslation, restoreTranslation, restoringTranslation]);
+  }, [isOpen, meta, isRu, saveBookWithTranslation, savingBook, savingTranslation, bookId, isProjectOpen, downloadZip, importZip, apiKeys, restoreTranslation, restoringTranslation]);
 
   const headerRightRef = useRef(headerRight);
   headerRightRef.current = headerRight;
