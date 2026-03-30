@@ -10,6 +10,15 @@ import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
 import { getProjectActivityMs } from "@/lib/projectActivity";
 import { stripFileExtension } from "@/lib/fileFormatUtils";
 
+const LANG_SUFFIX_RE = /^(.*)_(EN|RU)$/i;
+
+function isLikelyTranslationMirrorByName(projectName: string, existingProjects: Set<string>): boolean {
+  const match = projectName.match(LANG_SUFFIX_RE);
+  if (!match) return false;
+  const baseName = match[1];
+  return existingProjects.has(baseName);
+}
+
 // ── Read bookId from an arbitrary ProjectStorage ────────────
 
 export async function getBookIdFromStorage(
@@ -62,6 +71,13 @@ export async function resolveLocalStorageForBook(
 ): Promise<ProjectStorage | null> {
   const activate = resolveOpts?.activate ?? false;
 
+  // Prefer already active storage first (LAST_PROJECT_KEY bootstrap source of truth).
+  const activeBookId = await getBookIdFromStorage(opts.projectStorage);
+  const currentStorageUsable = await isCurrentStorageUsable(opts.projectStorage, opts.storageBackend);
+  if (opts.projectStorage?.isReady && activeBookId === targetBookId && currentStorageUsable) {
+    return opts.projectStorage;
+  }
+
   if (opts.storageBackend === "opfs") {
     const existingProjects = await getExistingOpfsProjects();
     let projectNames = (opts.localProjectNamesByBookId.get(targetBookId) || [])
@@ -73,6 +89,10 @@ export async function resolveLocalStorageForBook(
       console.debug("[Resolver] Map empty for bookId=%s, scanning OPFS directly (%d projects)", targetBookId, existingProjects.size);
       for (const projectName of existingProjects) {
         try {
+          // Extra safety: treat "Base_EN/Base_RU" as mirror when base project exists,
+          // even if mirror metadata is missing/corrupted.
+          if (isLikelyTranslationMirrorByName(projectName, existingProjects)) continue;
+
           const store = await OPFSStorage.openOrCreate(projectName);
           const meta = await store.readJSON<{ bookId?: string; targetLanguage?: string; sourceProjectName?: string }>("project.json");
           // Skip translation mirrors — they share bookId but are not the source project
@@ -133,12 +153,6 @@ export async function resolveLocalStorageForBook(
         console.warn("[Resolver] Failed to open freshest OPFS project for book:", targetBookId, err);
       }
     }
-  }
-
-  const activeBookId = await getBookIdFromStorage(opts.projectStorage);
-  const currentStorageUsable = await isCurrentStorageUsable(opts.projectStorage, opts.storageBackend);
-  if (opts.projectStorage?.isReady && activeBookId === targetBookId && currentStorageUsable) {
-    return opts.projectStorage;
   }
 
   return null;
