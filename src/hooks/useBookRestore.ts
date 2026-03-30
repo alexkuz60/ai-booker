@@ -57,6 +57,7 @@ export function useBookRestore({
   books, fileName, bookId, localProjectNamesByBookId,
   setStep, setFileName, setBookId, setTocEntries, setChapterIdMap,
   setPartIdMap, setChapterResults, setPdfRef, setTotalPages, setErrorMsg,
+  bumpProgressVersion,
 }: UseBookRestoreParams) {
   const [pdfRef, setPdfRefLocal] = useState<any>(null);
   const [totalPages, setTotalPagesLocal] = useState(0);
