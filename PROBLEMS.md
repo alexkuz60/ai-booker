@@ -152,12 +152,16 @@
 - Решение: `useTranslationBatch` инициализирует `currentStage` немедленно при старте пайплайна, до получения первого ответа от модели.
 - Файл: `src/hooks/useTranslationBatch.ts`.
 
-### Ш. Потеря translation-зеркала после рестарта браузера — 🔴 НЕ РЕШЕНО (B26)
-- Проблема: translation mirror проект (например, `Book_EN`) исчезает после рестарта браузера. Зеркало физически удаляется из OPFS.
-- B26-костыль (откатить): добавлены фильтры в `useLibrary` и `wipeProjectBrowserState` для пропуска зеркал. Это маскирует баг, а не чинит его. Вопрос не «как защитить зеркало от удаления», а «ПОЧЕМУ кто-то пытается его удалить при обычном рестарте».
-- Корневая причина: НЕ НАЙДЕНА. Нужно проследить полную цепочку от рестарта браузера до момента удаления OPFS-папки зеркала. `project.json` содержит `targetLanguage`/`sourceProjectName` — этих метаданных достаточно для корректной работы без костылей.
-- Принцип: Wipe-and-Deploy вызывается ТОЛЬКО при явном «Загрузить с сервера». При обычном рестарте никакой Wipe не должен срабатывать. Если срабатывает — это баг в логике восстановления, а не повод фильтровать удаляемые проекты.
-- Файлы для расследования: `useBookRestore.ts` (restoreFromLocal, openSavedBook), `useBookManager.ts` (auto-restore), `localProjectResolver.ts`, `projectCleanup.ts`.
+### Ш. Потеря translation-зеркала после рестарта браузера — ✅ РЕШЕНО (B26)
+- Проблема: translation mirror проект (например, `Book_EN`) "исчезает" после рестарта браузера.
+- Корневая причина: OPFS-папка НЕ удалялась. Проблема была в `resolveLocalStorageForBook`:
+  - При рестарте `step = "extracting_toc"` (из sessionStorage), а `useLibrary` загружает `localProjectNamesByBookId` ТОЛЬКО при `step === "library"`.
+  - В момент auto-restore карта проектов ПУСТАЯ → resolver не находит проект → restore fails → `setStep("library")`.
+  - Пользователь видит пустую библиотеку вместо восстановленного проекта.
+- Фикс: `resolveLocalStorageForBook` теперь делает прямой OPFS-скан (по bookId из project.json) как fallback, когда карта пуста.
+- Побочный баг (B26b): `deleteBook` в `useBookManager` сканировал ВСЕ проекты и удалял translation mirrors (общий bookId). Добавлена проверка `targetLanguage`/`sourceProjectName`.
+- Фильтры в `useLibrary` и `wipeProjectBrowserState` — НЕ костыли, а корректная защита: зеркала не должны попадать в список основных книг и не должны удаляться при Wipe-and-Deploy.
+- Файлы: `localProjectResolver.ts`, `useBookManager.ts`.
 
 ---
 
