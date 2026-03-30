@@ -111,9 +111,10 @@ interface StageNodeProps {
   isRu: boolean;
   disabled: boolean;
   onToggleStep?: (stepId: PipelineStepId, done: boolean) => void;
+  onStageClick?: (stageId: string) => void;
 }
 
-function StageNode({ stage, progress, isRu, disabled, onToggleStep }: StageNodeProps) {
+function StageNode({ stage, progress, isRu, disabled, onToggleStep, onStageClick }: StageNodeProps) {
   const Icon = stage.icon;
   const complete = isStageComplete(stage, progress);
   const frac = stageFraction(stage, progress);
@@ -122,11 +123,19 @@ function StageNode({ stage, progress, isRu, disabled, onToggleStep }: StageNodeP
   const hasPartial = doneCount > 0 && !complete;
   const isEmpty = doneCount === 0;
 
+  const handleClick = () => {
+    if (!disabled && onStageClick) onStageClick(stage.id);
+  };
+
   const nodeContent = (
-    <div className={cn(
-      "flex flex-col items-center gap-1 group/node",
-      disabled && "opacity-30 pointer-events-none",
-    )}>
+    <div
+      className={cn(
+        "flex flex-col items-center gap-1 group/node",
+        disabled && "opacity-30 pointer-events-none",
+        !disabled && onStageClick && "cursor-pointer",
+      )}
+      onClick={handleClick}
+    >
       <div className={cn(
         "relative flex items-center justify-center h-8 w-8 rounded-full border-2 transition-all",
         isEmpty && "border-muted-foreground/30 bg-background",
@@ -249,9 +258,11 @@ interface Props {
   progress: PipelineProgress;
   isRu: boolean;
   onToggleStep?: (stepId: PipelineStepId, done: boolean) => void;
+  /** Called when a stage icon is clicked. stageId = "trans_project" for first, others for navigation */
+  onStageClick?: (stageId: string) => void;
 }
 
-export function TranslationTimeline({ progress, isRu, onToggleStep }: Props) {
+export function TranslationTimeline({ progress, isRu, onToggleStep, onStageClick }: Props) {
   const isActive = !!progress.storyboard_done;
 
   return (
@@ -281,6 +292,7 @@ export function TranslationTimeline({ progress, isRu, onToggleStep }: Props) {
                 isRu={isRu}
                 disabled={!isActive}
                 onToggleStep={onToggleStep}
+                onStageClick={onStageClick}
               />
             </div>
           ))}

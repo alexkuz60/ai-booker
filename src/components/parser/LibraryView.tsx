@@ -11,15 +11,21 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { t } from "@/pages/parser/i18n";
 import type { BookRecord } from "@/pages/parser/types";
 import { PipelineTimeline } from "@/components/library/PipelineTimeline";
 import { TranslationTimeline } from "@/components/library/TranslationTimeline";
-import type { PipelineProgress, PipelineStepId } from "@/lib/projectStorage";
+import type { PipelineProgress, PipelineStepId, ProjectMeta } from "@/lib/projectStorage";
 import { createEmptyPipelineProgress } from "@/lib/projectStorage";
 import { readPipelineProgress, writePipelineStep } from "@/hooks/usePipelineProgress";
 import { OPFSStorage } from "@/lib/projectStorage";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { translationProjectExists, checkTranslationReadiness, createTranslationProject } from "@/lib/translationProject";
+import { toast } from "sonner";
 
 interface LibraryViewProps {
   isRu: boolean;
@@ -50,7 +56,8 @@ function LibraryViewInner({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [expandedTranslation, setExpandedTranslation] = useState<Set<string>>(new Set());
-
+  const [transCreateConfirm, setTransCreateConfirm] = useState<{ book: BookRecord; exists: boolean } | null>(null);
+  const [transCreating, setTransCreating] = useState(false);
   // Pipeline progress per book (read from OPFS project.json)
   const [progressMap, setProgressMap] = useState<Record<string, PipelineProgress>>({});
 
@@ -147,6 +154,92 @@ function LibraryViewInner({
       return next;
     });
   }, []);
+
+  const handleTranslationStageClick = useCallback(async (book: BookRecord, stageId: string) => {
+    if (stageId === "trans_project") {
+      // First stage — create translation project (with confirm if exists)
+      try {
+        const projects = await OPFSStorage.listProjects();
+        let sourceStore: any = null;
+        let sourceMeta: ProjectMeta | null = null;
+        for (const pn of projects) {
+          const store = await OPFSStorage.openOrCreate(pn);
+          const meta = await store.readJSON<ProjectMeta>("project.json");
+          if (meta?.bookId === book.id && !meta?.targetLanguage && !meta?.sourceProjectName) {
+            sourceStore = store;
+            sourceMeta = meta;
+            break;
+          }
+        }
+        if (!sourceStore || !sourceMeta) return;
+
+        const tLang = (sourceMeta.language === "ru" ? "en" : "ru") as "en" | "ru";
+        const exists = await translationProjectExists(sourceStore.projectName, tLang);
+
+        if (exists) {
+          setTransCreateConfirm({ book, exists: true });
+        } else {
+          // Create directly
+          await doCreateTranslationProject(book);
+        }
+      } catch (err) {
+        console.error("[LibraryView] translation stage click error:", err);
+      }
+    } else {
+      // Other stages — navigate to translation page
+      onStageNavigate?.(book, "/translation");
+    }
+  }, [onStageNavigate]);
+
+  const doCreateTranslationProject = useCallback(async (book: BookRecord) => {
+    setTransCreating(true);
+    try {
+      const projects = await OPFSStorage.listProjects();
+      let sourceStore: any = null;
+      let sourceMeta: ProjectMeta | null = null;
+      for (const pn of projects) {
+        const store = await OPFSStorage.openOrCreate(pn);
+        const meta = await store.readJSON<ProjectMeta>("project.json");
+        if (meta?.bookId === book.id && !meta?.targetLanguage && !meta?.sourceProjectName) {
+          sourceStore = store;
+          sourceMeta = meta;
+          break;
+        }
+      }
+      if (!sourceStore || !sourceMeta) return;
+
+      const readiness = await checkTranslationReadiness(sourceStore);
+      const readyIndices = Array.from(readiness.readyChapters.keys());
+      if (readyIndices.length === 0) {
+        toast.error(isRu
+          ? "Нет глав, готовых к переводу. Выполните раскадровку в Студии."
+          : "No chapters ready for translation. Complete storyboarding in Studio.");
+        return;
+      }
+
+      const tLang = (sourceMeta.language === "ru" ? "en" : "ru") as "en" | "ru";
+      await createTranslationProject({
+        sourceStorage: sourceStore,
+        sourceMeta,
+        targetLanguage: tLang,
+        chapterIndices: readyIndices,
+      });
+
+      toast.success(isRu
+        ? `Проект перевода создан (${readyIndices.length} глав)`
+        : `Translation project created (${readyIndices.length} chapters)`);
+
+      // Update progress flags
+      await handleToggleStep(book.id, "trans_storage_created" as PipelineStepId, true);
+      await handleToggleStep(book.id, "trans_migration_done" as PipelineStepId, true);
+    } catch (err) {
+      console.error("[LibraryView] create translation error:", err);
+      toast.error(isRu ? "Ошибка создания проекта перевода" : "Failed to create translation project");
+    } finally {
+      setTransCreating(false);
+      setTransCreateConfirm(null);
+    }
+  }, [isRu, handleToggleStep]);
 
   const renderBookCard = (book: BookRecord, actions: React.ReactNode, timeline?: React.ReactNode, translationTimeline?: React.ReactNode) => {
     const hasTranslation = !!translationTimeline;
@@ -360,6 +453,7 @@ function LibraryViewInner({
                     progress={getProgress(book.id)}
                     isRu={isRu}
                     onToggleStep={(stepId, done) => handleToggleStep(book.id, stepId, done)}
+                    onStageClick={(stageId) => handleTranslationStageClick(book, stageId)}
                   />
                 )))}
               </div>
@@ -434,6 +528,35 @@ function LibraryViewInner({
           </>
         )}
       </div>
+
+      {/* Translation project creation confirmation dialog */}
+      <Dialog open={!!transCreateConfirm} onOpenChange={(open) => { if (!open) setTransCreateConfirm(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {isRu ? "Проект перевода уже существует" : "Translation project already exists"}
+            </DialogTitle>
+            <DialogDescription>
+              {isRu
+                ? `Для книги «${transCreateConfirm?.book.title}» уже создан проект арт-перевода. Создать заново? Существующий проект будет перезаписан.`
+                : `Book "${transCreateConfirm?.book.title}" already has a translation project. Create again? The existing project will be overwritten.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTransCreateConfirm(null)} disabled={transCreating}>
+              {t("cancel", isRu)}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => transCreateConfirm && doCreateTranslationProject(transCreateConfirm.book)}
+              disabled={transCreating}
+            >
+              {transCreating && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
+              {isRu ? "Пересоздать" : "Recreate"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
