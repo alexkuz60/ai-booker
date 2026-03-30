@@ -45,7 +45,7 @@ function GatedRoute({ route, children }: { route: string; children: React.ReactN
         setTimeout(() => toast.warning(reason), 0);
       }
     }
-    return <Navigate to="/" replace />;
+    return <Navigate to="/library" replace />;
   }
 
   return <>{children}</>;
