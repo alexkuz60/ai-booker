@@ -29,6 +29,7 @@ export default function Library() {
     openProjectByName,
     storage: projectStorage,
     initialized: projectStorageInitialized,
+    bumpProgressVersion,
   } = useProjectStorageContext();
 
   const [pendingProjectName, setPendingProjectName] = useState<string | null>(null);
