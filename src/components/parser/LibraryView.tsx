@@ -130,12 +130,12 @@ function LibraryViewInner({
 
   const renderBookCard = (book: BookRecord, actions: React.ReactNode, timeline?: React.ReactNode) => (
     <Card key={book.id} className="hover:border-primary/30 transition-colors group">
-      <CardContent className="py-3 px-4 space-y-3">
+      <CardContent className="py-3 px-4">
         <div className="flex items-center gap-4">
           <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
             <BookOpen className="h-5 w-5 text-primary" />
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-shrink-0 max-w-[260px]">
             {editingId === book.id ? (
               <div className="flex items-center gap-1">
                 <Input
@@ -167,26 +167,20 @@ function LibraryViewInner({
                 <Clock className="h-3 w-3" />
                 {fmtDate(book.created_at)}
               </span>
-              {book.updated_at && book.updated_at !== book.created_at && (
-                <span className="flex items-center gap-1" title={fmtDateTime(book.updated_at)}>
-                  <CalendarClock className="h-3 w-3" />
-                  {t("libraryUpdated", isRu)}: {fmtDateTime(book.updated_at)}
-                </span>
-              )}
               {(book.chapter_count || 0) > 0 && (
                 <span>{book.chapter_count} {t("libraryChapters", isRu)}</span>
-              )}
-              {(book.scene_count || 0) > 0 && (
-                <span>{book.scene_count} {t("libraryScenes", isRu)}</span>
               )}
               <Badge variant="outline" className="text-[10px] font-mono">
                 {book.file_format === "fb2" ? "FB2" : book.file_format === "docx" ? "DOCX" : (book.file_name?.match(/\.fb2$/i) ? "FB2" : book.file_name?.match(/\.(docx?)$/i) ? "DOCX" : "PDF")}
               </Badge>
             </div>
           </div>
+          {/* Timeline takes remaining space */}
+          <div className="flex-1 min-w-0">
+            {timeline}
+          </div>
           {actions}
         </div>
-        {timeline}
       </CardContent>
     </Card>
   );
