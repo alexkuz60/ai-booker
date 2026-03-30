@@ -87,6 +87,9 @@ export function useTranslationStorage(
     if (!sourceStorage || !sourceMeta) {
       setTranslationStorage(null);
       setExists(false);
+      // Don't reset loading to false here — if inputs are null because
+      // the parent context hasn't initialized yet, we should keep loading=true
+      // so consumers know they should wait rather than assume "no project".
       return;
     }
 
