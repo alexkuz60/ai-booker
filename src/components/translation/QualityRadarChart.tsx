@@ -64,13 +64,23 @@ export function QualityRadarChart({
   const layer5R = layers?.["5R"] ?? null;
   const layerAlt = layers?.["5R+Alt"] ?? null;
 
-  // Build chart data from stages with persistent 3R baseline
+  // Build chart data from the "primary" scores (latest stage)
   const chartData = useMemo(() => {
+    if (!scores) {
+      return AXES.map((a) => ({
+        axis: a,
+        label: AXIS_LABELS[a][isRu ? "ru" : "en"],
+        value: 0,
+        layer3R: 0,
+        layer5R: 0,
+        layerAlt: 0,
+        fullMark: 1,
+      }));
+    }
     return AXES.map((a) => ({
       axis: a,
       label: AXIS_LABELS[a][isRu ? "ru" : "en"],
-      value: scores?.[a] ?? 0,
-      base3R: layer3R?.[a] ?? scores?.[a] ?? 0,
+      value: scores[a],
       layer3R: layer3R?.[a] ?? 0,
       layer5R: layer5R?.[a] ?? 0,
       layerAlt: layerAlt?.[a] ?? 0,
@@ -79,9 +89,9 @@ export function QualityRadarChart({
   }, [scores, layer3R, layer5R, layerAlt, isRu]);
 
 
-  const show3R = chartData.some((item) => item.base3R > 0);
-  const show5R = visibleLayers.includes("5R") && hasAnyAxis(layer5R);
-  const showAlt = visibleLayers.includes("5R+Alt") && hasAnyAxis(layerAlt);
+  const show3R = hasAnyAxis(layer3R);
+  const show5R = hasAnyAxis(layer5R);
+  const showAlt = hasAnyAxis(layerAlt);
 
   const dotSize = compact ? 3 : 5;
 
@@ -118,12 +128,12 @@ export function QualityRadarChart({
             />
             <PolarRadiusAxis domain={[0, 1]} tick={false} axisLine={false} />
 
-            {/* Layer: 3R (persistent base) */}
+            {/* Layer: 3R (Basis) */}
             {show3R && (
               <Radar
                 key="layer-3r"
                 name="3R"
-                dataKey="base3R"
+                dataKey="layer3R"
                 stroke={LAYER_COLORS["3R"].stroke}
                 fill={LAYER_COLORS["3R"].fill}
                 fillOpacity={0.08}
@@ -213,15 +223,12 @@ export function QualityRadarChart({
       </div>
 
 
-      {/* Axis score bars — stacked by stage */}
+      {/* Axis score bars */}
       {!compact && scores && (
         <div className="w-full space-y-1.5 px-2">
           {AXES.map((axis) => {
-            const v3R = layer3R?.[axis] ?? 0;
-            const v5R = layer5R?.[axis] ?? 0;
-            const vAlt = layerAlt?.[axis] ?? 0;
-            const best = Math.max(v3R, v5R, vAlt, scores[axis]);
-            const lvl = getScoreLevel(best);
+            const val = scores[axis];
+            const lvl = getScoreLevel(val);
             return (
               <button
                 key={axis}
@@ -231,37 +238,20 @@ export function QualityRadarChart({
                 <span className="text-[10px] text-muted-foreground w-20 truncate">
                   {AXIS_LABELS[axis][isRu ? "ru" : "en"]}
                 </span>
-                <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden flex">
-                  {v3R > 0 && (
-                    <div
-                      className="h-full transition-all duration-500"
-                      style={{ width: `${v3R * 100}%`, backgroundColor: LAYER_COLORS["3R"].stroke }}
-                    />
-                  )}
-                  {v5R > 0 && (
-                    <div
-                      className="h-full transition-all duration-500"
-                      style={{ width: `${v5R * 100}%`, backgroundColor: LAYER_COLORS["5R"].stroke }}
-                    />
-                  )}
-                  {vAlt > 0 && (
-                    <div
-                      className="h-full transition-all duration-500"
-                      style={{ width: `${vAlt * 100}%`, backgroundColor: LAYER_COLORS["5R+Alt"].stroke }}
-                    />
-                  )}
-                  {v3R === 0 && v5R === 0 && vAlt === 0 && (
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${scores[axis] * 100}%`, backgroundColor: SCORE_COLORS[lvl] }}
-                    />
-                  )}
+                <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${val * 100}%`,
+                      backgroundColor: SCORE_COLORS[lvl],
+                    }}
+                  />
                 </div>
                 <span
                   className="text-[10px] font-mono font-medium w-8 text-right"
                   style={{ color: SCORE_COLORS[lvl] }}
                 >
-                  {(best * 100).toFixed(0)}
+                  {(val * 100).toFixed(0)}
                 </span>
               </button>
             );
