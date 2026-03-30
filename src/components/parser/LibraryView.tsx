@@ -128,62 +128,65 @@ function LibraryViewInner({
     return `${d.toLocaleDateString(isRu ? 'ru-RU' : 'en-US')} ${d.toLocaleTimeString(isRu ? 'ru-RU' : 'en-US', { hour: '2-digit', minute: '2-digit' })}`;
   };
 
-  const renderBookCard = (book: BookRecord, actions: React.ReactNode) => (
+  const renderBookCard = (book: BookRecord, actions: React.ReactNode, timeline?: React.ReactNode) => (
     <Card key={book.id} className="hover:border-primary/30 transition-colors group">
-      <CardContent className="py-3 px-4 flex items-center gap-4">
-        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <BookOpen className="h-5 w-5 text-primary" />
-        </div>
-        <div className="flex-1 min-w-0">
-          {editingId === book.id ? (
-            <div className="flex items-center gap-1">
-              <Input
-                value={editValue}
-                onChange={e => setEditValue(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") cancelRename(); }}
-                className="h-7 text-sm"
-                autoFocus
-              />
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={commitRename}>
-                <Check className="h-3.5 w-3.5 text-primary" />
-              </Button>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={cancelRename}>
-                <X className="h-3.5 w-3.5 text-muted-foreground" />
-              </Button>
-            </div>
-          ) : (
-            <p className="font-medium text-sm text-foreground truncate flex items-center gap-1.5">
-              {book.title}
-              {syncedBookIds.has(book.id) && (
-                <span title={isRu ? "Синхронизировано с сервером" : "Synced to server"}>
-                  <Cloud className="h-3.5 w-3.5 text-primary/60 flex-shrink-0" />
+      <CardContent className="py-3 px-4 space-y-3">
+        <div className="flex items-center gap-4">
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <BookOpen className="h-5 w-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            {editingId === book.id ? (
+              <div className="flex items-center gap-1">
+                <Input
+                  value={editValue}
+                  onChange={e => setEditValue(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") cancelRename(); }}
+                  className="h-7 text-sm"
+                  autoFocus
+                />
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={commitRename}>
+                  <Check className="h-3.5 w-3.5 text-primary" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={cancelRename}>
+                  <X className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+              </div>
+            ) : (
+              <p className="font-medium text-sm text-foreground truncate flex items-center gap-1.5">
+                {book.title}
+                {syncedBookIds.has(book.id) && (
+                  <span title={isRu ? "Синхронизировано с сервером" : "Synced to server"}>
+                    <Cloud className="h-3.5 w-3.5 text-primary/60 flex-shrink-0" />
+                  </span>
+                )}
+              </p>
+            )}
+            <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5 flex-wrap">
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {fmtDate(book.created_at)}
+              </span>
+              {book.updated_at && book.updated_at !== book.created_at && (
+                <span className="flex items-center gap-1" title={fmtDateTime(book.updated_at)}>
+                  <CalendarClock className="h-3 w-3" />
+                  {t("libraryUpdated", isRu)}: {fmtDateTime(book.updated_at)}
                 </span>
               )}
-            </p>
-          )}
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5 flex-wrap">
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {fmtDate(book.created_at)}
-            </span>
-            {book.updated_at && book.updated_at !== book.created_at && (
-              <span className="flex items-center gap-1" title={fmtDateTime(book.updated_at)}>
-                <CalendarClock className="h-3 w-3" />
-                {t("libraryUpdated", isRu)}: {fmtDateTime(book.updated_at)}
-              </span>
-            )}
-            {(book.chapter_count || 0) > 0 && (
-              <span>{book.chapter_count} {t("libraryChapters", isRu)}</span>
-            )}
-            {(book.scene_count || 0) > 0 && (
-              <span>{book.scene_count} {t("libraryScenes", isRu)}</span>
-            )}
-            <Badge variant="outline" className="text-[10px] font-mono">
-              {book.file_format === "fb2" ? "FB2" : book.file_format === "docx" ? "DOCX" : (book.file_name?.match(/\.fb2$/i) ? "FB2" : book.file_name?.match(/\.(docx?)$/i) ? "DOCX" : "PDF")}
-            </Badge>
+              {(book.chapter_count || 0) > 0 && (
+                <span>{book.chapter_count} {t("libraryChapters", isRu)}</span>
+              )}
+              {(book.scene_count || 0) > 0 && (
+                <span>{book.scene_count} {t("libraryScenes", isRu)}</span>
+              )}
+              <Badge variant="outline" className="text-[10px] font-mono">
+                {book.file_format === "fb2" ? "FB2" : book.file_format === "docx" ? "DOCX" : (book.file_name?.match(/\.fb2$/i) ? "FB2" : book.file_name?.match(/\.(docx?)$/i) ? "DOCX" : "PDF")}
+              </Badge>
+            </div>
           </div>
+          {actions}
         </div>
-        {actions}
+        {timeline}
       </CardContent>
     </Card>
   );
@@ -242,41 +245,40 @@ function LibraryViewInner({
                   {t("libraryLocalTitle", isRu)}
                 </h3>
                 {books.map(book => renderBookCard(book, (
-                  <div className="flex items-center gap-2">
-                    <PipelineTimeline
-                      progress={getProgress(book.id)}
-                      isRu={isRu}
-                      onToggleStep={(stepId, done) => handleToggleStep(book.id, stepId, done)}
-                    />
-                    <div className="flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {onRename && (
-                        <Button variant="ghost" size="sm" onClick={() => startRename(book)} className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
-                          <Pencil className="h-3 w-3" />
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {onRename && (
+                      <Button variant="ghost" size="sm" onClick={() => startRename(book)} className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    )}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-7 w-7 p-0">
+                          <Trash2 className="h-3 w-3" />
                         </Button>
-                      )}
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-7 w-7 p-0">
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>{t("deleteBookTitle", isRu)}</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              {isRu ? `«${book.title}» ` : `"${book.title}" `}{t("deleteBookDesc", isRu)}
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>{t("cancel", isRu)}</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => onDelete(book.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                              {t("libraryDelete", isRu)}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>{t("deleteBookTitle", isRu)}</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {isRu ? `«${book.title}» ` : `"${book.title}" `}{t("deleteBookDesc", isRu)}
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>{t("cancel", isRu)}</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => onDelete(book.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                            {t("libraryDelete", isRu)}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
+                ), (
+                  <PipelineTimeline
+                    progress={getProgress(book.id)}
+                    isRu={isRu}
+                    onToggleStep={(stepId, done) => handleToggleStep(book.id, stepId, done)}
+                  />
                 )))}
               </div>
             )}
