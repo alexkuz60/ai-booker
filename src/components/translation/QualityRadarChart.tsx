@@ -17,7 +17,7 @@ import {
   SCORE_COLORS,
 } from "@/lib/qualityRadar";
 import { cn } from "@/lib/utils";
-import { ThreeAxisRadarOverlay } from "./ThreeAxisRadarOverlay";
+
 
 export type RadarLayer = "3R" | "5R" | "5R+Alt";
 
