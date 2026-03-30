@@ -340,6 +340,8 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     books,
     loadingLibrary,
     localProjectNamesByBookId,
+    progressMap,
+    setProgressMap,
     loadLibrary,
     loadLibraryFromServer,
     loadBookFromServerById,
