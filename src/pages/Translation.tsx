@@ -304,12 +304,12 @@ export default function Translation() {
             setSelectedSegment(null);
           }}
         >
-          <SelectTrigger className="w-[280px] h-8 text-xs">
+          <SelectTrigger className="w-[300px] h-9 text-sm">
             <SelectValue placeholder={isRu ? "Выберите главу…" : "Select chapter…"} />
           </SelectTrigger>
           <SelectContent>
             {chapters.map((ch) => (
-              <SelectItem key={ch.index} value={String(ch.index)} className="text-xs">
+              <SelectItem key={ch.index} value={String(ch.index)} className="text-sm">
                 {ch.title}
               </SelectItem>
             ))}
