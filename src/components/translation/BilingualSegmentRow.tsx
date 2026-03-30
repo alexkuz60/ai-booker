@@ -62,6 +62,7 @@ export function BilingualSegmentRow({
     <AccordionItem
       key={seg.segment_id}
       value={seg.segment_id}
+      data-segment-id={seg.segment_id}
       className={cn(
         "border rounded-md overflow-hidden cursor-pointer transition-colors",
         isSelected

@@ -29,6 +29,7 @@ interface Props {
   onTranslateSegments?: (segments: Segment[]) => Promise<void>;
   onLiteraryEdit?: (segment: Segment) => Promise<void>;
   onCritique?: (segment: Segment) => Promise<void>;
+  onSegmentsLoaded?: (segmentIds: string[]) => void;
   translating?: boolean;
   progressLabel?: string | null;
   selectedSegmentId?: string | null;
@@ -50,6 +51,7 @@ export function BilingualSegmentsView({
   onTranslateSegments,
   onLiteraryEdit,
   onCritique,
+  onSegmentsLoaded,
   translating = false,
   progressLabel,
   selectedSegmentId,
@@ -97,14 +99,16 @@ export function BilingualSegmentsView({
         }
 
         if (!cancelled) {
-          setItems(segments.map(seg => {
+          const mapped = segments.map(seg => {
             const trans = transMap.get(seg.segment_id);
             return {
               segment: seg,
               translatedText: trans?.text ?? "",
               hasLiteral: trans?.hasLiteral ?? false,
             };
-          }));
+          });
+          setItems(mapped);
+          onSegmentsLoaded?.(segments.map(s => s.segment_id));
         }
       } catch (err) {
         console.error("[BilingualSegmentsView] read error:", err);
