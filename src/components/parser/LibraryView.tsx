@@ -21,7 +21,7 @@ import { PipelineTimeline } from "@/components/library/PipelineTimeline";
 import { TranslationTimeline } from "@/components/library/TranslationTimeline";
 import type { PipelineProgress, PipelineStepId, ProjectMeta } from "@/lib/projectStorage";
 import { createEmptyPipelineProgress } from "@/lib/projectStorage";
-import { readPipelineProgress, writePipelineStep } from "@/hooks/usePipelineProgress";
+import { writePipelineStep } from "@/hooks/usePipelineProgress";
 import { OPFSStorage } from "@/lib/projectStorage";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { translationProjectExists, checkTranslationReadiness, createTranslationProject } from "@/lib/translationProject";
