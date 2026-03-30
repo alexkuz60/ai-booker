@@ -156,10 +156,10 @@
 
 ---
 
-## Баги — Потеря translation-зеркала (B26) 🔴
+## Баги — Потеря translation-зеркала (B26) ✅ РЕШЕНО
 
-- [ ] **Найти корневую причину удаления зеркала при рестарте** — Translation mirror проект (`Book_EN`) исчезает из OPFS после рестарта браузера. `project.json` содержит `targetLanguage`/`sourceProjectName` — метаданных достаточно. Задача: проследить цепочку от рестарта до физического удаления. Гипотезы: (1) auto-restore в useBookManager вызывает openSavedBook с Wipe-and-Deploy по ошибке; (2) zombie-scan в projectCleanup слишком агрессивен; (3) баг в localProjectResolver теряет маппинг. Костыли-фильтры (B26) — откатить после нахождения корневой причины.
-- [ ] **Принцип: при обычном рестарте — никакого Wipe** — Wipe-and-Deploy только при явном «Загрузить с сервера». Если Wipe срабатывает при рестарте — это баг.
+- [x] **Корневая причина найдена** — OPFS-папка НЕ удалялась. Проблема — гонка состояний: `useTranslationStorage` получал `sourceStorage=null` до инициализации контекста и немедленно отвечал `exists: false`. Страница Translation не ждала `initialized` и показывала «пустой проект».
+- [x] **Фикс** — Translation.tsx ждёт `initialized` (спиннер). `useTranslationStorage` не сбрасывает `loading` при null-входах. Fallback-скан OPFS в `resolveLocalStorageForBook` сохранён как страховка.
 
 ## Баги — AI Роли / Пресеты
 
