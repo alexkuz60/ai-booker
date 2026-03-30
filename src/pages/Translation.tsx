@@ -386,8 +386,8 @@ export default function Translation() {
             <ResizablePanel defaultSize={panelSizes.inner[1] ?? 75} minSize={40}>
               <div className="h-full flex flex-col">
                 <div className="shrink-0 border-b px-3 py-1.5 flex items-center gap-1.5 bg-muted/50">
-                  <Languages className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  <Languages className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     {isRu ? "Билингва" : "Bilingual"}
                   </span>
                   {transProjectExists && selectedSceneId && (
