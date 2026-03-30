@@ -6,11 +6,12 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { BookRecord } from "@/pages/parser/types";
-import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
+import { OPFSStorage, type ProjectStorage, type PipelineProgress, createEmptyPipelineProgress } from "@/lib/projectStorage";
 import type { LocalBookStructure } from "@/lib/localSync";
 import { detectFileFormat } from "@/lib/fileFormatUtils";
 import { getProjectActivityMs } from "@/lib/projectActivity";
 import { paths } from "@/lib/projectPaths";
+import { readPipelineProgress } from "@/hooks/usePipelineProgress";
 
 type LocalLibraryCandidate = {
   record: BookRecord;
