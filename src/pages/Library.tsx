@@ -112,8 +112,14 @@ export default function Library() {
   }, [setStep]);
 
   const startNewProject = useCallback(() => {
+    setShouldRedirect(true);
     setStep("upload");
   }, [setStep]);
+
+  const handleOpenBook = useCallback((book: BookRecord) => {
+    setShouldRedirect(true);
+    openSavedBook(book);
+  }, [openSavedBook]);
 
   // ── Page header ──
   useEffect(() => {
