@@ -154,14 +154,14 @@
 
 ### Ш. Потеря translation-зеркала после рестарта браузера — ✅ РЕШЕНО (B26)
 - Проблема: translation mirror проект (например, `Book_EN`) "исчезает" после рестарта браузера.
-- Корневая причина: OPFS-папка НЕ удалялась. Проблема была в `resolveLocalStorageForBook`:
-  - При рестарте `step = "extracting_toc"` (из sessionStorage), а `useLibrary` загружает `localProjectNamesByBookId` ТОЛЬКО при `step === "library"`.
-  - В момент auto-restore карта проектов ПУСТАЯ → resolver не находит проект → restore fails → `setStep("library")`.
-  - Пользователь видит пустую библиотеку вместо восстановленного проекта.
-- Фикс: `resolveLocalStorageForBook` теперь делает прямой OPFS-скан (по bookId из project.json) как fallback, когда карта пуста.
-- Побочный баг (B26b): `deleteBook` в `useBookManager` сканировал ВСЕ проекты и удалял translation mirrors (общий bookId). Добавлена проверка `targetLanguage`/`sourceProjectName`.
-- Фильтры в `useLibrary` и `wipeProjectBrowserState` — НЕ костыли, а корректная защита: зеркала не должны попадать в список основных книг и не должны удаляться при Wipe-and-Deploy.
-- Файлы: `localProjectResolver.ts`, `useBookManager.ts`.
+- Корневая причина: OPFS-папка НЕ удалялась. Проблема — **гонка состояний** (race condition):
+  - `useTranslationStorage` получает `sourceStorage=null` пока `useProjectStorageContext` не инициализирован.
+  - При `sourceStorage=null` хук немедленно отвечал `exists: false, loading: false`.
+  - Страница Translation.tsx не ждала `initialized` от контекста и показывала «пустой проект».
+  - При автоматической перезагрузке OPFS-бутстрап уже завершён → проект находится.
+- Фикс (v2): Translation.tsx ждёт `initialized`, показывая спиннер. `useTranslationStorage` не сбрасывает `loading` при null-входах.
+- Предыдущие фиксы (v1, остаются): fallback-скан OPFS в `resolveLocalStorageForBook`, защита `deleteBook` от удаления зеркал.
+- Файлы: `Translation.tsx`, `useTranslationStorage.ts`, `localProjectResolver.ts`, `useBookManager.ts`.
 
 ---
 
