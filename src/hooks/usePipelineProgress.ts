@@ -97,9 +97,6 @@ export async function readPipelineProgress(storage: ProjectStorage): Promise<Pip
     const saved = (meta?.pipelineProgress as PipelineProgress) ?? {};
     const progress = { ...createEmptyPipelineProgress(), ...saved };
 
-    console.debug("[PipelineProgress] readPipelineProgress for", storage.projectName,
-      "meta exists:", !!meta, "saved keys:", Object.keys(saved), "saved:", JSON.stringify(saved));
-
     // Auto-infer obvious flags for legacy projects that pre-date pipelineProgress
     let patched = false;
 
@@ -122,18 +119,44 @@ export async function readPipelineProgress(storage: ProjectStorage): Promise<Pip
           patched = true;
         }
       } catch {}
-    }
 
-    // Infer storyboard_done from scene_index having storyboarded scenes
-    if (!progress.storyboard_done) {
-      try {
-        const idx = await storage.readJSON<Record<string, unknown>>("scene_index.json");
-        if (idx && typeof idx === "object") {
-          const entries = Object.values(idx);
-          if (entries.some((e: any) => e?.storyboarded)) {
-            progress.storyboard_done = true;
+      // Legacy fallback: structure/characters.json
+      if (!progress.characters_extracted) {
+        try {
+          const legacyChars = await storage.readJSON<unknown[]>("structure/characters.json");
+          if (Array.isArray(legacyChars) && legacyChars.length > 0) {
+            progress.characters_extracted = true;
             patched = true;
           }
+        } catch {}
+      }
+    }
+
+    // Infer profiles_done from enriched character fields
+    if (!progress.profiles_done) {
+      try {
+        const chars = await storage.readJSON<any[]>("characters.json");
+        if (Array.isArray(chars) && chars.some((c) =>
+          !!c?.profile ||
+          !!c?.temperament ||
+          !!c?.speech_style ||
+          (Array.isArray(c?.psycho_tags) && c.psycho_tags.length > 0) ||
+          (Array.isArray(c?.speech_tags) && c.speech_tags.length > 0) ||
+          !!c?.description,
+        )) {
+          progress.profiles_done = true;
+          patched = true;
+        }
+      } catch {}
+    }
+
+    // Infer storyboard_done from scene_index.storyboarded
+    if (!progress.storyboard_done) {
+      try {
+        const idx = await storage.readJSON<{ storyboarded?: string[] }>("scene_index.json");
+        if (Array.isArray(idx?.storyboarded) && idx.storyboarded.length > 0) {
+          progress.storyboard_done = true;
+          patched = true;
         }
       } catch {}
     }
