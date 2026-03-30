@@ -264,7 +264,7 @@ export function PipelineTimeline({ progress, isRu, onToggleStep }: Props) {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="flex items-start gap-0 w-full max-w-[520px]">
+      <div className="flex items-start gap-0 w-full">
         {STAGES.map((stage, idx) => (
           <div key={stage.id} className="contents">
             {idx > 0 && (
