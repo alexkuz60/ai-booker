@@ -273,6 +273,10 @@ export function useFileUpload({
             updatedAt: new Date().toISOString(),
             language: (existingMeta?.language === "en" ? "en" : (isRu ? "ru" : "en")),
             fileFormat: isFb2 ? "fb2" : (isDocx ? "docx" : "pdf"),
+            pipelineProgress: {
+              file_uploaded: true,
+              opfs_created: true,
+            },
           });
 
           await syncStructureToLocal(targetStorage, {
