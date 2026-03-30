@@ -292,6 +292,7 @@ export function TranslationTimeline({ progress, isRu, onToggleStep, onStageClick
                 isRu={isRu}
                 disabled={!isActive}
                 onToggleStep={onToggleStep}
+                onStageClick={onStageClick}
               />
             </div>
           ))}

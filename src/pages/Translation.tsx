@@ -179,25 +179,6 @@ export default function Translation() {
     if (!isOpen || !meta) return undefined;
     return (
       <div className="flex items-center gap-2">
-        <Button
-          size="sm"
-          onClick={handleCreateTranslation}
-          disabled={creating || !readiness || readiness.readyChapters.size === 0 || transProjectExists}
-          className="h-7 text-xs px-3"
-        >
-          {creating ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-          ) : (
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
-          )}
-          {creating && createProgress
-            ? createProgress
-            : transProjectExists
-              ? isRu ? "Проект создан" : "Project exists"
-              : isRu
-                ? `Перевод (${meta.language === "ru" ? "→ EN" : "→ RU"})`
-                : `Translate (${meta.language === "ru" ? "→ EN" : "→ RU"})`}
-        </Button>
         <SaveBookButton
           isRu={isRu}
           onClick={saveBook}
@@ -216,7 +197,7 @@ export default function Translation() {
         />
       </div>
     );
-  }, [isOpen, meta, creating, readiness, isRu, handleCreateTranslation, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, transProjectExists, apiKeys, createProgress]);
+  }, [isOpen, meta, isRu, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, apiKeys]);
 
   const headerRightRef = useRef(headerRight);
   headerRightRef.current = headerRight;
