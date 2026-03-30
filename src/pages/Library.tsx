@@ -50,12 +50,15 @@ export default function Library() {
     pendingProjectName,
   });
 
-  // ── Navigate to Parser when book is opened/uploaded ──
+  // ── Navigate to Parser only after a NEW book open/upload action ──
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+
   useEffect(() => {
-    if (step === "workspace") {
+    if (shouldRedirect && step === "workspace") {
+      setShouldRedirect(false);
       navigate("/parser");
     }
-  }, [step, navigate]);
+  }, [step, shouldRedirect, navigate]);
 
   // ── Restore-from-server progress dialog ──
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
@@ -109,8 +112,14 @@ export default function Library() {
   }, [setStep]);
 
   const startNewProject = useCallback(() => {
+    setShouldRedirect(true);
     setStep("upload");
   }, [setStep]);
+
+  const handleOpenBook = useCallback((book: BookRecord) => {
+    setShouldRedirect(true);
+    openSavedBook(book);
+  }, [openSavedBook]);
 
   // ── Page header ──
   useEffect(() => {
@@ -137,7 +146,7 @@ export default function Library() {
           {(step === "library" || step === "workspace") && (
             <LibraryView
               isRu={isRu} books={books} loadingLibrary={loadingLibrary}
-              onUpload={startNewProject} onOpen={openSavedBook} onDelete={deleteBook}
+              onUpload={startNewProject} onOpen={handleOpenBook} onDelete={deleteBook}
               onClearAll={clearAllProjects} onRename={renameBook}
               serverBooks={serverBooks} loadingServerBooks={loadingServerBooks}
               onOpenServerBook={handleRestoreClick} onDeleteServerBook={deleteServerBook}
