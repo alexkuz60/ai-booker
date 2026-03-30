@@ -41,10 +41,9 @@ export function usePipelineProgress(
     let cancelled = false;
     (async () => {
       try {
-        const meta = await storage.readJSON<Record<string, unknown>>("project.json");
+        const repaired = await readPipelineProgress(storage);
         if (cancelled) return;
-        const saved = (meta?.pipelineProgress as PipelineProgress) ?? {};
-        setProgress(prev => ({ ...createEmptyPipelineProgress(), ...saved }));
+        setProgress(repaired);
       } catch {
         // project.json missing — use defaults
       } finally {
