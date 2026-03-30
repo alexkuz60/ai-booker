@@ -194,10 +194,15 @@ export default function Translation() {
     // Automatically push translation project if it exists
     if (transProjectExists && translationStorage) {
       try {
+        onProgress?.("translation", "running");
         await saveTranslation();
+        onProgress?.("translation", "done");
       } catch (err) {
         console.error("[Translation] auto-sync translation failed:", err);
+        onProgress?.("translation", "error", err instanceof Error ? err.message : String(err));
       }
+    } else {
+      onProgress?.("translation", "skipped", isRu ? "Нет проекта перевода" : "No translation project");
     }
   }, [saveBook, transProjectExists, translationStorage, saveTranslation]);
 
