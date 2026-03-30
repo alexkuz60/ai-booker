@@ -262,7 +262,7 @@ export default function Translation() {
         animate={{ opacity: 1 }}
       >
         <Loader2 className="h-8 w-8 animate-spin opacity-40" />
-        <p className="text-sm">
+        <p className="text-base">
           {isRu ? "Загрузка проекта…" : "Loading project…"}
         </p>
       </motion.div>
