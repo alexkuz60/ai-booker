@@ -44,6 +44,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { QualityMonitorPanel } from "@/components/translation/QualityMonitorPanel";
 import { TranslationProgressPanel } from "@/components/translation/TranslationProgressPanel";
+import { SegmentQualityChart } from "@/components/translation/SegmentQualityChart";
 
 interface ChapterEntry {
   index: number;
