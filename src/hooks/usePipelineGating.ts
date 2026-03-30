@@ -37,10 +37,12 @@ function storyboardReady(p: PipelineProgress): boolean {
 }
 
 export function usePipelineGating(): GatingResult {
-  const { storage, isOpen, progressVersion } = useProjectStorageContext();
-  const { progress, loading } = usePipelineProgress(isOpen ? storage : null, progressVersion);
+  const { storage, isOpen, progressVersion, initialized } = useProjectStorageContext();
+  const { progress, loading: progressLoading } = usePipelineProgress(isOpen ? storage : null, progressVersion);
 
   const hasProject = !!isOpen;
+  // Still loading if OPFS bootstrap hasn't completed OR pipeline progress is loading
+  const loading = !initialized || progressLoading;
 
   const isLocked = (route: string): boolean => {
     if (!hasProject) {
