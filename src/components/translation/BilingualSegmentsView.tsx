@@ -243,8 +243,10 @@ export function BilingualSegmentsView({
 
       <Accordion type="single" collapsible value={openValue} onValueChange={(val) => {
           if (!val) {
+            prevSelectedRef.current = null;
             onSelectSegment?.(null);
           } else {
+            prevSelectedRef.current = val;
             const found = items.find(i => i.segment.segment_id === val);
             if (found) {
               const fullText = found.segment.phrases.map(p => p.text).join(" ");
