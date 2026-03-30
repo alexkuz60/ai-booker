@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, memo } from "react";
 import { motion } from "framer-motion";
-import { Upload, BookOpen, Library, Trash2, FolderOpen, Clock, Loader2, Eraser, Pencil, Check, X, Cloud, Download, CalendarClock } from "lucide-react";
+import { Upload, BookOpen, Library, Trash2, Clock, Loader2, Eraser, Pencil, Check, X, Cloud, Download, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,24 +37,18 @@ function LibraryViewInner({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
-  // Pipeline progress per book (keyed by bookId)
+  // Pipeline progress per book
   const [pipelineMap, setPipelineMap] = useState<Record<string, PipelineStage[]>>({});
 
   const getPipeline = useCallback((bookId: string): PipelineStage[] => {
     if (!pipelineMap[bookId]) {
-      // Initialize with defaults — auto-detect will fill later
       const stages = createDefaultPipeline();
-      // If book exists locally with chapters/scenes, mark project stage done
       const book = books.find(b => b.id === bookId);
       if (book) {
-        stages[0].subSteps[0].done = true; // file uploaded
-        stages[0].subSteps[1].done = true; // opfs created
-        if ((book.chapter_count || 0) > 0) {
-          stages[1].subSteps[0].done = true; // toc
-        }
-        if ((book.scene_count || 0) > 0) {
-          stages[1].subSteps[1].done = true; // scenes analyzed
-        }
+        stages[0].subSteps[0].done = true;
+        stages[0].subSteps[1].done = true;
+        if ((book.chapter_count || 0) > 0) stages[1].subSteps[0].done = true;
+        if ((book.scene_count || 0) > 0) stages[1].subSteps[1].done = true;
       }
       setPipelineMap(prev => ({ ...prev, [bookId]: stages }));
       return stages;
@@ -156,7 +150,7 @@ function LibraryViewInner({
   return (
     <motion.div key="library" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
       className="flex-1 h-full overflow-auto">
-      <div className="py-8 px-6 space-y-6">
+      <div className="py-8 px-6 space-y-6 w-full">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-xl font-semibold text-foreground">{t("libraryTitle", isRu)}</h2>
           <div className="flex items-center gap-2">
@@ -200,50 +194,56 @@ function LibraryViewInner({
           </div>
         ) : (
           <>
-            {/* Local projects section */}
+            {/* Local projects */}
             {books.length > 0 && (
               <div className="space-y-2">
                 <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   {t("libraryLocalTitle", isRu)}
                 </h3>
                 {books.map(book => renderBookCard(book, (
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {onRename && (
-                      <Button variant="ghost" size="sm" onClick={() => startRename(book)} className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                    <Button variant="outline" size="sm" onClick={() => onOpen(book)} className="gap-1.5 text-xs">
-                      <FolderOpen className="h-3 w-3" />
-                      {t("libraryOpen", isRu)}
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-8 w-8 p-0">
-                          <Trash2 className="h-3.5 w-3.5" />
+                  <div className="flex items-center gap-2">
+                    <PipelineTimeline
+                      stages={getPipeline(book.id)}
+                      isRu={isRu}
+                      bookId={book.id}
+                      onToggleSubStep={(stageId, subStepId, done) =>
+                        handleToggleSubStep(book.id, stageId, subStepId, done)
+                      }
+                    />
+                    <div className="flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {onRename && (
+                        <Button variant="ghost" size="sm" onClick={() => startRename(book)} className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
+                          <Pencil className="h-3 w-3" />
                         </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>{t("deleteBookTitle", isRu)}</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            {isRu ? `«${book.title}» ` : `"${book.title}" `}{t("deleteBookDesc", isRu)}
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>{t("cancel", isRu)}</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => onDelete(book.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                            {t("libraryDelete", isRu)}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                      )}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-7 w-7 p-0">
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>{t("deleteBookTitle", isRu)}</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {isRu ? `«${book.title}» ` : `"${book.title}" `}{t("deleteBookDesc", isRu)}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>{t("cancel", isRu)}</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => onDelete(book.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                              {t("libraryDelete", isRu)}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </div>
                 )))}
               </div>
             )}
 
-            {/* Empty state (no local AND no server books) */}
+            {/* Empty state */}
             {books.length === 0 && serverBooks.length === 0 && !loadingServerBooks && (
               <Card className="border-dashed">
                 <CardContent className="py-16 flex flex-col items-center gap-4 text-muted-foreground">
