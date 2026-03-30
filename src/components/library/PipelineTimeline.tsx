@@ -4,7 +4,7 @@
  * Requirements:
  * 1. Click any icon → opens book & navigates to that stage's page.
  * 2. Context menus always active (even locked icons). Checkboxes update progress JSON.
- * 3. Partial progress = bright icon; full = filled primary circle.
+ * 3. Partial progress = bright icon; full = filled primary circle (keeps native icon).
  * 4. First step "Project" click = full reload with confirmation dialog (resets all).
  */
 
