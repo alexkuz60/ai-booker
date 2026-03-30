@@ -73,7 +73,6 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
 
     // Read pipeline progress alongside metadata
     const progress = await readPipelineProgress(storage);
-    console.debug("[Library] Pipeline progress for", storage.projectName, "bookId:", resolvedId, progress);
 
     return {
       record: {
