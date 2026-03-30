@@ -9,6 +9,7 @@ import { LanguageProvider } from "@/hooks/useLanguage";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeaderProvider } from "@/hooks/usePageHeader";
 import { ProjectStorageProvider } from "@/hooks/useProjectStorageContext";
+import Home from "./pages/Home";
 import Library from "./pages/Library";
 import Parser from "./pages/Parser";
 import Studio from "./pages/Studio";
@@ -42,6 +43,7 @@ function ProtectedRoutes() {
         <AppLayout>
           <Routes>
             <Route path="/" element={<Library />} />
+            <Route path="/home" element={<Home />} />
             <Route path="/parser" element={<Parser />} />
             <Route path="/studio" element={<Studio />} />
             <Route path="/montage" element={<Montage />} />
