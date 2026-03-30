@@ -53,7 +53,8 @@
 
 ```
 📁 BookTitle/
-├── project.json           — ProjectMeta (version, bookId, title, userId, language, fileFormat, layoutVersion: 2)
+├── project.json           — ProjectMeta (version, bookId, title, userId, language, fileFormat,
+│                             pipelineProgress, translationProject?, layoutVersion: 2)
 ├── scene_index.json       — SceneIndexData: sceneId→chapterId маппинг, хеши контента, маркеры storyboarded/characterMapped
 ├── characters.json        — CharacterIndex[] (глобальный реестр персонажей книги)
 ├── 📁 source/
