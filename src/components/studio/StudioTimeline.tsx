@@ -212,6 +212,12 @@ export function StudioTimeline({
       );
       toast.success(isRu ? "Сцена отрендерена" : "Scene rendered");
       onSceneRendered?.(sceneId);
+      // Auto-set pipeline flag
+      if (storage) {
+        import("@/hooks/usePipelineProgress").then(({ writePipelineStep }) =>
+          writePipelineStep(storage, "scene_render", true).catch(() => {}),
+        );
+      }
     } catch (err: any) {
       toast.error(isRu ? "Ошибка рендера" : "Render error", { description: err.message });
     }
