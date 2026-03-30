@@ -48,6 +48,7 @@ function LibraryViewInner({
   const syncedBookIds = useMemo(() => new Set(serverBooks.map(b => b.id)), [serverBooks]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [expandedTranslation, setExpandedTranslation] = useState<Set<string>>(new Set());
 
   // Pipeline progress per book (read from OPFS project.json)
   const [progressMap, setProgressMap] = useState<Record<string, PipelineProgress>>({});
