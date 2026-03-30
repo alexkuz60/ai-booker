@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, Library, PlusCircle, Network, Users, RefreshCw } from "lucide-react";
+import { Bot, Network, Users } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -23,18 +23,9 @@ import { useParserHelpers } from "@/hooks/useParserHelpers";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { useImperativeSave } from "@/hooks/useImperativeSave";
-import {
-  SyncProgressDialog,
-  buildRestoreSteps,
-  type SyncStep,
-  type SyncProgressCallback,
-} from "@/components/SyncProgressDialog";
 import { useParserCharacters } from "@/hooks/useParserCharacters";
 import { useTocMutations } from "@/hooks/useTocMutations";
 
-import LibraryView from "@/components/parser/LibraryView";
-import UploadView from "@/components/parser/UploadView";
-import { ExtractingTocView, ErrorView } from "@/components/parser/StatusViews";
 import NavSidebar from "@/components/parser/NavSidebar";
 import ChapterDetailPanel from "@/components/parser/ChapterDetailPanel";
 import { AiRolesTab } from "@/components/profile/tabs/AiRolesTab";
@@ -51,8 +42,6 @@ export default function Parser() {
   const userApiKeys = useUserApiKeys();
   const [aiRolesOpen, setAiRolesOpen] = useState(false);
   const [parserTab, setParserTab] = useState<"structure" | "characters">("structure");
-  const [pendingProjectName, setPendingProjectName] = useState<string | null>(null);
-  const [showReloadConfirm, setShowReloadConfirm] = useState(false);
   const {
     backend: storageBackend,
     createProject,
@@ -93,14 +82,19 @@ export default function Parser() {
   });
 
   const {
-    step, setStep, books, loadingLibrary, fileName, errorMsg, bookId, uploadProgress,
+    step, setStep, fileName, errorMsg, bookId, uploadProgress,
     chapterIdMap, setChapterIdMap, tocEntries, setTocEntries, pdfRef, totalPages, file,
     partIdMap, chapterResults, setChapterResults, fileInputRef,
-    openSavedBook, deleteBook, clearAllProjects, handleFileSelect, handleReset: bookReset, reloadBook, ensurePdfLoaded,
-    reloadLibrary, renameBook,
-    serverBooks, loadingServerBooks, deleteServerBook,
+    openSavedBook, handleFileSelect, handleReset: bookReset, ensurePdfLoaded,
     serverNewerBookId, dismissServerNewer, acceptServerVersion,
-  } = useBookManager({ userId: user?.id, isRu, projectStorage, projectStorageInitialized, storageBackend, createProject, openProjectByName, pendingProjectName });
+  } = useBookManager({ userId: user?.id, isRu, projectStorage, projectStorageInitialized, storageBackend, createProject, openProjectByName });
+
+  // ── Redirect to Library if no active book ──
+  useEffect(() => {
+    if (step === "library" || step === "upload") {
+      navigate("/", { replace: true });
+    }
+  }, [step, navigate]);
 
   const {
     characters, extracting, extractProgress, extractPoolStats, extractedCount, extractTotal, extractCharacters,
@@ -137,7 +131,6 @@ export default function Parser() {
   const localPartsForSave = useMemo(() => {
     const seen = new Set<string>();
     const parts: Array<{ id: string; title: string; partNumber: number }> = [];
-
     for (const entry of tocEntries) {
       if (!entry.partTitle || seen.has(entry.partTitle)) continue;
       seen.add(entry.partTitle);
@@ -147,7 +140,6 @@ export default function Parser() {
         partNumber: parts.length + 1,
       });
     }
-
     return parts;
   }, [tocEntries, partIdMap]);
 
@@ -175,7 +167,7 @@ export default function Parser() {
     getSnapshot: getLocalSnapshot,
   });
 
-  // ── TOC Mutations (extracted from Parser) ──
+  // ── TOC Mutations ──
   const mutations = useTocMutations({
     tocEntries, setTocEntries,
     chapterIdMap, setChapterIdMap,
@@ -241,68 +233,18 @@ export default function Parser() {
     setSelectedIndices(new Set());
     setLastClickedIdx(null);
     setExpandedNodes(new Set());
-    setPendingProjectName(null);
     resetAnalysis();
     sessionStorage.removeItem(NAV_STATE_KEY);
   }, [bookReset, resetAnalysis]);
 
-  const startNewProject = useCallback(() => {
-    handleReset();
-    setParserTab("structure");
-    setStep("upload");
-  }, [handleReset, setStep]);
-
-  // ── Restore-from-server progress dialog (lives here to survive step changes) ──
-  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
-  const [restoreSteps, setRestoreSteps] = useState<SyncStep[]>([]);
-  const [restorePhase, setRestorePhase] = useState<"confirm" | "running" | "done" | "error">("confirm");
-  const [restoreError, setRestoreError] = useState<string>();
-  const [restoreTargetBook, setRestoreTargetBook] = useState<BookRecord | null>(null);
-  const [restoreDownloadIr, setRestoreDownloadIr] = useState(true);
-  const [restoreDownloadAtmo, setRestoreDownloadAtmo] = useState(true);
-  const [restoreDownloadSfx, setRestoreDownloadSfx] = useState(true);
-
-  const handleRestoreClick = useCallback((book: BookRecord) => {
-    setRestoreTargetBook(book);
-    setRestoreSteps(buildRestoreSteps(isRu));
-    setRestorePhase("confirm");
-    setRestoreError(undefined);
-    setRestoreDialogOpen(true);
-  }, [isRu]);
-
-  const handleRestoreProgress: SyncProgressCallback = useCallback(
-    (stepId, status, detail) => {
-      setRestoreSteps(prev =>
-        prev.map(s => s.id === stepId ? { ...s, status, detail: detail ?? s.detail } : s),
-      );
-    },
-    [],
-  );
-
-  const handleRestoreConfirm = useCallback(async () => {
-    if (!restoreTargetBook) return;
-    setRestorePhase("running");
-    try {
-      await openSavedBook(restoreTargetBook, { skipTimestampCheck: true, downloadImpulses: restoreDownloadIr, downloadAtmosphere: restoreDownloadAtmo, downloadSfx: restoreDownloadSfx }, undefined, undefined, handleRestoreProgress);
-      setRestorePhase("done");
-    } catch (e) {
-      setRestoreError(e instanceof Error ? e.message : String(e));
-      setRestorePhase("error");
-    }
-  }, [restoreTargetBook, openSavedBook, handleRestoreProgress, restoreDownloadIr, restoreDownloadAtmo, restoreDownloadSfx]);
-
   useEffect(() => {
     if (!new URLSearchParams(location.search).has("resetLocal")) return;
-
     let cancelled = false;
-
     void (async () => {
       await hardResetLocalData();
       if (cancelled) return;
       handleReset();
-      setParserTab("structure");
-      setStep("upload");
-      navigate("/parser", { replace: true });
+      navigate("/", { replace: true });
       toast({
         title: isRu ? "Локальное хранилище очищено" : "Local storage cleared",
         description: isRu
@@ -310,105 +252,54 @@ export default function Parser() {
           : "All local parser projects and caches were removed from this browser.",
       });
     })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [location.search, hardResetLocalData, handleReset, navigate, isRu, toast, setStep]);
+    return () => { cancelled = true; };
+  }, [location.search, hardResetLocalData, handleReset, navigate, isRu, toast]);
 
   // ── Page header ──
   const headerRight = useMemo(() => {
-    const navButtons = (
-      <div className="flex items-center gap-1">
-        <Button
-          variant={step === "library" ? "secondary" : "ghost"} size="sm"
-          onClick={() => {
-            if (step === "workspace") handleReset();
-            else setStep("library");
-            void reloadLibrary();
-          }}
-          className="gap-1.5 text-xs"
-        >
-          <Library className="h-3.5 w-3.5" />
-          {isRu ? "Библиотека" : "Library"}
-        </Button>
-        {step === "library" && (
+    if (step !== "workspace") return null;
+
+    return (
+      <div className="flex items-center gap-3">
+        <div className="text-xs text-muted-foreground font-body">
+          {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} · {totalScenes} {t("scenes", isRu)}
+        </div>
+        <div className="flex items-center gap-1">
           <Button
-            variant="ghost" size="sm"
-            onClick={startNewProject}
+            variant={parserTab === "structure" ? "secondary" : "ghost"} size="sm"
+            onClick={() => setParserTab("structure")}
             className="gap-1.5 text-xs"
           >
-            <PlusCircle className="h-3.5 w-3.5" />
-            {isRu ? "Новая книга" : "New Book"}
+            <Network className="h-3.5 w-3.5" />
+            {isRu ? "Структура" : "Structure"}
           </Button>
-        )}
-        {step === "workspace" && (
           <Button
-            variant="ghost" size="sm"
-            onClick={() => setShowReloadConfirm(true)}
+            variant={parserTab === "characters" ? "secondary" : "ghost"} size="sm"
+            onClick={() => setParserTab(parserTab === "characters" ? "structure" : "characters")}
             className="gap-1.5 text-xs"
-            title={isRu ? "Перезагрузить книгу (загрузить другую версию файла)" : "Reload book (upload different file version)"}
           >
-            <RefreshCw className="h-3.5 w-3.5" />
-            {isRu ? "Перезагрузить" : "Reload"}
-          </Button>
-        )}
-
-        {step === "workspace" && (
-          <>
-            <span className="w-px h-4 bg-border mx-1" />
-            <Button
-              variant={parserTab === "structure" ? "secondary" : "ghost"} size="sm"
-              onClick={() => setParserTab("structure")}
-              className="gap-1.5 text-xs"
-            >
-              <Network className="h-3.5 w-3.5" />
-              {isRu ? "Структура" : "Structure"}
-            </Button>
-            <Button
-              variant={parserTab === "characters" ? "secondary" : "ghost"} size="sm"
-              onClick={() => setParserTab(parserTab === "characters" ? "structure" : "characters")}
-              className="gap-1.5 text-xs"
-            >
-              <Users className="h-3.5 w-3.5" />
-              {isRu ? "Персонажи" : "Characters"}
-            </Button>
-          </>
-        )}
-      </div>
-    );
-
-    if (step === "workspace") {
-      return (
-        <div className="flex items-center gap-3">
-          <div className="text-xs text-muted-foreground font-body">
-            {analyzedCount}/{tocEntries.length} {t("chapters", isRu)} · {totalScenes} {t("scenes", isRu)}
-          </div>
-          {navButtons}
-          <SaveBookButton
-            isRu={isRu}
-            onClick={saveBook}
-            loading={savingBook}
-            disabled={!bookId}
-            showDownloadZip={isProjectOpen}
-            onDownloadZip={downloadZip}
-            showImportZip={!isProjectOpen}
-            onImportZip={importZip}
-          />
-          <Button variant="ghost" size="sm" onClick={() => setAiRolesOpen(true)} className="gap-1.5">
-            <Bot className="h-3.5 w-3.5" />
-            {isRu ? "AI Роли" : "AI Roles"}
+            <Users className="h-3.5 w-3.5" />
+            {isRu ? "Персонажи" : "Characters"}
           </Button>
         </div>
-      );
-    }
+        <SaveBookButton
+          isRu={isRu}
+          onClick={saveBook}
+          loading={savingBook}
+          disabled={!bookId}
+          showDownloadZip={isProjectOpen}
+          onDownloadZip={downloadZip}
+          showImportZip={!isProjectOpen}
+          onImportZip={importZip}
+        />
+        <Button variant="ghost" size="sm" onClick={() => setAiRolesOpen(true)} className="gap-1.5">
+          <Bot className="h-3.5 w-3.5" />
+          {isRu ? "AI Роли" : "AI Roles"}
+        </Button>
+      </div>
+    );
+  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, parserTab, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip]);
 
-    return navButtons;
-  }, [step, isRu, analyzedCount, tocEntries.length, totalScenes, handleReset, setStep, parserTab, reloadBook, reloadLibrary, saveBook, savingBook, bookId, startNewProject]);
-
-  // Use ref for headerRight to avoid re-render cycle:
-  // headerRight is a ReactNode — new JSX ref on every useMemo recompute.
-  // Putting it in effect deps causes: effect → context update → re-render → new headerRight → effect → ∞
   const headerRightRef = useRef(headerRight);
   headerRightRef.current = headerRight;
 
@@ -515,7 +406,6 @@ export default function Parser() {
     }
   }, [tocEntries, navRestoredFromStorage]);
 
-  // ── Memoized role model maps to prevent child re-renders ──
   const navRoleModels = useMemo(() => ({
     screenwriter: getModelForRole("screenwriter"),
     director: getModelForRole("director"),
@@ -528,9 +418,14 @@ export default function Parser() {
     director: getModelForRole("director"),
   }), [getModelForRole]);
 
+  // If not in workspace, show nothing (redirect will fire)
+  if (step !== "workspace") {
+    return null;
+  }
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col h-full">
-      {/* Hidden file input always in DOM for reload from workspace */}
+      {/* Hidden file input for analysis (kept for potential future use) */}
       <input
         ref={fileInputRef}
         type="file"
@@ -540,32 +435,7 @@ export default function Parser() {
       />
       <div className="flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
-          {step === "library" && (
-            <LibraryView
-              isRu={isRu} books={books} loadingLibrary={loadingLibrary}
-              onUpload={startNewProject} onOpen={openSavedBook} onDelete={deleteBook}
-              onClearAll={clearAllProjects} onRename={renameBook}
-              serverBooks={serverBooks} loadingServerBooks={loadingServerBooks}
-              onOpenServerBook={handleRestoreClick} onDeleteServerBook={deleteServerBook}
-            />
-          )}
-          {step === "upload" && (
-            <UploadView
-              isRu={isRu}
-              fileInputRef={fileInputRef}
-              onFileSelect={handleFileSelect}
-              storageBackend={storageBackend}
-              onCreateWithFile={(name) => setPendingProjectName(name)}
-              onCancel={handleReset}
-            />
-          )}
-          {step === "extracting_toc" && (
-            <ExtractingTocView fileName={fileName} isRu={isRu} uploadProgress={uploadProgress} />
-          )}
-          {step === "error" && (
-            <ErrorView errorMsg={errorMsg} isRu={isRu} onReset={handleReset} />
-          )}
-          {step === "workspace" && parserTab === "structure" && (
+          {parserTab === "structure" && (
             <motion.div key="workspace-structure" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="flex h-full min-h-0 overflow-hidden">
               <ResizablePanelGroup direction="horizontal" autoSaveId={NAV_WIDTH_KEY} className="h-full min-h-0">
@@ -586,7 +456,7 @@ export default function Parser() {
                     onOpenPdf={handleOpenPdf}
                     onRenamePart={mutations.renamePart}
                     onMergeEntries={mutations.mergeEntries}
-                     roleModels={navRoleModels}
+                    roleModels={navRoleModels}
                     onBatchAnalyze={batchAnalyzeAll}
                     onStopAnalysis={stopAnalysis}
                     isAnalyzing={isAnalyzing}
@@ -595,24 +465,24 @@ export default function Parser() {
                 <ResizableHandle withHandle />
                 <ResizablePanel defaultSize={78} className="min-h-0 overflow-hidden">
                   <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
-                   <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
-                     <ChapterDetailPanel
-                       isRu={isRu} selectedIdx={selectedIdx}
-                       selectedEntry={selectedEntry} selectedResult={selectedResult}
-                       analysisLog={analysisLog} onAnalyze={analyzeChapter}
-                       onStopAnalysis={stopAnalysis}
-                       isAnalyzing={isAnalyzing}
-                       childCount={selectedChildCount}
+                    <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
+                      <ChapterDetailPanel
+                        isRu={isRu} selectedIdx={selectedIdx}
+                        selectedEntry={selectedEntry} selectedResult={selectedResult}
+                        analysisLog={analysisLog} onAnalyze={analyzeChapter}
+                        onStopAnalysis={stopAnalysis}
+                        isAnalyzing={isAnalyzing}
+                        childCount={selectedChildCount}
                         roleModels={detailRoleModels}
                         onScenesUpdate={mutations.handleScenesUpdate}
                       />
-                   </div>
+                    </div>
                   </div>
                 </ResizablePanel>
               </ResizablePanelGroup>
             </motion.div>
           )}
-          {step === "workspace" && parserTab === "characters" && (
+          {parserTab === "characters" && (
             <motion.div key="workspace-characters" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="flex h-full min-h-0 overflow-hidden">
               <ParserCharactersPanel
@@ -660,9 +530,6 @@ export default function Parser() {
           </div>
         </SheetContent>
       </Sheet>
-
-
-
 
       {/* ── Delete Confirmation Dialog ── */}
       <AlertDialog open={!!mutations.pendingDelete} onOpenChange={(open) => { if (!open) mutations.setPendingDelete(null); }}>
@@ -726,79 +593,14 @@ export default function Parser() {
             </AlertDialogCancel>
             <AlertDialogAction onClick={() => {
               dismissServerNewer();
-              setRestoreSteps(buildRestoreSteps(isRu));
-              setRestorePhase("running");
-              setRestoreError(undefined);
-              setRestoreDialogOpen(true);
-              acceptServerVersion(handleRestoreProgress).then(() => {
-                setRestorePhase("done");
-              }).catch((e) => {
-                setRestoreError(e instanceof Error ? e.message : String(e));
-                setRestorePhase("error");
-              });
+              // Navigate to library for restore flow
+              navigate("/");
             }}>
               {isRu ? "Загрузить с сервера" : "Load from server"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* ── Reload Book Confirmation Dialog ── */}
-      <AlertDialog open={showReloadConfirm} onOpenChange={setShowReloadConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {isRu ? "Перезагрузить файл книги?" : "Reload book file?"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {isRu
-                ? "Текущая структура и результаты анализа будут сброшены. Выберите новый файл для повторного разбора."
-                : "Current structure and analysis results will be reset. Select a new file to re-parse."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
-            <AlertDialogAction onClick={async () => {
-              setShowReloadConfirm(false);
-              await reloadBook();
-              fileInputRef.current?.click();
-            }}>
-              {isRu ? "Выбрать файл" : "Select file"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <SyncProgressDialog
-        isRu={isRu}
-        open={restoreDialogOpen}
-        onOpenChange={setRestoreDialogOpen}
-        onConfirm={handleRestoreConfirm}
-        steps={restoreSteps}
-        phase={restorePhase}
-        errorMessage={restoreError}
-        mode="restore"
-        confirmOptions={[
-          {
-            id: "download_ir",
-            label: isRu ? "Загрузить импульсы реверберации (IR)" : "Download reverb impulses (IR)",
-            checked: restoreDownloadIr,
-            onChange: setRestoreDownloadIr,
-          },
-          {
-            id: "download_atmo",
-            label: isRu ? "Загрузить звуки атмосферы" : "Download atmosphere sounds",
-            checked: restoreDownloadAtmo,
-            onChange: setRestoreDownloadAtmo,
-          },
-          {
-            id: "download_sfx",
-            label: isRu ? "Загрузить звуковые эффекты (SFX)" : "Download sound effects (SFX)",
-            checked: restoreDownloadSfx,
-            onChange: setRestoreDownloadSfx,
-          },
-        ]}
-      />
     </motion.div>
   );
 }
