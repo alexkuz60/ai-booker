@@ -168,6 +168,8 @@ export default function Library() {
               onClearAll={clearAllProjects} onRename={renameBook}
               serverBooks={serverBooks} loadingServerBooks={loadingServerBooks}
               onOpenServerBook={handleRestoreClick} onDeleteServerBook={deleteServerBook}
+              onStageNavigate={handleStageNavigate}
+              onProjectReset={handleProjectReset}
             />
           )}
           {step === "upload" && (
