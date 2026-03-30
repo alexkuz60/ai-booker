@@ -357,5 +357,4 @@ function LibraryViewInner({
   );
 }
 
-const LibraryView = memo(LibraryViewInner);
-export default LibraryView;
+export default LibraryViewInner;
