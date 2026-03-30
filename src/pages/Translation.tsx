@@ -55,7 +55,7 @@ const TRANSLATION_ROLES: AiRoleId[] = ["art_translator", "literary_editor", "tra
 export default function Translation() {
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
-  const { storage, meta, isOpen } = useProjectStorageContext();
+  const { storage, meta, isOpen, initialized } = useProjectStorageContext();
   const apiKeys = useUserApiKeys();
   const { getModelForRole, getEffectivePool } = useAiRoles(apiKeys);
 
@@ -273,6 +273,21 @@ export default function Translation() {
   }, [storage, isOpen]);
 
   // ── No project open ────────────────────────────────────
+  if (!initialized) {
+    return (
+      <motion.div
+        className="flex-1 flex flex-col h-full items-center justify-center gap-4 text-muted-foreground"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <Loader2 className="h-8 w-8 animate-spin opacity-40" />
+        <p className="text-sm">
+          {isRu ? "Загрузка проекта…" : "Loading project…"}
+        </p>
+      </motion.div>
+    );
+  }
+
   if (!isOpen || !meta) {
     return (
       <motion.div
