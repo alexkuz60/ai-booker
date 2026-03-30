@@ -204,11 +204,12 @@ export function QualityRadarChart({
       {!compact && scores && (
         <div className="w-full space-y-2 px-2">
           {AXES.map((axis) => {
-            const layers: { key: RadarLayer; value: number }[] = [
-              { key: "3R", value: layer3R?.[axis] ?? 0 },
-              { key: "5R", value: layer5R?.[axis] ?? 0 },
-              { key: "5R+Alt", value: layerAlt?.[axis] ?? 0 },
-            ].filter((l) => l.value > 0);
+            const allLayers: { key: RadarLayer; value: number }[] = [
+              { key: "3R" as RadarLayer, value: layer3R?.[axis] ?? 0 },
+              { key: "5R" as RadarLayer, value: layer5R?.[axis] ?? 0 },
+              { key: "5R+Alt" as RadarLayer, value: layerAlt?.[axis] ?? 0 },
+            ];
+            const layers = allLayers.filter((l) => l.value > 0);
 
             // fallback to primary if no layers
             if (layers.length === 0 && scores[axis] > 0) {
