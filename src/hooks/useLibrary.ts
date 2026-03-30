@@ -270,7 +270,9 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       return;
     }
 
-    if (step !== "library") {
+    const shouldLoadLibrary = step === "library" || step === "workspace";
+
+    if (!shouldLoadLibrary) {
       libraryLoadedRef.current = false;
       serverBooksLoadedRef.current = false;
       return;
@@ -284,7 +286,8 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
 
   // Auto-load server books after local library is ready
   useEffect(() => {
-    if (!userId || step !== "library" || loadingLibrary) return;
+    const shouldLoadLibrary = step === "library" || step === "workspace";
+    if (!userId || !shouldLoadLibrary || loadingLibrary) return;
     if (!serverBooksLoadedRef.current) {
       serverBooksLoadedRef.current = true;
       void loadServerBooks();
