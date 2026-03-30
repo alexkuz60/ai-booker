@@ -12,6 +12,7 @@ import {
 } from "@/lib/tocStructure";
 import { paths } from "@/lib/projectPaths";
 import { buildSceneIndex, writeSceneIndex, readSceneIndex } from "@/lib/sceneIndex";
+import { writePipelineStep } from "@/hooks/usePipelineProgress";
 
 export interface LocalBookStructure {
   bookId: string;
@@ -134,6 +135,13 @@ export async function syncStructureToLocal(
         await Promise.all(staleCleanups);
         console.debug(`[LocalSync] Cleaned up ${staleSceneIds.length} stale scene(s):`, staleSceneIds);
       }
+    }
+
+    // ── Auto-set pipeline flags ──
+    await writePipelineStep(storage, "toc_extracted", true);
+    const hasScenes = Array.from(data.chapterResults.values()).some(r => r.scenes.length > 0);
+    if (hasScenes) {
+      await writePipelineStep(storage, "scenes_analyzed", true);
     }
 
     console.debug(`[LocalSync] Structure saved: ${data.toc.length} chapters, ${data.chapterResults.size} results`);

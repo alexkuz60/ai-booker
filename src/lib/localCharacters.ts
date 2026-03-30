@@ -53,6 +53,13 @@ export async function saveCharacterIndex(
     const legacy = characters.map(toLegacyCharacter);
     await storage.writeJSON(paths.structureCharactersLegacy(), legacy);
     await touchProjectUpdatedAt(storage);
+
+    // Auto-set pipeline flag
+    if (characters.length > 0) {
+      const { writePipelineStep } = await import("@/hooks/usePipelineProgress");
+      await writePipelineStep(storage, "characters_extracted", true);
+    }
+
     console.debug(`[localCharacters] Saved ${characters.length} characters`);
   } catch (err) {
     console.warn("[localCharacters] Failed to save characters:", err);

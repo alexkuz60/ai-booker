@@ -88,6 +88,12 @@ export async function saveStoryboardToLocal(
     await storage.writeJSON(filePath, payload);
     await markStoryboarded(storage, sceneId);
     await touchProjectUpdatedAt(storage);
+
+    // Auto-set pipeline flag: storyboard_done when first storyboard is saved
+    if (data.segments.length > 0) {
+      const { writePipelineStep } = await import("@/hooks/usePipelineProgress");
+      await writePipelineStep(storage, "storyboard_done", true);
+    }
   } catch (err) {
     console.warn("[StoryboardSync] Failed to save:", err);
   }
