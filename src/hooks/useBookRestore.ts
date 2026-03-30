@@ -49,6 +49,7 @@ interface UseBookRestoreParams {
   setPdfRef: React.Dispatch<React.SetStateAction<any>>;
   setTotalPages: React.Dispatch<React.SetStateAction<number>>;
   setErrorMsg: React.Dispatch<React.SetStateAction<string>>;
+  bumpProgressVersion?: () => void;
 }
 
 export function useBookRestore({
