@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -219,18 +220,25 @@ function LibraryViewInner({
               <>
                 <div className="w-px bg-border mx-3 self-stretch" />
                 <div className="flex items-center flex-shrink-0">
-                  <Button
-                    variant={isTranslationExpanded ? "secondary" : "outline"}
-                    size="sm"
-                    className="gap-1.5 text-[11px] h-7 px-2"
-                    disabled={!translationActive}
-                    onClick={() => toggleTranslation(book.id)}
-                    title={!translationActive ? (isRu ? "Требуется раскадровка" : "Storyboard required") : ""}
-                  >
-                    <Languages className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">{isRu ? "Арт-перевод" : "Art Translation"}</span>
-                    <ChevronDown className={`h-3 w-3 transition-transform ${isTranslationExpanded ? "rotate-180" : ""}`} />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={isTranslationExpanded ? "secondary" : "outline"}
+                        size="icon"
+                        className="h-12 w-12 flex flex-col gap-0.5"
+                        disabled={!translationActive}
+                        onClick={() => toggleTranslation(book.id)}
+                      >
+                        <Languages className="h-5 w-5" />
+                        <ChevronDown className={`h-3 w-3 transition-transform ${isTranslationExpanded ? "rotate-180" : ""}`} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="left">
+                      {!translationActive
+                        ? (isRu ? "Требуется раскадровка" : "Storyboard required")
+                        : (isRu ? "Арт-перевод" : "Art Translation")}
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               </>
             )}
