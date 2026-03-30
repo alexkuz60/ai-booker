@@ -252,7 +252,7 @@ function LibraryViewInner({
                   {t("libraryLocalTitle", isRu)}
                 </h3>
                 {books.map(book => renderBookCard(book, (
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <>
                     {onRename && (
                       <Button variant="ghost" size="sm" onClick={() => startRename(book)} className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
                         <Pencil className="h-3 w-3" />
