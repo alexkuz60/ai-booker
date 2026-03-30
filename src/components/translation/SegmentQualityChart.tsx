@@ -157,6 +157,8 @@ export function SegmentQualityChart({
     return Math.max(4, Math.min(28, size));
   }, [barData.length]);
 
+  const hasData = barData.some((b) => b["3R"] > 0 || b["5R"] > 0 || b["5R+Alt"] > 0);
+
   if (!sceneId || segmentIds.length === 0) return null;
 
   return (
