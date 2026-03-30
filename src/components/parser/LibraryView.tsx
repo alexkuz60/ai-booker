@@ -278,13 +278,20 @@ function LibraryViewInner({
                     </AlertDialog>
                   </div>
                 ), (
-                  <PipelineTimeline
-                    progress={getProgress(book.id)}
-                    isRu={isRu}
-                    onToggleStep={(stepId, done) => handleToggleStep(book.id, stepId, done)}
-                    onStageClick={(route) => onStageNavigate?.(book, route)}
-                    onProjectReset={() => onProjectReset?.(book)}
-                  />
+                  <div>
+                    <PipelineTimeline
+                      progress={getProgress(book.id)}
+                      isRu={isRu}
+                      onToggleStep={(stepId, done) => handleToggleStep(book.id, stepId, done)}
+                      onStageClick={(route) => onStageNavigate?.(book, route)}
+                      onProjectReset={() => onProjectReset?.(book)}
+                    />
+                    <TranslationTimeline
+                      progress={getProgress(book.id)}
+                      isRu={isRu}
+                      onToggleStep={(stepId, done) => handleToggleStep(book.id, stepId, done)}
+                    />
+                  </div>
                 )))}
               </div>
             )}
