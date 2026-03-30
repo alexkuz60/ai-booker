@@ -96,10 +96,20 @@ export async function readPipelineProgress(storage: ProjectStorage): Promise<Pip
     const saved = (meta?.pipelineProgress as PipelineProgress) ?? {};
     const progress = { ...createEmptyPipelineProgress(), ...saved };
 
-    // Auto-infer obvious flags for legacy projects that pre-date pipelineProgress
+    // Check if this is a legacy project that has NO pipelineProgress at all.
+    // Only in that case do we auto-infer flags from files.
+    // If pipelineProgress already exists (even partially) — respect user's manual choices.
+    const hasSavedProgress = meta && typeof meta.pipelineProgress === "object" && meta.pipelineProgress !== null
+      && Object.keys(meta.pipelineProgress as Record<string, unknown>).length > 0;
+
+    if (hasSavedProgress) {
+      // User has explicit progress — return as-is, no overwriting
+      return progress;
+    }
+
+    // ── Legacy migration: infer flags from file existence (one-time) ──
     let patched = false;
 
-    // If project.json exists, project was created and file was uploaded
     if (meta && !progress.file_uploaded) {
       progress.file_uploaded = true;
       patched = true;
@@ -109,7 +119,6 @@ export async function readPipelineProgress(storage: ProjectStorage): Promise<Pip
       patched = true;
     }
 
-    // Infer characters_extracted from characters.json existence
     if (!progress.characters_extracted) {
       try {
         const chars = await storage.readJSON<unknown[]>("characters.json");
@@ -118,8 +127,6 @@ export async function readPipelineProgress(storage: ProjectStorage): Promise<Pip
           patched = true;
         }
       } catch {}
-
-      // Legacy fallback: structure/characters.json
       if (!progress.characters_extracted) {
         try {
           const legacyChars = await storage.readJSON<unknown[]>("structure/characters.json");
@@ -131,14 +138,11 @@ export async function readPipelineProgress(storage: ProjectStorage): Promise<Pip
       }
     }
 
-    // Infer profiles_done from enriched character fields
     if (!progress.profiles_done) {
       try {
         const chars = await storage.readJSON<any[]>("characters.json");
         if (Array.isArray(chars) && chars.some((c) =>
-          !!c?.profile ||
-          !!c?.temperament ||
-          !!c?.speech_style ||
+          !!c?.profile || !!c?.temperament || !!c?.speech_style ||
           (Array.isArray(c?.psycho_tags) && c.psycho_tags.length > 0) ||
           (Array.isArray(c?.speech_tags) && c.speech_tags.length > 0) ||
           !!c?.description,
@@ -149,7 +153,6 @@ export async function readPipelineProgress(storage: ProjectStorage): Promise<Pip
       } catch {}
     }
 
-    // Infer storyboard_done from scene_index.storyboarded
     if (!progress.storyboard_done) {
       try {
         const idx = await storage.readJSON<{ storyboarded?: string[] }>("scene_index.json");
@@ -160,16 +163,16 @@ export async function readPipelineProgress(storage: ProjectStorage): Promise<Pip
       } catch {}
     }
 
-    // Persist repaired progress so the fix is permanent
+    // Persist inferred progress so legacy migration runs only once
     if (patched) {
       try {
         const freshMeta = (await storage.readJSON<Record<string, unknown>>("project.json")) ?? {};
         freshMeta.pipelineProgress = progress;
         freshMeta.updatedAt = new Date().toISOString();
         await storage.writeJSON("project.json", freshMeta);
-        console.info("[PipelineProgress] Auto-repaired flags for project:", storage.projectName);
+        console.info("[PipelineProgress] Legacy migration complete for:", storage.projectName);
       } catch (e) {
-        console.warn("[PipelineProgress] Failed to persist auto-repair:", e);
+        console.warn("[PipelineProgress] Failed to persist legacy migration:", e);
       }
     }
 
