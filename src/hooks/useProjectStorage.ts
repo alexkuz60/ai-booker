@@ -34,6 +34,10 @@ interface UseProjectStorageReturn {
   isOpen: boolean;
   /** Loading state */
   loading: boolean;
+  /** Monotonically increasing counter — bumped whenever pipeline progress changes */
+  progressVersion: number;
+  /** Bump progressVersion so consumers re-read pipeline progress */
+  bumpProgressVersion: () => void;
 
   /** Create new project (opens folder picker on Chromium) */
   createProject: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<ProjectStorage>;
