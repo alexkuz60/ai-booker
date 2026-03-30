@@ -42,9 +42,9 @@ interface QualityRadarChartProps {
 const AXES: RadarAxis[] = ["semantic", "sentiment", "rhythm", "phonetic", "cultural"];
 
 export const LAYER_COLORS: Record<RadarLayer, { stroke: string; fill: string }> = {
-  "3R": { stroke: "hsl(0, 75%, 55%)", fill: "hsl(0, 75%, 55%)" },
-  "5R": { stroke: "hsl(45, 90%, 50%)", fill: "hsl(45, 90%, 50%)" },
-  "5R+Alt": { stroke: "hsl(175, 60%, 45%)", fill: "hsl(175, 60%, 45%)" },
+  "3R": { stroke: "hsl(0, 80%, 48%)", fill: "hsl(0, 80%, 48%)" },
+  "5R": { stroke: "hsl(40, 95%, 45%)", fill: "hsl(40, 95%, 45%)" },
+  "5R+Alt": { stroke: "hsl(160, 75%, 38%)", fill: "hsl(160, 75%, 38%)" },
 };
 
 function hasAnyAxis(scores: RadarScores | null | undefined) {
