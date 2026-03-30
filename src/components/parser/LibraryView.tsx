@@ -119,7 +119,7 @@ function LibraryViewInner({
   return (
     <motion.div key="library" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
       className="flex-1 h-full overflow-auto">
-      <div className="max-w-3xl mx-auto py-8 px-6 space-y-6">
+      <div className="py-8 px-6 space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-xl font-semibold text-foreground">{t("libraryTitle", isRu)}</h2>
           <div className="flex items-center gap-2">
