@@ -29,6 +29,7 @@ interface Props {
   onTranslateSegments?: (segments: Segment[]) => Promise<void>;
   onLiteraryEdit?: (segment: Segment) => Promise<void>;
   onCritique?: (segment: Segment) => Promise<void>;
+  onSegmentsLoaded?: (segmentIds: string[]) => void;
   translating?: boolean;
   progressLabel?: string | null;
   selectedSegmentId?: string | null;
