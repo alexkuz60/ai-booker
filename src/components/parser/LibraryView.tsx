@@ -139,65 +139,112 @@ function LibraryViewInner({
     return `${d.toLocaleDateString(isRu ? 'ru-RU' : 'en-US')} ${d.toLocaleTimeString(isRu ? 'ru-RU' : 'en-US', { hour: '2-digit', minute: '2-digit' })}`;
   };
 
-  const renderBookCard = (book: BookRecord, actions: React.ReactNode, timeline?: React.ReactNode) => (
-    <Card key={book.id} className="hover:border-primary/30 transition-colors group">
-      <CardContent className="py-3 px-4">
-        <div className="flex items-center gap-4">
-          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <BookOpen className="h-5 w-5 text-primary" />
-          </div>
-          <div className="min-w-0 flex-shrink-0 max-w-[260px]">
-            {editingId === book.id ? (
-              <div className="flex items-center gap-1">
-                <Input
-                  value={editValue}
-                  onChange={e => setEditValue(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") cancelRename(); }}
-                  className="h-7 text-sm"
-                  autoFocus
-                />
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={commitRename}>
-                  <Check className="h-3.5 w-3.5 text-primary" />
-                </Button>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={cancelRename}>
-                  <X className="h-3.5 w-3.5 text-muted-foreground" />
-                </Button>
-              </div>
-            ) : (
-              <p className="font-medium text-sm text-foreground truncate flex items-center gap-1.5">
-                {book.title}
-                {syncedBookIds.has(book.id) && (
-                  <span title={isRu ? "Синхронизировано с сервером" : "Synced to server"}>
-                    <Cloud className="h-3.5 w-3.5 text-primary/60 flex-shrink-0" />
-                  </span>
-                )}
-              </p>
-            )}
-            <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5 flex-wrap">
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {fmtDate(book.created_at)}
-              </span>
-              {(book.chapter_count || 0) > 0 && (
-                <span>{book.chapter_count} {t("libraryChapters", isRu)}</span>
+  const toggleTranslation = useCallback((bookId: string) => {
+    setExpandedTranslation(prev => {
+      const next = new Set(prev);
+      if (next.has(bookId)) next.delete(bookId); else next.add(bookId);
+      return next;
+    });
+  }, []);
+
+  const renderBookCard = (book: BookRecord, actions: React.ReactNode, timeline?: React.ReactNode, translationTimeline?: React.ReactNode) => {
+    const hasTranslation = !!translationTimeline;
+    const isTranslationExpanded = expandedTranslation.has(book.id);
+    const progress = getProgress(book.id);
+    const translationActive = !!progress.storyboard_done;
+
+    return (
+      <Card key={book.id} className="hover:border-primary/30 transition-colors group">
+        <CardContent className="py-3 px-4">
+          <div className="flex items-center gap-4">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <BookOpen className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0 flex-shrink-0 max-w-[260px]">
+              {editingId === book.id ? (
+                <div className="flex items-center gap-1">
+                  <Input
+                    value={editValue}
+                    onChange={e => setEditValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") cancelRename(); }}
+                    className="h-7 text-sm"
+                    autoFocus
+                  />
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={commitRename}>
+                    <Check className="h-3.5 w-3.5 text-primary" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={cancelRename}>
+                    <X className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Button>
+                </div>
+              ) : (
+                <p className="font-medium text-sm text-foreground truncate flex items-center gap-1.5">
+                  {book.title}
+                  {syncedBookIds.has(book.id) && (
+                    <span title={isRu ? "Синхронизировано с сервером" : "Synced to server"}>
+                      <Cloud className="h-3.5 w-3.5 text-primary/60 flex-shrink-0" />
+                    </span>
+                  )}
+                </p>
               )}
-              <Badge variant="outline" className="text-[10px] font-mono">
-                {book.file_format === "fb2" ? "FB2" : book.file_format === "docx" ? "DOCX" : (book.file_name?.match(/\.fb2$/i) ? "FB2" : book.file_name?.match(/\.(docx?)$/i) ? "DOCX" : "PDF")}
-              </Badge>
+              <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5 flex-wrap">
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {fmtDate(book.created_at)}
+                </span>
+                {(book.chapter_count || 0) > 0 && (
+                  <span>{book.chapter_count} {t("libraryChapters", isRu)}</span>
+                )}
+                <Badge variant="outline" className="text-[10px] font-mono">
+                  {book.file_format === "fb2" ? "FB2" : book.file_format === "docx" ? "DOCX" : (book.file_name?.match(/\.fb2$/i) ? "FB2" : book.file_name?.match(/\.(docx?)$/i) ? "DOCX" : "PDF")}
+                </Badge>
+              </div>
+              {/* Action buttons under the title */}
+              <div className="flex items-center gap-0.5 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {actions}
+              </div>
             </div>
-            {/* Action buttons under the title */}
-            <div className="flex items-center gap-0.5 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              {actions}
+            {/* Timeline + art-translation button */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">{timeline}</div>
+                {hasTranslation && (
+                  <Button
+                    variant={isTranslationExpanded ? "secondary" : "outline"}
+                    size="sm"
+                    className="gap-1.5 text-[11px] h-7 px-2 flex-shrink-0"
+                    disabled={!translationActive}
+                    onClick={() => toggleTranslation(book.id)}
+                    title={!translationActive ? (isRu ? "Требуется раскадровка" : "Storyboard required") : ""}
+                  >
+                    <Languages className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">{isRu ? "Арт-перевод" : "Art Translation"}</span>
+                    <ChevronDown className={`h-3 w-3 transition-transform ${isTranslationExpanded ? "rotate-180" : ""}`} />
+                  </Button>
+                )}
+              </div>
+              {/* Collapsible translation section */}
+              <AnimatePresence>
+                {hasTranslation && isTranslationExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-2 pt-2 border-t border-border/50">
+                      {translationTimeline}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
-          {/* Timeline takes remaining space */}
-          <div className="flex-1 min-w-0">
-            {timeline}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <motion.div key="library" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
