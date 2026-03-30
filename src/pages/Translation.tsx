@@ -454,7 +454,7 @@ export default function Translation() {
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground">
                     <BookOpen className="h-10 w-10 opacity-20" />
-                    <p className="text-xs">
+                    <p className="text-sm">
                       {isRu ? "Выберите сцену для просмотра" : "Select a scene to view"}
                     </p>
                   </div>
