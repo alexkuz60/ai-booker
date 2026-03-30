@@ -97,6 +97,9 @@ export async function readPipelineProgress(storage: ProjectStorage): Promise<Pip
     const saved = (meta?.pipelineProgress as PipelineProgress) ?? {};
     const progress = { ...createEmptyPipelineProgress(), ...saved };
 
+    console.debug("[PipelineProgress] readPipelineProgress for", storage.projectName,
+      "meta exists:", !!meta, "saved keys:", Object.keys(saved), "saved:", JSON.stringify(saved));
+
     // Auto-infer obvious flags for legacy projects that pre-date pipelineProgress
     let patched = false;
 
