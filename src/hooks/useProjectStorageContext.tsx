@@ -20,6 +20,8 @@ export function ProjectStorageProvider({ children }: { children: ReactNode }) {
       value.initialized,
       value.isOpen,
       value.loading,
+      value.progressVersion,
+      value.bumpProgressVersion,
       value.createProject,
       value.openProject,
       value.openProjectByName,
