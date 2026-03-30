@@ -98,9 +98,14 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       const candidatesRaw = await Promise.all(projectNames.map(async (projectName) => {
         try {
           const store = await OPFSStorage.openOrCreate(projectName);
+          // Skip translation mirror projects — they share bookId but are independent
+          const meta = await store.readJSON<Record<string, unknown>>("project.json").catch(() => null);
+          if (meta && ((meta as any).targetLanguage || (meta as any).sourceProjectName)) {
+            console.debug("[Library] Skipping translation mirror:", projectName);
+            return null;
+          }
           const result = await mapLocalStructureToBook(store);
           if (!result) {
-            const meta = await store.readJSON<Record<string, unknown>>("project.json").catch(() => null);
             const toc = await store.readJSON<Record<string, unknown>>("structure/toc.json").catch(() => null);
             console.warn("[Library] Project skipped (no bookId):", projectName, { meta, tocBookId: (toc as any)?.bookId });
           }

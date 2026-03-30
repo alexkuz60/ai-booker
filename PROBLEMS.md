@@ -1,7 +1,7 @@
 # Архив решённых проблем и багов
 
 > Этот файл — **read-only архив**. Новые задачи добавляются в `TODO.md`.
-> Актуальная дата: 2026-03-29.
+> Актуальная дата: 2026-03-30.
 
 ---
 
@@ -151,6 +151,11 @@
 - Проблема: при запуске пайплайна для одной сцены счётчик в панели прогресса отображал «Сцены: 0/1» и не обновлялся до завершения, вместо показа посегментного прогресса «Сегменты: X/Y».
 - Решение: `useTranslationBatch` инициализирует `currentStage` немедленно при старте пайплайна, до получения первого ответа от модели.
 - Файл: `src/hooks/useTranslationBatch.ts`.
+
+### Ш. Wipe-and-Deploy удалял translation-зеркало — ✅ РЕШЕНО (B26)
+- Проблема: translation mirror проекты (например, `Book_EN`) имеют тот же `bookId`, что и исходный. `useLibrary.loadLocalLibrary` включал их в `localProjectNamesByBookId`, и при Wipe-and-Deploy (`wipeProjectBrowserState`) они удалялись в шаге 1, **до** zombie-скана (шаг 1b), который их проверяет.
+- Решение: двухуровневая защита — (1) `useLibrary` фильтрует зеркала при построении `localProjectNamesByBookId`; (2) `wipeProjectBrowserState` проверяет `targetLanguage`/`sourceProjectName` перед удалением каждого проекта (defense-in-depth).
+- Файлы: `src/hooks/useLibrary.ts`, `src/lib/projectCleanup.ts`.
 
 ---
 
