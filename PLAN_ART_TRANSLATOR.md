@@ -271,8 +271,8 @@ Score = Σ(wi · axiScore_i), где i ∈ {semantic, sentiment, rhythm, phoneti
 | **F6** | Критик (✅ critique-translation EF) + цикл итераций (✅ translationPipeline.ts — orchestrator: literal→literary→radar→critique→re-iterate) | ✅ Готово |
 | **F7** | Quality Radar UI: `QualityRadarChart` (recharts RadarChart, цветовая индикация), `RadarAxisDetail` (drill-down по сегментам), `QualityMonitorPanel` (загрузка radar.json, двухуровневый кэш, segment breakdown) | ✅ Готово |
 | **F7b** | Многослойная визуализация: 3R-треугольник (`ThreeAxisRadarOverlay`, SVG), 5R/5R+Alt (recharts Radar), строгая изоляция данных между стадиями, управление слоями + пресеты весов в едином ряду хедера | ✅ Готово |
+| **F7c** | Карта качества сцены: `SegmentQualityChart` (гистограмма всех сегментов, трёхслойный overlay по выбранной оси, клик→навигация к сегменту, адаптивные бины) | ✅ Готово |
 | **F8** | Батчинг: `useTranslationBatch` (full pipeline per scene + chapter batch с ModelPoolManager), `TranslationProgressPanel` (прогресс + воркеры пула), три уровня перевода (сегмент/сцена/глава), гибкий парсинг ответов AI, пропуск пустых сегментов | ✅ Готово |
-| **F9** | TTS-интеграция переведённой версии | 🔲 Планируется |
 
 ---
 
