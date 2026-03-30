@@ -27,8 +27,8 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/comp
 import { cn } from "@/lib/utils";
 
 const mainNav = [
-  { title: "Главная", titleEn: "Home", url: "/home", icon: Home },
-  { title: "Библиотека", titleEn: "Library", url: "/", icon: Library },
+  { title: "Главная", titleEn: "Home", url: "/", icon: Home },
+  { title: "Библиотека", titleEn: "Library", url: "/library", icon: Library },
   { title: "Парсер", titleEn: "Parser", url: "/parser", icon: BookOpen },
   { title: "Студия", titleEn: "Studio", url: "/studio", icon: AudioWaveform },
   { title: "Монтаж", titleEn: "Montage", url: "/montage", icon: Film },

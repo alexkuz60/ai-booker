@@ -45,7 +45,7 @@ function GatedRoute({ route, children }: { route: string; children: React.ReactN
         setTimeout(() => toast.warning(reason), 0);
       }
     }
-    return <Navigate to="/" replace />;
+    return <Navigate to="/library" replace />;
   }
 
   return <>{children}</>;
@@ -69,8 +69,8 @@ function ProtectedRoutes() {
       <ProjectStorageProvider>
         <AppLayout>
           <Routes>
-            <Route path="/" element={<Library />} />
-            <Route path="/home" element={<Home />} />
+            <Route path="/" element={<Home />} />
+            <Route path="/library" element={<Library />} />
             <Route path="/parser" element={<Parser />} />
             <Route path="/studio" element={
               <GatedRoute route="/studio"><Studio /></GatedRoute>
@@ -96,7 +96,7 @@ function ProtectedRoutes() {
 function AuthRoute() {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/library" replace />;
   return <Auth />;
 }
 
