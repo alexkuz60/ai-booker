@@ -241,16 +241,16 @@ export function QualityRadarChart({
                 </div>
                 <TooltipProvider delayDuration={200}>
                   <div className="flex items-center shrink-0 w-[72px]">
-                    {allLayers.map(({ key, value }, i) => (
+                    {layers.map(({ key, value }, i) => (
                       <React.Fragment key={key}>
                         {i > 0 && <span className="text-[8px] text-muted-foreground mx-0.5">·</span>}
                         <UiTooltip>
                           <TooltipTrigger asChild>
                             <span
                               className="text-[9px] font-mono font-medium cursor-default"
-                              style={{ color: value > 0 ? LAYER_COLORS[key].stroke : "hsl(var(--muted-foreground) / 0.3)" }}
+                              style={{ color: LAYER_COLORS[key].stroke }}
                             >
-                              {(value * 100).toFixed(0).padStart(2, "0")}
+                              {(value * 100).toFixed(0)}
                             </span>
                           </TooltipTrigger>
                           <TooltipContent side="top" className="text-[10px] px-2 py-1">
