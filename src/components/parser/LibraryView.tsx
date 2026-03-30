@@ -156,11 +156,12 @@ function LibraryViewInner({
     return (
       <Card key={book.id} className="hover:border-primary/30 transition-colors group">
         <CardContent className="py-3 px-4">
-          <div className="flex items-center gap-4">
-            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <BookOpen className="h-5 w-5 text-primary" />
-            </div>
-            <div className="min-w-0 flex-shrink-0 max-w-[260px]">
+          <div className="flex items-stretch gap-0">
+            {/* Left column: icon + title */}
+            <div className="min-w-0 flex-shrink-0 max-w-[260px] flex flex-col">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mb-1.5">
+                <BookOpen className="h-4 w-4 text-primary" />
+              </div>
               {editingId === book.id ? (
                 <div className="flex items-center gap-1">
                   <Input
@@ -204,15 +205,24 @@ function LibraryViewInner({
                 {actions}
               </div>
             </div>
-            {/* Timeline + art-translation button */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <div className="flex-1 min-w-0">{timeline}</div>
-                {hasTranslation && (
+
+            {/* Vertical separator */}
+            <div className="w-px bg-border mx-3 self-stretch" />
+
+            {/* Timeline */}
+            <div className="flex-1 min-w-0 flex flex-col justify-center">
+              {timeline}
+            </div>
+
+            {/* Vertical separator + Art Translation button */}
+            {hasTranslation && (
+              <>
+                <div className="w-px bg-border mx-3 self-stretch" />
+                <div className="flex items-center flex-shrink-0">
                   <Button
                     variant={isTranslationExpanded ? "secondary" : "outline"}
                     size="sm"
-                    className="gap-1.5 text-[11px] h-7 px-2 flex-shrink-0"
+                    className="gap-1.5 text-[11px] h-7 px-2"
                     disabled={!translationActive}
                     onClick={() => toggleTranslation(book.id)}
                     title={!translationActive ? (isRu ? "Требуется раскадровка" : "Storyboard required") : ""}
@@ -221,26 +231,27 @@ function LibraryViewInner({
                     <span className="hidden sm:inline">{isRu ? "Арт-перевод" : "Art Translation"}</span>
                     <ChevronDown className={`h-3 w-3 transition-transform ${isTranslationExpanded ? "rotate-180" : ""}`} />
                   </Button>
-                )}
-              </div>
-              {/* Collapsible translation section */}
-              <AnimatePresence>
-                {hasTranslation && isTranslationExpanded && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="mt-2 pt-2 border-t border-border/50">
-                      {translationTimeline}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                </div>
+              </>
+            )}
           </div>
+
+          {/* Collapsible translation section */}
+          <AnimatePresence>
+            {hasTranslation && isTranslationExpanded && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-2 pt-2 border-t border-border/50">
+                  {translationTimeline}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </CardContent>
       </Card>
     );
