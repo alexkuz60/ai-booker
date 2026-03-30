@@ -277,6 +277,8 @@ function LibraryViewInner({
                     progress={getProgress(book.id)}
                     isRu={isRu}
                     onToggleStep={(stepId, done) => handleToggleStep(book.id, stepId, done)}
+                    onStageClick={(route) => onStageNavigate?.(book, route)}
+                    onProjectReset={() => onProjectReset?.(book)}
                   />
                 )))}
               </div>
