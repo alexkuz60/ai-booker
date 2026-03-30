@@ -31,11 +31,16 @@ interface LibraryViewProps {
   loadingServerBooks?: boolean;
   onOpenServerBook?: (book: BookRecord) => void;
   onDeleteServerBook?: (bookId: string) => void;
+  /** Called when a pipeline stage icon is clicked — opens book & navigates to route */
+  onStageNavigate?: (book: BookRecord, route: string) => void;
+  /** Called when user confirms project reset (first stage "Project" click) */
+  onProjectReset?: (book: BookRecord) => void;
 }
 
 function LibraryViewInner({
   isRu, books, loadingLibrary, onUpload, onOpen, onDelete, onClearAll, onRename,
   serverBooks = [], loadingServerBooks = false, onOpenServerBook, onDeleteServerBook,
+  onStageNavigate, onProjectReset,
 }: LibraryViewProps) {
   const syncedBookIds = useMemo(() => new Set(serverBooks.map(b => b.id)), [serverBooks]);
   const [editingId, setEditingId] = useState<string | null>(null);
