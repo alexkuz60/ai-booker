@@ -40,6 +40,7 @@ export default function Library() {
     openSavedBook, deleteBook, clearAllProjects, renameBook,
     reloadLibrary,
     serverBooks, loadingServerBooks, deleteServerBook,
+    progressMap, setProgressMap,
   } = useBookManager({
     userId: user?.id,
     isRu,
