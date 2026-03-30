@@ -334,14 +334,14 @@ export default function Translation() {
         )}
 
         {readiness && (
-          <div className="flex items-center gap-2 ml-auto text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 ml-auto text-sm text-muted-foreground">
             <span>{isRu ? "Сцен:" : "Scenes:"}</span>
-            <Badge variant={readiness.totalReady === readiness.totalScenes ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+            <Badge variant={readiness.totalReady === readiness.totalScenes ? "default" : "secondary"} className="text-xs px-1.5 py-0">
               {readiness.totalReady} / {readiness.totalScenes}
             </Badge>
-            {checking && <Loader2 className="h-3 w-3 animate-spin" />}
+            {checking && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {transProjectExists && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-primary border-primary/30">
+              <Badge variant="outline" className="text-xs px-1.5 py-0 text-primary border-primary/30">
                 {isRu ? "Проект перевода" : "Translation project"} ✓
               </Badge>
             )}
