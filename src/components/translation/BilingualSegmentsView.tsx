@@ -99,14 +99,16 @@ export function BilingualSegmentsView({
         }
 
         if (!cancelled) {
-          setItems(segments.map(seg => {
+          const mapped = segments.map(seg => {
             const trans = transMap.get(seg.segment_id);
             return {
               segment: seg,
               translatedText: trans?.text ?? "",
               hasLiteral: trans?.hasLiteral ?? false,
             };
-          }));
+          });
+          setItems(mapped);
+          onSegmentsLoaded?.(segments.map(s => s.segment_id));
         }
       } catch (err) {
         console.error("[BilingualSegmentsView] read error:", err);
