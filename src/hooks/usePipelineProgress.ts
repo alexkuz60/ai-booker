@@ -95,7 +95,60 @@ export async function readPipelineProgress(storage: ProjectStorage): Promise<Pip
   try {
     const meta = await storage.readJSON<Record<string, unknown>>("project.json");
     const saved = (meta?.pipelineProgress as PipelineProgress) ?? {};
-    return { ...createEmptyPipelineProgress(), ...saved };
+    const progress = { ...createEmptyPipelineProgress(), ...saved };
+
+    // Auto-infer obvious flags for legacy projects that pre-date pipelineProgress
+    let patched = false;
+
+    // If project.json exists, project was created and file was uploaded
+    if (meta && !progress.file_uploaded) {
+      progress.file_uploaded = true;
+      patched = true;
+    }
+    if (meta && !progress.opfs_created) {
+      progress.opfs_created = true;
+      patched = true;
+    }
+
+    // Infer characters_extracted from characters.json existence
+    if (!progress.characters_extracted) {
+      try {
+        const chars = await storage.readJSON<unknown[]>("characters.json");
+        if (Array.isArray(chars) && chars.length > 0) {
+          progress.characters_extracted = true;
+          patched = true;
+        }
+      } catch {}
+    }
+
+    // Infer storyboard_done from scene_index having storyboarded scenes
+    if (!progress.storyboard_done) {
+      try {
+        const idx = await storage.readJSON<Record<string, unknown>>("scene_index.json");
+        if (idx && typeof idx === "object") {
+          const entries = Object.values(idx);
+          if (entries.some((e: any) => e?.storyboarded)) {
+            progress.storyboard_done = true;
+            patched = true;
+          }
+        }
+      } catch {}
+    }
+
+    // Persist repaired progress so the fix is permanent
+    if (patched) {
+      try {
+        const freshMeta = (await storage.readJSON<Record<string, unknown>>("project.json")) ?? {};
+        freshMeta.pipelineProgress = progress;
+        freshMeta.updatedAt = new Date().toISOString();
+        await storage.writeJSON("project.json", freshMeta);
+        console.info("[PipelineProgress] Auto-repaired flags for project:", storage.projectName);
+      } catch (e) {
+        console.warn("[PipelineProgress] Failed to persist auto-repair:", e);
+      }
+    }
+
+    return progress;
   } catch {
     return createEmptyPipelineProgress();
   }
@@ -109,7 +162,8 @@ export async function writePipelineStep(
 ): Promise<void> {
   try {
     const meta = (await storage.readJSON<Record<string, unknown>>("project.json")) ?? {};
-    const progress = ((meta.pipelineProgress as PipelineProgress) ?? createEmptyPipelineProgress());
+    // Always merge with defaults to avoid losing keys
+    const progress = { ...createEmptyPipelineProgress(), ...((meta.pipelineProgress as PipelineProgress) ?? {}) };
     progress[stepId] = done;
     meta.pipelineProgress = progress;
     meta.updatedAt = new Date().toISOString();
