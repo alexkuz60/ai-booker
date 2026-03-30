@@ -360,7 +360,7 @@ function LibraryViewInner({
                           </AlertDialogContent>
                         </AlertDialog>
                       )}
-                    </div>
+                    </>
                   )))
                 )}
               </div>
