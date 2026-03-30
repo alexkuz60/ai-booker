@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, memo } from "react";
+import { useState, useMemo, useCallback, useEffect, memo } from "react";
 import { motion } from "framer-motion";
 import { Upload, BookOpen, Library, Trash2, Clock, Loader2, Eraser, Pencil, Check, X, Cloud, Download, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { t } from "@/pages/parser/i18n";
 import type { BookRecord } from "@/pages/parser/types";
-import { PipelineTimeline, createDefaultPipeline, type PipelineStage } from "@/components/library/PipelineTimeline";
+import { PipelineTimeline } from "@/components/library/PipelineTimeline";
+import type { PipelineProgress, PipelineStepId } from "@/lib/projectStorage";
+import { createEmptyPipelineProgress } from "@/lib/projectStorage";
+import { readPipelineProgress, writePipelineStep } from "@/hooks/usePipelineProgress";
+import { OPFSStorage } from "@/lib/projectStorage";
 
 interface LibraryViewProps {
   isRu: boolean;
@@ -37,34 +41,71 @@ function LibraryViewInner({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
-  // Pipeline progress per book
-  const [pipelineMap, setPipelineMap] = useState<Record<string, PipelineStage[]>>({});
+  // Pipeline progress per book (read from OPFS project.json)
+  const [progressMap, setProgressMap] = useState<Record<string, PipelineProgress>>({});
 
-  const getPipeline = useCallback((bookId: string): PipelineStage[] => {
-    if (!pipelineMap[bookId]) {
-      const stages = createDefaultPipeline();
-      const book = books.find(b => b.id === bookId);
-      if (book) {
-        stages[0].subSteps[0].done = true;
-        stages[0].subSteps[1].done = true;
-        if ((book.chapter_count || 0) > 0) stages[1].subSteps[0].done = true;
-        if ((book.scene_count || 0) > 0) stages[1].subSteps[1].done = true;
+  // Load pipeline progress for all local books
+  useEffect(() => {
+    if (books.length === 0) return;
+    let cancelled = false;
+
+    (async () => {
+      const map: Record<string, PipelineProgress> = {};
+      for (const book of books) {
+        if (cancelled) return;
+        try {
+          // Find OPFS project for this book
+          const projects = await OPFSStorage.listProjects();
+          for (const pn of projects) {
+            const store = await OPFSStorage.openOrCreate(pn);
+            const meta = await store.readJSON<Record<string, unknown>>("project.json");
+            if (meta?.bookId === book.id && !meta?.targetLanguage && !meta?.sourceProjectName) {
+              map[book.id] = await readPipelineProgress(store);
+              break;
+            }
+          }
+        } catch { /* skip */ }
+        if (!map[book.id]) {
+          // Fallback: infer from BookRecord data
+          const p = createEmptyPipelineProgress();
+          p.file_uploaded = true;
+          p.opfs_created = true;
+          if ((book.chapter_count || 0) > 0) p.toc_extracted = true;
+          if ((book.scene_count || 0) > 0) p.scenes_analyzed = true;
+          map[book.id] = p;
+        }
       }
-      setPipelineMap(prev => ({ ...prev, [bookId]: stages }));
-      return stages;
-    }
-    return pipelineMap[bookId];
-  }, [pipelineMap, books]);
+      if (!cancelled) setProgressMap(map);
+    })();
 
-  const handleToggleSubStep = useCallback((bookId: string, stageId: string, subStepId: string, done: boolean) => {
-    setPipelineMap(prev => {
-      const stages = (prev[bookId] || createDefaultPipeline()).map(stage =>
-        stage.id === stageId
-          ? { ...stage, subSteps: stage.subSteps.map(s => s.id === subStepId ? { ...s, done } : s) }
-          : stage,
-      );
-      return { ...prev, [bookId]: stages };
-    });
+    return () => { cancelled = true; };
+  }, [books]);
+
+  const getProgress = useCallback((bookId: string): PipelineProgress => {
+    return progressMap[bookId] ?? createEmptyPipelineProgress();
+  }, [progressMap]);
+
+  const handleToggleStep = useCallback(async (bookId: string, stepId: PipelineStepId, done: boolean) => {
+    // Update local state immediately
+    setProgressMap(prev => ({
+      ...prev,
+      [bookId]: { ...(prev[bookId] ?? createEmptyPipelineProgress()), [stepId]: done },
+    }));
+
+    // Persist to OPFS
+    try {
+      const projects = await OPFSStorage.listProjects();
+      for (const pn of projects) {
+        const store = await OPFSStorage.openOrCreate(pn);
+        const meta = await store.readJSON<Record<string, unknown>>("project.json");
+        if (meta?.bookId === bookId && !meta?.targetLanguage && !meta?.sourceProjectName) {
+          await writePipelineStep(store, stepId, done);
+          break;
+        }
+      }
+    } catch (e) {
+      console.error("[LibraryView] Failed to persist pipeline step:", e);
+    }
   }, []);
 
   const startRename = (book: BookRecord) => {
@@ -203,12 +244,9 @@ function LibraryViewInner({
                 {books.map(book => renderBookCard(book, (
                   <div className="flex items-center gap-2">
                     <PipelineTimeline
-                      stages={getPipeline(book.id)}
+                      progress={getProgress(book.id)}
                       isRu={isRu}
-                      bookId={book.id}
-                      onToggleSubStep={(stageId, subStepId, done) =>
-                        handleToggleSubStep(book.id, stageId, subStepId, done)
-                      }
+                      onToggleStep={(stepId, done) => handleToggleStep(book.id, stepId, done)}
                     />
                     <div className="flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {onRename && (
