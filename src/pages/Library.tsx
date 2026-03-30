@@ -50,12 +50,15 @@ export default function Library() {
     pendingProjectName,
   });
 
-  // ── Navigate to Parser when book is opened/uploaded ──
+  // ── Navigate to Parser only after a NEW book open/upload action ──
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+
   useEffect(() => {
-    if (step === "workspace") {
+    if (shouldRedirect && step === "workspace") {
+      setShouldRedirect(false);
       navigate("/parser");
     }
-  }, [step, navigate]);
+  }, [step, shouldRedirect, navigate]);
 
   // ── Restore-from-server progress dialog ──
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
