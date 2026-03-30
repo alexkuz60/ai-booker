@@ -87,6 +87,11 @@ export default function Translation() {
   const { translationStorage, exists: transProjectExists, refresh: refreshTransStorage } =
     useTranslationStorage(storage, meta);
 
+  const { saveTranslation, saving: savingTranslation } = useSaveTranslation({
+    translationStorage,
+    isRu,
+  });
+
   // Compute source/target langs
   const sourceLang = meta?.language ?? "ru";
   const targetLang = sourceLang === "ru" ? "en" : "ru";
