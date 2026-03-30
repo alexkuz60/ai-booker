@@ -115,16 +115,15 @@ function StageNode({ stage, idx, progress, isRu, onStageClick, onToggleStep }: S
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <Tooltip>
-          <TooltipTrigger asChild>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <ContextMenuTrigger asChild>
             <button
               onClick={() => onStageClick(stage, idx)}
               className={cn(
                 "flex flex-col items-center gap-1.5 group/node focus-visible:outline-none cursor-pointer",
               )}
             >
-              {/* Circle */}
               <div className={cn(
                 "relative flex items-center justify-center h-10 w-10 rounded-full border-2 transition-all",
                 isEmpty && "border-muted-foreground/30 bg-background group-hover/node:border-primary/50",
@@ -139,8 +138,6 @@ function StageNode({ stage, idx, progress, isRu, onStageClick, onToggleStep }: S
                     hasPartial ? "text-primary" : "text-muted-foreground group-hover/node:text-foreground",
                   )} />
                 )}
-
-                {/* Partial ring indicator */}
                 {hasPartial && (
                   <svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 40 40">
                     <circle
@@ -155,16 +152,12 @@ function StageNode({ stage, idx, progress, isRu, onStageClick, onToggleStep }: S
                   </svg>
                 )}
               </div>
-
-              {/* Label */}
               <span className={cn(
                 "text-[11px] font-medium leading-tight text-center max-w-[72px]",
                 complete ? "text-primary" : hasPartial ? "text-foreground/80" : "text-muted-foreground/60",
               )}>
                 {isRu ? stage.labelRu : stage.labelEn}
               </span>
-
-              {/* Sub-step counter */}
               <span className={cn(
                 "text-[10px] tabular-nums",
                 complete ? "text-primary/70" : "text-muted-foreground/60",
@@ -172,29 +165,27 @@ function StageNode({ stage, idx, progress, isRu, onStageClick, onToggleStep }: S
                 {doneCount}/{totalCount}
               </span>
             </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="text-xs max-w-[200px]">
-            <p className="font-medium mb-1">
-              {isRu ? stage.labelRu : stage.labelEn}
-            </p>
-            <ul className="space-y-0.5">
-              {stage.subSteps.map(sub => (
-                <li key={sub.id} className="flex items-center gap-1.5">
-                  {progress[sub.id]
-                    ? <Check className="h-3 w-3 text-primary flex-shrink-0" />
-                    : <span className="h-3 w-3 rounded-full border border-muted-foreground/30 flex-shrink-0" />
-                  }
-                  <span className={progress[sub.id] ? "text-foreground" : "text-muted-foreground"}>
-                    {isRu ? sub.labelRu : sub.labelEn}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </TooltipContent>
-        </Tooltip>
-      </ContextMenuTrigger>
-
-      {/* Context menu — always active, all checkboxes editable */}
+          </ContextMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="text-xs max-w-[200px]">
+          <p className="font-medium mb-1">
+            {isRu ? stage.labelRu : stage.labelEn}
+          </p>
+          <ul className="space-y-0.5">
+            {stage.subSteps.map(sub => (
+              <li key={sub.id} className="flex items-center gap-1.5">
+                {progress[sub.id]
+                  ? <Check className="h-3 w-3 text-primary flex-shrink-0" />
+                  : <span className="h-3 w-3 rounded-full border border-muted-foreground/30 flex-shrink-0" />
+                }
+                <span className={progress[sub.id] ? "text-foreground" : "text-muted-foreground"}>
+                  {isRu ? sub.labelRu : sub.labelEn}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </TooltipContent>
+      </Tooltip>
       <ContextMenuContent className="w-56">
         <ContextMenuLabel className="text-xs font-semibold">
           {isRu ? stage.labelRu : stage.labelEn}
