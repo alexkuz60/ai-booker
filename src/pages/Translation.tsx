@@ -87,9 +87,12 @@ export default function Translation() {
   const { translationStorage, exists: transProjectExists, refresh: refreshTransStorage } =
     useTranslationStorage(storage, meta);
 
-  const { saveTranslation, saving: savingTranslation } = useSaveTranslation({
+  const { saveTranslation, saving: savingTranslation, restoreTranslation, restoring: restoringTranslation } = useSaveTranslation({
     translationStorage,
+    sourceStorage: storage,
+    sourceMeta: meta,
     isRu,
+    onRestored: refreshTransStorage,
   });
 
   // Compute source/target langs
