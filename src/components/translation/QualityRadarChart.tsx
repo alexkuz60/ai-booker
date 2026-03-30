@@ -223,12 +223,15 @@ export function QualityRadarChart({
       </div>
 
 
-      {/* Axis score bars */}
+      {/* Axis score bars — stacked by stage */}
       {!compact && scores && (
         <div className="w-full space-y-1.5 px-2">
           {AXES.map((axis) => {
-            const val = scores[axis];
-            const lvl = getScoreLevel(val);
+            const v3R = layer3R?.[axis] ?? 0;
+            const v5R = layer5R?.[axis] ?? 0;
+            const vAlt = layerAlt?.[axis] ?? 0;
+            const best = Math.max(v3R, v5R, vAlt, scores[axis]);
+            const lvl = getScoreLevel(best);
             return (
               <button
                 key={axis}
@@ -238,20 +241,37 @@ export function QualityRadarChart({
                 <span className="text-[10px] text-muted-foreground w-20 truncate">
                   {AXIS_LABELS[axis][isRu ? "ru" : "en"]}
                 </span>
-                <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${val * 100}%`,
-                      backgroundColor: SCORE_COLORS[lvl],
-                    }}
-                  />
+                <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden flex">
+                  {v3R > 0 && (
+                    <div
+                      className="h-full transition-all duration-500"
+                      style={{ width: `${v3R * 100}%`, backgroundColor: LAYER_COLORS["3R"].stroke }}
+                    />
+                  )}
+                  {v5R > 0 && (
+                    <div
+                      className="h-full transition-all duration-500"
+                      style={{ width: `${v5R * 100}%`, backgroundColor: LAYER_COLORS["5R"].stroke }}
+                    />
+                  )}
+                  {vAlt > 0 && (
+                    <div
+                      className="h-full transition-all duration-500"
+                      style={{ width: `${vAlt * 100}%`, backgroundColor: LAYER_COLORS["5R+Alt"].stroke }}
+                    />
+                  )}
+                  {v3R === 0 && v5R === 0 && vAlt === 0 && (
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${scores[axis] * 100}%`, backgroundColor: SCORE_COLORS[lvl] }}
+                    />
+                  )}
                 </div>
                 <span
                   className="text-[10px] font-mono font-medium w-8 text-right"
                   style={{ color: SCORE_COLORS[lvl] }}
                 >
-                  {(val * 100).toFixed(0)}
+                  {(best * 100).toFixed(0)}
                 </span>
               </button>
             );
