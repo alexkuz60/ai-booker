@@ -207,7 +207,59 @@ interface ProjectStorage {
 | `openSavedBook` | Wipe OPFS → deploy server copy → React state | Local + React state |
 | Кнопка «На сервер» | chapters + scenes + parts + characters + storyboards + UI state | Supabase |
 
-### 1.10 Синхронизация между устройствами (Wipe-and-Deploy)
+### 1.10 Pipeline Progress (единый источник готовности)
+
+`project.json.pipelineProgress` — плоский `Record<PipelineStepId, boolean>` — **единственный** источник правды для проверки готовности этапов пайплайна. Используется для:
+- Визуального таймлайна в Библиотеке (4 стадии × подшаги)
+- Hard gating: блокировка навигации к следующей стадии до готовности предыдущей
+- Проверок в коде: «можно ли открыть Студию?» → `isDone("toc_extracted") && isDone("scenes_analyzed")`
+
+**Шаги пайплайна:**
+
+| Стадия | Шаг ID | Авто-детект | Описание |
+|--------|--------|-------------|----------|
+| Проект | `file_uploaded` | ✅ | Файл загружен в OPFS |
+| Проект | `opfs_created` | ✅ | Хранилище проекта создано |
+| Парсер | `toc_extracted` | ✅ | Структура (TOC) извлечена |
+| Парсер | `scenes_analyzed` | ✅ | Сцены проанализированы |
+| Парсер | `characters_extracted` | ✅ | Персонажи извлечены |
+| Парсер | `profiles_done` | ❌ | Профайлы готовы (ручной) |
+| Студия | `storyboard_done` | ✅ | Раскадровка выполнена |
+| Студия | `inline_edit` | ❌ | Инлайн-правка (ручной) |
+| Студия | `synthesis_done` | ✅ | Синтез речи завершён |
+| Студия | `mix_done` | ❌ | Микс и эффекты (ручной) |
+| Студия | `scene_render` | ✅ | Рендер сцен завершён |
+| Монтаж | `chapter_assembly` | ❌ | Сборка главы (ручной) |
+| Монтаж | `mastering` | ❌ | Мастеринг (ручной) |
+| Монтаж | `final_render` | ✅ | Финальный рендер завершён |
+
+**Авто-детект** шаги записываются модулями при сохранении результатов (например, `syncStructureToLocal` → `toc_extracted = true`). Ручные шаги переключаются пользователем через контекстное меню таймлайна.
+
+**Ключевые файлы:**
+
+| Файл | Назначение |
+|------|------------|
+| `src/lib/projectStorage.ts` | Типы `PipelineProgress`, `PipelineStepId`, `PIPELINE_STEP_IDS`, `createEmptyPipelineProgress()` |
+| `src/hooks/usePipelineProgress.ts` | React-хук + standalone helpers `readPipelineProgress()`, `writePipelineStep()` |
+| `src/components/library/PipelineTimeline.tsx` | UI-компонент таймлайна (маппинг stepId → стадия — чисто визуальный) |
+
+### 1.11 Translation Project Link
+
+`project.json.translationProject` — ссылка на параллельный проект арт-перевода. Хранится в исходном проекте (не в зеркале).
+
+```json
+{
+  "translationProject": {
+    "projectName": "Book_EN",
+    "targetLanguage": "en",
+    "createdAt": "2026-03-30T12:00:00Z"
+  }
+}
+```
+
+Зеркальный проект по-прежнему хранит `sourceProjectName` и `targetLanguage` в своём `project.json`. Связь двунаправленная: исходный → `translationProject`, зеркало → `sourceProjectName`.
+
+### 1.12 Синхронизация между устройствами (Wipe-and-Deploy)
 
 **Стратегия: Local-Only с облачным бэкапом.**
 
