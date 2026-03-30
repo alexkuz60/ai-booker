@@ -6,16 +6,18 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { BookRecord } from "@/pages/parser/types";
-import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
+import { OPFSStorage, type ProjectStorage, type PipelineProgress, createEmptyPipelineProgress } from "@/lib/projectStorage";
 import type { LocalBookStructure } from "@/lib/localSync";
 import { detectFileFormat } from "@/lib/fileFormatUtils";
 import { getProjectActivityMs } from "@/lib/projectActivity";
 import { paths } from "@/lib/projectPaths";
+import { readPipelineProgress } from "@/hooks/usePipelineProgress";
 
 type LocalLibraryCandidate = {
   record: BookRecord;
   projectName: string;
   dedupeKey: string;
+  progress: PipelineProgress;
 };
 
 interface UseLibraryParams {
@@ -29,6 +31,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
   const [books, setBooks] = useState<BookRecord[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [localProjectNamesByBookId, setLocalProjectNamesByBookId] = useState<Map<string, string[]>>(new Map());
+  const [progressMap, setProgressMap] = useState<Record<string, PipelineProgress>>({});
   const libraryLoadedRef = useRef(false);
 
   // Server books (separate section)
@@ -68,6 +71,9 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       : meta?.updatedAt || structure?.updatedAt || meta?.createdAt || new Date(0).toISOString();
     const dedupeKey = `book:${resolvedId}`;
 
+    // Read pipeline progress alongside metadata
+    const progress = await readPipelineProgress(storage);
+
     return {
       record: {
         id: resolvedId,
@@ -83,6 +89,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       },
       projectName: storage.projectName,
       dedupeKey,
+      progress,
     };
   }, []);
 
@@ -132,9 +139,11 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       }
 
       const localIndex = new Map<string, string[]>();
+      const pMap: Record<string, PipelineProgress> = {};
       const dedupedBooks = Array.from(byDedupeKey.values()).map((candidate) => {
         const allProjects = projectsByDedupeKey.get(candidate.dedupeKey) || [candidate.projectName];
         localIndex.set(candidate.record.id, allProjects);
+        pMap[candidate.record.id] = candidate.progress;
 
         // ── Diagnostic: warn about duplicate OPFS folders for the same bookId ──
         if (allProjects.length > 1) {
@@ -148,6 +157,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       });
 
       setLocalProjectNamesByBookId(localIndex);
+      setProgressMap(pMap);
       return dedupedBooks.sort((a, b) => getTs(b.created_at) - getTs(a.created_at));
     }
 
@@ -330,6 +340,8 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     books,
     loadingLibrary,
     localProjectNamesByBookId,
+    progressMap,
+    setProgressMap,
     loadLibrary,
     loadLibraryFromServer,
     loadBookFromServerById,

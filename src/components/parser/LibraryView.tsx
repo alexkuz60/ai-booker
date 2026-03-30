@@ -21,7 +21,7 @@ import { PipelineTimeline } from "@/components/library/PipelineTimeline";
 import { TranslationTimeline } from "@/components/library/TranslationTimeline";
 import type { PipelineProgress, PipelineStepId, ProjectMeta } from "@/lib/projectStorage";
 import { createEmptyPipelineProgress } from "@/lib/projectStorage";
-import { readPipelineProgress, writePipelineStep } from "@/hooks/usePipelineProgress";
+import { writePipelineStep } from "@/hooks/usePipelineProgress";
 import { OPFSStorage } from "@/lib/projectStorage";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { translationProjectExists, checkTranslationReadiness, createTranslationProject } from "@/lib/translationProject";
@@ -44,12 +44,17 @@ interface LibraryViewProps {
   onStageNavigate?: (book: BookRecord, route: string) => void;
   /** Called when user confirms project reset (first stage "Project" click) */
   onProjectReset?: (book: BookRecord) => void;
+  /** Pipeline progress map pre-loaded from useLibrary */
+  progressMap?: Record<string, PipelineProgress>;
+  /** Setter for progressMap (for local updates after toggle) */
+  setProgressMap?: React.Dispatch<React.SetStateAction<Record<string, PipelineProgress>>>;
 }
 
 function LibraryViewInner({
   isRu, books, loadingLibrary, onUpload, onOpen, onDelete, onClearAll, onRename,
   serverBooks = [], loadingServerBooks = false, onOpenServerBook, onDeleteServerBook,
   onStageNavigate, onProjectReset,
+  progressMap: externalProgressMap, setProgressMap: externalSetProgressMap,
 }: LibraryViewProps) {
   const { bumpProgressVersion } = useProjectStorageContext();
   const syncedBookIds = useMemo(() => new Set(serverBooks.map(b => b.id)), [serverBooks]);
@@ -58,45 +63,10 @@ function LibraryViewInner({
   const [expandedTranslation, setExpandedTranslation] = useState<Set<string>>(new Set());
   const [transCreateConfirm, setTransCreateConfirm] = useState<{ book: BookRecord; exists: boolean } | null>(null);
   const [transCreating, setTransCreating] = useState(false);
-  // Pipeline progress per book (read from OPFS project.json)
-  const [progressMap, setProgressMap] = useState<Record<string, PipelineProgress>>({});
-
-  // Load pipeline progress for all local books
-  useEffect(() => {
-    if (books.length === 0) return;
-    let cancelled = false;
-
-    (async () => {
-      const map: Record<string, PipelineProgress> = {};
-      for (const book of books) {
-        if (cancelled) return;
-        try {
-          // Find OPFS project for this book
-          const projects = await OPFSStorage.listProjects();
-          for (const pn of projects) {
-            const store = await OPFSStorage.openOrCreate(pn);
-            const meta = await store.readJSON<Record<string, unknown>>("project.json");
-            if (meta?.bookId === book.id && !meta?.targetLanguage && !meta?.sourceProjectName) {
-              map[book.id] = await readPipelineProgress(store);
-              break;
-            }
-          }
-        } catch { /* skip */ }
-        if (!map[book.id]) {
-          // Fallback: infer from BookRecord data
-          const p = createEmptyPipelineProgress();
-          p.file_uploaded = true;
-          p.opfs_created = true;
-          if ((book.chapter_count || 0) > 0) p.toc_extracted = true;
-          if ((book.scene_count || 0) > 0) p.scenes_analyzed = true;
-          map[book.id] = p;
-        }
-      }
-      if (!cancelled) setProgressMap(map);
-    })();
-
-    return () => { cancelled = true; };
-  }, [books]);
+  // Pipeline progress per book — prefer externally provided map
+  const [localProgressMap, setLocalProgressMap] = useState<Record<string, PipelineProgress>>({});
+  const progressMap = externalProgressMap ?? localProgressMap;
+  const setProgressMap = externalSetProgressMap ?? setLocalProgressMap;
 
   const getProgress = useCallback((bookId: string): PipelineProgress => {
     return progressMap[bookId] ?? createEmptyPipelineProgress();
