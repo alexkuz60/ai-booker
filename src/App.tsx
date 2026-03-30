@@ -96,7 +96,7 @@ function ProtectedRoutes() {
 function AuthRoute() {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/library" replace />;
   return <Auth />;
 }
 
