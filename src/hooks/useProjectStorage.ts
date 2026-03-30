@@ -14,6 +14,7 @@ import { findSourceBlob, getMimeType, detectFileFormat } from "@/lib/fileFormatU
 import { ensureV2Layout } from "@/lib/projectMigrator";
 
 const LAST_PROJECT_KEY = "booker_last_project";
+const LANG_SUFFIX_RE = /^(.*)_(EN|RU)$/i;
 const LOCAL_RESET_KEYS = [
   LAST_PROJECT_KEY,
   "parser-active-book",
@@ -335,20 +336,43 @@ export function useProjectStorage(): UseProjectStorageReturn {
           return;
         }
 
+        let activeStore = store;
+        let activeMeta = projectMeta;
+        let activeName = targetName;
+
+        // Never bootstrap a translation mirror as the active project.
+        // Translation module must anchor to source project + mirror resolved separately.
+        if (projectMeta.targetLanguage || projectMeta.sourceProjectName) {
+          const existingProjects = await OPFSStorage.listProjects();
+          const inferredSourceName =
+            projectMeta.sourceProjectName || targetName.match(LANG_SUFFIX_RE)?.[1] || null;
+
+          if (inferredSourceName && existingProjects.includes(inferredSourceName)) {
+            const sourceStore = await OPFSStorage.openOrCreate(inferredSourceName);
+            const sourceMeta = await sourceStore.readJSON<ProjectMeta>("project.json");
+            if (sourceMeta && !sourceMeta.targetLanguage && !sourceMeta.sourceProjectName) {
+              activeStore = sourceStore;
+              activeMeta = sourceMeta;
+              activeName = inferredSourceName;
+              console.info("[ProjectStorage] Redirected bootstrap from translation mirror to source:", targetName, "→", inferredSourceName);
+            }
+          }
+        }
+
         // Migrate V1 → V2 if needed and load scene index
-        await ensureV2Layout(store);
+        await ensureV2Layout(activeStore);
 
         if (!cancelled) {
-          setStorage(store);
-          setMeta(projectMeta);
+          setStorage(activeStore);
+          setMeta(activeMeta);
           try {
             localStorage.setItem(LAST_PROJECT_KEY, JSON.stringify({
-              name: targetName,
+              name: activeName,
               backend,
-              bookId: projectMeta.bookId,
+              bookId: activeMeta.bookId,
             }));
           } catch {}
-          console.info("[ProjectStorage] Restored project:", targetName, "bookId:", projectMeta.bookId);
+          console.info("[ProjectStorage] Restored project:", activeName, "bookId:", activeMeta.bookId);
         }
       } catch (err) {
         console.warn("[ProjectStorage] Bootstrap error:", err);
