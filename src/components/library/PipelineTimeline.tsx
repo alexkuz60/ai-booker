@@ -1,25 +1,27 @@
 /**
- * PipelineTimeline — horizontal 4-stage progress indicator for book cards.
+ * PipelineTimeline — horizontal stepper for book pipeline progress.
  *
+ * Classic step-connector-step layout with icons, labels, progress lines.
  * Reads from project.json's `pipelineProgress` (flat Record<string, boolean>).
- * Stage → sub-step mapping is purely a UI concern defined here.
  */
 
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FolderOpen, BookOpen, Music, Film,
-  ChevronRight, Check, Lock,
+  Check, Lock,
 } from "lucide-react";
 import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent,
   ContextMenuCheckboxItem, ContextMenuSeparator, ContextMenuLabel,
 } from "@/components/ui/context-menu";
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import {
+  Tooltip, TooltipTrigger, TooltipContent, TooltipProvider,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { PipelineProgress, PipelineStepId } from "@/lib/projectStorage";
 
-// ── Stage / sub-step UI definition ──────────────────────
+// ── Stage / sub-step definitions ────────────────────────
 
 interface SubStepDef {
   id: PipelineStepId;
@@ -90,7 +92,161 @@ function stageFraction(stage: StageDef, progress: PipelineProgress): number {
   return stage.subSteps.filter(s => !!progress[s.id]).length / stage.subSteps.length;
 }
 
-// ── Component ───────────────────────────────────────────
+// ── StageNode sub-component ─────────────────────────────
+
+interface StageNodeProps {
+  stage: StageDef;
+  idx: number;
+  progress: PipelineProgress;
+  isRu: boolean;
+  onNavigate: (stage: StageDef, idx: number) => void;
+  onToggleStep?: (stepId: PipelineStepId, done: boolean) => void;
+}
+
+function StageNode({ stage, idx, progress, isRu, onNavigate, onToggleStep }: StageNodeProps) {
+  const Icon = stage.icon;
+  const unlocked = isStageUnlocked(idx, progress);
+  const complete = isStageComplete(stage, progress);
+  const frac = stageFraction(stage, progress);
+  const doneCount = stage.subSteps.filter(s => !!progress[s.id]).length;
+  const totalCount = stage.subSteps.length;
+  const hasPartial = doneCount > 0 && !complete;
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => onNavigate(stage, idx)}
+              disabled={!unlocked}
+              className={cn(
+                "flex flex-col items-center gap-1.5 group/node focus-visible:outline-none",
+                !unlocked && "opacity-40 cursor-not-allowed",
+                unlocked && "cursor-pointer",
+              )}
+            >
+              {/* Circle */}
+              <div className={cn(
+                "relative flex items-center justify-center h-10 w-10 rounded-full border-2 transition-all",
+                !unlocked && "border-muted bg-muted/30",
+                unlocked && !complete && !hasPartial && "border-muted-foreground/30 bg-background group-hover/node:border-primary/50",
+                hasPartial && !complete && "border-primary/50 bg-primary/5",
+                complete && "border-primary bg-primary text-primary-foreground",
+              )}>
+                {!unlocked ? (
+                  <Lock className="h-4 w-4 text-muted-foreground" />
+                ) : complete ? (
+                  <Check className="h-5 w-5" />
+                ) : (
+                  <Icon className={cn(
+                    "h-4.5 w-4.5",
+                    hasPartial ? "text-primary" : "text-muted-foreground group-hover/node:text-foreground",
+                  )} />
+                )}
+
+                {/* Partial ring indicator */}
+                {unlocked && hasPartial && (
+                  <svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 40 40">
+                    <circle
+                      cx="20" cy="20" r="18"
+                      fill="none"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth="2"
+                      strokeDasharray={`${frac * 113} 113`}
+                      strokeLinecap="round"
+                      className="opacity-60"
+                    />
+                  </svg>
+                )}
+              </div>
+
+              {/* Label */}
+              <span className={cn(
+                "text-[11px] font-medium leading-tight text-center max-w-[72px]",
+                complete ? "text-primary" : unlocked ? "text-foreground/80" : "text-muted-foreground/50",
+              )}>
+                {isRu ? stage.labelRu : stage.labelEn}
+              </span>
+
+              {/* Sub-step counter */}
+              <span className={cn(
+                "text-[10px] tabular-nums",
+                complete ? "text-primary/70" : "text-muted-foreground/60",
+              )}>
+                {doneCount}/{totalCount}
+              </span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs max-w-[200px]">
+            <p className="font-medium mb-1">
+              {isRu ? stage.labelRu : stage.labelEn}
+              {!unlocked && " 🔒"}
+            </p>
+            <ul className="space-y-0.5">
+              {stage.subSteps.map(sub => (
+                <li key={sub.id} className="flex items-center gap-1.5">
+                  {progress[sub.id]
+                    ? <Check className="h-3 w-3 text-primary flex-shrink-0" />
+                    : <span className="h-3 w-3 rounded-full border border-muted-foreground/30 flex-shrink-0" />
+                  }
+                  <span className={progress[sub.id] ? "text-foreground" : "text-muted-foreground"}>
+                    {isRu ? sub.labelRu : sub.labelEn}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </TooltipContent>
+        </Tooltip>
+      </ContextMenuTrigger>
+
+      <ContextMenuContent className="w-56">
+        <ContextMenuLabel className="text-xs font-semibold">
+          {isRu ? stage.labelRu : stage.labelEn}
+        </ContextMenuLabel>
+        <ContextMenuSeparator />
+        {stage.subSteps.map(sub => (
+          <ContextMenuCheckboxItem
+            key={sub.id}
+            checked={!!progress[sub.id]}
+            disabled={sub.auto}
+            onCheckedChange={(checked) => {
+              if (!sub.auto) onToggleStep?.(sub.id, !!checked);
+            }}
+            onSelect={(e) => e.preventDefault()}
+            className="text-xs"
+          >
+            <span className="flex items-center gap-1.5">
+              {isRu ? sub.labelRu : sub.labelEn}
+              {sub.auto && (
+                <span className="text-[9px] text-muted-foreground/60 uppercase tracking-wide">auto</span>
+              )}
+            </span>
+          </ContextMenuCheckboxItem>
+        ))}
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
+
+// ── Connector line between stages ───────────────────────
+
+function Connector({ prevComplete, nextUnlocked }: { prevComplete: boolean; nextUnlocked: boolean }) {
+  return (
+    <div className="flex-1 flex items-start pt-5">
+      <div className={cn(
+        "h-0.5 w-full rounded-full transition-colors",
+        prevComplete && nextUnlocked
+          ? "bg-primary/60"
+          : prevComplete
+            ? "bg-primary/30"
+            : "bg-muted-foreground/15",
+      )} />
+    </div>
+  );
+}
+
+// ── Main component ──────────────────────────────────────
 
 interface Props {
   progress: PipelineProgress;
@@ -108,112 +264,25 @@ export function PipelineTimeline({ progress, isRu, onToggleStep }: Props) {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="flex items-center gap-0.5">
-        {STAGES.map((stage, idx) => {
-          const Icon = stage.icon;
-          const unlocked = isStageUnlocked(idx, progress);
-          const complete = isStageComplete(stage, progress);
-          const frac = stageFraction(stage, progress);
-          const doneCount = stage.subSteps.filter(s => !!progress[s.id]).length;
-          const totalCount = stage.subSteps.length;
-          const hasPartial = doneCount > 0 && !complete;
-
-          return (
-            <div key={stage.id} className="flex items-center">
-              {idx > 0 && (
-                <ChevronRight className={cn(
-                  "h-3 w-3 mx-0.5 flex-shrink-0",
-                  isStageComplete(STAGES[idx - 1], progress)
-                    ? "text-primary/60"
-                    : "text-muted-foreground/30",
-                )} />
-              )}
-
-              <ContextMenu>
-                <ContextMenuTrigger asChild>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => handleStageClick(stage, idx)}
-                        disabled={!unlocked}
-                        className={cn(
-                          "relative flex items-center justify-center h-8 w-8 rounded-lg transition-all",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                          !unlocked && "opacity-40 cursor-not-allowed",
-                          unlocked && !complete && "hover:bg-accent cursor-pointer",
-                          complete && "bg-primary/15 text-primary cursor-pointer hover:bg-primary/20",
-                          hasPartial && !complete && "ring-1 ring-primary/30",
-                        )}
-                      >
-                        {!unlocked ? (
-                          <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-                        ) : complete ? (
-                          <div className="relative">
-                            <Icon className="h-4 w-4 text-primary" />
-                            <Check className="absolute -bottom-1 -right-1 h-2.5 w-2.5 text-primary bg-background rounded-full" />
-                          </div>
-                        ) : (
-                          <Icon className={cn(
-                            "h-4 w-4",
-                            hasPartial ? "text-primary/70" : "text-muted-foreground",
-                          )} />
-                        )}
-
-                        {unlocked && !complete && doneCount > 0 && (
-                          <div className="absolute bottom-0.5 left-1.5 right-1.5 h-0.5 rounded-full bg-muted overflow-hidden">
-                            <div
-                              className="h-full bg-primary/60 rounded-full transition-all"
-                              style={{ width: `${frac * 100}%` }}
-                            />
-                          </div>
-                        )}
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs">
-                      <p className="font-medium">
-                        {isRu ? stage.labelRu : stage.labelEn}
-                        {!unlocked && " 🔒"}
-                      </p>
-                      <p className="text-muted-foreground">
-                        {doneCount}/{totalCount} {isRu ? "готово" : "done"}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </ContextMenuTrigger>
-
-                <ContextMenuContent className="w-56">
-                  <ContextMenuLabel className="text-xs font-semibold">
-                    {isRu ? stage.labelRu : stage.labelEn}
-                  </ContextMenuLabel>
-                  <ContextMenuSeparator />
-                  {stage.subSteps.map(sub => (
-                    <ContextMenuCheckboxItem
-                      key={sub.id}
-                      checked={!!progress[sub.id]}
-                      disabled={sub.auto}
-                      onCheckedChange={(checked) => {
-                        if (!sub.auto) {
-                          onToggleStep?.(sub.id, !!checked);
-                        }
-                      }}
-                      onSelect={(e) => e.preventDefault()}
-                      className="text-xs"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        {isRu ? sub.labelRu : sub.labelEn}
-                        {sub.auto && (
-                          <span className="text-[9px] text-muted-foreground/60 uppercase tracking-wide">
-                            auto
-                          </span>
-                        )}
-                      </span>
-                    </ContextMenuCheckboxItem>
-                  ))}
-                </ContextMenuContent>
-              </ContextMenu>
-            </div>
-          );
-        })}
+      <div className="flex items-start gap-0 w-full max-w-[520px]">
+        {STAGES.map((stage, idx) => (
+          <div key={stage.id} className="contents">
+            {idx > 0 && (
+              <Connector
+                prevComplete={isStageComplete(STAGES[idx - 1], progress)}
+                nextUnlocked={isStageUnlocked(idx, progress)}
+              />
+            )}
+            <StageNode
+              stage={stage}
+              idx={idx}
+              progress={progress}
+              isRu={isRu}
+              onNavigate={handleStageClick}
+              onToggleStep={onToggleStep}
+            />
+          </div>
+        ))}
       </div>
     </TooltipProvider>
   );
