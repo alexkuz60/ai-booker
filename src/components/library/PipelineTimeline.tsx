@@ -216,9 +216,9 @@ function Connector({ nextComplete, nextPartial }: { nextComplete: boolean; nextP
     <div className="flex-1 flex items-start pt-5">
       <div className={cn(
         "w-full rounded-full transition-colors",
-        prevComplete
+        nextComplete
           ? "h-[3px] bg-primary"
-          : prevPartial
+          : nextPartial
             ? "h-[3px] border-t-[3px] border-dashed border-primary/60 bg-transparent"
             : "h-0.5 bg-muted-foreground/15",
       )} />
