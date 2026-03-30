@@ -11,7 +11,7 @@
 import { useCallback, useState } from "react";
 import {
   FolderOpen, BookOpen, Music, Film,
-  Check, RefreshCw,
+  Check, X, RefreshCw,
 } from "lucide-react";
 import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent,
