@@ -131,7 +131,7 @@ function StageNode({ stage, idx, progress, isRu, onStageClick, onToggleStep }: S
                 complete && "border-primary bg-primary text-primary-foreground",
               )}>
                 {complete ? (
-                  <Check className="h-5 w-5" />
+                  <Icon className="h-5 w-5 text-primary-foreground" />
                 ) : (
                   <Icon className={cn(
                     "h-4.5 w-4.5",
@@ -174,9 +174,9 @@ function StageNode({ stage, idx, progress, isRu, onStageClick, onToggleStep }: S
           <ul className="space-y-0.5">
             {stage.subSteps.map(sub => (
               <li key={sub.id} className="flex items-center gap-1.5">
-                {progress[sub.id]
+               {progress[sub.id]
                   ? <Check className="h-3 w-3 text-primary flex-shrink-0" />
-                  : <span className="h-3 w-3 rounded-full border border-muted-foreground/30 flex-shrink-0" />
+                  : <X className="h-3 w-3 text-muted-foreground/50 flex-shrink-0" />
                 }
                 <span className={progress[sub.id] ? "text-foreground" : "text-muted-foreground"}>
                   {isRu ? sub.labelRu : sub.labelEn}
@@ -211,12 +211,16 @@ function StageNode({ stage, idx, progress, isRu, onStageClick, onToggleStep }: S
 
 // ── Connector line between stages ───────────────────────
 
-function Connector({ prevComplete }: { prevComplete: boolean }) {
+function Connector({ prevComplete, prevPartial }: { prevComplete: boolean; prevPartial: boolean }) {
   return (
     <div className="flex-1 flex items-start pt-5">
       <div className={cn(
-        "h-0.5 w-full rounded-full transition-colors",
-        prevComplete ? "bg-primary/60" : "bg-muted-foreground/15",
+        "w-full rounded-full transition-colors",
+        prevComplete
+          ? "h-[3px] bg-primary"
+          : prevPartial
+            ? "h-[3px] border-t-[3px] border-dashed border-primary/60 bg-transparent"
+            : "h-0.5 bg-muted-foreground/15",
       )} />
     </div>
   );
