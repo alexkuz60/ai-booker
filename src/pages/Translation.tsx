@@ -8,7 +8,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { Languages, Radar, BookOpen, Loader2, FileText, Wand2, Square, CloudUpload } from "lucide-react";
+import { Languages, Radar, BookOpen, Loader2, FileText, Wand2, Square, CloudUpload, CloudDownload } from "lucide-react";
 import { getScoreLevel, SCORE_COLORS } from "@/lib/qualityRadar";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import {
