@@ -480,7 +480,7 @@ export default function Translation() {
                   style={{ color: SCORE_COLORS[getScoreLevel(monitorScore)] }}
                 >
                   {Math.round(monitorScore * 100)}
-                  <span className="text-xs font-normal text-muted-foreground"> / 100</span>
+                  <span className="text-sm font-normal text-muted-foreground"> / 100</span>
                 </span>
               )}
             </div>
