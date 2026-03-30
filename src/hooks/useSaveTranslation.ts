@@ -11,8 +11,12 @@ import { useAuth } from "@/hooks/useAuth";
 
 const BUCKET = "book-uploads";
 
+function sanitizeStorageKey(name: string): string {
+  return encodeURIComponent(name).replace(/%20/g, "_");
+}
+
 function translationStoragePath(userId: string, projectName: string): string {
-  return `${userId}/translations/${projectName}.zip`;
+  return `${userId}/translations/${sanitizeStorageKey(projectName)}.zip`;
 }
 
 /**
