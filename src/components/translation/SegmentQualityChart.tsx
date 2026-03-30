@@ -214,7 +214,7 @@ export function SegmentQualityChart({
                   data={barData}
                   margin={{ top: 8, right: 12, bottom: 4, left: 4 }}
                   barCategoryGap="25%"
-                  barGap={-20}
+                  barGap={-dynamicBarSize}
                 >
                   <XAxis
                     dataKey="label"
