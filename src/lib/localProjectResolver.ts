@@ -64,8 +64,28 @@ export async function resolveLocalStorageForBook(
 
   if (opts.storageBackend === "opfs") {
     const existingProjects = await getExistingOpfsProjects();
-    const projectNames = (opts.localProjectNamesByBookId.get(targetBookId) || [])
+    let projectNames = (opts.localProjectNamesByBookId.get(targetBookId) || [])
       .filter((projectName) => existingProjects.has(projectName));
+
+    // B26 fix: if the pre-built map is empty (e.g. auto-restore before library loaded),
+    // do a direct OPFS scan to find the project by bookId in project.json.
+    if (!projectNames.length && existingProjects.size > 0) {
+      console.debug("[Resolver] Map empty for bookId=%s, scanning OPFS directly (%d projects)", targetBookId, existingProjects.size);
+      for (const projectName of existingProjects) {
+        try {
+          const store = await OPFSStorage.openOrCreate(projectName);
+          const meta = await store.readJSON<{ bookId?: string; targetLanguage?: string; sourceProjectName?: string }>("project.json");
+          // Skip translation mirrors — they share bookId but are not the source project
+          if (meta?.targetLanguage || meta?.sourceProjectName) continue;
+          if (meta?.bookId === targetBookId) {
+            projectNames.push(projectName);
+          }
+        } catch { /* skip unreadable */ }
+      }
+      if (projectNames.length) {
+        console.debug("[Resolver] Direct scan found %d project(s) for bookId=%s: [%s]", projectNames.length, targetBookId, projectNames.join(", "));
+      }
+    }
 
     if (projectNames.length) {
       if (projectNames.length > 1) {
