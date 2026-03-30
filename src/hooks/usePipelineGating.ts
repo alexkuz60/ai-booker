@@ -37,8 +37,8 @@ function storyboardReady(p: PipelineProgress): boolean {
 }
 
 export function usePipelineGating(): GatingResult {
-  const { storage, isOpen } = useProjectStorageContext();
-  const { progress, loading } = usePipelineProgress(isOpen ? storage : null);
+  const { storage, isOpen, progressVersion } = useProjectStorageContext();
+  const { progress, loading } = usePipelineProgress(isOpen ? storage : null, progressVersion);
 
   const hasProject = !!isOpen;
 

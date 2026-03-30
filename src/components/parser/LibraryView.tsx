@@ -17,6 +17,7 @@ import type { PipelineProgress, PipelineStepId } from "@/lib/projectStorage";
 import { createEmptyPipelineProgress } from "@/lib/projectStorage";
 import { readPipelineProgress, writePipelineStep } from "@/hooks/usePipelineProgress";
 import { OPFSStorage } from "@/lib/projectStorage";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 
 interface LibraryViewProps {
   isRu: boolean;
@@ -42,6 +43,7 @@ function LibraryViewInner({
   serverBooks = [], loadingServerBooks = false, onOpenServerBook, onDeleteServerBook,
   onStageNavigate, onProjectReset,
 }: LibraryViewProps) {
+  const { bumpProgressVersion } = useProjectStorageContext();
   const syncedBookIds = useMemo(() => new Set(serverBooks.map(b => b.id)), [serverBooks]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -105,13 +107,15 @@ function LibraryViewInner({
         const meta = await store.readJSON<Record<string, unknown>>("project.json");
         if (meta?.bookId === bookId && !meta?.targetLanguage && !meta?.sourceProjectName) {
           await writePipelineStep(store, stepId, done);
+          // Notify sidebar and other consumers to re-read progress
+          bumpProgressVersion();
           break;
         }
       }
     } catch (e) {
       console.error("[LibraryView] Failed to persist pipeline step:", e);
     }
-  }, []);
+  }, [bumpProgressVersion]);
 
   const startRename = (book: BookRecord) => {
     setEditingId(book.id);
