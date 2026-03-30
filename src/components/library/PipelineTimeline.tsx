@@ -10,7 +10,7 @@
 
 import { useCallback, useState } from "react";
 import {
-  FolderOpen, BookOpen, Music, Film,
+  FolderOpen, BookOpen, AudioWaveform, Film,
   Check, X, RefreshCw,
 } from "lucide-react";
 import {
@@ -63,7 +63,7 @@ const STAGES: StageDef[] = [
     ],
   },
   {
-    id: "studio", labelRu: "Студия", labelEn: "Studio", route: "/studio", icon: Music,
+    id: "studio", labelRu: "Студия", labelEn: "Studio", route: "/studio", icon: AudioWaveform,
     subSteps: [
       { id: "storyboard_done", labelRu: "Раскадровка", labelEn: "Storyboard" },
       { id: "inline_edit", labelRu: "Инлайн-правка", labelEn: "Inline editing" },
