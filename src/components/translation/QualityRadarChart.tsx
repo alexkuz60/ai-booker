@@ -200,12 +200,21 @@ export function QualityRadarChart({
       </div>
 
 
-      {/* Axis score bars */}
+      {/* Axis score bars — 3 layers per axis */}
       {!compact && scores && (
-        <div className="w-full space-y-1.5 px-2">
+        <div className="w-full space-y-2 px-2">
           {AXES.map((axis) => {
-            const val = scores[axis];
-            const lvl = getScoreLevel(val);
+            const layers: { key: RadarLayer; value: number }[] = [
+              { key: "3R", value: layer3R?.[axis] ?? 0 },
+              { key: "5R", value: layer5R?.[axis] ?? 0 },
+              { key: "5R+Alt", value: layerAlt?.[axis] ?? 0 },
+            ].filter((l) => l.value > 0);
+
+            // fallback to primary if no layers
+            if (layers.length === 0 && scores[axis] > 0) {
+              layers.push({ key: "5R", value: scores[axis] });
+            }
+
             return (
               <button
                 key={axis}
@@ -215,21 +224,27 @@ export function QualityRadarChart({
                 <span className="text-[10px] text-muted-foreground w-20 truncate">
                   {AXIS_LABELS[axis][isRu ? "ru" : "en"]}
                 </span>
-                <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${val * 100}%`,
-                      backgroundColor: SCORE_COLORS[lvl],
-                    }}
-                  />
+                <div className="flex-1 flex flex-col gap-0.5">
+                  {layers.map(({ key, value }) => (
+                    <div key={key} className="flex items-center gap-1.5">
+                      <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${value * 100}%`,
+                            backgroundColor: LAYER_COLORS[key].stroke,
+                          }}
+                        />
+                      </div>
+                      <span
+                        className="text-[9px] font-mono font-medium w-7 text-right shrink-0"
+                        style={{ color: LAYER_COLORS[key].stroke }}
+                      >
+                        {(value * 100).toFixed(0)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-                <span
-                  className="text-[10px] font-mono font-medium w-8 text-right"
-                  style={{ color: SCORE_COLORS[lvl] }}
-                >
-                  {(val * 100).toFixed(0)}
-                </span>
               </button>
             );
           })}
