@@ -55,6 +55,7 @@ interface UseBookManagerParams {
 export function useBookManager({
   userId, isRu, projectStorage, projectStorageInitialized = false,
   storageBackend = "none", createProject, openProjectByName, pendingProjectName,
+  bumpProgressVersion,
 }: UseBookManagerParams) {
   // ── Shared state ──────────────────────────────────────────
   const [step, setStep] = useState<Step>(() => {
