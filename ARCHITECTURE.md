@@ -235,13 +235,18 @@ interface ProjectStorage {
 
 **Авто-детект** шаги записываются модулями при сохранении результатов (например, `syncStructureToLocal` → `toc_extracted = true`). Ручные шаги переключаются пользователем через контекстное меню таймлайна.
 
+**Реактивная синхронизация:** изменение прогресса через контекстное меню таймлайна вызывает `bumpProgressVersion()` из `ProjectStorageContext`. Это заставляет `usePipelineProgress` (используемый в `usePipelineGating`) перечитать `project.json` из OPFS, обновляя блокировки навигации в сайдбаре в реальном времени.
+
 **Ключевые файлы:**
 
 | Файл | Назначение |
 |------|------------|
 | `src/lib/projectStorage.ts` | Типы `PipelineProgress`, `PipelineStepId`, `PIPELINE_STEP_IDS`, `createEmptyPipelineProgress()` |
-| `src/hooks/usePipelineProgress.ts` | React-хук + standalone helpers `readPipelineProgress()`, `writePipelineStep()` |
+| `src/hooks/usePipelineProgress.ts` | React-хук (принимает `version` для принудительного перечитывания) + standalone helpers |
+| `src/hooks/usePipelineGating.ts` | Гейтинг навигации — читает `progressVersion` из контекста |
+| `src/hooks/useProjectStorageContext.tsx` | Провайдер — хранит `progressVersion` + `bumpProgressVersion()` |
 | `src/components/library/PipelineTimeline.tsx` | UI-компонент таймлайна (маппинг stepId → стадия — чисто визуальный) |
+| `src/components/parser/LibraryView.tsx` | Вызывает `bumpProgressVersion()` после записи шага в OPFS |
 
 ### 1.11 Translation Project Link
 
