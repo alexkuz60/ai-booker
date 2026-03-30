@@ -254,10 +254,10 @@ export function SegmentQualityChart({
                           key={i}
                           fillOpacity={
                             hoveredIdx === null
-                              ? (layer === "3R" ? 0.5 : layer === "5R" ? 0.65 : 0.85)
+                              ? (layer === "3R" ? 0.85 : layer === "5R" ? 0.65 : 0.5)
                               : hoveredIdx === i
                                 ? 1
-                                : (layer === "3R" ? 0.25 : layer === "5R" ? 0.35 : 0.45)
+                                : (layer === "3R" ? 0.5 : layer === "5R" ? 0.35 : 0.25)
                           }
                         />
                       ))}
