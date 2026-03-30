@@ -447,7 +447,13 @@ const Studio = () => {
     setClearedDirtySceneIds(prev => new Set(prev).add(sceneId));
     // Always refresh clips when segmentation/synthesis completes
     setClipsRefreshToken(t => t + 1);
-  }, []);
+    // Auto-set pipeline flag
+    if (storage) {
+      import("@/hooks/usePipelineProgress").then(({ writePipelineStep }) =>
+        writePipelineStep(storage, "synthesis_done", true).catch(() => {}),
+      );
+    }
+  }, [storage]);
 
   const { setPageHeader } = usePageHeader();
 
