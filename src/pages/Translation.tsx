@@ -238,7 +238,7 @@ export default function Translation() {
         />
       </div>
     );
-  }, [isOpen, meta, isRu, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, apiKeys, transProjectExists, saveTranslation, savingTranslation]);
+  }, [isOpen, meta, isRu, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, apiKeys, transProjectExists, saveTranslation, savingTranslation, restoreTranslation, restoringTranslation]);
 
   const headerRightRef = useRef(headerRight);
   headerRightRef.current = headerRight;
