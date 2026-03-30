@@ -393,7 +393,7 @@ export default function Translation() {
                   {transProjectExists && selectedSceneId && (
                     <div className="flex items-center gap-1.5 ml-auto">
                       {batchProgress.running && batchProgress.currentStage && (
-                        <span className="text-[10px] text-muted-foreground tabular-nums">
+                        <span className="text-xs text-muted-foreground tabular-nums">
                           {(() => {
                             const cs = batchProgress.currentStage;
                             const stageNum = cs.stage === "literal" ? 1 : cs.stage === "literary" ? 1 : cs.stage === "radar" ? 2 : cs.stage === "critique" ? 3 : 0;
