@@ -474,24 +474,39 @@ export default function Translation() {
                   )}
                 </div>
                 {selectedSceneId ? (
-                  <ScrollArea className="h-full">
-                    <div className="p-3" key={`${selectedSceneId}-${bilingualTick}`}>
-                      <BilingualSegmentsView
-                        sourceStorage={storage}
+                  <div className="h-full flex flex-col">
+                    <ScrollArea className="flex-1 min-h-0">
+                      <div className="p-3" key={`${selectedSceneId}-${bilingualTick}`}>
+                        <BilingualSegmentsView
+                          sourceStorage={storage}
+                          translationStorage={translationStorage}
+                          sceneId={selectedSceneId}
+                          chapterId={selectedChapter?.chapterId ?? null}
+                          isRu={isRu}
+                          onTranslateSegments={transProjectExists ? handleTranslateSegments : undefined}
+                          onLiteraryEdit={transProjectExists ? handleLiteraryEdit : undefined}
+                          onCritique={transProjectExists ? handleCritique : undefined}
+                          onSegmentsLoaded={setSceneSegmentIds}
+                          translating={translating || batchProgress.running}
+                          progressLabel={progressLabel}
+                          selectedSegmentId={selectedSegment?.segmentId ?? null}
+                          onSelectSegment={setSelectedSegment}
+                        />
+                      </div>
+                    </ScrollArea>
+                    {transProjectExists && sceneSegmentIds.length > 0 && (
+                      <SegmentQualityChart
                         translationStorage={translationStorage}
                         sceneId={selectedSceneId}
                         chapterId={selectedChapter?.chapterId ?? null}
+                        segmentIds={sceneSegmentIds}
                         isRu={isRu}
-                        onTranslateSegments={transProjectExists ? handleTranslateSegments : undefined}
-                        onLiteraryEdit={transProjectExists ? handleLiteraryEdit : undefined}
-                        onCritique={transProjectExists ? handleCritique : undefined}
-                        translating={translating || batchProgress.running}
-                        progressLabel={progressLabel}
                         selectedSegmentId={selectedSegment?.segmentId ?? null}
                         onSelectSegment={setSelectedSegment}
+                        reloadTick={bilingualTick}
                       />
-                    </div>
-                  </ScrollArea>
+                    )}
+                  </div>
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground">
                     <BookOpen className="h-10 w-10 opacity-20" />
