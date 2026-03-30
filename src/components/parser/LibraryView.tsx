@@ -56,7 +56,8 @@ function LibraryViewInner({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [expandedTranslation, setExpandedTranslation] = useState<Set<string>>(new Set());
-
+  const [transCreateConfirm, setTransCreateConfirm] = useState<{ book: BookRecord; exists: boolean } | null>(null);
+  const [transCreating, setTransCreating] = useState(false);
   // Pipeline progress per book (read from OPFS project.json)
   const [progressMap, setProgressMap] = useState<Record<string, PipelineProgress>>({});
 
