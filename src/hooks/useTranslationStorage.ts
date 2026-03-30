@@ -42,6 +42,12 @@ async function resolveTranslationProjectName(
       const isMirrorProject = !!meta.sourceProjectName || !!meta.targetLanguage;
       if (!isMirrorProject) continue;
 
+      console.info("[resolveTranslation] candidate:", projectName, {
+        sourceProjectName: meta.sourceProjectName,
+        targetLanguage: meta.targetLanguage,
+        bookId: meta.bookId,
+      });
+
       const sameBook = meta.bookId === sourceMeta.bookId;
       const linkedToCurrentSource = meta.sourceProjectName === sourceStorage.projectName;
       const looksLikeMirrorName = projectName.startsWith(`${sourceStorage.projectName}_`);
@@ -99,18 +105,30 @@ export function useTranslationStorage(
     (async () => {
       try {
         const projects = await OPFSStorage.listProjects();
+        console.info("[useTranslationStorage] OPFS projects:", projects, "source:", sourceStorage.projectName, "lang:", sourceMeta.language);
         if (cancelled) return;
 
           const resolvedProjectName = await resolveTranslationProjectName(projects, sourceStorage, sourceMeta);
+          console.info("[useTranslationStorage] resolved:", resolvedProjectName);
           if (cancelled) return;
 
           if (resolvedProjectName) {
             const store = await OPFSStorage.openOrCreate(resolvedProjectName);
-            if (!cancelled && mountedRef.current) {
+            // Verify project.json exists — if not, the folder is a zombie
+            const projMeta = await store.readJSON<ProjectMeta>("project.json");
+            if (!projMeta) {
+              console.warn("[useTranslationStorage] project.json missing in resolved project:", resolvedProjectName);
+              if (!cancelled && mountedRef.current) {
+                setTranslationStorage(null);
+                setExists(false);
+              }
+            } else if (!cancelled && mountedRef.current) {
+              console.info("[useTranslationStorage] ✅ opened translation project:", resolvedProjectName);
               setTranslationStorage(store);
               setExists(true);
             }
           } else {
+            console.warn("[useTranslationStorage] no translation project found for source:", sourceStorage.projectName);
             if (!cancelled && mountedRef.current) {
               setTranslationStorage(null);
               setExists(false);
