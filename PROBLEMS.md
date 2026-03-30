@@ -163,6 +163,11 @@
 - Предыдущие фиксы (v1, остаются): fallback-скан OPFS в `resolveLocalStorageForBook`, защита `deleteBook` от удаления зеркал.
 - Файлы: `Translation.tsx`, `useTranslationStorage.ts`, `localProjectResolver.ts`, `useBookManager.ts`.
 
+### Щ. Таймлайн и сайдбар не синхронизировались с прогрессом — ✅ РЕШЕНО (B27)
+- Проблема: ручное переключение чекбоксов в контекстном меню таймлайна записывало `pipelineProgress` в OPFS, но сайдбар не обновлял гейтинг — пункты оставались заблокированными. При загрузке книги с сервера таймлайн и меню не отражали сохранённый прогресс из `project.json`.
+- Решение: реактивный счётчик `progressVersion` в `ProjectStorageContext`. Любое изменение прогресса (ручное, restore, deploy) вызывает `bumpProgressVersion()` → `usePipelineProgress` и `usePipelineGating` перечитывают данные из OPFS.
+- Файлы: `useProjectStorage.ts`, `useProjectStorageContext.tsx`, `usePipelineProgress.ts`, `usePipelineGating.ts`, `useBookRestore.ts`, `LibraryView.tsx`.
+
 ---
 
 ## Защита от регрессий
