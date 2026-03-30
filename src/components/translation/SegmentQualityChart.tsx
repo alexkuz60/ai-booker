@@ -205,23 +205,8 @@ export function SegmentQualityChart({
                   data={barData}
                   margin={{ top: 8, right: 12, bottom: 4, left: 4 }}
                   barCategoryGap="15%"
+                  barGap={-20}
                 >
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    domain={[0, 1]}
-                    tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(v: number) => `${Math.round(v * 100)}`}
-                    width={28}
-                  />
-                  <Tooltip content={<CustomTooltip isRu={isRu} activeAxis={activeAxis} />} />
-
                   {/* Overlay: render longest bars first (behind), short ones on top */}
                   {OVERLAY_ORDER.map((layer) => (
                     <Bar
@@ -232,6 +217,7 @@ export function SegmentQualityChart({
                       stroke={LAYER_COLORS[layer].stroke}
                       strokeWidth={0.5}
                       radius={[2, 2, 0, 0]}
+                      barSize={20}
                       cursor="pointer"
                       onClick={(_: any, idx: number) => {
                         if (barData[idx]) handleBarClick(barData[idx]);
