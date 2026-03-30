@@ -409,7 +409,7 @@ export default function Translation() {
                         variant="ghost"
                         onClick={handleTranslateSceneFull}
                         disabled={translating || batchProgress.running}
-                        className="h-6 text-[10px] px-2 gap-1"
+                        className="h-7 text-xs px-2 gap-1"
                       >
                         {batchProgress.running && batchProgress.scenesTotal === 1 ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
