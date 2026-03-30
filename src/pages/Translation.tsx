@@ -277,7 +277,7 @@ export default function Translation() {
         animate={{ opacity: 1 }}
       >
         <Languages className="h-16 w-16 opacity-20" />
-        <p className="text-sm">
+        <p className="text-base">
           {isRu
             ? "Откройте проект в Парсере, чтобы начать перевод"
             : "Open a project in Parser to start translation"}
