@@ -65,8 +65,8 @@ interface Props {
   reloadTick?: number;
 }
 
-/** Layers ordered bottom-to-top for overlay: longest first */
-const OVERLAY_ORDER: RadarLayer[] = ["3R", "5R", "5R+Alt"];
+/** Layers ordered back-to-front: 3R (primary) rendered last = topmost z-level */
+const OVERLAY_ORDER: RadarLayer[] = ["5R+Alt", "5R", "3R"];
 
 export function SegmentQualityChart({
   translationStorage,
