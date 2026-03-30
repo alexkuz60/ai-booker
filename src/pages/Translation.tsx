@@ -322,7 +322,7 @@ export default function Translation() {
             variant="secondary"
             onClick={handleTranslateChapter}
             disabled={translating || batchProgress.running}
-            className="h-7 text-xs px-3 gap-1.5"
+            className="h-8 text-sm px-3 gap-1.5"
           >
             {batchProgress.running ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
