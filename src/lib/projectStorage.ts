@@ -49,6 +49,45 @@ export interface ProjectStorage {
   importZip(zip: Blob): Promise<void>;
 }
 
+// ─── Pipeline progress ───────────────────────────────────
+
+/** Flat map of pipeline step IDs → completion status. */
+export type PipelineProgress = Record<string, boolean>;
+
+/** All known pipeline step IDs (for defaults). */
+export const PIPELINE_STEP_IDS = [
+  "file_uploaded",
+  "opfs_created",
+  "toc_extracted",
+  "scenes_analyzed",
+  "characters_extracted",
+  "profiles_done",
+  "storyboard_done",
+  "inline_edit",
+  "synthesis_done",
+  "mix_done",
+  "scene_render",
+  "chapter_assembly",
+  "mastering",
+  "final_render",
+] as const;
+
+export type PipelineStepId = (typeof PIPELINE_STEP_IDS)[number];
+
+export function createEmptyPipelineProgress(): PipelineProgress {
+  const p: PipelineProgress = {};
+  for (const id of PIPELINE_STEP_IDS) p[id] = false;
+  return p;
+}
+
+// ─── Translation project link ────────────────────────────
+
+export interface TranslationProjectLink {
+  projectName: string;
+  targetLanguage: "en" | "ru";
+  createdAt: string;
+}
+
 // ─── Project metadata ────────────────────────────────────
 
 export interface ProjectMeta {
@@ -62,10 +101,15 @@ export interface ProjectMeta {
   /** File format of the source book — strict type from fileFormatUtils */
   fileFormat?: "pdf" | "docx";
 
-  // ─── Art Translation linkage ─────────────────────────────
-  /** OPFS project name of the source (original) project. Present only in translation projects. */
+  // ─── Pipeline progress (единый источник готовности) ──────
+  pipelineProgress?: PipelineProgress;
+
+  // ─── Art Translation linkage ────────────────────────────
+  /** Link to parallel translation project. Present only in source projects with active translation. */
+  translationProject?: TranslationProjectLink;
+  /** OPFS project name of the source (original) project. Present only in translation mirror projects. */
   sourceProjectName?: string;
-  /** Target language for translation. Present only in translation projects. */
+  /** Target language for translation. Present only in translation mirror projects. */
   targetLanguage?: "en" | "ru";
 }
 

@@ -1,16 +1,15 @@
 /**
  * PipelineTimeline — horizontal 4-stage progress indicator for book cards.
  *
- * Stages: Project → Parser → Studio → Montage
- * Each stage icon is a navigation button (disabled until prerequisites met).
- * Sub-steps shown in a context menu with auto-detect + manual checkboxes.
+ * Reads from project.json's `pipelineProgress` (flat Record<string, boolean>).
+ * Stage → sub-step mapping is purely a UI concern defined here.
  */
 
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FolderOpen, BookOpen, Music, Film,
-  ChevronRight, Check, Circle, Lock,
+  ChevronRight, Check, Lock,
 } from "lucide-react";
 import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent,
@@ -18,134 +17,104 @@ import {
 } from "@/components/ui/context-menu";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import type { PipelineProgress, PipelineStepId } from "@/lib/projectStorage";
 
-// ── Pipeline definition ─────────────────────────────────────
+// ── Stage / sub-step UI definition ──────────────────────
 
-export interface SubStep {
-  id: string;
+interface SubStepDef {
+  id: PipelineStepId;
   labelRu: string;
   labelEn: string;
-  auto?: boolean;        // can be auto-detected
-  done: boolean;
+  auto?: boolean;
 }
 
-export interface PipelineStage {
+interface StageDef {
   id: "project" | "parser" | "studio" | "montage";
   labelRu: string;
   labelEn: string;
   route: string;
-  subSteps: SubStep[];
+  icon: typeof FolderOpen;
+  subSteps: SubStepDef[];
 }
 
-export interface PipelineProgress {
-  stages: PipelineStage[];
+const STAGES: StageDef[] = [
+  {
+    id: "project", labelRu: "Проект", labelEn: "Project", route: "/", icon: FolderOpen,
+    subSteps: [
+      { id: "file_uploaded", labelRu: "Файл загружен", labelEn: "File uploaded", auto: true },
+      { id: "opfs_created", labelRu: "Хранилище создано", labelEn: "Storage created", auto: true },
+    ],
+  },
+  {
+    id: "parser", labelRu: "Парсер", labelEn: "Parser", route: "/parser", icon: BookOpen,
+    subSteps: [
+      { id: "toc_extracted", labelRu: "Структура (TOC)", labelEn: "Structure (TOC)", auto: true },
+      { id: "scenes_analyzed", labelRu: "Сцены проанализированы", labelEn: "Scenes analyzed", auto: true },
+      { id: "characters_extracted", labelRu: "Персонажи извлечены", labelEn: "Characters extracted", auto: true },
+      { id: "profiles_done", labelRu: "Профайлы готовы", labelEn: "Profiles ready" },
+    ],
+  },
+  {
+    id: "studio", labelRu: "Студия", labelEn: "Studio", route: "/studio", icon: Music,
+    subSteps: [
+      { id: "storyboard_done", labelRu: "Раскадровка", labelEn: "Storyboard", auto: true },
+      { id: "inline_edit", labelRu: "Инлайн-правка", labelEn: "Inline editing" },
+      { id: "synthesis_done", labelRu: "Синтез речи", labelEn: "Speech synthesis", auto: true },
+      { id: "mix_done", labelRu: "Микс и эффекты", labelEn: "Mix & effects" },
+      { id: "scene_render", labelRu: "Рендер сцен", labelEn: "Scene render", auto: true },
+    ],
+  },
+  {
+    id: "montage", labelRu: "Монтаж", labelEn: "Montage", route: "/montage", icon: Film,
+    subSteps: [
+      { id: "chapter_assembly", labelRu: "Сборка главы", labelEn: "Chapter assembly" },
+      { id: "mastering", labelRu: "Мастеринг", labelEn: "Mastering" },
+      { id: "final_render", labelRu: "Финальный рендер", labelEn: "Final render", auto: true },
+    ],
+  },
+];
+
+// ── Helpers ──────────────────────────────────────────────
+
+function isStageComplete(stage: StageDef, progress: PipelineProgress): boolean {
+  return stage.subSteps.length > 0 && stage.subSteps.every(s => !!progress[s.id]);
 }
 
-// ── Default pipeline factory ────────────────────────────────
-
-export function createDefaultPipeline(): PipelineStage[] {
-  return [
-    {
-      id: "project",
-      labelRu: "Проект",
-      labelEn: "Project",
-      route: "/",
-      subSteps: [
-        { id: "file_uploaded", labelRu: "Файл загружен", labelEn: "File uploaded", auto: true, done: false },
-        { id: "opfs_created", labelRu: "Хранилище создано", labelEn: "Storage created", auto: true, done: false },
-      ],
-    },
-    {
-      id: "parser",
-      labelRu: "Парсер",
-      labelEn: "Parser",
-      route: "/parser",
-      subSteps: [
-        { id: "toc_extracted", labelRu: "Структура (TOC)", labelEn: "Structure (TOC)", auto: true, done: false },
-        { id: "scenes_analyzed", labelRu: "Сцены проанализированы", labelEn: "Scenes analyzed", auto: true, done: false },
-        { id: "characters_extracted", labelRu: "Персонажи извлечены", labelEn: "Characters extracted", auto: true, done: false },
-        { id: "profiles_done", labelRu: "Профайлы готовы", labelEn: "Profiles ready", done: false },
-      ],
-    },
-    {
-      id: "studio",
-      labelRu: "Студия",
-      labelEn: "Studio",
-      route: "/studio",
-      subSteps: [
-        { id: "storyboard_done", labelRu: "Раскадровка", labelEn: "Storyboard", auto: true, done: false },
-        { id: "inline_edit", labelRu: "Инлайн-правка", labelEn: "Inline editing", done: false },
-        { id: "synthesis_done", labelRu: "Синтез речи", labelEn: "Speech synthesis", auto: true, done: false },
-        { id: "mix_done", labelRu: "Микс и эффекты", labelEn: "Mix & effects", done: false },
-        { id: "scene_render", labelRu: "Рендер сцен", labelEn: "Scene render", auto: true, done: false },
-      ],
-    },
-    {
-      id: "montage",
-      labelRu: "Монтаж",
-      labelEn: "Montage",
-      route: "/montage",
-      subSteps: [
-        { id: "chapter_assembly", labelRu: "Сборка главы", labelEn: "Chapter assembly", done: false },
-        { id: "mastering", labelRu: "Мастеринг", labelEn: "Mastering", done: false },
-        { id: "final_render", labelRu: "Финальный рендер", labelEn: "Final render", auto: true, done: false },
-      ],
-    },
-  ];
+function isStageUnlocked(stageIdx: number, progress: PipelineProgress): boolean {
+  if (stageIdx === 0) return true;
+  return isStageComplete(STAGES[stageIdx - 1], progress);
 }
 
-// ── Helpers ──────────────────────────────────────────────────
-
-function stageIcon(id: string) {
-  switch (id) {
-    case "project": return FolderOpen;
-    case "parser": return BookOpen;
-    case "studio": return Music;
-    case "montage": return Film;
-    default: return Circle;
-  }
-}
-
-function isStageComplete(stage: PipelineStage): boolean {
-  return stage.subSteps.length > 0 && stage.subSteps.every(s => s.done);
-}
-
-function isStageUnlocked(stages: PipelineStage[], idx: number): boolean {
-  if (idx === 0) return true;
-  return isStageComplete(stages[idx - 1]);
-}
-
-function stageProgress(stage: PipelineStage): number {
+function stageFraction(stage: StageDef, progress: PipelineProgress): number {
   if (stage.subSteps.length === 0) return 0;
-  return stage.subSteps.filter(s => s.done).length / stage.subSteps.length;
+  return stage.subSteps.filter(s => !!progress[s.id]).length / stage.subSteps.length;
 }
 
-// ── Component ───────────────────────────────────────────────
+// ── Component ───────────────────────────────────────────
 
 interface Props {
-  stages: PipelineStage[];
+  progress: PipelineProgress;
   isRu: boolean;
-  onToggleSubStep?: (stageId: string, subStepId: string, done: boolean) => void;
-  bookId: string;
+  onToggleStep?: (stepId: PipelineStepId, done: boolean) => void;
 }
 
-export function PipelineTimeline({ stages, isRu, onToggleSubStep, bookId }: Props) {
+export function PipelineTimeline({ progress, isRu, onToggleStep }: Props) {
   const navigate = useNavigate();
 
-  const handleStageClick = useCallback((stage: PipelineStage, idx: number) => {
-    if (!isStageUnlocked(stages, idx)) return;
+  const handleStageClick = useCallback((stage: StageDef, idx: number) => {
+    if (!isStageUnlocked(idx, progress)) return;
     navigate(stage.route);
-  }, [stages, navigate]);
+  }, [progress, navigate]);
 
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex items-center gap-0.5">
-        {stages.map((stage, idx) => {
-          const Icon = stageIcon(stage.id);
-          const unlocked = isStageUnlocked(stages, idx);
-          const complete = isStageComplete(stage);
-          const progress = stageProgress(stage);
-          const doneCount = stage.subSteps.filter(s => s.done).length;
+        {STAGES.map((stage, idx) => {
+          const Icon = stage.icon;
+          const unlocked = isStageUnlocked(idx, progress);
+          const complete = isStageComplete(stage, progress);
+          const frac = stageFraction(stage, progress);
+          const doneCount = stage.subSteps.filter(s => !!progress[s.id]).length;
           const totalCount = stage.subSteps.length;
           const hasPartial = doneCount > 0 && !complete;
 
@@ -154,7 +123,7 @@ export function PipelineTimeline({ stages, isRu, onToggleSubStep, bookId }: Prop
               {idx > 0 && (
                 <ChevronRight className={cn(
                   "h-3 w-3 mx-0.5 flex-shrink-0",
-                  isStageComplete(stages[idx - 1])
+                  isStageComplete(STAGES[idx - 1], progress)
                     ? "text-primary/60"
                     : "text-muted-foreground/30",
                 )} />
@@ -190,12 +159,11 @@ export function PipelineTimeline({ stages, isRu, onToggleSubStep, bookId }: Prop
                           )} />
                         )}
 
-                        {/* Mini progress arc (bottom line) */}
                         {unlocked && !complete && doneCount > 0 && (
                           <div className="absolute bottom-0.5 left-1.5 right-1.5 h-0.5 rounded-full bg-muted overflow-hidden">
                             <div
                               className="h-full bg-primary/60 rounded-full transition-all"
-                              style={{ width: `${progress * 100}%` }}
+                              style={{ width: `${frac * 100}%` }}
                             />
                           </div>
                         )}
@@ -204,7 +172,7 @@ export function PipelineTimeline({ stages, isRu, onToggleSubStep, bookId }: Prop
                     <TooltipContent side="bottom" className="text-xs">
                       <p className="font-medium">
                         {isRu ? stage.labelRu : stage.labelEn}
-                        {!unlocked && (isRu ? " 🔒" : " 🔒")}
+                        {!unlocked && " 🔒"}
                       </p>
                       <p className="text-muted-foreground">
                         {doneCount}/{totalCount} {isRu ? "готово" : "done"}
@@ -221,11 +189,11 @@ export function PipelineTimeline({ stages, isRu, onToggleSubStep, bookId }: Prop
                   {stage.subSteps.map(sub => (
                     <ContextMenuCheckboxItem
                       key={sub.id}
-                      checked={sub.done}
+                      checked={!!progress[sub.id]}
                       disabled={sub.auto}
                       onCheckedChange={(checked) => {
                         if (!sub.auto) {
-                          onToggleSubStep?.(stage.id, sub.id, !!checked);
+                          onToggleStep?.(sub.id, !!checked);
                         }
                       }}
                       onSelect={(e) => e.preventDefault()}
