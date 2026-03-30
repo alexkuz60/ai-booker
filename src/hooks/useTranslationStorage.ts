@@ -42,6 +42,12 @@ async function resolveTranslationProjectName(
       const isMirrorProject = !!meta.sourceProjectName || !!meta.targetLanguage;
       if (!isMirrorProject) continue;
 
+      console.info("[resolveTranslation] candidate:", projectName, {
+        sourceProjectName: meta.sourceProjectName,
+        targetLanguage: meta.targetLanguage,
+        bookId: meta.bookId,
+      });
+
       const sameBook = meta.bookId === sourceMeta.bookId;
       const linkedToCurrentSource = meta.sourceProjectName === sourceStorage.projectName;
       const looksLikeMirrorName = projectName.startsWith(`${sourceStorage.projectName}_`);
