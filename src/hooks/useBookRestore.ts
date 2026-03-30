@@ -248,6 +248,7 @@ export function useBookRestore({
       setPartIdMap(result.partIdMap);
       setChapterResults(result.chapterResults);
       setStep("workspace");
+      bumpProgressVersion?.();
 
       const bookFormat = detectFileFormat(book.file_name);
       const formatLabel = bookFormat.toUpperCase();
@@ -266,6 +267,7 @@ export function useBookRestore({
     updatePdfRef, updateTotalPages,
     setStep, setFileName, setBookId, setTocEntries,
     setChapterIdMap, setPartIdMap, setChapterResults, setErrorMsg,
+    bumpProgressVersion,
   ]);
 
   // ── Lazy PDF loader ───────────────────────────────────────
