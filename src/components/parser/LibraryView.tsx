@@ -13,6 +13,7 @@ import {
 import { t } from "@/pages/parser/i18n";
 import type { BookRecord } from "@/pages/parser/types";
 import { PipelineTimeline } from "@/components/library/PipelineTimeline";
+import { TranslationTimeline } from "@/components/library/TranslationTimeline";
 import type { PipelineProgress, PipelineStepId } from "@/lib/projectStorage";
 import { createEmptyPipelineProgress } from "@/lib/projectStorage";
 import { readPipelineProgress, writePipelineStep } from "@/hooks/usePipelineProgress";
