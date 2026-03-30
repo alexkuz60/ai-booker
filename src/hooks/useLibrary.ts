@@ -27,7 +27,7 @@ interface UseLibraryParams {
 
 export function useLibrary({ userId, storageBackend, projectStorage, step }: UseLibraryParams) {
   const [books, setBooks] = useState<BookRecord[]>([]);
-  const [loadingLibrary, setLoadingLibrary] = useState(true);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [localProjectNamesByBookId, setLocalProjectNamesByBookId] = useState<Map<string, string[]>>(new Map());
   const libraryLoadedRef = useRef(false);
 
@@ -273,7 +273,6 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     if (step !== "library") {
       libraryLoadedRef.current = false;
       serverBooksLoadedRef.current = false;
-      setLoadingLibrary(false);
       return;
     }
 
