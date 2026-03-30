@@ -204,7 +204,7 @@ export default function Translation() {
     } else {
       onProgress?.("translation", "skipped", isRu ? "Нет проекта перевода" : "No translation project");
     }
-  }, [saveBook, transProjectExists, translationStorage, saveTranslation]);
+  }, [saveBook, transProjectExists, translationStorage, saveTranslation, isRu]);
 
   const headerRight = useMemo(() => {
     if (!isOpen || !meta) return undefined;
