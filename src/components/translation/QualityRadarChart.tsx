@@ -18,6 +18,8 @@ import {
 } from "@/lib/qualityRadar";
 import { cn } from "@/lib/utils";
 import { ThreeAxisRadarOverlay } from "./ThreeAxisRadarOverlay";
+import { LAYER_LABELS } from "@/lib/radarStages";
+import { Tooltip as UiTooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 
 export type RadarLayer = "3R" | "5R" | "5R+Alt";
 
@@ -237,17 +239,28 @@ export function QualityRadarChart({
                     />
                   ))}
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  {layers.map(({ key, value }) => (
-                    <span
-                      key={key}
-                      className="text-[9px] font-mono font-medium"
-                      style={{ color: LAYER_COLORS[key].stroke }}
-                    >
-                      {(value * 100).toFixed(0)}
-                    </span>
-                  ))}
-                </div>
+                <TooltipProvider delayDuration={200}>
+                  <div className="flex items-center shrink-0">
+                    {layers.map(({ key, value }, i) => (
+                      <React.Fragment key={key}>
+                        {i > 0 && <span className="text-[8px] text-muted-foreground mx-0.5">·</span>}
+                        <UiTooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              className="text-[9px] font-mono font-medium cursor-default"
+                              style={{ color: LAYER_COLORS[key].stroke }}
+                            >
+                              {(value * 100).toFixed(0)}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-[10px] px-2 py-1">
+                            {LAYER_LABELS[key]?.[(isRu ? "ru" : "en") as "ru" | "en"] ?? key}: {(value * 100).toFixed(0)}%
+                          </TooltipContent>
+                        </UiTooltip>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </TooltipProvider>
               </button>
             );
           })}
