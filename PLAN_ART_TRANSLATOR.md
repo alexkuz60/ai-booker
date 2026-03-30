@@ -159,6 +159,16 @@ Score = Σ(wi · axiScore_i), где i ∈ {semantic, sentiment, rhythm, phoneti
 - Двухуровневый **модульный кэш** (radarCache + computedCache) — мгновенное отображение при повторном выборе и навигации.
 - Сохранённые оценки загружаются из `radar.json`; пересчёт — только для несохранённых сегментов.
 
+### 5.3b. Карта качества сцены (SegmentQualityChart)
+
+- Сворачиваемая гистограмма **всех сегментов** выбранной сцены, расположена под билингва-аккордеонами.
+- Отображает трёхслойный overlay (3R/5R/5R+Alt) для выбранной оси (Семантика/Тональность/Ритмика/Фонетика/Культура).
+- Вертикальная колонка-переключатель осей (S/T/R/P/C) слева от графика.
+- Клик по бину → выбор и прокрутка к соответствующему сегменту в билингве.
+- Адаптивная ширина бинов: от 4px (>100 сегментов) до 28px (<20 сегментов).
+- Данные загружаются из `radarStages` (radar-literal/literary/critique.json), перечитываются по `reloadTick`.
+- Компонент: `SegmentQualityChart.tsx`, импортирует `LAYER_COLORS` из `QualityRadarChart.tsx`.
+
 ### 5.4. Многослойная визуализация (F7b)
 
 Радар отображает до 3 независимых слоёв, каждый со своими данными:
@@ -261,9 +271,9 @@ Score = Σ(wi · axiScore_i), где i ∈ {semantic, sentiment, rhythm, phoneti
 | **F6** | Критик (✅ critique-translation EF) + цикл итераций (✅ translationPipeline.ts — orchestrator: literal→literary→radar→critique→re-iterate) | ✅ Готово |
 | **F7** | Quality Radar UI: `QualityRadarChart` (recharts RadarChart, цветовая индикация), `RadarAxisDetail` (drill-down по сегментам), `QualityMonitorPanel` (загрузка radar.json, двухуровневый кэш, segment breakdown) | ✅ Готово |
 | **F7b** | Многослойная визуализация: 3R-треугольник (`ThreeAxisRadarOverlay`, SVG), 5R/5R+Alt (recharts Radar), строгая изоляция данных между стадиями, управление слоями + пресеты весов в едином ряду хедера | ✅ Готово |
+| **F7c** | Карта качества сцены: `SegmentQualityChart` (гистограмма всех сегментов, трёхслойный overlay по выбранной оси, клик→навигация к сегменту, адаптивные бины) | ✅ Готово |
 | **F8** | Батчинг: `useTranslationBatch` (full pipeline per scene + chapter batch с ModelPoolManager), `TranslationProgressPanel` (прогресс + воркеры пула), три уровня перевода (сегмент/сцена/глава), гибкий парсинг ответов AI, пропуск пустых сегментов | ✅ Готово |
 | **F9** | TTS-интеграция переведённой версии | 🔲 Планируется |
-
 ---
 
 *Документ обновляется по мере проработки деталей каждой фазы.*
