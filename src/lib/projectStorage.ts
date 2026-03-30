@@ -70,6 +70,13 @@ export const PIPELINE_STEP_IDS = [
   "chapter_assembly",
   "mastering",
   "final_render",
+  // Translation pipeline
+  "trans_storage_created",
+  "trans_migration_done",
+  "trans_literal_done",
+  "trans_literary_done",
+  "trans_critique_done",
+  "trans_export_done",
 ] as const;
 
 export type PipelineStepId = (typeof PIPELINE_STEP_IDS)[number];
