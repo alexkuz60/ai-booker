@@ -24,13 +24,15 @@ interface UsePipelineProgressReturn {
 
 export function usePipelineProgress(
   storage: ProjectStorage | null | undefined,
+  /** Optional version counter — bump to force re-read from OPFS */
+  version?: number,
 ): UsePipelineProgressReturn {
   const [progress, setProgress] = useState<PipelineProgress>(createEmptyPipelineProgress);
   const [loading, setLoading] = useState(true);
   const storageRef = useRef(storage);
   storageRef.current = storage;
 
-  // Load from project.json on mount / storage change
+  // Load from project.json on mount / storage change / version bump
   useEffect(() => {
     if (!storage) {
       setLoading(false);
@@ -42,7 +44,7 @@ export function usePipelineProgress(
         const meta = await storage.readJSON<Record<string, unknown>>("project.json");
         if (cancelled) return;
         const saved = (meta?.pipelineProgress as PipelineProgress) ?? {};
-        setProgress(prev => ({ ...prev, ...saved }));
+        setProgress(prev => ({ ...createEmptyPipelineProgress(), ...saved }));
       } catch {
         // project.json missing — use defaults
       } finally {
@@ -50,7 +52,7 @@ export function usePipelineProgress(
       }
     })();
     return () => { cancelled = true; };
-  }, [storage]);
+  }, [storage, version]);
 
   const persist = useCallback(async (updated: PipelineProgress) => {
     const s = storageRef.current;

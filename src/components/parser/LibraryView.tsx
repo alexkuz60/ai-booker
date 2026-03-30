@@ -42,6 +42,7 @@ function LibraryViewInner({
   serverBooks = [], loadingServerBooks = false, onOpenServerBook, onDeleteServerBook,
   onStageNavigate, onProjectReset,
 }: LibraryViewProps) {
+  const { bumpProgressVersion } = useProjectStorageContext();
   const syncedBookIds = useMemo(() => new Set(serverBooks.map(b => b.id)), [serverBooks]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
