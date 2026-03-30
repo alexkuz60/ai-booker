@@ -192,10 +192,15 @@ export function useBookManager({
         for (const projectName of candidateProjects) {
           try {
             const store = await OPFSStorage.openOrCreate(projectName);
-            const meta = await store.readJSON<{ bookId?: string }>("project.json").catch(() => null);
+            const meta = await store.readJSON<{ bookId?: string; targetLanguage?: string; sourceProjectName?: string }>("project.json").catch(() => null);
             const toc = await store.readJSON<{ bookId?: string }>(paths.structureToc()).catch(() => null);
             const resolvedBookId = meta?.bookId || toc?.bookId || null;
             if (resolvedBookId !== delBookId) continue;
+            // B26: Skip translation mirror projects — they share bookId but are independent
+            if ((meta as any)?.targetLanguage || (meta as any)?.sourceProjectName) {
+              console.info("[deleteBook] Skipping translation mirror:", projectName);
+              continue;
+            }
             projectsToDelete.push(projectName);
             console.info("[deleteBook] Confirmed OPFS project for bookId:", delBookId, "→", projectName);
           } catch {
