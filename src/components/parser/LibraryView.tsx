@@ -107,13 +107,15 @@ function LibraryViewInner({
         const meta = await store.readJSON<Record<string, unknown>>("project.json");
         if (meta?.bookId === bookId && !meta?.targetLanguage && !meta?.sourceProjectName) {
           await writePipelineStep(store, stepId, done);
+          // Notify sidebar and other consumers to re-read progress
+          bumpProgressVersion();
           break;
         }
       }
     } catch (e) {
       console.error("[LibraryView] Failed to persist pipeline step:", e);
     }
-  }, []);
+  }, [bumpProgressVersion]);
 
   const startRename = (book: BookRecord) => {
     setEditingId(book.id);
