@@ -121,6 +121,24 @@ export default function Library() {
     openSavedBook(book);
   }, [openSavedBook]);
 
+  /** Timeline stage click: open book then navigate to the stage's route */
+  const handleStageNavigate = useCallback((book: BookRecord, route: string) => {
+    // Open the book, then navigate to the target route
+    (async () => {
+      await openSavedBook(book);
+      navigate(route);
+    })();
+  }, [openSavedBook, navigate]);
+
+  /** Project reset: re-upload the book file (wipe progress) */
+  const handleProjectReset = useCallback((book: BookRecord) => {
+    // Delete and start fresh upload
+    (async () => {
+      await deleteBook(book.id);
+      startNewProject();
+    })();
+  }, [deleteBook, startNewProject]);
+
   // ── Page header ──
   useEffect(() => {
     setPageHeader({
@@ -150,6 +168,8 @@ export default function Library() {
               onClearAll={clearAllProjects} onRename={renameBook}
               serverBooks={serverBooks} loadingServerBooks={loadingServerBooks}
               onOpenServerBook={handleRestoreClick} onDeleteServerBook={deleteServerBook}
+              onStageNavigate={handleStageNavigate}
+              onProjectReset={handleProjectReset}
             />
           )}
           {step === "upload" && (
