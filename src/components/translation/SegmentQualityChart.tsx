@@ -149,6 +149,14 @@ export function SegmentQualityChart({
     });
   }, [onSelectSegment]);
 
+  // Adaptive bar size: clamp between 4 and 28px based on segment count
+  const dynamicBarSize = useMemo(() => {
+    const count = barData.length || 1;
+    // Assume ~600px usable chart width; 40% gap → 60% for bars
+    const size = Math.floor((600 * 0.6) / count);
+    return Math.max(4, Math.min(28, size));
+  }, [barData.length]);
+
   const hasData = barData.some((b) => b["3R"] > 0 || b["5R"] > 0 || b["5R+Alt"] > 0);
 
   if (!sceneId || segmentIds.length === 0) return null;
@@ -206,7 +214,7 @@ export function SegmentQualityChart({
                   data={barData}
                   margin={{ top: 8, right: 12, bottom: 4, left: 4 }}
                   barCategoryGap="25%"
-                  barGap={-20}
+                  barGap={-dynamicBarSize}
                 >
                   <XAxis
                     dataKey="label"
@@ -233,7 +241,7 @@ export function SegmentQualityChart({
                       fillOpacity={layer === "3R" ? 0.5 : layer === "5R" ? 0.65 : 0.85}
                       stroke="none"
                       radius={[2, 2, 0, 0]}
-                      barSize={20}
+                      barSize={dynamicBarSize}
                       cursor="pointer"
                       onClick={(_: any, idx: number) => {
                         if (barData[idx]) handleBarClick(barData[idx]);
