@@ -17,6 +17,7 @@ type LocalLibraryCandidate = {
   record: BookRecord;
   projectName: string;
   dedupeKey: string;
+  progress: PipelineProgress;
 };
 
 interface UseLibraryParams {
