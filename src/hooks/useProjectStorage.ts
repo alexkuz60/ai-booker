@@ -65,7 +65,12 @@ export function useProjectStorage(): UseProjectStorageReturn {
   const [meta, setMeta] = useState<ProjectMeta | null>(null);
   const [loading, setLoading] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const [progressVersion, setProgressVersion] = useState(0);
   const backend = detectStorageBackend();
+
+  const bumpProgressVersion = useCallback(() => {
+    setProgressVersion(v => v + 1);
+  }, []);
 
   // ── Create new project ──────────────────────────────────
 
@@ -366,6 +371,8 @@ export function useProjectStorage(): UseProjectStorageReturn {
     initialized,
     isOpen: !!storage,
     loading,
+    progressVersion,
+    bumpProgressVersion,
     createProject,
     openProject,
     openProjectByName,
