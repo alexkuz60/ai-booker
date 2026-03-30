@@ -204,9 +204,25 @@ export function SegmentQualityChart({
                 <BarChart
                   data={barData}
                   margin={{ top: 8, right: 12, bottom: 4, left: 4 }}
-                  barCategoryGap="15%"
+                  barCategoryGap="25%"
                   barGap={-20}
                 >
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    domain={[0, 1]}
+                    tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v: number) => `${Math.round(v * 100)}`}
+                    width={28}
+                  />
+                  <Tooltip content={<CustomTooltip isRu={isRu} activeAxis={activeAxis} />} />
+
                   {/* Overlay: render longest bars first (behind), short ones on top */}
                   {OVERLAY_ORDER.map((layer) => (
                     <Bar
@@ -214,15 +230,29 @@ export function SegmentQualityChart({
                       dataKey={layer}
                       fill={LAYER_COLORS[layer].fill}
                       fillOpacity={layer === "3R" ? 0.5 : layer === "5R" ? 0.65 : 0.85}
-                      stroke={LAYER_COLORS[layer].stroke}
-                      strokeWidth={0.5}
+                      stroke="none"
                       radius={[2, 2, 0, 0]}
                       barSize={20}
                       cursor="pointer"
                       onClick={(_: any, idx: number) => {
                         if (barData[idx]) handleBarClick(barData[idx]);
                       }}
-                    />
+                      onMouseEnter={(_: any, idx: number) => setHoveredIdx(idx)}
+                      onMouseLeave={() => setHoveredIdx(null)}
+                    >
+                      {barData.map((_, i) => (
+                        <Cell
+                          key={i}
+                          fillOpacity={
+                            hoveredIdx === null
+                              ? (layer === "3R" ? 0.5 : layer === "5R" ? 0.65 : 0.85)
+                              : hoveredIdx === i
+                                ? 1
+                                : (layer === "3R" ? 0.25 : layer === "5R" ? 0.35 : 0.45)
+                          }
+                        />
+                      ))}
+                    </Bar>
                   ))}
                 </BarChart>
               </ResponsiveContainer>
