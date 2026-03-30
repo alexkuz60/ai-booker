@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -174,10 +174,15 @@ export function BilingualSegmentsView({
     }
   }, [onCritique]);
 
-  // When selectedSegmentId changes externally (e.g. chart bar click),
-  // enrich the selection with full text data from items so the monitor panel updates.
+  // When selectedSegmentId changes externally (e.g. chart bar click) with empty text,
+  // enrich the selection with full text data so the monitor panel updates.
+  // Skip if accordion already provided the full data (originalText is present).
+  const prevSelectedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!selectedSegmentId || !onSelectSegment || items.length === 0) return;
+    // Skip if same segment already selected (accordion already enriched it)
+    if (prevSelectedRef.current === selectedSegmentId) return;
+    prevSelectedRef.current = selectedSegmentId;
     const found = items.find(i => i.segment.segment_id === selectedSegmentId);
     if (!found) return;
     const fullText = found.segment.phrases.map(p => p.text).join(" ");
@@ -238,8 +243,10 @@ export function BilingualSegmentsView({
 
       <Accordion type="single" collapsible value={openValue} onValueChange={(val) => {
           if (!val) {
+            prevSelectedRef.current = null;
             onSelectSegment?.(null);
           } else {
+            prevSelectedRef.current = val;
             const found = items.find(i => i.segment.segment_id === val);
             if (found) {
               const fullText = found.segment.phrases.map(p => p.text).join(" ");
