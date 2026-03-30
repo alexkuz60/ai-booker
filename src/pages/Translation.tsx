@@ -8,7 +8,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { Languages, Radar, BookOpen, Loader2, FileText, Wand2, Square } from "lucide-react";
+import { Languages, Radar, BookOpen, Loader2, FileText, Wand2, Square, CloudUpload } from "lucide-react";
 import { getScoreLevel, SCORE_COLORS } from "@/lib/qualityRadar";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import {
@@ -30,6 +30,7 @@ import { useSegmentLiteraryEdit } from "@/hooks/useSegmentLiteraryEdit";
 import { useSegmentCritique } from "@/hooks/useSegmentCritique";
 import { useTranslationBatch } from "@/hooks/useTranslationBatch";
 import { useTranslationActions } from "@/hooks/useTranslationActions";
+import { useSaveTranslation } from "@/hooks/useSaveTranslation";
 import { paths } from "@/lib/projectPaths";
 import type { TocChapter } from "@/pages/parser/types";
 import type { AiRoleId } from "@/config/aiRoles";
@@ -85,6 +86,11 @@ export default function Translation() {
   // Translation storage (mirror OPFS project)
   const { translationStorage, exists: transProjectExists, refresh: refreshTransStorage } =
     useTranslationStorage(storage, meta);
+
+  const { saveTranslation, saving: savingTranslation } = useSaveTranslation({
+    translationStorage,
+    isRu,
+  });
 
   // Compute source/target langs
   const sourceLang = meta?.language ?? "ru";
@@ -179,6 +185,23 @@ export default function Translation() {
     if (!isOpen || !meta) return undefined;
     return (
       <div className="flex items-center gap-2">
+        {transProjectExists && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={saveTranslation}
+            disabled={savingTranslation}
+            className="gap-1.5"
+            title={isRu ? "Сохранить перевод на сервер" : "Save translation to server"}
+          >
+            {savingTranslation ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <CloudUpload className="h-3.5 w-3.5" />
+            )}
+            {isRu ? "Перевод → сервер" : "Save translation"}
+          </Button>
+        )}
         <SaveBookButton
           isRu={isRu}
           onClick={saveBook}
@@ -197,7 +220,7 @@ export default function Translation() {
         />
       </div>
     );
-  }, [isOpen, meta, isRu, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, apiKeys]);
+  }, [isOpen, meta, isRu, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, apiKeys, transProjectExists, saveTranslation, savingTranslation]);
 
   const headerRightRef = useRef(headerRight);
   headerRightRef.current = headerRight;
