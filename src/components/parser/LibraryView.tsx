@@ -155,6 +155,92 @@ function LibraryViewInner({
     });
   }, []);
 
+  const handleTranslationStageClick = useCallback(async (book: BookRecord, stageId: string) => {
+    if (stageId === "trans_project") {
+      // First stage — create translation project (with confirm if exists)
+      try {
+        const projects = await OPFSStorage.listProjects();
+        let sourceStore: any = null;
+        let sourceMeta: ProjectMeta | null = null;
+        for (const pn of projects) {
+          const store = await OPFSStorage.openOrCreate(pn);
+          const meta = await store.readJSON<ProjectMeta>("project.json");
+          if (meta?.bookId === book.id && !meta?.targetLanguage && !meta?.sourceProjectName) {
+            sourceStore = store;
+            sourceMeta = meta;
+            break;
+          }
+        }
+        if (!sourceStore || !sourceMeta) return;
+
+        const tLang = (sourceMeta.language === "ru" ? "en" : "ru") as "en" | "ru";
+        const exists = await translationProjectExists(sourceStore.projectName, tLang);
+
+        if (exists) {
+          setTransCreateConfirm({ book, exists: true });
+        } else {
+          // Create directly
+          await doCreateTranslationProject(book);
+        }
+      } catch (err) {
+        console.error("[LibraryView] translation stage click error:", err);
+      }
+    } else {
+      // Other stages — navigate to translation page
+      onStageNavigate?.(book, "/translation");
+    }
+  }, [onStageNavigate]);
+
+  const doCreateTranslationProject = useCallback(async (book: BookRecord) => {
+    setTransCreating(true);
+    try {
+      const projects = await OPFSStorage.listProjects();
+      let sourceStore: any = null;
+      let sourceMeta: ProjectMeta | null = null;
+      for (const pn of projects) {
+        const store = await OPFSStorage.openOrCreate(pn);
+        const meta = await store.readJSON<ProjectMeta>("project.json");
+        if (meta?.bookId === book.id && !meta?.targetLanguage && !meta?.sourceProjectName) {
+          sourceStore = store;
+          sourceMeta = meta;
+          break;
+        }
+      }
+      if (!sourceStore || !sourceMeta) return;
+
+      const readiness = await checkTranslationReadiness(sourceStore);
+      const readyIndices = Array.from(readiness.readyChapters.keys());
+      if (readyIndices.length === 0) {
+        toast.error(isRu
+          ? "Нет глав, готовых к переводу. Выполните раскадровку в Студии."
+          : "No chapters ready for translation. Complete storyboarding in Studio.");
+        return;
+      }
+
+      const tLang = (sourceMeta.language === "ru" ? "en" : "ru") as "en" | "ru";
+      await createTranslationProject({
+        sourceStorage: sourceStore,
+        sourceMeta,
+        targetLanguage: tLang,
+        chapterIndices: readyIndices,
+      });
+
+      toast.success(isRu
+        ? `Проект перевода создан (${readyIndices.length} глав)`
+        : `Translation project created (${readyIndices.length} chapters)`);
+
+      // Update progress flags
+      await handleToggleStep(book.id, "trans_storage_created" as PipelineStepId, true);
+      await handleToggleStep(book.id, "trans_migration_done" as PipelineStepId, true);
+    } catch (err) {
+      console.error("[LibraryView] create translation error:", err);
+      toast.error(isRu ? "Ошибка создания проекта перевода" : "Failed to create translation project");
+    } finally {
+      setTransCreating(false);
+      setTransCreateConfirm(null);
+    }
+  }, [isRu, handleToggleStep]);
+
   const renderBookCard = (book: BookRecord, actions: React.ReactNode, timeline?: React.ReactNode, translationTimeline?: React.ReactNode) => {
     const hasTranslation = !!translationTimeline;
     const isTranslationExpanded = expandedTranslation.has(book.id);
