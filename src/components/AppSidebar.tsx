@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Library, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen, LogOut, Shield, MessageCircle, Scissors, Waves, Languages } from "lucide-react";
+import { Home, Library, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen, LogOut, Shield, MessageCircle, Scissors, Waves, Languages } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useTheme } from "next-themes";
@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 const mainNav = [
+  { title: "Главная", titleEn: "Home", url: "/home", icon: Home },
   { title: "Библиотека", titleEn: "Library", url: "/", icon: Library },
   { title: "Парсер", titleEn: "Parser", url: "/parser", icon: BookOpen },
   { title: "Студия", titleEn: "Studio", url: "/studio", icon: AudioWaveform },
