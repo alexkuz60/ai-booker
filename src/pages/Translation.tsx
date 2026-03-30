@@ -185,6 +185,23 @@ export default function Translation() {
     if (!isOpen || !meta) return undefined;
     return (
       <div className="flex items-center gap-2">
+        {transProjectExists && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={saveTranslation}
+            disabled={savingTranslation}
+            className="gap-1.5"
+            title={isRu ? "Сохранить перевод на сервер" : "Save translation to server"}
+          >
+            {savingTranslation ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <CloudUpload className="h-3.5 w-3.5" />
+            )}
+            {isRu ? "Перевод → сервер" : "Save translation"}
+          </Button>
+        )}
         <SaveBookButton
           isRu={isRu}
           onClick={saveBook}
@@ -203,7 +220,7 @@ export default function Translation() {
         />
       </div>
     );
-  }, [isOpen, meta, isRu, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, apiKeys]);
+  }, [isOpen, meta, isRu, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, apiKeys, transProjectExists, saveTranslation, savingTranslation]);
 
   const headerRightRef = useRef(headerRight);
   headerRightRef.current = headerRight;
