@@ -528,6 +528,35 @@ function LibraryViewInner({
           </>
         )}
       </div>
+
+      {/* Translation project creation confirmation dialog */}
+      <Dialog open={!!transCreateConfirm} onOpenChange={(open) => { if (!open) setTransCreateConfirm(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {isRu ? "Проект перевода уже существует" : "Translation project already exists"}
+            </DialogTitle>
+            <DialogDescription>
+              {isRu
+                ? `Для книги «${transCreateConfirm?.book.title}» уже создан проект арт-перевода. Создать заново? Существующий проект будет перезаписан.`
+                : `Book "${transCreateConfirm?.book.title}" already has a translation project. Create again? The existing project will be overwritten.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTransCreateConfirm(null)} disabled={transCreating}>
+              {t("cancel", isRu)}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => transCreateConfirm && doCreateTranslationProject(transCreateConfirm.book)}
+              disabled={transCreating}
+            >
+              {transCreating && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
+              {isRu ? "Пересоздать" : "Recreate"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
