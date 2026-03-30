@@ -2,13 +2,17 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeaderProvider } from "@/hooks/usePageHeader";
 import { ProjectStorageProvider } from "@/hooks/useProjectStorageContext";
+import { usePipelineGating } from "@/hooks/usePipelineGating";
+import { useLanguage } from "@/hooks/useLanguage";
+import { toast } from "sonner";
+import { useEffect, useRef } from "react";
 import Home from "./pages/Home";
 import Library from "./pages/Library";
 import Parser from "./pages/Parser";
@@ -23,6 +27,29 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+/** Route guard component — redirects locked routes to Library */
+function GatedRoute({ route, children }: { route: string; children: React.ReactNode }) {
+  const { isLocked, lockReason, loading } = usePipelineGating();
+  const { isRu } = useLanguage();
+  const toastShown = useRef(false);
+
+  if (loading) return null;
+
+  if (isLocked(route)) {
+    if (!toastShown.current) {
+      toastShown.current = true;
+      const reason = lockReason(route, isRu);
+      if (reason) {
+        // Defer toast to avoid render-phase side effects
+        setTimeout(() => toast.warning(reason), 0);
+      }
+    }
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
 
 function ProtectedRoutes() {
   const { user, loading } = useAuth();
@@ -45,11 +72,17 @@ function ProtectedRoutes() {
             <Route path="/" element={<Library />} />
             <Route path="/home" element={<Home />} />
             <Route path="/parser" element={<Parser />} />
-            <Route path="/studio" element={<Studio />} />
-            <Route path="/montage" element={<Montage />} />
+            <Route path="/studio" element={
+              <GatedRoute route="/studio"><Studio /></GatedRoute>
+            } />
+            <Route path="/montage" element={
+              <GatedRoute route="/montage"><Montage /></GatedRoute>
+            } />
             <Route path="/narrators" element={<Narrators />} />
             <Route path="/soundscape" element={<Soundscape />} />
-            <Route path="/translation" element={<Translation />} />
+            <Route path="/translation" element={
+              <GatedRoute route="/translation"><Translation /></GatedRoute>
+            } />
             <Route path="/profile" element={<Profile />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<NotFound />} />

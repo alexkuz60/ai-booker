@@ -1,12 +1,14 @@
 import { useState } from "react";
-import { Home, Library, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen, LogOut, Shield, MessageCircle, Scissors, Waves, Languages } from "lucide-react";
+import { Home, Library, Mic2, AudioWaveform, User, Sun, Moon, Globe, BookOpen, LogOut, Shield, MessageCircle, Scissors, Waves, Languages, Lock } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useLanguage } from "@/hooks/useLanguage";
+import { usePipelineGating } from "@/hooks/usePipelineGating";
 import { AssistantChat } from "@/components/AssistantChat";
+import { toast } from "sonner";
 
 import {
   Sidebar,
@@ -21,6 +23,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 const mainNav = [
@@ -44,13 +47,52 @@ export function AppSidebar() {
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const { lang, isRu, toggleLang } = useLanguage();
+  const { isLocked, lockReason } = usePipelineGating();
 
   const isActive = (path: string) =>
     path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
 
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
+
+  const handleNavClick = (url: string, e: React.MouseEvent) => {
+    if (isLocked(url)) {
+      e.preventDefault();
+      const reason = lockReason(url, isRu);
+      if (reason) toast.warning(reason);
+    }
+  };
+
+  const renderNavItem = (item: typeof mainNav[0]) => {
+    const locked = isLocked(item.url);
+    return (
+      <SidebarMenuItem key={item.url}>
+        <SidebarMenuButton
+          asChild
+          isActive={isActive(item.url)}
+          tooltip={collapsed ? (lang === "ru" ? item.title : item.titleEn) + (locked ? " 🔒" : "") : undefined}
+        >
+          <NavLink
+            to={locked ? "#" : item.url}
+            end={item.url === "/"}
+            className={cn("hover:bg-accent/50", locked && "opacity-40 cursor-not-allowed")}
+            activeClassName="bg-accent text-accent-foreground"
+            onClick={(e: React.MouseEvent) => handleNavClick(item.url, e)}
+          >
+            <item.icon className="h-4 w-4" />
+            {!collapsed && (
+              <span className="font-body text-sm flex items-center gap-1.5">
+                {lang === "ru" ? item.title : item.titleEn}
+                {locked && <Lock className="h-3 w-3 text-muted-foreground" />}
+              </span>
+            )}
+          </NavLink>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  };
 
   return (
     <>
@@ -76,29 +118,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNav.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url)}
-                    tooltip={collapsed ? (lang === "ru" ? item.title : item.titleEn) : undefined}
-                  >
-                    <NavLink
-                      to={item.url}
-                      end={item.url === "/"}
-                      className="hover:bg-accent/50"
-                      activeClassName="bg-accent text-accent-foreground"
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && (
-                        <span className="font-body text-sm">
-                          {lang === "ru" ? item.title : item.titleEn}
-                        </span>
-                      )}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {mainNav.map(renderNavItem)}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -109,28 +129,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {extraNav.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url)}
-                    tooltip={collapsed ? (lang === "ru" ? item.title : item.titleEn) : undefined}
-                  >
-                    <NavLink
-                      to={item.url}
-                      className="hover:bg-accent/50"
-                      activeClassName="bg-accent text-accent-foreground"
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && (
-                        <span className="font-body text-sm">
-                          {lang === "ru" ? item.title : item.titleEn}
-                        </span>
-                      )}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {extraNav.map(renderNavItem)}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
