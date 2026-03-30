@@ -149,7 +149,13 @@ export function SegmentQualityChart({
     });
   }, [onSelectSegment]);
 
-  const hasData = barData.some((b) => b["3R"] > 0 || b["5R"] > 0 || b["5R+Alt"] > 0);
+  // Adaptive bar size: clamp between 4 and 28px based on segment count
+  const dynamicBarSize = useMemo(() => {
+    const count = barData.length || 1;
+    // Assume ~600px usable chart width; 40% gap → 60% for bars
+    const size = Math.floor((600 * 0.6) / count);
+    return Math.max(4, Math.min(28, size));
+  }, [barData.length]);
 
   if (!sceneId || segmentIds.length === 0) return null;
 
