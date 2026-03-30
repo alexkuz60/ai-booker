@@ -205,6 +205,21 @@ export default function Translation() {
             {isRu ? "Перевод → сервер" : "Save translation"}
           </Button>
         )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={restoreTranslation}
+          disabled={restoringTranslation || savingTranslation}
+          className="gap-1.5"
+          title={isRu ? "Восстановить перевод с сервера" : "Restore translation from server"}
+        >
+          {restoringTranslation ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <CloudDownload className="h-3.5 w-3.5" />
+          )}
+          {isRu ? "Перевод ← сервер" : "Restore translation"}
+        </Button>
         <SaveBookButton
           isRu={isRu}
           onClick={saveBook}
