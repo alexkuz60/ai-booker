@@ -17,6 +17,7 @@ import type { PipelineProgress, PipelineStepId } from "@/lib/projectStorage";
 import { createEmptyPipelineProgress } from "@/lib/projectStorage";
 import { readPipelineProgress, writePipelineStep } from "@/hooks/usePipelineProgress";
 import { OPFSStorage } from "@/lib/projectStorage";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 
 interface LibraryViewProps {
   isRu: boolean;
