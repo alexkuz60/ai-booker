@@ -152,10 +152,12 @@
 - Решение: `useTranslationBatch` инициализирует `currentStage` немедленно при старте пайплайна, до получения первого ответа от модели.
 - Файл: `src/hooks/useTranslationBatch.ts`.
 
-### Ш. Wipe-and-Deploy удалял translation-зеркало — ✅ РЕШЕНО (B26)
-- Проблема: translation mirror проекты (например, `Book_EN`) имеют тот же `bookId`, что и исходный. `useLibrary.loadLocalLibrary` включал их в `localProjectNamesByBookId`, и при Wipe-and-Deploy (`wipeProjectBrowserState`) они удалялись в шаге 1, **до** zombie-скана (шаг 1b), который их проверяет.
-- Решение: двухуровневая защита — (1) `useLibrary` фильтрует зеркала при построении `localProjectNamesByBookId`; (2) `wipeProjectBrowserState` проверяет `targetLanguage`/`sourceProjectName` перед удалением каждого проекта (defense-in-depth).
-- Файлы: `src/hooks/useLibrary.ts`, `src/lib/projectCleanup.ts`.
+### Ш. Потеря translation-зеркала после рестарта браузера — 🔴 НЕ РЕШЕНО (B26)
+- Проблема: translation mirror проект (например, `Book_EN`) исчезает после рестарта браузера. Зеркало физически удаляется из OPFS.
+- B26-костыль (откатить): добавлены фильтры в `useLibrary` и `wipeProjectBrowserState` для пропуска зеркал. Это маскирует баг, а не чинит его. Вопрос не «как защитить зеркало от удаления», а «ПОЧЕМУ кто-то пытается его удалить при обычном рестарте».
+- Корневая причина: НЕ НАЙДЕНА. Нужно проследить полную цепочку от рестарта браузера до момента удаления OPFS-папки зеркала. `project.json` содержит `targetLanguage`/`sourceProjectName` — этих метаданных достаточно для корректной работы без костылей.
+- Принцип: Wipe-and-Deploy вызывается ТОЛЬКО при явном «Загрузить с сервера». При обычном рестарте никакой Wipe не должен срабатывать. Если срабатывает — это баг в логике восстановления, а не повод фильтровать удаляемые проекты.
+- Файлы для расследования: `useBookRestore.ts` (restoreFromLocal, openSavedBook), `useBookManager.ts` (auto-restore), `localProjectResolver.ts`, `projectCleanup.ts`.
 
 ---
 
