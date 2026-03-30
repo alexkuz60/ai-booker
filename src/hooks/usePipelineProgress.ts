@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProjectStorage, PipelineProgress, PipelineStepId } from "@/lib/projectStorage";
 import { createEmptyPipelineProgress } from "@/lib/projectStorage";
+import { readPipelineProgress } from "@/hooks/usePipelineProgress";
 
 interface UsePipelineProgressReturn {
   progress: PipelineProgress;
@@ -41,10 +42,9 @@ export function usePipelineProgress(
     let cancelled = false;
     (async () => {
       try {
-        const meta = await storage.readJSON<Record<string, unknown>>("project.json");
+        const repaired = await readPipelineProgress(storage);
         if (cancelled) return;
-        const saved = (meta?.pipelineProgress as PipelineProgress) ?? {};
-        setProgress(prev => ({ ...createEmptyPipelineProgress(), ...saved }));
+        setProgress(repaired);
       } catch {
         // project.json missing — use defaults
       } finally {
