@@ -51,6 +51,7 @@ export function BilingualSegmentsView({
   onTranslateSegments,
   onLiteraryEdit,
   onCritique,
+  onSegmentsLoaded,
   translating = false,
   progressLabel,
   selectedSegmentId,
