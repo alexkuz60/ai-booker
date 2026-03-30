@@ -17,7 +17,7 @@ import {
   SCORE_COLORS,
 } from "@/lib/qualityRadar";
 import { cn } from "@/lib/utils";
-
+import { ThreeAxisRadarOverlay } from "./ThreeAxisRadarOverlay";
 
 export type RadarLayer = "3R" | "5R" | "5R+Alt";
 
@@ -89,11 +89,8 @@ export function QualityRadarChart({
   }, [scores, layer3R, layer5R, layerAlt, isRu]);
 
 
-  const show3R = hasAnyAxis(layer3R);
-  const show5R = hasAnyAxis(layer5R);
-  const showAlt = hasAnyAxis(layerAlt);
-
-  const dotSize = compact ? 3 : 5;
+  const show5R = visibleLayers.includes("5R") && hasAnyAxis(layer5R);
+  const showAlt = visibleLayers.includes("5R+Alt") && hasAnyAxis(layerAlt);
 
   return (
     <div className={cn("flex flex-col items-center gap-3", compact ? "gap-2" : "gap-4")}>
@@ -128,22 +125,7 @@ export function QualityRadarChart({
             />
             <PolarRadiusAxis domain={[0, 1]} tick={false} axisLine={false} />
 
-            {/* Layer: 3R (Basis) */}
-            {show3R && (
-              <Radar
-                key="layer-3r"
-                name="3R"
-                dataKey="layer3R"
-                stroke={LAYER_COLORS["3R"].stroke}
-                fill={LAYER_COLORS["3R"].fill}
-                fillOpacity={0.08}
-                strokeWidth={1.5}
-                dot={{ r: dotSize, fill: LAYER_COLORS["3R"].stroke, strokeWidth: 0 }}
-                isAnimationActive={false}
-              />
-            )}
-
-            {/* Layer: 5R */}
+            {/* Layer: 5R (overlay) */}
             {show5R && (
               <Radar
                 key="layer-5r"
@@ -151,9 +133,8 @@ export function QualityRadarChart({
                 dataKey="layer5R"
                 stroke={LAYER_COLORS["5R"].stroke}
                 fill={LAYER_COLORS["5R"].fill}
-                fillOpacity={0.1}
+                fillOpacity={0.15}
                 strokeWidth={1.5}
-                dot={{ r: dotSize, fill: LAYER_COLORS["5R"].stroke, strokeWidth: 0 }}
                 isAnimationActive={false}
               />
             )}
@@ -166,10 +147,9 @@ export function QualityRadarChart({
                 dataKey="layerAlt"
                 stroke={LAYER_COLORS["5R+Alt"].stroke}
                 fill={LAYER_COLORS["5R+Alt"].fill}
-                fillOpacity={0.06}
+                fillOpacity={0.1}
                 strokeWidth={1.5}
                 strokeDasharray="2 2"
-                dot={{ r: dotSize, fill: LAYER_COLORS["5R+Alt"].stroke, strokeWidth: 0 }}
                 isAnimationActive={false}
               />
             )}
@@ -179,47 +159,44 @@ export function QualityRadarChart({
                 if (!payload?.length) return null;
                 const item = payload[0]?.payload;
                 if (!item) return null;
-                const rows: { label: string; value: number; dotColor: string }[] = [];
+                const rows: { label: string; value: number; color: string }[] = [];
                 if (item.layer3R > 0) {
-                  rows.push({ label: "3R", value: item.layer3R, dotColor: LAYER_COLORS["3R"].stroke });
+                  const lvl3 = getScoreLevel(item.layer3R);
+                  rows.push({ label: "3R", value: item.layer3R, color: LAYER_COLORS["3R"].stroke });
                 }
                 if (item.layer5R > 0) {
-                  rows.push({ label: "5R", value: item.layer5R, dotColor: LAYER_COLORS["5R"].stroke });
+                  const lvl5 = getScoreLevel(item.layer5R);
+                  rows.push({ label: "5R", value: item.layer5R, color: LAYER_COLORS["5R"].stroke });
                 }
                 if (item.layerAlt > 0) {
-                  rows.push({ label: "5R+Alt", value: item.layerAlt, dotColor: LAYER_COLORS["5R+Alt"].stroke });
+                  rows.push({ label: "5R+Alt", value: item.layerAlt, color: LAYER_COLORS["5R+Alt"].stroke });
                 }
+                // fallback to primary value if no layers have data
                 if (rows.length === 0 && item.value > 0) {
                   const lvl = getScoreLevel(item.value);
-                  rows.push({ label: "", value: item.value, dotColor: SCORE_COLORS[lvl] });
+                  rows.push({ label: "", value: item.value, color: SCORE_COLORS[lvl] });
                 }
                 if (rows.length === 0) return null;
                 return (
                   <div className="rounded-lg border bg-background px-3 py-2 text-xs shadow-lg space-y-0.5">
                     <span className="font-medium">{item.label}</span>
-                    {rows.map((r) => {
-                      const lvl = getScoreLevel(r.value);
-                      return (
-                        <div key={r.label} className="flex items-center gap-2">
-                          <span
-                            className="inline-block h-2 w-2 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: r.dotColor }}
-                          />
-                          {r.label && (
-                            <span className="text-muted-foreground text-[10px] min-w-[32px]">{r.label}</span>
-                          )}
-                          <span className="font-mono font-bold ml-auto" style={{ color: SCORE_COLORS[lvl] }}>
-                            {(r.value * 100).toFixed(0)}%
-                          </span>
-                        </div>
-                      );
-                    })}
+                    {rows.map((r) => (
+                      <div key={r.label} className="flex items-center justify-between gap-3">
+                        {r.label && (
+                          <span className="text-muted-foreground text-[10px]">{r.label}</span>
+                        )}
+                        <span className="font-mono font-bold" style={{ color: r.color }}>
+                          {(r.value * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 );
               }}
             />
           </RadarChart>
         </ResponsiveContainer>
+        <ThreeAxisRadarOverlay scores={layer3R} />
       </div>
 
 
