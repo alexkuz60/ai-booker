@@ -49,6 +49,7 @@ interface UseBookManagerParams {
   createProject?: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<ProjectStorage>;
   openProjectByName?: (projectName: string) => Promise<ProjectStorage | null>;
   pendingProjectName?: string | null;
+  bumpProgressVersion?: () => void;
 }
 
 export function useBookManager({
@@ -107,6 +108,7 @@ export function useBookManager({
     localProjectNamesByBookId: library.localProjectNamesByBookId,
     setStep, setFileName, setBookId, setTocEntries, setChapterIdMap,
     setPartIdMap, setChapterResults, setPdfRef, setTotalPages, setErrorMsg,
+    bumpProgressVersion,
   });
 
   // openSavedBook ref for useServerSync (breaks circular dependency)
