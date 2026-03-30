@@ -122,6 +122,20 @@ export async function createTranslationProject(
   await store.writeJSON(paths.projectMeta(), translationMeta);
   await ensureV2Layout(store);
 
+  // 3b. Write back-link in source project.json (translationProject field)
+  try {
+    const srcMeta = (await sourceStorage.readJSON<Record<string, unknown>>(paths.projectMeta())) ?? {};
+    srcMeta.translationProject = {
+      projectName,
+      targetLanguage,
+      createdAt: translationMeta.createdAt,
+    };
+    srcMeta.updatedAt = new Date().toISOString();
+    await sourceStorage.writeJSON(paths.projectMeta(), srcMeta);
+  } catch (e) {
+    console.warn("[translationProject] Failed to write back-link to source:", e);
+  }
+
   // 4. Copy structure/toc.json
   progress("Copying structure…", 0.1);
   const toc = await sourceStorage.readJSON<{ toc: TocChapter[]; parts: unknown[] }>(
