@@ -31,6 +31,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
   const [books, setBooks] = useState<BookRecord[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [localProjectNamesByBookId, setLocalProjectNamesByBookId] = useState<Map<string, string[]>>(new Map());
+  const [progressMap, setProgressMap] = useState<Record<string, PipelineProgress>>({});
   const libraryLoadedRef = useRef(false);
 
   // Server books (separate section)
