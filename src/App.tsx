@@ -69,8 +69,8 @@ function ProtectedRoutes() {
       <ProjectStorageProvider>
         <AppLayout>
           <Routes>
-            <Route path="/" element={<Library />} />
-            <Route path="/home" element={<Home />} />
+            <Route path="/" element={<Home />} />
+            <Route path="/library" element={<Library />} />
             <Route path="/parser" element={<Parser />} />
             <Route path="/studio" element={
               <GatedRoute route="/studio"><Studio /></GatedRoute>
