@@ -29,6 +29,7 @@ export default function Library() {
     openProjectByName,
     storage: projectStorage,
     initialized: projectStorageInitialized,
+    bumpProgressVersion,
   } = useProjectStorageContext();
 
   const [pendingProjectName, setPendingProjectName] = useState<string | null>(null);
@@ -48,6 +49,7 @@ export default function Library() {
     createProject,
     openProjectByName,
     pendingProjectName,
+    bumpProgressVersion,
   });
 
   // ── Navigate to Parser only after a NEW book open/upload action ──

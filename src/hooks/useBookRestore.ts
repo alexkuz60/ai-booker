@@ -49,6 +49,7 @@ interface UseBookRestoreParams {
   setPdfRef: React.Dispatch<React.SetStateAction<any>>;
   setTotalPages: React.Dispatch<React.SetStateAction<number>>;
   setErrorMsg: React.Dispatch<React.SetStateAction<string>>;
+  bumpProgressVersion?: () => void;
 }
 
 export function useBookRestore({
@@ -56,6 +57,7 @@ export function useBookRestore({
   books, fileName, bookId, localProjectNamesByBookId,
   setStep, setFileName, setBookId, setTocEntries, setChapterIdMap,
   setPartIdMap, setChapterResults, setPdfRef, setTotalPages, setErrorMsg,
+  bumpProgressVersion,
 }: UseBookRestoreParams) {
   const [pdfRef, setPdfRefLocal] = useState<any>(null);
   const [totalPages, setTotalPagesLocal] = useState(0);
@@ -171,6 +173,7 @@ export function useBookRestore({
       if (canTryLocal) {
         const restored = await restoreFromLocal(book.id);
         if (restored) {
+          bumpProgressVersion?.();
           if (checkServerNewer && setServerNewerBookId) {
             const isNewer = await checkServerNewer(book.id);
             if (isNewer) setServerNewerBookId(book.id);
@@ -245,6 +248,7 @@ export function useBookRestore({
       setPartIdMap(result.partIdMap);
       setChapterResults(result.chapterResults);
       setStep("workspace");
+      bumpProgressVersion?.();
 
       const bookFormat = detectFileFormat(book.file_name);
       const formatLabel = bookFormat.toUpperCase();
@@ -263,6 +267,7 @@ export function useBookRestore({
     updatePdfRef, updateTotalPages,
     setStep, setFileName, setBookId, setTocEntries,
     setChapterIdMap, setPartIdMap, setChapterResults, setErrorMsg,
+    bumpProgressVersion,
   ]);
 
   // ── Lazy PDF loader ───────────────────────────────────────
