@@ -6,12 +6,21 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { BookRecord } from "@/pages/parser/types";
-import { OPFSStorage, type ProjectStorage, type PipelineProgress, createEmptyPipelineProgress } from "@/lib/projectStorage";
+import { OPFSStorage, type ProjectStorage, type PipelineProgress } from "@/lib/projectStorage";
 import type { LocalBookStructure } from "@/lib/localSync";
 import { detectFileFormat } from "@/lib/fileFormatUtils";
 import { getProjectActivityMs } from "@/lib/projectActivity";
 import { paths } from "@/lib/projectPaths";
 import { readPipelineProgress } from "@/hooks/usePipelineProgress";
+
+const OPFS_NON_PROJECT_DIRS = new Set(["atmo-cache", "ir-cache", "sfx-cache"]);
+const NESTED_TRANSLATION_SUFFIX_RE = /_(EN|RU)_(EN|RU)$/i;
+const LANG_SUFFIX_RE = /_(EN|RU)$/i;
+
+function isNestedTranslationMirrorMeta(meta: Record<string, unknown> | null): boolean {
+  const source = typeof meta?.sourceProjectName === "string" ? meta.sourceProjectName : "";
+  return !!source && LANG_SUFFIX_RE.test(source);
+}
 
 type LocalLibraryCandidate = {
   record: BookRecord;
@@ -52,7 +61,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     }>("project.json");
 
     // Skip mirror translation projects — they are not independent books
-    if (meta?.sourceProjectName && meta?.targetLanguage) return null;
+    if (meta?.sourceProjectName || meta?.targetLanguage) return null;
 
     const needStructure = !meta?.bookId || !meta?.title || !meta?.fileFormat;
     const structure = needStructure
@@ -100,29 +109,50 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     };
 
     if (storageBackend === "opfs") {
-      const projectNames = await OPFSStorage.listProjects();
-      console.debug("[Library] OPFS projects found:", projectNames);
-      const candidatesRaw = await Promise.all(projectNames.map(async (projectName) => {
+      const allProjectNames = await OPFSStorage.listProjects();
+      const projectNames = allProjectNames.filter((name) => !OPFS_NON_PROJECT_DIRS.has(name));
+
+      const scanResults = await Promise.all(projectNames.map(async (projectName) => {
         try {
-          const store = await OPFSStorage.openOrCreate(projectName);
-          // Skip translation mirror projects — they share bookId but are independent
-          const meta = await store.readJSON<Record<string, unknown>>("project.json").catch(() => null);
-          if (meta && ((meta as any).targetLanguage || (meta as any).sourceProjectName)) {
-            console.debug("[Library] Skipping translation mirror:", projectName);
-            return null;
+          if (NESTED_TRANSLATION_SUFFIX_RE.test(projectName)) {
+            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: true, projectName };
           }
+
+          const store = await OPFSStorage.openOrCreate(projectName);
+          const meta = await store.readJSON<Record<string, unknown>>("project.json").catch(() => null);
+
+          if (isNestedTranslationMirrorMeta(meta)) {
+            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: true, projectName };
+          }
+
+          // Skip translation mirror projects — they share bookId but are independent
+          if (meta && ((meta as any).targetLanguage || (meta as any).sourceProjectName)) {
+            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
+          }
+
           const result = await mapLocalStructureToBook(store);
           if (!result) {
             const toc = await store.readJSON<Record<string, unknown>>("structure/toc.json").catch(() => null);
-            console.warn("[Library] Project skipped (no bookId):", projectName, { meta, tocBookId: (toc as any)?.bookId });
+            const hasBookId = typeof (meta as any)?.bookId === "string" || typeof (toc as any)?.bookId === "string";
+            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: !hasBookId, projectName };
           }
-          return result;
+          return { candidate: result, shouldDelete: false, projectName };
         } catch (err) {
           console.warn("[Library] Failed to read project:", projectName, err);
-          return null;
+          return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
         }
       }));
-      const candidates = candidatesRaw.filter((v): v is LocalLibraryCandidate => !!v);
+
+      const staleProjects = Array.from(
+        new Set(scanResults.filter((r) => r.shouldDelete).map((r) => r.projectName)),
+      );
+      if (staleProjects.length > 0) {
+        await Promise.all(staleProjects.map((name) => OPFSStorage.deleteProject(name).catch(() => {})));
+      }
+
+      const candidates = scanResults
+        .map((r) => r.candidate)
+        .filter((v): v is LocalLibraryCandidate => !!v);
 
       const byDedupeKey = new Map<string, LocalLibraryCandidate>();
       const projectsByDedupeKey = new Map<string, string[]>();
@@ -271,7 +301,6 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
 
   // Auto-load when on library step
   useEffect(() => {
-    console.debug("[Library] effect: userId=%s, step=%s, backend=%s, loaded=%s", userId ?? "null", step, storageBackend, libraryLoadedRef.current);
     if (!userId) {
       setBooks([]);
       setLoadingLibrary(false);

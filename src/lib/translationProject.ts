@@ -96,6 +96,12 @@ export async function createTranslationProject(
   const { sourceStorage, sourceMeta, targetLanguage, chapterIndices, onProgress } = opts;
   const progress = onProgress ?? (() => {});
 
+  // Guard: never create nested mirrors like *_EN_RU or *_RU_EN
+  // Source project for translation must be the original project.
+  if (sourceMeta.sourceProjectName || sourceMeta.targetLanguage || /_(EN|RU)$/i.test(sourceStorage.projectName)) {
+    throw new Error("Invalid translation source project");
+  }
+
   // 1. Derive project name
   const langSuffix = targetLanguage.toUpperCase();
   const projectName = `${sourceStorage.projectName}_${langSuffix}`;
