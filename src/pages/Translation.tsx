@@ -262,7 +262,7 @@ export default function Translation() {
         animate={{ opacity: 1 }}
       >
         <Loader2 className="h-8 w-8 animate-spin opacity-40" />
-        <p className="text-sm">
+        <p className="text-base">
           {isRu ? "Загрузка проекта…" : "Loading project…"}
         </p>
       </motion.div>
@@ -277,7 +277,7 @@ export default function Translation() {
         animate={{ opacity: 1 }}
       >
         <Languages className="h-16 w-16 opacity-20" />
-        <p className="text-sm">
+        <p className="text-base">
           {isRu
             ? "Откройте проект в Парсере, чтобы начать перевод"
             : "Open a project in Parser to start translation"}
@@ -304,12 +304,12 @@ export default function Translation() {
             setSelectedSegment(null);
           }}
         >
-          <SelectTrigger className="w-[280px] h-8 text-xs">
+          <SelectTrigger className="w-[300px] h-9 text-sm">
             <SelectValue placeholder={isRu ? "Выберите главу…" : "Select chapter…"} />
           </SelectTrigger>
           <SelectContent>
             {chapters.map((ch) => (
-              <SelectItem key={ch.index} value={String(ch.index)} className="text-xs">
+              <SelectItem key={ch.index} value={String(ch.index)} className="text-sm">
                 {ch.title}
               </SelectItem>
             ))}
@@ -322,7 +322,7 @@ export default function Translation() {
             variant="secondary"
             onClick={handleTranslateChapter}
             disabled={translating || batchProgress.running}
-            className="h-7 text-xs px-3 gap-1.5"
+            className="h-8 text-sm px-3 gap-1.5"
           >
             {batchProgress.running ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -334,14 +334,14 @@ export default function Translation() {
         )}
 
         {readiness && (
-          <div className="flex items-center gap-2 ml-auto text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 ml-auto text-sm text-muted-foreground">
             <span>{isRu ? "Сцен:" : "Scenes:"}</span>
-            <Badge variant={readiness.totalReady === readiness.totalScenes ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+            <Badge variant={readiness.totalReady === readiness.totalScenes ? "default" : "secondary"} className="text-xs px-1.5 py-0">
               {readiness.totalReady} / {readiness.totalScenes}
             </Badge>
-            {checking && <Loader2 className="h-3 w-3 animate-spin" />}
+            {checking && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {transProjectExists && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-primary border-primary/30">
+              <Badge variant="outline" className="text-xs px-1.5 py-0 text-primary border-primary/30">
                 {isRu ? "Проект перевода" : "Translation project"} ✓
               </Badge>
             )}
@@ -363,8 +363,8 @@ export default function Translation() {
             <ResizablePanel defaultSize={panelSizes.inner[0] ?? 25} minSize={12} maxSize={40}>
               <div className="h-full border-r bg-muted/30 flex flex-col">
                 <div className="shrink-0 border-b px-3 py-1.5 flex items-center gap-1.5 bg-muted/50">
-                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     {isRu ? "Сцены" : "Scenes"}
                   </span>
                 </div>
@@ -386,14 +386,14 @@ export default function Translation() {
             <ResizablePanel defaultSize={panelSizes.inner[1] ?? 75} minSize={40}>
               <div className="h-full flex flex-col">
                 <div className="shrink-0 border-b px-3 py-1.5 flex items-center gap-1.5 bg-muted/50">
-                  <Languages className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  <Languages className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     {isRu ? "Билингва" : "Bilingual"}
                   </span>
                   {transProjectExists && selectedSceneId && (
                     <div className="flex items-center gap-1.5 ml-auto">
                       {batchProgress.running && batchProgress.currentStage && (
-                        <span className="text-[10px] text-muted-foreground tabular-nums">
+                        <span className="text-xs text-muted-foreground tabular-nums">
                           {(() => {
                             const cs = batchProgress.currentStage;
                             const stageNum = cs.stage === "literal" ? 1 : cs.stage === "literary" ? 1 : cs.stage === "radar" ? 2 : cs.stage === "critique" ? 3 : 0;
@@ -409,7 +409,7 @@ export default function Translation() {
                         variant="ghost"
                         onClick={handleTranslateSceneFull}
                         disabled={translating || batchProgress.running}
-                        className="h-6 text-[10px] px-2 gap-1"
+                        className="h-7 text-xs px-2 gap-1"
                       >
                         {batchProgress.running && batchProgress.scenesTotal === 1 ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
@@ -454,7 +454,7 @@ export default function Translation() {
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground">
                     <BookOpen className="h-10 w-10 opacity-20" />
-                    <p className="text-xs">
+                    <p className="text-sm">
                       {isRu ? "Выберите сцену для просмотра" : "Select a scene to view"}
                     </p>
                   </div>
@@ -470,8 +470,8 @@ export default function Translation() {
         <ResizablePanel defaultSize={panelSizes.main[1] ?? 30} minSize={20}>
           <div className="h-full flex flex-col">
             <div className="shrink-0 border-b px-3 py-1.5 flex items-center gap-1.5 bg-muted/50">
-              <Radar className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <Radar className="h-4 w-4 text-muted-foreground" />
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 {isRu ? "Мониторинг" : "Monitor"}
               </span>
               {monitorScore != null && (
@@ -480,7 +480,7 @@ export default function Translation() {
                   style={{ color: SCORE_COLORS[getScoreLevel(monitorScore)] }}
                 >
                   {Math.round(monitorScore * 100)}
-                  <span className="text-xs font-normal text-muted-foreground"> / 100</span>
+                  <span className="text-sm font-normal text-muted-foreground"> / 100</span>
                 </span>
               )}
             </div>
