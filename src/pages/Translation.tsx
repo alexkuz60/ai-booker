@@ -30,6 +30,7 @@ import { useSegmentLiteraryEdit } from "@/hooks/useSegmentLiteraryEdit";
 import { useSegmentCritique } from "@/hooks/useSegmentCritique";
 import { useTranslationBatch } from "@/hooks/useTranslationBatch";
 import { useTranslationActions } from "@/hooks/useTranslationActions";
+import { useSaveTranslation } from "@/hooks/useSaveTranslation";
 import { paths } from "@/lib/projectPaths";
 import type { TocChapter } from "@/pages/parser/types";
 import type { AiRoleId } from "@/config/aiRoles";
