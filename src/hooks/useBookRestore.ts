@@ -173,6 +173,7 @@ export function useBookRestore({
       if (canTryLocal) {
         const restored = await restoreFromLocal(book.id);
         if (restored) {
+          bumpProgressVersion?.();
           if (checkServerNewer && setServerNewerBookId) {
             const isNewer = await checkServerNewer(book.id);
             if (isNewer) setServerNewerBookId(book.id);
