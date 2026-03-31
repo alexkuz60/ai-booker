@@ -3,6 +3,9 @@
  *
  * Consolidates translate/literary/critique per-segment and per-scene actions,
  * translation project creation, and batch chapter translation.
+ *
+ * Single-segment operations use `bilingualRef.patchSegment()` for flicker-free
+ * in-place updates. Bulk operations (scene/chapter) call `bilingualRef.reload()`.
  */
 
 import { useCallback, useState } from "react";
@@ -12,6 +15,7 @@ import type { ProjectStorage, ProjectMeta } from "@/lib/projectStorage";
 import type { TranslationReadiness } from "@/lib/translationProject";
 import { createTranslationProject, translationProjectExists } from "@/lib/translationProject";
 import type { SelectedSegmentData } from "@/components/translation/BilingualSegmentsView";
+import type { BilingualSegmentsHandle } from "@/components/translation/BilingualSegmentsView";
 
 interface Deps {
   storage: ProjectStorage | null;
@@ -26,8 +30,10 @@ interface Deps {
   /** Currently selected segment */
   selectedSegment: SelectedSegmentData | null;
   setSelectedSegment: React.Dispatch<React.SetStateAction<SelectedSegmentData | null>>;
-  /** Bilingual tick refresher */
-  setBilingualTick: React.Dispatch<React.SetStateAction<number>>;
+  /** Ref to BilingualSegmentsView for granular updates */
+  bilingualRef: React.RefObject<BilingualSegmentsHandle | null>;
+  /** Callback to bump quality chart refresh */
+  onQualityUpdate?: () => void;
   /** Hooks */
   doTranslateSegments: (segments: Segment[], sceneId: string, chapterId: string) => Promise<any>;
   editSegment: (seg: Segment, sceneId: string, chapterId: string, originalText: string) => Promise<any>;
@@ -42,7 +48,7 @@ export function useTranslationActions(deps: Deps) {
     storage, meta, isRu,
     selectedSceneId, selectedChapter,
     readiness, selectedSegment, setSelectedSegment,
-    setBilingualTick,
+    bilingualRef, onQualityUpdate,
     doTranslateSegments, editSegment, critiqueSegment,
     translateSceneFull, translateChapterBatch,
     refreshTransStorage,
@@ -54,8 +60,14 @@ export function useTranslationActions(deps: Deps) {
   const handleTranslateSegments = useCallback(async (segments: Segment[]) => {
     if (!selectedSceneId || !selectedChapter?.chapterId) return;
     const result = await doTranslateSegments(segments, selectedSceneId, selectedChapter.chapterId);
-    if (result) setBilingualTick(t => t + 1);
-  }, [doTranslateSegments, selectedSceneId, selectedChapter, setBilingualTick]);
+    if (result?.translations) {
+      // Patch each translated segment in-place
+      for (const [segId, text] of result.translations) {
+        bilingualRef.current?.patchSegment(segId, text, "literal");
+      }
+      onQualityUpdate?.();
+    }
+  }, [doTranslateSegments, selectedSceneId, selectedChapter, bilingualRef, onQualityUpdate]);
 
   const handleLiteraryEdit = useCallback(async (seg: Segment) => {
     if (!selectedSceneId || !selectedChapter?.chapterId || !storage) return;
@@ -65,12 +77,14 @@ export function useTranslationActions(deps: Deps) {
     const originalText = srcSeg?.phrases?.map((p: any) => p.text).join(" ") ?? "";
     const result = await editSegment(seg, selectedSceneId, selectedChapter.chapterId, originalText);
     if (result) {
+      // Patch in-place
+      bilingualRef.current?.patchSegment(seg.segment_id, result.text, "literary");
       if (selectedSegment?.segmentId === seg.segment_id) {
         setSelectedSegment({ ...selectedSegment, translatedText: result.text });
       }
-      setBilingualTick(t => t + 1);
+      onQualityUpdate?.();
     }
-  }, [editSegment, selectedSceneId, selectedChapter, storage, selectedSegment, setSelectedSegment, setBilingualTick]);
+  }, [editSegment, selectedSceneId, selectedChapter, storage, selectedSegment, setSelectedSegment, bilingualRef, onQualityUpdate]);
 
   const handleCritique = useCallback(async (seg: Segment) => {
     if (!selectedSceneId || !selectedChapter?.chapterId || !storage) return;
@@ -80,12 +94,14 @@ export function useTranslationActions(deps: Deps) {
     const originalText = srcSeg?.phrases?.map((p: any) => p.text).join(" ") ?? "";
     const result = await critiqueSegment(seg, selectedSceneId, selectedChapter.chapterId, originalText);
     if (result) {
+      // Patch stage only — text stays as literary
+      bilingualRef.current?.patchSegment(seg.segment_id, selectedSegment?.translatedText ?? "", "critique");
       if (selectedSegment?.segmentId === seg.segment_id) {
         setSelectedSegment(prev => prev ? { ...prev } : null);
       }
-      setBilingualTick(t => t + 1);
+      onQualityUpdate?.();
     }
-  }, [critiqueSegment, selectedSceneId, selectedChapter, storage, selectedSegment, setSelectedSegment, setBilingualTick]);
+  }, [critiqueSegment, selectedSceneId, selectedChapter, storage, selectedSegment, setSelectedSegment, bilingualRef, onQualityUpdate]);
 
   const handleTranslateSceneFull = useCallback(async () => {
     if (!selectedSceneId || !selectedChapter?.chapterId) return;

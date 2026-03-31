@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useImperativeHandle, forwardRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,14 @@ export interface SelectedSegmentData {
   translatedText: string;
   segmentType: string;
   speaker: string | null;
+}
+
+/** Imperative API exposed via ref for granular updates */
+export interface BilingualSegmentsHandle {
+  /** Update a single segment's translation text + stage without full reload */
+  patchSegment: (segmentId: string, translatedText: string, stage?: RadarStage | null) => void;
+  /** Force full reload from OPFS (for bulk operations) */
+  reload: () => void;
 }
 
 interface Props {
@@ -42,7 +50,7 @@ interface SegmentWithTranslation {
   hasLiteral: boolean;
 }
 
-export function BilingualSegmentsView({
+export const BilingualSegmentsView = forwardRef<BilingualSegmentsHandle, Props>(function BilingualSegmentsView({
   sourceStorage,
   translationStorage,
   sceneId,
@@ -56,7 +64,7 @@ export function BilingualSegmentsView({
   progressLabel,
   selectedSegmentId,
   onSelectSegment,
-}: Props) {
+}, ref) {
   const [items, setItems] = useState<SegmentWithTranslation[]>([]);
   const [loading, setLoading] = useState(false);
   const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set());
@@ -64,62 +72,78 @@ export function BilingualSegmentsView({
   const [editingIds, setEditingIds] = useState<Set<string>>(new Set());
   const [critiquingIds, setCritiquingIds] = useState<Set<string>>(new Set());
 
-  // Load source segments + any existing translations
-  useEffect(() => {
+  // ── Full load from OPFS ─────────────────────────────────
+  const loadAll = useCallback(async () => {
     if (!sourceStorage || !sceneId || !chapterId) {
       setItems([]);
       return;
     }
-    let cancelled = false;
     setLoading(true);
+    try {
+      const sourceData = await sourceStorage.readJSON<LocalStoryboardData>(
+        paths.storyboard(sceneId, chapterId),
+      );
+      const segments = sourceData?.segments ?? [];
 
-    (async () => {
-      try {
-        const sourceData = await sourceStorage.readJSON<LocalStoryboardData>(
-          paths.storyboard(sceneId, chapterId),
+      let translationSegments: Segment[] = [];
+      if (translationStorage) {
+        const transData = await translationStorage.readJSON<LocalStoryboardData>(
+          `chapters/${chapterId}/scenes/${sceneId}/storyboard.json`,
         );
-        const segments = sourceData?.segments ?? [];
-
-        let translationSegments: Segment[] = [];
-        if (translationStorage) {
-          const transData = await translationStorage.readJSON<LocalStoryboardData>(
-            `chapters/${chapterId}/scenes/${sceneId}/storyboard.json`,
-          );
-          translationSegments = transData?.segments ?? [];
-        }
-
-        const transMap = new Map<string, { text: string; hasLiteral: boolean }>();
-        for (const tseg of translationSegments) {
-          const literaryText = (tseg as any)._literary;
-          const literalText = (tseg as any)._literal;
-          const phrasesText = tseg.phrases.map(p => p.text).filter(Boolean).join(" ");
-          const text = literaryText || literalText || phrasesText;
-          const hasLiteral = !!literalText;
-          transMap.set(tseg.segment_id, { text, hasLiteral });
-        }
-
-        if (!cancelled) {
-          const mapped = segments.map(seg => {
-            const trans = transMap.get(seg.segment_id);
-            return {
-              segment: seg,
-              translatedText: trans?.text ?? "",
-              hasLiteral: trans?.hasLiteral ?? false,
-            };
-          });
-          setItems(mapped);
-          onSegmentsLoaded?.(segments.map(s => s.segment_id));
-        }
-      } catch (err) {
-        console.error("[BilingualSegmentsView] read error:", err);
-        if (!cancelled) setItems([]);
-      } finally {
-        if (!cancelled) setLoading(false);
+        translationSegments = transData?.segments ?? [];
       }
-    })();
 
-    return () => { cancelled = true; };
-  }, [sourceStorage, translationStorage, sceneId, chapterId]);
+      const transMap = new Map<string, { text: string; hasLiteral: boolean }>();
+      for (const tseg of translationSegments) {
+        const literaryText = (tseg as any)._literary;
+        const literalText = (tseg as any)._literal;
+        const phrasesText = tseg.phrases.map(p => p.text).filter(Boolean).join(" ");
+        const text = literaryText || literalText || phrasesText;
+        const hasLiteral = !!literalText;
+        transMap.set(tseg.segment_id, { text, hasLiteral });
+      }
+
+      const mapped = segments.map(seg => {
+        const trans = transMap.get(seg.segment_id);
+        return {
+          segment: seg,
+          translatedText: trans?.text ?? "",
+          hasLiteral: trans?.hasLiteral ?? false,
+        };
+      });
+      setItems(mapped);
+      onSegmentsLoaded?.(segments.map(s => s.segment_id));
+    } catch (err) {
+      console.error("[BilingualSegmentsView] read error:", err);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [sourceStorage, translationStorage, sceneId, chapterId, onSegmentsLoaded]);
+
+  // Load on scene change
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  // ── Imperative handle for granular updates ──────────────
+  useImperativeHandle(ref, () => ({
+    patchSegment(segmentId: string, translatedText: string, stage?: RadarStage | null) {
+      setItems(prev => prev.map(item =>
+        item.segment.segment_id === segmentId
+          ? { ...item, translatedText, hasLiteral: true }
+          : item,
+      ));
+      if (stage !== undefined) {
+        setSegmentStages(prev => {
+          const next = new Map(prev);
+          next.set(segmentId, stage);
+          return next;
+        });
+      }
+    },
+    reload: loadAll,
+  }), [loadAll]);
 
   // Load segment stage info from radar files
   useEffect(() => {
@@ -261,4 +285,4 @@ export function BilingualSegmentsView({
       </Accordion>
     </div>
   );
-}
+});

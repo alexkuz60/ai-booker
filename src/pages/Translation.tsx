@@ -17,7 +17,7 @@ import {
   type TranslationReadiness,
 } from "@/lib/translationProject";
 import { TranslationChapterNav } from "@/components/translation/TranslationChapterNav";
-import { BilingualSegmentsView, type SelectedSegmentData } from "@/components/translation/BilingualSegmentsView";
+import { BilingualSegmentsView, type SelectedSegmentData, type BilingualSegmentsHandle } from "@/components/translation/BilingualSegmentsView";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
@@ -72,7 +72,8 @@ export default function Translation() {
   const [readiness, setReadiness] = useState<TranslationReadiness | null>(null);
   const [checking, setChecking] = useState(false);
   const [monitorScore, setMonitorScore] = useState<number | null>(null);
-  const [bilingualTick, setBilingualTick] = useState(0);
+  const [qualityChartTick, setQualityChartTick] = useState(0);
+  const bilingualRef = useRef<BilingualSegmentsHandle>(null);
 
   // Panel size persistence
   const { value: panelSizes, update: setPanelSizes } = useCloudSettings<{
@@ -155,8 +156,8 @@ export default function Translation() {
     isRu,
     getModelForRole,
     getEffectivePool,
-    onSceneComplete: () => setBilingualTick(t => t + 1),
-    onSegmentComplete: () => setBilingualTick(t => t + 1),
+    onSceneComplete: () => { bilingualRef.current?.reload(); setQualityChartTick(t => t + 1); },
+    onSegmentComplete: () => { bilingualRef.current?.reload(); setQualityChartTick(t => t + 1); },
   });
 
   // ── Extracted actions ───────────────────────────────────
@@ -178,7 +179,8 @@ export default function Translation() {
     readiness,
     selectedSegment,
     setSelectedSegment,
-    setBilingualTick,
+    bilingualRef,
+    onQualityUpdate: () => setQualityChartTick(t => t + 1),
     doTranslateSegments,
     editSegment,
     critiqueSegment,
@@ -528,8 +530,9 @@ export default function Translation() {
                 {selectedSceneId ? (
                   <div className="h-full flex flex-col">
                     <ScrollArea className="flex-1 min-h-0">
-                      <div className="p-3" key={`${selectedSceneId}-${bilingualTick}`}>
+                      <div className="p-3" key={selectedSceneId}>
                         <BilingualSegmentsView
+                          ref={bilingualRef}
                           sourceStorage={storage}
                           translationStorage={translationStorage}
                           sceneId={selectedSceneId}
@@ -555,7 +558,7 @@ export default function Translation() {
                         isRu={isRu}
                         selectedSegmentId={selectedSegment?.segmentId ?? null}
                         onSelectSegment={setSelectedSegment}
-                        reloadTick={bilingualTick}
+                        reloadTick={qualityChartTick}
                       />
                     )}
                   </div>
