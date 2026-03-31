@@ -179,7 +179,7 @@ export default function Translation() {
     readiness,
     selectedSegment,
     setSelectedSegment,
-    setBilingualTick,
+    bilingualRef,
     doTranslateSegments,
     editSegment,
     critiqueSegment,
