@@ -118,8 +118,8 @@ export function useTranslationBatch(opts: Opts): UseTranslationBatchReturn {
         onProgress: (info) => {
           setProgress(prev => ({ ...prev, currentStage: info }));
         },
-        onSegmentComplete: (segId) => {
-          onSegmentComplete?.(segId);
+        onSegmentComplete: (segId, result) => {
+          onSegmentComplete?.(segId, result);
         },
       });
 
