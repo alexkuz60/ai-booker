@@ -255,7 +255,7 @@ interface ProjectStorage {
 | `src/components/library/PipelineTimeline.tsx` | UI-компонент таймлайна (маппинг stepId → стадия — чисто визуальный) |
 | `src/components/parser/LibraryView.tsx` | Вызывает `bumpProgressVersion()` после записи шага в OPFS |
 
-### 1.11 Translation Project Link
+### 1.11 Translation Project Link и облачная синхронизация перевода
 
 `project.json.translationProject` — ссылка на параллельный проект арт-перевода. Хранится в исходном проекте (не в зеркале).
 
