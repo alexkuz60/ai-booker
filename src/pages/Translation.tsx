@@ -529,8 +529,9 @@ export default function Translation() {
                 {selectedSceneId ? (
                   <div className="h-full flex flex-col">
                     <ScrollArea className="flex-1 min-h-0">
-                      <div className="p-3" key={`${selectedSceneId}-${bilingualTick}`}>
+                      <div className="p-3" key={selectedSceneId}>
                         <BilingualSegmentsView
+                          ref={bilingualRef}
                           sourceStorage={storage}
                           translationStorage={translationStorage}
                           sceneId={selectedSceneId}
