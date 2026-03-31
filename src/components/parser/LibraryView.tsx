@@ -83,7 +83,8 @@ function LibraryViewInner({
     try {
       const projects = await OPFSStorage.listProjects();
       for (const pn of projects) {
-        const store = await OPFSStorage.openOrCreate(pn);
+        const store = await OPFSStorage.openExisting(pn);
+        if (!store) continue;
         const meta = await store.readJSON<Record<string, unknown>>("project.json");
         if (meta?.bookId === bookId && !meta?.targetLanguage && !meta?.sourceProjectName) {
           await writePipelineStep(store, stepId, done);
@@ -133,7 +134,8 @@ function LibraryViewInner({
         let sourceStore: any = null;
         let sourceMeta: ProjectMeta | null = null;
         for (const pn of projects) {
-          const store = await OPFSStorage.openOrCreate(pn);
+          const store = await OPFSStorage.openExisting(pn);
+          if (!store) continue;
           const meta = await store.readJSON<ProjectMeta>("project.json");
           if (meta?.bookId === book.id && !meta?.targetLanguage && !meta?.sourceProjectName) {
             sourceStore = store;
@@ -144,7 +146,6 @@ function LibraryViewInner({
         if (!sourceStore || !sourceMeta) return;
 
         const tLang = (sourceMeta.language === "ru" ? "en" : "ru") as "en" | "ru";
-        const exists = await translationProjectExists(sourceStore.projectName, tLang);
 
         if (exists) {
           setTransCreateConfirm({ book, exists: true });
@@ -168,7 +169,8 @@ function LibraryViewInner({
       let sourceStore: any = null;
       let sourceMeta: ProjectMeta | null = null;
       for (const pn of projects) {
-        const store = await OPFSStorage.openOrCreate(pn);
+        const store = await OPFSStorage.openExisting(pn);
+        if (!store) continue;
         const meta = await store.readJSON<ProjectMeta>("project.json");
         if (meta?.bookId === book.id && !meta?.targetLanguage && !meta?.sourceProjectName) {
           sourceStore = store;

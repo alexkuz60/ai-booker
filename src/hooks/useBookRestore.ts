@@ -192,8 +192,8 @@ export function useBookRestore({
     if (existingProjects.length > 0) {
       try {
         const { OPFSStorage } = await import("@/lib/projectStorage");
-        const oldStore = await OPFSStorage.openOrCreate(existingProjects[0]);
-        if (oldStore.isReady) {
+        const oldStore = await OPFSStorage.openExisting(existingProjects[0]);
+        if (oldStore?.isReady) {
           const found = await findSourceBlob(oldStore);
           if (found) {
             preservedSourceBlob = found.blob;

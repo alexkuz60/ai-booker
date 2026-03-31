@@ -55,7 +55,13 @@ export async function wipeProjectBrowserState(
   //    Defense-in-depth: skip translation mirrors even if they ended up in the list.
   for (const projectName of localProjectNames) {
     try {
-      const store = await OPFSStorage.openOrCreate(projectName);
+      const store = await OPFSStorage.openExisting(projectName);
+      if (!store) {
+        // Directory exists in list but can't be opened — force delete
+        await OPFSStorage.deleteProject(projectName);
+        console.log(`[Wipe] Deleted unopenable OPFS project: ${projectName}`);
+        continue;
+      }
       const meta = await store.readJSON<ProjectMeta>("project.json");
       if (meta?.targetLanguage || meta?.sourceProjectName) {
         console.log(`[Wipe] Skipping translation mirror: ${projectName}`);
@@ -74,7 +80,8 @@ export async function wipeProjectBrowserState(
     const surviving = await OPFSStorage.listProjects();
     for (const projectName of surviving) {
       try {
-        const store = await OPFSStorage.openOrCreate(projectName);
+        const store = await OPFSStorage.openExisting(projectName);
+        if (!store) continue;
         const meta = await store.readJSON<ProjectMeta>("project.json");
         if (meta?.bookId === bookId) {
           // Skip translation mirrors — they have targetLanguage or sourceProjectName
