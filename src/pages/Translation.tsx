@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { writePipelineStep } from "@/hooks/usePipelineProgress";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { useCallback, useEffect, useState, useMemo, useRef } from "react";
