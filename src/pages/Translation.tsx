@@ -557,7 +557,7 @@ export default function Translation() {
                         isRu={isRu}
                         selectedSegmentId={selectedSegment?.segmentId ?? null}
                         onSelectSegment={setSelectedSegment}
-                        reloadTick={bilingualTick}
+                        reloadTick={qualityChartTick}
                       />
                     )}
                   </div>
