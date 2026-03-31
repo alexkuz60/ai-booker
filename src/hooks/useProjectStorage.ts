@@ -178,7 +178,10 @@ export function useProjectStorage(): UseProjectStorageReturn {
       // Always reopen a fresh OPFS handle instead of reusing the active one.
       // This avoids "zombie" handles after Wipe-and-Deploy deletes a project
       // and recreates it under the same directory name.
-      const store = await OPFSStorage.openOrCreate(projectName);
+      const store = await OPFSStorage.openExisting(projectName);
+      if (!store) {
+        return null;
+      }
       const projectMeta = await store.readJSON<ProjectMeta>("project.json");
       if (!projectMeta) {
         throw new Error("Not a valid Booker project (project.json not found)");
@@ -329,7 +332,11 @@ export function useProjectStorage(): UseProjectStorageReturn {
 
         if (!targetName) return;
 
-        const store = await OPFSStorage.openOrCreate(targetName);
+        const store = await OPFSStorage.openExisting(targetName);
+        if (!store) {
+          console.warn("[ProjectStorage] Saved OPFS project not found:", targetName);
+          return;
+        }
         const projectMeta = await store.readJSON<ProjectMeta>("project.json");
         if (!projectMeta) {
           console.warn("[ProjectStorage] project.json missing in", targetName);
@@ -348,7 +355,11 @@ export function useProjectStorage(): UseProjectStorageReturn {
             projectMeta.sourceProjectName || targetName.match(LANG_SUFFIX_RE)?.[1] || null;
 
           if (inferredSourceName && existingProjects.includes(inferredSourceName)) {
-            const sourceStore = await OPFSStorage.openOrCreate(inferredSourceName);
+            const sourceStore = await OPFSStorage.openExisting(inferredSourceName);
+            if (!sourceStore) {
+              console.warn("[ProjectStorage] Source project missing for translation bootstrap:", inferredSourceName);
+              return;
+            }
             const sourceMeta = await sourceStore.readJSON<ProjectMeta>("project.json");
             if (sourceMeta && !sourceMeta.targetLanguage && !sourceMeta.sourceProjectName) {
               activeStore = sourceStore;

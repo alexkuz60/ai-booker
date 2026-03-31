@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { useCallback, useEffect, useState, useMemo, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
 import {
   ResizablePanelGroup,
@@ -58,6 +59,7 @@ export default function Translation() {
   const { isRu } = useLanguage();
   const { setPageHeader } = usePageHeader();
   const { storage, meta, isOpen, initialized } = useProjectStorageContext();
+  const navigate = useNavigate();
   const apiKeys = useUserApiKeys();
   const { getModelForRole, getEffectivePool } = useAiRoles(apiKeys);
 
@@ -328,6 +330,51 @@ export default function Translation() {
             ? "Откройте проект в Парсере, чтобы начать перевод"
             : "Open a project in Parser to start translation"}
         </p>
+      </motion.div>
+    );
+  }
+
+  if (!transProjectExists) {
+    return (
+      <motion.div
+        className="flex-1 flex flex-col h-full items-center justify-center gap-4 px-6 text-center text-muted-foreground"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <Languages className="h-16 w-16 opacity-20" />
+        <div className="space-y-2 max-w-2xl">
+          <p className="text-base text-foreground">
+            {isRu ? "Проект перевода не создан" : "Translation project not created"}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {isRu
+              ? "Рабочая область перевода открывается только для реально созданного проекта. Создайте его кликом в карточке книги в Библиотеке или восстановите перевод с сервера."
+              : "The translation workspace opens only for a real translation project. Create it from the book card in the Library or restore it from the server."}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/library")}
+            className="gap-1.5"
+          >
+            <BookOpen className="h-4 w-4" />
+            {isRu ? "Открыть Библиотеку" : "Open Library"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={restoreTranslation}
+            disabled={restoringTranslation || savingTranslation}
+            className="gap-1.5"
+          >
+            {restoringTranslation ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CloudDownload className="h-4 w-4" />
+            )}
+            {isRu ? "Перевод ← сервер" : "Restore translation"}
+          </Button>
+        </div>
       </motion.div>
     );
   }

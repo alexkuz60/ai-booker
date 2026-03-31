@@ -86,8 +86,11 @@ export async function translationProjectExists(
 ): Promise<boolean> {
   const langSuffix = targetLanguage.toUpperCase();
   const projectName = `${sourceProjectName}_${langSuffix}`;
-  const existing = await OPFSStorage.listProjects();
-  return existing.includes(projectName);
+  const store = await OPFSStorage.openExisting(projectName);
+  if (!store) return false;
+
+  const meta = await store.readJSON<Pick<ProjectMeta, "sourceProjectName" | "targetLanguage">>(paths.projectMeta());
+  return meta?.sourceProjectName === sourceProjectName && meta?.targetLanguage === targetLanguage;
 }
 
 export async function createTranslationProject(
