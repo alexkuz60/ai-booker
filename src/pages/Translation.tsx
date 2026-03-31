@@ -72,7 +72,8 @@ export default function Translation() {
   const [readiness, setReadiness] = useState<TranslationReadiness | null>(null);
   const [checking, setChecking] = useState(false);
   const [monitorScore, setMonitorScore] = useState<number | null>(null);
-  const [bilingualTick, setBilingualTick] = useState(0);
+  const [qualityChartTick, setQualityChartTick] = useState(0);
+  const bilingualRef = useRef<BilingualSegmentsHandle>(null);
 
   // Panel size persistence
   const { value: panelSizes, update: setPanelSizes } = useCloudSettings<{
