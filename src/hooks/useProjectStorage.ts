@@ -189,7 +189,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
         throw new Error("Not a valid Booker project (project.json not found)");
       }
 
-      await ensureV2Layout(store);
+      await readSceneIndex(store);
 
       setStorage(store);
       setMeta(projectMeta);
