@@ -199,6 +199,17 @@
 - Инвариант: `openOrCreate` допустим ТОЛЬКО при явном создании проекта пользователем (createProject, importZip, createTranslationProject, restoreTranslation). Во всех остальных случаях — строго `openExisting`.
 - Файлы: `useProjectStorage.ts`, `useLibrary.ts`, `LibraryView.tsx`, `localProjectResolver.ts`, `projectCleanup.ts`, `useBookRestore.ts`, `translationProject.ts`, `Translation.tsx`.
 
+### Ф. Сброс pipeline-флагов перевода при перезагрузке — ✅ РЕШЕНО (B21)
+- Проблема: при перезапуске браузера несколько хуков одновременно обращались к `project.json` в OPFS. Из-за блокировок файлов `readJSON` возвращал `null`, и функции записи (`persist`, `writePipelineStep`) интерпретировали это как пустой проект, перезаписывая метаданные объектом без `pipelineProgress` и `translationProject`.
+- Также `useLibrary` при сканировании OPFS мог не прочитать метаданные зеркала перевода и ошибочно трактовать его как основной проект (split-brain).
+- Также `useTranslationStorage` кэшировал отрицательный результат поиска (null), что приводило к «залипанию» пустой заставки даже после восстановления флагов.
+- Решение:
+  1. `readProjectMetaForWrite()` с retry (30ms) — при первом `null` повторное чтение перед записью.
+  2. Гвард: если meta по-прежнему `null` после retry — запись блокируется (refuse destructive overwrite).
+  3. `useLibrary`: эвристика по суффиксу `_EN`/`_RU` для фильтрации зеркал при нечитаемых метаданных.
+  4. `useTranslationStorage`: отрицательные результаты не кэшируются (no negative caching).
+- Файлы: `usePipelineProgress.ts`, `translationProject.ts`, `useLibrary.ts`, `useTranslationStorage.ts`.
+
 ---
 
 ## Защита от регрессий
