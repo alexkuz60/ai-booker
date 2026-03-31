@@ -86,7 +86,7 @@ export default function Translation() {
   const [sceneSegmentIds, setSceneSegmentIds] = useState<string[]>([]);
 
   // Translation storage (mirror OPFS project)
-  const { translationStorage, exists: transProjectExists, refresh: refreshTransStorage } =
+  const { translationStorage, exists: transProjectExists, loading: transLoading, refresh: refreshTransStorage } =
     useTranslationStorage(storage, meta);
 
   const { saveTranslation, saving: savingTranslation, restoreTranslation, restoring: restoringTranslation } = useSaveTranslation({
