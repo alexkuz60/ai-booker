@@ -348,7 +348,9 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       report("storyboard", "running");
       let savedStoryboardCount = 0;
       try {
-        savedStoryboardCount = await pushAllToDb();
+        savedStoryboardCount = await pushAllToDb((done, total) => {
+          report("storyboard", "running", `${done}/${total}`);
+        });
         if (savedStoryboardCount > 0) {
           console.log(`[SaveToServer] Pushed ${savedStoryboardCount} storyboarded scenes`);
         }
