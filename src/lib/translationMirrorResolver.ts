@@ -40,6 +40,13 @@ export function buildTranslationMirrorNames(
   );
 }
 
+function matchesTargetBySuffix(
+  projectName: string,
+  targetLanguage: TranslationTargetLanguage,
+): boolean {
+  return inferTranslationTargetLanguageFromName(projectName) === targetLanguage;
+}
+
 async function readTranslationMirrorCandidate(
   projectName: string,
 ): Promise<TranslationMirrorCandidate | null> {
@@ -78,6 +85,7 @@ export async function resolveTranslationMirrorProjectName(
   opts: ResolveTranslationMirrorOptions,
 ): Promise<string | null> {
   const { projects, sourceMeta, sourceStorage } = opts;
+  const projectSet = new Set(projects);
   const preferredTargetLanguage: TranslationTargetLanguage = sourceMeta.language === "en" ? "ru" : "en";
   const linkedProjectName = sourceMeta.translationProject?.projectName ?? null;
   const preferredNames = buildTranslationMirrorNames(
@@ -87,14 +95,29 @@ export async function resolveTranslationMirrorProjectName(
   );
 
   let preferredNameCandidate: string | null = null;
+  let preferredNameByPresence: string | null = null;
   let linkedCandidate: string | null = null;
   let sameBookCandidate: string | null = null;
 
   for (const projectName of preferredNames) {
-    if (projectName === sourceStorage.projectName || !projects.includes(projectName)) continue;
+    if (projectName === sourceStorage.projectName || !projectSet.has(projectName)) continue;
+
+    if (!preferredNameByPresence && (
+      projectName === linkedProjectName ||
+      matchesTargetBySuffix(projectName, preferredTargetLanguage)
+    )) {
+      preferredNameByPresence = projectName;
+    }
 
     const candidate = await readTranslationMirrorCandidate(projectName);
-    if (!candidate) continue;
+    if (!candidate) {
+      // OPFS read may fail transiently under concurrent writes; trust explicit backlink name if present.
+      if (projectName === linkedProjectName) {
+        console.warn("[translationMirrorResolver] using linked project by name fallback:", projectName);
+        return projectName;
+      }
+      continue;
+    }
 
     const sameBook = !candidate.bookId || candidate.bookId === sourceMeta.bookId;
     const sameTarget = !candidate.targetLanguage || candidate.targetLanguage === preferredTargetLanguage;
@@ -132,7 +155,7 @@ export async function resolveTranslationMirrorProjectName(
     }
   }
 
-  return preferredNameCandidate ?? linkedCandidate ?? sameBookCandidate ?? null;
+  return preferredNameCandidate ?? linkedCandidate ?? sameBookCandidate ?? preferredNameByPresence ?? null;
 }
 
 interface TranslationMirrorProjectExistsOptions {
