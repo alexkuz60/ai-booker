@@ -59,9 +59,15 @@ export function usePipelineProgress(
   const persist = useCallback(async (updated: PipelineProgress) => {
     const s = storageRef.current;
     if (!s) return;
+    if (!loadedRef.current) {
+      console.warn("[PipelineProgress] persist skipped — initial load not finished yet");
+      return;
+    }
     try {
       const meta = (await s.readJSON<Record<string, unknown>>("project.json")) ?? {};
-      meta.pipelineProgress = updated;
+      // Merge: never overwrite OPFS progress with stale React state
+      const existing = (meta.pipelineProgress as PipelineProgress) ?? {};
+      meta.pipelineProgress = { ...existing, ...updated };
       meta.updatedAt = new Date().toISOString();
       await s.writeJSON("project.json", meta);
     } catch (e) {
