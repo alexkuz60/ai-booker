@@ -6,6 +6,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { OPFSStorage } from "@/lib/projectStorage";
 import type { ProjectStorage, ProjectMeta } from "@/lib/projectStorage";
+import { resolveTranslationMirrorProjectName } from "@/lib/translationMirrorResolver";
 
 interface UseTranslationStorageReturn {
   /** Translation project storage (null if not created yet) */
@@ -16,61 +17,6 @@ interface UseTranslationStorageReturn {
   loading: boolean;
   /** Refresh / re-check existence */
   refresh: () => void;
-}
-
-async function resolveTranslationProjectName(
-  projects: string[],
-  sourceStorage: ProjectStorage,
-  sourceMeta: ProjectMeta,
-): Promise<string | null> {
-  const sourceLang = sourceMeta.language;
-  const preferredTargetLang = sourceLang === "en" ? "ru" : "en";
-  const preferredSuffix = preferredTargetLang.toUpperCase();
-  const exactName = `${sourceStorage.projectName}_${preferredSuffix}`;
-
-  if (projects.includes(exactName)) return exactName;
-
-  let linkedCandidate: string | null = null;
-  let sameBookCandidate: string | null = null;
-
-  for (const projectName of projects) {
-    try {
-      const store = await OPFSStorage.openExisting(projectName);
-      if (!store) continue;
-      const meta = await store.readJSON<ProjectMeta>("project.json");
-      if (!meta) continue;
-
-      const isMirrorProject = !!meta.sourceProjectName || !!meta.targetLanguage;
-      if (!isMirrorProject) continue;
-
-      console.info("[resolveTranslation] candidate:", projectName, {
-        sourceProjectName: meta.sourceProjectName,
-        targetLanguage: meta.targetLanguage,
-        bookId: meta.bookId,
-      });
-
-      const sameBook = meta.bookId === sourceMeta.bookId;
-      const linkedToCurrentSource = meta.sourceProjectName === sourceStorage.projectName;
-      const looksLikeMirrorName = projectName.startsWith(`${sourceStorage.projectName}_`);
-      const isPreferredTarget = meta.targetLanguage === preferredTargetLang;
-
-      if (linkedToCurrentSource && isPreferredTarget) {
-        return projectName;
-      }
-
-      if (!linkedCandidate && linkedToCurrentSource) {
-        linkedCandidate = projectName;
-      }
-
-      if (!sameBookCandidate && sameBook && (isPreferredTarget || looksLikeMirrorName)) {
-        sameBookCandidate = projectName;
-      }
-    } catch {
-      // Ignore unreadable candidates and continue scanning.
-    }
-  }
-
-  return linkedCandidate ?? sameBookCandidate ?? null;
 }
 
 export function useTranslationStorage(
@@ -109,7 +55,11 @@ export function useTranslationStorage(
         console.info("[useTranslationStorage] OPFS projects:", projects, "source:", sourceStorage.projectName, "lang:", sourceMeta.language);
         if (cancelled) return;
 
-          const resolvedProjectName = await resolveTranslationProjectName(projects, sourceStorage, sourceMeta);
+          const resolvedProjectName = await resolveTranslationMirrorProjectName({
+            projects,
+            sourceStorage,
+            sourceMeta,
+          });
           console.info("[useTranslationStorage] resolved:", resolvedProjectName);
           if (cancelled) return;
 

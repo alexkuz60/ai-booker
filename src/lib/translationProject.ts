@@ -15,6 +15,7 @@ import type { SceneIndexData } from "@/lib/sceneIndex";
 import type { LocalStoryboardData } from "@/lib/storyboardSync";
 import type { TocChapter } from "@/pages/parser/types";
 import { readSceneIndex } from "@/lib/sceneIndex";
+import { buildTranslationMirrorNames, resolveTranslationMirrorProjectName } from "@/lib/translationMirrorResolver";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -83,14 +84,41 @@ export interface CreateTranslationOpts {
 export async function translationProjectExists(
   sourceProjectName: string,
   targetLanguage: "en" | "ru",
+  sourceMeta?: Pick<ProjectMeta, "bookId" | "language" | "translationProject">,
 ): Promise<boolean> {
-  const langSuffix = targetLanguage.toUpperCase();
-  const projectName = `${sourceProjectName}_${langSuffix}`;
-  const store = await OPFSStorage.openExisting(projectName);
-  if (!store) return false;
+  const projects = await OPFSStorage.listProjects();
 
-  const meta = await store.readJSON<Pick<ProjectMeta, "sourceProjectName" | "targetLanguage">>(paths.projectMeta());
-  return meta?.sourceProjectName === sourceProjectName && meta?.targetLanguage === targetLanguage;
+  if (sourceMeta) {
+    const resolvedProjectName = await resolveTranslationMirrorProjectName({
+      projects,
+      sourceStorage: { projectName: sourceProjectName },
+      sourceMeta,
+    });
+    if (!resolvedProjectName) return false;
+    return true;
+  }
+
+  const candidateNames = buildTranslationMirrorNames(sourceProjectName, targetLanguage);
+  for (const projectName of candidateNames) {
+    const store = await OPFSStorage.openExisting(projectName);
+    if (!store) continue;
+
+    const meta = await store.readJSON<Pick<ProjectMeta, "sourceProjectName" | "targetLanguage">>(paths.projectMeta());
+    const inferredTarget = projectName.endsWith("_EN") || projectName.endsWith(" EN") || projectName.endsWith("-EN")
+      ? "en"
+      : projectName.endsWith("_RU") || projectName.endsWith(" RU") || projectName.endsWith("-RU")
+        ? "ru"
+        : null;
+
+    if (
+      meta?.sourceProjectName === sourceProjectName && meta?.targetLanguage === targetLanguage
+      || (!meta?.sourceProjectName && !meta?.targetLanguage && inferredTarget === targetLanguage)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export async function createTranslationProject(

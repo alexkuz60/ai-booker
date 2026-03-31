@@ -112,6 +112,7 @@ export function useSaveTranslation({
 
     const projectName =
       translationStorage?.projectName ??
+      sourceMeta.translationProject?.projectName ??
       deriveTranslationProjectName(sourceStorage.projectName, sourceMeta.language ?? "ru");
 
     setRestoring(true);
