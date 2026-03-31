@@ -114,7 +114,15 @@ export function useTranslationStorage(
           if (cancelled) return;
 
           if (resolvedProjectName) {
-            const store = await OPFSStorage.openOrCreate(resolvedProjectName);
+            const store = await OPFSStorage.openExisting(resolvedProjectName);
+            if (!store) {
+              console.warn("[useTranslationStorage] resolved project directory missing:", resolvedProjectName);
+              if (!cancelled && mountedRef.current) {
+                setTranslationStorage(null);
+                setExists(false);
+              }
+              return;
+            }
             // Verify project.json exists — if not, the folder is a zombie
             const projMeta = await store.readJSON<ProjectMeta>("project.json");
             if (!projMeta) {
