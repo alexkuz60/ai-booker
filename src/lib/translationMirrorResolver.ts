@@ -62,7 +62,8 @@ async function readTranslationMirrorCandidate(
       sourceProjectName: meta?.sourceProjectName ?? null,
       targetLanguage,
     };
-  } catch {
+  } catch (err) {
+    console.warn("[translationMirrorResolver] error reading candidate:", projectName, err);
     return null;
   }
 }

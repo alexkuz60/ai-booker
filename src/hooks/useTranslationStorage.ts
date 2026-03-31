@@ -1,12 +1,21 @@
 /**
  * useTranslationStorage — opens the mirror OPFS translation project
  * alongside the source project, providing read/write access to translated data.
+ *
+ * Resolution priority:
+ * 1. Backlink: sourceMeta.translationProject.projectName (trusted, no full scan)
+ * 2. Full resolver scan (fallback when backlink is missing)
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { OPFSStorage } from "@/lib/projectStorage";
 import type { ProjectStorage, ProjectMeta } from "@/lib/projectStorage";
 import { resolveTranslationMirrorProjectName } from "@/lib/translationMirrorResolver";
+
+const TAG = "[useTranslationStorage]";
+
+/** In-memory cache: sourceProjectName → resolved translation project name */
+const resolvedCache = new Map<string, string | null>();
 
 interface UseTranslationStorageReturn {
   /** Translation project storage (null if not created yet) */
@@ -19,6 +28,27 @@ interface UseTranslationStorageReturn {
   refresh: () => void;
 }
 
+/**
+ * Try to open a translation project by its exact name.
+ * Returns the storage if the folder exists AND contains a valid project.json.
+ */
+async function tryOpenByName(projectName: string): Promise<ProjectStorage | null> {
+  const store = await OPFSStorage.openExisting(projectName);
+  if (!store) {
+    console.warn(TAG, "folder missing for backlink:", projectName);
+    return null;
+  }
+  const meta = await store.readJSON<ProjectMeta>("project.json").catch((err) => {
+    console.warn(TAG, "project.json read error in", projectName, err);
+    return null;
+  });
+  if (!meta) {
+    console.warn(TAG, "project.json absent in", projectName, "— zombie folder");
+    return null;
+  }
+  return store;
+}
+
 export function useTranslationStorage(
   sourceStorage: ProjectStorage | null,
   sourceMeta: ProjectMeta | null,
@@ -29,7 +59,11 @@ export function useTranslationStorage(
   const [tick, setTick] = useState(0);
   const mountedRef = useRef(true);
 
-  const refresh = useCallback(() => setTick((t) => t + 1), []);
+  const refresh = useCallback(() => {
+    // Invalidate cache on manual refresh
+    if (sourceStorage) resolvedCache.delete(sourceStorage.projectName);
+    setTick((t) => t + 1);
+  }, [sourceStorage]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -40,61 +74,88 @@ export function useTranslationStorage(
     if (!sourceStorage || !sourceMeta) {
       setTranslationStorage(null);
       setExists(false);
-      // Don't reset loading to false here — if inputs are null because
-      // the parent context hasn't initialized yet, we should keep loading=true
-      // so consumers know they should wait rather than assume "no project".
       return;
     }
 
     let cancelled = false;
     setLoading(true);
 
+    const sourceKey = sourceStorage.projectName;
+
     (async () => {
       try {
-        const projects = await OPFSStorage.listProjects();
-        console.info("[useTranslationStorage] OPFS projects:", projects, "source:", sourceStorage.projectName, "lang:", sourceMeta.language);
-        if (cancelled) return;
-
-          const resolvedProjectName = await resolveTranslationMirrorProjectName({
-            projects,
-            sourceStorage,
-            sourceMeta,
-          });
-          console.info("[useTranslationStorage] resolved:", resolvedProjectName);
-          if (cancelled) return;
-
-          if (resolvedProjectName) {
-            const store = await OPFSStorage.openExisting(resolvedProjectName);
-            if (!store) {
-              console.warn("[useTranslationStorage] resolved project directory missing:", resolvedProjectName);
-              if (!cancelled && mountedRef.current) {
-                setTranslationStorage(null);
-                setExists(false);
-              }
-              return;
-            }
-            // Verify project.json exists — if not, the folder is a zombie
-            const projMeta = await store.readJSON<ProjectMeta>("project.json");
-            if (!projMeta) {
-              console.warn("[useTranslationStorage] project.json missing in resolved project:", resolvedProjectName);
-              if (!cancelled && mountedRef.current) {
-                setTranslationStorage(null);
-                setExists(false);
-              }
-            } else if (!cancelled && mountedRef.current) {
-              console.info("[useTranslationStorage] ✅ opened translation project:", resolvedProjectName);
+        // ── 1. Check in-memory cache ──
+        if (resolvedCache.has(sourceKey)) {
+          const cached = resolvedCache.get(sourceKey)!;
+          if (cached) {
+            const store = await tryOpenByName(cached);
+            if (store && !cancelled && mountedRef.current) {
+              console.info(TAG, "✅ opened from cache:", cached);
               setTranslationStorage(store);
               setExists(true);
+              return;
             }
+            // Cache stale — clear and continue
+            resolvedCache.delete(sourceKey);
           } else {
-            console.warn("[useTranslationStorage] no translation project found for source:", sourceStorage.projectName);
+            // Cached as "no project"
             if (!cancelled && mountedRef.current) {
               setTranslationStorage(null);
               setExists(false);
             }
+            return;
           }
+        }
+
+        // ── 2. Backlink: trust sourceMeta.translationProject ──
+        const backlink = sourceMeta.translationProject?.projectName;
+        if (backlink) {
+          console.info(TAG, "trying backlink:", backlink);
+          const store = await tryOpenByName(backlink);
+          if (store && !cancelled && mountedRef.current) {
+            console.info(TAG, "✅ opened via backlink:", backlink);
+            resolvedCache.set(sourceKey, backlink);
+            setTranslationStorage(store);
+            setExists(true);
+            return;
+          }
+          // Backlink broken — fall through to full scan
+          console.warn(TAG, "backlink broken, falling through to full scan");
+        }
+
+        // ── 3. Full resolver scan (fallback) ──
+        const projects = await OPFSStorage.listProjects();
+        console.info(TAG, "full scan, OPFS projects:", projects.length, "source:", sourceKey);
+        if (cancelled) return;
+
+        const resolvedProjectName = await resolveTranslationMirrorProjectName({
+          projects,
+          sourceStorage,
+          sourceMeta,
+        });
+        console.info(TAG, "resolved:", resolvedProjectName);
+        if (cancelled) return;
+
+        if (resolvedProjectName) {
+          const store = await tryOpenByName(resolvedProjectName);
+          if (store && !cancelled && mountedRef.current) {
+            console.info(TAG, "✅ opened via full scan:", resolvedProjectName);
+            resolvedCache.set(sourceKey, resolvedProjectName);
+            setTranslationStorage(store);
+            setExists(true);
+            return;
+          }
+        }
+
+        // No project found
+        console.warn(TAG, "no translation project found for:", sourceKey);
+        resolvedCache.set(sourceKey, null);
+        if (!cancelled && mountedRef.current) {
+          setTranslationStorage(null);
+          setExists(false);
+        }
       } catch (err) {
-        console.error("[useTranslationStorage] error:", err);
+        console.error(TAG, "resolution error:", err);
         if (!cancelled && mountedRef.current) {
           setTranslationStorage(null);
           setExists(false);
