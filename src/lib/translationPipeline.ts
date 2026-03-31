@@ -522,12 +522,28 @@ async function saveTranslationResults(
 
 // ── Staged radar file persistence ────────────────────────────────────────────
 
+/**
+ * Save/merge radar files for a set of segments.
+ * Reads existing data first so incremental (per-segment) calls don't overwrite
+ * previously saved segments.
+ */
 async function saveStageRadarFiles(
   targetStorage: ProjectStorage,
   sceneId: string,
   chapterId: string,
   results: TranslationSegmentResult[],
 ): Promise<void> {
+  // Helper: merge new segments into existing file data
+  const mergeSegments = <T extends StageSegmentRadar>(
+    existing: T[] | undefined,
+    incoming: T[],
+  ): T[] => {
+    const map = new Map<string, T>();
+    for (const s of (existing ?? [])) map.set(s.segmentId, s);
+    for (const s of incoming) map.set(s.segmentId, s);
+    return Array.from(map.values());
+  };
+
   // radar-literal.json — 3R axes only (semantic, rhythm, phonetic)
   const literalSegments: StageSegmentRadar[] = results
     .filter(r => r.literal)
@@ -562,16 +578,28 @@ async function saveStageRadarFiles(
       radar: r.radar,
       literary: r.literary,
       critiqueNotes: r.critiqueNotes,
-      alternatives: [], // Will be populated in future critique phase
+      alternatives: [],
     }));
 
+  // Read existing files to merge
+  const [existingLiteral, existingLiterary, existingCritique] = await Promise.all([
+    literalSegments.length > 0 ? readStageRadar(targetStorage, chapterId, sceneId, "literal") : null,
+    literarySegments.length > 0 ? readStageRadar(targetStorage, chapterId, sceneId, "literary") : null,
+    critiqueSegments.length > 0 ? readCritiqueRadar(targetStorage, chapterId, sceneId) : null,
+  ]);
+
   await Promise.all([
-    writeStageRadar(targetStorage, chapterId, sceneId, "literal", literalSegments),
+    literalSegments.length > 0
+      ? writeStageRadar(targetStorage, chapterId, sceneId, "literal",
+          mergeSegments(existingLiteral?.segments, literalSegments))
+      : Promise.resolve(),
     literarySegments.length > 0
-      ? writeStageRadar(targetStorage, chapterId, sceneId, "literary", literarySegments)
+      ? writeStageRadar(targetStorage, chapterId, sceneId, "literary",
+          mergeSegments(existingLiterary?.segments, literarySegments))
       : Promise.resolve(),
     critiqueSegments.length > 0
-      ? writeCritiqueRadar(targetStorage, chapterId, sceneId, critiqueSegments)
+      ? writeCritiqueRadar(targetStorage, chapterId, sceneId,
+          mergeSegments(existingCritique?.segments as CritiqueSegmentRadar[] | undefined, critiqueSegments))
       : Promise.resolve(),
   ]);
 }
