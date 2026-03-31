@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
@@ -96,6 +96,63 @@ function MultiColorProgress({ steps }: { steps: SyncStep[] }) {
   );
 }
 
+/** Step list with auto-scroll to the currently running step */
+function StepList({ steps }: { steps: SyncStep[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const runningRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (runningRef.current && containerRef.current) {
+      runningRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [steps]);
+
+  return (
+    <div ref={containerRef} className="space-y-1.5 max-h-60 overflow-y-auto">
+      {steps.map((step, i) => {
+        const isRunning = step.status === "running";
+        return (
+          <div
+            key={step.id}
+            ref={isRunning ? runningRef : undefined}
+            className={cn(
+              "flex items-start gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors",
+              isRunning && "bg-primary/5",
+              step.status === "error" && "bg-destructive/5",
+            )}
+          >
+            <div className="mt-0.5 shrink-0">
+              <StepIcon status={step.status} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span
+                className={cn(
+                  "font-medium",
+                  step.status === "pending" && "text-muted-foreground/60",
+                  step.status === "skipped" && "text-muted-foreground/50 line-through",
+                )}
+              >
+                {step.label}
+              </span>
+              {step.detail && (
+                <p className="text-xs text-muted-foreground truncate">{step.detail}</p>
+              )}
+            </div>
+            {step.status === "done" && (
+              <div
+                className={cn(
+                  "h-2 w-2 rounded-full mt-1.5 shrink-0",
+                  STEP_COLORS[i % STEP_COLORS.length],
+                )}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function SyncProgressDialog({
   isRu,
   open,
@@ -109,15 +166,14 @@ export function SyncProgressDialog({
 }: SyncProgressDialogProps) {
   const doneCount = steps.filter((s) => s.status === "done" || s.status === "skipped").length;
   const isRunningOrDone = phase === "running" || phase === "done" || phase === "error";
+  const isLocked = phase === "running";
 
-    const isLocked = phase === "running";
-
-    return (
-      <AlertDialog open={open} onOpenChange={isLocked ? () => {} : onOpenChange}>
-        <AlertDialogContent
-          className="max-w-md"
-          onEscapeKeyDown={isLocked ? (e) => e.preventDefault() : undefined}
-        >
+  return (
+    <AlertDialog open={open} onOpenChange={isLocked ? () => {} : onOpenChange}>
+      <AlertDialogContent
+        className="max-w-md"
+        onEscapeKeyDown={isLocked ? (e) => e.preventDefault() : undefined}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             {mode === "restore"
@@ -167,44 +223,7 @@ export function SyncProgressDialog({
               {doneCount}/{steps.length} {isRu ? "шагов" : "steps"}
             </p>
 
-            <div className="space-y-1.5 max-h-60 overflow-y-auto">
-              {steps.map((step, i) => (
-                <div
-                  key={step.id}
-                  className={cn(
-                    "flex items-start gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors",
-                    step.status === "running" && "bg-primary/5",
-                    step.status === "error" && "bg-destructive/5",
-                  )}
-                >
-                  <div className="mt-0.5 shrink-0">
-                    <StepIcon status={step.status} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span
-                      className={cn(
-                        "font-medium",
-                        step.status === "pending" && "text-muted-foreground/60",
-                        step.status === "skipped" && "text-muted-foreground/50 line-through",
-                      )}
-                    >
-                      {step.label}
-                    </span>
-                    {step.detail && (
-                      <p className="text-xs text-muted-foreground truncate">{step.detail}</p>
-                    )}
-                  </div>
-                  {step.status === "done" && (
-                    <div
-                      className={cn(
-                        "h-2 w-2 rounded-full mt-1.5 shrink-0",
-                        STEP_COLORS[i % STEP_COLORS.length],
-                      )}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
+            <StepList steps={steps} />
 
             {errorMessage && (
               <p className="text-xs text-destructive bg-destructive/10 rounded-md px-3 py-2">

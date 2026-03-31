@@ -212,14 +212,18 @@ export function useStoryboardPersistence(sceneId: string | null, chapterId?: str
    * Push ALL storyboarded scenes from OPFS → DB.
    * Used by "Save to Server" button.
    */
-  const pushAllToDb = useCallback(async (): Promise<number> => {
+  const pushAllToDb = useCallback(async (
+    onSceneProgress?: (done: number, total: number) => void,
+  ): Promise<number> => {
     if (!storage) return 0;
     const sceneIds = await listStoryboardedScenes(storage);
+    const total = sceneIds.length;
     let pushed = 0;
     for (const sid of sceneIds) {
       try {
         await pushToDb(sid);
         pushed++;
+        onSceneProgress?.(pushed, total);
       } catch (err) {
         console.warn(`[pushAllToDb] Failed for scene ${sid}:`, err);
       }
