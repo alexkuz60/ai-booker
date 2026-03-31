@@ -398,7 +398,7 @@ await storage.readJSON(`storyboard/scene_${sceneId}.json`);
 
 Резолвер генерирует V2-пути, включающие chapterId, который резолвится из scene_index через `resolveChapterId()`.
 
-### 1.12 Миграция V1 → V2
+### 1.13 Миграция V1 → V2
 
 Автоматическая миграция выполняется в `ensureV2Layout()` при загрузке проекта:
 
