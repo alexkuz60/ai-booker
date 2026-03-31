@@ -57,7 +57,7 @@ interface Opts {
   /** Callback after scene translated (e.g. refresh UI) */
   onSceneComplete?: (sceneId: string) => void;
   /** Callback after each segment is processed (for live UI updates) */
-  onSegmentComplete?: (segmentId: string) => void;
+  onSegmentComplete?: (segmentId: string, result: TranslationSegmentResult) => void;
 }
 
 const EMPTY_PROGRESS: BatchTranslationProgress = {
