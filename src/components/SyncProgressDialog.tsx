@@ -167,16 +167,7 @@ export function SyncProgressDialog({
               {doneCount}/{steps.length} {isRu ? "шагов" : "steps"}
             </p>
 
-            <div className="space-y-1.5 max-h-60 overflow-y-auto">
-              {steps.map((step, i) => (
-                <div
-                  key={step.id}
-                  className={cn(
-                    "flex items-start gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors",
-                    step.status === "running" && "bg-primary/5",
-                    step.status === "error" && "bg-destructive/5",
-                  )}
-                >
+            <StepList steps={steps} />
                   <div className="mt-0.5 shrink-0">
                     <StepIcon status={step.status} />
                   </div>
