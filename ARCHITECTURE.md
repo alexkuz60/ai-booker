@@ -629,7 +629,7 @@ assert(storedBookId === targetBookId, "bookId mismatch — aborting write");
 - Bucket `impulse-responses` — аудиофайлы IR
 - Администратор управляет флагом `is_public` в `/admin` → ImpulseManager
 
-### 1.17 Плагины клипов и иерархическое управление (Clip Plugin System)
+### 1.19 Плагины клипов и иерархическое управление (Clip Plugin System)
 
 Каждый клип на таймлайне может иметь индивидуальную цепочку обработки: EQ → Compressor → Limiter → Panner3D → Convolver.
 
