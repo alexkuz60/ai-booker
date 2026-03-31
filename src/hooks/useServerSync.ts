@@ -70,7 +70,8 @@ export function useServerSync({
       const projectNames = localProjectNamesByBookId.get(targetBookId);
       if (projectNames?.length) {
         try {
-          return await OPFSStorage.openOrCreate(projectNames[0]);
+          const store = await OPFSStorage.openExisting(projectNames[0]);
+          if (store) return store;
         } catch (err) {
           console.warn("[SyncCheck] Failed to open OPFS project:", projectNames[0], err);
         }

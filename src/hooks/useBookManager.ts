@@ -194,7 +194,8 @@ export function useBookManager({
 
         for (const projectName of candidateProjects) {
           try {
-            const store = await OPFSStorage.openOrCreate(projectName);
+            const store = await OPFSStorage.openExisting(projectName);
+            if (!store) continue;
             const meta = await store.readJSON<{ bookId?: string; targetLanguage?: string; sourceProjectName?: string }>("project.json").catch(() => null);
             const toc = await store.readJSON<{ bookId?: string }>(paths.structureToc()).catch(() => null);
             const resolvedBookId = meta?.bookId || toc?.bookId || null;
@@ -281,7 +282,8 @@ export function useBookManager({
         if (projectNames?.length) {
           for (const name of projectNames) {
             try {
-              const store = await OPFSStorage.openOrCreate(name);
+              const store = await OPFSStorage.openExisting(name);
+              if (!store) continue;
               // Clean up structure + content (V2: chapters/, V1: scenes/)
               const structFiles = await store.listDir("structure").catch(() => []);
               for (const f of structFiles) await store.delete(`structure/${f}`).catch(() => {});
