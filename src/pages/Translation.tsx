@@ -17,7 +17,7 @@ import {
   type TranslationReadiness,
 } from "@/lib/translationProject";
 import { TranslationChapterNav } from "@/components/translation/TranslationChapterNav";
-import { BilingualSegmentsView, type SelectedSegmentData } from "@/components/translation/BilingualSegmentsView";
+import { BilingualSegmentsView, type SelectedSegmentData, type BilingualSegmentsHandle } from "@/components/translation/BilingualSegmentsView";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
