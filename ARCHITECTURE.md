@@ -579,7 +579,7 @@ assert(storedBookId === targetBookId, "bookId mismatch — aborting write");
 `openSavedBook` и `restoreFromLocal` — **read-only** по отношению к Supabase.  
 Единственная допустимая DB-запись — при ручном нажатии «На сервер» (`saveBook`).
 
-### 1.16 Ограничения
+### 1.17 Ограничения
 
 - **OPFS** не даёт пользователю видеть файлы в проводнике — это ограничение API, не баг. ZIP-экспорт решает проблему.
 - **FS Access API** — права сбрасываются при перезапуске браузера, потребуется re-pick папки.
