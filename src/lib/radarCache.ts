@@ -11,11 +11,6 @@ import { useEffect, useState } from "react";
 
 // ── Module-level caches ─────────────────────────────────────────
 
-/** Per-scene legacy radar.json cache */
-export const radarCache = new Map<string, {
-  segments: { segmentId: string; radar: RadarScores; critiqueNotes?: string[] }[];
-}>();
-
 /** Per-segment computed scores (survives remount within session) */
 export const computedCache = new Map<string, { scores: RadarScores; notes: string[] }>();
 
