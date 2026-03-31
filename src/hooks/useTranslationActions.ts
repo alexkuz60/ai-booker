@@ -48,7 +48,7 @@ export function useTranslationActions(deps: Deps) {
     storage, meta, isRu,
     selectedSceneId, selectedChapter,
     readiness, selectedSegment, setSelectedSegment,
-    bilingualRef,
+    bilingualRef, onQualityUpdate,
     doTranslateSegments, editSegment, critiqueSegment,
     translateSceneFull, translateChapterBatch,
     refreshTransStorage,
