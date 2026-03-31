@@ -382,6 +382,20 @@ export default function Translation() {
             )}
             {isRu ? "Перевод ← сервер" : "Restore translation"}
           </Button>
+          {storage && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="gap-1.5"
+              onClick={async () => {
+                await writePipelineStep(storage, "trans_storage_created" as any, true);
+                await writePipelineStep(storage, "trans_migration_done" as any, true);
+                alert(isRu ? "Флаги выставлены, обновите страницу для проверки." : "Flags set, reload to verify.");
+              }}
+            >
+              🔧 {isRu ? "Выставить флаги перевода" : "Force translation flags"}
+            </Button>
+          )}
         </div>
       </motion.div>
     );
@@ -449,21 +463,6 @@ export default function Translation() {
           </div>
         )}
 
-        {/* DEBUG: force-set translation pipeline flags */}
-        {storage && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="text-[10px] h-6 px-2 border-yellow-500/50 text-yellow-500"
-            onClick={async () => {
-              await writePipelineStep(storage, "trans_storage_created" as any, true);
-              await writePipelineStep(storage, "trans_migration_done" as any, true);
-              alert("Flags set! Reload to verify.");
-            }}
-          >
-            🔧 Force trans flags = true
-          </Button>
-        )}
       </div>
 
       <ResizablePanelGroup
