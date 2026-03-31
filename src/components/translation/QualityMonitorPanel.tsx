@@ -17,7 +17,6 @@ import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { readAllStages, LAYER_LABELS } from "@/lib/radarStages";
 import {
-  radarCache,
   computedCache,
   stageCache,
   normalizeRadar,
