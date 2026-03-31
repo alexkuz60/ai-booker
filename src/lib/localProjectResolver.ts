@@ -12,11 +12,30 @@ import { stripFileExtension } from "@/lib/fileFormatUtils";
 
 const LANG_SUFFIX_RE = /^(.*)_(EN|RU)$/i;
 
-function isLikelyTranslationMirrorByName(projectName: string, existingProjects: Set<string>): boolean {
+function isLikelyTranslationMirrorByName(projectName: string, existingProjects?: Set<string>): boolean {
   const match = projectName.match(LANG_SUFFIX_RE);
   if (!match) return false;
-  const baseName = match[1];
-  return existingProjects.has(baseName);
+  // If we have the project list, only consider it a mirror when base exists
+  if (existingProjects) return existingProjects.has(match[1]);
+  // Without project list, any _EN/_RU suffix is suspicious
+  return true;
+}
+
+/** Read project.json and return true if this folder is a translation mirror */
+async function isMirrorByMeta(projectName: string): Promise<boolean> {
+  try {
+    const store = await OPFSStorage.openExisting(projectName);
+    if (!store) return false; // folder doesn't exist — not a mirror
+    const meta = await store.readJSON<{ targetLanguage?: string; sourceProjectName?: string }>("project.json");
+    if (!meta) {
+      // project.json unreadable — fall back to name heuristic (safe side: treat as mirror)
+      console.warn("[Resolver] project.json unreadable for", projectName, "— treating as potential mirror by name");
+      return isLikelyTranslationMirrorByName(projectName);
+    }
+    return Boolean(meta.targetLanguage || meta.sourceProjectName);
+  } catch {
+    return isLikelyTranslationMirrorByName(projectName);
+  }
 }
 
 // ── Read bookId from an arbitrary ProjectStorage ────────────
@@ -83,21 +102,29 @@ export async function resolveLocalStorageForBook(
     let projectNames = (opts.localProjectNamesByBookId.get(targetBookId) || [])
       .filter((projectName) => existingProjects.has(projectName));
 
+    // Filter out mirrors that may have leaked into the pre-built map
+    const filteredNames: string[] = [];
+    for (const pn of projectNames) {
+      if (await isMirrorByMeta(pn)) {
+        console.warn("[Resolver] Filtering mirror from pre-built map:", pn);
+        continue;
+      }
+      filteredNames.push(pn);
+    }
+    projectNames = filteredNames;
+
     // B26 fix: if the pre-built map is empty (e.g. auto-restore before library loaded),
     // do a direct OPFS scan to find the project by bookId in project.json.
     if (!projectNames.length && existingProjects.size > 0) {
       console.debug("[Resolver] Map empty for bookId=%s, scanning OPFS directly (%d projects)", targetBookId, existingProjects.size);
       for (const projectName of existingProjects) {
         try {
-          // Extra safety: treat "Base_EN/Base_RU" as mirror when base project exists,
-          // even if mirror metadata is missing/corrupted.
-          if (isLikelyTranslationMirrorByName(projectName, existingProjects)) continue;
+          // Skip mirrors — by meta first, then by name as fallback
+          if (await isMirrorByMeta(projectName)) continue;
 
           const store = await OPFSStorage.openExisting(projectName);
           if (!store) continue;
-          const meta = await store.readJSON<{ bookId?: string; targetLanguage?: string; sourceProjectName?: string }>("project.json");
-          // Skip translation mirrors — they share bookId but are not the source project
-          if (meta?.targetLanguage || meta?.sourceProjectName) continue;
+          const meta = await store.readJSON<{ bookId?: string }>("project.json");
           if (meta?.bookId === targetBookId) {
             projectNames.push(projectName);
           }
