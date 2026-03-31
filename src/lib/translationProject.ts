@@ -14,7 +14,7 @@ import { paths } from "@/lib/projectPaths";
 import type { SceneIndexData } from "@/lib/sceneIndex";
 import type { LocalStoryboardData } from "@/lib/storyboardSync";
 import type { TocChapter } from "@/pages/parser/types";
-import { ensureV2Layout } from "@/lib/projectMigrator";
+import { readSceneIndex } from "@/lib/sceneIndex";
 
 // ─── Types ──────────────────────────────────────────────────
 
