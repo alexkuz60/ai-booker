@@ -12,11 +12,30 @@ import { stripFileExtension } from "@/lib/fileFormatUtils";
 
 const LANG_SUFFIX_RE = /^(.*)_(EN|RU)$/i;
 
-function isLikelyTranslationMirrorByName(projectName: string, existingProjects: Set<string>): boolean {
+function isLikelyTranslationMirrorByName(projectName: string, existingProjects?: Set<string>): boolean {
   const match = projectName.match(LANG_SUFFIX_RE);
   if (!match) return false;
-  const baseName = match[1];
-  return existingProjects.has(baseName);
+  // If we have the project list, only consider it a mirror when base exists
+  if (existingProjects) return existingProjects.has(match[1]);
+  // Without project list, any _EN/_RU suffix is suspicious
+  return true;
+}
+
+/** Read project.json and return true if this folder is a translation mirror */
+async function isMirrorByMeta(projectName: string): Promise<boolean> {
+  try {
+    const store = await OPFSStorage.openExisting(projectName);
+    if (!store) return false; // folder doesn't exist — not a mirror
+    const meta = await store.readJSON<{ targetLanguage?: string; sourceProjectName?: string }>("project.json");
+    if (!meta) {
+      // project.json unreadable — fall back to name heuristic (safe side: treat as mirror)
+      console.warn("[Resolver] project.json unreadable for", projectName, "— treating as potential mirror by name");
+      return isLikelyTranslationMirrorByName(projectName);
+    }
+    return Boolean(meta.targetLanguage || meta.sourceProjectName);
+  } catch {
+    return isLikelyTranslationMirrorByName(projectName);
+  }
 }
 
 // ── Read bookId from an arbitrary ProjectStorage ────────────
