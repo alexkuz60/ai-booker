@@ -145,9 +145,18 @@ export const BilingualSegmentsView = forwardRef<BilingualSegmentsHandle, Props>(
     reload: loadAll,
   }), [loadAll]);
 
-  // Load segment stage info from radar files
+  // Track segment IDs separately to avoid re-reading stages when items
+  // change due to patchSegment (which already sets stages directly).
+  const segmentIdList = useMemo(
+    () => items.map(i => i.segment.segment_id),
+    // Only recalculate when segment count or identity changes (not text)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items.length, items.map(i => i.segment.segment_id).join(",")],
+  );
+
+  // Load segment stage info from radar files — only on scene change, NOT on items patch
   useEffect(() => {
-    if (!translationStorage || !sceneId || !chapterId) {
+    if (!translationStorage || !sceneId || !chapterId || segmentIdList.length === 0) {
       setSegmentStages(new Map());
       return;
     }
@@ -157,8 +166,8 @@ export const BilingualSegmentsView = forwardRef<BilingualSegmentsHandle, Props>(
         const stages = await readAllStages(translationStorage, chapterId, sceneId);
         if (cancelled) return;
         const map = new Map<string, RadarStage | null>();
-        for (const item of items) {
-          map.set(item.segment.segment_id, getSegmentStage(item.segment.segment_id, stages));
+        for (const id of segmentIdList) {
+          map.set(id, getSegmentStage(id, stages));
         }
         setSegmentStages(map);
       } catch {
@@ -166,7 +175,7 @@ export const BilingualSegmentsView = forwardRef<BilingualSegmentsHandle, Props>(
       }
     })();
     return () => { cancelled = true; };
-  }, [translationStorage, sceneId, chapterId, items]);
+  }, [translationStorage, sceneId, chapterId, segmentIdList]);
 
   const handleTranslateSegment = useCallback(async (seg: Segment) => {
     if (!onTranslateSegments) return;
