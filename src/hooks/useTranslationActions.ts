@@ -99,8 +99,9 @@ export function useTranslationActions(deps: Deps) {
       if (selectedSegment?.segmentId === seg.segment_id) {
         setSelectedSegment(prev => prev ? { ...prev } : null);
       }
+      onQualityUpdate?.();
     }
-  }, [critiqueSegment, selectedSceneId, selectedChapter, storage, selectedSegment, setSelectedSegment, bilingualRef]);
+  }, [critiqueSegment, selectedSceneId, selectedChapter, storage, selectedSegment, setSelectedSegment, bilingualRef, onQualityUpdate]);
 
   const handleTranslateSceneFull = useCallback(async () => {
     if (!selectedSceneId || !selectedChapter?.chapterId) return;
