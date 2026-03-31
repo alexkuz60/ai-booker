@@ -65,8 +65,9 @@ export function useTranslationActions(deps: Deps) {
       for (const [segId, text] of result.translations) {
         bilingualRef.current?.patchSegment(segId, text, "literal");
       }
+      onQualityUpdate?.();
     }
-  }, [doTranslateSegments, selectedSceneId, selectedChapter, bilingualRef]);
+  }, [doTranslateSegments, selectedSceneId, selectedChapter, bilingualRef, onQualityUpdate]);
 
   const handleLiteraryEdit = useCallback(async (seg: Segment) => {
     if (!selectedSceneId || !selectedChapter?.chapterId || !storage) return;
