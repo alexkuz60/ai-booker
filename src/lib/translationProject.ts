@@ -161,14 +161,20 @@ export async function createTranslationProject(
 
   // 3b. Write back-link in source project.json (translationProject field)
   try {
-    const srcMeta = (await sourceStorage.readJSON<Record<string, unknown>>(paths.projectMeta())) ?? {};
-    srcMeta.translationProject = {
-      projectName,
-      targetLanguage,
-      createdAt: translationMeta.createdAt,
-    };
-    srcMeta.updatedAt = new Date().toISOString();
-    await sourceStorage.writeJSON(paths.projectMeta(), srcMeta);
+    const srcMeta = await sourceStorage.readJSON<Record<string, unknown>>(paths.projectMeta());
+    if (!srcMeta) {
+      console.warn("[translationProject] source project.json unreadable — skip backlink write to avoid destructive overwrite");
+    } else {
+      await sourceStorage.writeJSON(paths.projectMeta(), {
+        ...srcMeta,
+        translationProject: {
+          projectName,
+          targetLanguage,
+          createdAt: translationMeta.createdAt,
+        },
+        updatedAt: new Date().toISOString(),
+      });
+    }
   } catch (e) {
     console.warn("[translationProject] Failed to write back-link to source:", e);
   }

@@ -22,6 +22,15 @@ function isNestedTranslationMirrorMeta(meta: Record<string, unknown> | null): bo
   return !!source && LANG_SUFFIX_RE.test(source);
 }
 
+function isLikelyTranslationMirrorByName(projectName: string, existingProjects?: Set<string>): boolean {
+  const match = projectName.match(LANG_SUFFIX_RE);
+  if (!match) return false;
+  // If project list is available, treat as mirror only when base exists.
+  if (existingProjects) return existingProjects.has(match[1]);
+  // Without list, be conservative: language suffix is suspicious.
+  return true;
+}
+
 type LocalLibraryCandidate = {
   record: BookRecord;
   projectName: string;
@@ -111,6 +120,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     if (storageBackend === "opfs") {
       const allProjectNames = await OPFSStorage.listProjects();
       const projectNames = allProjectNames.filter((name) => !OPFS_NON_PROJECT_DIRS.has(name));
+      const existingProjectSet = new Set(projectNames);
 
       const scanResults = await Promise.all(projectNames.map(async (projectName) => {
         try {
@@ -118,11 +128,22 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
             return { candidate: null as LocalLibraryCandidate | null, shouldDelete: true, projectName };
           }
 
+          // If this looks like SOURCE_EN / SOURCE_RU and SOURCE exists, skip as mirror
+          // even if project.json is temporarily unreadable.
+          if (isLikelyTranslationMirrorByName(projectName, existingProjectSet)) {
+            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
+          }
+
           const store = await OPFSStorage.openExisting(projectName);
           if (!store) {
             return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
           }
           const meta = await store.readJSON<Record<string, unknown>>("project.json").catch(() => null);
+
+          if (!meta && isLikelyTranslationMirrorByName(projectName, existingProjectSet)) {
+            console.warn("[Library] project.json unreadable for likely mirror, skipping:", projectName);
+            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
+          }
 
           if (isNestedTranslationMirrorMeta(meta)) {
             return { candidate: null as LocalLibraryCandidate | null, shouldDelete: true, projectName };
@@ -137,7 +158,12 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
           if (!result) {
             const toc = await store.readJSON<Record<string, unknown>>("structure/toc.json").catch(() => null);
             const hasBookId = typeof (meta as any)?.bookId === "string" || typeof (toc as any)?.bookId === "string";
-            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: !hasBookId, projectName };
+            const likelyMirror = isLikelyTranslationMirrorByName(projectName, existingProjectSet);
+            return {
+              candidate: null as LocalLibraryCandidate | null,
+              shouldDelete: !hasBookId && !likelyMirror,
+              projectName,
+            };
           }
           return { candidate: result, shouldDelete: false, projectName };
         } catch (err) {
