@@ -156,8 +156,8 @@ export default function Translation() {
     isRu,
     getModelForRole,
     getEffectivePool,
-    onSceneComplete: () => setBilingualTick(t => t + 1),
-    onSegmentComplete: () => setBilingualTick(t => t + 1),
+    onSceneComplete: () => { bilingualRef.current?.reload(); setQualityChartTick(t => t + 1); },
+    onSegmentComplete: () => { bilingualRef.current?.reload(); setQualityChartTick(t => t + 1); },
   });
 
   // ── Extracted actions ───────────────────────────────────
