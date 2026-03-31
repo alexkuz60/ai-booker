@@ -27,6 +27,8 @@ import {
   DEFAULT_WEIGHTS,
 } from "@/lib/qualityRadar";
 import {
+  readStageRadar,
+  readCritiqueRadar,
   writeStageRadar,
   writeCritiqueRadar,
   type StageSegmentRadar,
