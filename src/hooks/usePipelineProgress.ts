@@ -10,6 +10,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProjectStorage, PipelineProgress, PipelineStepId } from "@/lib/projectStorage";
 import { createEmptyPipelineProgress } from "@/lib/projectStorage";
 
+const PROJECT_META_READ_RETRY_MS = 30;
+
 interface UsePipelineProgressReturn {
   progress: PipelineProgress;
   /** Set a single step's done status and persist to project.json */
@@ -20,6 +22,20 @@ interface UsePipelineProgressReturn {
   isDone: (stepId: PipelineStepId) => boolean;
   /** Loading state */
   loading: boolean;
+}
+
+async function readProjectMetaForWrite(
+  storage: ProjectStorage,
+): Promise<Record<string, unknown> | null> {
+  const first = await storage.readJSON<Record<string, unknown>>("project.json");
+  if (first) return first;
+
+  // OPFS can briefly return null during concurrent writes; retry once.
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, PROJECT_META_READ_RETRY_MS);
+  });
+
+  return await storage.readJSON<Record<string, unknown>>("project.json");
 }
 
 export function usePipelineProgress(
@@ -64,12 +80,19 @@ export function usePipelineProgress(
       return;
     }
     try {
-      const meta = (await s.readJSON<Record<string, unknown>>("project.json")) ?? {};
+      const meta = await readProjectMetaForWrite(s);
+      if (!meta) {
+        console.warn("[PipelineProgress] persist skipped — project.json unreadable, refusing destructive overwrite");
+        return;
+      }
+
       // Merge: never overwrite OPFS progress with stale React state
       const existing = (meta.pipelineProgress as PipelineProgress) ?? {};
-      meta.pipelineProgress = { ...existing, ...updated };
-      meta.updatedAt = new Date().toISOString();
-      await s.writeJSON("project.json", meta);
+      await s.writeJSON("project.json", {
+        ...meta,
+        pipelineProgress: { ...existing, ...updated },
+        updatedAt: new Date().toISOString(),
+      });
     } catch (e) {
       console.error("[PipelineProgress] Failed to persist:", e);
     }
@@ -116,13 +139,20 @@ export async function writePipelineStep(
   done: boolean,
 ): Promise<void> {
   try {
-    const meta = (await storage.readJSON<Record<string, unknown>>("project.json")) ?? {};
+    const meta = await readProjectMetaForWrite(storage);
+    if (!meta) {
+      console.warn("[PipelineProgress] writePipelineStep skipped — project.json unreadable, refusing destructive overwrite");
+      return;
+    }
+
     // Always merge with defaults to avoid losing keys
     const progress = { ...createEmptyPipelineProgress(), ...((meta.pipelineProgress as PipelineProgress) ?? {}) };
     progress[stepId] = done;
-    meta.pipelineProgress = progress;
-    meta.updatedAt = new Date().toISOString();
-    await storage.writeJSON("project.json", meta);
+    await storage.writeJSON("project.json", {
+      ...meta,
+      pipelineProgress: progress,
+      updatedAt: new Date().toISOString(),
+    });
   } catch (e) {
     console.error("[PipelineProgress] writePipelineStep failed:", e);
   }
