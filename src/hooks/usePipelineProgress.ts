@@ -29,6 +29,7 @@ export function usePipelineProgress(
 ): UsePipelineProgressReturn {
   const [progress, setProgress] = useState<PipelineProgress>(createEmptyPipelineProgress);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef(false);
   const storageRef = useRef(storage);
   storageRef.current = storage;
 
