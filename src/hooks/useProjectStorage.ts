@@ -132,7 +132,9 @@ export function useProjectStorage(): UseProjectStorageReturn {
       } else {
         const projects = await OPFSStorage.listProjects();
         if (projects.length === 0) throw new Error("No projects found");
-        store = await OPFSStorage.openOrCreate(projects[0]);
+        const maybeStore = await OPFSStorage.openExisting(projects[0]);
+        if (!maybeStore) throw new Error("Failed to open OPFS project: " + projects[0]);
+        store = maybeStore;
       }
 
       const projectMeta = await store.readJSON<ProjectMeta>("project.json");

@@ -282,7 +282,8 @@ export function useBookManager({
         if (projectNames?.length) {
           for (const name of projectNames) {
             try {
-              const store = await OPFSStorage.openOrCreate(name);
+              const store = await OPFSStorage.openExisting(name);
+              if (!store) continue;
               // Clean up structure + content (V2: chapters/, V1: scenes/)
               const structFiles = await store.listDir("structure").catch(() => []);
               for (const f of structFiles) await store.delete(`structure/${f}`).catch(() => {});
