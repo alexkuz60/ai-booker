@@ -11,7 +11,7 @@ import {
 import { downloadBlob } from "@/lib/projectZip";
 import { paths } from "@/lib/projectPaths";
 import { findSourceBlob, getMimeType, detectFileFormat } from "@/lib/fileFormatUtils";
-import { ensureV2Layout } from "@/lib/projectMigrator";
+import { readSceneIndex } from "@/lib/sceneIndex";
 
 const LAST_PROJECT_KEY = "booker_last_project";
 const LANG_SUFFIX_RE = /^(.*)_(EN|RU)$/i;
