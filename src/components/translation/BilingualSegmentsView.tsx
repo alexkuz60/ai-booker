@@ -20,6 +20,14 @@ export interface SelectedSegmentData {
   speaker: string | null;
 }
 
+/** Imperative API exposed via ref for granular updates */
+export interface BilingualSegmentsHandle {
+  /** Update a single segment's translation text + stage without full reload */
+  patchSegment: (segmentId: string, translatedText: string, stage?: RadarStage | null) => void;
+  /** Force full reload from OPFS (for bulk operations) */
+  reload: () => void;
+}
+
 interface Props {
   sourceStorage: ProjectStorage | null;
   translationStorage: ProjectStorage | null;
