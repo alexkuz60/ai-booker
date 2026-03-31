@@ -458,7 +458,7 @@ PDF outline содержит контейнерные узлы (например
 
 **Файл:** `src/lib/studioChapter.ts` — `saveStudioChapter()` всегда strip-ит `content`/`content_preview` перед записью в sessionStorage.
 
-### 1.14 Правила вложенности данных (Data Nesting Invariants)
+### 1.15 Правила вложенности данных (Data Nesting Invariants)
 
 > Дата добавления: 2026-03-26. Иерархия данных проекта строго вложена. Изменение на любом уровне инвалидирует ВСЕ нижние уровни.
 
