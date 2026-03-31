@@ -332,7 +332,15 @@ export async function runTranslationPipeline(
     };
     results.push(segResult);
 
-    // Notify caller so UI can update live
+    // ── Incremental persistence: write radar files per-segment so UI
+    //    can read updated data immediately on reloadTick ──
+    try {
+      await saveStageRadarFiles(targetStorage, sceneId, chapterId, [segResult]);
+    } catch (e) {
+      console.warn("[Pipeline] Incremental radar write failed for segment", seg.segment_id, e);
+    }
+
+    // Notify caller so UI can update live (radar data is now in OPFS)
     onSegmentComplete?.(seg.segment_id, segResult);
   }
 
