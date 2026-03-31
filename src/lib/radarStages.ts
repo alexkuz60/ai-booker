@@ -68,11 +68,6 @@ export function radarStagePath(chapterId: string, sceneId: string, stage: RadarS
   return `chapters/${chapterId}/scenes/${sceneId}/${STAGE_FILES[stage]}`;
 }
 
-/** Legacy monolithic path */
-export function radarLegacyPath(chapterId: string, sceneId: string): string {
-  return `chapters/${chapterId}/scenes/${sceneId}/radar.json`;
-}
-
 // ── Read helpers ─────────────────────────────────────────────────────────────
 
 export async function readStageRadar(

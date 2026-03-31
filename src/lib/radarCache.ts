@@ -35,7 +35,6 @@ function emitInvalidation() {
  */
 export function invalidateRadarCache(sceneId: string, segmentId?: string) {
   stageCache.delete(sceneId);
-  radarCache.delete(sceneId);
   if (segmentId) {
     computedCache.delete(`${sceneId}:${segmentId}`);
   } else {
