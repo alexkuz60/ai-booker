@@ -102,21 +102,29 @@ export async function resolveLocalStorageForBook(
     let projectNames = (opts.localProjectNamesByBookId.get(targetBookId) || [])
       .filter((projectName) => existingProjects.has(projectName));
 
+    // Filter out mirrors that may have leaked into the pre-built map
+    const filteredNames: string[] = [];
+    for (const pn of projectNames) {
+      if (await isMirrorByMeta(pn)) {
+        console.warn("[Resolver] Filtering mirror from pre-built map:", pn);
+        continue;
+      }
+      filteredNames.push(pn);
+    }
+    projectNames = filteredNames;
+
     // B26 fix: if the pre-built map is empty (e.g. auto-restore before library loaded),
     // do a direct OPFS scan to find the project by bookId in project.json.
     if (!projectNames.length && existingProjects.size > 0) {
       console.debug("[Resolver] Map empty for bookId=%s, scanning OPFS directly (%d projects)", targetBookId, existingProjects.size);
       for (const projectName of existingProjects) {
         try {
-          // Extra safety: treat "Base_EN/Base_RU" as mirror when base project exists,
-          // even if mirror metadata is missing/corrupted.
-          if (isLikelyTranslationMirrorByName(projectName, existingProjects)) continue;
+          // Skip mirrors — by meta first, then by name as fallback
+          if (await isMirrorByMeta(projectName)) continue;
 
           const store = await OPFSStorage.openExisting(projectName);
           if (!store) continue;
-          const meta = await store.readJSON<{ bookId?: string; targetLanguage?: string; sourceProjectName?: string }>("project.json");
-          // Skip translation mirrors — they share bookId but are not the source project
-          if (meta?.targetLanguage || meta?.sourceProjectName) continue;
+          const meta = await store.readJSON<{ bookId?: string }>("project.json");
           if (meta?.bookId === targetBookId) {
             projectNames.push(projectName);
           }
