@@ -194,7 +194,8 @@ export function useBookManager({
 
         for (const projectName of candidateProjects) {
           try {
-            const store = await OPFSStorage.openOrCreate(projectName);
+            const store = await OPFSStorage.openExisting(projectName);
+            if (!store) continue;
             const meta = await store.readJSON<{ bookId?: string; targetLanguage?: string; sourceProjectName?: string }>("project.json").catch(() => null);
             const toc = await store.readJSON<{ bookId?: string }>(paths.structureToc()).catch(() => null);
             const resolvedBookId = meta?.bookId || toc?.bookId || null;
