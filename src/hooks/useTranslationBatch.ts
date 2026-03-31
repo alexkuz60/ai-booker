@@ -13,7 +13,7 @@ import type { LocalStoryboardData } from "@/lib/storyboardSync";
 import type { SceneIndexData } from "@/lib/sceneIndex";
 import type { AiRoleId } from "@/config/aiRoles";
 import { ModelPoolManager, logPoolStats, type PoolTask, type PoolProgress, type PoolStats } from "@/lib/modelPoolManager";
-import { runTranslationPipeline, type TranslationSceneResult, type PipelineProgress } from "@/lib/translationPipeline";
+import { runTranslationPipeline, type TranslationSceneResult, type TranslationSegmentResult, type PipelineProgress } from "@/lib/translationPipeline";
 import { paths } from "@/lib/projectPaths";
 import { toast } from "sonner";
 
