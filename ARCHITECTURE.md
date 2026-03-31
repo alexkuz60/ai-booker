@@ -412,7 +412,7 @@ await storage.readJSON(`storyboard/scene_${sceneId}.json`);
 
 **Файл:** `src/lib/projectMigrator.ts`
 
-### 1.13 Критические контракты
+### 1.14 Критические контракты
 
 #### К1. resolvePageRange — диапазон страниц глав
 
