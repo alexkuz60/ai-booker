@@ -560,9 +560,6 @@ export default function Translation() {
                   chapterId={selectedChapter?.chapterId ?? null}
                   isRu={isRu}
                   selectedSegment={selectedSegment}
-                  sourceLang={(sourceLang as "ru" | "en")}
-                  targetLang={(targetLang as "ru" | "en")}
-                  userApiKeys={apiKeys}
                   onScoreChange={setMonitorScore}
                 />
               </div>

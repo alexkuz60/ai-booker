@@ -35,9 +35,6 @@ interface QualityMonitorPanelProps {
   chapterId: string | null;
   isRu: boolean;
   selectedSegment?: SelectedSegmentData | null;
-  sourceLang?: "ru" | "en";
-  targetLang?: "ru" | "en";
-  userApiKeys?: Record<string, string>;
   onScoreChange?: (score: number | null) => void;
 }
 
@@ -47,9 +44,6 @@ export function QualityMonitorPanel({
   chapterId,
   isRu,
   selectedSegment,
-  sourceLang = "ru",
-  targetLang = "en",
-  userApiKeys = {},
   onScoreChange,
 }: QualityMonitorPanelProps) {
   const cacheRevision = useRadarInvalidationRevision();
