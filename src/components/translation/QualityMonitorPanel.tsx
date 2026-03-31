@@ -7,8 +7,6 @@ import {
   RADAR_PRESETS,
   PRESET_LABELS,
   computeWeightedScore,
-  computeProgrammaticAxes,
-  computeSemanticScore,
 } from "@/lib/qualityRadar";
 import { Badge } from "@/components/ui/badge";
 import type { SelectedSegmentData } from "@/components/translation/BilingualSegmentsView";
