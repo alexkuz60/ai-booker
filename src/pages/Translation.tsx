@@ -157,7 +157,12 @@ export default function Translation() {
     getModelForRole,
     getEffectivePool,
     onSceneComplete: () => { bilingualRef.current?.reload(); setQualityChartTick(t => t + 1); },
-    onSegmentComplete: () => { bilingualRef.current?.reload(); setQualityChartTick(t => t + 1); },
+    onSegmentComplete: (_segId, result) => {
+      const text = result.literary || result.literal;
+      const stage = result.radarHistory.length > 0 ? "critique" as const : "literal" as const;
+      bilingualRef.current?.patchSegment(_segId, text, stage);
+      setQualityChartTick(t => t + 1);
+    },
   });
 
   // ── Extracted actions ───────────────────────────────────

@@ -1,6 +1,9 @@
 /**
  * useTranslationBatch — orchestrates chapter-level batch translation
  * using ModelPoolManager for parallel scene processing through the full pipeline.
+ *
+ * onSegmentComplete passes the full TranslationSegmentResult so callers
+ * can do granular UI patches without a full OPFS reload.
  */
 
 import { useState, useCallback, useRef } from "react";
@@ -10,7 +13,7 @@ import type { LocalStoryboardData } from "@/lib/storyboardSync";
 import type { SceneIndexData } from "@/lib/sceneIndex";
 import type { AiRoleId } from "@/config/aiRoles";
 import { ModelPoolManager, logPoolStats, type PoolTask, type PoolProgress, type PoolStats } from "@/lib/modelPoolManager";
-import { runTranslationPipeline, type TranslationSceneResult, type PipelineProgress } from "@/lib/translationPipeline";
+import { runTranslationPipeline, type TranslationSceneResult, type TranslationSegmentResult, type PipelineProgress } from "@/lib/translationPipeline";
 import { paths } from "@/lib/projectPaths";
 import { toast } from "sonner";
 
@@ -54,7 +57,7 @@ interface Opts {
   /** Callback after scene translated (e.g. refresh UI) */
   onSceneComplete?: (sceneId: string) => void;
   /** Callback after each segment is processed (for live UI updates) */
-  onSegmentComplete?: (segmentId: string) => void;
+  onSegmentComplete?: (segmentId: string, result: TranslationSegmentResult) => void;
 }
 
 const EMPTY_PROGRESS: BatchTranslationProgress = {
@@ -115,8 +118,8 @@ export function useTranslationBatch(opts: Opts): UseTranslationBatchReturn {
         onProgress: (info) => {
           setProgress(prev => ({ ...prev, currentStage: info }));
         },
-        onSegmentComplete: (segId) => {
-          onSegmentComplete?.(segId);
+        onSegmentComplete: (segId, result) => {
+          onSegmentComplete?.(segId, result);
         },
       });
 
