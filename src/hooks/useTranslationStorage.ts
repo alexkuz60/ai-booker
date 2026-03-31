@@ -35,7 +35,8 @@ async function resolveTranslationProjectName(
 
   for (const projectName of projects) {
     try {
-      const store = await OPFSStorage.openOrCreate(projectName);
+      const store = await OPFSStorage.openExisting(projectName);
+      if (!store) continue;
       const meta = await store.readJSON<ProjectMeta>("project.json");
       if (!meta) continue;
 
