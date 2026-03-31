@@ -5,8 +5,6 @@
  *   - radar-literal.json   → 3R polygon (semantic, rhythm, phonetic)
  *   - radar-literary.json  → 5R polygon (all 5 axes)
  *   - radar-critique.json  → 5R + alternatives
- *
- * Old monolithic radar.json is still read for backward-compat.
  */
 
 import type { RadarScores } from "./qualityRadar";
@@ -66,11 +64,6 @@ const STAGE_FILES: Record<RadarStage, string> = {
 
 export function radarStagePath(chapterId: string, sceneId: string, stage: RadarStage): string {
   return `chapters/${chapterId}/scenes/${sceneId}/${STAGE_FILES[stage]}`;
-}
-
-/** Legacy monolithic path */
-export function radarLegacyPath(chapterId: string, sceneId: string): string {
-  return `chapters/${chapterId}/scenes/${sceneId}/radar.json`;
 }
 
 // ── Read helpers ─────────────────────────────────────────────────────────────

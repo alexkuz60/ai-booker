@@ -35,7 +35,8 @@ async function resolveTranslationProjectName(
 
   for (const projectName of projects) {
     try {
-      const store = await OPFSStorage.openOrCreate(projectName);
+      const store = await OPFSStorage.openExisting(projectName);
+      if (!store) continue;
       const meta = await store.readJSON<ProjectMeta>("project.json");
       if (!meta) continue;
 
@@ -78,7 +79,7 @@ export function useTranslationStorage(
 ): UseTranslationStorageReturn {
   const [translationStorage, setTranslationStorage] = useState<ProjectStorage | null>(null);
   const [exists, setExists] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
   const mountedRef = useRef(true);
 
@@ -113,7 +114,15 @@ export function useTranslationStorage(
           if (cancelled) return;
 
           if (resolvedProjectName) {
-            const store = await OPFSStorage.openOrCreate(resolvedProjectName);
+            const store = await OPFSStorage.openExisting(resolvedProjectName);
+            if (!store) {
+              console.warn("[useTranslationStorage] resolved project directory missing:", resolvedProjectName);
+              if (!cancelled && mountedRef.current) {
+                setTranslationStorage(null);
+                setExists(false);
+              }
+              return;
+            }
             // Verify project.json exists — if not, the folder is a zombie
             const projMeta = await store.readJSON<ProjectMeta>("project.json");
             if (!projMeta) {

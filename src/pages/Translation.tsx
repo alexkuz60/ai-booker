@@ -86,7 +86,7 @@ export default function Translation() {
   const [sceneSegmentIds, setSceneSegmentIds] = useState<string[]>([]);
 
   // Translation storage (mirror OPFS project)
-  const { translationStorage, exists: transProjectExists, refresh: refreshTransStorage } =
+  const { translationStorage, exists: transProjectExists, loading: transLoading, refresh: refreshTransStorage } =
     useTranslationStorage(storage, meta);
 
   const { saveTranslation, saving: savingTranslation, restoreTranslation, restoring: restoringTranslation } = useSaveTranslation({
@@ -300,7 +300,7 @@ export default function Translation() {
   }, [storage, isOpen]);
 
   // ── No project open ────────────────────────────────────
-  if (!initialized) {
+  if (!initialized || transLoading) {
     return (
       <motion.div
         className="flex-1 flex flex-col h-full items-center justify-center gap-4 text-muted-foreground"
@@ -560,9 +560,6 @@ export default function Translation() {
                   chapterId={selectedChapter?.chapterId ?? null}
                   isRu={isRu}
                   selectedSegment={selectedSegment}
-                  sourceLang={(sourceLang as "ru" | "en")}
-                  targetLang={(targetLang as "ru" | "en")}
-                  userApiKeys={apiKeys}
                   onScoreChange={setMonitorScore}
                 />
               </div>

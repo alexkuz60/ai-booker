@@ -440,7 +440,7 @@ export class OPFSStorage implements ProjectStorage {
     await importProjectZip(this, zip);
   }
 
-  /** Create or open project in OPFS */
+  /** Create or open project in OPFS (creates directories if missing) */
   static async openOrCreate(projectName: string): Promise<OPFSStorage> {
     const opfsRoot = await navigator.storage.getDirectory();
     const projectDir = await opfsRoot.getDirectoryHandle(projectName, { create: true }) as unknown as FileSystemDirectoryHandle;
@@ -454,6 +454,21 @@ export class OPFSStorage implements ProjectStorage {
     await audio.getDirectoryHandle("renders", { create: true });
     await projectDir.getDirectoryHandle("montage", { create: true });
     return new OPFSStorage(projectDir, projectName);
+  }
+
+  /**
+   * Open an existing project in OPFS WITHOUT creating anything.
+   * Returns null if the directory does not exist.
+   * Use this for scanning / searching — never openOrCreate.
+   */
+  static async openExisting(projectName: string): Promise<OPFSStorage | null> {
+    try {
+      const opfsRoot = await navigator.storage.getDirectory();
+      const projectDir = await opfsRoot.getDirectoryHandle(projectName, { create: false }) as unknown as FileSystemDirectoryHandle;
+      return new OPFSStorage(projectDir, projectName);
+    } catch {
+      return null;
+    }
   }
 
   /** Delete a project directory from OPFS by name */
