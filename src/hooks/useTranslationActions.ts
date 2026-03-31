@@ -82,8 +82,9 @@ export function useTranslationActions(deps: Deps) {
       if (selectedSegment?.segmentId === seg.segment_id) {
         setSelectedSegment({ ...selectedSegment, translatedText: result.text });
       }
+      onQualityUpdate?.();
     }
-  }, [editSegment, selectedSceneId, selectedChapter, storage, selectedSegment, setSelectedSegment, bilingualRef]);
+  }, [editSegment, selectedSceneId, selectedChapter, storage, selectedSegment, setSelectedSegment, bilingualRef, onQualityUpdate]);
 
   const handleCritique = useCallback(async (seg: Segment) => {
     if (!selectedSceneId || !selectedChapter?.chapterId || !storage) return;
