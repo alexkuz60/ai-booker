@@ -119,6 +119,29 @@
 | `src/lib/localProjectResolver.ts` | **Резолвер проектов** — поиск/активация/создание OPFS ProjectStorage по bookId. `resolveLocalStorageForBook()`, `ensureWritableLocalStorage()` |
 | `src/lib/projectCleanup.ts` | **Очистка browser state** — `wipeProjectBrowserState()` (по bookId) и `wipeAllBrowserState()` |
 | `src/hooks/useProjectStorage.ts` | React-хук: create / open / close / import / export проекта |
+
+### 1.6a OPFS-гигиена: защита от зомби-директорий
+
+> **Правило:** `OPFSStorage.openOrCreate()` ЗАПРЕЩЕНО использовать для поиска, сканирования или проверки существования проектов — он автоматически создаёт пустую директорию, если проект не найден (зомби-директория).
+
+**Разрешённые методы по контексту:**
+
+| Контекст | Метод | Обоснование |
+|----------|-------|-------------|
+| Поиск / сканирование / bootstrap | `OPFSStorage.openExisting()` | Возвращает `null` если проект не найден, НЕ создаёт директорию |
+| Проверка существования | `OPFSStorage.listProjects()` + проверка по имени | Список без побочных эффектов |
+| Создание нового проекта | `OPFSStorage.openOrCreate()` | **Только по явному действию пользователя** |
+
+**Легитимные точки вызова `openOrCreate` (исчерпывающий список):**
+
+| # | Файл | Триггер | Действие пользователя |
+|---|------|---------|-----------------------|
+| 1 | `useProjectStorage.ts` → `createProject()` | Создание проекта книги | Кнопка «Создать проект» в Библиотеке |
+| 2 | `useProjectStorage.ts` → `importProjectFromZip()` | Импорт из ZIP | Выбор ZIP-файла |
+| 3 | `translationProject.ts` → `createTranslationProject()` | Создание проекта перевода | Клик по шагу «Проект» степпера + подтверждение |
+| 4 | `useSaveTranslation.ts` → `restoreTranslation()` | Восстановление перевода из облака | Кнопка «Перевод ← сервер» |
+
+**Любые другие вызовы `openOrCreate` — баг.** Все сканеры (useLibrary, useTranslationStorage, localProjectResolver, bootstrap в useProjectStorage) ОБЯЗАНЫ использовать `openExisting`.
 | `src/hooks/useProjectStorageContext.tsx` | React Context + Provider для глобального доступа |
 | `src/lib/localSync.ts` | `syncStructureToLocal()` / `readStructureFromLocal()` — запись/чтение структуры |
 | `src/lib/projectZip.ts` | ZIP экспорт/импорт через `fflate` |

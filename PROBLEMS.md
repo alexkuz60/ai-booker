@@ -86,6 +86,12 @@
 - Решение: `reloadBook` теперь удаляет `characters.json` вместе с `chapters/`.
 - Файл: `useBookManager.ts`.
 
+### Р-bis. Зомби-директории OPFS — ✅ РЕШЕНО (B21)
+- Проблема: `OPFSStorage.openOrCreate()` использовался в сканерах (useLibrary, useTranslationStorage, localProjectResolver, bootstrap), создавая пустые папки при поиске проектов. После перезагрузки ПК пустые зомби-проекты персистировали и нарушали логику (пустой проект перевода открывался вместо реального).
+- Инвариант: **`openOrCreate` — ТОЛЬКО по явному действию пользователя** (4 точки: createProject, importFromZip, createTranslationProject, restoreTranslation). Все сканеры/бутстрапы — строго `openExisting`.
+- Решение: замена всех `openOrCreate` → `openExisting` в 11 точках по 8 файлам (сканеры, бутстрап, резолверы). `openOrCreate` оставлен только для 4 легитимных создателей. См. ARCHITECTURE.md §1.6a.
+- Файлы: `useTranslationStorage.ts`, `localProjectResolver.ts`, `useProjectStorage.ts`, `useBookRestore.ts`, `projectCleanup.ts`, `useLibrary.ts`, `translationProject.ts`, `useSaveTranslation.ts`.
+
 ### Р. SFX-клипы не отображаются после обновления страницы — ✅ РЕШЕНО (B19)
 - Проблема: `readAtmospheresFromLocal` использовала `atmoPath(sceneId)`, который вызывает `resolveChapterId()` из кэша `sceneIndex`. После F5 кэш пуст → путь содержит `__unresolved__` → файл не читается → клип не отображается. Атмосфера-клипы работали, если загружались позже (когда кэш уже заполнялся другими операциями).
 - Решение: добавлен fallback `readSceneIndex(storage)` при обнаружении `__unresolved__` в пути — аналогично существующему паттерну в `storyboardSync`. Fallback добавлен во все функции модуля: `readAtmospheresFromLocal`, `saveAtmospheresToLocal` (транзитивно защищает `addAtmosphereClip`, `deleteAtmosphereClip`, `updateAtmosphereClip`).
