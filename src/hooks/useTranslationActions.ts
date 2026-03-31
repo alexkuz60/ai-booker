@@ -32,6 +32,8 @@ interface Deps {
   setSelectedSegment: React.Dispatch<React.SetStateAction<SelectedSegmentData | null>>;
   /** Ref to BilingualSegmentsView for granular updates */
   bilingualRef: React.RefObject<BilingualSegmentsHandle | null>;
+  /** Callback to bump quality chart refresh */
+  onQualityUpdate?: () => void;
   /** Hooks */
   doTranslateSegments: (segments: Segment[], sceneId: string, chapterId: string) => Promise<any>;
   editSegment: (seg: Segment, sceneId: string, chapterId: string, originalText: string) => Promise<any>;
