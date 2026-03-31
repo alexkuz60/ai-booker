@@ -29,11 +29,13 @@ export function usePipelineProgress(
 ): UsePipelineProgressReturn {
   const [progress, setProgress] = useState<PipelineProgress>(createEmptyPipelineProgress);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef(false);
   const storageRef = useRef(storage);
   storageRef.current = storage;
 
   // Load from project.json on mount / storage change / version bump
   useEffect(() => {
+    loadedRef.current = false;
     if (!storage) {
       setLoading(false);
       return;
@@ -44,6 +46,7 @@ export function usePipelineProgress(
         const repaired = await readPipelineProgress(storage);
         if (cancelled) return;
         setProgress(repaired);
+        loadedRef.current = true;
       } catch {
         // project.json missing — use defaults
       } finally {
@@ -56,9 +59,15 @@ export function usePipelineProgress(
   const persist = useCallback(async (updated: PipelineProgress) => {
     const s = storageRef.current;
     if (!s) return;
+    if (!loadedRef.current) {
+      console.warn("[PipelineProgress] persist skipped — initial load not finished yet");
+      return;
+    }
     try {
       const meta = (await s.readJSON<Record<string, unknown>>("project.json")) ?? {};
-      meta.pipelineProgress = updated;
+      // Merge: never overwrite OPFS progress with stale React state
+      const existing = (meta.pipelineProgress as PipelineProgress) ?? {};
+      meta.pipelineProgress = { ...existing, ...updated };
       meta.updatedAt = new Date().toISOString();
       await s.writeJSON("project.json", meta);
     } catch (e) {

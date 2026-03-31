@@ -264,7 +264,9 @@ export function useFileUpload({
           }));
 
           const existingMeta = await targetStorage.readJSON<Record<string, unknown>>("project.json").catch(() => null);
+          const existingProgress = (existingMeta?.pipelineProgress as Record<string, boolean>) ?? {};
           await targetStorage.writeJSON("project.json", {
+            ...existingMeta,
             version: Number(existingMeta?.version) || 1,
             bookId: resolvedBookId,
             title: pendingProjectName || stripFileExtension(f.name),
@@ -274,6 +276,7 @@ export function useFileUpload({
             language: (existingMeta?.language === "en" ? "en" : (isRu ? "ru" : "en")),
             fileFormat: isFb2 ? "fb2" : (isDocx ? "docx" : "pdf"),
             pipelineProgress: {
+              ...existingProgress,
               file_uploaded: true,
               opfs_created: true,
             },
