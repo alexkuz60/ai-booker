@@ -181,21 +181,6 @@ export function SyncProgressDialog({
                     >
                       {step.label}
                     </span>
-                    {step.detail && (
-                      <p className="text-xs text-muted-foreground truncate">{step.detail}</p>
-                    )}
-                  </div>
-                  {step.status === "done" && (
-                    <div
-                      className={cn(
-                        "h-2 w-2 rounded-full mt-1.5 shrink-0",
-                        STEP_COLORS[i % STEP_COLORS.length],
-                      )}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
 
             {errorMessage && (
               <p className="text-xs text-destructive bg-destructive/10 rounded-md px-3 py-2">
