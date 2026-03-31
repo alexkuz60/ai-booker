@@ -147,6 +147,7 @@ function LibraryViewInner({
 
         const tLang = (sourceMeta.language === "ru" ? "en" : "ru") as "en" | "ru";
 
+        const exists = await translationProjectExists(sourceStore.projectName, tLang);
         if (exists) {
           setTransCreateConfirm({ book, exists: true });
         } else {
