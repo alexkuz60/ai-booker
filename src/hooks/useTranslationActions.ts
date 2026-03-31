@@ -74,12 +74,13 @@ export function useTranslationActions(deps: Deps) {
     const originalText = srcSeg?.phrases?.map((p: any) => p.text).join(" ") ?? "";
     const result = await editSegment(seg, selectedSceneId, selectedChapter.chapterId, originalText);
     if (result) {
+      // Patch in-place
+      bilingualRef.current?.patchSegment(seg.segment_id, result.text, "literary");
       if (selectedSegment?.segmentId === seg.segment_id) {
         setSelectedSegment({ ...selectedSegment, translatedText: result.text });
       }
-      setBilingualTick(t => t + 1);
     }
-  }, [editSegment, selectedSceneId, selectedChapter, storage, selectedSegment, setSelectedSegment, setBilingualTick]);
+  }, [editSegment, selectedSceneId, selectedChapter, storage, selectedSegment, setSelectedSegment, bilingualRef]);
 
   const handleCritique = useCallback(async (seg: Segment) => {
     if (!selectedSceneId || !selectedChapter?.chapterId || !storage) return;
@@ -89,12 +90,13 @@ export function useTranslationActions(deps: Deps) {
     const originalText = srcSeg?.phrases?.map((p: any) => p.text).join(" ") ?? "";
     const result = await critiqueSegment(seg, selectedSceneId, selectedChapter.chapterId, originalText);
     if (result) {
+      // Patch stage only — text stays as literary
+      bilingualRef.current?.patchSegment(seg.segment_id, selectedSegment?.translatedText ?? "", "critique");
       if (selectedSegment?.segmentId === seg.segment_id) {
         setSelectedSegment(prev => prev ? { ...prev } : null);
       }
-      setBilingualTick(t => t + 1);
     }
-  }, [critiqueSegment, selectedSceneId, selectedChapter, storage, selectedSegment, setSelectedSegment, setBilingualTick]);
+  }, [critiqueSegment, selectedSceneId, selectedChapter, storage, selectedSegment, setSelectedSegment, bilingualRef]);
 
   const handleTranslateSceneFull = useCallback(async () => {
     if (!selectedSceneId || !selectedChapter?.chapterId) return;
