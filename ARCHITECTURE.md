@@ -680,7 +680,7 @@ assert(storedBookId === targetBookId, "bookId mismatch — aborting write");
 
 ---
 
-### 1.13 Аудио-движок (AudioEngine / Tone.js)
+### 1.20 Аудио-движок (AudioEngine / Tone.js)
 
 **Принцип: максимально использовать встроенные возможности Tone.js.**
 
