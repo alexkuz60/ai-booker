@@ -285,4 +285,4 @@ export const BilingualSegmentsView = forwardRef<BilingualSegmentsHandle, Props>(
       </Accordion>
     </div>
   );
-}
+});
