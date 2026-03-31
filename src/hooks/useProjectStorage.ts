@@ -372,8 +372,8 @@ export function useProjectStorage(): UseProjectStorageReturn {
           }
         }
 
-        // Migrate V1 → V2 if needed and load scene index
-        await ensureV2Layout(activeStore);
+        // Load scene index into memory
+        await readSceneIndex(activeStore);
 
         if (!cancelled) {
           setStorage(activeStore);

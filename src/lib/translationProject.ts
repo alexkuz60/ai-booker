@@ -129,7 +129,7 @@ export async function createTranslationProject(
     layoutVersion: 2,
   };
   await store.writeJSON(paths.projectMeta(), translationMeta);
-  await ensureV2Layout(store);
+  await readSceneIndex(store);
 
   // 3b. Write back-link in source project.json (translationProject field)
   try {

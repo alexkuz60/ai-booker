@@ -433,19 +433,6 @@ await storage.readJSON(`storyboard/scene_${sceneId}.json`);
 
 Резолвер генерирует V2-пути, включающие chapterId, который резолвится из scene_index через `resolveChapterId()`.
 
-### 1.13 Миграция V1 → V2
-
-Автоматическая миграция выполняется в `ensureV2Layout()` при загрузке проекта:
-
-1. Определяется версия layout (`detectLayoutVersion`)
-2. Для V1: читаются `scenes/chapter_*.json` → строится маппинг sceneId→chapterId
-3. Файлы перемещаются в V2-иерархию: `chapters/{cid}/content.json`, `chapters/{cid}/scenes/{sid}/storyboard.json`, etc.
-4. Создаётся `scene_index.json` с хешами контента
-5. `characters/index.json` → `characters.json` (корень)
-6. `project.json.layoutVersion` = 2
-7. Старые V1 директории (`scenes/`, `storyboard/`) удаляются
-
-**Файл:** `src/lib/projectMigrator.ts`
 
 ### 1.14 Критические контракты
 
