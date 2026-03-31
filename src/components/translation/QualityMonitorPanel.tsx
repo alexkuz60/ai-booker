@@ -140,7 +140,7 @@ export function QualityMonitorPanel({
     })();
 
     return () => { cancelled = true; };
-  }, [selectedSegment?.segmentId, selectedSegment?.originalText, selectedSegment?.translatedText, storage, sceneId, chapterId, sourceLang, targetLang, userApiKeys, weights, cacheRevision]);
+  }, [selectedSegment?.segmentId, selectedSegment?.originalText, selectedSegment?.translatedText, storage, sceneId, chapterId, weights, cacheRevision]);
 
   // Load stage radar files for layer overlays
   useEffect(() => {
