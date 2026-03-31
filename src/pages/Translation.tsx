@@ -180,6 +180,7 @@ export default function Translation() {
     selectedSegment,
     setSelectedSegment,
     bilingualRef,
+    onQualityUpdate: () => setQualityChartTick(t => t + 1),
     doTranslateSegments,
     editSegment,
     critiqueSegment,
