@@ -224,7 +224,7 @@ export const BilingualSegmentsView = forwardRef<BilingualSegmentsHandle, Props>(
     );
   }
 
-  const openValue = selectedSegmentId ?? undefined;
+  const openValue = selectedSegmentId ?? "";
 
   return (
     <div className="space-y-2">
