@@ -164,7 +164,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
 
     if (backend !== "opfs") {
       if (storage?.projectName === projectName && meta) {
-        await ensureV2Layout(storage);
+        await readSceneIndex(storage);
         return storage;
       }
       return null;
