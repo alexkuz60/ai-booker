@@ -181,6 +181,17 @@
 - Решение: добавлена миграция `CREATE POLICY "Users can update own books" ON storage.objects FOR UPDATE`.
 - Файлы: миграция `add_update_policy_book_uploads`.
 
+### Я. Автосоздание пустых проектов перевода — ✅ РЕШЕНО (B30)
+- Проблема: после перезагрузки браузера страница `/translation` показывала пустой проект перевода с заполненным навигатором, но без результатов перевода. При каждом последующем F5 создавался новый пустой mirror.
+- Корневая причина: повсеместное использование `OPFSStorage.openOrCreate()` вместо `OPFSStorage.openExisting()` в read-only контекстах (bootstrap, library scan, resolver, cleanup). `openOrCreate` создаёт пустую директорию, если проект не существует — «зомби-папка» затем принималась за легитимный проект.
+- Нарушенное правило: «Новый проект может создать только пользователь кликом в карточке книги Библиотеки» (OPFS Storage Hygiene).
+- Решение:
+  1. Замена `openOrCreate` → `openExisting` + null-check во **всех** read-only точках: `useProjectStorage` (bootstrap + openProjectByName), `useLibrary` (scan + rename), `LibraryView` (handleToggleStep, handleTranslationStageClick, doCreateTranslationProject), `localProjectResolver` (direct scan + ranked open), `projectCleanup` (wipe verification), `useBookRestore` (source blob preservation).
+  2. Добавлен guard-экран на `/translation`: если mirror-проект не существует, показывается сообщение с кнопками «Открыть Библиотеку» и «Перевод ← сервер» вместо пустой рабочей области.
+  3. Усилена проверка `translationProjectExists()`: помимо наличия директории, верифицируются поля `sourceProjectName` и `targetLanguage` в `project.json`.
+- Инвариант: `openOrCreate` допустим ТОЛЬКО при явном создании проекта пользователем (createProject, importZip, createTranslationProject, restoreTranslation). Во всех остальных случаях — строго `openExisting`.
+- Файлы: `useProjectStorage.ts`, `useLibrary.ts`, `LibraryView.tsx`, `localProjectResolver.ts`, `projectCleanup.ts`, `useBookRestore.ts`, `translationProject.ts`, `Translation.tsx`.
+
 ---
 
 ## Защита от регрессий

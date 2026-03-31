@@ -118,7 +118,10 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
             return { candidate: null as LocalLibraryCandidate | null, shouldDelete: true, projectName };
           }
 
-          const store = await OPFSStorage.openOrCreate(projectName);
+          const store = await OPFSStorage.openExisting(projectName);
+          if (!store) {
+            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
+          }
           const meta = await store.readJSON<Record<string, unknown>>("project.json").catch(() => null);
 
           if (isNestedTranslationMirrorMeta(meta)) {
@@ -343,7 +346,8 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     // Update project.json in all matching OPFS projects
     for (const projectName of projectNames) {
       try {
-        const store = await OPFSStorage.openOrCreate(projectName);
+        const store = await OPFSStorage.openExisting(projectName);
+        if (!store) continue;
         const meta = await store.readJSON<Record<string, unknown>>(paths.projectMeta());
         if (meta) {
           meta.title = newTitle;

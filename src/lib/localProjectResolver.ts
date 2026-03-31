@@ -93,7 +93,8 @@ export async function resolveLocalStorageForBook(
           // even if mirror metadata is missing/corrupted.
           if (isLikelyTranslationMirrorByName(projectName, existingProjects)) continue;
 
-          const store = await OPFSStorage.openOrCreate(projectName);
+          const store = await OPFSStorage.openExisting(projectName);
+          if (!store) continue;
           const meta = await store.readJSON<{ bookId?: string; targetLanguage?: string; sourceProjectName?: string }>("project.json");
           // Skip translation mirrors — they share bookId but are not the source project
           if (meta?.targetLanguage || meta?.sourceProjectName) continue;
@@ -118,7 +119,8 @@ export async function resolveLocalStorageForBook(
           await Promise.all(
             projectNames.map(async (projectName) => {
               try {
-                const store = await OPFSStorage.openOrCreate(projectName);
+                const store = await OPFSStorage.openExisting(projectName);
+                if (!store) return null;
                 return {
                   projectName,
                   store,
