@@ -471,6 +471,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
           console.error("[SaveToServer] bookId mismatch! storage=%s, target=%s — aborting meta write", freshMeta.bookId, currentBookId);
         } else {
           const nextMeta: ProjectMeta = {
+            ...freshMeta,
             version: PROJECT_META_VERSION,
             bookId: currentBookId,
             title: freshMeta.title || toc[0]?.title || "Book",
