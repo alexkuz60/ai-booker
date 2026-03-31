@@ -102,8 +102,8 @@ export function useProjectStorage(): UseProjectStorageReturn {
         language,
       };
 
-      await store.writeJSON("project.json", { ...projectMeta, layoutVersion: 2 });
-      await ensureV2Layout(store);
+      await store.writeJSON("project.json", projectMeta);
+      await readSceneIndex(store);
       setStorage(store);
       setMeta(projectMeta);
 
