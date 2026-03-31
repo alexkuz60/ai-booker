@@ -125,66 +125,8 @@ export function QualityMonitorPanel({
 
         if (cancelled) return;
 
-        // 2. Legacy radar.json
-        let radarSegments = sceneId ? radarCache.get(sceneId)?.segments : undefined;
-        if (!radarSegments && storage && sceneId && chapterId) {
-          const radarPath = `chapters/${chapterId}/scenes/${sceneId}/radar.json`;
-          const radarData = await storage.readJSON<{
-            segments?: { segmentId: string; radar: RadarScores; critiqueNotes?: string[] }[];
-          }>(radarPath);
-          if (radarData?.segments) {
-            radarSegments = radarData.segments;
-            radarCache.set(sceneId, { segments: radarSegments });
-          }
-        }
-
-        if (!cancelled && radarSegments) {
-          const saved = radarSegments.find((s) => s.segmentId === selectedSegment.segmentId);
-          if (saved?.radar) {
-            const normRadar = normalizeRadar(saved.radar);
-            const hasData = Object.entries(normRadar)
-              .filter(([k]) => k !== "weighted")
-              .some(([, v]) => (v as number) > 0);
-            if (hasData) {
-              const scores = { ...normRadar, weighted: computeWeightedScore(normRadar, weights) };
-              computedCache.set(segKey, { scores: normRadar, notes: saved.critiqueNotes ?? [] });
-              setSegmentScores(scores);
-              setCritiqueNotes(saved.critiqueNotes ?? []);
-              setComputing(false);
-              return;
-            }
-          }
-        }
-
-        if (cancelled) return;
-
-        // 3. Compute on the fly
-        const { rhythm, phonetic } = computeProgrammaticAxes(
-          selectedSegment.originalText,
-          selectedSegment.translatedText,
-          sourceLang,
-          targetLang,
-        );
-
-        const semantic = await computeSemanticScore(
-          selectedSegment.originalText,
-          selectedSegment.translatedText,
-          userApiKeys,
-        );
-
-        if (cancelled) return;
-
-        const scores: RadarScores = {
-          semantic: semantic ?? 0,
-          sentiment: 0,
-          rhythm,
-          phonetic,
-          cultural: 0,
-          weighted: 0,
-        };
-        scores.weighted = computeWeightedScore(scores, weights);
-        computedCache.set(segKey, { scores: { ...scores }, notes: [] });
-        setSegmentScores(scores);
+        // No staged radar data found — show empty state, no fallbacks
+        setSegmentScores(null);
         setCritiqueNotes([]);
       } catch (err) {
         console.error("[QualityMonitor] compute error:", err);
