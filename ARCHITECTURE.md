@@ -271,7 +271,22 @@ interface ProjectStorage {
 
 Зеркальный проект по-прежнему хранит `sourceProjectName` и `targetLanguage` в своём `project.json`. Связь двунаправленная: исходный → `translationProject`, зеркало → `sourceProjectName`.
 
-### 1.12 Синхронизация между устройствами (Wipe-and-Deploy)
+**Облачная синхронизация перевода:**
+- При нажатии «На сервер» на странице перевода сохраняются оба проекта: основной (DB upsert) и зеркало перевода (ZIP → `book-uploads` bucket, путь `{userId}/translations/{projectName}.zip`).
+- Кириллица в именах файлов транслитерируется в латиницу через `CYRILLIC_MAP` (ограничение Supabase Storage).
+- Восстановление перевода: кнопка «Перевод ← сервер» загружает ZIP из облака → wipe OPFS-зеркала → импорт.
+- RLS-политики бакета `book-uploads` включают INSERT, SELECT, UPDATE и DELETE для `authenticated` (по `auth.uid()` = первый сегмент пути).
+
+**Диалог синхронизации (`SyncProgressDialog`):**
+- Автопрокрутка к текущему активному шагу (`scrollIntoView`).
+- Инкрементальный счётчик сцен при сохранении раскадровки (например, `3/15`).
+- Шаг `translation` отображает статус сохранения проекта перевода.
+
+**Сохранение метаданных (`useSaveBookToProject`):**
+- При формировании `nextMeta` используется spread `...freshMeta` для сохранения всех существующих полей (`pipelineProgress`, `translationProject`, `fileFormat`, `usedImpulseIds` и др.).
+- Запрещено: конструировать `nextMeta` вручную с перечислением полей — это приводит к потере метаданных.
+
+### 1.12a Синхронизация между устройствами (Wipe-and-Deploy)
 
 **Стратегия: Local-Only с облачным бэкапом.**
 
