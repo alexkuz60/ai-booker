@@ -15,7 +15,7 @@ import { resolveTranslationMirrorProjectName } from "@/lib/translationMirrorReso
 const TAG = "[useTranslationStorage]";
 
 /** In-memory cache: sourceProjectName → resolved translation project name */
-const resolvedCache = new Map<string, string | null>();
+const resolvedCache = new Map<string, string>();
 
 interface UseTranslationStorageReturn {
   /** Translation project storage (null if not created yet) */
@@ -82,26 +82,17 @@ export function useTranslationStorage(
     (async () => {
       try {
         // ── 1. Check in-memory cache ──
-        if (resolvedCache.has(sourceKey)) {
-          const cached = resolvedCache.get(sourceKey)!;
-          if (cached) {
-            const store = await tryOpenByName(cached);
-            if (store && !cancelled && mountedRef.current) {
-              console.info(TAG, "✅ opened from cache:", cached);
-              setTranslationStorage(store);
-              setExists(true);
-              return;
-            }
-            // Cache stale — clear and continue
-            resolvedCache.delete(sourceKey);
-          } else {
-            // Cached as "no project"
-            if (!cancelled && mountedRef.current) {
-              setTranslationStorage(null);
-              setExists(false);
-            }
+        const cached = resolvedCache.get(sourceKey);
+        if (cached) {
+          const store = await tryOpenByName(cached);
+          if (store && !cancelled && mountedRef.current) {
+            console.info(TAG, "✅ opened from cache:", cached);
+            setTranslationStorage(store);
+            setExists(true);
             return;
           }
+          // Cache stale — clear and continue
+          resolvedCache.delete(sourceKey);
         }
 
         // ── 2. Backlink: trust sourceMeta.translationProject ──
@@ -144,9 +135,9 @@ export function useTranslationStorage(
           }
         }
 
-        // No project found
+        // No project found (don't cache negative result to avoid sticky false-negatives
+        // when OPFS metadata is temporarily unreadable during startup contention).
         console.warn(TAG, "no translation project found for:", sourceKey);
-        resolvedCache.set(sourceKey, null);
         if (!cancelled && mountedRef.current) {
           setTranslationStorage(null);
           setExists(false);
