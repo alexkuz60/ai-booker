@@ -47,9 +47,7 @@
 
 Автодетект: `detectStorageBackend()` → `"fs-access"` | `"opfs"` | `"none"`.
 
-### 1.5 Структура папки проекта (V2 — иерархическая)
-
-> V1 (плоская) структура устарела. Проекты автоматически мигрируются на V2 при первом открытии (`ensureV2Layout`).
+### 1.5 Структура папки проекта (иерархическая)
 
 ```
 📁 BookTitle/
@@ -76,7 +74,7 @@
 └── 📁 montage/
 ```
 
-**Преимущества V2 перед V1:**
+**Преимущества иерархической структуры:**
 - **Структурная изоляция**: данные сцены физически вложены в папку главы → невозможно случайно обратиться к данным чужой главы
 - **Атомарное удаление**: удаление главы = удаление одной директории рекурсивно
 - **Самодокументирующийся ZIP**: при экспорте структура папок читаема без парсинга ID
@@ -96,7 +94,7 @@
 - **Дикторы → Голос**: `Narrators.tsx handleSave()` записывает voice_config **только в OPFS** (`characters.json`). DB НЕ обновляется — voice_config попадёт в `book_characters` при следующем Push to Server.
 - **Push to Server**: `useSaveBookToProject` читает `characters.json` → upsert в `book_characters`
 
-**Миграция:** при открытии проекта, если `characters.json` отсутствует, но есть `characters/index.json` (V1) — автомиграция через `ensureV2Layout()`.
+
 
 **Ключевые файлы кода:**
 
@@ -111,10 +109,9 @@
 | Файл | Назначение |
 |------|------------|
 | `src/lib/projectStorage.ts` | Интерфейс `ProjectStorage` + классы `LocalFSStorage`, `OPFSStorage` |
-| `src/lib/projectPaths.ts` | **Централизованный резолвер путей** — V2 иерархическая структура, все пути через `paths.*` |
+| `src/lib/projectPaths.ts` | **Централизованный резолвер путей** — иерархическая структура, все пути через `paths.*` |
 | `src/lib/sceneIndex.ts` | **Индекс сцен** — sceneId→chapterId маппинг, dirty-маркеры, storyboarded/characterMapped |
 | `src/lib/contentHash.ts` | **FNV-1a 32-bit хеш** — контроль целостности контента сцен |
-| `src/lib/projectMigrator.ts` | **V1→V2 миграция** — автоматическая при открытии проекта (`ensureV2Layout`) |
 | `src/lib/serverDeploy.ts` | **Wipe-and-Deploy pipeline** — чистая async-функция `deployFromServer()`: загрузка данных с сервера → запись в OPFS (10 шагов). Батчинг запросов через `fetchChunked()` для >1000 записей |
 | `src/lib/localProjectResolver.ts` | **Резолвер проектов** — поиск/активация/создание OPFS ProjectStorage по bookId. `resolveLocalStorageForBook()`, `ensureWritableLocalStorage()` |
 | `src/lib/projectCleanup.ts` | **Очистка browser state** — `wipeProjectBrowserState()` (по bookId) и `wipeAllBrowserState()` |
@@ -436,19 +433,6 @@ await storage.readJSON(`storyboard/scene_${sceneId}.json`);
 
 Резолвер генерирует V2-пути, включающие chapterId, который резолвится из scene_index через `resolveChapterId()`.
 
-### 1.13 Миграция V1 → V2
-
-Автоматическая миграция выполняется в `ensureV2Layout()` при загрузке проекта:
-
-1. Определяется версия layout (`detectLayoutVersion`)
-2. Для V1: читаются `scenes/chapter_*.json` → строится маппинг sceneId→chapterId
-3. Файлы перемещаются в V2-иерархию: `chapters/{cid}/content.json`, `chapters/{cid}/scenes/{sid}/storyboard.json`, etc.
-4. Создаётся `scene_index.json` с хешами контента
-5. `characters/index.json` → `characters.json` (корень)
-6. `project.json.layoutVersion` = 2
-7. Старые V1 директории (`scenes/`, `storyboard/`) удаляются
-
-**Файл:** `src/lib/projectMigrator.ts`
 
 ### 1.14 Критические контракты
 

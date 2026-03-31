@@ -11,7 +11,7 @@ import {
 import { downloadBlob } from "@/lib/projectZip";
 import { paths } from "@/lib/projectPaths";
 import { findSourceBlob, getMimeType, detectFileFormat } from "@/lib/fileFormatUtils";
-import { ensureV2Layout } from "@/lib/projectMigrator";
+import { readSceneIndex } from "@/lib/sceneIndex";
 
 const LAST_PROJECT_KEY = "booker_last_project";
 const LANG_SUFFIX_RE = /^(.*)_(EN|RU)$/i;
@@ -102,8 +102,8 @@ export function useProjectStorage(): UseProjectStorageReturn {
         language,
       };
 
-      await store.writeJSON("project.json", { ...projectMeta, layoutVersion: 2 });
-      await ensureV2Layout(store);
+      await store.writeJSON("project.json", projectMeta);
+      await readSceneIndex(store);
       setStorage(store);
       setMeta(projectMeta);
 
@@ -164,7 +164,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
 
     if (backend !== "opfs") {
       if (storage?.projectName === projectName && meta) {
-        await ensureV2Layout(storage);
+        await readSceneIndex(storage);
         return storage;
       }
       return null;
@@ -189,7 +189,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
         throw new Error("Not a valid Booker project (project.json not found)");
       }
 
-      await ensureV2Layout(store);
+      await readSceneIndex(store);
 
       setStorage(store);
       setMeta(projectMeta);
@@ -372,8 +372,8 @@ export function useProjectStorage(): UseProjectStorageReturn {
           }
         }
 
-        // Migrate V1 → V2 if needed and load scene index
-        await ensureV2Layout(activeStore);
+        // Load scene index into memory
+        await readSceneIndex(activeStore);
 
         if (!cancelled) {
           setStorage(activeStore);
