@@ -94,7 +94,7 @@
 - **Дикторы → Голос**: `Narrators.tsx handleSave()` записывает voice_config **только в OPFS** (`characters.json`). DB НЕ обновляется — voice_config попадёт в `book_characters` при следующем Push to Server.
 - **Push to Server**: `useSaveBookToProject` читает `characters.json` → upsert в `book_characters`
 
-**Миграция:** при открытии проекта, если `characters.json` отсутствует, но есть `characters/index.json` (V1) — автомиграция через `ensureV2Layout()`.
+
 
 **Ключевые файлы кода:**
 
