@@ -5,8 +5,6 @@
  *   - radar-literal.json   → 3R polygon (semantic, rhythm, phonetic)
  *   - radar-literary.json  → 5R polygon (all 5 axes)
  *   - radar-critique.json  → 5R + alternatives
- *
- * Old monolithic radar.json is still read for backward-compat.
  */
 
 import type { RadarScores } from "./qualityRadar";
