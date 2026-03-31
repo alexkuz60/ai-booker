@@ -168,6 +168,19 @@
 - Решение: реактивный счётчик `progressVersion` в `ProjectStorageContext`. Любое изменение прогресса (ручное, restore, deploy) вызывает `bumpProgressVersion()` → `usePipelineProgress` и `usePipelineGating` перечитывают данные из OPFS.
 - Файлы: `useProjectStorage.ts`, `useProjectStorageContext.tsx`, `usePipelineProgress.ts`, `usePipelineGating.ts`, `useBookRestore.ts`, `LibraryView.tsx`.
 
+### Э. Потеря pipelineProgress при Push to Server — ✅ РЕШЕНО (B28)
+- Проблема: при нажатии «На сервер» (`useSaveBookToProject.saveBook`) формирование `nextMeta` конструировалось вручную с перечислением полей, без spread существующего `freshMeta`. Поля `pipelineProgress`, `translationProject`, `fileFormat`, `usedImpulseIds` терялись → чекбоксы «Готово» для Студии/Раскадровки и Парсера (персонажи, профайлы) сбрасывались.
+- Корневая причина: ручная конструкция `nextMeta: ProjectMeta = { version, bookId, title, ... }` вместо `{ ...freshMeta, version, bookId, title, ... }`.
+- Решение: spread `...freshMeta` в начале объекта `nextMeta` → все существующие поля сохраняются, явные поля (version, bookId, updatedAt и др.) перезаписывают только то, что нужно обновить.
+- Инвариант: **ЗАПРЕЩЕНО** конструировать `nextMeta` с перечислением полей — только через spread.
+- Файл: `src/hooks/useSaveBookToProject.ts`.
+
+### Ю. Ошибка RLS при повторном сохранении перевода — ✅ РЕШЕНО (B29)
+- Проблема: повторная загрузка ZIP перевода в бакет `book-uploads` (с `upsert: true`) блокировалась RLS-политикой: `"new row violates row-level security policy"` (HTTP 403).
+- Корневая причина: для бакета `book-uploads` существовали RLS-политики INSERT, SELECT и DELETE, но **отсутствовала политика UPDATE**. `upsert: true` в Supabase Storage требует и INSERT, и UPDATE прав.
+- Решение: добавлена миграция `CREATE POLICY "Users can update own books" ON storage.objects FOR UPDATE`.
+- Файлы: миграция `add_update_policy_book_uploads`.
+
 ---
 
 ## Защита от регрессий
