@@ -35,6 +35,7 @@ export function usePipelineProgress(
 
   // Load from project.json on mount / storage change / version bump
   useEffect(() => {
+    loadedRef.current = false;
     if (!storage) {
       setLoading(false);
       return;
@@ -45,6 +46,7 @@ export function usePipelineProgress(
         const repaired = await readPipelineProgress(storage);
         if (cancelled) return;
         setProgress(repaired);
+        loadedRef.current = true;
       } catch {
         // project.json missing — use defaults
       } finally {
