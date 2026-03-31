@@ -30,20 +30,16 @@ interface UseTranslationStorageReturn {
 
 /**
  * Try to open a translation project by its exact name.
- * Returns the storage if the folder exists AND contains a valid project.json.
+ * Returns the storage if the folder exists.
+ *
+ * IMPORTANT: do not hard-fail on missing/unreadable project.json here.
+ * Under OPFS concurrent writes, metadata reads can transiently fail and must
+ * not block opening an already linked mirror folder.
  */
 async function tryOpenByName(projectName: string): Promise<ProjectStorage | null> {
   const store = await OPFSStorage.openExisting(projectName);
   if (!store) {
     console.warn(TAG, "folder missing for backlink:", projectName);
-    return null;
-  }
-  const meta = await store.readJSON<ProjectMeta>("project.json").catch((err) => {
-    console.warn(TAG, "project.json read error in", projectName, err);
-    return null;
-  });
-  if (!meta) {
-    console.warn(TAG, "project.json absent in", projectName, "— zombie folder");
     return null;
   }
   return store;
@@ -74,6 +70,7 @@ export function useTranslationStorage(
     if (!sourceStorage || !sourceMeta) {
       setTranslationStorage(null);
       setExists(false);
+      setLoading(false);
       return;
     }
 
