@@ -1,6 +1,9 @@
 /**
  * useTranslationBatch — orchestrates chapter-level batch translation
  * using ModelPoolManager for parallel scene processing through the full pipeline.
+ *
+ * onSegmentComplete passes the full TranslationSegmentResult so callers
+ * can do granular UI patches without a full OPFS reload.
  */
 
 import { useState, useCallback, useRef } from "react";
