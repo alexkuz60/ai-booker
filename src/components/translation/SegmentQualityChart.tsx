@@ -13,6 +13,7 @@ import {
   ResponsiveContainer,
   Cell,
   CartesianGrid,
+  ReferenceLine,
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { type RadarAxis, AXIS_LABELS } from "@/lib/qualityRadar";
@@ -87,6 +88,7 @@ export function SegmentQualityChart({
   const [open, setOpen] = useState(true);
   const [activeAxis, setActiveAxis] = useState<RadarAxis>("semantic");
   const [barData, setBarData] = useState<SegmentBar[]>([]);
+  const [highlightedIdx, setHighlightedIdx] = useState<number | null>(null);
 
   // Load radar stage data
   useEffect(() => {
@@ -145,7 +147,8 @@ export function SegmentQualityChart({
     return () => { cancelled = true; };
   }, [translationStorage, sceneId, chapterId, segmentIds, activeAxis, reloadTick]);
 
-  const handleBarClick = useCallback((data: SegmentBar) => {
+  const handleBarClick = useCallback((data: SegmentBar, idx: number) => {
+    setHighlightedIdx(idx);
     if (!onSelectSegment) return;
     onSelectSegment({
       segmentId: data.segmentId,
@@ -154,7 +157,6 @@ export function SegmentQualityChart({
       segmentType: "",
       speaker: null,
     });
-    // Auto-scroll: the accordion in BilingualSegmentsView will open via selectedSegmentId
     requestAnimationFrame(() => {
       const el = document.querySelector(`[data-segment-id="${data.segmentId}"]`);
       el?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -253,6 +255,15 @@ export function SegmentQualityChart({
                     content={<CustomTooltip isRu={isRu} activeAxis={activeAxis} />}
                     cursor={{ fill: "hsl(var(--foreground) / 0.06)", stroke: "hsl(var(--foreground) / 0.3)", strokeWidth: 1 }}
                   />
+                  {highlightedIdx !== null && barData[highlightedIdx] && (
+                    <ReferenceLine
+                      x={barData[highlightedIdx].label}
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={1.5}
+                      strokeDasharray="3 2"
+                      ifOverflow="extendDomain"
+                    />
+                  )}
 
                   {/* Overlay: render longest bars first (behind), short ones on top */}
                   {OVERLAY_ORDER.map((layer) => (
@@ -266,11 +277,16 @@ export function SegmentQualityChart({
                       barSize={dynamicBarSize}
                       cursor="pointer"
                       onClick={(_: any, idx: number) => {
-                        if (barData[idx]) handleBarClick(barData[idx]);
+                        if (barData[idx]) handleBarClick(barData[idx], idx);
                       }}
                     >
                       {barData.map((_, i) => (
-                        <Cell key={i} />
+                        <Cell
+                          key={i}
+                          fillOpacity={highlightedIdx !== null && highlightedIdx !== i
+                            ? (layer === "3R" ? 0.4 : layer === "5R" ? 0.3 : 0.2)
+                            : undefined}
+                        />
                       ))}
                     </Bar>
                   ))}
