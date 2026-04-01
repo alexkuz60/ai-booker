@@ -250,7 +250,10 @@ export function SegmentQualityChart({
                     tickFormatter={(v: number) => `${Math.round((v + Y_BASE) * 100)}`}
                     width={28}
                   />
-                  <Tooltip content={<CustomTooltip isRu={isRu} activeAxis={activeAxis} />} />
+                  <Tooltip
+                    content={<CustomTooltip isRu={isRu} activeAxis={activeAxis} />}
+                    cursor={{ stroke: "hsl(var(--foreground))", strokeWidth: 1, strokeDasharray: "3 2", style: { zIndex: 999 } }}
+                  />
 
                   {/* Overlay: render longest bars first (behind), short ones on top */}
                   {OVERLAY_ORDER.map((layer) => (
@@ -266,20 +269,9 @@ export function SegmentQualityChart({
                       onClick={(_: any, idx: number) => {
                         if (barData[idx]) handleBarClick(barData[idx]);
                       }}
-                      onMouseEnter={(_: any, idx: number) => setHoveredIdx(idx)}
-                      onMouseLeave={() => setHoveredIdx(null)}
                     >
                       {barData.map((_, i) => (
-                        <Cell
-                          key={i}
-                          fillOpacity={
-                            hoveredIdx === null
-                              ? (layer === "3R" ? 0.85 : layer === "5R" ? 0.65 : 0.5)
-                              : hoveredIdx === i
-                                ? 1
-                                : (layer === "3R" ? 0.5 : layer === "5R" ? 0.35 : 0.25)
-                          }
-                        />
+                        <Cell key={i} />
                       ))}
                     </Bar>
                   ))}
