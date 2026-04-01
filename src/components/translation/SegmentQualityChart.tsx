@@ -255,6 +255,15 @@ export function SegmentQualityChart({
                     content={<CustomTooltip isRu={isRu} activeAxis={activeAxis} />}
                     cursor={{ fill: "hsl(var(--foreground) / 0.06)", stroke: "hsl(var(--foreground) / 0.3)", strokeWidth: 1 }}
                   />
+                  {highlightedIdx !== null && barData[highlightedIdx] && (
+                    <ReferenceLine
+                      x={barData[highlightedIdx].label}
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={1.5}
+                      strokeDasharray="3 2"
+                      ifOverflow="extendDomain"
+                    />
+                  )}
 
                   {/* Overlay: render longest bars first (behind), short ones on top */}
                   {OVERLAY_ORDER.map((layer) => (
