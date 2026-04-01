@@ -30,11 +30,12 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { level, content, lang = "ru", characters } = body as {
+    const { level, content, lang = "ru", characters, maxOutputTokens } = body as {
       level: "chapter" | "scene";
       content: string;
       lang?: "ru" | "en";
       characters?: Array<{ name: string; gender: string; temperament?: string; speech_style?: string }>;
+      maxOutputTokens?: number;
     };
 
     if (!level || !content) {
@@ -55,7 +56,11 @@ Deno.serve(async (req) => {
       ? buildChapterSystemPrompt(isRu)
       : buildSceneSystemPrompt(isRu, characters);
 
-    const userPrompt = content.slice(0, 48000); // generous limit for full chapters
+    // Content is pre-trimmed by the client; apply a safety cap
+    const userPrompt = content.slice(0, 120_000);
+
+    // Use client-provided output limit or a sensible default
+    const outputTokens = maxOutputTokens ?? 2048;
 
     const startMs = Date.now();
     const aiResp = await fetch(resolved.endpoint, {
@@ -70,8 +75,7 @@ Deno.serve(async (req) => {
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.3,
-        ...modelParams(resolved.model),
+        ...modelParams(resolved.model, { maxTokens: outputTokens, temperature: 0.3 }),
         response_format: { type: "json_object" },
       }),
     });
