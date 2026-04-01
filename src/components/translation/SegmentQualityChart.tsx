@@ -12,7 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  ReferenceLine,
+  CartesianGrid,
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { type RadarAxis, AXIS_LABELS } from "@/lib/qualityRadar";
@@ -162,7 +162,7 @@ export function SegmentQualityChart({
   if (!sceneId || segmentIds.length === 0) return null;
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="border-t">
+    <Collapsible open={open} onOpenChange={setOpen} className="border-t shrink-0">
       <CollapsibleTrigger className="flex w-full items-center gap-1.5 px-3 py-1 hover:bg-muted/50 transition-colors">
         <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -216,6 +216,12 @@ export function SegmentQualityChart({
                   barCategoryGap="25%"
                   barGap={-dynamicBarSize}
                 >
+                  <CartesianGrid
+                    horizontal
+                    vertical={false}
+                    stroke="hsl(var(--muted-foreground) / 0.12)"
+                    strokeDasharray="3 3"
+                  />
                   <XAxis
                     dataKey="label"
                     tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
@@ -223,7 +229,8 @@ export function SegmentQualityChart({
                     tickLine={false}
                   />
                   <YAxis
-                    domain={[0, 1]}
+                    domain={[0.3, 1]}
+                    ticks={[0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]}
                     tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
                     axisLine={false}
                     tickLine={false}
