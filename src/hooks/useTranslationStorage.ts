@@ -1,10 +1,12 @@
 /**
- * useTranslationStorage — opens the mirror OPFS translation project
- * alongside the source project, providing read/write access to translated data.
+ * useTranslationStorage — opens the mirror OPFS translation project.
  *
- * Resolution priority:
- * 1. Backlink: sourceMeta.translationProject.projectName (trusted, no full scan)
- * 2. Full resolver scan (fallback when backlink is missing)
+ * Dead-simple logic:
+ * 1. Build list of candidate names (persisted link, backlink, canonical suffixes)
+ * 2. Try openExisting for each — OPFS open is instant, no retries needed
+ * 3. If found → done. If not → exists=false.
+ *
+ * On tab re-focus: re-attempt once (covers edge case of concurrent creation).
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -17,46 +19,15 @@ import {
 } from "@/lib/translationMirrorResolver";
 
 const TAG = "[useTranslationStorage]";
-const OPEN_RETRY_DELAYS_MS = [120, 420] as const;
-const BACKGROUND_RETRY_DELAY_MS = 1800;
 
 /** In-memory cache: sourceProjectName → resolved translation project name */
 const resolvedCache = new Map<string, string>();
 
-interface ResolvedTranslationStore {
-  store: ProjectStorage;
-  projectName: string;
-  via: "cache" | "trusted-link";
-}
-
 interface UseTranslationStorageReturn {
-  /** Translation project storage (null if not created yet) */
   translationStorage: ProjectStorage | null;
-  /** Whether translation project exists */
   exists: boolean;
-  /** Loading state */
   loading: boolean;
-  /** Refresh / re-check existence */
   refresh: () => void;
-}
-
-/**
- * Try to open a translation project by its exact name.
- * Returns the storage if the folder exists.
- *
- * IMPORTANT: do not hard-fail on missing/unreadable project.json here.
- * Under OPFS concurrent writes, metadata reads can transiently fail and must
- * not block opening an already linked mirror folder.
- */
-async function tryOpenByName(projectName: string): Promise<ProjectStorage | null> {
-  const store = await OPFSStorage.openExisting(projectName);
-  return store;
-}
-
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }
 
 function isTranslationExpected(
@@ -72,6 +43,35 @@ function isTranslationExpected(
   );
 }
 
+function buildCandidates(
+  sourceKey: string,
+  sourceMeta: ProjectMeta,
+  persistedProjectName: string | null,
+): string[] {
+  const backlink = sourceMeta.translationProject?.projectName ?? null;
+  const targetLang = sourceMeta.language === "en" ? "ru" : "en";
+
+  return Array.from(
+    new Set(
+      [
+        resolvedCache.get(sourceKey),
+        persistedProjectName,
+        backlink,
+        ...buildTranslationMirrorNames(sourceKey, targetLang, backlink),
+      ].filter((n): n is string => !!n && n !== sourceKey),
+    ),
+  );
+}
+
+/** Try each candidate name once — openExisting is instant */
+async function openFirstMatch(candidates: string[]): Promise<{ store: ProjectStorage; name: string } | null> {
+  for (const name of candidates) {
+    const store = await OPFSStorage.openExisting(name);
+    if (store) return { store, name };
+  }
+  return null;
+}
+
 export function useTranslationStorage(
   sourceStorage: ProjectStorage | null,
   sourceMeta: ProjectMeta | null,
@@ -83,7 +83,6 @@ export function useTranslationStorage(
   const mountedRef = useRef(true);
 
   const refresh = useCallback(() => {
-    // Invalidate cache on manual refresh
     if (sourceStorage) resolvedCache.delete(sourceStorage.projectName);
     setTick((t) => t + 1);
   }, [sourceStorage]);
@@ -93,6 +92,7 @@ export function useTranslationStorage(
     return () => { mountedRef.current = false; };
   }, []);
 
+  // ── Main resolution: one-shot, no retries ──
   useEffect(() => {
     if (!sourceStorage || !sourceMeta) {
       setTranslationStorage(null);
@@ -106,90 +106,41 @@ export function useTranslationStorage(
 
     const sourceKey = sourceStorage.projectName;
     const sourceBookId = sourceMeta.bookId ?? null;
-    const backlink = sourceMeta.translationProject?.projectName ?? null;
-    const preferredTargetLanguage = sourceMeta.language === "en" ? "ru" : "en";
     const persistedProjectName = readPersistedTranslationMirrorProjectName({
       sourceBookId,
       sourceProjectName: sourceKey,
     });
-    const translationExpected = isTranslationExpected(sourceMeta, persistedProjectName);
-    const trustedCandidates = Array.from(
-      new Set(
-        [
-          persistedProjectName,
-          backlink,
-          ...buildTranslationMirrorNames(sourceKey, preferredTargetLanguage, backlink),
-        ].filter((name): name is string => !!name && name !== sourceKey),
-      ),
-    );
+    const expected = isTranslationExpected(sourceMeta, persistedProjectName);
+    const candidates = buildCandidates(sourceKey, sourceMeta, persistedProjectName);
 
-    setExists(translationExpected);
+    // Set exists optimistically if we expect it
+    setExists(expected);
 
     (async () => {
       try {
-        const resolveOnce = async (): Promise<ResolvedTranslationStore | null> => {
-          // ── 1. Check in-memory cache ──
-          const cached = resolvedCache.get(sourceKey);
-          if (cached) {
-            const store = await tryOpenByName(cached);
-            if (store) {
-              return { store, projectName: cached, via: "cache" };
-            }
-            // Cache stale — clear and continue
-            resolvedCache.delete(sourceKey);
-          }
+        const result = await openFirstMatch(candidates);
+        if (cancelled || !mountedRef.current) return;
 
-          // ── 2. Trust the already-created mirror link/name and open it directly ──
-          for (const candidateName of trustedCandidates) {
-            const store = await tryOpenByName(candidateName);
-            if (store) {
-              return { store, projectName: candidateName, via: "trusted-link" };
-            }
-          }
-
-          return null;
-        };
-
-        const maxAttempts = translationExpected ? OPEN_RETRY_DELAYS_MS.length + 1 : 1;
-
-        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-          const resolved = await resolveOnce();
-          if (cancelled) return;
-
-          if (resolved && mountedRef.current) {
-            console.info(TAG, `✅ opened via ${resolved.via}:`, resolved.projectName);
-            resolvedCache.set(sourceKey, resolved.projectName);
-            writePersistedTranslationMirrorProjectName({
-              sourceBookId,
-              sourceProjectName: sourceKey,
-              translationProjectName: resolved.projectName,
-            });
-            setTranslationStorage(resolved.store);
-            setExists(true);
-            return;
-          }
-
-          if (attempt < OPEN_RETRY_DELAYS_MS.length) {
-            await wait(OPEN_RETRY_DELAYS_MS[attempt]);
-            if (cancelled) return;
-          }
-        }
-
-        console.warn(TAG, "trusted translation project not opened for:", sourceKey, {
-          backlink,
-          trustedCandidates,
-          persistedProjectName,
-          translationExpected,
-        });
-        if (!cancelled && mountedRef.current) {
+        if (result) {
+          console.info(TAG, "✅ opened:", result.name);
+          resolvedCache.set(sourceKey, result.name);
+          writePersistedTranslationMirrorProjectName({
+            sourceBookId,
+            sourceProjectName: sourceKey,
+            translationProjectName: result.name,
+          });
+          setTranslationStorage(result.store);
+          setExists(true);
+        } else {
+          console.warn(TAG, "not found for:", sourceKey, { candidates, expected });
           setTranslationStorage(null);
-          if (!translationExpected) setExists(false);
+          if (!expected) setExists(false);
         }
       } catch (err) {
-        console.error(TAG, "resolution error:", err);
+        console.error(TAG, "error:", err);
         if (!cancelled && mountedRef.current) {
           setTranslationStorage(null);
-          if (!translationExpected) setExists(false);
+          if (!expected) setExists(false);
         }
       } finally {
         if (!cancelled && mountedRef.current) setLoading(false);
@@ -199,36 +150,23 @@ export function useTranslationStorage(
     return () => { cancelled = true; };
   }, [sourceStorage, sourceMeta, tick]);
 
+  // ── Re-attempt on tab focus (covers creation in another tab / long inactivity) ──
   useEffect(() => {
     if (!sourceStorage || !sourceMeta || translationStorage || !exists) return;
 
-    const handleFocus = () => refresh();
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
+    const handle = () => {
+      if (document.visibilityState === "visible" || document.hasFocus()) {
         refresh();
       }
     };
 
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
+    window.addEventListener("focus", handle);
+    document.addEventListener("visibilitychange", handle);
     return () => {
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handle);
+      document.removeEventListener("visibilitychange", handle);
     };
   }, [sourceStorage, sourceMeta, translationStorage, exists, refresh]);
-
-  useEffect(() => {
-    if (!sourceStorage || !sourceMeta || translationStorage || !exists || loading) return;
-
-    const retryId = window.setTimeout(() => {
-      refresh();
-    }, BACKGROUND_RETRY_DELAY_MS);
-
-    return () => {
-      window.clearTimeout(retryId);
-    };
-  }, [sourceStorage, sourceMeta, translationStorage, exists, loading, refresh]);
 
   return { translationStorage, exists, loading, refresh };
 }
