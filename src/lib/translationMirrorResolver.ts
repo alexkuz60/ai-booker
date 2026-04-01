@@ -57,6 +57,21 @@ export function writePersistedTranslationMirrorProjectName(opts: {
   }
 }
 
+export function getTranslationMirrorSourceProjectName(projectName: string): string | null {
+  const sourceProjectName = projectName.trim().match(TRANSLATION_MIRROR_SUFFIX_RE)?.[1]?.trim();
+  return sourceProjectName || null;
+}
+
+export function isLikelyTranslationMirrorName(
+  projectName: string,
+  existingProjects?: Set<string>,
+): boolean {
+  const sourceProjectName = getTranslationMirrorSourceProjectName(projectName);
+  if (!sourceProjectName) return false;
+  if (existingProjects) return existingProjects.has(sourceProjectName);
+  return true;
+}
+
 export function buildTranslationMirrorNames(
   sourceProjectName: string,
   targetLanguage: TranslationTargetLanguage,

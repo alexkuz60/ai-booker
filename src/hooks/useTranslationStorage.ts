@@ -1,13 +1,15 @@
 /**
  * useTranslationStorage — opens the translation OPFS project.
  *
- * Dead-simple: read the project name from meta/localStorage, open it. Done.
+ * Resolves the mirror name from backlink/local hint/canonical candidates,
+ * then opens the first existing OPFS project.
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { OPFSStorage } from "@/lib/projectStorage";
 import type { ProjectStorage, ProjectMeta } from "@/lib/projectStorage";
 import {
+  buildTranslationMirrorNames,
   readPersistedTranslationMirrorProjectName,
   writePersistedTranslationMirrorProjectName,
 } from "@/lib/translationMirrorResolver";
@@ -21,24 +23,26 @@ interface UseTranslationStorageReturn {
   refresh: () => void;
 }
 
-function getTranslationProjectName(
+function getTranslationProjectNames(
   sourceKey: string,
   sourceMeta: ProjectMeta,
-): string | null {
-  // 1. Backlink in project.json — the most reliable source
+): string[] {
   const backlink = sourceMeta.translationProject?.projectName;
-  if (backlink) return backlink;
-
-  // 2. localStorage persistence
   const persisted = readPersistedTranslationMirrorProjectName({
     sourceBookId: sourceMeta.bookId ?? null,
     sourceProjectName: sourceKey,
   });
-  if (persisted) return persisted;
+  const targetLanguage: "en" | "ru" = sourceMeta.language === "en" ? "ru" : "en";
 
-  // 3. Canonical suffix convention
-  const targetLang = sourceMeta.language === "en" ? "RU" : "EN";
-  return `${sourceKey}_${targetLang}`;
+  return Array.from(
+    new Set(
+      [
+        backlink,
+        persisted,
+        ...buildTranslationMirrorNames(sourceKey, targetLanguage, backlink),
+      ].filter((name): name is string => !!name),
+    ),
+  );
 }
 
 export function useTranslationStorage(
@@ -72,9 +76,9 @@ export function useTranslationStorage(
     setLoading(true);
 
     const sourceKey = sourceStorage.projectName;
-    const projectName = getTranslationProjectName(sourceKey, sourceMeta);
+    const candidateNames = getTranslationProjectNames(sourceKey, sourceMeta);
 
-    if (!projectName) {
+    if (candidateNames.length === 0) {
       console.info(TAG, "no translation project name found for:", sourceKey);
       setTranslationStorage(null);
       setExists(false);
@@ -84,25 +88,35 @@ export function useTranslationStorage(
 
     (async () => {
       try {
-        const store = await OPFSStorage.openExisting(projectName);
+        let store: ProjectStorage | null = null;
+        let resolvedProjectName: string | null = null;
+
+        for (const candidateName of candidateNames) {
+          const maybeStore = await OPFSStorage.openExisting(candidateName);
+          if (!maybeStore) continue;
+          store = maybeStore;
+          resolvedProjectName = candidateName;
+          break;
+        }
+
         if (cancelled || !mountedRef.current) return;
 
-        if (store) {
-          console.info(TAG, "✅ opened:", projectName);
+        if (store && resolvedProjectName) {
+          console.info(TAG, "✅ opened:", resolvedProjectName);
           writePersistedTranslationMirrorProjectName({
             sourceBookId: sourceMeta.bookId ?? null,
             sourceProjectName: sourceKey,
-            translationProjectName: projectName,
+            translationProjectName: resolvedProjectName,
           });
           setTranslationStorage(store);
           setExists(true);
         } else {
-          console.warn(TAG, "project not found in OPFS:", projectName);
+          console.warn(TAG, "project not found in OPFS:", candidateNames.join(", "));
           setTranslationStorage(null);
           setExists(false);
         }
       } catch (err) {
-        console.error(TAG, "error opening:", projectName, err);
+        console.error(TAG, "error opening candidates:", candidateNames, err);
         if (!cancelled && mountedRef.current) {
           setTranslationStorage(null);
           setExists(false);

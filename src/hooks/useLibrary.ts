@@ -12,23 +12,16 @@ import { detectFileFormat } from "@/lib/fileFormatUtils";
 import { getProjectActivityMs } from "@/lib/projectActivity";
 import { paths } from "@/lib/projectPaths";
 import { readPipelineProgress } from "@/hooks/usePipelineProgress";
+import {
+  getTranslationMirrorSourceProjectName,
+  isLikelyTranslationMirrorName,
+} from "@/lib/translationMirrorResolver";
 
 const OPFS_NON_PROJECT_DIRS = new Set(["atmo-cache", "ir-cache", "sfx-cache"]);
-const NESTED_TRANSLATION_SUFFIX_RE = /_(EN|RU)_(EN|RU)$/i;
-const LANG_SUFFIX_RE = /_(EN|RU)$/i;
 
 function isNestedTranslationMirrorMeta(meta: Record<string, unknown> | null): boolean {
   const source = typeof meta?.sourceProjectName === "string" ? meta.sourceProjectName : "";
-  return !!source && LANG_SUFFIX_RE.test(source);
-}
-
-function isLikelyTranslationMirrorByName(projectName: string, existingProjects?: Set<string>): boolean {
-  const match = projectName.match(LANG_SUFFIX_RE);
-  if (!match) return false;
-  // If project list is available, treat as mirror only when base exists.
-  if (existingProjects) return existingProjects.has(match[1]);
-  // Without list, be conservative: language suffix is suspicious.
-  return true;
+  return !!source && !!getTranslationMirrorSourceProjectName(source);
 }
 
 type LocalLibraryCandidate = {
@@ -124,13 +117,13 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
 
       const scanResults = await Promise.all(projectNames.map(async (projectName) => {
         try {
-          if (NESTED_TRANSLATION_SUFFIX_RE.test(projectName)) {
+          if (/(?:[_\s-])(EN|RU)(?:[_\s-])(EN|RU)$/i.test(projectName)) {
             return { candidate: null as LocalLibraryCandidate | null, shouldDelete: true, projectName };
           }
 
           // If this looks like SOURCE_EN / SOURCE_RU and SOURCE exists, skip as mirror
           // even if project.json is temporarily unreadable.
-          if (isLikelyTranslationMirrorByName(projectName, existingProjectSet)) {
+          if (isLikelyTranslationMirrorName(projectName, existingProjectSet)) {
             return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
           }
 
@@ -140,7 +133,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
           }
           const meta = await store.readJSON<Record<string, unknown>>("project.json").catch(() => null);
 
-          if (!meta && isLikelyTranslationMirrorByName(projectName, existingProjectSet)) {
+          if (!meta && isLikelyTranslationMirrorName(projectName, existingProjectSet)) {
             console.warn("[Library] project.json unreadable for likely mirror, skipping:", projectName);
             return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
           }
@@ -158,7 +151,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
           if (!result) {
             const toc = await store.readJSON<Record<string, unknown>>("structure/toc.json").catch(() => null);
             const hasBookId = typeof (meta as any)?.bookId === "string" || typeof (toc as any)?.bookId === "string";
-            const likelyMirror = isLikelyTranslationMirrorByName(projectName, existingProjectSet);
+            const likelyMirror = isLikelyTranslationMirrorName(projectName, existingProjectSet);
             return {
               candidate: null as LocalLibraryCandidate | null,
               shouldDelete: !hasBookId && !likelyMirror,

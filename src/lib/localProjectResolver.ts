@@ -9,17 +9,7 @@
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
 import { getProjectActivityMs } from "@/lib/projectActivity";
 import { stripFileExtension } from "@/lib/fileFormatUtils";
-
-const LANG_SUFFIX_RE = /^(.*)_(EN|RU)$/i;
-
-function isLikelyTranslationMirrorByName(projectName: string, existingProjects?: Set<string>): boolean {
-  const match = projectName.match(LANG_SUFFIX_RE);
-  if (!match) return false;
-  // If we have the project list, only consider it a mirror when base exists
-  if (existingProjects) return existingProjects.has(match[1]);
-  // Without project list, any _EN/_RU suffix is suspicious
-  return true;
-}
+import { isLikelyTranslationMirrorName } from "@/lib/translationMirrorResolver";
 
 /** Read project.json and return true if this folder is a translation mirror */
 async function isMirrorByMeta(projectName: string): Promise<boolean> {
@@ -30,11 +20,11 @@ async function isMirrorByMeta(projectName: string): Promise<boolean> {
     if (!meta) {
       // project.json unreadable — fall back to name heuristic (safe side: treat as mirror)
       console.warn("[Resolver] project.json unreadable for", projectName, "— treating as potential mirror by name");
-      return isLikelyTranslationMirrorByName(projectName);
+      return isLikelyTranslationMirrorName(projectName);
     }
     return Boolean(meta.targetLanguage || meta.sourceProjectName);
   } catch {
-    return isLikelyTranslationMirrorByName(projectName);
+    return isLikelyTranslationMirrorName(projectName);
   }
 }
 
