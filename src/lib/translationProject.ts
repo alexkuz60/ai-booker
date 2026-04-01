@@ -17,7 +17,7 @@ import type { TocChapter } from "@/pages/parser/types";
 import { readSceneIndex } from "@/lib/sceneIndex";
 import {
   buildTranslationMirrorNames,
-  resolveTranslationMirrorProjectName,
+  readPersistedTranslationMirrorProjectName,
   writePersistedTranslationMirrorProjectName,
 } from "@/lib/translationMirrorResolver";
 
@@ -90,36 +90,28 @@ export async function translationProjectExists(
   targetLanguage: "en" | "ru",
   sourceMeta?: Pick<ProjectMeta, "bookId" | "language" | "translationProject">,
 ): Promise<boolean> {
-  const projects = await OPFSStorage.listProjects();
-
-  if (sourceMeta) {
-    const resolvedProjectName = await resolveTranslationMirrorProjectName({
-      projects,
-      sourceStorage: { projectName: sourceProjectName },
-      sourceMeta,
-    });
-    if (!resolvedProjectName) return false;
-    return true;
+  // 1. Backlink in meta
+  const backlink = sourceMeta?.translationProject?.projectName;
+  if (backlink) {
+    const store = await OPFSStorage.openExisting(backlink);
+    if (store) return true;
   }
 
+  // 2. localStorage persistence
+  const persisted = readPersistedTranslationMirrorProjectName({
+    sourceBookId: sourceMeta?.bookId ?? null,
+    sourceProjectName,
+  });
+  if (persisted) {
+    const store = await OPFSStorage.openExisting(persisted);
+    if (store) return true;
+  }
+
+  // 3. Canonical name convention
   const candidateNames = buildTranslationMirrorNames(sourceProjectName, targetLanguage);
-  for (const projectName of candidateNames) {
-    const store = await OPFSStorage.openExisting(projectName);
-    if (!store) continue;
-
-    const meta = await store.readJSON<Pick<ProjectMeta, "sourceProjectName" | "targetLanguage">>(paths.projectMeta());
-    const inferredTarget = projectName.endsWith("_EN") || projectName.endsWith(" EN") || projectName.endsWith("-EN")
-      ? "en"
-      : projectName.endsWith("_RU") || projectName.endsWith(" RU") || projectName.endsWith("-RU")
-        ? "ru"
-        : null;
-
-    if (
-      meta?.sourceProjectName === sourceProjectName && meta?.targetLanguage === targetLanguage
-      || (!meta?.sourceProjectName && !meta?.targetLanguage && inferredTarget === targetLanguage)
-    ) {
-      return true;
-    }
+  for (const name of candidateNames) {
+    const store = await OPFSStorage.openExisting(name);
+    if (store) return true;
   }
 
   return false;
