@@ -130,7 +130,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
 
           const store = await OPFSStorage.openExisting(projectName);
           if (!store) {
-            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
+            return { candidate: null as LocalLibraryCandidate | null, projectName };
           }
           const meta = await store.readJSON<Record<string, unknown>>("project.json").catch(() => null);
 
