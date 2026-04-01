@@ -9,7 +9,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { Languages, Radar, BookOpen, Loader2, FileText, Wand2, Square, RefreshCw, CloudDownload } from "lucide-react";
+import { Languages, Radar, BookOpen, Loader2, FileText, Wand2, Square, RefreshCw, CloudDownload, ScrollText } from "lucide-react";
 import { getScoreLevel, SCORE_COLORS } from "@/lib/qualityRadar";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import {
@@ -46,6 +46,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { QualityMonitorPanel } from "@/components/translation/QualityMonitorPanel";
 import { TranslationProgressPanel } from "@/components/translation/TranslationProgressPanel";
 import { SegmentQualityChart } from "@/components/translation/SegmentQualityChart";
+import { SynopsisContextDialog } from "@/components/translation/SynopsisContextDialog";
+import { useTranslationSynopsis } from "@/hooks/useTranslationSynopsis";
 
 interface ChapterEntry {
   index: number;
@@ -87,6 +89,7 @@ export default function Translation() {
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [selectedSegment, setSelectedSegment] = useState<SelectedSegmentData | null>(null);
   const [sceneSegmentIds, setSceneSegmentIds] = useState<string[]>([]);
+  const [synopsisOpen, setSynopsisOpen] = useState(false);
 
   // Translation storage (mirror OPFS project)
   const { translationStorage, exists: transProjectExists, loading: transLoading, refresh: refreshTransStorage } =
@@ -164,6 +167,24 @@ export default function Translation() {
       setQualityChartTick(t => t + 1);
     },
   });
+
+  // ── Synopsis context ────────────────────────────────────
+  const synopsis = useTranslationSynopsis({
+    sourceStorage: storage,
+    translationStorage,
+    isRu,
+    model: translationModel,
+    userApiKeys: apiKeys,
+    sourceLang,
+  });
+
+  // Load synopses when chapter/scene change
+  useEffect(() => {
+    if (selectedChapter?.chapterId && selectedSceneId) {
+      synopsis.loadAll(selectedChapter.chapterId, selectedSceneId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChapter?.chapterId, selectedSceneId]);
 
   // ── Extracted actions ───────────────────────────────────
   const {
@@ -487,6 +508,18 @@ export default function Translation() {
           </Button>
         )}
 
+        {transProjectExists && selectedChapter && selectedSceneId && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setSynopsisOpen(true)}
+            className="h-8 text-sm px-3 gap-1.5"
+          >
+            <ScrollText className="h-3.5 w-3.5" />
+            {isRu ? "Контекст" : "Context"}
+          </Button>
+        )}
+
         {readiness && (
           <div className="flex items-center gap-2 ml-auto text-sm text-muted-foreground">
             <span>{isRu ? "Сцен:" : "Scenes:"}</span>
@@ -677,6 +710,23 @@ export default function Translation() {
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
+
+      <SynopsisContextDialog
+        open={synopsisOpen}
+        onOpenChange={setSynopsisOpen}
+        isRu={isRu}
+        bookMeta={synopsis.bookMeta}
+        chapterSynopsis={synopsis.chapterSynopsis}
+        sceneSynopsis={synopsis.sceneSynopsis}
+        onBookMetaChange={synopsis.setBookMeta}
+        onChapterChange={synopsis.setChapterSynopsis}
+        onSceneChange={synopsis.setSceneSynopsis}
+        onSave={synopsis.saveAll}
+        onGenerateChapter={() => selectedChapter && synopsis.generateChapter(selectedChapter.chapterId)}
+        onGenerateScene={() => selectedSceneId && selectedChapter && synopsis.generateScene(selectedSceneId, selectedChapter.chapterId)}
+        generating={synopsis.generating}
+        chapterTitle={selectedChapter?.title}
+      />
     </motion.div>
   );
 }
