@@ -125,7 +125,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
           // If this looks like SOURCE_EN / SOURCE_RU and SOURCE exists, skip as mirror
           // even if project.json is temporarily unreadable.
           if (isLikelyTranslationMirrorName(projectName, existingProjectSet)) {
-            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
+            return { candidate: null as LocalLibraryCandidate | null, projectName };
           }
 
           const store = await OPFSStorage.openExisting(projectName);
