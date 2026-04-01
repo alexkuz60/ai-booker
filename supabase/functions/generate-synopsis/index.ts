@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
       ? buildChapterSystemPrompt(isRu)
       : buildSceneSystemPrompt(isRu, characters);
 
-    const userPrompt = content.slice(0, 12000); // limit context
+    const userPrompt = content.slice(0, 48000); // generous limit for full chapters
 
     const startMs = Date.now();
     const aiResp = await fetch(resolved.endpoint, {
