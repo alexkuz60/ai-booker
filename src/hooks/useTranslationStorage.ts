@@ -10,12 +10,22 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { OPFSStorage } from "@/lib/projectStorage";
 import type { ProjectStorage, ProjectMeta } from "@/lib/projectStorage";
-import { resolveTranslationMirrorProjectName } from "@/lib/translationMirrorResolver";
+import {
+  buildTranslationMirrorNames,
+  resolveTranslationMirrorProjectName,
+} from "@/lib/translationMirrorResolver";
 
 const TAG = "[useTranslationStorage]";
+const RESOLUTION_RETRY_DELAYS_MS = [120, 320] as const;
 
 /** In-memory cache: sourceProjectName → resolved translation project name */
 const resolvedCache = new Map<string, string>();
+
+interface ResolvedTranslationStore {
+  store: ProjectStorage;
+  projectName: string;
+  via: "cache" | "direct-candidate" | "full-scan";
+}
 
 interface UseTranslationStorageReturn {
   /** Translation project storage (null if not created yet) */
@@ -38,11 +48,13 @@ interface UseTranslationStorageReturn {
  */
 async function tryOpenByName(projectName: string): Promise<ProjectStorage | null> {
   const store = await OPFSStorage.openExisting(projectName);
-  if (!store) {
-    console.warn(TAG, "folder missing for backlink:", projectName);
-    return null;
-  }
   return store;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 export function useTranslationStorage(
@@ -78,60 +90,72 @@ export function useTranslationStorage(
     setLoading(true);
 
     const sourceKey = sourceStorage.projectName;
+    const backlink = sourceMeta.translationProject?.projectName;
+    const preferredTargetLanguage = sourceMeta.language === "en" ? "ru" : "en";
+    const directCandidates = buildTranslationMirrorNames(
+      sourceKey,
+      preferredTargetLanguage,
+      backlink,
+    );
 
     (async () => {
       try {
-        // ── 1. Check in-memory cache ──
-        const cached = resolvedCache.get(sourceKey);
-        if (cached) {
-          const store = await tryOpenByName(cached);
-          if (store && !cancelled && mountedRef.current) {
-            console.info(TAG, "✅ opened from cache:", cached);
-            setTranslationStorage(store);
-            setExists(true);
-            return;
+        const resolveOnce = async (): Promise<ResolvedTranslationStore | null> => {
+          // ── 1. Check in-memory cache ──
+          const cached = resolvedCache.get(sourceKey);
+          if (cached) {
+            const store = await tryOpenByName(cached);
+            if (store) {
+              return { store, projectName: cached, via: "cache" };
+            }
+            // Cache stale — clear and continue
+            resolvedCache.delete(sourceKey);
           }
-          // Cache stale — clear and continue
-          resolvedCache.delete(sourceKey);
-        }
 
-        // ── 2. Backlink: trust sourceMeta.translationProject ──
-        const backlink = sourceMeta.translationProject?.projectName;
-        if (backlink) {
-          console.info(TAG, "trying backlink:", backlink);
-          const store = await tryOpenByName(backlink);
-          if (store && !cancelled && mountedRef.current) {
-            console.info(TAG, "✅ opened via backlink:", backlink);
-            resolvedCache.set(sourceKey, backlink);
-            setTranslationStorage(store);
-            setExists(true);
-            return;
+          // ── 2. Direct open by exact canonical mirror names ──
+          // This bypasses metadata reads and even OPFS listing when the folder name
+          // is known, which is more robust on cold browser restores.
+          for (const candidateName of directCandidates) {
+            const store = await tryOpenByName(candidateName);
+            if (store) {
+              return { store, projectName: candidateName, via: "direct-candidate" };
+            }
           }
-          // Backlink broken — fall through to full scan
-          console.warn(TAG, "backlink broken, falling through to full scan");
-        }
 
-        // ── 3. Full resolver scan (fallback) ──
-        const projects = await OPFSStorage.listProjects();
-        console.info(TAG, "full scan, OPFS projects:", projects.length, "source:", sourceKey);
-        if (cancelled) return;
+          // ── 3. Full resolver scan (fallback for legacy / renamed mirrors) ──
+          const projects = await OPFSStorage.listProjects();
+          console.info(TAG, "full scan, OPFS projects:", projects.length, "source:", sourceKey);
 
-        const resolvedProjectName = await resolveTranslationMirrorProjectName({
-          projects,
-          sourceStorage,
-          sourceMeta,
-        });
-        console.info(TAG, "resolved:", resolvedProjectName);
-        if (cancelled) return;
+          const resolvedProjectName = await resolveTranslationMirrorProjectName({
+            projects,
+            sourceStorage,
+            sourceMeta,
+          });
+          console.info(TAG, "resolved:", resolvedProjectName);
 
-        if (resolvedProjectName) {
+          if (!resolvedProjectName) return null;
+
           const store = await tryOpenByName(resolvedProjectName);
-          if (store && !cancelled && mountedRef.current) {
-            console.info(TAG, "✅ opened via full scan:", resolvedProjectName);
-            resolvedCache.set(sourceKey, resolvedProjectName);
-            setTranslationStorage(store);
+          if (!store) return null;
+
+          return { store, projectName: resolvedProjectName, via: "full-scan" };
+        };
+
+        for (let attempt = 0; attempt <= RESOLUTION_RETRY_DELAYS_MS.length; attempt += 1) {
+          const resolved = await resolveOnce();
+          if (cancelled) return;
+
+          if (resolved && mountedRef.current) {
+            console.info(TAG, `✅ opened via ${resolved.via}:`, resolved.projectName);
+            resolvedCache.set(sourceKey, resolved.projectName);
+            setTranslationStorage(resolved.store);
             setExists(true);
             return;
+          }
+
+          if (attempt < RESOLUTION_RETRY_DELAYS_MS.length) {
+            await wait(RESOLUTION_RETRY_DELAYS_MS[attempt]);
+            if (cancelled) return;
           }
         }
 
