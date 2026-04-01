@@ -37,12 +37,12 @@ import {
 const AXES: RadarAxis[] = ["semantic", "sentiment", "rhythm", "phonetic", "cultural"];
 const Y_BASE = 0.3; // bars start from 30%
 
-const AXIS_ICONS: Record<RadarAxis, string> = {
-  semantic: "S",
-  sentiment: "T",
-  rhythm: "R",
-  phonetic: "P",
-  cultural: "C",
+const AXIS_ICONS: Record<RadarAxis, Record<string, string>> = {
+  semantic: { ru: "С", en: "S" },
+  sentiment: { ru: "Т", en: "T" },
+  rhythm: { ru: "Р", en: "R" },
+  phonetic: { ru: "Ф", en: "P" },
+  cultural: { ru: "К", en: "C" },
 };
 
 interface SegmentBar {
