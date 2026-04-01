@@ -15,7 +15,11 @@ import type { SceneIndexData } from "@/lib/sceneIndex";
 import type { LocalStoryboardData } from "@/lib/storyboardSync";
 import type { TocChapter } from "@/pages/parser/types";
 import { readSceneIndex } from "@/lib/sceneIndex";
-import { buildTranslationMirrorNames, resolveTranslationMirrorProjectName } from "@/lib/translationMirrorResolver";
+import {
+  buildTranslationMirrorNames,
+  resolveTranslationMirrorProjectName,
+  writePersistedTranslationMirrorProjectName,
+} from "@/lib/translationMirrorResolver";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -178,6 +182,12 @@ export async function createTranslationProject(
   } catch (e) {
     console.warn("[translationProject] Failed to write back-link to source:", e);
   }
+
+  writePersistedTranslationMirrorProjectName({
+    sourceBookId: sourceMeta.bookId,
+    sourceProjectName: sourceStorage.projectName,
+    translationProjectName: projectName,
+  });
 
   // 4. Copy structure/toc.json
   progress("Copying structure…", 0.1);

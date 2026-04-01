@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { OPFSStorage, type ProjectStorage, type ProjectMeta } from "@/lib/projectStorage";
 import { useAuth } from "@/hooks/useAuth";
+import { writePersistedTranslationMirrorProjectName } from "@/lib/translationMirrorResolver";
 
 const BUCKET = "book-uploads";
 
@@ -138,6 +139,12 @@ export function useSaveTranslation({
       // 3. Create fresh OPFS project and import ZIP
       const store = await OPFSStorage.openOrCreate(projectName);
       await store.importZip(data);
+
+      writePersistedTranslationMirrorProjectName({
+        sourceBookId: sourceMeta.bookId,
+        sourceProjectName: sourceStorage.projectName,
+        translationProjectName: projectName,
+      });
 
       toast.success(
         isRu
