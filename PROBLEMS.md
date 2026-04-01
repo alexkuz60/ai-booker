@@ -160,15 +160,9 @@
 - Файл: `src/hooks/useTranslationBatch.ts`.
 
 ### Ш. Потеря translation-зеркала после рестарта браузера — ✅ РЕШЕНО (B26)
-- Проблема: translation mirror проект (например, `Book_EN`) "исчезает" после рестарта браузера.
-- Корневая причина: OPFS-папка НЕ удалялась. Проблема — **гонка состояний** (race condition):
-  - `useTranslationStorage` получает `sourceStorage=null` пока `useProjectStorageContext` не инициализирован.
-  - При `sourceStorage=null` хук немедленно отвечал `exists: false, loading: false`.
-  - Страница Translation.tsx не ждала `initialized` от контекста и показывала «пустой проект».
-  - При автоматической перезагрузке OPFS-бутстрап уже завершён → проект находится.
-- Фикс (v2): Translation.tsx ждёт `initialized`, показывая спиннер. `useTranslationStorage` не сбрасывает `loading` при null-входах.
-- Предыдущие фиксы (v1, остаются): fallback-скан OPFS в `resolveLocalStorageForBook`, защита `deleteBook` от удаления зеркал.
-- Файлы: `Translation.tsx`, `useTranslationStorage.ts`, `localProjectResolver.ts`, `useBookManager.ts`.
+- Проблема: `useTranslationStorage` получал `sourceStorage=null` до инициализации контекста → `exists: false`.
+- Решение: Translation.tsx ждёт `initialized` (спиннер). One-shot разрешение зеркала: backlink → localStorage → каноническое имя через `openExisting`.
+- Файлы: `Translation.tsx`, `useTranslationStorage.ts`.
 
 ### Щ. Таймлайн и сайдбар не синхронизировались с прогрессом — ✅ РЕШЕНО (B27)
 - Проблема: ручное переключение чекбоксов в контекстном меню таймлайна записывало `pipelineProgress` в OPFS, но сайдбар не обновлял гейтинг — пункты оставались заблокированными. При загрузке книги с сервера таймлайн и меню не отражали сохранённый прогресс из `project.json`.
