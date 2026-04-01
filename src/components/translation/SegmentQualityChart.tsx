@@ -49,9 +49,14 @@ interface SegmentBar {
   segmentId: string;
   index: number;
   label: string;
+  /** Display values (shifted by Y_BASE) */
   "3R": number;
   "5R": number;
   "5R+Alt": number;
+  /** Raw 0-1 values for tooltip */
+  raw3R: number;
+  raw5R: number;
+  rawAlt: number;
 }
 
 interface Props {
