@@ -37,12 +37,12 @@ import {
 const AXES: RadarAxis[] = ["semantic", "sentiment", "rhythm", "phonetic", "cultural"];
 const Y_BASE = 0.3; // bars start from 30%
 
-const AXIS_ICONS: Record<RadarAxis, string> = {
-  semantic: "S",
-  sentiment: "T",
-  rhythm: "R",
-  phonetic: "P",
-  cultural: "C",
+const AXIS_ICONS: Record<RadarAxis, Record<string, string>> = {
+  semantic: { ru: "С", en: "S" },
+  sentiment: { ru: "Т", en: "T" },
+  rhythm: { ru: "Р", en: "R" },
+  phonetic: { ru: "Ф", en: "P" },
+  cultural: { ru: "К", en: "C" },
 };
 
 interface SegmentBar {
@@ -178,7 +178,7 @@ export function SegmentQualityChart({
       <CollapsibleTrigger className="flex w-full items-center gap-1.5 px-3 py-1 hover:bg-muted/50 transition-colors">
         <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          {isRu ? "Карта качества" : "Quality Map"}
+          {isRu ? "Карта качества арт-перевода" : "Art Translation Quality Map"}
         </span>
         <ChevronDown className={cn(
           "h-3.5 w-3.5 text-muted-foreground ml-auto transition-transform",
@@ -203,7 +203,7 @@ export function SegmentQualityChart({
                           : "text-muted-foreground hover:bg-muted hover:text-foreground"
                       )}
                     >
-                      {AXIS_ICONS[axis]}
+                      {AXIS_ICONS[axis][isRu ? "ru" : "en"]}
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="right" className="text-xs">
