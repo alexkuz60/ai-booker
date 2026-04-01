@@ -178,7 +178,7 @@ export function SegmentQualityChart({
       <CollapsibleTrigger className="flex w-full items-center gap-1.5 px-3 py-1 hover:bg-muted/50 transition-colors">
         <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          {isRu ? "Карта качества" : "Quality Map"}
+          {isRu ? "Карта качества арт-перевода" : "Art Translation Quality Map"}
         </span>
         <ChevronDown className={cn(
           "h-3.5 w-3.5 text-muted-foreground ml-auto transition-transform",
