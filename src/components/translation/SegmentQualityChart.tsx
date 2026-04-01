@@ -203,7 +203,7 @@ export function SegmentQualityChart({
                           : "text-muted-foreground hover:bg-muted hover:text-foreground"
                       )}
                     >
-                      {AXIS_ICONS[axis]}
+                      {AXIS_ICONS[axis][isRu ? "ru" : "en"]}
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="right" className="text-xs">
