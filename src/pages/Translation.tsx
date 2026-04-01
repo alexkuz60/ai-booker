@@ -508,6 +508,18 @@ export default function Translation() {
           </Button>
         )}
 
+        {transProjectExists && selectedChapter && selectedSceneId && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setSynopsisOpen(true)}
+            className="h-8 text-sm px-3 gap-1.5"
+          >
+            <ScrollText className="h-3.5 w-3.5" />
+            {isRu ? "Контекст" : "Context"}
+          </Button>
+        )}
+
         {readiness && (
           <div className="flex items-center gap-2 ml-auto text-sm text-muted-foreground">
             <span>{isRu ? "Сцен:" : "Scenes:"}</span>
