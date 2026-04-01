@@ -12,7 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  ReferenceLine,
+  CartesianGrid,
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { type RadarAxis, AXIS_LABELS } from "@/lib/qualityRadar";
