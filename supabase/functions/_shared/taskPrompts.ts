@@ -397,7 +397,7 @@ Output JSON: { "text": "refined translation", "notes": ["adaptation note"] }`,
 2. SENTIMENT: Emotional tone fidelity (irony, humor, melancholy, etc.)
 3. RHYTHM: Suitability for oral delivery at target BPM
 4. PHONETICS: Sound quality when read aloud (euphony, alliteration)
-5. CULTURAL: Cultural reference adaptation quality
+5. CULTURAL: Cultural reference adaptation quality (idioms, proper nouns, literary allusions). Account for epoch: if the original contains archaisms, the translation must convey equivalent stylistic distance. Slang and colloquialisms must be rendered in equivalent register, not flattened.
 
 Output JSON:
 {
@@ -416,7 +416,7 @@ Be evidence-based — cite specific text fragments.`,
 2. СЕНТИМЕНТ: Сохранение эмоционального тона
 3. РИТМИКА: Пригодность для устного чтения при целевом BPM
 4. ФОНЕТИКА: Звучание при чтении вслух
-5. КУЛЬТУРНЫЙ КОД: Адаптация культурных отсылок
+5. КУЛЬТУРНЫЙ КОД: Адаптация культурных отсылок (идиомы, имена, аллюзии). Учитывай эпоху: архаизмы должны передаваться с той же стилистической дистанцией. Сленг и разговорная речь — в эквивалентном регистре, без нивелирования.
 
 Формат JSON:
 {

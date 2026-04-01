@@ -601,6 +601,8 @@ Evaluate the translation across these 5 axes (score 0-100 each):
    - Idioms and proverbs: equivalent found vs. literal translation
    - Proper nouns: appropriate transliteration/adaptation
    - Historical/literary allusions: recognizable to target audience
+   - Epoch awareness: if the original contains archaisms, the translation must convey the same stylistic distance using period-appropriate equivalents in the target language
+   - Slang and colloquialisms: character-specific or era-specific informal speech must be rendered with equivalent register, not flattened into neutral language
 
 Output format (JSON):
 {
@@ -666,6 +668,8 @@ Be precise and evidence-based. Every issue must cite specific text fragments.`,
    - Идиомы и пословицы: найден эквивалент vs. буквальный перевод
    - Имена собственные: уместная транслитерация/адаптация
    - Литературные аллюзии: узнаваемы для целевой аудитории
+   - Эпоха текста: если оригинал содержит архаизмы, перевод должен передавать ту же стилистическую дистанцию через соответствующие средства целевого языка
+   - Сленг и разговорная речь: характерный для персонажа или эпохи неформальный язык должен быть передан в эквивалентном регистре, а не нивелирован до нейтрального стиля
 
 Формат вывода (JSON):
 {
