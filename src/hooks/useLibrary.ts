@@ -118,7 +118,8 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       const scanResults = await Promise.all(projectNames.map(async (projectName) => {
         try {
           if (/(?:[_\s-])(EN|RU)(?:[_\s-])(EN|RU)$/i.test(projectName)) {
-            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: true, projectName };
+            console.warn("[Library] Skipping nested mirror (not deleting):", projectName);
+            return { candidate: null as LocalLibraryCandidate | null, projectName };
           }
 
           // If this looks like SOURCE_EN / SOURCE_RU and SOURCE exists, skip as mirror
