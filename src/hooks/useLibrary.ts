@@ -118,59 +118,49 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       const scanResults = await Promise.all(projectNames.map(async (projectName) => {
         try {
           if (/(?:[_\s-])(EN|RU)(?:[_\s-])(EN|RU)$/i.test(projectName)) {
-            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: true, projectName };
+            console.warn("[Library] Skipping nested mirror (not deleting):", projectName);
+            return { candidate: null as LocalLibraryCandidate | null, projectName };
           }
 
           // If this looks like SOURCE_EN / SOURCE_RU and SOURCE exists, skip as mirror
           // even if project.json is temporarily unreadable.
           if (isLikelyTranslationMirrorName(projectName, existingProjectSet)) {
-            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
+            return { candidate: null as LocalLibraryCandidate | null, projectName };
           }
 
           const store = await OPFSStorage.openExisting(projectName);
           if (!store) {
-            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
+            return { candidate: null as LocalLibraryCandidate | null, projectName };
           }
           const meta = await store.readJSON<Record<string, unknown>>("project.json").catch(() => null);
 
           if (!meta && isLikelyTranslationMirrorName(projectName, existingProjectSet)) {
             console.warn("[Library] project.json unreadable for likely mirror, skipping:", projectName);
-            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
+            return { candidate: null as LocalLibraryCandidate | null, projectName };
           }
 
           if (isNestedTranslationMirrorMeta(meta)) {
-            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: true, projectName };
+            console.warn("[Library] Nested mirror by meta, skipping (not deleting):", projectName);
+            return { candidate: null as LocalLibraryCandidate | null, projectName };
           }
 
           // Skip translation mirror projects — they share bookId but are independent
           if (meta && ((meta as any).targetLanguage || (meta as any).sourceProjectName)) {
-            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
+            return { candidate: null as LocalLibraryCandidate | null, projectName };
           }
 
           const result = await mapLocalStructureToBook(store);
           if (!result) {
-            const toc = await store.readJSON<Record<string, unknown>>("structure/toc.json").catch(() => null);
-            const hasBookId = typeof (meta as any)?.bookId === "string" || typeof (toc as any)?.bookId === "string";
-            const likelyMirror = isLikelyTranslationMirrorName(projectName, existingProjectSet);
-            return {
-              candidate: null as LocalLibraryCandidate | null,
-              shouldDelete: !hasBookId && !likelyMirror,
-              projectName,
-            };
+            return { candidate: null as LocalLibraryCandidate | null, projectName };
           }
-          return { candidate: result, shouldDelete: false, projectName };
+          return { candidate: result, projectName };
         } catch (err) {
           console.warn("[Library] Failed to read project:", projectName, err);
-          return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
+          return { candidate: null as LocalLibraryCandidate | null, projectName };
         }
       }));
 
-      const staleProjects = Array.from(
-        new Set(scanResults.filter((r) => r.shouldDelete).map((r) => r.projectName)),
-      );
-      if (staleProjects.length > 0) {
-        await Promise.all(staleProjects.map((name) => OPFSStorage.deleteProject(name).catch(() => {})));
-      }
+
 
       const candidates = scanResults
         .map((r) => r.candidate)
