@@ -397,7 +397,7 @@ Output JSON: { "text": "refined translation", "notes": ["adaptation note"] }`,
 2. SENTIMENT: Emotional tone fidelity (irony, humor, melancholy, etc.)
 3. RHYTHM: Suitability for oral delivery at target BPM
 4. PHONETICS: Sound quality when read aloud (euphony, alliteration)
-5. CULTURAL: Cultural reference adaptation quality
+5. CULTURAL: Cultural reference adaptation quality (idioms, proper nouns, literary allusions). Account for epoch: if the original contains archaisms, the translation must convey equivalent stylistic distance. Slang and colloquialisms must be rendered in equivalent register, not flattened.
 
 Output JSON:
 {
