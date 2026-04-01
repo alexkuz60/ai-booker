@@ -251,7 +251,7 @@ export function SegmentQualityChart({
                   />
                   <Tooltip
                     content={<CustomTooltip isRu={isRu} activeAxis={activeAxis} />}
-                    cursor={{ stroke: "hsl(var(--foreground))", strokeWidth: 1, strokeDasharray: "3 2", style: { zIndex: 999 } }}
+                    cursor={{ stroke: "hsl(var(--foreground) / 0.4)", strokeWidth: 1, strokeDasharray: "3 2" }}
                   />
 
                   {/* Overlay: render longest bars first (behind), short ones on top */}
