@@ -18,6 +18,7 @@ import {
 
 const TAG = "[useTranslationStorage]";
 const OPEN_RETRY_DELAYS_MS = [120, 420] as const;
+const BACKGROUND_RETRY_DELAY_MS = 1800;
 
 /** In-memory cache: sourceProjectName → resolved translation project name */
 const resolvedCache = new Map<string, string>();
@@ -216,6 +217,18 @@ export function useTranslationStorage(
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [sourceStorage, sourceMeta, translationStorage, exists, refresh]);
+
+  useEffect(() => {
+    if (!sourceStorage || !sourceMeta || translationStorage || !exists || loading) return;
+
+    const retryId = window.setTimeout(() => {
+      refresh();
+    }, BACKGROUND_RETRY_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(retryId);
+    };
+  }, [sourceStorage, sourceMeta, translationStorage, exists, loading, refresh]);
 
   return { translationStorage, exists, loading, refresh };
 }
