@@ -77,8 +77,7 @@ export async function wipeProjectBrowserState(
     }
   }
 
-  // 1b. Verify deletion — scan for any surviving SOURCE folders with the same bookId.
-  // CRITICAL: Skip translation mirror projects (they share bookId but are independent).
+  // 1b. Log surviving folders with same bookId (no auto-deletion).
   try {
     const surviving = await OPFSStorage.listProjects();
     for (const projectName of surviving) {
@@ -86,14 +85,8 @@ export async function wipeProjectBrowserState(
         const store = await OPFSStorage.openExisting(projectName);
         if (!store) continue;
         const meta = await store.readJSON<ProjectMeta>("project.json");
-        if (meta?.bookId === bookId) {
-          // Skip translation mirrors — they have targetLanguage or sourceProjectName
-          if (meta.targetLanguage || meta.sourceProjectName) {
-            console.log(`[Wipe] Skipping translation mirror: ${projectName} (bookId=${bookId})`);
-            continue;
-          }
-          console.warn(`[Wipe] ⚠️ ZOMBIE folder detected after wipe: ${projectName} (bookId=${bookId}). Force-deleting.`);
-          await OPFSStorage.deleteProject(projectName);
+        if (meta?.bookId === bookId && !meta.targetLanguage && !meta.sourceProjectName) {
+          console.warn(`[Wipe] ⚠️ Source folder survived wipe: ${projectName} (bookId=${bookId}). NOT auto-deleting.`);
         }
       } catch {
         // Can't read project.json — skip
