@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import { writePipelineStep } from "@/hooks/usePipelineProgress";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePageHeader } from "@/hooks/usePageHeader";
 import { useCallback, useEffect, useState, useMemo, useRef } from "react";
@@ -10,7 +9,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { Languages, Radar, BookOpen, Loader2, FileText, Wand2, Square, CloudUpload, CloudDownload } from "lucide-react";
+import { Languages, Radar, BookOpen, Loader2, FileText, Wand2, Square, RefreshCw, CloudDownload } from "lucide-react";
 import { getScoreLevel, SCORE_COLORS } from "@/lib/qualityRadar";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import {
@@ -342,6 +341,60 @@ export default function Translation() {
     );
   }
 
+  if (transProjectExists && !translationStorage) {
+    return (
+      <motion.div
+        className="flex-1 flex flex-col h-full items-center justify-center gap-4 px-6 text-center text-muted-foreground"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <Loader2 className="h-10 w-10 animate-spin opacity-40" />
+        <div className="space-y-2 max-w-2xl">
+          <p className="text-base text-foreground">
+            {isRu ? "Переподключаем проект перевода" : "Reconnecting translation project"}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {isRu
+              ? "Проект перевода для этой книги уже считается созданным. Повторите подключение или восстановите локальную копию с сервера."
+              : "This book already has a translation project. Retry the local connection or restore the local copy from the server."}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={refreshTransStorage}
+            disabled={transLoading}
+            className="gap-1.5"
+          >
+            <RefreshCw className="h-4 w-4" />
+            {isRu ? "Переподключить" : "Retry connection"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={restoreTranslation}
+            disabled={restoringTranslation || savingTranslation}
+            className="gap-1.5"
+          >
+            {restoringTranslation ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CloudDownload className="h-4 w-4" />
+            )}
+            {isRu ? "Перевод ← сервер" : "Restore translation"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate("/library")}
+            className="gap-1.5"
+          >
+            <BookOpen className="h-4 w-4" />
+            {isRu ? "Открыть Библиотеку" : "Open Library"}
+          </Button>
+        </div>
+      </motion.div>
+    );
+  }
+
   if (!transProjectExists) {
     return (
       <motion.div
@@ -356,8 +409,8 @@ export default function Translation() {
           </p>
           <p className="text-sm text-muted-foreground">
             {isRu
-              ? "Рабочая область перевода открывается только для реально созданного проекта. Создайте его кликом в карточке книги в Библиотеке или восстановите перевод с сервера."
-              : "The translation workspace opens only for a real translation project. Create it from the book card in the Library or restore it from the server."}
+              ? "Для этой книги пока нет локального проекта перевода. Создайте его в Библиотеке или восстановите перевод с сервера."
+              : "There is no local translation project for this book yet. Create it in the Library or restore it from the server."}
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-2">
@@ -382,20 +435,6 @@ export default function Translation() {
             )}
             {isRu ? "Перевод ← сервер" : "Restore translation"}
           </Button>
-          {storage && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="gap-1.5"
-              onClick={async () => {
-                await writePipelineStep(storage, "trans_storage_created" as any, true);
-                await writePipelineStep(storage, "trans_migration_done" as any, true);
-                alert(isRu ? "Флаги выставлены, обновите страницу для проверки." : "Flags set, reload to verify.");
-              }}
-            >
-              🔧 {isRu ? "Выставить флаги перевода" : "Force translation flags"}
-            </Button>
-          )}
         </div>
       </motion.div>
     );
