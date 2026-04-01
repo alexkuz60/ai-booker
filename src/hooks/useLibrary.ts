@@ -146,7 +146,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
 
           // Skip translation mirror projects — they share bookId but are independent
           if (meta && ((meta as any).targetLanguage || (meta as any).sourceProjectName)) {
-            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
+            return { candidate: null as LocalLibraryCandidate | null, projectName };
           }
 
           const result = await mapLocalStructureToBook(store);
