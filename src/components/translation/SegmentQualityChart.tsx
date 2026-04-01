@@ -219,7 +219,7 @@ export function SegmentQualityChart({
                   <CartesianGrid
                     horizontal
                     vertical={false}
-                    stroke="hsl(var(--muted-foreground) / 0.12)"
+                    stroke="hsl(var(--muted-foreground) / 0.3)"
                     strokeDasharray="3 3"
                   />
                   <XAxis
