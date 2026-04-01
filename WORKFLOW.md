@@ -305,12 +305,22 @@
 **Модуль:** Перевод (`/translation`)
 **Хуки:** `useTranslationStorage`, `useSaveTranslation`, `useTranslationBatch`, `useSegmentTranslation`, `useSegmentLiteraryEdit`, `useSegmentCritique`
 
+### Гарантии загрузки
+- **initialized guard** — Translation.tsx ждёт `initialized` из контекста перед рендерингом (спиннер). Предотвращает race condition (B26) с `useTranslationStorage`.
+- **LAST_PROJECT_KEY anchoring** — хранилище разрешается через localStorage с автоматическим поиском родительского проекта и fallback-сканом OPFS.
+- **Проверка существования** — строго по метаданным `project.json` (`sourceProjectName` + `targetLanguage`), не по наличию папки.
+
 ### Пайплайн перевода
 Трёхагентный пайплайн (Переводчик → Литредактор → Критик) с итеративным улучшением:
 1. **Дословный перевод** — Edge Function `translate-literal`
 2. **Литературная редактура** — Edge Function `translate-literary`
 3. **Критика качества** — Edge Function `critique-translation` → Quality Radar (5 осей)
 4. **Итерация** — повтор шагов 2-3 если `radar.weighted < qualityThreshold` (до 2 итераций)
+
+### Визуализация качества
+- **SegmentQualityChart** — гистограмма per-segment качества по 5 осям (С/Т/Р/Ф/К) с данными из OPFS (radar-literal/literary/critique.json)
+- **Двусторонняя синхронизация** — клик по бину ↔ выбор сегмента в билингве (persistent highlight)
+- **BilingualSegmentsView** — аккордеон single-open с приоритетом художественной правки над подстрочником
 
 ### Серверная синхронизация
 - ✅ **Авто-пуш перевода** — при нажатии «На сервер» на странице перевода автоматически сохраняются оба проекта (основной + зеркало перевода)
