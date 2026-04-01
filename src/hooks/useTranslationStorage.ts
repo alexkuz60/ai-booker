@@ -12,11 +12,13 @@ import { OPFSStorage } from "@/lib/projectStorage";
 import type { ProjectStorage, ProjectMeta } from "@/lib/projectStorage";
 import {
   buildTranslationMirrorNames,
+  readPersistedTranslationMirrorProjectName,
   resolveTranslationMirrorProjectName,
+  writePersistedTranslationMirrorProjectName,
 } from "@/lib/translationMirrorResolver";
 
 const TAG = "[useTranslationStorage]";
-const RESOLUTION_RETRY_DELAYS_MS = [120, 320] as const;
+const RESOLUTION_RETRY_DELAYS_MS = [120, 320, 700, 1500, 2500] as const;
 
 /** In-memory cache: sourceProjectName → resolved translation project name */
 const resolvedCache = new Map<string, string>();
@@ -90,12 +92,22 @@ export function useTranslationStorage(
     setLoading(true);
 
     const sourceKey = sourceStorage.projectName;
+    const sourceBookId = sourceMeta.bookId ?? null;
     const backlink = sourceMeta.translationProject?.projectName;
     const preferredTargetLanguage = sourceMeta.language === "en" ? "ru" : "en";
-    const directCandidates = buildTranslationMirrorNames(
-      sourceKey,
-      preferredTargetLanguage,
-      backlink,
+    const fallbackTargetLanguage = preferredTargetLanguage === "en" ? "ru" : "en";
+    const persistedProjectName = readPersistedTranslationMirrorProjectName({
+      sourceBookId,
+      sourceProjectName: sourceKey,
+    });
+    const directCandidates = Array.from(
+      new Set(
+        [
+          persistedProjectName,
+          ...buildTranslationMirrorNames(sourceKey, preferredTargetLanguage, backlink),
+          ...buildTranslationMirrorNames(sourceKey, fallbackTargetLanguage),
+        ].filter((name): name is string => !!name && name !== sourceKey),
+      ),
     );
 
     (async () => {
@@ -148,6 +160,11 @@ export function useTranslationStorage(
           if (resolved && mountedRef.current) {
             console.info(TAG, `✅ opened via ${resolved.via}:`, resolved.projectName);
             resolvedCache.set(sourceKey, resolved.projectName);
+            writePersistedTranslationMirrorProjectName({
+              sourceBookId,
+              sourceProjectName: sourceKey,
+              translationProjectName: resolved.projectName,
+            });
             setTranslationStorage(resolved.store);
             setExists(true);
             return;
@@ -161,7 +178,11 @@ export function useTranslationStorage(
 
         // No project found (don't cache negative result to avoid sticky false-negatives
         // when OPFS metadata is temporarily unreadable during startup contention).
-        console.warn(TAG, "no translation project found for:", sourceKey);
+        console.warn(TAG, "no translation project found for:", sourceKey, {
+          backlink,
+          directCandidates,
+          persistedProjectName,
+        });
         if (!cancelled && mountedRef.current) {
           setTranslationStorage(null);
           setExists(false);

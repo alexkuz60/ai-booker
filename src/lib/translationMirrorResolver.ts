@@ -4,6 +4,8 @@ import { paths } from "@/lib/projectPaths";
 export type TranslationTargetLanguage = "en" | "ru";
 
 export const TRANSLATION_MIRROR_SUFFIX_RE = /^(.*?)(?:[_\s-])(EN|RU)$/i;
+const TRANSLATION_LINK_STORAGE_PREFIX = "booker_translation_mirror";
+const CANDIDATE_READ_RETRY_DELAYS_MS = [60, 180] as const;
 
 type TranslationMirrorCandidate = {
   bookId: string | null;
@@ -12,6 +14,60 @@ type TranslationMirrorCandidate = {
   sourceProjectName: string | null;
   targetLanguage: TranslationTargetLanguage | null;
 };
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function buildPersistedTranslationLinkKeys(
+  sourceProjectName: string,
+  sourceBookId?: string | null,
+): string[] {
+  const keys = [`${TRANSLATION_LINK_STORAGE_PREFIX}:source:${sourceProjectName}`];
+  if (sourceBookId) {
+    keys.unshift(`${TRANSLATION_LINK_STORAGE_PREFIX}:book:${sourceBookId}`);
+  }
+  return keys;
+}
+
+export function readPersistedTranslationMirrorProjectName(opts: {
+  sourceBookId?: string | null;
+  sourceProjectName: string;
+}): string | null {
+  if (typeof localStorage === "undefined") return null;
+
+  try {
+    for (const key of buildPersistedTranslationLinkKeys(opts.sourceProjectName, opts.sourceBookId)) {
+      const value = localStorage.getItem(key)?.trim();
+      if (value) return value;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+export function writePersistedTranslationMirrorProjectName(opts: {
+  sourceBookId?: string | null;
+  sourceProjectName: string;
+  translationProjectName: string;
+}): void {
+  if (typeof localStorage === "undefined") return;
+
+  const value = opts.translationProjectName.trim();
+  if (!value) return;
+
+  try {
+    for (const key of buildPersistedTranslationLinkKeys(opts.sourceProjectName, opts.sourceBookId)) {
+      localStorage.setItem(key, value);
+    }
+  } catch {
+    // Non-fatal: persistence is only a resilience hint.
+  }
+}
 
 export function inferTranslationTargetLanguageFromName(
   projectName: string,
@@ -50,29 +106,42 @@ function matchesTargetBySuffix(
 async function readTranslationMirrorCandidate(
   projectName: string,
 ): Promise<TranslationMirrorCandidate | null> {
-  try {
-    const store = await OPFSStorage.openExisting(projectName);
-    if (!store) return null;
+  let lastError: unknown = null;
 
-    const meta = await store.readJSON<ProjectMeta>(paths.projectMeta()).catch(() => null);
-    const toc = !meta?.bookId
-      ? await store.readJSON<{ bookId?: string }>(paths.structureToc()).catch(() => null)
-      : null;
-    const targetLanguage = meta?.targetLanguage ?? inferTranslationTargetLanguageFromName(projectName);
+  for (let attempt = 0; attempt <= CANDIDATE_READ_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      const store = await OPFSStorage.openExisting(projectName);
+      if (!store) return null;
 
-    if (!meta && !toc) return null;
+      const meta = await store.readJSON<ProjectMeta>(paths.projectMeta()).catch(() => null);
+      const toc = !meta?.bookId
+        ? await store.readJSON<{ bookId?: string }>(paths.structureToc()).catch(() => null)
+        : null;
+      const targetLanguage = meta?.targetLanguage ?? inferTranslationTargetLanguageFromName(projectName);
 
-    return {
-      bookId: meta?.bookId ?? toc?.bookId ?? null,
-      isMirrorLike: Boolean(meta?.sourceProjectName || meta?.targetLanguage || targetLanguage),
-      projectName,
-      sourceProjectName: meta?.sourceProjectName ?? null,
-      targetLanguage,
-    };
-  } catch (err) {
-    console.warn("[translationMirrorResolver] error reading candidate:", projectName, err);
-    return null;
+      if (meta || toc) {
+        return {
+          bookId: meta?.bookId ?? toc?.bookId ?? null,
+          isMirrorLike: Boolean(meta?.sourceProjectName || meta?.targetLanguage || targetLanguage),
+          projectName,
+          sourceProjectName: meta?.sourceProjectName ?? null,
+          targetLanguage,
+        };
+      }
+    } catch (err) {
+      lastError = err;
+    }
+
+    if (attempt < CANDIDATE_READ_RETRY_DELAYS_MS.length) {
+      await wait(CANDIDATE_READ_RETRY_DELAYS_MS[attempt]);
+    }
   }
+
+  if (lastError) {
+    console.warn("[translationMirrorResolver] error reading candidate:", projectName, lastError);
+  }
+
+  return null;
 }
 
 interface ResolveTranslationMirrorOptions {
@@ -98,6 +167,7 @@ export async function resolveTranslationMirrorProjectName(
   let preferredNameByPresence: string | null = null;
   let linkedCandidate: string | null = null;
   let sameBookCandidate: string | null = null;
+  let sameBookMirrorCandidate: string | null = null;
 
   for (const projectName of preferredNames) {
     if (projectName === sourceStorage.projectName || !projectSet.has(projectName)) continue;
@@ -140,9 +210,9 @@ export async function resolveTranslationMirrorProjectName(
     const sameBook = candidate.bookId === sourceMeta.bookId;
     const linkedToCurrentSource =
       candidate.sourceProjectName === sourceStorage.projectName || projectName === linkedProjectName;
-    const isPreferredTarget = candidate.targetLanguage === preferredTargetLanguage;
+    const matchesPreferredTarget = !candidate.targetLanguage || candidate.targetLanguage === preferredTargetLanguage;
 
-    if (linkedToCurrentSource && isPreferredTarget) {
+    if (linkedToCurrentSource && matchesPreferredTarget) {
       return projectName;
     }
 
@@ -150,12 +220,21 @@ export async function resolveTranslationMirrorProjectName(
       linkedCandidate = projectName;
     }
 
-    if (!sameBookCandidate && sameBook && isPreferredTarget) {
+    if (!sameBookCandidate && sameBook && matchesPreferredTarget) {
       sameBookCandidate = projectName;
+    }
+
+    if (!sameBookMirrorCandidate && sameBook) {
+      sameBookMirrorCandidate = projectName;
     }
   }
 
-  return preferredNameCandidate ?? linkedCandidate ?? sameBookCandidate ?? preferredNameByPresence ?? null;
+  return preferredNameCandidate
+    ?? sameBookCandidate
+    ?? linkedCandidate
+    ?? sameBookMirrorCandidate
+    ?? preferredNameByPresence
+    ?? null;
 }
 
 interface TranslationMirrorProjectExistsOptions {
@@ -168,6 +247,15 @@ interface TranslationMirrorProjectExistsOptions {
 export async function translationMirrorProjectExists(
   opts: TranslationMirrorProjectExistsOptions,
 ): Promise<boolean> {
+  const persistedProjectName = readPersistedTranslationMirrorProjectName({
+    sourceBookId: opts.sourceBookId,
+    sourceProjectName: opts.sourceProjectName,
+  });
+  if (persistedProjectName) {
+    const persistedStore = await OPFSStorage.openExisting(persistedProjectName);
+    if (persistedStore) return true;
+  }
+
   const projects = await OPFSStorage.listProjects();
   const resolvedProjectName = await resolveTranslationMirrorProjectName({
     projects,
