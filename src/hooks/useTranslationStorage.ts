@@ -1,27 +1,18 @@
 /**
- * useTranslationStorage — opens the mirror OPFS translation project.
+ * useTranslationStorage — opens the translation OPFS project.
  *
- * Dead-simple logic:
- * 1. Build list of candidate names (persisted link, backlink, canonical suffixes)
- * 2. Try openExisting for each — OPFS open is instant, no retries needed
- * 3. If found → done. If not → exists=false.
- *
- * On tab re-focus: re-attempt once (covers edge case of concurrent creation).
+ * Dead-simple: read the project name from meta/localStorage, open it. Done.
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { OPFSStorage } from "@/lib/projectStorage";
 import type { ProjectStorage, ProjectMeta } from "@/lib/projectStorage";
 import {
-  buildTranslationMirrorNames,
   readPersistedTranslationMirrorProjectName,
   writePersistedTranslationMirrorProjectName,
 } from "@/lib/translationMirrorResolver";
 
 const TAG = "[useTranslationStorage]";
-
-/** In-memory cache: sourceProjectName → resolved translation project name */
-const resolvedCache = new Map<string, string>();
 
 interface UseTranslationStorageReturn {
   translationStorage: ProjectStorage | null;
@@ -30,46 +21,24 @@ interface UseTranslationStorageReturn {
   refresh: () => void;
 }
 
-function isTranslationExpected(
-  sourceMeta: ProjectMeta,
-  persistedProjectName: string | null,
-): boolean {
-  const progress = sourceMeta.pipelineProgress ?? {};
-  return Boolean(
-    sourceMeta.translationProject?.projectName
-      || persistedProjectName
-      || progress.trans_storage_created
-      || progress.trans_migration_done,
-  );
-}
-
-function buildCandidates(
+function getTranslationProjectName(
   sourceKey: string,
   sourceMeta: ProjectMeta,
-  persistedProjectName: string | null,
-): string[] {
-  const backlink = sourceMeta.translationProject?.projectName ?? null;
-  const targetLang = sourceMeta.language === "en" ? "ru" : "en";
+): string | null {
+  // 1. Backlink in project.json — the most reliable source
+  const backlink = sourceMeta.translationProject?.projectName;
+  if (backlink) return backlink;
 
-  return Array.from(
-    new Set(
-      [
-        resolvedCache.get(sourceKey),
-        persistedProjectName,
-        backlink,
-        ...buildTranslationMirrorNames(sourceKey, targetLang, backlink),
-      ].filter((n): n is string => !!n && n !== sourceKey),
-    ),
-  );
-}
+  // 2. localStorage persistence
+  const persisted = readPersistedTranslationMirrorProjectName({
+    sourceBookId: sourceMeta.bookId ?? null,
+    sourceProjectName: sourceKey,
+  });
+  if (persisted) return persisted;
 
-/** Try each candidate name once — openExisting is instant */
-async function openFirstMatch(candidates: string[]): Promise<{ store: ProjectStorage; name: string } | null> {
-  for (const name of candidates) {
-    const store = await OPFSStorage.openExisting(name);
-    if (store) return { store, name };
-  }
-  return null;
+  // 3. Canonical suffix convention
+  const targetLang = sourceMeta.language === "en" ? "RU" : "EN";
+  return `${sourceKey}_${targetLang}`;
 }
 
 export function useTranslationStorage(
@@ -83,16 +52,14 @@ export function useTranslationStorage(
   const mountedRef = useRef(true);
 
   const refresh = useCallback(() => {
-    if (sourceStorage) resolvedCache.delete(sourceStorage.projectName);
     setTick((t) => t + 1);
-  }, [sourceStorage]);
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
 
-  // ── Main resolution: one-shot, no retries ──
   useEffect(() => {
     if (!sourceStorage || !sourceMeta) {
       setTranslationStorage(null);
@@ -105,42 +72,40 @@ export function useTranslationStorage(
     setLoading(true);
 
     const sourceKey = sourceStorage.projectName;
-    const sourceBookId = sourceMeta.bookId ?? null;
-    const persistedProjectName = readPersistedTranslationMirrorProjectName({
-      sourceBookId,
-      sourceProjectName: sourceKey,
-    });
-    const expected = isTranslationExpected(sourceMeta, persistedProjectName);
-    const candidates = buildCandidates(sourceKey, sourceMeta, persistedProjectName);
+    const projectName = getTranslationProjectName(sourceKey, sourceMeta);
 
-    // Set exists optimistically if we expect it
-    setExists(expected);
+    if (!projectName) {
+      console.info(TAG, "no translation project name found for:", sourceKey);
+      setTranslationStorage(null);
+      setExists(false);
+      setLoading(false);
+      return;
+    }
 
     (async () => {
       try {
-        const result = await openFirstMatch(candidates);
+        const store = await OPFSStorage.openExisting(projectName);
         if (cancelled || !mountedRef.current) return;
 
-        if (result) {
-          console.info(TAG, "✅ opened:", result.name);
-          resolvedCache.set(sourceKey, result.name);
+        if (store) {
+          console.info(TAG, "✅ opened:", projectName);
           writePersistedTranslationMirrorProjectName({
-            sourceBookId,
+            sourceBookId: sourceMeta.bookId ?? null,
             sourceProjectName: sourceKey,
-            translationProjectName: result.name,
+            translationProjectName: projectName,
           });
-          setTranslationStorage(result.store);
+          setTranslationStorage(store);
           setExists(true);
         } else {
-          console.warn(TAG, "not found for:", sourceKey, { candidates, expected });
+          console.warn(TAG, "project not found in OPFS:", projectName);
           setTranslationStorage(null);
-          if (!expected) setExists(false);
+          setExists(false);
         }
       } catch (err) {
-        console.error(TAG, "error:", err);
+        console.error(TAG, "error opening:", projectName, err);
         if (!cancelled && mountedRef.current) {
           setTranslationStorage(null);
-          if (!expected) setExists(false);
+          setExists(false);
         }
       } finally {
         if (!cancelled && mountedRef.current) setLoading(false);
@@ -150,23 +115,17 @@ export function useTranslationStorage(
     return () => { cancelled = true; };
   }, [sourceStorage, sourceMeta, tick]);
 
-  // ── Re-attempt on tab focus (covers creation in another tab / long inactivity) ──
+  // Re-open on tab focus (covers creation in another tab)
   useEffect(() => {
-    if (!sourceStorage || !sourceMeta || translationStorage || !exists) return;
+    if (!sourceStorage || !sourceMeta || translationStorage) return;
 
     const handle = () => {
-      if (document.visibilityState === "visible" || document.hasFocus()) {
-        refresh();
-      }
+      if (document.visibilityState === "visible") refresh();
     };
 
-    window.addEventListener("focus", handle);
     document.addEventListener("visibilitychange", handle);
-    return () => {
-      window.removeEventListener("focus", handle);
-      document.removeEventListener("visibilitychange", handle);
-    };
-  }, [sourceStorage, sourceMeta, translationStorage, exists, refresh]);
+    return () => document.removeEventListener("visibilitychange", handle);
+  }, [sourceStorage, sourceMeta, translationStorage, refresh]);
 
   return { translationStorage, exists, loading, refresh };
 }
