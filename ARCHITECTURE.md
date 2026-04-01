@@ -291,19 +291,11 @@ interface ProjectStorage {
 
 Зеркальный проект по-прежнему хранит `sourceProjectName` и `targetLanguage` в своём `project.json`. Связь двунаправленная: исходный → `translationProject`, зеркало → `sourceProjectName`.
 
-#### Гарантии инициализации модуля перевода
+#### Разрешение проекта перевода
 
-**Проблема (B26):** race condition — `useTranslationStorage` получал `sourceStorage=null` до инициализации контекста и немедленно отвечал `exists: false`, показывая «пустой проект».
+**One-shot стратегия:** `useTranslationStorage` читает имя проекта из `project.json.translationProject.projectName` (backlink) → `localStorage` → каноническое имя (`_EN`/`_RU`). Первый найденный через `OPFSStorage.openExisting()` — результат. Никаких retry, fallback-сканов, таймеров.
 
-**Решение — трёхуровневая защита:**
-
-1. **`initialized` guard (Translation.tsx):** страница ждёт флаг `initialized` из `ProjectStorageContext` перед любым рендерингом. До этого — спиннер. Это предотвращает обращение к `useTranslationStorage` с `null`-входами.
-
-2. **LAST_PROJECT_KEY anchoring:** хранилище перевода разрешается через `LAST_PROJECT_KEY` в `localStorage` с автоматическим поиском родительского проекта. `useTranslationStorage` не сбрасывает `loading` при `null`-входах — ждёт валидные данные.
-
-3. **Fallback-скан OPFS:** `resolveLocalStorageForBook` сканирует все OPFS-проекты как страховка от потери `LAST_PROJECT_KEY`.
-
-**Инвариант:** существование проекта перевода проверяется строго по метаданным `project.json` (соответствие `sourceProjectName` и `targetLanguage`), а не по наличию папки.
+**Guard:** Translation.tsx ждёт `initialized` из `ProjectStorageContext` перед рендерингом (спиннер). Если зеркало не найдено — guard-экран с кнопками «Открыть Библиотеку» / «Перевод ← сервер».
 
 #### Карта качества арт-перевода (SegmentQualityChart)
 

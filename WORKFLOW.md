@@ -305,10 +305,9 @@
 **Модуль:** Перевод (`/translation`)
 **Хуки:** `useTranslationStorage`, `useSaveTranslation`, `useTranslationBatch`, `useSegmentTranslation`, `useSegmentLiteraryEdit`, `useSegmentCritique`
 
-### Гарантии загрузки
-- **initialized guard** — Translation.tsx ждёт `initialized` из контекста перед рендерингом (спиннер). Предотвращает race condition (B26) с `useTranslationStorage`.
-- **LAST_PROJECT_KEY anchoring** — хранилище разрешается через localStorage с автоматическим поиском родительского проекта и fallback-сканом OPFS.
-- **Проверка существования** — строго по метаданным `project.json` (`sourceProjectName` + `targetLanguage`), не по наличию папки.
+### Разрешение проекта перевода
+- **One-shot:** backlink из `project.json` → `localStorage` → каноническое имя. Первый найденный через `openExisting` — результат.
+- **Guard:** Translation.tsx ждёт `initialized` перед рендерингом. Если зеркало не найдено — guard-экран.
 
 ### Пайплайн перевода
 Трёхагентный пайплайн (Переводчик → Литредактор → Критик) с итеративным улучшением:
