@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/tooltip";
 
 const AXES: RadarAxis[] = ["semantic", "sentiment", "rhythm", "phonetic", "cultural"];
+const Y_BASE = 0.3; // bars start from 30%
 
 const AXIS_ICONS: Record<RadarAxis, string> = {
   semantic: "S",
@@ -48,9 +49,14 @@ interface SegmentBar {
   segmentId: string;
   index: number;
   label: string;
+  /** Display values (shifted by Y_BASE) */
   "3R": number;
   "5R": number;
   "5R+Alt": number;
+  /** Raw 0-1 values for tooltip */
+  raw3R: number;
+  raw5R: number;
+  rawAlt: number;
 }
 
 interface Props {
@@ -113,13 +119,20 @@ export function SegmentQualityChart({
           const r5 = ltr ? normalizeRadar(ltr.radar) : null;
           const r5a = crt ? normalizeRadar(crt.radar) : null;
 
+          const v3 = r3 ? r3[activeAxis] : 0;
+          const v5 = r5 ? r5[activeAxis] : 0;
+          const vA = r5a ? r5a[activeAxis] : 0;
+
           return {
             segmentId: id,
             index: idx + 1,
             label: `${idx + 1}`,
-            "3R": r3 ? r3[activeAxis] : 0,
-            "5R": r5 ? r5[activeAxis] : 0,
-            "5R+Alt": r5a ? r5a[activeAxis] : 0,
+            "3R": Math.max(0, v3 - Y_BASE),
+            "5R": Math.max(0, v5 - Y_BASE),
+            "5R+Alt": Math.max(0, vA - Y_BASE),
+            raw3R: v3,
+            raw5R: v5,
+            rawAlt: vA,
           };
         });
 
@@ -157,7 +170,7 @@ export function SegmentQualityChart({
     return Math.max(4, Math.min(28, size));
   }, [barData.length]);
 
-  const hasData = barData.some((b) => b["3R"] > 0 || b["5R"] > 0 || b["5R+Alt"] > 0);
+  const hasData = barData.some((b) => b.raw3R > 0 || b.raw5R > 0 || b.rawAlt > 0);
 
   if (!sceneId || segmentIds.length === 0) return null;
 
@@ -229,12 +242,12 @@ export function SegmentQualityChart({
                     tickLine={false}
                   />
                   <YAxis
-                    domain={[0.3, 1]}
-                    ticks={[0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]}
+                    domain={[0, 1 - Y_BASE]}
+                    ticks={[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]}
                     tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
                     axisLine={false}
                     tickLine={false}
-                    tickFormatter={(v: number) => `${Math.round(v * 100)}`}
+                    tickFormatter={(v: number) => `${Math.round((v + Y_BASE) * 100)}`}
                     width={28}
                   />
                   <Tooltip content={<CustomTooltip isRu={isRu} activeAxis={activeAxis} />} />
@@ -298,10 +311,10 @@ function CustomTooltip({ isRu, activeAxis, active, payload, label }: TooltipPayl
 
   const axisLabel = AXIS_LABELS[activeAxis][isRu ? "ru" : "en"];
 
-  const layers: { key: RadarLayer; label: string }[] = [
-    { key: "3R", label: isRu ? "Первичный" : "Primary" },
-    { key: "5R", label: isRu ? "Художественный" : "Art Edit" },
-    { key: "5R+Alt", label: isRu ? "Критика" : "Critique" },
+  const layers: { key: RadarLayer; rawKey: keyof SegmentBar; label: string }[] = [
+    { key: "3R", rawKey: "raw3R", label: isRu ? "Первичный" : "Primary" },
+    { key: "5R", rawKey: "raw5R", label: isRu ? "Художественный" : "Art Edit" },
+    { key: "5R+Alt", rawKey: "rawAlt", label: isRu ? "Критика" : "Critique" },
   ];
 
   return (
@@ -309,8 +322,8 @@ function CustomTooltip({ isRu, activeAxis, active, payload, label }: TooltipPayl
       <div className="font-medium text-popover-foreground">
         {isRu ? "Сегмент" : "Segment"} {data.index} · {axisLabel}
       </div>
-      {layers.map(({ key, label }) => {
-        const val = data[key];
+      {layers.map(({ key, rawKey, label }) => {
+        const val = data[rawKey] as number;
         if (!val) return null;
         return (
           <div key={key} className="flex items-center gap-1.5">
