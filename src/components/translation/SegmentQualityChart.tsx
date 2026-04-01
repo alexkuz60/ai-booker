@@ -268,11 +268,16 @@ export function SegmentQualityChart({
                       barSize={dynamicBarSize}
                       cursor="pointer"
                       onClick={(_: any, idx: number) => {
-                        if (barData[idx]) handleBarClick(barData[idx]);
+                        if (barData[idx]) handleBarClick(barData[idx], idx);
                       }}
                     >
                       {barData.map((_, i) => (
-                        <Cell key={i} />
+                        <Cell
+                          key={i}
+                          fillOpacity={highlightedIdx !== null && highlightedIdx !== i
+                            ? (layer === "3R" ? 0.4 : layer === "5R" ? 0.3 : 0.2)
+                            : undefined}
+                        />
                       ))}
                     </Bar>
                   ))}
