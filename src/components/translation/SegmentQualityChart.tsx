@@ -90,6 +90,13 @@ export function SegmentQualityChart({
   const [barData, setBarData] = useState<SegmentBar[]>([]);
   const [highlightedIdx, setHighlightedIdx] = useState<number | null>(null);
 
+  // Sync highlight when segment is selected externally (e.g. from bilingual view)
+  useEffect(() => {
+    if (!selectedSegmentId) { setHighlightedIdx(null); return; }
+    const idx = barData.findIndex((b) => b.segmentId === selectedSegmentId);
+    setHighlightedIdx(idx >= 0 ? idx : null);
+  }, [selectedSegmentId, barData]);
+
   // Load radar stage data
   useEffect(() => {
     if (!translationStorage || !sceneId || !chapterId || segmentIds.length === 0) {
