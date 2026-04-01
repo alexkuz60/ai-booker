@@ -151,16 +151,9 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
 
           const result = await mapLocalStructureToBook(store);
           if (!result) {
-            const toc = await store.readJSON<Record<string, unknown>>("structure/toc.json").catch(() => null);
-            const hasBookId = typeof (meta as any)?.bookId === "string" || typeof (toc as any)?.bookId === "string";
-            const likelyMirror = isLikelyTranslationMirrorName(projectName, existingProjectSet);
-            return {
-              candidate: null as LocalLibraryCandidate | null,
-              shouldDelete: !hasBookId && !likelyMirror,
-              projectName,
-            };
+            return { candidate: null as LocalLibraryCandidate | null, projectName };
           }
-          return { candidate: result, shouldDelete: false, projectName };
+          return { candidate: result, projectName };
         } catch (err) {
           console.warn("[Library] Failed to read project:", projectName, err);
           return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
