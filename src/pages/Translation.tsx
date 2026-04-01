@@ -549,7 +549,7 @@ export default function Translation() {
                   )}
                 </div>
                 {selectedSceneId ? (
-                  <div className="h-full flex flex-col">
+                  <div className="h-full flex flex-col overflow-hidden">
                     <ScrollArea className="flex-1 min-h-0">
                       <div className="p-3" key={selectedSceneId}>
                         <BilingualSegmentsView
