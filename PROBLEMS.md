@@ -160,15 +160,9 @@
 - Файл: `src/hooks/useTranslationBatch.ts`.
 
 ### Ш. Потеря translation-зеркала после рестарта браузера — ✅ РЕШЕНО (B26)
-- Проблема: translation mirror проект (например, `Book_EN`) "исчезает" после рестарта браузера.
-- Корневая причина: OPFS-папка НЕ удалялась. Проблема — **гонка состояний** (race condition):
-  - `useTranslationStorage` получает `sourceStorage=null` пока `useProjectStorageContext` не инициализирован.
-  - При `sourceStorage=null` хук немедленно отвечал `exists: false, loading: false`.
-  - Страница Translation.tsx не ждала `initialized` от контекста и показывала «пустой проект».
-  - При автоматической перезагрузке OPFS-бутстрап уже завершён → проект находится.
-- Фикс (v2): Translation.tsx ждёт `initialized`, показывая спиннер. `useTranslationStorage` не сбрасывает `loading` при null-входах.
-- Предыдущие фиксы (v1, остаются): fallback-скан OPFS в `resolveLocalStorageForBook`, защита `deleteBook` от удаления зеркал.
-- Файлы: `Translation.tsx`, `useTranslationStorage.ts`, `localProjectResolver.ts`, `useBookManager.ts`.
+- Проблема: `useTranslationStorage` получал `sourceStorage=null` до инициализации контекста → `exists: false`.
+- Решение: Translation.tsx ждёт `initialized` (спиннер). One-shot разрешение зеркала: backlink → localStorage → каноническое имя через `openExisting`.
+- Файлы: `Translation.tsx`, `useTranslationStorage.ts`.
 
 ### Щ. Таймлайн и сайдбар не синхронизировались с прогрессом — ✅ РЕШЕНО (B27)
 - Проблема: ручное переключение чекбоксов в контекстном меню таймлайна записывало `pipelineProgress` в OPFS, но сайдбар не обновлял гейтинг — пункты оставались заблокированными. При загрузке книги с сервера таймлайн и меню не отражали сохранённый прогресс из `project.json`.
@@ -189,25 +183,14 @@
 - Файлы: миграция `add_update_policy_book_uploads`.
 
 ### Я. Автосоздание пустых проектов перевода — ✅ РЕШЕНО (B30)
-- Проблема: после перезагрузки браузера страница `/translation` показывала пустой проект перевода с заполненным навигатором, но без результатов перевода. При каждом последующем F5 создавался новый пустой mirror.
-- Корневая причина: повсеместное использование `OPFSStorage.openOrCreate()` вместо `OPFSStorage.openExisting()` в read-only контекстах (bootstrap, library scan, resolver, cleanup). `openOrCreate` создаёт пустую директорию, если проект не существует — «зомби-папка» затем принималась за легитимный проект.
-- Нарушенное правило: «Новый проект может создать только пользователь кликом в карточке книги Библиотеки» (OPFS Storage Hygiene).
-- Решение:
-  1. Замена `openOrCreate` → `openExisting` + null-check во **всех** read-only точках: `useProjectStorage` (bootstrap + openProjectByName), `useLibrary` (scan + rename), `LibraryView` (handleToggleStep, handleTranslationStageClick, doCreateTranslationProject), `localProjectResolver` (direct scan + ranked open), `projectCleanup` (wipe verification), `useBookRestore` (source blob preservation).
-  2. Добавлен guard-экран на `/translation`: если mirror-проект не существует, показывается сообщение с кнопками «Открыть Библиотеку» и «Перевод ← сервер» вместо пустой рабочей области.
-  3. Усилена проверка `translationProjectExists()`: помимо наличия директории, верифицируются поля `sourceProjectName` и `targetLanguage` в `project.json`.
-- Инвариант: `openOrCreate` допустим ТОЛЬКО при явном создании проекта пользователем (createProject, importZip, createTranslationProject, restoreTranslation). Во всех остальных случаях — строго `openExisting`.
+- Проблема: `openOrCreate` в read-only контекстах создавал пустые OPFS-папки → «зомби-проекты».
+- Решение: все read-only точки используют `openExisting`. `openOrCreate` — только при явном создании пользователем.
+- Инвариант: `openOrCreate` допустим ТОЛЬКО в 4 точках: createProject, importZip, createTranslationProject, restoreTranslation.
 - Файлы: `useProjectStorage.ts`, `useLibrary.ts`, `LibraryView.tsx`, `localProjectResolver.ts`, `projectCleanup.ts`, `useBookRestore.ts`, `translationProject.ts`, `Translation.tsx`.
 
 ### Ф. Сброс pipeline-флагов перевода при перезагрузке — ✅ РЕШЕНО (B21)
-- Проблема: при перезапуске браузера несколько хуков одновременно обращались к `project.json` в OPFS. Из-за блокировок файлов `readJSON` возвращал `null`, и функции записи (`persist`, `writePipelineStep`) интерпретировали это как пустой проект, перезаписывая метаданные объектом без `pipelineProgress` и `translationProject`.
-- Также `useLibrary` при сканировании OPFS мог не прочитать метаданные зеркала перевода и ошибочно трактовать его как основной проект (split-brain).
-- Также `useTranslationStorage` кэшировал отрицательный результат поиска (null), что приводило к «залипанию» пустой заставки даже после восстановления флагов.
-- Решение:
-  1. `readProjectMetaForWrite()` с retry (30ms) — при первом `null` повторное чтение перед записью.
-  2. Гвард: если meta по-прежнему `null` после retry — запись блокируется (refuse destructive overwrite).
-  3. `useLibrary`: эвристика по суффиксу `_EN`/`_RU` для фильтрации зеркал при нечитаемых метаданных.
-  4. `useTranslationStorage`: отрицательные результаты не кэшируются (no negative caching).
+- Проблема: конкурентные записи в `project.json` при холодном старте перезаписывали метаданные без `pipelineProgress`.
+- Решение: `readProjectMetaForWrite()` с retry при первом `null`, блокировка записи если meta остаётся `null`. `useLibrary` фильтрует зеркала по суффиксу `_EN`/`_RU`.
 - Файлы: `usePipelineProgress.ts`, `translationProject.ts`, `useLibrary.ts`, `useTranslationStorage.ts`.
 
 ---

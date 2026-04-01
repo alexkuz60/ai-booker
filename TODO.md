@@ -162,8 +162,7 @@
 
 ## Баги — Потеря translation-зеркала (B26) ✅ РЕШЕНО
 
-- [x] **Корневая причина найдена** — OPFS-папка НЕ удалялась. Проблема — гонка состояний: `useTranslationStorage` получал `sourceStorage=null` до инициализации контекста и немедленно отвечал `exists: false`. Страница Translation не ждала `initialized` и показывала «пустой проект».
-- [x] **Фикс** — Translation.tsx ждёт `initialized` (спиннер). `useTranslationStorage` не сбрасывает `loading` при null-входах. Fallback-скан OPFS в `resolveLocalStorageForBook` сохранён как страховка.
+- [x] **Фикс** — One-shot разрешение: backlink → localStorage → каноническое имя. Guard `initialized` на странице Translation.
 
 ## Баги — AI Роли / Пресеты
 
