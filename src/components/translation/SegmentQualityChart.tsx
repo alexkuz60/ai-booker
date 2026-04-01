@@ -242,12 +242,12 @@ export function SegmentQualityChart({
                     tickLine={false}
                   />
                   <YAxis
-                    domain={[0.3, 1]}
-                    ticks={[0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]}
+                    domain={[0, 1 - Y_BASE]}
+                    ticks={[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]}
                     tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
                     axisLine={false}
                     tickLine={false}
-                    tickFormatter={(v: number) => `${Math.round(v * 100)}`}
+                    tickFormatter={(v: number) => `${Math.round((v + Y_BASE) * 100)}`}
                     width={28}
                   />
                   <Tooltip content={<CustomTooltip isRu={isRu} activeAxis={activeAxis} />} />
