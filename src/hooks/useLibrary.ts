@@ -117,7 +117,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
 
       const scanResults = await Promise.all(projectNames.map(async (projectName) => {
         try {
-          if (NESTED_TRANSLATION_SUFFIX_RE.test(projectName)) {
+          if (/(?:[_\s-])(EN|RU)(?:[_\s-])(EN|RU)$/i.test(projectName)) {
             return { candidate: null as LocalLibraryCandidate | null, shouldDelete: true, projectName };
           }
 
