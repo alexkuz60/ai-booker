@@ -140,7 +140,8 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
           }
 
           if (isNestedTranslationMirrorMeta(meta)) {
-            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: true, projectName };
+            console.warn("[Library] Nested mirror by meta, skipping (not deleting):", projectName);
+            return { candidate: null as LocalLibraryCandidate | null, projectName };
           }
 
           // Skip translation mirror projects — they share bookId but are independent
