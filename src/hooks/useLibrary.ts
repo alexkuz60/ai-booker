@@ -160,12 +160,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
         }
       }));
 
-      const staleProjects = Array.from(
-        new Set(scanResults.filter((r) => r.shouldDelete).map((r) => r.projectName)),
-      );
-      if (staleProjects.length > 0) {
-        await Promise.all(staleProjects.map((name) => OPFSStorage.deleteProject(name).catch(() => {})));
-      }
+
 
       const candidates = scanResults
         .map((r) => r.candidate)
