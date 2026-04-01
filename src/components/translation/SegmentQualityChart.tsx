@@ -162,7 +162,7 @@ export function SegmentQualityChart({
   if (!sceneId || segmentIds.length === 0) return null;
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="border-t">
+    <Collapsible open={open} onOpenChange={setOpen} className="border-t shrink-0">
       <CollapsibleTrigger className="flex w-full items-center gap-1.5 px-3 py-1 hover:bg-muted/50 transition-colors">
         <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
