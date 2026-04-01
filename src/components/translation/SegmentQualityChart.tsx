@@ -119,13 +119,20 @@ export function SegmentQualityChart({
           const r5 = ltr ? normalizeRadar(ltr.radar) : null;
           const r5a = crt ? normalizeRadar(crt.radar) : null;
 
+          const v3 = r3 ? r3[activeAxis] : 0;
+          const v5 = r5 ? r5[activeAxis] : 0;
+          const vA = r5a ? r5a[activeAxis] : 0;
+
           return {
             segmentId: id,
             index: idx + 1,
             label: `${idx + 1}`,
-            "3R": r3 ? r3[activeAxis] : 0,
-            "5R": r5 ? r5[activeAxis] : 0,
-            "5R+Alt": r5a ? r5a[activeAxis] : 0,
+            "3R": Math.max(0, v3 - Y_BASE),
+            "5R": Math.max(0, v5 - Y_BASE),
+            "5R+Alt": Math.max(0, vA - Y_BASE),
+            raw3R: v3,
+            raw5R: v5,
+            rawAlt: vA,
           };
         });
 
