@@ -136,7 +136,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
 
           if (!meta && isLikelyTranslationMirrorName(projectName, existingProjectSet)) {
             console.warn("[Library] project.json unreadable for likely mirror, skipping:", projectName);
-            return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
+            return { candidate: null as LocalLibraryCandidate | null, projectName };
           }
 
           if (isNestedTranslationMirrorMeta(meta)) {
