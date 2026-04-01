@@ -12,23 +12,16 @@ import { detectFileFormat } from "@/lib/fileFormatUtils";
 import { getProjectActivityMs } from "@/lib/projectActivity";
 import { paths } from "@/lib/projectPaths";
 import { readPipelineProgress } from "@/hooks/usePipelineProgress";
+import {
+  getTranslationMirrorSourceProjectName,
+  isLikelyTranslationMirrorName,
+} from "@/lib/translationMirrorResolver";
 
 const OPFS_NON_PROJECT_DIRS = new Set(["atmo-cache", "ir-cache", "sfx-cache"]);
-const NESTED_TRANSLATION_SUFFIX_RE = /_(EN|RU)_(EN|RU)$/i;
-const LANG_SUFFIX_RE = /_(EN|RU)$/i;
 
 function isNestedTranslationMirrorMeta(meta: Record<string, unknown> | null): boolean {
   const source = typeof meta?.sourceProjectName === "string" ? meta.sourceProjectName : "";
-  return !!source && LANG_SUFFIX_RE.test(source);
-}
-
-function isLikelyTranslationMirrorByName(projectName: string, existingProjects?: Set<string>): boolean {
-  const match = projectName.match(LANG_SUFFIX_RE);
-  if (!match) return false;
-  // If project list is available, treat as mirror only when base exists.
-  if (existingProjects) return existingProjects.has(match[1]);
-  // Without list, be conservative: language suffix is suspicious.
-  return true;
+  return !!source && !!getTranslationMirrorSourceProjectName(source);
 }
 
 type LocalLibraryCandidate = {
