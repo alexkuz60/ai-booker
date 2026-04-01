@@ -181,6 +181,17 @@ export async function createTranslationProject(
     translationProjectName: projectName,
   });
 
+  // 3c. Write OPFS-internal link (survives localStorage clears)
+  try {
+    await sourceStorage.writeJSON("_translation_link.json", {
+      projectName,
+      targetLanguage,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (e) {
+    console.warn("[translationProject] Failed to write OPFS link:", e);
+  }
+
   // 4. Copy structure/toc.json
   progress("Copying structure…", 0.1);
   const toc = await sourceStorage.readJSON<{ toc: TocChapter[]; parts: unknown[] }>(

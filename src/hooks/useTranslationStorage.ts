@@ -1,8 +1,15 @@
 /**
  * useTranslationStorage — opens the translation OPFS project.
  *
- * Resolves mirror name from backlink/local hint/canonical candidates,
- * then falls back to metadata scan when links were lost.
+ * Resolution strategy (in order):
+ * 1. OPFS-internal link file (_translation_link.json in source project)
+ * 2. localStorage persisted hint
+ * 3. Backlink in source project.json
+ * 4. Canonical name candidates (_EN, _RU)
+ * 5. Full OPFS meta-scan (scans ALL projects by bookId + targetLanguage)
+ *
+ * Every candidate is VALIDATED by reading its project.json before acceptance.
+ * On success, all link sources are written back for fast future resolution.
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -16,7 +23,45 @@ import {
 
 const TAG = "[useTranslationStorage]";
 
-type TranslationFlags = Partial<Record<"trans_storage_created" | "trans_migration_done", boolean>>;
+// ── OPFS-internal link (survives localStorage clears) ──────
+
+const OPFS_LINK_FILE = "_translation_link.json";
+
+interface OpfsTranslationLink {
+  projectName: string;
+  targetLanguage: string;
+  updatedAt: string;
+}
+
+async function readOpfsTranslationLink(
+  sourceStorage: ProjectStorage,
+): Promise<string | null> {
+  try {
+    const link = await sourceStorage.readJSON<OpfsTranslationLink>(OPFS_LINK_FILE);
+    return link?.projectName?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeOpfsTranslationLink(
+  sourceStorage: ProjectStorage,
+  projectName: string,
+  targetLanguage: string,
+): Promise<void> {
+  try {
+    const link: OpfsTranslationLink = {
+      projectName,
+      targetLanguage,
+      updatedAt: new Date().toISOString(),
+    };
+    await sourceStorage.writeJSON(OPFS_LINK_FILE, link);
+  } catch (err) {
+    console.warn(TAG, "Failed to write OPFS link:", err);
+  }
+}
+
+// ── Helpers ────────────────────────────────────────────────
 
 interface UseTranslationStorageReturn {
   translationStorage: ProjectStorage | null;
@@ -29,24 +74,49 @@ function getTargetLanguage(sourceMeta: ProjectMeta): "en" | "ru" {
   return sourceMeta.language === "en" ? "ru" : "en";
 }
 
-function isTranslationExpected(sourceKey: string, sourceMeta: ProjectMeta): boolean {
-  const persisted = readPersistedTranslationMirrorProjectName({
-    sourceBookId: sourceMeta.bookId ?? null,
-    sourceProjectName: sourceKey,
-  });
-  const flags = (sourceMeta.pipelineProgress ?? {}) as TranslationFlags;
+/**
+ * Validate that an opened OPFS store is actually a translation mirror
+ * for the given source project. Returns the store only if valid.
+ */
+async function validateMirrorStore(
+  store: ProjectStorage,
+  sourceKey: string,
+  sourceBookId: string | undefined,
+  targetLanguage: string,
+): Promise<boolean> {
+  try {
+    const meta = await store.readJSON<ProjectMeta>("project.json");
+    if (!meta) return false;
 
-  return Boolean(
-    sourceMeta.translationProject?.projectName ||
-    persisted ||
-    flags.trans_storage_created ||
-    flags.trans_migration_done,
-  );
+    // Must look like a mirror
+    if (!meta.targetLanguage && !meta.sourceProjectName) return false;
+
+    // Strong match: sourceProjectName + targetLanguage
+    if (meta.sourceProjectName === sourceKey && meta.targetLanguage === targetLanguage) return true;
+
+    // Medium match: bookId + targetLanguage
+    if (sourceBookId && meta.bookId === sourceBookId && meta.targetLanguage === targetLanguage) return true;
+
+    // Weak match: sourceProjectName only (language might differ in meta)
+    if (meta.sourceProjectName === sourceKey) return true;
+
+    // Weak match: bookId only
+    if (sourceBookId && meta.bookId === sourceBookId) return true;
+
+    return false;
+  } catch {
+    return false;
+  }
 }
 
-function getTranslationProjectNames(
+/**
+ * Build all candidate names from multiple sources (OPFS link, localStorage, backlink, canonical).
+ */
+function getAllCandidateNames(
+  sourceStorage: ProjectStorage,
   sourceKey: string,
   sourceMeta: ProjectMeta,
+  opfsLinkName: string | null,
 ): string[] {
   const backlink = sourceMeta.translationProject?.projectName;
   const persisted = readPersistedTranslationMirrorProjectName({
@@ -58,74 +128,127 @@ function getTranslationProjectNames(
   return Array.from(
     new Set(
       [
-        backlink,
+        opfsLinkName,
         persisted,
+        backlink,
         ...buildTranslationMirrorNames(sourceKey, targetLanguage, backlink),
       ].filter((name): name is string => !!name),
     ),
   );
 }
 
-async function resolveTranslationByMetaScan(
+/**
+ * Full OPFS meta-scan: iterate ALL projects and find the best mirror match.
+ * This is the nuclear fallback that always works if the mirror exists.
+ */
+async function findMirrorByMetaScan(
   sourceKey: string,
   sourceMeta: ProjectMeta,
 ): Promise<{ store: ProjectStorage; projectName: string } | null> {
   try {
     const targetLanguage = getTargetLanguage(sourceMeta);
-    const projectNames = await OPFSStorage.listProjects();
+    const allProjects = await OPFSStorage.listProjects();
 
-    const candidates: Array<{ projectName: string; score: number; updatedAt: string }> = [];
+    const candidates: Array<{
+      projectName: string;
+      score: number;
+      updatedAt: string;
+    }> = [];
 
-    for (const projectName of projectNames) {
+    for (const projectName of allProjects) {
       if (projectName === sourceKey) continue;
 
-      const store = await OPFSStorage.openExisting(projectName);
-      if (!store) continue;
+      try {
+        const store = await OPFSStorage.openExisting(projectName);
+        if (!store) continue;
 
-      const meta = await store.readJSON<ProjectMeta>("project.json");
-      if (!meta) continue;
+        const meta = await store.readJSON<ProjectMeta>("project.json");
+        if (!meta) continue;
 
-      const looksLikeMirror = Boolean(meta.targetLanguage || meta.sourceProjectName);
-      if (!looksLikeMirror) continue;
+        // Must have SOME mirror signal
+        const isMirror = Boolean(meta.targetLanguage || meta.sourceProjectName);
+        // Also accept by name pattern if metadata is incomplete
+        const nameMatch = /_(EN|RU)$/i.test(projectName);
+        if (!isMirror && !nameMatch) continue;
 
-      let score = 0;
-      if (meta.sourceProjectName === sourceKey && meta.targetLanguage === targetLanguage) {
-        score = 4;
-      } else if (meta.sourceProjectName === sourceKey) {
-        score = 3;
-      } else if (sourceMeta.bookId && meta.bookId === sourceMeta.bookId && meta.targetLanguage === targetLanguage) {
-        score = 2;
-      } else if (sourceMeta.bookId && meta.bookId === sourceMeta.bookId) {
-        score = 1;
-      }
+        let score = 0;
 
-      if (score > 0) {
-        candidates.push({
-          projectName,
-          score,
-          updatedAt: meta.updatedAt ?? meta.createdAt ?? "",
-        });
+        // Exact source + language match
+        if (meta.sourceProjectName === sourceKey && meta.targetLanguage === targetLanguage) {
+          score = 10;
+        }
+        // Source match, any language
+        else if (meta.sourceProjectName === sourceKey) {
+          score = 8;
+        }
+        // BookId + language match
+        else if (sourceMeta.bookId && meta.bookId === sourceMeta.bookId && meta.targetLanguage === targetLanguage) {
+          score = 6;
+        }
+        // BookId match only
+        else if (sourceMeta.bookId && meta.bookId === sourceMeta.bookId) {
+          score = 4;
+        }
+        // Name pattern match (e.g., SourceName_EN)
+        else if (nameMatch && projectName.startsWith(sourceKey)) {
+          score = 2;
+        }
+
+        if (score > 0) {
+          candidates.push({
+            projectName,
+            score,
+            updatedAt: meta.updatedAt ?? meta.createdAt ?? "",
+          });
+        }
+      } catch {
+        // Skip unreadable projects
       }
     }
 
     if (!candidates.length) return null;
 
+    // Best score wins, then most recently updated
     candidates.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       return b.updatedAt.localeCompare(a.updatedAt);
     });
 
     const winner = candidates[0];
-    const winnerStore = await OPFSStorage.openExisting(winner.projectName);
-    if (!winnerStore) return null;
+    console.info(TAG, `meta-scan found mirror: ${winner.projectName} (score=${winner.score})`);
 
-    console.info(TAG, "fallback meta-scan resolved:", winner.projectName);
-    return { store: winnerStore, projectName: winner.projectName };
+    const store = await OPFSStorage.openExisting(winner.projectName);
+    if (!store) return null;
+
+    return { store, projectName: winner.projectName };
   } catch (err) {
-    console.warn(TAG, "fallback meta-scan failed:", err);
+    console.warn(TAG, "meta-scan failed:", err);
     return null;
   }
 }
+
+/**
+ * Persist ALL link sources for fast future resolution.
+ */
+function persistAllLinks(
+  sourceStorage: ProjectStorage,
+  sourceKey: string,
+  sourceMeta: ProjectMeta,
+  resolvedName: string,
+  targetLanguage: string,
+): void {
+  // 1. OPFS-internal link (survives localStorage clears)
+  writeOpfsTranslationLink(sourceStorage, resolvedName, targetLanguage);
+
+  // 2. localStorage hint
+  writePersistedTranslationMirrorProjectName({
+    sourceBookId: sourceMeta.bookId ?? null,
+    sourceProjectName: sourceKey,
+    translationProjectName: resolvedName,
+  });
+}
+
+// ── Hook ───────────────────────────────────────────────────
 
 export function useTranslationStorage(
   sourceStorage: ProjectStorage | null,
@@ -158,33 +281,40 @@ export function useTranslationStorage(
     setLoading(true);
 
     const sourceKey = sourceStorage.projectName;
-    const candidateNames = getTranslationProjectNames(sourceKey, sourceMeta);
-    const expected = isTranslationExpected(sourceKey, sourceMeta);
-
-    if (candidateNames.length === 0) {
-      console.info(TAG, "no translation project name found for:", sourceKey);
-      setTranslationStorage(null);
-      setExists(expected);
-      setLoading(false);
-      return;
-    }
+    const targetLanguage = getTargetLanguage(sourceMeta);
 
     (async () => {
       try {
         let store: ProjectStorage | null = null;
         let resolvedProjectName: string | null = null;
 
+        // ── Phase 1: Try candidates (fast path) ──────────
+        const opfsLinkName = await readOpfsTranslationLink(sourceStorage);
+        const candidateNames = getAllCandidateNames(sourceStorage, sourceKey, sourceMeta, opfsLinkName);
+
+        console.debug(TAG, "candidates for", sourceKey, ":", candidateNames);
+
         for (const candidateName of candidateNames) {
           const maybeStore = await OPFSStorage.openExisting(candidateName);
           if (!maybeStore) continue;
+
+          // CRITICAL: Validate the store is actually our mirror
+          const valid = await validateMirrorStore(maybeStore, sourceKey, sourceMeta.bookId, targetLanguage);
+          if (!valid) {
+            console.warn(TAG, `candidate ${candidateName} exists but failed validation — skipping`);
+            continue;
+          }
+
           store = maybeStore;
           resolvedProjectName = candidateName;
+          console.info(TAG, "✅ validated candidate:", candidateName);
           break;
         }
 
-        // Self-heal when link/name drift happened (duplicate source folders, stale hints, etc.)
+        // ── Phase 2: Full meta-scan (nuclear fallback) ───
         if (!store) {
-          const fallback = await resolveTranslationByMetaScan(sourceKey, sourceMeta);
+          console.info(TAG, "all candidates failed, starting full meta-scan…");
+          const fallback = await findMirrorByMetaScan(sourceKey, sourceMeta);
           if (fallback) {
             store = fallback.store;
             resolvedProjectName = fallback.projectName;
@@ -193,26 +323,23 @@ export function useTranslationStorage(
 
         if (cancelled || !mountedRef.current) return;
 
+        // ── Result ───────────────────────────────────────
         if (store && resolvedProjectName) {
           console.info(TAG, "✅ opened:", resolvedProjectName);
-          writePersistedTranslationMirrorProjectName({
-            sourceBookId: sourceMeta.bookId ?? null,
-            sourceProjectName: sourceKey,
-            translationProjectName: resolvedProjectName,
-          });
+          // Write back ALL links for instant future resolution
+          persistAllLinks(sourceStorage, sourceKey, sourceMeta, resolvedProjectName, targetLanguage);
           setTranslationStorage(store);
           setExists(true);
         } else {
-          console.warn(TAG, "project not found in OPFS:", candidateNames.join(", "));
+          console.warn(TAG, "mirror not found in OPFS for:", sourceKey);
           setTranslationStorage(null);
-          // Keep "exists" true when translation was previously created, so UI shows reconnect state.
-          setExists(expected);
+          setExists(false);
         }
       } catch (err) {
-        console.error(TAG, "error opening candidates:", candidateNames, err);
+        console.error(TAG, "resolution error:", err);
         if (!cancelled && mountedRef.current) {
           setTranslationStorage(null);
-          setExists(expected);
+          setExists(false);
         }
       } finally {
         if (!cancelled && mountedRef.current) setLoading(false);
