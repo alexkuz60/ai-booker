@@ -291,6 +291,35 @@ interface ProjectStorage {
 
 Зеркальный проект по-прежнему хранит `sourceProjectName` и `targetLanguage` в своём `project.json`. Связь двунаправленная: исходный → `translationProject`, зеркало → `sourceProjectName`.
 
+#### Гарантии инициализации модуля перевода
+
+**Проблема (B26):** race condition — `useTranslationStorage` получал `sourceStorage=null` до инициализации контекста и немедленно отвечал `exists: false`, показывая «пустой проект».
+
+**Решение — трёхуровневая защита:**
+
+1. **`initialized` guard (Translation.tsx):** страница ждёт флаг `initialized` из `ProjectStorageContext` перед любым рендерингом. До этого — спиннер. Это предотвращает обращение к `useTranslationStorage` с `null`-входами.
+
+2. **LAST_PROJECT_KEY anchoring:** хранилище перевода разрешается через `LAST_PROJECT_KEY` в `localStorage` с автоматическим поиском родительского проекта. `useTranslationStorage` не сбрасывает `loading` при `null`-входах — ждёт валидные данные.
+
+3. **Fallback-скан OPFS:** `resolveLocalStorageForBook` сканирует все OPFS-проекты как страховка от потери `LAST_PROJECT_KEY`.
+
+**Инвариант:** существование проекта перевода проверяется строго по метаданным `project.json` (соответствие `sourceProjectName` и `targetLanguage`), а не по наличию папки.
+
+#### Карта качества арт-перевода (SegmentQualityChart)
+
+Интерактивная гистограмма с адаптивной шириной бинов, отображающая per-segment качество по 5 осям (С/Т/Р/Ф/К). Данные читаются из OPFS-файлов `radar-literal.json`, `radar-literary.json`, `radar-critique.json`.
+
+**Визуальные параметры:**
+- Шкала Y: 30%–100% (Y_BASE = 0.3 — нижняя граница столбцов)
+- Наложение слоёв: 5R+Alt → 5R → 3R (3R — самый верхний)
+- Вертикальный пунктирный курсор при наведении (без перерисовки бинов)
+- Яркая горизонтальная сетка (opacity 0.3)
+
+**Двусторонняя синхронизация с билингвой:**
+- Клик по бину → `onSelectSegment()` → автопрокрутка к сегменту в `BilingualSegmentsView`
+- Выбор сегмента в билингве → `selectedSegmentId` → подсветка соответствующего бина (persistent highlight: вертикальная `ReferenceLine` + затемнение остальных бинов)
+- Выделение сохраняется до клика по другому бину или выбора другого сегмента
+
 **Облачная синхронизация перевода:**
 - При нажатии «На сервер» на странице перевода сохраняются оба проекта: основной (DB upsert) и зеркало перевода (ZIP → `book-uploads` bucket, путь `{userId}/translations/{projectName}.zip`).
 - Кириллица в именах файлов транслитерируется в латиницу через `CYRILLIC_MAP` (ограничение Supabase Storage).
