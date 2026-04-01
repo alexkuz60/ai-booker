@@ -156,7 +156,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
           return { candidate: result, projectName };
         } catch (err) {
           console.warn("[Library] Failed to read project:", projectName, err);
-          return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
+          return { candidate: null as LocalLibraryCandidate | null, projectName };
         }
       }));
 
