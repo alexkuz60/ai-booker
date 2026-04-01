@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/tooltip";
 
 const AXES: RadarAxis[] = ["semantic", "sentiment", "rhythm", "phonetic", "cultural"];
+const Y_BASE = 0.3; // bars start from 30%
 
 const AXIS_ICONS: Record<RadarAxis, string> = {
   semantic: "S",
