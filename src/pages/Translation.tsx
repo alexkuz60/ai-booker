@@ -698,6 +698,23 @@ export default function Translation() {
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
+
+      <SynopsisContextDialog
+        open={synopsisOpen}
+        onOpenChange={setSynopsisOpen}
+        isRu={isRu}
+        bookMeta={synopsis.bookMeta}
+        chapterSynopsis={synopsis.chapterSynopsis}
+        sceneSynopsis={synopsis.sceneSynopsis}
+        onBookMetaChange={synopsis.setBookMeta}
+        onChapterChange={synopsis.setChapterSynopsis}
+        onSceneChange={synopsis.setSceneSynopsis}
+        onSave={synopsis.saveAll}
+        onGenerateChapter={() => selectedChapter && synopsis.generateChapter(selectedChapter.chapterId)}
+        onGenerateScene={() => selectedSceneId && selectedChapter && synopsis.generateScene(selectedSceneId, selectedChapter.chapterId)}
+        generating={synopsis.generating}
+        chapterTitle={selectedChapter?.title}
+      />
     </motion.div>
   );
 }
