@@ -311,10 +311,10 @@ function CustomTooltip({ isRu, activeAxis, active, payload, label }: TooltipPayl
 
   const axisLabel = AXIS_LABELS[activeAxis][isRu ? "ru" : "en"];
 
-  const layers: { key: RadarLayer; label: string }[] = [
-    { key: "3R", label: isRu ? "Первичный" : "Primary" },
-    { key: "5R", label: isRu ? "Художественный" : "Art Edit" },
-    { key: "5R+Alt", label: isRu ? "Критика" : "Critique" },
+  const layers: { key: RadarLayer; rawKey: keyof SegmentBar; label: string }[] = [
+    { key: "3R", rawKey: "raw3R", label: isRu ? "Первичный" : "Primary" },
+    { key: "5R", rawKey: "raw5R", label: isRu ? "Художественный" : "Art Edit" },
+    { key: "5R+Alt", rawKey: "rawAlt", label: isRu ? "Критика" : "Critique" },
   ];
 
   return (
@@ -322,8 +322,8 @@ function CustomTooltip({ isRu, activeAxis, active, payload, label }: TooltipPayl
       <div className="font-medium text-popover-foreground">
         {isRu ? "Сегмент" : "Segment"} {data.index} · {axisLabel}
       </div>
-      {layers.map(({ key, label }) => {
-        const val = data[key];
+      {layers.map(({ key, rawKey, label }) => {
+        const val = data[rawKey] as number;
         if (!val) return null;
         return (
           <div key={key} className="flex items-center gap-1.5">
