@@ -168,6 +168,24 @@ export default function Translation() {
     },
   });
 
+  // ── Synopsis context ────────────────────────────────────
+  const synopsis = useTranslationSynopsis({
+    sourceStorage: storage,
+    translationStorage,
+    isRu,
+    model: translationModel,
+    userApiKeys: apiKeys,
+    sourceLang,
+  });
+
+  // Load synopses when chapter/scene change
+  useEffect(() => {
+    if (selectedChapter?.chapterId && selectedSceneId) {
+      synopsis.loadAll(selectedChapter.chapterId, selectedSceneId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChapter?.chapterId, selectedSceneId]);
+
   // ── Extracted actions ───────────────────────────────────
   const {
     creating,
