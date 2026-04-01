@@ -17,7 +17,7 @@ import type { TocChapter } from "@/pages/parser/types";
 import { readSceneIndex } from "@/lib/sceneIndex";
 import {
   buildTranslationMirrorNames,
-  resolveTranslationMirrorProjectName,
+  readPersistedTranslationMirrorProjectName,
   writePersistedTranslationMirrorProjectName,
 } from "@/lib/translationMirrorResolver";
 
