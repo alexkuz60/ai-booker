@@ -147,7 +147,8 @@ export function SegmentQualityChart({
     return () => { cancelled = true; };
   }, [translationStorage, sceneId, chapterId, segmentIds, activeAxis, reloadTick]);
 
-  const handleBarClick = useCallback((data: SegmentBar) => {
+  const handleBarClick = useCallback((data: SegmentBar, idx: number) => {
+    setHighlightedIdx(idx);
     if (!onSelectSegment) return;
     onSelectSegment({
       segmentId: data.segmentId,
@@ -156,7 +157,6 @@ export function SegmentQualityChart({
       segmentType: "",
       speaker: null,
     });
-    // Auto-scroll: the accordion in BilingualSegmentsView will open via selectedSegmentId
     requestAnimationFrame(() => {
       const el = document.querySelector(`[data-segment-id="${data.segmentId}"]`);
       el?.scrollIntoView({ behavior: "smooth", block: "center" });
