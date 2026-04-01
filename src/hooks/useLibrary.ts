@@ -123,7 +123,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
 
           // If this looks like SOURCE_EN / SOURCE_RU and SOURCE exists, skip as mirror
           // even if project.json is temporarily unreadable.
-          if (isLikelyTranslationMirrorByName(projectName, existingProjectSet)) {
+          if (isLikelyTranslationMirrorName(projectName, existingProjectSet)) {
             return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
           }
 
@@ -133,7 +133,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
           }
           const meta = await store.readJSON<Record<string, unknown>>("project.json").catch(() => null);
 
-          if (!meta && isLikelyTranslationMirrorByName(projectName, existingProjectSet)) {
+          if (!meta && isLikelyTranslationMirrorName(projectName, existingProjectSet)) {
             console.warn("[Library] project.json unreadable for likely mirror, skipping:", projectName);
             return { candidate: null as LocalLibraryCandidate | null, shouldDelete: false, projectName };
           }
@@ -151,7 +151,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
           if (!result) {
             const toc = await store.readJSON<Record<string, unknown>>("structure/toc.json").catch(() => null);
             const hasBookId = typeof (meta as any)?.bookId === "string" || typeof (toc as any)?.bookId === "string";
-            const likelyMirror = isLikelyTranslationMirrorByName(projectName, existingProjectSet);
+            const likelyMirror = isLikelyTranslationMirrorName(projectName, existingProjectSet);
             return {
               candidate: null as LocalLibraryCandidate | null,
               shouldDelete: !hasBookId && !likelyMirror,
