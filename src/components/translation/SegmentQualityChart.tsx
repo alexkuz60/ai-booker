@@ -216,6 +216,12 @@ export function SegmentQualityChart({
                   barCategoryGap="25%"
                   barGap={-dynamicBarSize}
                 >
+                  <CartesianGrid
+                    horizontal
+                    vertical={false}
+                    stroke="hsl(var(--muted-foreground) / 0.12)"
+                    strokeDasharray="3 3"
+                  />
                   <XAxis
                     dataKey="label"
                     tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
@@ -223,7 +229,8 @@ export function SegmentQualityChart({
                     tickLine={false}
                   />
                   <YAxis
-                    domain={[0, 1]}
+                    domain={[0.3, 1]}
+                    ticks={[0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]}
                     tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
                     axisLine={false}
                     tickLine={false}
