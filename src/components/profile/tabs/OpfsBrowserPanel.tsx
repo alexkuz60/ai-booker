@@ -33,7 +33,7 @@ async function readDir(dir: FileSystemDirectoryHandle, parentPath = "", depth = 
   for await (const [name, handle] of (dir as any).entries()) {
     const fullPath = parentPath ? `${parentPath}/${name}` : name;
     if (handle.kind === "directory") {
-      const children = depth < 2
+      const children = depth < 6
         ? await readDir(handle as FileSystemDirectoryHandle, fullPath, depth + 1)
         : undefined;
       entries.push({ name, kind: "directory", path: fullPath, children });
