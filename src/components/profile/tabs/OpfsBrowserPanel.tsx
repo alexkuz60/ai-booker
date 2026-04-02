@@ -144,7 +144,7 @@ function EntryNode({
         <FolderIcon className="h-3.5 w-3.5 shrink-0 text-primary" />
         <span className="font-medium truncate">{entry.name}</span>
         {stats && (
-          <span className="ml-auto text-[10px] text-muted-foreground shrink-0">
+          <span className="ml-auto mr-5 text-[10px] text-muted-foreground shrink-0">
             {stats.files}f {stats.dirs > 0 ? `${stats.dirs}d ` : ""}{stats.bytes > 0 ? formatBytes(stats.bytes) : ""}
           </span>
         )}
