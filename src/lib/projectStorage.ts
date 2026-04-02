@@ -443,11 +443,7 @@ export class OPFSStorage implements ProjectStorage {
     // Ensure subdirs
     await projectDir.getDirectoryHandle("source", { create: true });
     await projectDir.getDirectoryHandle("structure", { create: true });
-    await projectDir.getDirectoryHandle("scenes", { create: true });
-    const audio = await projectDir.getDirectoryHandle("audio", { create: true });
-    await audio.getDirectoryHandle("tts", { create: true });
-    await audio.getDirectoryHandle("atmosphere", { create: true });
-    await audio.getDirectoryHandle("renders", { create: true });
+    await projectDir.getDirectoryHandle("chapters", { create: true });
     await projectDir.getDirectoryHandle("montage", { create: true });
     return new OPFSStorage(projectDir, projectName);
   }
