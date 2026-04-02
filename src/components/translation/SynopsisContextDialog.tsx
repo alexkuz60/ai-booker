@@ -67,6 +67,8 @@ interface Props {
   sceneTitle?: string;
   /** Characters from the current chapter for the Characters tab */
   chapterCharacters?: CharacterIndex[];
+  /** IDs of characters present in the current scene */
+  sceneCharIds?: Set<string>;
   /** IDs of characters excluded from translation context */
   excludedCharIds?: Set<string>;
   onExcludedCharsChange?: (ids: Set<string>) => void;
@@ -91,6 +93,7 @@ export function SynopsisContextDialog({
   chapterTitle,
   sceneTitle,
   chapterCharacters = [],
+  sceneCharIds = new Set(),
   excludedCharIds = new Set(),
   onExcludedCharsChange,
 }: Props) {
@@ -329,6 +332,7 @@ export function SynopsisContextDialog({
                     characters={chapterCharacters}
                     isRu={isRu}
                     onSelect={setSelectedCharId}
+                    sceneCharIds={sceneCharIds}
                     excludedIds={excludedCharIds}
                     onToggleExclude={(id) => {
                       const next = new Set(excludedCharIds);
@@ -352,12 +356,14 @@ function CharacterList({
   characters,
   isRu,
   onSelect,
+  sceneCharIds,
   excludedIds,
   onToggleExclude,
 }: {
   characters: CharacterIndex[];
   isRu: boolean;
   onSelect: (id: string) => void;
+  sceneCharIds: Set<string>;
   excludedIds: Set<string>;
   onToggleExclude: (id: string) => void;
 }) {
@@ -369,6 +375,14 @@ function CharacterList({
     );
   }
 
+  // Sort: scene characters first, then rest
+  const sorted = [...characters].sort((a, b) => {
+    const aScene = sceneCharIds.has(a.id) ? 0 : 1;
+    const bScene = sceneCharIds.has(b.id) ? 0 : 1;
+    if (aScene !== bScene) return aScene - bScene;
+    return a.name.localeCompare(b.name);
+  });
+
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between px-2 pb-1">
@@ -376,13 +390,14 @@ function CharacterList({
           {isRu ? "Включены в контекст" : "Included in context"}: {characters.length - excludedIds.size}/{characters.length}
         </span>
       </div>
-      {characters.map((ch) => {
+      {sorted.map((ch) => {
         const hasProfile = !!(ch.temperament || ch.description);
         const excluded = excludedIds.has(ch.id);
+        const inScene = sceneCharIds.has(ch.id);
         return (
           <div
             key={ch.id}
-            className={`flex items-center gap-2 rounded-md p-2.5 hover:bg-muted/70 transition-colors ${excluded ? "opacity-50" : ""}`}
+            className={`flex items-center gap-2 rounded-md p-2.5 hover:bg-muted/70 transition-colors ${excluded ? "opacity-50" : ""} ${inScene ? "bg-yellow-500/10 border border-yellow-500/30" : ""}`}
           >
             <Checkbox
               checked={!excluded}
