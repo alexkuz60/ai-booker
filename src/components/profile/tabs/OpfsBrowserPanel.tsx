@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { isOPFSSupported } from "@/lib/projectStorage";
+import { JsonTreeView } from "./JsonTreeView";
 
 /* ─── Types ──────────────────────────────────────────── */
 
