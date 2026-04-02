@@ -370,37 +370,52 @@ function CharacterList({
   }
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
+      <div className="flex items-center justify-between px-2 pb-1">
+        <span className="text-xs text-muted-foreground">
+          {isRu ? "Включены в контекст" : "Included in context"}: {characters.length - excludedIds.size}/{characters.length}
+        </span>
+      </div>
       {characters.map((ch) => {
         const hasProfile = !!(ch.temperament || ch.description);
+        const excluded = excludedIds.has(ch.id);
         return (
-          <button
+          <div
             key={ch.id}
-            onClick={() => onSelect(ch.id)}
-            className="w-full text-left flex items-center gap-2 rounded-md p-2.5 hover:bg-muted/70 transition-colors"
+            className={`flex items-center gap-2 rounded-md p-2.5 hover:bg-muted/70 transition-colors ${excluded ? "opacity-50" : ""}`}
           >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium truncate">{ch.name}</span>
-                <Badge variant="outline" className="text-[10px] px-1 py-0 shrink-0">
-                  {ch.gender === "male" ? (isRu ? "М" : "M") : ch.gender === "female" ? (isRu ? "Ж" : "F") : "?"}
-                </Badge>
-                {ch.age_group && (
-                  <Badge variant="secondary" className="text-[10px] px-1 py-0 shrink-0">
-                    {loc(ch.age_group, AGE_LABELS, isRu)}
+            <Checkbox
+              checked={!excluded}
+              onCheckedChange={() => onToggleExclude(ch.id)}
+              className="shrink-0"
+            />
+            <button
+              onClick={() => onSelect(ch.id)}
+              className="flex-1 min-w-0 text-left flex items-center gap-2"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium truncate">{ch.name}</span>
+                  <Badge variant="outline" className="text-[10px] px-1 py-0 shrink-0">
+                    {ch.gender === "male" ? (isRu ? "М" : "M") : ch.gender === "female" ? (isRu ? "Ж" : "F") : "?"}
                   </Badge>
+                  {ch.age_group && (
+                    <Badge variant="secondary" className="text-[10px] px-1 py-0 shrink-0">
+                      {loc(ch.age_group, AGE_LABELS, isRu)}
+                    </Badge>
+                  )}
+                </div>
+                {ch.description && (
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{ch.description}</p>
                 )}
               </div>
-              {ch.description && (
-                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{ch.description}</p>
+              {hasProfile && (
+                <Badge variant="default" className="text-[10px] px-1.5 py-0 shrink-0">
+                  {isRu ? "профиль" : "profile"}
+                </Badge>
               )}
-            </div>
-            {hasProfile && (
-              <Badge variant="default" className="text-[10px] px-1.5 py-0 shrink-0">
-                {isRu ? "профиль" : "profile"}
-              </Badge>
-            )}
-          </button>
+            </button>
+          </div>
         );
       })}
     </div>
