@@ -228,8 +228,27 @@ export default function Translation() {
     }).catch(() => { if (!cancelled) setSceneCharIds(new Set()); });
     return () => { cancelled = true; };
   }, [storage, selectedSceneId]);
+  // ── Load excluded chars from OPFS on chapter change ─────
+  useEffect(() => {
+    const store = translationStorage || storage;
+    if (!store || !selectedChapter?.chapterId) { setExcludedCharIds(new Set()); return; }
+    let cancelled = false;
+    readExcludedChars(store, selectedChapter.chapterId).then((ids) => {
+      if (!cancelled) setExcludedCharIds(ids);
+    }).catch(() => { if (!cancelled) setExcludedCharIds(new Set()); });
+    return () => { cancelled = true; };
+  }, [storage, translationStorage, selectedChapter?.chapterId]);
 
-  // ── Extracted actions ───────────────────────────────────
+  // ── Save excluded chars handler ─────────────────────────
+  const handleExcludedCharsChange = useCallback((ids: Set<string>) => {
+    setExcludedCharIds(ids);
+    const store = translationStorage || storage;
+    if (store && selectedChapter?.chapterId) {
+      saveExcludedChars(store, selectedChapter.chapterId, ids).catch(console.error);
+    }
+  }, [storage, translationStorage, selectedChapter?.chapterId]);
+
+
   const {
     creating,
     createProgress,
