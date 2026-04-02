@@ -352,10 +352,14 @@ function CharacterList({
   characters,
   isRu,
   onSelect,
+  excludedIds,
+  onToggleExclude,
 }: {
   characters: CharacterIndex[];
   isRu: boolean;
   onSelect: (id: string) => void;
+  excludedIds: Set<string>;
+  onToggleExclude: (id: string) => void;
 }) {
   if (characters.length === 0) {
     return (
