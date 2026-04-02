@@ -1,60 +1,31 @@
 /**
- * translationMirrorResolver — helpers for linking source ↔ translation OPFS projects.
+ * translationMirrorResolver — translation mirror helpers.
  *
- * Simple utilities: build canonical names, persist/read the link in localStorage.
+ * Runtime loading must use a single source of truth:
+ * source project.json → translationProject.projectName.
+ *
+ * Suffix helpers remain only for mirror classification in library/source
+ * project hygiene code. They must not be used to resolve translation loading.
  */
+
+import type { ProjectMeta } from "@/lib/projectStorage";
 
 export type TranslationTargetLanguage = "en" | "ru";
 
 export const TRANSLATION_MIRROR_SUFFIX_RE = /^(.*?)(?:[_\s-])(EN|RU)$/i;
-const TRANSLATION_LINK_STORAGE_PREFIX = "booker_translation_mirror";
 
-function buildPersistedTranslationLinkKeys(
+export function getLinkedTranslationProjectName(
+  meta: Pick<ProjectMeta, "translationProject"> | null | undefined,
+): string | null {
+  const projectName = meta?.translationProject?.projectName?.trim();
+  return projectName || null;
+}
+
+export function getExpectedTranslationProjectName(
   sourceProjectName: string,
-  sourceBookId?: string | null,
-): string[] {
-  const keys = [`${TRANSLATION_LINK_STORAGE_PREFIX}:source:${sourceProjectName}`];
-  if (sourceBookId) {
-    keys.unshift(`${TRANSLATION_LINK_STORAGE_PREFIX}:book:${sourceBookId}`);
-  }
-  return keys;
-}
-
-export function readPersistedTranslationMirrorProjectName(opts: {
-  sourceBookId?: string | null;
-  sourceProjectName: string;
-}): string | null {
-  if (typeof localStorage === "undefined") return null;
-
-  try {
-    for (const key of buildPersistedTranslationLinkKeys(opts.sourceProjectName, opts.sourceBookId)) {
-      const value = localStorage.getItem(key)?.trim();
-      if (value) return value;
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-}
-
-export function writePersistedTranslationMirrorProjectName(opts: {
-  sourceBookId?: string | null;
-  sourceProjectName: string;
-  translationProjectName: string;
-}): void {
-  if (typeof localStorage === "undefined") return;
-
-  const value = opts.translationProjectName.trim();
-  if (!value) return;
-
-  try {
-    for (const key of buildPersistedTranslationLinkKeys(opts.sourceProjectName, opts.sourceBookId)) {
-      localStorage.setItem(key, value);
-    }
-  } catch {
-    // Non-fatal: persistence is only a resilience hint.
-  }
+  targetLanguage: TranslationTargetLanguage,
+): string {
+  return `${sourceProjectName}_${targetLanguage.toUpperCase()}`;
 }
 
 export function getTranslationMirrorSourceProjectName(projectName: string): string | null {
@@ -70,23 +41,4 @@ export function isLikelyTranslationMirrorName(
   if (!sourceProjectName) return false;
   if (existingProjects) return existingProjects.has(sourceProjectName);
   return true;
-}
-
-export function buildTranslationMirrorNames(
-  sourceProjectName: string,
-  targetLanguage: TranslationTargetLanguage,
-  linkedProjectName?: string | null,
-): string[] {
-  const suffix = targetLanguage.toUpperCase();
-
-  return Array.from(
-    new Set(
-      [
-        linkedProjectName,
-        `${sourceProjectName}_${suffix}`,
-        `${sourceProjectName} ${suffix}`,
-        `${sourceProjectName}-${suffix}`,
-      ].filter((name): name is string => !!name),
-    ),
-  );
 }

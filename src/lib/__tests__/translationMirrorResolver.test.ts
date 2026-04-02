@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildTranslationMirrorNames,
+  getExpectedTranslationProjectName,
+  getLinkedTranslationProjectName,
   getTranslationMirrorSourceProjectName,
   isLikelyTranslationMirrorName,
 } from "../translationMirrorResolver";
@@ -20,11 +21,14 @@ describe("translationMirrorResolver", () => {
     expect(isLikelyTranslationMirrorName("Чужой_EN", existingProjects)).toBe(false);
   });
 
-  it("builds unique canonical candidate names", () => {
-    expect(buildTranslationMirrorNames("Book", "en", "Book EN")).toEqual([
-      "Book EN",
-      "Book_EN",
-      "Book-EN",
-    ]);
+  it("reads linked project name from source meta", () => {
+    expect(getLinkedTranslationProjectName({
+      translationProject: { projectName: "Book_EN" },
+    } as any)).toBe("Book_EN");
+    expect(getLinkedTranslationProjectName(null)).toBeNull();
+  });
+
+  it("builds deterministic mirror name", () => {
+    expect(getExpectedTranslationProjectName("Book", "en")).toBe("Book_EN");
   });
 });
