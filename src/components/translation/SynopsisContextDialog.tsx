@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Wand2, BookOpen, FileText, Theater, Users, ChevronLeft } from "lucide-react";
+import { Loader2, Wand2, BookOpen, FileText, Theater, Users, ChevronLeft, Save } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { BookMetaSynopsis, ChapterSynopsis, SceneSynopsis } from "@/lib/translationSynopsis";
 import type { CharacterIndex } from "@/pages/parser/types";
@@ -98,6 +98,12 @@ export function SynopsisContextDialog({
   onExcludedCharsChange,
 }: Props) {
   const [selectedCharId, setSelectedCharId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const handleExplicitSave = useCallback(async () => {
+    setSaving(true);
+    try { await onSave(); } finally { setSaving(false); }
+  }, [onSave]);
 
   const handleClose = useCallback(async (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -163,7 +169,7 @@ export function SynopsisContextDialog({
                     <Input
                       value={bm.era}
                       onChange={(e) => onBookMetaChange({ ...bm, era: e.target.value })}
-                      placeholder={isRu ? "XIX век, Серебряный век..." : "Victorian, Modern..."}
+                      placeholder={isRu ? "Современность" : "Contemporary"}
                       className="h-8 text-sm"
                     />
                   </div>
@@ -172,19 +178,19 @@ export function SynopsisContextDialog({
                     <Input
                       value={bm.genre}
                       onChange={(e) => onBookMetaChange({ ...bm, genre: e.target.value })}
-                      placeholder={isRu ? "Роман, детектив..." : "Novel, thriller..."}
+                      placeholder={isRu ? "Сатирическая повесть" : "Satirical novella"}
                       className="h-8 text-sm"
                     />
                   </div>
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">{isRu ? "Стиль" : "Style"}</Label>
-                  <Input
-                    value={bm.style}
-                    onChange={(e) => onBookMetaChange({ ...bm, style: e.target.value })}
-                    placeholder={isRu ? "Классическая проза, разговорный..." : "Classical prose, colloquial..."}
-                    className="h-8 text-sm"
-                  />
+                    <Input
+                      value={bm.style}
+                      onChange={(e) => onBookMetaChange({ ...bm, style: e.target.value })}
+                      placeholder={isRu ? "Ироническая проза, разговорный" : "Ironic prose, colloquial"}
+                      className="h-8 text-sm"
+                    />
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">{isRu ? "Примечание автора" : "Author note"}</Label>
@@ -345,6 +351,13 @@ export function SynopsisContextDialog({
             </ScrollArea>
           </TabsContent>
         </Tabs>
+
+        <div className="flex justify-end pt-2 border-t">
+          <Button onClick={handleExplicitSave} disabled={saving} className="gap-1.5">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {isRu ? "Сохранить изменения" : "Save changes"}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
