@@ -93,13 +93,14 @@ function countEntries(entries: OpfsEntry[]): { files: number; dirs: number; byte
 /* ─── Tree node ──────────────────────────────────────── */
 
 function EntryNode({
-  entry, depth, isRu, onViewJson, selectedPath,
+  entry, depth, isRu, onViewJson, selectedPath, onDelete,
 }: {
   entry: OpfsEntry;
   depth: number;
   isRu: boolean;
   onViewJson: (path: string, name: string) => void;
   selectedPath?: string;
+  onDelete: (path: string, name: string, kind: "file" | "directory") => void;
 }) {
   const [open, setOpen] = useState(depth < 1);
   const isJson = entry.name.endsWith(".json");
@@ -133,6 +134,13 @@ function EntryNode({
             <Eye className="h-3 w-3" />
           </Button>
         )}
+        <Button
+          variant="ghost" size="icon"
+          className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0 text-destructive hover:text-destructive"
+          onClick={() => onDelete(entry.path, entry.name, "file")}
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
         {entry.size != null && <span className="ml-auto mr-5 text-[10px] opacity-50 shrink-0">{formatBytes(entry.size)}</span>}
       </div>
     );
@@ -144,24 +152,33 @@ function EntryNode({
 
   return (
     <div>
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 py-0.5 w-full text-left text-xs hover:bg-muted/50 rounded-sm px-1"
-        style={{ paddingLeft: depth * 16 }}
-      >
-        <Chevron className="h-3 w-3 shrink-0 text-muted-foreground" />
-        <FolderIcon className="h-3.5 w-3.5 shrink-0 text-primary" />
-        <span className="font-medium truncate">{entry.name}</span>
-        {stats && (
-          <span className="ml-auto mr-5 text-[10px] text-muted-foreground shrink-0">
-            {stats.files}f {stats.dirs > 0 ? `${stats.dirs}d ` : ""}{stats.bytes > 0 ? formatBytes(stats.bytes) : ""}
-          </span>
-        )}
-      </button>
+      <div className="group flex items-center">
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex items-center gap-1.5 py-0.5 flex-1 text-left text-xs hover:bg-muted/50 rounded-sm px-1"
+          style={{ paddingLeft: depth * 16 }}
+        >
+          <Chevron className="h-3 w-3 shrink-0 text-muted-foreground" />
+          <FolderIcon className="h-3.5 w-3.5 shrink-0 text-primary" />
+          <span className="font-medium truncate">{entry.name}</span>
+          {stats && (
+            <span className="ml-auto mr-1 text-[10px] text-muted-foreground shrink-0">
+              {stats.files}f {stats.dirs > 0 ? `${stats.dirs}d ` : ""}{stats.bytes > 0 ? formatBytes(stats.bytes) : ""}
+            </span>
+          )}
+        </button>
+        <Button
+          variant="ghost" size="icon"
+          className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0 text-destructive hover:text-destructive"
+          onClick={() => onDelete(entry.path, entry.name, "directory")}
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
+      </div>
       {open && entry.children && (
         <div>
           {entry.children.map(child => (
-            <EntryNode key={child.name} entry={child} depth={depth + 1} isRu={isRu} onViewJson={onViewJson} selectedPath={selectedPath} />
+            <EntryNode key={child.name} entry={child} depth={depth + 1} isRu={isRu} onViewJson={onViewJson} selectedPath={selectedPath} onDelete={onDelete} />
           ))}
           {entry.children.length === 0 && (
             <div className="text-[10px] text-muted-foreground italic py-0.5" style={{ paddingLeft: (depth + 1) * 16 }}>
