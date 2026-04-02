@@ -216,7 +216,17 @@ export function useCharacterProfiles({
           const profile = profileByName.get(key)
             || c.aliases.reduce<CharacterProfile | undefined>(
               (found, a) => found || profileByName.get(a.toLowerCase()), undefined);
-          if (profile) return { ...c, profile };
+          if (profile) return {
+            ...c,
+            profile,
+            // Sync top-level fields from nested profile for consistency
+            age_group: profile.age_group || c.age_group,
+            temperament: profile.temperament ?? c.temperament,
+            speech_style: profile.speech_style ?? c.speech_style,
+            description: profile.description ?? c.description,
+            speech_tags: profile.speech_tags?.length ? profile.speech_tags : c.speech_tags,
+            psycho_tags: profile.psycho_tags?.length ? profile.psycho_tags : c.psycho_tags,
+          };
           return c;
         });
         if (!skipPersist) {

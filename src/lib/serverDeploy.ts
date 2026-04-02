@@ -392,6 +392,7 @@ export async function deployFromServer({
           }
         }
 
+        const hasProfile = !!(sc.description || sc.temperament || sc.speech_style);
         return {
           id: sc.id,
           name: sc.name,
@@ -406,6 +407,15 @@ export async function deployFromServer({
           sort_order: sc.sort_order || 0,
           color: sc.color || null,
           voice_config: (sc.voice_config as Record<string, unknown>) || {},
+          // Reconstruct nested profile from top-level fields for UI compat
+          profile: hasProfile ? {
+            age_group: sc.age_group || "unknown",
+            temperament: sc.temperament || undefined,
+            speech_style: sc.speech_style || undefined,
+            description: sc.description || undefined,
+            speech_tags: sc.speech_tags || [],
+            psycho_tags: sc.psycho_tags || [],
+          } : undefined,
           appearances,
           sceneCount: charSceneCount.get(sc.id) || 0,
         };

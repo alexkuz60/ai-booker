@@ -20,18 +20,74 @@ import { markCharacterMapped, getCachedSceneIndex } from "@/lib/sceneIndex";
 
 // ─── Read / Write helpers ────────────────────────────────────
 
+/**
+ * Normalize a CharacterIndex so that `profile` nested object and top-level
+ * fields are always in sync.  Top-level fields win when both are present;
+ * if only `profile` exists, it is promoted to top-level.
+ */
+function normalizeProfileFields(c: CharacterIndex): CharacterIndex {
+  const p = c.profile;
+  const hasTopLevel = !!(c.description || c.temperament || c.speech_style);
+  const hasNested  = !!(p?.description || p?.temperament || p?.speech_style);
+
+  if (!hasTopLevel && !hasNested) return c;
+
+  if (hasTopLevel && !hasNested) {
+    // Build nested profile from top-level
+    return {
+      ...c,
+      profile: {
+        age_group: c.age_group,
+        temperament: c.temperament || undefined,
+        speech_style: c.speech_style || undefined,
+        description: c.description || undefined,
+        speech_tags: c.speech_tags,
+        psycho_tags: c.psycho_tags,
+        profiledBy: p?.profiledBy,
+      },
+    };
+  }
+
+  if (!hasTopLevel && hasNested && p) {
+    // Promote nested profile to top-level
+    return {
+      ...c,
+      age_group: p.age_group || c.age_group,
+      temperament: p.temperament ?? c.temperament,
+      speech_style: p.speech_style ?? c.speech_style,
+      description: p.description ?? c.description,
+      speech_tags: p.speech_tags?.length ? p.speech_tags : c.speech_tags,
+      psycho_tags: p.psycho_tags?.length ? p.psycho_tags : c.psycho_tags,
+    };
+  }
+
+  // Both exist — ensure nested is updated from top-level (canonical)
+  return {
+    ...c,
+    profile: {
+      age_group: c.age_group,
+      temperament: c.temperament || undefined,
+      speech_style: c.speech_style || undefined,
+      description: c.description || undefined,
+      speech_tags: c.speech_tags,
+      psycho_tags: c.psycho_tags,
+      profiledBy: p?.profiledBy || c.profile?.profiledBy,
+    },
+  };
+}
+
 export async function readCharacterIndex(
   storage: ProjectStorage,
 ): Promise<CharacterIndex[]> {
   try {
     // Try current location
     const data = await storage.readJSON<CharacterIndex[]>(paths.characterIndex());
-    if (data && data.length > 0) return data;
+    if (data && data.length > 0) return data.map(normalizeProfileFields);
 
     // Migrate from legacy format
     const legacy = await storage.readJSON<LocalCharacter[]>(paths.structureCharactersLegacy());
     if (legacy && legacy.length > 0) {
-      const migrated = legacy.map(migrateLocalCharacter);
+      const migrated = legacy.map(migrateLocalCharacter).map(normalizeProfileFields);
       await saveCharacterIndex(storage, migrated);
       console.debug(`[localCharacters] Migrated ${migrated.length} characters from legacy format`);
       return migrated;
