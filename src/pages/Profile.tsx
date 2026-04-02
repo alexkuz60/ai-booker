@@ -15,6 +15,7 @@ import { usePageHeader } from '@/hooks/usePageHeader';
 import { ProfileTab } from '@/components/profile/tabs/ProfileTab';
 import { ApiRoutersTab } from '@/components/profile/tabs/ApiRoutersTab';
 import { AiUsageWidget } from '@/components/profile/AiUsageWidget';
+import { OpfsBrowserPanel } from '@/components/profile/tabs/OpfsBrowserPanel';
 
 export default function Profile() {
   const { theme, setTheme } = useTheme();
