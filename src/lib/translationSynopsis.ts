@@ -59,6 +59,7 @@ export const synopsisPaths = {
   bookMeta: () => "synopsis/book-meta.json",
   chapter: (chapterId: string) => `synopsis/chapter-${chapterId}.json`,
   scene: (sceneId: string) => `synopsis/scene-${sceneId}.json`,
+  excludedChars: (chapterId: string) => `synopsis/excluded-chars-${chapterId}.json`,
 } as const;
 
 // ─── Read helpers ───────────────────────────────────────────────────
