@@ -16,9 +16,8 @@ import type { LocalStoryboardData } from "@/lib/storyboardSync";
 import type { TocChapter } from "@/pages/parser/types";
 import { readSceneIndex } from "@/lib/sceneIndex";
 import {
-  buildTranslationMirrorNames,
-  readPersistedTranslationMirrorProjectName,
-  writePersistedTranslationMirrorProjectName,
+  getExpectedTranslationProjectName,
+  getLinkedTranslationProjectName,
 } from "@/lib/translationMirrorResolver";
 
 // ─── Types ──────────────────────────────────────────────────
@@ -86,35 +85,30 @@ export interface CreateTranslationOpts {
 
 /** Check if a translation project already exists in OPFS */
 export async function translationProjectExists(
-  sourceProjectName: string,
-  targetLanguage: "en" | "ru",
+  sourceStorage: ProjectStorage,
   sourceMeta?: Pick<ProjectMeta, "bookId" | "language" | "translationProject">,
 ): Promise<boolean> {
-  // 1. Backlink in meta
-  const backlink = sourceMeta?.translationProject?.projectName;
-  if (backlink) {
-    const store = await OPFSStorage.openExisting(backlink);
-    if (store) return true;
-  }
+  const liveMeta = await sourceStorage
+    .readJSON<Pick<ProjectMeta, "bookId" | "language" | "translationProject">>(paths.projectMeta())
+    .catch(() => null);
+  const effectiveMeta = liveMeta ?? sourceMeta ?? null;
+  if (!effectiveMeta?.language) return false;
 
-  // 2. localStorage persistence
-  const persisted = readPersistedTranslationMirrorProjectName({
-    sourceBookId: sourceMeta?.bookId ?? null,
-    sourceProjectName,
-  });
-  if (persisted) {
-    const store = await OPFSStorage.openExisting(persisted);
-    if (store) return true;
-  }
+  const targetLanguage = (effectiveMeta.language === "ru" ? "en" : "ru") as "en" | "ru";
+  const projectName = getLinkedTranslationProjectName(effectiveMeta)
+    ?? getExpectedTranslationProjectName(sourceStorage.projectName, targetLanguage);
 
-  // 3. Canonical name convention
-  const candidateNames = buildTranslationMirrorNames(sourceProjectName, targetLanguage);
-  for (const name of candidateNames) {
-    const store = await OPFSStorage.openExisting(name);
-    if (store) return true;
-  }
+  const store = await OPFSStorage.openExisting(projectName);
+  if (!store) return false;
 
-  return false;
+  const mirrorMeta = await store
+    .readJSON<Pick<ProjectMeta, "bookId" | "sourceProjectName" | "targetLanguage">>(paths.projectMeta())
+    .catch(() => null);
+  if (!mirrorMeta) return false;
+
+  return mirrorMeta.sourceProjectName === sourceStorage.projectName
+    && mirrorMeta.targetLanguage === targetLanguage
+    && (!effectiveMeta.bookId || !mirrorMeta.bookId || mirrorMeta.bookId === effectiveMeta.bookId);
 }
 
 export async function createTranslationProject(
@@ -131,9 +125,14 @@ export async function createTranslationProject(
 
   // 1. Derive project name
   const langSuffix = targetLanguage.toUpperCase();
-  const projectName = `${sourceStorage.projectName}_${langSuffix}`;
+  const projectName = getExpectedTranslationProjectName(sourceStorage.projectName, targetLanguage);
 
   progress("Creating project…", 0);
+
+  const existing = await OPFSStorage.openExisting(projectName);
+  if (existing) {
+    throw new Error(`Translation project already exists: ${projectName}`);
+  }
 
   // 2. Create OPFS project
   const store = await OPFSStorage.openOrCreate(projectName);
@@ -173,23 +172,6 @@ export async function createTranslationProject(
     }
   } catch (e) {
     console.warn("[translationProject] Failed to write back-link to source:", e);
-  }
-
-  writePersistedTranslationMirrorProjectName({
-    sourceBookId: sourceMeta.bookId,
-    sourceProjectName: sourceStorage.projectName,
-    translationProjectName: projectName,
-  });
-
-  // 3c. Write OPFS-internal link (survives localStorage clears)
-  try {
-    await sourceStorage.writeJSON("_translation_link.json", {
-      projectName,
-      targetLanguage,
-      updatedAt: new Date().toISOString(),
-    });
-  } catch (e) {
-    console.warn("[translationProject] Failed to write OPFS link:", e);
   }
 
   // 4. Copy structure/toc.json

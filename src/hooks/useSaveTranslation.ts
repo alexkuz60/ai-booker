@@ -8,7 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { OPFSStorage, type ProjectStorage, type ProjectMeta } from "@/lib/projectStorage";
 import { useAuth } from "@/hooks/useAuth";
-import { writePersistedTranslationMirrorProjectName } from "@/lib/translationMirrorResolver";
+import { paths } from "@/lib/projectPaths";
+import { getLinkedTranslationProjectName } from "@/lib/translationMirrorResolver";
 
 const BUCKET = "book-uploads";
 
@@ -33,18 +34,6 @@ function sanitizeStorageKey(name: string): string {
 
 function translationStoragePath(userId: string, projectName: string): string {
   return `${userId}/translations/${sanitizeStorageKey(projectName)}.zip`;
-}
-
-/**
- * Derive the expected translation project name from source project.
- * Convention: SourceName_EN or SourceName_RU
- */
-function deriveTranslationProjectName(
-  sourceProjectName: string,
-  sourceLang: string,
-): string {
-  const targetLang = sourceLang === "ru" ? "EN" : "RU";
-  return `${sourceProjectName}_${targetLang}`;
 }
 
 interface UseSaveTranslationOpts {
@@ -106,18 +95,32 @@ export function useSaveTranslation({
   }, [translationStorage, user?.id, isRu]);
 
   const restoreTranslation = useCallback(async () => {
-    if (!user?.id || !sourceStorage || !sourceMeta) {
+    if (!user?.id || !sourceStorage) {
       toast.error(isRu ? "Исходный проект не открыт" : "Source project not open");
       return;
     }
 
-    const projectName =
-      translationStorage?.projectName ??
-      sourceMeta.translationProject?.projectName ??
-      deriveTranslationProjectName(sourceStorage.projectName, sourceMeta.language ?? "ru");
-
     setRestoring(true);
     try {
+      const liveSourceMeta = await sourceStorage.readJSON<ProjectMeta>(paths.projectMeta()).catch(() => null);
+      const effectiveSourceMeta = liveSourceMeta ?? sourceMeta;
+      if (!effectiveSourceMeta) {
+        toast.error(isRu ? "Метаданные проекта недоступны" : "Project metadata unavailable");
+        return;
+      }
+
+      const projectName = translationStorage?.projectName
+        ?? getLinkedTranslationProjectName(effectiveSourceMeta);
+
+      if (!projectName) {
+        toast.error(
+          isRu
+            ? "В project.json нет ссылки на проект перевода"
+            : "Translation project link is missing in project.json",
+        );
+        return;
+      }
+
       // 1. Try to download ZIP from server
       const storagePath = translationStoragePath(user.id, projectName);
       const { data, error } = await supabase.storage.from(BUCKET).download(storagePath);
@@ -140,11 +143,21 @@ export function useSaveTranslation({
       const store = await OPFSStorage.openOrCreate(projectName);
       await store.importZip(data);
 
-      writePersistedTranslationMirrorProjectName({
-        sourceBookId: sourceMeta.bookId,
-        sourceProjectName: sourceStorage.projectName,
-        translationProjectName: projectName,
-      });
+      const importedMeta = await store
+        .readJSON<Pick<ProjectMeta, "createdAt" | "targetLanguage">>(paths.projectMeta())
+        .catch(() => null);
+      const currentSourceMeta = await sourceStorage.readJSON<Record<string, unknown>>(paths.projectMeta()).catch(() => null);
+      if (currentSourceMeta) {
+        await sourceStorage.writeJSON(paths.projectMeta(), {
+          ...currentSourceMeta,
+          translationProject: {
+            projectName,
+            targetLanguage: importedMeta?.targetLanguage ?? (effectiveSourceMeta.language === "ru" ? "en" : "ru"),
+            createdAt: effectiveSourceMeta.translationProject?.createdAt ?? importedMeta?.createdAt ?? new Date().toISOString(),
+          },
+          updatedAt: new Date().toISOString(),
+        });
+      }
 
       toast.success(
         isRu

@@ -125,7 +125,7 @@ export function useTranslationActions(deps: Deps) {
 
     const tLang = (meta.language === "ru" ? "en" : "ru") as "en" | "ru";
 
-    const exists = await translationProjectExists(storage.projectName, tLang, meta);
+    const exists = await translationProjectExists(storage, meta);
     if (exists) {
       toast.error(isRu
         ? `Проект перевода "${storage.projectName}_${tLang.toUpperCase()}" уже существует`
