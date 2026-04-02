@@ -185,6 +185,12 @@ export default function Profile() {
         <TabsContent value="ai-analytics">
           <AiUsageWidget isRu={isRu} />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="opfs">
+            <OpfsBrowserPanel isRu={isRu} />
+          </TabsContent>
+        )}
       </Tabs>
     </motion.div>
   );
