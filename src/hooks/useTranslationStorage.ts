@@ -39,6 +39,20 @@ async function openLinkedMirror(
   sourceStorage: ProjectStorage,
   sourceMeta: ProjectMeta | null,
 ): Promise<ProjectStorage | null> {
+  // ╔══════════════════════════════════════════════════════════════════╗
+  // ║  ЕДИНСТВЕННЫЙ ИСТОЧНИК ИСТИНЫ для загрузки проекта перевода:    ║
+  // ║  project.json → translationProject.projectName                 ║
+  // ║                                                                ║
+  // ║  ЗАПРЕЩЕНО добавлять:                                          ║
+  // ║  - localStorage hints / fallbacks                              ║
+  // ║  - _translation_link.json или другие OPFS-файлы-ссылки         ║
+  // ║  - Канонические имена-кандидаты (_EN, _RU, -EN, " EN")         ║
+  // ║  - Сканирование всех OPFS-проектов (meta-scan)                 ║
+  // ║  - Retry-таймеры, visibility/focus-слушатели                   ║
+  // ║  - «Самоисцеление» (write-back, persistAllLinks)              ║
+  // ║                                                                ║
+  // ║  Если backlink отсутствует — показать empty state, не искать.  ║
+  // ╚══════════════════════════════════════════════════════════════════╝
   const effectiveSourceMeta = await readLiveSourceMeta(sourceStorage, sourceMeta);
   if (!effectiveSourceMeta) return null;
 
