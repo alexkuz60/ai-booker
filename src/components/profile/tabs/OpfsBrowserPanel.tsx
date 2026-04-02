@@ -381,12 +381,14 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              {isRu ? "Удалить папку?" : "Delete folder?"}
+              {deleteTarget?.kind === "file"
+                ? (isRu ? "Удалить файл?" : "Delete file?")
+                : (isRu ? "Удалить папку?" : "Delete folder?")}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {isRu
-                ? `Папка «${deleteTarget}» и всё её содержимое будут безвозвратно удалены из OPFS.`
-                : `Folder "${deleteTarget}" and all its contents will be permanently deleted from OPFS.`}
+                ? `«${deleteTarget?.path}» будет безвозвратно удалён из OPFS.`
+                : `"${deleteTarget?.path}" will be permanently deleted from OPFS.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
