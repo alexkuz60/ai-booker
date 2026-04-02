@@ -91,6 +91,8 @@ export function SynopsisContextDialog({
   chapterTitle,
   sceneTitle,
   chapterCharacters = [],
+  excludedCharIds = new Set(),
+  onExcludedCharsChange,
 }: Props) {
   const [selectedCharId, setSelectedCharId] = useState<string | null>(null);
 
