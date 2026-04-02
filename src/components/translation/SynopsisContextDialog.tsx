@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Wand2, BookOpen, FileText, Theater, Users, ChevronLeft } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { BookMetaSynopsis, ChapterSynopsis, SceneSynopsis } from "@/lib/translationSynopsis";
 import type { CharacterIndex } from "@/pages/parser/types";
 
@@ -66,6 +67,9 @@ interface Props {
   sceneTitle?: string;
   /** Characters from the current chapter for the Characters tab */
   chapterCharacters?: CharacterIndex[];
+  /** IDs of characters excluded from translation context */
+  excludedCharIds?: Set<string>;
+  onExcludedCharsChange?: (ids: Set<string>) => void;
 }
 
 // ─── Component ──────────────────────────────────────────────────────
@@ -87,6 +91,8 @@ export function SynopsisContextDialog({
   chapterTitle,
   sceneTitle,
   chapterCharacters = [],
+  excludedCharIds = new Set(),
+  onExcludedCharsChange,
 }: Props) {
   const [selectedCharId, setSelectedCharId] = useState<string | null>(null);
 
@@ -323,6 +329,12 @@ export function SynopsisContextDialog({
                     characters={chapterCharacters}
                     isRu={isRu}
                     onSelect={setSelectedCharId}
+                    excludedIds={excludedCharIds}
+                    onToggleExclude={(id) => {
+                      const next = new Set(excludedCharIds);
+                      if (next.has(id)) next.delete(id); else next.add(id);
+                      onExcludedCharsChange?.(next);
+                    }}
                   />
                 )}
               </div>
@@ -340,10 +352,14 @@ function CharacterList({
   characters,
   isRu,
   onSelect,
+  excludedIds,
+  onToggleExclude,
 }: {
   characters: CharacterIndex[];
   isRu: boolean;
   onSelect: (id: string) => void;
+  excludedIds: Set<string>;
+  onToggleExclude: (id: string) => void;
 }) {
   if (characters.length === 0) {
     return (
@@ -354,37 +370,52 @@ function CharacterList({
   }
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
+      <div className="flex items-center justify-between px-2 pb-1">
+        <span className="text-xs text-muted-foreground">
+          {isRu ? "Включены в контекст" : "Included in context"}: {characters.length - excludedIds.size}/{characters.length}
+        </span>
+      </div>
       {characters.map((ch) => {
         const hasProfile = !!(ch.temperament || ch.description);
+        const excluded = excludedIds.has(ch.id);
         return (
-          <button
+          <div
             key={ch.id}
-            onClick={() => onSelect(ch.id)}
-            className="w-full text-left flex items-center gap-2 rounded-md p-2.5 hover:bg-muted/70 transition-colors"
+            className={`flex items-center gap-2 rounded-md p-2.5 hover:bg-muted/70 transition-colors ${excluded ? "opacity-50" : ""}`}
           >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium truncate">{ch.name}</span>
-                <Badge variant="outline" className="text-[10px] px-1 py-0 shrink-0">
-                  {ch.gender === "male" ? (isRu ? "М" : "M") : ch.gender === "female" ? (isRu ? "Ж" : "F") : "?"}
-                </Badge>
-                {ch.age_group && (
-                  <Badge variant="secondary" className="text-[10px] px-1 py-0 shrink-0">
-                    {loc(ch.age_group, AGE_LABELS, isRu)}
+            <Checkbox
+              checked={!excluded}
+              onCheckedChange={() => onToggleExclude(ch.id)}
+              className="shrink-0"
+            />
+            <button
+              onClick={() => onSelect(ch.id)}
+              className="flex-1 min-w-0 text-left flex items-center gap-2"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium truncate">{ch.name}</span>
+                  <Badge variant="outline" className="text-[10px] px-1 py-0 shrink-0">
+                    {ch.gender === "male" ? (isRu ? "М" : "M") : ch.gender === "female" ? (isRu ? "Ж" : "F") : "?"}
                   </Badge>
+                  {ch.age_group && (
+                    <Badge variant="secondary" className="text-[10px] px-1 py-0 shrink-0">
+                      {loc(ch.age_group, AGE_LABELS, isRu)}
+                    </Badge>
+                  )}
+                </div>
+                {ch.description && (
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{ch.description}</p>
                 )}
               </div>
-              {ch.description && (
-                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{ch.description}</p>
+              {hasProfile && (
+                <Badge variant="default" className="text-[10px] px-1.5 py-0 shrink-0">
+                  {isRu ? "профиль" : "profile"}
+                </Badge>
               )}
-            </div>
-            {hasProfile && (
-              <Badge variant="default" className="text-[10px] px-1.5 py-0 shrink-0">
-                {isRu ? "профиль" : "profile"}
-              </Badge>
-            )}
-          </button>
+            </button>
+          </div>
         );
       })}
     </div>
