@@ -10,7 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import { OPFSStorage } from "@/lib/projectStorage";
 import type { ProjectStorage, ProjectMeta } from "@/lib/projectStorage";
 import { paths } from "@/lib/projectPaths";
-import { getLinkedTranslationProjectName, getExpectedTranslationProjectName } from "@/lib/translationMirrorResolver";
+import { getLinkedTranslationProjectName } from "@/lib/translationMirrorResolver";
 
 const TAG = "[useTranslationStorage]";
 
@@ -58,47 +58,7 @@ async function openLinkedMirror(
 
   const linkedProjectName = getLinkedTranslationProjectName(effectiveSourceMeta)
     ?? getLinkedTranslationProjectName(sourceMeta);
-
-  // ── One-time migration for pre-refactor projects ──────────────
-  // If backlink is missing, try the deterministic canonical name once.
-  // If found & valid, write the backlink into source project.json so
-  // this path never runs again. This is NOT a scan — it's a single
-  // openExisting() call for a known name.
-  if (!linkedProjectName) {
-    const targetLanguage = getTargetLanguage(effectiveSourceMeta);
-    const canonicalName = getExpectedTranslationProjectName(sourceStorage.projectName, targetLanguage);
-    const candidateStore = await OPFSStorage.openExisting(canonicalName);
-    if (!candidateStore) return null;
-
-    const candidateMeta = await candidateStore.readJSON<ProjectMeta>(paths.projectMeta()).catch(() => null);
-    if (!candidateMeta) return null;
-
-    const valid = candidateMeta.sourceProjectName === sourceStorage.projectName
-      && candidateMeta.targetLanguage === targetLanguage
-      && (!effectiveSourceMeta.bookId || !candidateMeta.bookId || candidateMeta.bookId === effectiveSourceMeta.bookId);
-    if (!valid) return null;
-
-    // Write backlink so this migration never triggers again
-    try {
-      const freshSource = await sourceStorage.readJSON<Record<string, unknown>>(paths.projectMeta()).catch(() => null);
-      if (freshSource) {
-        await sourceStorage.writeJSON(paths.projectMeta(), {
-          ...freshSource,
-          translationProject: {
-            projectName: canonicalName,
-            targetLanguage,
-            createdAt: candidateMeta.createdAt ?? new Date().toISOString(),
-          },
-          updatedAt: new Date().toISOString(),
-        });
-        console.info(TAG, "migrated backlink for legacy project:", canonicalName);
-      }
-    } catch (e) {
-      console.warn(TAG, "failed to write migration backlink:", e);
-    }
-
-    return candidateStore;
-  }
+  if (!linkedProjectName) return null;
 
   const store = await OPFSStorage.openExisting(linkedProjectName);
   if (!store) {
