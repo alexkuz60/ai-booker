@@ -327,20 +327,10 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
               {entries !== null && !loading && (
                 <div className="space-y-0.5">
                   {topFolders.map(folder => (
-                    <div key={folder.name} className="group relative">
-                      <EntryNode entry={folder} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
-                        onClick={() => setDeleteTarget(folder.name)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+                    <EntryNode key={folder.name} entry={folder} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} onDelete={handleRequestDelete} />
                   ))}
                   {topFiles.map(f => (
-                    <EntryNode key={f.name} entry={f} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} />
+                    <EntryNode key={f.name} entry={f} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} onDelete={handleRequestDelete} />
                   ))}
                   {entries.length === 0 && (
                     <div className="text-center py-4 text-xs text-muted-foreground">
