@@ -35,6 +35,7 @@ import { useSaveTranslation } from "@/hooks/useSaveTranslation";
 import { paths } from "@/lib/projectPaths";
 import type { TocChapter, CharacterIndex } from "@/pages/parser/types";
 import { readCharacterIndex, getChapterCharacterIds, getSceneCharacterIds } from "@/lib/localCharacters";
+import { readExcludedChars, saveExcludedChars } from "@/lib/translationSynopsis";
 import type { AiRoleId } from "@/config/aiRoles";
 import {
   Select,
