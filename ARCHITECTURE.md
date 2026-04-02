@@ -62,7 +62,7 @@
 │   └── chapters.json      — маппинг index → chapterId
 ├── 📁 chapters/
 │   └── 📁 {chapterId}/
-│       ├── content.json   — { chapterId, scenes[], status } (бывш. scenes/chapter_{id}.json)
+│       ├── content.json   — { chapterId, scenes[], status }
 │       └── 📁 scenes/
 │           └── 📁 {sceneId}/
 │               ├── storyboard.json — LocalStoryboardData (segments, typeMappings, audioStatus, contentHash)
