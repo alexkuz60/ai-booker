@@ -124,7 +124,7 @@ function EntryNode({
             <Eye className="h-3 w-3" />
           </Button>
         )}
-        {entry.size != null && <span className="ml-auto text-[10px] opacity-50 shrink-0">{formatBytes(entry.size)}</span>}
+        {entry.size != null && <span className="ml-auto mr-5 text-[10px] opacity-50 shrink-0">{formatBytes(entry.size)}</span>}
       </div>
     );
   }
