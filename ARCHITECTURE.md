@@ -43,7 +43,7 @@
 | Бэкенд | Браузеры | Видимость файлов | Детект |
 |--------|----------|-------------------|--------|
 | `LocalFSStorage` (File System Access API) | Chrome, Edge, Opera | Видны в проводнике ОС | `showDirectoryPicker` в `window` |
-| `OPFSStorage` (Origin Private File System) | Firefox, Safari | Скрыты (только через ZIP-экспорт) | `navigator.storage.getDirectory` |
+| `OPFSStorage` (Origin Private File System) | Firefox, Safari | Скрыты от ОС; доступны через OPFS Browser (admin) или ZIP-экспорт | `navigator.storage.getDirectory` |
 
 Автодетект: `detectStorageBackend()` → `"fs-access"` | `"opfs"` | `"none"`.
 
