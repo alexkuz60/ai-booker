@@ -115,6 +115,14 @@ export async function saveSceneSynopsis(
   await storage.writeJSON(synopsisPaths.scene(data.sceneId), data);
 }
 
+export async function saveExcludedChars(
+  storage: ProjectStorage,
+  chapterId: string,
+  ids: Set<string>,
+): Promise<void> {
+  await storage.writeJSON(synopsisPaths.excludedChars(chapterId), [...ids]);
+}
+
 // ─── Load full context for pipeline ─────────────────────────────────
 
 export async function loadTranslationContext(
