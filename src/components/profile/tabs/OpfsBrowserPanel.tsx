@@ -314,7 +314,7 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
 
       {/* JSON viewer dialog */}
       <Dialog open={!!jsonViewer} onOpenChange={open => !open && setJsonViewer(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+        <DialogContent className="max-w-2xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm font-mono">
               <FileText className="h-4 w-4 text-primary" />
@@ -326,11 +326,11 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <ScrollArea className="flex-1 min-h-0 max-h-[60vh]">
+            <div className="overflow-auto max-h-[60vh]">
               <pre className="text-xs font-mono whitespace-pre-wrap break-words p-3 bg-muted/50 rounded-md">
                 {jsonViewer?.content}
               </pre>
-            </ScrollArea>
+            </div>
           )}
         </DialogContent>
       </Dialog>
