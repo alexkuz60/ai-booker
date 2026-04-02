@@ -791,7 +791,7 @@ export default function Translation() {
         chapterCharacters={chapterChars}
         sceneCharIds={sceneCharIds}
         excludedCharIds={excludedCharIds}
-        onExcludedCharsChange={setExcludedCharIds}
+        onExcludedCharsChange={handleExcludedCharsChange}
       />
     </motion.div>
   );
