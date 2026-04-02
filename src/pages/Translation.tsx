@@ -92,6 +92,7 @@ export default function Translation() {
   const [selectedSegment, setSelectedSegment] = useState<SelectedSegmentData | null>(null);
   const [sceneSegmentIds, setSceneSegmentIds] = useState<string[]>([]);
   const [synopsisOpen, setSynopsisOpen] = useState(false);
+  const [excludedCharIds, setExcludedCharIds] = useState<Set<string>>(new Set());
 
   // Translation storage (mirror OPFS project)
   const { translationStorage, exists: transProjectExists, loading: transLoading, refresh: refreshTransStorage } =
