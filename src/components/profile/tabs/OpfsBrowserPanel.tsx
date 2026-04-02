@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { isOPFSSupported } from "@/lib/projectStorage";
+import { JsonTreeView } from "./JsonTreeView";
 
 /* ─── Types ──────────────────────────────────────────── */
 
@@ -327,9 +328,7 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
             </div>
           ) : (
             <div className="overflow-auto max-h-[60vh]">
-              <pre className="text-xs font-mono whitespace-pre-wrap break-words p-3 bg-muted/50 rounded-md">
-                {jsonViewer?.content}
-              </pre>
+              <JsonTreeView content={jsonViewer?.content ?? ""} />
             </div>
           )}
         </DialogContent>
