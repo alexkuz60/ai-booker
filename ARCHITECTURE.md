@@ -293,7 +293,7 @@ interface ProjectStorage {
 
 #### Разрешение проекта перевода
 
-**One-shot стратегия:** `useTranslationStorage` читает имя проекта из `project.json.translationProject.projectName` (backlink) → `localStorage` → каноническое имя (`_EN`/`_RU`). Первый найденный через `OPFSStorage.openExisting()` — результат. Никаких retry, fallback-сканов, таймеров.
+**Direct-link стратегия:** `useTranslationStorage` читает имя проекта **только** из `project.json.translationProject.projectName` (backlink). Один вызов `OPFSStorage.openExisting()` + валидация `sourceProjectName`/`targetLanguage`/`bookId` в метаданных mirror-проекта. Никаких localStorage-подсказок, `_translation_link.json`, канонических имён-кандидатов, OPFS meta-сканов, retry-таймеров, visibility/focus-слушателей. `refresh()` вызывается только явно после создания/восстановления проекта.
 
 **Guard:** Translation.tsx ждёт `initialized` из `ProjectStorageContext` перед рендерингом (спиннер). Если зеркало не найдено — guard-экран с кнопками «Открыть Библиотеку» / «Перевод ← сервер».
 
