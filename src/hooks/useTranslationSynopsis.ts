@@ -242,7 +242,11 @@ export function useTranslationSynopsis(opts: Opts) {
       // Get character profiles for the scene
       const characters = await readCharacterIndex(sourceStorage);
       const charIds = await getSceneCharacterIds(sourceStorage, sceneId);
-      const charProfiles = extractSceneCharacterProfiles(characters, charIds);
+      // Filter out excluded characters
+      const effectiveIds = excludedCharIds?.size
+        ? new Set([...charIds].filter((id) => !excludedCharIds.has(id)))
+        : charIds;
+      const charProfiles = extractSceneCharacterProfiles(characters, effectiveIds);
 
       const rawContent = texts.join("\n");
 
