@@ -756,6 +756,7 @@ export default function Translation() {
         onGenerateScene={() => selectedSceneId && selectedChapter && synopsis.generateScene(selectedSceneId, selectedChapter.chapterId)}
         generating={synopsis.generating}
         chapterTitle={selectedChapter?.title}
+        chapterCharacters={chapterChars}
       />
     </motion.div>
   );
