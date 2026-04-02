@@ -33,7 +33,8 @@ import { useTranslationBatch } from "@/hooks/useTranslationBatch";
 import { useTranslationActions } from "@/hooks/useTranslationActions";
 import { useSaveTranslation } from "@/hooks/useSaveTranslation";
 import { paths } from "@/lib/projectPaths";
-import type { TocChapter } from "@/pages/parser/types";
+import type { TocChapter, CharacterIndex } from "@/pages/parser/types";
+import { readCharacterIndex, getChapterCharacterIds } from "@/lib/localCharacters";
 import type { AiRoleId } from "@/config/aiRoles";
 import {
   Select,
