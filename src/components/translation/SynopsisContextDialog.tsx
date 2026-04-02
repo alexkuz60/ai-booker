@@ -367,7 +367,7 @@ function CharacterList({
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium truncate">{ch.name}</span>
                 <Badge variant="outline" className="text-[10px] px-1 py-0 shrink-0">
-                  {ch.gender === "m" ? (isRu ? "М" : "M") : ch.gender === "f" ? (isRu ? "Ж" : "F") : ch.gender}
+                  {ch.gender === "male" ? (isRu ? "М" : "M") : ch.gender === "female" ? (isRu ? "Ж" : "F") : "?"}
                 </Badge>
                 {ch.age_group && (
                   <Badge variant="secondary" className="text-[10px] px-1 py-0 shrink-0">
