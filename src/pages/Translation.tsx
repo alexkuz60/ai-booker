@@ -189,6 +189,7 @@ export default function Translation() {
 
   // ── Chapter characters for synopsis dialog ─────────────
   const [chapterChars, setChapterChars] = useState<CharacterIndex[]>([]);
+  const [sceneCharIds, setSceneCharIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!storage || !selectedChapter?.chapterId) { setChapterChars([]); return; }
@@ -196,7 +197,6 @@ export default function Translation() {
     (async () => {
       try {
         const allChars = await readCharacterIndex(storage);
-        // Get scene IDs for this chapter from scene index
         const sceneIndex = await storage.readJSON<Record<string, any>>(paths.sceneIndex());
         const entries = sceneIndex?.entries ?? {};
         const chapterSceneIds = Object.entries(entries)
@@ -215,6 +215,16 @@ export default function Translation() {
     })();
     return () => { cancelled = true; };
   }, [storage, selectedChapter?.chapterId]);
+
+  // ── Scene character IDs for highlighting ────────────────
+  useEffect(() => {
+    if (!storage || !selectedSceneId) { setSceneCharIds(new Set()); return; }
+    let cancelled = false;
+    getSceneCharacterIds(storage, selectedSceneId).then((ids) => {
+      if (!cancelled) setSceneCharIds(ids);
+    }).catch(() => { if (!cancelled) setSceneCharIds(new Set()); });
+    return () => { cancelled = true; };
+  }, [storage, selectedSceneId]);
 
   // ── Extracted actions ───────────────────────────────────
   const {
