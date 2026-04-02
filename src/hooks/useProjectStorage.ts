@@ -396,7 +396,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
           return;
         }
 
-        let activeStore = store;
+        let activeStore: ProjectStorage = store;
         let activeMeta = projectMeta;
         let activeName = targetName;
 

@@ -190,21 +190,18 @@ export function useBookRestore({
     let preservedSourceBlob: Blob | null = null;
     let preservedTranslationProject: ProjectMeta["translationProject"] | undefined;
     const existingProjects = localProjectNamesByBookId.get(book.id) || [];
-    if (existingProjects.length > 0) {
+    const existingSourceStore = await resolveLocalStorageForBook(book.id, resolverOpts());
+    if (existingSourceStore?.isReady) {
       try {
-        const { OPFSStorage } = await import("@/lib/projectStorage");
-        const oldStore = await OPFSStorage.openExisting(existingProjects[0]);
-        if (oldStore?.isReady) {
-          const oldMeta = await oldStore.readJSON<ProjectMeta>("project.json").catch(() => null);
-          if (oldMeta?.translationProject) {
-            preservedTranslationProject = oldMeta.translationProject;
-          }
+        const oldMeta = await existingSourceStore.readJSON<ProjectMeta>("project.json").catch(() => null);
+        if (oldMeta?.translationProject) {
+          preservedTranslationProject = oldMeta.translationProject;
+        }
 
-          const found = await findSourceBlob(oldStore);
-          if (found) {
-            preservedSourceBlob = found.blob;
-            console.log(`[OpenBook] Preserved source file (${found.format}) before wipe`);
-          }
+        const found = await findSourceBlob(existingSourceStore);
+        if (found) {
+          preservedSourceBlob = found.blob;
+          console.log(`[OpenBook] Preserved source file (${found.format}) before wipe`);
         }
       } catch (err) {
         console.warn("[OpenBook] Failed to preserve source file:", err);

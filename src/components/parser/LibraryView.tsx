@@ -157,29 +157,6 @@ function LibraryViewInner({
     });
   }, []);
 
-  const handleTranslationStageClick = useCallback(async (book: BookRecord, stageId: string) => {
-    if (stageId === "trans_project") {
-      // First stage — create translation project (with confirm if exists)
-      try {
-        const source = await resolveSourceProject(book.id);
-        if (!source) return;
-
-        const exists = await translationProjectExists(source.store, source.meta);
-        if (exists) {
-          setTransCreateConfirm({ book, exists: true });
-        } else {
-          // Create directly
-          await doCreateTranslationProject(book);
-        }
-      } catch (err) {
-        console.error("[LibraryView] translation stage click error:", err);
-      }
-    } else {
-      // Other stages — navigate to translation page
-      onStageNavigate?.(book, "/translation");
-    }
-  }, [doCreateTranslationProject, onStageNavigate, resolveSourceProject]);
-
   const doCreateTranslationProject = useCallback(async (book: BookRecord) => {
     setTransCreating(true);
     try {
@@ -218,6 +195,29 @@ function LibraryViewInner({
       setTransCreateConfirm(null);
     }
   }, [isRu, handleToggleStep, resolveSourceProject]);
+
+  const handleTranslationStageClick = useCallback(async (book: BookRecord, stageId: string) => {
+    if (stageId === "trans_project") {
+      // First stage — create translation project (with confirm if exists)
+      try {
+        const source = await resolveSourceProject(book.id);
+        if (!source) return;
+
+        const exists = await translationProjectExists(source.store, source.meta);
+        if (exists) {
+          setTransCreateConfirm({ book, exists: true });
+        } else {
+          // Create directly
+          await doCreateTranslationProject(book);
+        }
+      } catch (err) {
+        console.error("[LibraryView] translation stage click error:", err);
+      }
+    } else {
+      // Other stages — navigate to translation page
+      onStageNavigate?.(book, "/translation");
+    }
+  }, [doCreateTranslationProject, onStageNavigate, resolveSourceProject]);
 
   const renderBookCard = (book: BookRecord, actions: React.ReactNode, timeline?: React.ReactNode, translationTimeline?: React.ReactNode) => {
     const hasTranslation = !!translationTimeline;
