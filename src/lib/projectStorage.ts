@@ -321,11 +321,7 @@ export class LocalFSStorage implements ProjectStorage {
     // Pre-create directory structure
     await root.getDirectoryHandle("source", { create: true });
     await root.getDirectoryHandle("structure", { create: true });
-    await root.getDirectoryHandle("scenes", { create: true });
-    const audio = await root.getDirectoryHandle("audio", { create: true });
-    await audio.getDirectoryHandle("tts", { create: true });
-    await audio.getDirectoryHandle("atmosphere", { create: true });
-    await audio.getDirectoryHandle("renders", { create: true });
+    await root.getDirectoryHandle("chapters", { create: true });
     await root.getDirectoryHandle("montage", { create: true });
     return new LocalFSStorage(root);
   }
@@ -447,11 +443,7 @@ export class OPFSStorage implements ProjectStorage {
     // Ensure subdirs
     await projectDir.getDirectoryHandle("source", { create: true });
     await projectDir.getDirectoryHandle("structure", { create: true });
-    await projectDir.getDirectoryHandle("scenes", { create: true });
-    const audio = await projectDir.getDirectoryHandle("audio", { create: true });
-    await audio.getDirectoryHandle("tts", { create: true });
-    await audio.getDirectoryHandle("atmosphere", { create: true });
-    await audio.getDirectoryHandle("renders", { create: true });
+    await projectDir.getDirectoryHandle("chapters", { create: true });
     await projectDir.getDirectoryHandle("montage", { create: true });
     return new OPFSStorage(projectDir, projectName);
   }
