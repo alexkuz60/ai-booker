@@ -421,7 +421,7 @@ function CharacterProfile({
       {/* Badges */}
       <div className="flex flex-wrap gap-1.5">
         <Badge variant="outline">
-          {ch.gender === "m" ? (isRu ? "Мужской" : "Male") : ch.gender === "f" ? (isRu ? "Женский" : "Female") : ch.gender}
+          {ch.gender === "male" ? (isRu ? "Мужской" : "Male") : ch.gender === "female" ? (isRu ? "Женский" : "Female") : ch.gender}
         </Badge>
         {ch.age_group && <Badge variant="outline">{loc(ch.age_group, AGE_LABELS, isRu)}</Badge>}
         {ch.temperament && <Badge variant="secondary">{loc(ch.temperament, TEMPERAMENT_LABELS, isRu)}</Badge>}
