@@ -4,14 +4,14 @@ import {
   ChevronRight, ChevronDown, FileText, File, FileAudio, AlertTriangle, Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  ResizableHandle, ResizablePanel, ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { isOPFSSupported } from "@/lib/projectStorage";
@@ -22,7 +22,7 @@ import { JsonTreeView } from "./JsonTreeView";
 interface OpfsEntry {
   name: string;
   kind: "file" | "directory";
-  path: string;           // full path from OPFS root
+  path: string;
   size?: number;
   children?: OpfsEntry[];
 }
@@ -53,7 +53,6 @@ async function readDir(dir: FileSystemDirectoryHandle, parentPath = "", depth = 
   });
 }
 
-/** Read a file from OPFS by path segments */
 async function readOpfsFile(path: string): Promise<string> {
   const parts = path.split("/").filter(Boolean);
   let dir: FileSystemDirectoryHandle = await navigator.storage.getDirectory() as unknown as FileSystemDirectoryHandle;
@@ -94,24 +93,33 @@ function countEntries(entries: OpfsEntry[]): { files: number; dirs: number; byte
 /* ─── Tree node ──────────────────────────────────────── */
 
 function EntryNode({
-  entry, depth, isRu, onViewJson,
+  entry, depth, isRu, onViewJson, selectedPath,
 }: {
   entry: OpfsEntry;
   depth: number;
   isRu: boolean;
   onViewJson: (path: string, name: string) => void;
+  selectedPath?: string;
 }) {
   const [open, setOpen] = useState(depth < 1);
   const isJson = entry.name.endsWith(".json");
+  const isSelected = isJson && entry.path === selectedPath;
 
   if (entry.kind === "file") {
     const Icon = isJson ? FileText
       : (entry.name.endsWith(".mp3") || entry.name.endsWith(".wav") || entry.name.endsWith(".ogg")) ? FileAudio
       : File;
     return (
-      <div className="group flex items-center gap-1.5 py-0.5 text-xs text-muted-foreground" style={{ paddingLeft: depth * 16 }}>
+      <div
+        className={cn(
+          "group flex items-center gap-1.5 py-0.5 text-xs text-muted-foreground",
+          isSelected && "bg-primary/10 text-foreground rounded-sm",
+        )}
+        style={{ paddingLeft: depth * 16 }}
+      >
         <Icon className="h-3.5 w-3.5 shrink-0 opacity-60" />
-        <span className={cn("truncate", isJson && "cursor-pointer hover:text-foreground")}
+        <span
+          className={cn("truncate", isJson && "cursor-pointer hover:text-foreground")}
           onClick={isJson ? () => onViewJson(entry.path, entry.name) : undefined}
         >
           {entry.name}
@@ -153,7 +161,7 @@ function EntryNode({
       {open && entry.children && (
         <div>
           {entry.children.map(child => (
-            <EntryNode key={child.name} entry={child} depth={depth + 1} isRu={isRu} onViewJson={onViewJson} />
+            <EntryNode key={child.name} entry={child} depth={depth + 1} isRu={isRu} onViewJson={onViewJson} selectedPath={selectedPath} />
           ))}
           {entry.children.length === 0 && (
             <div className="text-[10px] text-muted-foreground italic py-0.5" style={{ paddingLeft: (depth + 1) * 16 }}>
@@ -178,8 +186,8 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // JSON viewer
-  const [jsonViewer, setJsonViewer] = useState<{ name: string; content: string } | null>(null);
+  // JSON viewer — inline in right panel
+  const [jsonViewer, setJsonViewer] = useState<{ name: string; path: string; content: string } | null>(null);
   const [jsonLoading, setJsonLoading] = useState(false);
 
   const supported = isOPFSSupported();
@@ -200,19 +208,18 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
 
   const handleViewJson = useCallback(async (path: string, name: string) => {
     setJsonLoading(true);
-    setJsonViewer({ name, content: "" });
+    setJsonViewer({ name, path, content: "" });
     try {
       const text = await readOpfsFile(path);
-      // Try to pretty-print
       let formatted: string;
       try {
         formatted = JSON.stringify(JSON.parse(text), null, 2);
       } catch {
         formatted = text;
       }
-      setJsonViewer({ name, content: formatted });
+      setJsonViewer({ name, path, content: formatted });
     } catch (err: any) {
-      setJsonViewer({ name, content: `Error: ${err.message}` });
+      setJsonViewer({ name, path, content: `Error: ${err.message}` });
     } finally {
       setJsonLoading(false);
     }
@@ -236,11 +243,9 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
 
   if (!supported) {
     return (
-      <Card>
-        <CardContent className="py-8 text-center text-muted-foreground text-sm">
-          {isRu ? "OPFS не поддерживается этим браузером" : "OPFS is not supported by this browser"}
-        </CardContent>
-      </Card>
+      <div className="py-8 text-center text-muted-foreground text-sm">
+        {isRu ? "OPFS не поддерживается этим браузером" : "OPFS is not supported by this browser"}
+      </div>
     );
   }
 
@@ -250,89 +255,105 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
 
   return (
     <>
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <FolderOpen className="h-4 w-4 text-primary" />
-              {isRu ? "OPFS браузер" : "OPFS Browser"}
-              <Badge variant="outline" className="text-[10px] font-normal">admin</Badge>
-            </CardTitle>
-            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5" onClick={scan} disabled={loading}>
-              <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-              {isRu ? "Сканировать" : "Scan"}
-            </Button>
-          </div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <FolderOpen className="h-4 w-4 text-primary" />
+            {isRu ? "OPFS браузер" : "OPFS Browser"}
+            <Badge variant="outline" className="text-[10px] font-normal">admin</Badge>
+          </h3>
           {totalStats && (
-            <p className="text-[11px] text-muted-foreground mt-1">
+            <p className="text-[11px] text-muted-foreground mt-0.5">
               {isRu ? "Всего:" : "Total:"} {totalStats.dirs} {isRu ? "папок" : "dirs"}, {totalStats.files} {isRu ? "файлов" : "files"}
               {totalStats.bytes > 0 && ` (${formatBytes(totalStats.bytes)})`}
             </p>
           )}
-        </CardHeader>
-        <CardContent>
-          {entries === null && !loading && (
-            <div className="text-center py-6 text-xs text-muted-foreground">
-              {isRu
-                ? "Нажмите «Сканировать» для просмотра содержимого OPFS"
-                : 'Click "Scan" to view OPFS contents'}
-            </div>
-          )}
-          {loading && (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          )}
-          {entries !== null && !loading && (
-            <ScrollArea className="h-[calc(100vh-24rem)] min-h-[250px] max-h-[600px]">
-              <div className="space-y-0.5">
-                {topFolders.map(folder => (
-                  <div key={folder.name} className="group relative">
-                    <EntryNode entry={folder} depth={0} isRu={isRu} onViewJson={handleViewJson} />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-0 h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
-                      onClick={() => setDeleteTarget(folder.name)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                ))}
-                {topFiles.map(f => (
-                  <EntryNode key={f.name} entry={f} depth={0} isRu={isRu} onViewJson={handleViewJson} />
-                ))}
-                {entries.length === 0 && (
-                  <div className="text-center py-4 text-xs text-muted-foreground">
-                    {isRu ? "OPFS пуст" : "OPFS is empty"}
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-          )}
-        </CardContent>
-      </Card>
+        </div>
+        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5" onClick={scan} disabled={loading}>
+          <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+          {isRu ? "Сканировать" : "Scan"}
+        </Button>
+      </div>
 
-      {/* JSON viewer dialog */}
-      <Dialog open={!!jsonViewer} onOpenChange={open => !open && setJsonViewer(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-sm font-mono">
-              <FileText className="h-4 w-4 text-primary" />
-              {jsonViewer?.name}
-            </DialogTitle>
-          </DialogHeader>
-          {jsonLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      {/* Split panel */}
+      <div className="border rounded-lg overflow-hidden" style={{ height: "calc(100vh - 20rem)" }}>
+        <ResizablePanelGroup direction="horizontal">
+          {/* Left: tree navigator */}
+          <ResizablePanel defaultSize={45} minSize={25}>
+            <div className="h-full overflow-auto p-2">
+              {entries === null && !loading && (
+                <div className="text-center py-6 text-xs text-muted-foreground">
+                  {isRu
+                    ? 'Нажмите «Сканировать» для просмотра'
+                    : 'Click "Scan" to browse'}
+                </div>
+              )}
+              {loading && (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              )}
+              {entries !== null && !loading && (
+                <div className="space-y-0.5">
+                  {topFolders.map(folder => (
+                    <div key={folder.name} className="group relative">
+                      <EntryNode entry={folder} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
+                        onClick={() => setDeleteTarget(folder.name)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                  {topFiles.map(f => (
+                    <EntryNode key={f.name} entry={f} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} />
+                  ))}
+                  {entries.length === 0 && (
+                    <div className="text-center py-4 text-xs text-muted-foreground">
+                      {isRu ? "OPFS пуст" : "OPFS is empty"}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="overflow-auto max-h-[60vh]">
-              <JsonTreeView content={jsonViewer?.content ?? ""} />
+          </ResizablePanel>
+
+          <ResizableHandle withHandle />
+
+          {/* Right: file viewer */}
+          <ResizablePanel defaultSize={55} minSize={25}>
+            <div className="h-full overflow-auto p-2">
+              {!jsonViewer && (
+                <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
+                  {isRu ? "Выберите JSON-файл для просмотра" : "Select a JSON file to view"}
+                </div>
+              )}
+              {jsonViewer && (
+                <div className="h-full flex flex-col">
+                  <div className="flex items-center gap-2 pb-2 border-b mb-2 shrink-0">
+                    <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <span className="text-xs font-mono truncate">{jsonViewer.name}</span>
+                    <span className="text-[10px] text-muted-foreground truncate ml-auto">{jsonViewer.path}</span>
+                  </div>
+                  {jsonLoading ? (
+                    <div className="flex items-center justify-center flex-1">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <div className="flex-1 overflow-auto min-h-0">
+                      <JsonTreeView content={jsonViewer.content} />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
 
       {/* Delete confirmation */}
       <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
