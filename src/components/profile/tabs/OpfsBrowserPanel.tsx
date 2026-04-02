@@ -1,12 +1,13 @@
 import { useState, useCallback } from "react";
 import {
   FolderClosed, FolderOpen, Trash2, RefreshCw, Loader2,
-  ChevronRight, ChevronDown, FileText, File, FileAudio, AlertTriangle,
+  ChevronRight, ChevronDown, FileText, File, FileAudio, AlertTriangle, Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -20,33 +21,47 @@ import { isOPFSSupported } from "@/lib/projectStorage";
 interface OpfsEntry {
   name: string;
   kind: "file" | "directory";
+  path: string;           // full path from OPFS root
   size?: number;
   children?: OpfsEntry[];
 }
 
 /* ─── Helpers ────────────────────────────────────────── */
 
-async function readDir(dir: FileSystemDirectoryHandle, depth = 0): Promise<OpfsEntry[]> {
+async function readDir(dir: FileSystemDirectoryHandle, parentPath = "", depth = 0): Promise<OpfsEntry[]> {
   const entries: OpfsEntry[] = [];
   for await (const [name, handle] of (dir as any).entries()) {
+    const fullPath = parentPath ? `${parentPath}/${name}` : name;
     if (handle.kind === "directory") {
       const children = depth < 2
-        ? await readDir(handle as FileSystemDirectoryHandle, depth + 1)
+        ? await readDir(handle as FileSystemDirectoryHandle, fullPath, depth + 1)
         : undefined;
-      entries.push({ name, kind: "directory", children });
+      entries.push({ name, kind: "directory", path: fullPath, children });
     } else {
       let size: number | undefined;
       try {
         const f = await (handle as FileSystemFileHandle).getFile();
         size = f.size;
       } catch { /* skip */ }
-      entries.push({ name, kind: "file", size });
+      entries.push({ name, kind: "file", path: fullPath, size });
     }
   }
   return entries.sort((a, b) => {
     if (a.kind !== b.kind) return a.kind === "directory" ? -1 : 1;
     return a.name.localeCompare(b.name);
   });
+}
+
+/** Read a file from OPFS by path segments */
+async function readOpfsFile(path: string): Promise<string> {
+  const parts = path.split("/").filter(Boolean);
+  let dir: FileSystemDirectoryHandle = await navigator.storage.getDirectory() as unknown as FileSystemDirectoryHandle;
+  for (let i = 0; i < parts.length - 1; i++) {
+    dir = await dir.getDirectoryHandle(parts[i]);
+  }
+  const fileHandle = await dir.getFileHandle(parts[parts.length - 1]);
+  const file = await fileHandle.getFile();
+  return file.text();
 }
 
 function formatBytes(bytes: number): string {
@@ -77,17 +92,38 @@ function countEntries(entries: OpfsEntry[]): { files: number; dirs: number; byte
 
 /* ─── Tree node ──────────────────────────────────────── */
 
-function EntryNode({ entry, depth, isRu }: { entry: OpfsEntry; depth: number; isRu: boolean }) {
+function EntryNode({
+  entry, depth, isRu, onViewJson,
+}: {
+  entry: OpfsEntry;
+  depth: number;
+  isRu: boolean;
+  onViewJson: (path: string, name: string) => void;
+}) {
   const [open, setOpen] = useState(depth < 1);
+  const isJson = entry.name.endsWith(".json");
 
   if (entry.kind === "file") {
-    const Icon = entry.name.endsWith(".json") ? FileText
+    const Icon = isJson ? FileText
       : (entry.name.endsWith(".mp3") || entry.name.endsWith(".wav") || entry.name.endsWith(".ogg")) ? FileAudio
       : File;
     return (
-      <div className="flex items-center gap-1.5 py-0.5 text-xs text-muted-foreground" style={{ paddingLeft: depth * 16 }}>
+      <div className="group flex items-center gap-1.5 py-0.5 text-xs text-muted-foreground" style={{ paddingLeft: depth * 16 }}>
         <Icon className="h-3.5 w-3.5 shrink-0 opacity-60" />
-        <span className="truncate">{entry.name}</span>
+        <span className={cn("truncate", isJson && "cursor-pointer hover:text-foreground")}
+          onClick={isJson ? () => onViewJson(entry.path, entry.name) : undefined}
+        >
+          {entry.name}
+        </span>
+        {isJson && (
+          <Button
+            variant="ghost" size="icon"
+            className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0"
+            onClick={() => onViewJson(entry.path, entry.name)}
+          >
+            <Eye className="h-3 w-3" />
+          </Button>
+        )}
         {entry.size != null && <span className="ml-auto text-[10px] opacity-50 shrink-0">{formatBytes(entry.size)}</span>}
       </div>
     );
@@ -116,7 +152,7 @@ function EntryNode({ entry, depth, isRu }: { entry: OpfsEntry; depth: number; is
       {open && entry.children && (
         <div>
           {entry.children.map(child => (
-            <EntryNode key={child.name} entry={child} depth={depth + 1} isRu={isRu} />
+            <EntryNode key={child.name} entry={child} depth={depth + 1} isRu={isRu} onViewJson={onViewJson} />
           ))}
           {entry.children.length === 0 && (
             <div className="text-[10px] text-muted-foreground italic py-0.5" style={{ paddingLeft: (depth + 1) * 16 }}>
@@ -141,6 +177,10 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // JSON viewer
+  const [jsonViewer, setJsonViewer] = useState<{ name: string; content: string } | null>(null);
+  const [jsonLoading, setJsonLoading] = useState(false);
+
   const supported = isOPFSSupported();
 
   const scan = useCallback(async () => {
@@ -156,6 +196,26 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
       setLoading(false);
     }
   }, [supported]);
+
+  const handleViewJson = useCallback(async (path: string, name: string) => {
+    setJsonLoading(true);
+    setJsonViewer({ name, content: "" });
+    try {
+      const text = await readOpfsFile(path);
+      // Try to pretty-print
+      let formatted: string;
+      try {
+        formatted = JSON.stringify(JSON.parse(text), null, 2);
+      } catch {
+        formatted = text;
+      }
+      setJsonViewer({ name, content: formatted });
+    } catch (err: any) {
+      setJsonViewer({ name, content: `Error: ${err.message}` });
+    } finally {
+      setJsonLoading(false);
+    }
+  }, []);
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -227,7 +287,7 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
               <div className="space-y-0.5">
                 {topFolders.map(folder => (
                   <div key={folder.name} className="group relative">
-                    <EntryNode entry={folder} depth={0} isRu={isRu} />
+                    <EntryNode entry={folder} depth={0} isRu={isRu} onViewJson={handleViewJson} />
                     <Button
                       variant="ghost"
                       size="icon"
@@ -239,7 +299,7 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
                   </div>
                 ))}
                 {topFiles.map(f => (
-                  <EntryNode key={f.name} entry={f} depth={0} isRu={isRu} />
+                  <EntryNode key={f.name} entry={f} depth={0} isRu={isRu} onViewJson={handleViewJson} />
                 ))}
                 {entries.length === 0 && (
                   <div className="text-center py-4 text-xs text-muted-foreground">
@@ -251,6 +311,29 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* JSON viewer dialog */}
+      <Dialog open={!!jsonViewer} onOpenChange={open => !open && setJsonViewer(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm font-mono">
+              <FileText className="h-4 w-4 text-primary" />
+              {jsonViewer?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {jsonLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <ScrollArea className="flex-1 min-h-0 max-h-[60vh]">
+              <pre className="text-xs font-mono whitespace-pre-wrap break-words p-3 bg-muted/50 rounded-md">
+                {jsonViewer?.content}
+              </pre>
+            </ScrollArea>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Delete confirmation */}
       <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
