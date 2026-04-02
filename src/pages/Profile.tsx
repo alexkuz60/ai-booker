@@ -140,6 +140,12 @@ export default function Profile() {
             <Activity className="h-4 w-4 shrink-0" />
             <span>{isRu ? 'AI Аналитика' : 'AI Analytics'}</span>
           </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="opfs" className="flex items-center gap-2 flex-1">
+              <HardDrive className="h-4 w-4 shrink-0" />
+              <span>OPFS</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="profile">
