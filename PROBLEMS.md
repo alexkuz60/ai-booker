@@ -193,6 +193,13 @@
 - Решение: `readProjectMetaForWrite()` с retry при первом `null`, блокировка записи если meta остаётся `null`. `useLibrary` фильтрует зеркала по суффиксу `_EN`/`_RU`.
 - Файлы: `usePipelineProgress.ts`, `translationProject.ts`, `useLibrary.ts`, `useTranslationStorage.ts`.
 
+### АА. Потеря профайлов персонажей после восстановления с сервера — ✅ РЕШЕНО (B31)
+- Проблема: после Wipe-and-Deploy профайлы персонажей (description, temperament, speech_style, speech_tags, psycho_tags) отображались как пустые, хотя данные присутствовали в БД. В `characters.json` данные хранились только во вложенном объекте `profile`, а UI читал верхнеуровневые поля (description, temperament и др.), которые были `null`.
+- Корневая причина: `serverDeploy.ts` при восстановлении записывал профайльные поля только на верхний уровень `CharacterIndex`, но при последующих чтениях/записях промежуточный код мог терять эту структуру. Отсутствовала нормализация при чтении из OPFS.
+- Решение: добавлена функция `normalizeProfileFields()` в `localCharacters.ts`, которая при каждом чтении `characters.json` зеркалирует данные между верхнеуровневыми полями и вложенным `profile`. Функция `applyProfiles()` в `useCharacterProfiles.ts` и `serverDeploy.ts` теперь обновляют оба уровня одновременно.
+- Инвариант: **профайльные поля ОБЯЗАНЫ присутствовать на обоих уровнях** (`CharacterIndex.description` и `CharacterIndex.profile.description`). Нормализация выполняется при чтении.
+- Файлы: `src/lib/localCharacters.ts`, `src/hooks/useCharacterProfiles.ts`, `src/lib/serverDeploy.ts`.
+
 ---
 
 ## Защита от регрессий
