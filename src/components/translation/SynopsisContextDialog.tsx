@@ -179,12 +179,12 @@ export function SynopsisContextDialog({
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">{isRu ? "Стиль" : "Style"}</Label>
-                  <Input
-                    value={bm.style}
-                    onChange={(e) => onBookMetaChange({ ...bm, style: e.target.value })}
-                    placeholder={isRu ? "Классическая проза, разговорный..." : "Classical prose, colloquial..."}
-                    className="h-8 text-sm"
-                  />
+                    <Input
+                      value={bm.style}
+                      onChange={(e) => onBookMetaChange({ ...bm, style: e.target.value })}
+                      placeholder={isRu ? "Ироническая проза, разговорный" : "Ironic prose, colloquial"}
+                      className="h-8 text-sm"
+                    />
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">{isRu ? "Примечание автора" : "Author note"}</Label>
