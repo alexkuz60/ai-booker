@@ -163,7 +163,7 @@ export function SynopsisContextDialog({
                     <Input
                       value={bm.era}
                       onChange={(e) => onBookMetaChange({ ...bm, era: e.target.value })}
-                      placeholder={isRu ? "XIX век, Серебряный век..." : "Victorian, Modern..."}
+                      placeholder={isRu ? "Современность" : "Contemporary"}
                       className="h-8 text-sm"
                     />
                   </div>
