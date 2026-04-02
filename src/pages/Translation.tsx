@@ -767,6 +767,7 @@ export default function Translation() {
         generating={synopsis.generating}
         chapterTitle={selectedChapter?.title}
         chapterCharacters={chapterChars}
+        sceneCharIds={sceneCharIds}
       />
     </motion.div>
   );
