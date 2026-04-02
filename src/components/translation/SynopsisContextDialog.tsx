@@ -172,7 +172,7 @@ export function SynopsisContextDialog({
                     <Input
                       value={bm.genre}
                       onChange={(e) => onBookMetaChange({ ...bm, genre: e.target.value })}
-                      placeholder={isRu ? "Роман, детектив..." : "Novel, thriller..."}
+                      placeholder={isRu ? "Сатирическая повесть" : "Satirical novella"}
                       className="h-8 text-sm"
                     />
                   </div>
