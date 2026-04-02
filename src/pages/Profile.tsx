@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { User, Key, Activity } from 'lucide-react';
+import { User, Key, Activity, HardDrive } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
@@ -15,6 +15,7 @@ import { usePageHeader } from '@/hooks/usePageHeader';
 import { ProfileTab } from '@/components/profile/tabs/ProfileTab';
 import { ApiRoutersTab } from '@/components/profile/tabs/ApiRoutersTab';
 import { AiUsageWidget } from '@/components/profile/AiUsageWidget';
+import { OpfsBrowserPanel } from '@/components/profile/tabs/OpfsBrowserPanel';
 
 export default function Profile() {
   const { theme, setTheme } = useTheme();
@@ -139,6 +140,12 @@ export default function Profile() {
             <Activity className="h-4 w-4 shrink-0" />
             <span>{isRu ? 'AI Аналитика' : 'AI Analytics'}</span>
           </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="opfs" className="flex items-center gap-2 flex-1">
+              <HardDrive className="h-4 w-4 shrink-0" />
+              <span>OPFS</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="profile">
@@ -178,6 +185,12 @@ export default function Profile() {
         <TabsContent value="ai-analytics">
           <AiUsageWidget isRu={isRu} />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="opfs">
+            <OpfsBrowserPanel isRu={isRu} />
+          </TabsContent>
+        )}
       </Tabs>
     </motion.div>
   );
