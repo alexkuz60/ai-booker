@@ -187,6 +187,35 @@ export default function Translation() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChapter?.chapterId, selectedSceneId]);
 
+  // ── Chapter characters for synopsis dialog ─────────────
+  const [chapterChars, setChapterChars] = useState<CharacterIndex[]>([]);
+
+  useEffect(() => {
+    if (!storage || !selectedChapter?.chapterId) { setChapterChars([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const allChars = await readCharacterIndex(storage);
+        // Get scene IDs for this chapter from scene index
+        const sceneIndex = await storage.readJSON<Record<string, any>>(paths.sceneIndex());
+        const entries = sceneIndex?.entries ?? {};
+        const chapterSceneIds = Object.entries(entries)
+          .filter(([, v]: [string, any]) => v.chapterId === selectedChapter.chapterId)
+          .map(([sid]) => sid);
+        const charIds = await getChapterCharacterIds(storage, chapterSceneIds);
+        if (cancelled) return;
+        if (charIds.size === 0) {
+          setChapterChars(allChars); // fallback: show all
+        } else {
+          setChapterChars(allChars.filter((c) => charIds.has(c.id)));
+        }
+      } catch {
+        if (!cancelled) setChapterChars([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [storage, selectedChapter?.chapterId]);
+
   // ── Extracted actions ───────────────────────────────────
   const {
     creating,
