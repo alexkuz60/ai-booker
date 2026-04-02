@@ -392,7 +392,7 @@ export default function Translation() {
   }, [storage, isOpen]);
 
   // ── No project open ────────────────────────────────────
-  if (!initialized || transLoading) {
+  if (!initialized) {
     return (
       <motion.div
         className="flex-1 flex flex-col h-full items-center justify-center gap-4 text-muted-foreground"
