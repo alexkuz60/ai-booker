@@ -1,26 +1,33 @@
 /**
  * ProjectStorage — абстракция локального хранилища проекта книги.
  *
- * Структура папок проекта:
+ * V2 layout (единственная актуальная структура):
  *   📁 BookTitle/
- *   ├── project.json          — метаданные проекта (bookId, title, userId, fileFormat, etc.)
+ *   ├── project.json              — метаданные проекта
+ *   ├── characters.json           — глобальный реестр персонажей
+ *   ├── scene_index.json          — индекс сцен (sceneId → chapterId)
  *   ├── 📁 source/
- *   │   └── book.pdf / book.docx — исходный файл книги
+ *   │   └── book.pdf / book.docx / book.fb2
  *   ├── 📁 structure/
- *   │   ├── toc.json          — оглавление (TocChapter[])
- *   │   ├── parts.json        — части книги
- *   │   ├── chapters.json     — главы
- *   │   └── characters.json   — персонажи
- *   ├── 📁 scenes/
- *   │   ├── scene_{id}.json   — сцена с сегментами и фразами
- *   │   └── ...
- *   ├── 📁 audio/
- *   │   ├── 📁 tts/           — синтезированные сегменты
- *   │   │   └── {segmentId}.mp3
- *   │   ├── 📁 atmosphere/    — атмосферные слои
- *   │   └── 📁 renders/       — финальные рендеры сцен
+ *   │   ├── toc.json              — оглавление (TocChapter[])
+ *   │   ├── chapters.json         — chapterIndex → uuid
+ *   │   └── characters.json       — (legacy, только для миграции)
+ *   ├── 📁 chapters/
+ *   │   └── {chapterId}/
+ *   │       ├── content.json      — сцены главы
+ *   │       └── 📁 scenes/
+ *   │           └── {sceneId}/
+ *   │               ├── storyboard.json
+ *   │               ├── characters.json
+ *   │               ├── atmospheres.json
+ *   │               └── 📁 audio/
+ *   │                   ├── 📁 tts/          — {segmentId}.mp3
+ *   │                   ├── 📁 atmosphere/   — атмосферные слои
+ *   │                   └── 📁 renders/      — финальные рендеры
  *   └── 📁 montage/
- *       └── ...               — данные монтажа
+ *
+ * ⚠️  Плоские папки V1 (scenes/, audio/) в корне — устаревшие артефакты.
+ *     Код НЕ читает и НЕ пишет в них. Безопасно удалять вручную.
  */
 
 // ─── Interface ───────────────────────────────────────────
