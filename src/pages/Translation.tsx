@@ -190,6 +190,7 @@ export default function Translation() {
   // ── Chapter characters for synopsis dialog ─────────────
   const [chapterChars, setChapterChars] = useState<CharacterIndex[]>([]);
   const [sceneCharIds, setSceneCharIds] = useState<Set<string>>(new Set());
+  const [excludedCharIds, setExcludedCharIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!storage || !selectedChapter?.chapterId) { setChapterChars([]); return; }
