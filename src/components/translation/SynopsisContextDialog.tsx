@@ -351,6 +351,13 @@ export function SynopsisContextDialog({
             </ScrollArea>
           </TabsContent>
         </Tabs>
+
+        <div className="flex justify-end pt-2 border-t">
+          <Button onClick={handleExplicitSave} disabled={saving} className="gap-1.5">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {isRu ? "Сохранить изменения" : "Save changes"}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
