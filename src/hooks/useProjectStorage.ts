@@ -22,6 +22,57 @@ const LOCAL_RESET_KEYS = [
   // К4: docx_chapter_texts and docx_html removed — now in-memory only
 ];
 
+function toTimestamp(value?: string): number {
+  if (!value) return 0;
+  const ts = new Date(value).getTime();
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+async function getProjectFreshness(store: ProjectStorage, meta: ProjectMeta): Promise<number> {
+  const structure = await store.readJSON<{ updatedAt?: string }>(paths.structureToc()).catch(() => null);
+  return Math.max(
+    toTimestamp(meta.updatedAt),
+    toTimestamp(meta.createdAt),
+    toTimestamp(structure?.updatedAt),
+  );
+}
+
+async function resolveFreshestSourceProject(bookId: string): Promise<{
+  name: string;
+  store: ProjectStorage;
+  meta: ProjectMeta;
+} | null> {
+  const projectNames = await OPFSStorage.listProjects();
+  const candidates = await Promise.all(projectNames.map(async (projectName) => {
+    const store = await OPFSStorage.openExisting(projectName);
+    if (!store) return null;
+
+    const meta = await store.readJSON<ProjectMeta>("project.json");
+    if (!meta || meta.bookId !== bookId || meta.targetLanguage || meta.sourceProjectName) {
+      return null;
+    }
+
+    const freshness = await getProjectFreshness(store, meta);
+    const linkBonus = meta.translationProject?.projectName ? 1_000_000_000_000_000 : 0;
+
+    return {
+      name: projectName,
+      store,
+      meta,
+      score: freshness + linkBonus,
+    };
+  }));
+
+  const sorted = candidates
+    .filter((candidate): candidate is NonNullable<typeof candidate> => !!candidate)
+    .sort((a, b) => b.score - a.score);
+
+  if (sorted.length === 0) return null;
+
+  const { name, store, meta } = sorted[0];
+  return { name, store, meta };
+}
+
 interface UseProjectStorageReturn {
   /** Current storage instance (null = no project open) */
   storage: ProjectStorage | null;
@@ -345,7 +396,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
           return;
         }
 
-        let activeStore = store;
+        let activeStore: ProjectStorage = store;
         let activeMeta = projectMeta;
         let activeName = targetName;
 
@@ -369,6 +420,16 @@ export function useProjectStorage(): UseProjectStorageReturn {
               activeName = inferredSourceName;
               console.info("[ProjectStorage] Redirected bootstrap from translation mirror to source:", targetName, "→", inferredSourceName);
             }
+          }
+        }
+
+        if (activeMeta.bookId && !activeMeta.targetLanguage && !activeMeta.sourceProjectName) {
+          const freshestSource = await resolveFreshestSourceProject(activeMeta.bookId);
+          if (freshestSource && freshestSource.name !== activeName) {
+            activeStore = freshestSource.store;
+            activeMeta = freshestSource.meta;
+            activeName = freshestSource.name;
+            console.info("[ProjectStorage] Redirected bootstrap to freshest source project:", targetName, "→", activeName);
           }
         }
 
