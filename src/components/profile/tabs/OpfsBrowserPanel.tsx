@@ -93,13 +93,14 @@ function countEntries(entries: OpfsEntry[]): { files: number; dirs: number; byte
 /* ─── Tree node ──────────────────────────────────────── */
 
 function EntryNode({
-  entry, depth, isRu, onViewJson, selectedPath,
+  entry, depth, isRu, onViewJson, selectedPath, onDelete,
 }: {
   entry: OpfsEntry;
   depth: number;
   isRu: boolean;
   onViewJson: (path: string, name: string) => void;
   selectedPath?: string;
+  onDelete: (path: string, name: string, kind: "file" | "directory") => void;
 }) {
   const [open, setOpen] = useState(depth < 1);
   const isJson = entry.name.endsWith(".json");
@@ -133,6 +134,13 @@ function EntryNode({
             <Eye className="h-3 w-3" />
           </Button>
         )}
+        <Button
+          variant="ghost" size="icon"
+          className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0 text-destructive hover:text-destructive"
+          onClick={() => onDelete(entry.path, entry.name, "file")}
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
         {entry.size != null && <span className="ml-auto mr-5 text-[10px] opacity-50 shrink-0">{formatBytes(entry.size)}</span>}
       </div>
     );
@@ -144,24 +152,33 @@ function EntryNode({
 
   return (
     <div>
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 py-0.5 w-full text-left text-xs hover:bg-muted/50 rounded-sm px-1"
-        style={{ paddingLeft: depth * 16 }}
-      >
-        <Chevron className="h-3 w-3 shrink-0 text-muted-foreground" />
-        <FolderIcon className="h-3.5 w-3.5 shrink-0 text-primary" />
-        <span className="font-medium truncate">{entry.name}</span>
-        {stats && (
-          <span className="ml-auto mr-5 text-[10px] text-muted-foreground shrink-0">
-            {stats.files}f {stats.dirs > 0 ? `${stats.dirs}d ` : ""}{stats.bytes > 0 ? formatBytes(stats.bytes) : ""}
-          </span>
-        )}
-      </button>
+      <div className="group flex items-center">
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex items-center gap-1.5 py-0.5 flex-1 text-left text-xs hover:bg-muted/50 rounded-sm px-1"
+          style={{ paddingLeft: depth * 16 }}
+        >
+          <Chevron className="h-3 w-3 shrink-0 text-muted-foreground" />
+          <FolderIcon className="h-3.5 w-3.5 shrink-0 text-primary" />
+          <span className="font-medium truncate">{entry.name}</span>
+          {stats && (
+            <span className="ml-auto mr-1 text-[10px] text-muted-foreground shrink-0">
+              {stats.files}f {stats.dirs > 0 ? `${stats.dirs}d ` : ""}{stats.bytes > 0 ? formatBytes(stats.bytes) : ""}
+            </span>
+          )}
+        </button>
+        <Button
+          variant="ghost" size="icon"
+          className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0 text-destructive hover:text-destructive"
+          onClick={() => onDelete(entry.path, entry.name, "directory")}
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
+      </div>
       {open && entry.children && (
         <div>
           {entry.children.map(child => (
-            <EntryNode key={child.name} entry={child} depth={depth + 1} isRu={isRu} onViewJson={onViewJson} selectedPath={selectedPath} />
+            <EntryNode key={child.name} entry={child} depth={depth + 1} isRu={isRu} onViewJson={onViewJson} selectedPath={selectedPath} onDelete={onDelete} />
           ))}
           {entry.children.length === 0 && (
             <div className="text-[10px] text-muted-foreground italic py-0.5" style={{ paddingLeft: (depth + 1) * 16 }}>
@@ -183,7 +200,7 @@ interface OpfsBrowserPanelProps {
 export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
   const [entries, setEntries] = useState<OpfsEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ path: string; name: string; kind: "file" | "directory" } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   // JSON viewer — inline in right panel
@@ -225,13 +242,26 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
     }
   }, []);
 
+  const handleRequestDelete = useCallback((path: string, name: string, kind: "file" | "directory") => {
+    setDeleteTarget({ path, name, kind });
+  }, []);
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const root = await navigator.storage.getDirectory();
-      await root.removeEntry(deleteTarget, { recursive: true });
-      toast.success(`«${deleteTarget}» ${isRu ? "удалено" : "deleted"}`);
+      const parts = deleteTarget.path.split("/").filter(Boolean);
+      const entryName = parts.pop()!;
+      let dir: FileSystemDirectoryHandle = await navigator.storage.getDirectory() as unknown as FileSystemDirectoryHandle;
+      for (const p of parts) {
+        dir = await dir.getDirectoryHandle(p);
+      }
+      await dir.removeEntry(entryName, { recursive: true });
+      toast.success(`«${deleteTarget.name}» ${isRu ? "удалено" : "deleted"}`);
+      // Clear viewer if deleted file was being viewed
+      if (jsonViewer && jsonViewer.path.startsWith(deleteTarget.path)) {
+        setJsonViewer(null);
+      }
       setDeleteTarget(null);
       await scan();
     } catch (err: any) {
@@ -297,20 +327,10 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
               {entries !== null && !loading && (
                 <div className="space-y-0.5">
                   {topFolders.map(folder => (
-                    <div key={folder.name} className="group relative">
-                      <EntryNode entry={folder} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
-                        onClick={() => setDeleteTarget(folder.name)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+                    <EntryNode key={folder.name} entry={folder} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} onDelete={handleRequestDelete} />
                   ))}
                   {topFiles.map(f => (
-                    <EntryNode key={f.name} entry={f} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} />
+                    <EntryNode key={f.name} entry={f} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} onDelete={handleRequestDelete} />
                   ))}
                   {entries.length === 0 && (
                     <div className="text-center py-4 text-xs text-muted-foreground">
@@ -361,12 +381,14 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              {isRu ? "Удалить папку?" : "Delete folder?"}
+              {deleteTarget?.kind === "file"
+                ? (isRu ? "Удалить файл?" : "Delete file?")
+                : (isRu ? "Удалить папку?" : "Delete folder?")}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {isRu
-                ? `Папка «${deleteTarget}» и всё её содержимое будут безвозвратно удалены из OPFS.`
-                : `Folder "${deleteTarget}" and all its contents will be permanently deleted from OPFS.`}
+                ? `«${deleteTarget?.path}» будет безвозвратно удалён из OPFS.`
+                : `"${deleteTarget?.path}" will be permanently deleted from OPFS.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
