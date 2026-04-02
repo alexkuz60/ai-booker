@@ -98,6 +98,12 @@ export function SynopsisContextDialog({
   onExcludedCharsChange,
 }: Props) {
   const [selectedCharId, setSelectedCharId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const handleExplicitSave = useCallback(async () => {
+    setSaving(true);
+    try { await onSave(); } finally { setSaving(false); }
+  }, [onSave]);
 
   const handleClose = useCallback(async (nextOpen: boolean) => {
     if (!nextOpen) {
