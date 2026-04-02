@@ -67,6 +67,9 @@ interface Props {
   sceneTitle?: string;
   /** Characters from the current chapter for the Characters tab */
   chapterCharacters?: CharacterIndex[];
+  /** IDs of characters excluded from translation context */
+  excludedCharIds?: Set<string>;
+  onExcludedCharsChange?: (ids: Set<string>) => void;
 }
 
 // ─── Component ──────────────────────────────────────────────────────
