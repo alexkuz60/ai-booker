@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Wand2, BookOpen, FileText, Theater, Users, ChevronLeft } from "lucide-react";
+import { Loader2, Wand2, BookOpen, FileText, Theater, Users, ChevronLeft, Save } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { BookMetaSynopsis, ChapterSynopsis, SceneSynopsis } from "@/lib/translationSynopsis";
 import type { CharacterIndex } from "@/pages/parser/types";
