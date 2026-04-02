@@ -107,18 +107,18 @@ function prepareSynopsisRequest(
 // ─── Hook ───────────────────────────────────────────────────────────
 
 interface Opts {
-  /** Source project storage (original book) */
   sourceStorage: ProjectStorage | null;
-  /** Translation project storage */
   translationStorage: ProjectStorage | null;
   isRu: boolean;
   model: string;
   userApiKeys: Record<string, string>;
   sourceLang: string;
+  /** Characters excluded from synopsis context */
+  excludedCharIds?: Set<string>;
 }
 
 export function useTranslationSynopsis(opts: Opts) {
-  const { sourceStorage, translationStorage, isRu, model, userApiKeys, sourceLang } = opts;
+  const { sourceStorage, translationStorage, isRu, model, userApiKeys, sourceLang, excludedCharIds } = opts;
 
   const [bookMeta, setBookMeta] = useState<BookMetaSynopsis | null>(null);
   const [chapterSynopsis, setChapterSynopsis] = useState<ChapterSynopsis | null>(null);
