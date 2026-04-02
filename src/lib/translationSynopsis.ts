@@ -59,6 +59,7 @@ export const synopsisPaths = {
   bookMeta: () => "synopsis/book-meta.json",
   chapter: (chapterId: string) => `synopsis/chapter-${chapterId}.json`,
   scene: (sceneId: string) => `synopsis/scene-${sceneId}.json`,
+  excludedChars: (chapterId: string) => `synopsis/excluded-chars-${chapterId}.json`,
 } as const;
 
 // ─── Read helpers ───────────────────────────────────────────────────
@@ -83,6 +84,14 @@ export async function readSceneSynopsis(
   return storage.readJSON<SceneSynopsis>(synopsisPaths.scene(sceneId));
 }
 
+export async function readExcludedChars(
+  storage: ProjectStorage,
+  chapterId: string,
+): Promise<Set<string>> {
+  const arr = await storage.readJSON<string[]>(synopsisPaths.excludedChars(chapterId));
+  return new Set(arr ?? []);
+}
+
 // ─── Write helpers ──────────────────────────────────────────────────
 
 export async function saveBookMeta(
@@ -104,6 +113,14 @@ export async function saveSceneSynopsis(
   data: SceneSynopsis,
 ): Promise<void> {
   await storage.writeJSON(synopsisPaths.scene(data.sceneId), data);
+}
+
+export async function saveExcludedChars(
+  storage: ProjectStorage,
+  chapterId: string,
+  ids: Set<string>,
+): Promise<void> {
+  await storage.writeJSON(synopsisPaths.excludedChars(chapterId), [...ids]);
 }
 
 // ─── Load full context for pipeline ─────────────────────────────────

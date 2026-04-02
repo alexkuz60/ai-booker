@@ -22,9 +22,11 @@ import {
   readBookMeta,
   readChapterSynopsis,
   readSceneSynopsis,
+  readExcludedChars,
   saveBookMeta,
   saveChapterSynopsis,
   saveSceneSynopsis,
+  saveExcludedChars,
   emptyBookMeta,
   emptyChapterSynopsis,
   emptySceneSynopsis,
@@ -105,18 +107,18 @@ function prepareSynopsisRequest(
 // ─── Hook ───────────────────────────────────────────────────────────
 
 interface Opts {
-  /** Source project storage (original book) */
   sourceStorage: ProjectStorage | null;
-  /** Translation project storage */
   translationStorage: ProjectStorage | null;
   isRu: boolean;
   model: string;
   userApiKeys: Record<string, string>;
   sourceLang: string;
+  /** Characters excluded from synopsis context */
+  excludedCharIds?: Set<string>;
 }
 
 export function useTranslationSynopsis(opts: Opts) {
-  const { sourceStorage, translationStorage, isRu, model, userApiKeys, sourceLang } = opts;
+  const { sourceStorage, translationStorage, isRu, model, userApiKeys, sourceLang, excludedCharIds } = opts;
 
   const [bookMeta, setBookMeta] = useState<BookMetaSynopsis | null>(null);
   const [chapterSynopsis, setChapterSynopsis] = useState<ChapterSynopsis | null>(null);
@@ -240,7 +242,11 @@ export function useTranslationSynopsis(opts: Opts) {
       // Get character profiles for the scene
       const characters = await readCharacterIndex(sourceStorage);
       const charIds = await getSceneCharacterIds(sourceStorage, sceneId);
-      const charProfiles = extractSceneCharacterProfiles(characters, charIds);
+      // Filter out excluded characters
+      const effectiveIds = excludedCharIds?.size
+        ? new Set([...charIds].filter((id) => !excludedCharIds.has(id)))
+        : charIds;
+      const charProfiles = extractSceneCharacterProfiles(characters, effectiveIds);
 
       const rawContent = texts.join("\n");
 
@@ -292,7 +298,7 @@ export function useTranslationSynopsis(opts: Opts) {
     } finally {
       setGenerating(null);
     }
-  }, [sourceStorage, translationStorage, model, userApiKeys, sourceLang, isRu]);
+  }, [sourceStorage, translationStorage, model, userApiKeys, sourceLang, isRu, excludedCharIds]);
 
   return {
     bookMeta,

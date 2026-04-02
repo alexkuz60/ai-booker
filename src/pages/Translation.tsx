@@ -35,6 +35,7 @@ import { useSaveTranslation } from "@/hooks/useSaveTranslation";
 import { paths } from "@/lib/projectPaths";
 import type { TocChapter, CharacterIndex } from "@/pages/parser/types";
 import { readCharacterIndex, getChapterCharacterIds, getSceneCharacterIds } from "@/lib/localCharacters";
+import { readExcludedChars, saveExcludedChars } from "@/lib/translationSynopsis";
 import type { AiRoleId } from "@/config/aiRoles";
 import {
   Select,
@@ -91,6 +92,7 @@ export default function Translation() {
   const [selectedSegment, setSelectedSegment] = useState<SelectedSegmentData | null>(null);
   const [sceneSegmentIds, setSceneSegmentIds] = useState<string[]>([]);
   const [synopsisOpen, setSynopsisOpen] = useState(false);
+  const [excludedCharIds, setExcludedCharIds] = useState<Set<string>>(new Set());
 
   // Translation storage (mirror OPFS project)
   const { translationStorage, exists: transProjectExists, loading: transLoading, refresh: refreshTransStorage } =
@@ -177,6 +179,7 @@ export default function Translation() {
     model: translationModel,
     userApiKeys: apiKeys,
     sourceLang,
+    excludedCharIds,
   });
 
   // Load synopses when chapter/scene change
@@ -190,7 +193,6 @@ export default function Translation() {
   // ── Chapter characters for synopsis dialog ─────────────
   const [chapterChars, setChapterChars] = useState<CharacterIndex[]>([]);
   const [sceneCharIds, setSceneCharIds] = useState<Set<string>>(new Set());
-  const [excludedCharIds, setExcludedCharIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!storage || !selectedChapter?.chapterId) { setChapterChars([]); return; }
@@ -226,8 +228,27 @@ export default function Translation() {
     }).catch(() => { if (!cancelled) setSceneCharIds(new Set()); });
     return () => { cancelled = true; };
   }, [storage, selectedSceneId]);
+  // ── Load excluded chars from OPFS on chapter change ─────
+  useEffect(() => {
+    const store = translationStorage || storage;
+    if (!store || !selectedChapter?.chapterId) { setExcludedCharIds(new Set()); return; }
+    let cancelled = false;
+    readExcludedChars(store, selectedChapter.chapterId).then((ids) => {
+      if (!cancelled) setExcludedCharIds(ids);
+    }).catch(() => { if (!cancelled) setExcludedCharIds(new Set()); });
+    return () => { cancelled = true; };
+  }, [storage, translationStorage, selectedChapter?.chapterId]);
 
-  // ── Extracted actions ───────────────────────────────────
+  // ── Save excluded chars handler ─────────────────────────
+  const handleExcludedCharsChange = useCallback((ids: Set<string>) => {
+    setExcludedCharIds(ids);
+    const store = translationStorage || storage;
+    if (store && selectedChapter?.chapterId) {
+      saveExcludedChars(store, selectedChapter.chapterId, ids).catch(console.error);
+    }
+  }, [storage, translationStorage, selectedChapter?.chapterId]);
+
+
   const {
     creating,
     createProgress,
@@ -770,7 +791,7 @@ export default function Translation() {
         chapterCharacters={chapterChars}
         sceneCharIds={sceneCharIds}
         excludedCharIds={excludedCharIds}
-        onExcludedCharsChange={setExcludedCharIds}
+        onExcludedCharsChange={handleExcludedCharsChange}
       />
     </motion.div>
   );
