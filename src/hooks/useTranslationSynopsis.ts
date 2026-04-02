@@ -298,7 +298,7 @@ export function useTranslationSynopsis(opts: Opts) {
     } finally {
       setGenerating(null);
     }
-  }, [sourceStorage, translationStorage, model, userApiKeys, sourceLang, isRu]);
+  }, [sourceStorage, translationStorage, model, userApiKeys, sourceLang, isRu, excludedCharIds]);
 
   return {
     bookMeta,
