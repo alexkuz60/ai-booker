@@ -329,6 +329,12 @@ export function SynopsisContextDialog({
                     characters={chapterCharacters}
                     isRu={isRu}
                     onSelect={setSelectedCharId}
+                    excludedIds={excludedCharIds}
+                    onToggleExclude={(id) => {
+                      const next = new Set(excludedCharIds);
+                      if (next.has(id)) next.delete(id); else next.add(id);
+                      onExcludedCharsChange?.(next);
+                    }}
                   />
                 )}
               </div>
