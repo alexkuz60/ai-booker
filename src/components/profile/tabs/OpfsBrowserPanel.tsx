@@ -283,7 +283,7 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
             </div>
           )}
           {entries !== null && !loading && (
-            <ScrollArea className="max-h-[400px]">
+            <ScrollArea className="h-[calc(100vh-24rem)] min-h-[250px] max-h-[600px]">
               <div className="space-y-0.5">
                 {topFolders.map(folder => (
                   <div key={folder.name} className="group relative">
