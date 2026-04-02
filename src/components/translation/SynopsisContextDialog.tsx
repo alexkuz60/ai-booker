@@ -332,6 +332,7 @@ export function SynopsisContextDialog({
                     characters={chapterCharacters}
                     isRu={isRu}
                     onSelect={setSelectedCharId}
+                    sceneCharIds={sceneCharIds}
                     excludedIds={excludedCharIds}
                     onToggleExclude={(id) => {
                       const next = new Set(excludedCharIds);
