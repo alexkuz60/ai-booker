@@ -178,6 +178,7 @@ export default function Translation() {
     model: translationModel,
     userApiKeys: apiKeys,
     sourceLang,
+    excludedCharIds,
   });
 
   // Load synopses when chapter/scene change
