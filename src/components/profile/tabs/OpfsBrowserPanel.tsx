@@ -200,7 +200,7 @@ interface OpfsBrowserPanelProps {
 export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
   const [entries, setEntries] = useState<OpfsEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ path: string; name: string; kind: "file" | "directory" } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   // JSON viewer — inline in right panel
@@ -242,13 +242,26 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
     }
   }, []);
 
+  const handleRequestDelete = useCallback((path: string, name: string, kind: "file" | "directory") => {
+    setDeleteTarget({ path, name, kind });
+  }, []);
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const root = await navigator.storage.getDirectory();
-      await root.removeEntry(deleteTarget, { recursive: true });
-      toast.success(`«${deleteTarget}» ${isRu ? "удалено" : "deleted"}`);
+      const parts = deleteTarget.path.split("/").filter(Boolean);
+      const entryName = parts.pop()!;
+      let dir: FileSystemDirectoryHandle = await navigator.storage.getDirectory() as unknown as FileSystemDirectoryHandle;
+      for (const p of parts) {
+        dir = await dir.getDirectoryHandle(p);
+      }
+      await dir.removeEntry(entryName, { recursive: true });
+      toast.success(`«${deleteTarget.name}» ${isRu ? "удалено" : "deleted"}`);
+      // Clear viewer if deleted file was being viewed
+      if (jsonViewer && jsonViewer.path.startsWith(deleteTarget.path)) {
+        setJsonViewer(null);
+      }
       setDeleteTarget(null);
       await scan();
     } catch (err: any) {
