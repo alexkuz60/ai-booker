@@ -93,7 +93,7 @@ export function useTranslationStorage(
 ): UseTranslationStorageReturn {
   const [translationStorage, setTranslationStorage] = useState<ProjectStorage | null>(null);
   const [exists, setExists] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [tick, setTick] = useState(0);
 
   const refresh = useCallback(() => {

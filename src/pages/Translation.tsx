@@ -392,7 +392,7 @@ export default function Translation() {
   }, [storage, isOpen]);
 
   // ── No project open ────────────────────────────────────
-  if (!initialized || transLoading) {
+  if (!initialized) {
     return (
       <motion.div
         className="flex-1 flex flex-col h-full items-center justify-center gap-4 text-muted-foreground"
@@ -424,7 +424,7 @@ export default function Translation() {
     );
   }
 
-  if (transProjectExists && !translationStorage) {
+  if (!transLoading && transProjectExists && !translationStorage) {
     return (
       <motion.div
         className="flex-1 flex flex-col h-full items-center justify-center gap-4 px-6 text-center text-muted-foreground"
@@ -478,7 +478,7 @@ export default function Translation() {
     );
   }
 
-  if (!transProjectExists) {
+  if (!transLoading && !transProjectExists) {
     return (
       <motion.div
         className="flex-1 flex flex-col h-full items-center justify-center gap-4 px-6 text-center text-muted-foreground"
