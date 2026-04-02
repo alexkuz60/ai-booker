@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { t } from "@/pages/parser/i18n";
 import type { Scene, TocChapter, Step, ChapterStatus, BookRecord } from "@/pages/parser/types";
 import { normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
-import type { ProjectStorage } from "@/lib/projectStorage";
+import type { ProjectStorage, ProjectMeta } from "@/lib/projectStorage";
 import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
 import { normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 import { detectFileFormat, getSourcePath, findSourceBlob, type FileFormat } from "@/lib/fileFormatUtils";
@@ -188,12 +188,18 @@ export function useBookRestore({
 
     // ── Preserve source file from existing OPFS before wipe ──
     let preservedSourceBlob: Blob | null = null;
+    let preservedTranslationProject: ProjectMeta["translationProject"] | undefined;
     const existingProjects = localProjectNamesByBookId.get(book.id) || [];
     if (existingProjects.length > 0) {
       try {
         const { OPFSStorage } = await import("@/lib/projectStorage");
         const oldStore = await OPFSStorage.openExisting(existingProjects[0]);
         if (oldStore?.isReady) {
+          const oldMeta = await oldStore.readJSON<ProjectMeta>("project.json").catch(() => null);
+          if (oldMeta?.translationProject) {
+            preservedTranslationProject = oldMeta.translationProject;
+          }
+
           const found = await findSourceBlob(oldStore);
           if (found) {
             preservedSourceBlob = found.blob;
@@ -239,6 +245,21 @@ export function useBookRestore({
         preservedSourceBlob,
         userId,
       });
+
+      if (preservedTranslationProject) {
+        try {
+          const targetMeta = await targetStorage.readJSON<ProjectMeta>("project.json");
+          if (targetMeta) {
+            await targetStorage.writeJSON("project.json", {
+              ...targetMeta,
+              translationProject: targetMeta.translationProject ?? preservedTranslationProject,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        } catch (err) {
+          console.warn("[OpenBook] Failed to restore translation backlink:", err);
+        }
+      }
 
       // Apply results to React state
       updatePdfRef(result.pdfProxy);

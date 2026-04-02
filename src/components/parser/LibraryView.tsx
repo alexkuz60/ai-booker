@@ -56,7 +56,7 @@ function LibraryViewInner({
   onStageNavigate, onProjectReset,
   progressMap: externalProgressMap, setProgressMap: externalSetProgressMap,
 }: LibraryViewProps) {
-  const { bumpProgressVersion } = useProjectStorageContext();
+  const { bumpProgressVersion, storage: activeStorage, meta: activeMeta } = useProjectStorageContext();
   const syncedBookIds = useMemo(() => new Set(serverBooks.map(b => b.id)), [serverBooks]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -72,6 +72,43 @@ function LibraryViewInner({
     return progressMap[bookId] ?? createEmptyPipelineProgress();
   }, [progressMap]);
 
+  const resolveSourceProject = useCallback(async (bookId: string) => {
+    if (activeStorage && activeMeta?.bookId === bookId && !activeMeta.targetLanguage && !activeMeta.sourceProjectName) {
+      return { store: activeStorage, meta: activeMeta };
+    }
+
+    const projects = await OPFSStorage.listProjects();
+    const candidates = await Promise.all(projects.map(async (projectName) => {
+      const store = await OPFSStorage.openExisting(projectName);
+      if (!store) return null;
+
+      const meta = await store.readJSON<ProjectMeta>("project.json");
+      if (!meta || meta.bookId !== bookId || meta.targetLanguage || meta.sourceProjectName) {
+        return null;
+      }
+
+      const updatedAt = Number.isFinite(new Date(meta.updatedAt).getTime())
+        ? new Date(meta.updatedAt).getTime()
+        : 0;
+      const createdAt = Number.isFinite(new Date(meta.createdAt).getTime())
+        ? new Date(meta.createdAt).getTime()
+        : 0;
+
+      return {
+        store,
+        meta,
+        score: Math.max(updatedAt, createdAt) + (meta.translationProject?.projectName ? 1_000_000_000_000_000 : 0),
+      };
+    }));
+
+    const sorted = candidates
+      .filter((candidate): candidate is NonNullable<typeof candidate> => !!candidate)
+      .sort((a, b) => b.score - a.score);
+
+    if (sorted.length === 0) return null;
+    return { store: sorted[0].store, meta: sorted[0].meta };
+  }, [activeStorage, activeMeta]);
+
   const handleToggleStep = useCallback(async (bookId: string, stepId: PipelineStepId, done: boolean) => {
     // Update local state immediately
     setProgressMap(prev => ({
@@ -81,22 +118,16 @@ function LibraryViewInner({
 
     // Persist to OPFS
     try {
-      const projects = await OPFSStorage.listProjects();
-      for (const pn of projects) {
-        const store = await OPFSStorage.openExisting(pn);
-        if (!store) continue;
-        const meta = await store.readJSON<Record<string, unknown>>("project.json");
-        if (meta?.bookId === bookId && !meta?.targetLanguage && !meta?.sourceProjectName) {
-          await writePipelineStep(store, stepId, done);
-          // Notify sidebar and other consumers to re-read progress
-          bumpProgressVersion();
-          break;
-        }
+      const source = await resolveSourceProject(bookId);
+      if (source) {
+        await writePipelineStep(source.store, stepId, done);
+        // Notify sidebar and other consumers to re-read progress
+        bumpProgressVersion();
       }
     } catch (e) {
       console.error("[LibraryView] Failed to persist pipeline step:", e);
     }
-  }, [bumpProgressVersion]);
+  }, [bumpProgressVersion, resolveSourceProject]);
 
   const startRename = (book: BookRecord) => {
     setEditingId(book.id);
@@ -130,22 +161,10 @@ function LibraryViewInner({
     if (stageId === "trans_project") {
       // First stage — create translation project (with confirm if exists)
       try {
-        const projects = await OPFSStorage.listProjects();
-        let sourceStore: any = null;
-        let sourceMeta: ProjectMeta | null = null;
-        for (const pn of projects) {
-          const store = await OPFSStorage.openExisting(pn);
-          if (!store) continue;
-          const meta = await store.readJSON<ProjectMeta>("project.json");
-          if (meta?.bookId === book.id && !meta?.targetLanguage && !meta?.sourceProjectName) {
-            sourceStore = store;
-            sourceMeta = meta;
-            break;
-          }
-        }
-        if (!sourceStore || !sourceMeta) return;
+        const source = await resolveSourceProject(book.id);
+        if (!source) return;
 
-        const exists = await translationProjectExists(sourceStore, sourceMeta);
+        const exists = await translationProjectExists(source.store, source.meta);
         if (exists) {
           setTransCreateConfirm({ book, exists: true });
         } else {
@@ -159,27 +178,15 @@ function LibraryViewInner({
       // Other stages — navigate to translation page
       onStageNavigate?.(book, "/translation");
     }
-  }, [onStageNavigate]);
+  }, [doCreateTranslationProject, onStageNavigate, resolveSourceProject]);
 
   const doCreateTranslationProject = useCallback(async (book: BookRecord) => {
     setTransCreating(true);
     try {
-      const projects = await OPFSStorage.listProjects();
-      let sourceStore: any = null;
-      let sourceMeta: ProjectMeta | null = null;
-      for (const pn of projects) {
-        const store = await OPFSStorage.openExisting(pn);
-        if (!store) continue;
-        const meta = await store.readJSON<ProjectMeta>("project.json");
-        if (meta?.bookId === book.id && !meta?.targetLanguage && !meta?.sourceProjectName) {
-          sourceStore = store;
-          sourceMeta = meta;
-          break;
-        }
-      }
-      if (!sourceStore || !sourceMeta) return;
+      const source = await resolveSourceProject(book.id);
+      if (!source) return;
 
-      const readiness = await checkTranslationReadiness(sourceStore);
+      const readiness = await checkTranslationReadiness(source.store);
       const readyIndices = Array.from(readiness.readyChapters.keys());
       if (readyIndices.length === 0) {
         toast.error(isRu
@@ -188,10 +195,10 @@ function LibraryViewInner({
         return;
       }
 
-      const tLang = (sourceMeta.language === "ru" ? "en" : "ru") as "en" | "ru";
+      const tLang = (source.meta.language === "ru" ? "en" : "ru") as "en" | "ru";
       await createTranslationProject({
-        sourceStorage: sourceStore,
-        sourceMeta,
+        sourceStorage: source.store,
+        sourceMeta: source.meta,
         targetLanguage: tLang,
         chapterIndices: readyIndices,
       });
@@ -210,7 +217,7 @@ function LibraryViewInner({
       setTransCreating(false);
       setTransCreateConfirm(null);
     }
-  }, [isRu, handleToggleStep]);
+  }, [isRu, handleToggleStep, resolveSourceProject]);
 
   const renderBookCard = (book: BookRecord, actions: React.ReactNode, timeline?: React.ReactNode, translationTimeline?: React.ReactNode) => {
     const hasTranslation = !!translationTimeline;
