@@ -93,6 +93,7 @@ export function SynopsisContextDialog({
   chapterTitle,
   sceneTitle,
   chapterCharacters = [],
+  sceneCharIds = new Set(),
   excludedCharIds = new Set(),
   onExcludedCharsChange,
 }: Props) {
