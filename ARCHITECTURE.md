@@ -295,7 +295,7 @@ interface ProjectStorage {
 
 **Direct-link стратегия:** `useTranslationStorage` читает имя проекта **только** из `project.json.translationProject.projectName` (backlink). Один вызов `OPFSStorage.openExisting()` + валидация `sourceProjectName`/`targetLanguage`/`bookId` в метаданных mirror-проекта. Никаких localStorage-подсказок, `_translation_link.json`, канонических имён-кандидатов, OPFS meta-сканов, retry-таймеров, visibility/focus-слушателей. `refresh()` вызывается только явно после создания/восстановления проекта.
 
-**Guard:** Translation.tsx ждёт `initialized` из `ProjectStorageContext` перед рендерингом (спиннер). Если зеркало не найдено — guard-экран с кнопками «Открыть Библиотеку» / «Перевод ← сервер».
+**Guard:** Translation.tsx ждёт только `initialized` из `ProjectStorageContext` перед рендерингом (спиннер). Загрузка translation storage (`transLoading`) **НЕ блокирует** основной UI — страница рендерится сразу после инициализации базового проекта. Состояния «Проект не создан» или «Переподключение» отображаются только после завершения асинхронной проверки `transLoading`, что исключает кратковременное мерцание ошибочных состояний. Если зеркало не найдено — guard-экран с кнопками «Открыть Библиотеку» / «Перевод ← сервер».
 
 #### Карта качества арт-перевода (SegmentQualityChart)
 
