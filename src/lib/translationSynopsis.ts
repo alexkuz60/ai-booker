@@ -84,6 +84,14 @@ export async function readSceneSynopsis(
   return storage.readJSON<SceneSynopsis>(synopsisPaths.scene(sceneId));
 }
 
+export async function readExcludedChars(
+  storage: ProjectStorage,
+  chapterId: string,
+): Promise<Set<string>> {
+  const arr = await storage.readJSON<string[]>(synopsisPaths.excludedChars(chapterId));
+  return new Set(arr ?? []);
+}
+
 // ─── Write helpers ──────────────────────────────────────────────────
 
 export async function saveBookMeta(
