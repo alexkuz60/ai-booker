@@ -277,31 +277,43 @@ interface ProjectStorage {
 | `src/components/library/PipelineTimeline.tsx` | UI-компонент таймлайна (маппинг stepId → стадия — чисто визуальный) |
 | `src/components/parser/LibraryView.tsx` | Вызывает `bumpProgressVersion()` после записи шага в OPFS |
 
-### 1.11 Translation Project Link и облачная синхронизация перевода
+### 1.11 Архитектура Арт-перевода (SSOT — Single Source of Truth)
 
-`project.json.translationProject` — ссылка на параллельный проект арт-перевода. Хранится в исходном проекте (не в зеркале).
+Данные перевода хранятся **внутри основного проекта** в языковых поддиректориях сцен. Отдельные зеркальные OPFS-проекты **НЕ используются**.
+
+#### Структура данных
+
+`project.json.translationLanguages` — массив активных языков перевода:
 
 ```json
 {
-  "translationProject": {
-    "projectName": "Book_EN",
-    "targetLanguage": "en",
-    "createdAt": "2026-03-30T12:00:00Z"
-  }
+  "translationLanguages": ["en"]
 }
 ```
 
-Зеркальный проект по-прежнему хранит `sourceProjectName` и `targetLanguage` в своём `project.json`. Связь двунаправленная: исходный → `translationProject`, зеркало → `sourceProjectName`.
+Все данные перевода размещаются по путям вида:
+```
+chapters/{chapterId}/scenes/{sceneId}/{lang}/storyboard.json
+chapters/{chapterId}/scenes/{sceneId}/{lang}/radar-{stage}.json
+chapters/{chapterId}/scenes/{sceneId}/{lang}/audio_meta.json
+chapters/{chapterId}/scenes/{sceneId}/{lang}/mixer_state.json
+chapters/{chapterId}/scenes/{sceneId}/{lang}/clip_plugins.json
+chapters/{chapterId}/scenes/{sceneId}/{lang}/audio/tts/{segmentId}.mp3
+```
 
-#### Разрешение проекта перевода
+Пути генерируются через `paths.translationStoryboard()`, `paths.translationRadar()` и др. (`projectPaths.ts`).
 
-**Direct-link стратегия:** `useTranslationStorage` читает имя проекта **только** из `project.json.translationProject.projectName` (backlink). Один вызов `OPFSStorage.openExisting()` + валидация `sourceProjectName`/`targetLanguage`/`bookId` в метаданных mirror-проекта. Никаких localStorage-подсказок, `_translation_link.json`, канонических имён-кандидатов, OPFS meta-сканов, retry-таймеров, visibility/focus-слушателей. `refresh()` вызывается только явно после создания/восстановления проекта.
+#### Инициализация перевода
 
-**Guard:** Translation.tsx ждёт только `initialized` из `ProjectStorageContext` перед рендерингом (спиннер). Загрузка translation storage (`transLoading`) **НЕ блокирует** основной UI — страница рендерится сразу после инициализации базового проекта. Состояния «Проект не создан» или «Переподключение» отображаются только после завершения асинхронной проверки `transLoading`, что исключает кратковременное мерцание ошибочных состояний. Если зеркало не найдено — guard-экран с кнопками «Открыть Библиотеку» / «Перевод ← сервер».
+Вместо создания зеркального OPFS-проекта — добавление кода языка в `translationLanguages[]` в `project.json`. Это активирует пайплайн без дополнительной инфраструктуры.
+
+#### Guard на странице Translation
+
+Translation.tsx ждёт `initialized` из `ProjectStorageContext` перед рендерингом. Доступность перевода определяется наличием `meta?.translationLanguages?.length > 0`. Если перевод не активирован — guard-экран с кнопкой инициализации.
 
 #### Карта качества арт-перевода (SegmentQualityChart)
 
-Интерактивная гистограмма с адаптивной шириной бинов, отображающая per-segment качество по 5 осям (С/Т/Р/Ф/К). Данные читаются из OPFS-файлов `radar-literal.json`, `radar-literary.json`, `radar-critique.json`.
+Интерактивная гистограмма с адаптивной шириной бинов, отображающая per-segment качество по 5 осям (С/Т/Р/Ф/К). Данные читаются из OPFS-файлов `{lang}/radar-literal.json`, `{lang}/radar-literary.json`, `{lang}/radar-critique.json`.
 
 **Визуальные параметры:**
 - Шкала Y: 30%–100% (Y_BASE = 0.3 — нижняя граница столбцов)
@@ -314,19 +326,27 @@ interface ProjectStorage {
 - Выбор сегмента в билингве → `selectedSegmentId` → подсветка соответствующего бина (persistent highlight: вертикальная `ReferenceLine` + затемнение остальных бинов)
 - Выделение сохраняется до клика по другому бину или выбора другого сегмента
 
-**Облачная синхронизация перевода:**
-- При нажатии «На сервер» на странице перевода сохраняются оба проекта: основной (DB upsert) и зеркало перевода (ZIP → `book-uploads` bucket, путь `{userId}/translations/{projectName}.zip`).
-- Кириллица в именах файлов транслитерируется в латиницу через `CYRILLIC_MAP` (ограничение Supabase Storage).
-- Восстановление перевода: кнопка «Перевод ← сервер» загружает ZIP из облака → wipe OPFS-зеркала → импорт.
+#### Облачная синхронизация перевода (Storage ZIP)
+
+- При нажатии «На сервер» данные перевода (JSON-файлы + TTS-аудио из lang-поддиректорий + папка `synopsis/`) упаковываются в ZIP и загружаются в `book-uploads/{userId}/translation_{bookId}.zip`.
+- Метаданные `translationLanguages` сохраняются в `user_settings` (ключ `translation-langs-{bookId}`).
+- Восстановление: ZIP скачивается из облака → файлы распаковываются в OPFS-проект → `translationLanguages` синхронизируются в `project.json`.
 - RLS-политики бакета `book-uploads` включают INSERT, SELECT, UPDATE и DELETE для `authenticated` (по `auth.uid()` = первый сегмент пути).
+
+**Устаревшие файлы (удалены):**
+- `useTranslationStorage` — хук зеркального проекта
+- `useSaveTranslation` — сохранение зеркала
+- `translationMirrorResolver` — поиск зеркального проекта
+- `translationProject.ts` — создание зеркала (кроме `checkTranslationReadiness`)
+- `_translation_link.json` — файл-ссылка между проектами
 
 **Диалог синхронизации (`SyncProgressDialog`):**
 - Автопрокрутка к текущему активному шагу (`scrollIntoView`).
 - Инкрементальный счётчик сцен при сохранении раскадровки (например, `3/15`).
-- Шаг `translation` отображает статус сохранения проекта перевода.
+- Шаг `translation` отображает статус сохранения/восстановления данных перевода.
 
 **Сохранение метаданных (`useSaveBookToProject`):**
-- При формировании `nextMeta` используется spread `...freshMeta` для сохранения всех существующих полей (`pipelineProgress`, `translationProject`, `fileFormat`, `usedImpulseIds` и др.).
+- При формировании `nextMeta` используется spread `...freshMeta` для сохранения всех существующих полей (`pipelineProgress`, `translationLanguages`, `fileFormat`, `usedImpulseIds` и др.).
 - Запрещено: конструировать `nextMeta` вручную с перечислением полей — это приводит к потере метаданных.
 
 ### 1.12a Синхронизация между устройствами (Wipe-and-Deploy)

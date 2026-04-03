@@ -303,11 +303,13 @@
 ## 16. Арт-перевод (Translation) 🔧
 
 **Модуль:** Перевод (`/translation`)
-**Хуки:** `useTranslationStorage`, `useSaveTranslation`, `useTranslationBatch`, `useSegmentTranslation`, `useSegmentLiteraryEdit`, `useSegmentCritique`
+**Хуки:** `useTranslationActions`, `useTranslationBatch`, `useSegmentTranslation`, `useSegmentLiteraryEdit`, `useSegmentCritique`
 
-### Разрешение проекта перевода
-- **One-shot:** backlink из `project.json` → `localStorage` → каноническое имя. Первый найденный через `openExisting` — результат.
-- **Guard:** Translation.tsx ждёт `initialized` перед рендерингом. Если зеркало не найдено — guard-экран.
+### Архитектура (SSOT)
+- Данные перевода хранятся **внутри основного проекта** в языковых поддиректориях: `chapters/{ch}/scenes/{sc}/{lang}/`.
+- Список активных языков — массив `translationLanguages` в `project.json`.
+- Отдельные зеркальные OPFS-проекты **НЕ используются** (удалены `useTranslationStorage`, `useSaveTranslation`, `translationMirrorResolver`).
+- Guard на Translation.tsx проверяет `meta?.translationLanguages?.length > 0`.
 
 ### Пайплайн перевода
 Трёхагентный пайплайн (Переводчик → Литредактор → Критик) с итеративным улучшением:
@@ -317,13 +319,13 @@
 4. **Итерация** — повтор шагов 2-3 если `radar.weighted < qualityThreshold` (до 2 итераций)
 
 ### Визуализация качества
-- **SegmentQualityChart** — гистограмма per-segment качества по 5 осям (С/Т/Р/Ф/К) с данными из OPFS (radar-literal/literary/critique.json)
+- **SegmentQualityChart** — гистограмма per-segment качества по 5 осям (С/Т/Р/Ф/К) с данными из OPFS (`{lang}/radar-literal.json` и др.)
 - **Двусторонняя синхронизация** — клик по бину ↔ выбор сегмента в билингве (persistent highlight)
 - **BilingualSegmentsView** — аккордеон single-open с приоритетом художественной правки над подстрочником
 
-### Серверная синхронизация
-- ✅ **Авто-пуш перевода** — при нажатии «На сервер» на странице перевода автоматически сохраняются оба проекта (основной + зеркало перевода)
-- ✅ **Восстановление перевода** — кнопка «Перевод ← сервер» загружает translation-зеркало из облака
+### Серверная синхронизация (Storage ZIP)
+- ✅ **Авто-пуш перевода** — при нажатии «На сервер» данные перевода (lang-поддиректории + `synopsis/`) упаковываются в ZIP → `book-uploads/{userId}/translation_{bookId}.zip`
+- ✅ **Восстановление перевода** — ZIP скачивается из облака → распаковывается в OPFS-проект → `translationLanguages` синхронизируются в `project.json`
 
 ### Роутинг
 - `/` → Home (лендинг)
