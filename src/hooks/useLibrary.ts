@@ -12,17 +12,7 @@ import { detectFileFormat } from "@/lib/fileFormatUtils";
 import { getProjectActivityMs } from "@/lib/projectActivity";
 import { paths } from "@/lib/projectPaths";
 import { readPipelineProgress } from "@/hooks/usePipelineProgress";
-import {
-  getTranslationMirrorSourceProjectName,
-  isLikelyTranslationMirrorName,
-} from "@/lib/translationMirrorResolver";
-
 const OPFS_NON_PROJECT_DIRS = new Set(["atmo-cache", "ir-cache", "sfx-cache"]);
-
-function isNestedTranslationMirrorMeta(meta: Record<string, unknown> | null): boolean {
-  const source = typeof meta?.sourceProjectName === "string" ? meta.sourceProjectName : "";
-  return !!source && !!getTranslationMirrorSourceProjectName(source);
-}
 
 type LocalLibraryCandidate = {
   record: BookRecord;

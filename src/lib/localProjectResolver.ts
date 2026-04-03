@@ -9,22 +9,16 @@
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
 import { getProjectActivityMs } from "@/lib/projectActivity";
 import { stripFileExtension } from "@/lib/fileFormatUtils";
-import { isLikelyTranslationMirrorName } from "@/lib/translationMirrorResolver";
-
-/** Read project.json and return true if this folder is a translation mirror */
+/** Read project.json and return true if this folder is a legacy translation mirror */
 async function isMirrorByMeta(projectName: string): Promise<boolean> {
   try {
     const store = await OPFSStorage.openExisting(projectName);
-    if (!store) return false; // folder doesn't exist — not a mirror
+    if (!store) return false;
     const meta = await store.readJSON<{ targetLanguage?: string; sourceProjectName?: string }>("project.json");
-    if (!meta) {
-      // project.json unreadable — fall back to name heuristic (safe side: treat as mirror)
-      console.warn("[Resolver] project.json unreadable for", projectName, "— treating as potential mirror by name");
-      return isLikelyTranslationMirrorName(projectName);
-    }
+    if (!meta) return false;
     return Boolean(meta.targetLanguage || meta.sourceProjectName);
   } catch {
-    return isLikelyTranslationMirrorName(projectName);
+    return false;
   }
 }
 

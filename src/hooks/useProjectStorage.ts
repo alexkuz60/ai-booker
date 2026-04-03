@@ -53,13 +53,12 @@ async function resolveFreshestSourceProject(bookId: string): Promise<{
     }
 
     const freshness = await getProjectFreshness(store, meta);
-    const linkBonus = meta.translationProject?.projectName ? 1_000_000_000_000_000 : 0;
 
     return {
       name: projectName,
       store,
       meta,
-      score: freshness + linkBonus,
+      score: freshness,
     };
   }));
 
