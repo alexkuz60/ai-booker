@@ -12,6 +12,7 @@ import { downloadBlob } from "@/lib/projectZip";
 import { paths } from "@/lib/projectPaths";
 import { findSourceBlob, getMimeType, detectFileFormat } from "@/lib/fileFormatUtils";
 import { readSceneIndex } from "@/lib/sceneIndex";
+import { getProjectActivityMs } from "@/lib/projectActivity";
 
 const LAST_PROJECT_KEY = "booker_last_project";
 const LANG_SUFFIX_RE = /^(.*)_(EN|RU)$/i;
@@ -21,21 +22,6 @@ const LOCAL_RESET_KEYS = [
   "parser-nav-state",
   // К4: docx_chapter_texts and docx_html removed — now in-memory only
 ];
-
-function toTimestamp(value?: string): number {
-  if (!value) return 0;
-  const ts = new Date(value).getTime();
-  return Number.isFinite(ts) ? ts : 0;
-}
-
-async function getProjectFreshness(store: ProjectStorage, meta: ProjectMeta): Promise<number> {
-  const structure = await store.readJSON<{ updatedAt?: string }>(paths.structureToc()).catch(() => null);
-  return Math.max(
-    toTimestamp(meta.updatedAt),
-    toTimestamp(meta.createdAt),
-    toTimestamp(structure?.updatedAt),
-  );
-}
 
 async function resolveFreshestSourceProject(bookId: string): Promise<{
   name: string;
@@ -52,7 +38,7 @@ async function resolveFreshestSourceProject(bookId: string): Promise<{
       return null;
     }
 
-    const freshness = await getProjectFreshness(store, meta);
+    const freshness = await getProjectActivityMs(store);
 
     return {
       name: projectName,
