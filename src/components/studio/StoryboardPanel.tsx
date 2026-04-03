@@ -10,14 +10,9 @@ import { useStoryboardPersistence, type StoryboardSnapshot } from "@/hooks/useSt
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
 
 import { useBackgroundAnalysis } from "@/hooks/useBackgroundAnalysis";
-import { Loader2, Sparkles, BookOpen, AudioLines, CheckCircle2, XCircle, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck, AlertTriangle, X } from "lucide-react";
-import { RoleBadge } from "@/components/ui/RoleBadge";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, Sparkles, AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   type PhraseAnnotation,
@@ -27,10 +22,9 @@ import {
 
 import type { Phrase, Segment, CharacterOption } from "./storyboard/types";
 import { SEGMENT_CONFIG } from "./storyboard/constants";
-import { EditablePhrase } from "./storyboard/EditablePhrase";
-import { SegmentTypeBadge } from "./storyboard/SegmentTypeBadge";
-import { SpeakerBadge } from "./storyboard/SpeakerBadge";
 import { StressReviewPanel, type StressSuggestion } from "./storyboard/StressReviewPanel";
+import { StoryboardToolbar } from "./storyboard/StoryboardToolbar";
+import { StoryboardSegmentRow } from "./storyboard/StoryboardSegmentRow";
 import type { LocalTypeMappingEntry } from "@/lib/storyboardSync";
 import { deriveStoryboardTypeMappings } from "@/lib/storyboardCharacterRouting";
 
@@ -1139,218 +1133,44 @@ export function StoryboardPanel({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground font-body">
-            {segments.length} {isRu ? "фрагм." : "seg."} · {totalPhrases} {isRu ? "фраз" : "phrases"}
-            {inlineNarrationSegIds.size > 0 && (
-              <span className="ml-1.5 text-accent-foreground">
-                · <MessageCircle className="inline h-3 w-3 -mt-0.5" /> {inlineNarrationSegIds.size}
-              </span>
-            )}
-          </span>
-          {analysisPending && segments.length > 0 && (
-            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground font-body">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              {isRu ? "Переанализ в фоне…" : "Re-analysis in background…"}
-            </span>
-          )}
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="sm" disabled={bgAnalyzing || !sceneContent} className="gap-1.5 h-7 text-xs">
-                {bgAnalyzing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                {isRu ? "Переанализ" : "Re-analyze"}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>{isRu ? "Переанализировать сцену?" : "Re-analyze scene?"}</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {isRu
-                    ? "Текущая раскадровка будет заменена. Существующие фразы, аудио и настройки голосов для этой сцены будут удалены."
-                    : "Current segmentation will be replaced. Existing phrases, audio and voice settings for this scene will be deleted."}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
-                <AlertDialogAction onClick={runAnalysis}>
-                  {isRu ? "Переанализ" : "Re-analyze"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 gap-1.5 text-xs"
-            disabled={!canMerge || merging || synthesizing}
-            onClick={handleMergeSegments}
-            title={isRu ? "Объединить выбранные соседние блоки" : "Merge selected adjacent segments"}
-          >
-            {merging ? <Loader2 className="h-3 w-3 animate-spin" /> : <Merge className="h-3 w-3" />}
-            {merging ? (isRu ? "Слияние…" : "Merging…") : (isRu ? "Объединить" : "Merge")}
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive"
-                disabled={mergeChecked.size === 0 || deleting || synthesizing}
-                title={isRu ? "Удалить выбранные блоки" : "Delete selected segments"}
-              >
-                {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                {deleting ? (isRu ? "Удаление…" : "Deleting…") : (isRu ? "Удалить" : "Delete")}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>{isRu ? "Удалить блоки?" : "Delete segments?"}</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {isRu
-                    ? `Будет удалено ${mergeChecked.size} блок(ов) вместе с фразами и аудио. Это действие нельзя отменить.`
-                    : `${mergeChecked.size} segment(s) will be deleted along with phrases and audio. This cannot be undone.`}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>{isRu ? "Отмена" : "Cancel"}</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteSegments} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                  {isRu ? "Удалить" : "Delete"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-          {dialogueCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={runDetectNarrations}
-              disabled={detecting || bgAnalyzing || synthesizing}
-              className="gap-1.5 h-7 text-xs"
-              title={isRu ? "Поиск авторских вставок в диалогах" : "Detect narrator insertions in dialogues"}
-            >
-              {detecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <ScanSearch className="h-3 w-3" />}
-              {detecting ? (isRu ? "Поиск…" : "Detecting…") : (isRu ? "Вставки" : "Narrations")}
-            </Button>
-          )}
-          {segments.length > 0 && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={correctingStress || bgAnalyzing || synthesizing}
-                  className="gap-1.5 h-7 text-xs"
-                  title={isRu ? "Коррекция ударений" : "Stress correction"}
-                >
-                  {correctingStress ? <Loader2 className="h-3 w-3 animate-spin" /> : <SpellCheck className="h-3 w-3" />}
-                  {isRu ? "Ударения" : "Stress"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-56 p-2" align="start">
-                <div className="flex flex-col gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="justify-start gap-2 h-8 text-xs"
-                    onClick={() => runStressCorrection("suggest")}
-                    disabled={correctingStress}
-                  >
-                    <Sparkles className="h-3 w-3" />
-                    {isRu ? "Найти неоднозначные" : "Find ambiguous"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="justify-start gap-2 h-8 text-xs"
-                    onClick={() => runStressCorrection("correct")}
-                    disabled={correctingStress}
-                  >
-                    <CheckCircle2 className="h-3 w-3" />
-                    {isRu ? "Применить словарь" : "Apply dictionary"}
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
-          {staleAudioSegIds.size > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={cleanStaleInlineAudio}
-              disabled={cleaningMetadata || synthesizing}
-              className="gap-1.5 h-7 text-xs text-destructive hover:text-destructive"
-              title={isRu
-                ? `Очистить ${staleAudioSegIds.size} устаревших аудио-вставок (без ре-синтеза)`
-                : `Clear ${staleAudioSegIds.size} stale audio metadata (no re-synthesis)`}
-            >
-              {cleaningMetadata ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eraser className="h-3 w-3" />}
-              {staleAudioSegIds.size}
-            </Button>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="flex items-center gap-1 border-r border-border pr-2 mr-0.5">
-            <Timer className="h-3 w-3 text-muted-foreground" />
-            {[1, 2, 3].map((sec) => (
-              <button
-                key={sec}
-                onClick={() => onSilenceSecChange?.(sec)}
-                className={cn(
-                  "h-5 w-5 text-[10px] font-mono rounded transition-colors",
-                  (silenceSec ?? 2) === sec
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                )}
-                title={isRu ? `Тишина в начале: ${sec}с` : `Start silence: ${sec}s`}
-              >
-                {sec}
-              </button>
-            ))}
-            <span className="text-[10px] text-muted-foreground ml-0.5">
-              {isRu ? "сек" : "s"}
-            </span>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={runSynthesis}
-            disabled={synthesizing || bgAnalyzing || segments.length === 0}
-            className="gap-1.5 h-7 text-xs"
-          >
-            {synthesizing ? <AudioLines className="h-3 w-3 animate-pulse-glow text-primary" /> : <AudioLines className="h-3 w-3" />}
-            {synthesizing
-              ? (synthProgress || (isRu ? "Синтез…" : "Synth…"))
-              : (isRu ? "Синтез сцены" : "Synthesize")}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1.5 text-xs"
-            disabled={recalcRunning || !sceneId || audioStatus.size === 0}
-            onClick={handleRecalcDurations}
-            title={isRu ? "Пересчитать длительности из MP3" : "Recalculate durations from MP3"}
-          >
-            {recalcRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Timer className="h-3 w-3" />}
-            {isRu ? "Пересчёт" : "Recalc"}
-          </Button>
-          {segments.length > 0 && (
-            <label className="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground select-none border-l border-border pl-2 ml-0.5">
-              <Checkbox
-                checked={mergeChecked.size > 0 && mergeChecked.size === segments.length}
-                onCheckedChange={(checked) => {
-                  if (checked) {
-                    setMergeChecked(new Set(segments.map(s => s.segment_id)));
-                  } else {
-                    setMergeChecked(new Set());
-                  }
-                }}
-              />
-              {isRu ? "Все" : "All"}
-            </label>
-          )}
-        </div>
-      </div>
+      <StoryboardToolbar
+        isRu={isRu}
+        segmentCount={segments.length}
+        totalPhrases={totalPhrases}
+        inlineNarrationCount={inlineNarrationSegIds.size}
+        analysisPending={analysisPending}
+        bgAnalyzing={bgAnalyzing}
+        sceneContent={sceneContent}
+        synthesizing={synthesizing}
+        synthProgress={synthProgress}
+        canMerge={canMerge}
+        merging={merging}
+        deleting={deleting}
+        mergeCheckedSize={mergeChecked.size}
+        dialogueCount={dialogueCount}
+        detecting={detecting}
+        correctingStress={correctingStress}
+        staleAudioSegIdsSize={staleAudioSegIds.size}
+        cleaningMetadata={cleaningMetadata}
+        recalcRunning={recalcRunning}
+        sceneId={sceneId}
+        audioStatusSize={audioStatus.size}
+        silenceSec={silenceSec ?? 2}
+        segmentIds={segments.map(s => s.segment_id)}
+        getModelForRole={getModelForRole}
+        onRunAnalysis={runAnalysis}
+        onMergeSegments={handleMergeSegments}
+        onDeleteSegments={handleDeleteSegments}
+        onDetectNarrations={runDetectNarrations}
+        onStressCorrection={runStressCorrection}
+        onCleanStaleAudio={cleanStaleInlineAudio}
+        onRecalcDurations={handleRecalcDurations}
+        onSilenceSecChange={onSilenceSecChange}
+        onRunSynthesis={runSynthesis}
+        onSelectAll={() => setMergeChecked(new Set(segments.map(s => s.segment_id)))}
+        onDeselectAll={() => setMergeChecked(new Set())}
+        allSelected={mergeChecked.size > 0 && mergeChecked.size === segments.length}
+      />
       {contentDirty && segments.length > 0 && (
         <div className="flex items-center gap-2 px-4 py-2 bg-destructive/10 border-b border-destructive/20 shrink-0">
           <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
@@ -1373,170 +1193,34 @@ export function StoryboardPanel({
       )}
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-3 space-y-2">
-          {segments.map((seg) => {
-            const isSelected = selectedSegmentId === seg.segment_id;
-            return (
-              <div
-                key={seg.segment_id}
-                id={`storyboard-seg-${seg.segment_id}`}
-                className={`rounded-lg border overflow-hidden transition-all cursor-pointer ${
-                  isSelected
-                    ? "border-primary ring-2 ring-primary/30 bg-card"
-                    : "border-border bg-card/50"
-                }`}
-                onClick={() => onSelectSegment?.(isSelected ? null : seg.segment_id)}
-              >
-                {/* Segment header */}
-                <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 bg-muted/30">
-                  <RoleBadge roleId="screenwriter" model={getModelForRole("screenwriter")} isRu={isRu} size={12} />
-                  <SegmentTypeBadge
-                    segmentType={seg.segment_type}
-                    isRu={isRu}
-                    onChange={(newType) => updateSegmentType(seg.segment_id, newType)}
-                  />
-                  {seg.segment_type !== "narrator" && seg.segment_type !== "footnote" && (
-                    <SpeakerBadge
-                      speaker={seg.speaker}
-                      characters={characters}
-                      isRu={isRu}
-                      onChange={(newSpeaker) => updateSpeaker(seg.segment_id, newSpeaker)}
-                    />
-                  )}
-                  {seg.segment_type === "lyric" && (
-                    <span
-                      className="text-[10px] text-pink-400 italic"
-                      title={isRu
-                        ? "Рекомендация: Yandex filipp/madirus (SSML контроль), OpenAI Onyx (натуральность), Sber Bora (эмоции)"
-                        : "Tip: Yandex filipp/madirus (SSML control), OpenAI Onyx (natural), Sber Bora (emotions)"}
-                    >
-                      🎭 {isRu ? "стих" : "verse"}
-                    </span>
-                  )}
-                  {(() => {
-                    const audio = audioStatus.get(seg.segment_id);
-                    if (!audio) return null;
-                    const durSec = (audio.durationMs / 1000).toFixed(1);
-                    return audio.status === "ready" ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-green-400 font-mono">
-                        <CheckCircle2 className="h-3 w-3" />
-                        {durSec}s
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-destructive font-mono">
-                        <XCircle className="h-3 w-3" />
-                        {isRu ? "ошибка" : "error"}
-                      </span>
-                    );
-                  })()}
-                  {seg.inline_narrations && seg.inline_narrations.length > 0 && (
-                    <span
-                      className="inline-flex items-center gap-0.5 text-[10px] text-accent-foreground font-mono"
-                      title={isRu
-                        ? `${seg.inline_narrations.length} авторская вставка`
-                        : `${seg.inline_narrations.length} narrator insertion(s)`}
-                    >
-                      <MessageCircle className="h-3 w-3" />
-                      {seg.inline_narrations.length}
-                    </span>
-                  )}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); resynthSegment(seg.segment_id); }}
-                    disabled={resynthSegId === seg.segment_id || synthesizing}
-                    className="ml-1 p-0.5 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
-                    title={audioStatus.get(seg.segment_id)
-                      ? (isRu ? "Ре-синтез блока" : "Re-synthesize segment")
-                      : (isRu ? "Синтез блока" : "Synthesize segment")}
-                  >
-                    {resynthSegId === seg.segment_id
-                      ? <AudioLines className="h-3 w-3 animate-pulse-glow text-primary" />
-                      : audioStatus.get(seg.segment_id)
-                        ? <RefreshCw className="h-3 w-3" />
-                        : <AudioLines className="h-3 w-3" />}
-                  </button>
-                  <div className="ml-auto flex items-center gap-1.5">
-                    {seg.split_silence_ms !== undefined && (
-                      <div className="flex items-center gap-0.5 border-r border-border pr-1.5 mr-0.5" onClick={(e) => e.stopPropagation()}>
-                        <Timer className="h-3 w-3 text-muted-foreground" />
-                        {[0, 500, 1000, 1500, 2000].map((ms) => (
-                          <button
-                            key={ms}
-                            onClick={() => handleSplitSilenceChange(seg.segment_id, ms)}
-                            className={cn(
-                              "h-4 min-w-[20px] text-[9px] font-mono rounded transition-colors",
-                              (seg.split_silence_ms ?? 0) === ms
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                            )}
-                            title={`${ms}ms`}
-                          >
-                            {ms === 0 ? "0" : (ms / 1000).toFixed(1)}
-                          </button>
-                        ))}
-                        <span className="text-[9px] text-muted-foreground">{isRu ? "с" : "s"}</span>
-                      </div>
-                    )}
-                    <span className="text-[10px] text-muted-foreground font-mono">
-                      #{seg.segment_number}
-                    </span>
-                    <Checkbox
-                      checked={mergeChecked.has(seg.segment_id)}
-                      onCheckedChange={() => toggleMergeCheck(seg.segment_id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-3.5 w-3.5"
-                    />
-                  </div>
-                </div>
-                {/* Phrases */}
-                <div className="divide-y divide-border/30">
-                  {seg.phrases.map((ph) => (
-                    <EditablePhrase
-                      key={ph.phrase_id}
-                      phrase={ph}
-                      isRu={isRu}
-                      onSave={savePhrase}
-                      onSplit={handleSplitAtPhrase}
-                      ttsProvider={seg.speaker ? (speakerProviderMap.get(seg.speaker.toLowerCase()) ?? "yandex") : "yandex"}
-                      onAnnotate={saveAnnotation}
-                      onRemoveAnnotation={removeAnnotation}
-                    />
-                  ))}
-                </div>
-                {seg.inline_narrations && seg.inline_narrations.length > 0 && (
-                  <div className="px-3 py-1 bg-accent/10 border-t border-border/30">
-                    <div className="flex items-center gap-2 mb-1">
-                      <BookOpen className="h-3 w-3 text-yellow-400/70" />
-                      <span className="text-[10px] text-muted-foreground font-mono">
-                        {isRu ? "Голос вставок:" : "Narration voice:"}
-                      </span>
-                      <SpeakerBadge
-                        speaker={inlineNarrationSpeaker}
-                        characters={characters}
-                        isRu={isRu}
-                        onChange={updateInlineNarrationSpeaker}
-                      />
-                    </div>
-                    {seg.inline_narrations.map((n, idx) => (
-                      <div key={idx} className="text-sm font-body flex items-start gap-1 leading-relaxed group/narr">
-                        <BookOpen className="h-3 w-3 mt-1 shrink-0 text-yellow-400/70" />
-                        <span className="text-muted-foreground/60 shrink-0">
-                          {isRu ? "после" : "after"} «{n.insert_after.slice(0, 20)}{n.insert_after.length > 20 ? "…" : ""}»
-                        </span>
-                        <span className="text-muted-foreground/60">→</span>
-                        <span className="text-yellow-300/70">«{n.text}»</span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); removeInlineNarration(seg.segment_id, idx); }}
-                          className="shrink-0 mt-0.5 opacity-0 group-hover/narr:opacity-100 transition-opacity text-destructive/60 hover:text-destructive"
-                          title={isRu ? "Удалить вставку" : "Remove narration"}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {segments.map((seg) => (
+            <StoryboardSegmentRow
+              key={seg.segment_id}
+              seg={seg}
+              isRu={isRu}
+              isSelected={selectedSegmentId === seg.segment_id}
+              audioStatus={audioStatus.get(seg.segment_id)}
+              ttsProvider={seg.speaker ? (speakerProviderMap.get(seg.speaker.toLowerCase()) ?? "yandex") : "yandex"}
+              characters={characters}
+              mergeChecked={mergeChecked.has(seg.segment_id)}
+              resynthSegId={resynthSegId}
+              synthesizing={synthesizing}
+              inlineNarrationSpeaker={inlineNarrationSpeaker}
+              getModelForRole={getModelForRole}
+              onSelect={(id) => onSelectSegment?.(id)}
+              onUpdateType={updateSegmentType}
+              onUpdateSpeaker={updateSpeaker}
+              onResynthSegment={resynthSegment}
+              onSplitSilenceChange={handleSplitSilenceChange}
+              onToggleMergeCheck={toggleMergeCheck}
+              onSavePhrase={savePhrase}
+              onSplitAtPhrase={handleSplitAtPhrase}
+              onAnnotate={saveAnnotation}
+              onRemoveAnnotation={removeAnnotation}
+              onRemoveInlineNarration={removeInlineNarration}
+              onUpdateInlineNarrationSpeaker={updateInlineNarrationSpeaker}
+            />
+          ))}
         </div>
       </ScrollArea>
 
