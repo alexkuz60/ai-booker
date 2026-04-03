@@ -9,6 +9,44 @@
 
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
 import { stripFileExtension } from "@/lib/fileFormatUtils";
+import { getProjectActivityMs } from "@/lib/projectActivity";
+
+async function pickBestProjectName(
+  targetBookId: string,
+  projectNames: string[],
+  activeStorage?: ProjectStorage | null,
+): Promise<string | null> {
+  if (projectNames.length === 0) return null;
+  if (projectNames.length === 1) return projectNames[0];
+
+  const ranked = await Promise.all(projectNames.map(async (projectName) => {
+    try {
+      const store = activeStorage?.isReady && activeStorage.projectName === projectName
+        ? activeStorage
+        : await OPFSStorage.openExisting(projectName);
+      if (!store?.isReady) return null;
+
+      const meta = await store.readJSON<{ bookId?: string; updatedAt?: string }>("project.json").catch(() => null);
+      if (meta?.bookId && meta.bookId !== targetBookId) return null;
+
+      const activityMs = await getProjectActivityMs(store).catch(() => 0);
+      const updatedAtMs = meta?.updatedAt ? new Date(meta.updatedAt).getTime() : 0;
+
+      return {
+        projectName,
+        score: Math.max(activityMs, Number.isFinite(updatedAtMs) ? updatedAtMs : 0),
+      };
+    } catch {
+      return null;
+    }
+  }));
+
+  const best = ranked
+    .filter((entry): entry is { projectName: string; score: number } => !!entry)
+    .sort((a, b) => b.score - a.score)[0];
+
+  return best?.projectName ?? projectNames[0];
+}
 
 // ── Read bookId from an arbitrary ProjectStorage ────────────
 
@@ -47,6 +85,10 @@ export async function resolveLocalStorageForBook(
   // Prefer already active storage first
   const activeBookId = await getBookIdFromStorage(opts.projectStorage);
   if (opts.projectStorage?.isReady && activeBookId === targetBookId) {
+    if (activate && opts.openProjectByName) {
+      const refreshed = await opts.openProjectByName(opts.projectStorage.projectName);
+      if (refreshed?.isReady) return refreshed;
+    }
     return opts.projectStorage;
   }
 
@@ -55,8 +97,8 @@ export async function resolveLocalStorageForBook(
     const projectNames = opts.localProjectNamesByBookId.get(targetBookId) || [];
     if (projectNames.length === 0) return null;
 
-    // Use the first (and ideally only) project name
-    const projectName = projectNames[0];
+    const projectName = await pickBestProjectName(targetBookId, projectNames, opts.projectStorage);
+    if (!projectName) return null;
     if (projectNames.length > 1) {
       console.warn(
         `[Resolver] ⚠️ Multiple OPFS folders for bookId=${targetBookId}: [${projectNames.join(", ")}]. Using first: ${projectName}`
