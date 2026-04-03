@@ -112,7 +112,7 @@ describe("Architectural invariants", () => {
     const matches = searchFiles(SRC_DIR, /projectSourcePolicy/);
     // Allow only this test file and migrateMirrorTranslation.ts
     const violations = matches.filter(
-      (m) => !m.file.includes("architecturalInvariants.test") && !m.file.includes("migrateMirrorTranslation")
+      (m) => !m.file.includes("migrateMirrorTranslation")
     );
 
     if (violations.length > 0) {
@@ -125,10 +125,9 @@ describe("Architectural invariants", () => {
 
   it("no resolveFreshestSourceProject function exists", () => {
     const matches = searchFiles(SRC_DIR, /resolveFreshestSourceProject/);
-    const violations = matches.filter((m) => !m.file.includes("architecturalInvariants.test"));
 
-    if (violations.length > 0) {
-      const msg = violations.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
+    if (matches.length > 0) {
+      const msg = matches.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
       expect.fail(
         `resolveFreshestSourceProject still exists (must be removed):\n${msg}`
       );
@@ -137,10 +136,9 @@ describe("Architectural invariants", () => {
 
   it("no multi-candidate ranking functions exist (pickPreferred, comparePreferred)", () => {
     const matches = searchFiles(SRC_DIR, /pickPreferredProjectCandidate|comparePreferredProjectCandidates/);
-    const violations = matches.filter((m) => !m.file.includes("architecturalInvariants.test"));
 
-    if (violations.length > 0) {
-      const msg = violations.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
+    if (matches.length > 0) {
+      const msg = matches.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
       expect.fail(
         `Multi-candidate ranking functions still exist (must be removed):\n${msg}`
       );
@@ -150,7 +148,7 @@ describe("Architectural invariants", () => {
   it("no isLegacyMirrorMeta usage outside migration utility", () => {
     const matches = searchFiles(SRC_DIR, /isLegacyMirrorMeta/);
     const violations = matches.filter(
-      (m) => !m.file.includes("architecturalInvariants.test") && !m.file.includes("migrateMirrorTranslation")
+      (m) => !m.file.includes("migrateMirrorTranslation")
     );
 
     if (violations.length > 0) {
