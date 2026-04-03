@@ -34,7 +34,7 @@ async function resolveFreshestSourceProject(bookId: string): Promise<{
     if (!store) return null;
 
     const meta = await store.readJSON<ProjectMeta>("project.json");
-    if (!meta || meta.bookId !== bookId || meta.targetLanguage || meta.sourceProjectName) {
+    if (!meta || meta.bookId !== bookId) {
       return null;
     }
 
