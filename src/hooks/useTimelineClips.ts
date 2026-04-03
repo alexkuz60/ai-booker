@@ -188,8 +188,10 @@ export function useTimelineClips(
           let durationSec: number;
 
           if (audioInfo && audioInfo.durationMs > 0) {
+            // Use duration from audio_meta (both "ready" TTS and "estimated")
             durationSec = audioInfo.durationMs / 1000;
           } else {
+            // Last resort fallback if no audio_meta entry exists
             const segPhrases = seg.phrases ?? [];
             const totalChars = segPhrases.reduce((sum, p) => sum + p.text.length, 0);
             durationSec = Math.max(0.5, totalChars / CHARS_PER_SEC);
