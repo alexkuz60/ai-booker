@@ -12,6 +12,7 @@ import { detectFileFormat } from "@/lib/fileFormatUtils";
 import { getProjectActivityMs } from "@/lib/projectActivity";
 import { paths } from "@/lib/projectPaths";
 import { readPipelineProgress } from "@/hooks/usePipelineProgress";
+import { comparePreferredProjectCandidates, isLegacyMirrorMeta } from "@/lib/projectSourcePolicy";
 const OPFS_NON_PROJECT_DIRS = new Set(["atmo-cache", "ir-cache", "sfx-cache"]);
 
 type LocalLibraryCandidate = {
@@ -19,6 +20,8 @@ type LocalLibraryCandidate = {
   projectName: string;
   dedupeKey: string;
   progress: PipelineProgress;
+  score: number;
+  isLegacyMirror: boolean;
 };
 
 interface UseLibraryParams {
@@ -48,6 +51,8 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       updatedAt?: string;
       language?: string;
       fileFormat?: string;
+      sourceProjectName?: string;
+      targetLanguage?: string;
     }>("project.json");
 
     const needStructure = !meta?.bookId || !meta?.title || !meta?.fileFormat;
@@ -86,6 +91,8 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       projectName: storage.projectName,
       dedupeKey,
       progress,
+      score: activityMs,
+      isLegacyMirror: isLegacyMirrorMeta(meta),
     };
   }, []);
 
@@ -132,7 +139,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
         projectsByDedupeKey.set(candidate.dedupeKey, existingProjects);
 
         const existing = byDedupeKey.get(candidate.dedupeKey);
-        if (!existing || getTs(candidate.record.created_at) > getTs(existing.record.created_at)) {
+        if (!existing || comparePreferredProjectCandidates(candidate, existing) < 0) {
           byDedupeKey.set(candidate.dedupeKey, candidate);
         }
       }
