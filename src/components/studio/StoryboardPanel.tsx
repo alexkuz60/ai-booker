@@ -288,9 +288,11 @@ export function StoryboardPanel({
     setAudioStatus(map);
     persist(buildSnapshot(undefined, map));
 
-    // Persist to OPFS audio_meta.json
+    // Persist to OPFS audio_meta.json and recalc positions
     if (storage && sceneId && Object.keys(opfsEntries).length > 0) {
-      writeAudioMeta(storage, sceneId, opfsEntries, chapterId ?? undefined).catch(() => {});
+      writeAudioMeta(storage, sceneId, opfsEntries, chapterId ?? undefined)
+        .then(() => recalcPositions(storage, sceneId, chapterId ?? undefined))
+        .catch(() => {});
     }
   }, [persist, buildSnapshot, storage, sceneId, chapterId]);
 
