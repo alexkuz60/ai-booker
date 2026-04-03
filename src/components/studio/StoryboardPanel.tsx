@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { upsertAudioEntry, writeAudioMeta, type LocalAudioEntry } from "@/lib/localAudioMeta";
 
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
