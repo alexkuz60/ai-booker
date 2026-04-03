@@ -102,31 +102,10 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
 
       const scanResults = await Promise.all(projectNames.map(async (projectName) => {
         try {
-          if (/(?:[_\s-])(EN|RU)(?:[_\s-])(EN|RU)$/i.test(projectName)) {
-            console.warn("[Library] Skipping nested mirror (not deleting):", projectName);
-            return { candidate: null as LocalLibraryCandidate | null, projectName };
-          }
-
-          // Legacy: skip projects that look like translation mirrors by name suffix
-          const mirrorSuffixMatch = projectName.trim().match(/^(.*?)(?:[_\s-])(EN|RU)$/i);
-          if (mirrorSuffixMatch) {
-            const possibleSource = mirrorSuffixMatch[1]?.trim();
-            if (possibleSource && existingProjectSet.has(possibleSource)) {
-              return { candidate: null as LocalLibraryCandidate | null, projectName };
-            }
-          }
-
           const store = await OPFSStorage.openExisting(projectName);
           if (!store) {
             return { candidate: null as LocalLibraryCandidate | null, projectName };
           }
-          const meta = await store.readJSON<Record<string, unknown>>("project.json").catch(() => null);
-
-          // Skip legacy translation mirror projects — they have targetLanguage or sourceProjectName
-          if (meta && ((meta as any).targetLanguage || (meta as any).sourceProjectName)) {
-            return { candidate: null as LocalLibraryCandidate | null, projectName };
-          }
-
           const result = await mapLocalStructureToBook(store);
           if (!result) {
             return { candidate: null as LocalLibraryCandidate | null, projectName };
