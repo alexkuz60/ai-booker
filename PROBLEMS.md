@@ -130,11 +130,11 @@
 
 ---
 
-### Т. Зомби-скан удаляет проекты-зеркала перевода — ✅ РЕШЕНО (B21)
-- Проблема: `wipeProjectBrowserState` при восстановлении книги (Wipe-and-Deploy) сканировал OPFS на «зомби» по `bookId`. Зеркальные проекты арт-перевода (например, `Book_EN`) имеют тот же `bookId`, что и исходный проект — они попадали под удаление.
-- Решение: зомби-скан в `projectCleanup.ts` явно пропускает проекты с `targetLanguage` или `sourceProjectName` в метаданных. Также `booker_last_project` не очищается при целевом wipe (только при `hardReset`), чтобы контекст сессии сохранялся.
-- Инвариант: **зеркальные проекты перевода неприкосновенны при wipe исходного проекта**. Удаление зеркала — только при ручном удалении или `hardResetLocalData`.
-- Файлы: `src/lib/projectCleanup.ts`, `src/hooks/useProjectStorage.ts`.
+### Т. Зомби-скан удаляет проекты-зеркала перевода — ✅ УСТАРЕЛО (B21)
+- Проблема: зеркальные OPFS-проекты перевода (`Book_EN`) имели тот же `bookId` и попадали под удаление при Wipe-and-Deploy.
+- Решение (v1): mirror-фильтрация по `targetLanguage`/`sourceProjectName`.
+- Решение (v2, текущее): **зеркальная архитектура полностью удалена**. Переводы хранятся в `{lang}/` подпапках внутри единого проекта. `ProjectMeta` больше не содержит `targetLanguage`, `sourceProjectName`, `translationProject`. Wipe удаляет все папки с bookId без mirror-проверок.
+- Файлы: `src/lib/projectCleanup.ts`, `src/lib/localProjectResolver.ts`, `src/lib/projectStorage.ts`.
 
 ### У. Bootstrap авто-детект — ✅ ОТКАТАНО (B22)
 - Проблема: при отсутствии `LAST_PROJECT_KEY` в localStorage была добавлена логика сканирования OPFS для автоматического выбора «лучшего» проекта. Это создавало ложную надёжность и лишние обращения к OPFS на каждом монтировании.
@@ -159,10 +159,10 @@
 - Решение: `useTranslationBatch` инициализирует `currentStage` немедленно при старте пайплайна, до получения первого ответа от модели.
 - Файл: `src/hooks/useTranslationBatch.ts`.
 
-### Ш. Потеря translation-зеркала после рестарта браузера — ✅ РЕШЕНО (B26)
-- Проблема: `useTranslationStorage` получал `sourceStorage=null` до инициализации контекста → `exists: false`.
-- Решение: Translation.tsx ждёт `initialized` (спиннер). One-shot разрешение зеркала: backlink → localStorage → каноническое имя через `openExisting`.
-- Файлы: `Translation.tsx`, `useTranslationStorage.ts`.
+### Ш. Потеря translation-зеркала после рестарта браузера — ✅ УСТАРЕЛО (B26)
+- Проблема: зеркальный проект не находился после перезагрузки.
+- Решение (v1): ожидание `initialized` + one-shot разрешение зеркала.
+- Решение (v2, текущее): **зеркала удалены**. Перевод читается из `{lang}/` подпапок единого проекта. Проблема устранена архитектурно.
 
 ### Щ. Таймлайн и сайдбар не синхронизировались с прогрессом — ✅ РЕШЕНО (B27)
 - Проблема: ручное переключение чекбоксов в контекстном меню таймлайна записывало `pipelineProgress` в OPFS, но сайдбар не обновлял гейтинг — пункты оставались заблокированными. При загрузке книги с сервера таймлайн и меню не отражали сохранённый прогресс из `project.json`.
@@ -190,8 +190,8 @@
 
 ### Ф. Сброс pipeline-флагов перевода при перезагрузке — ✅ РЕШЕНО (B21)
 - Проблема: конкурентные записи в `project.json` при холодном старте перезаписывали метаданные без `pipelineProgress`.
-- Решение: `readProjectMetaForWrite()` с retry при первом `null`, блокировка записи если meta остаётся `null`. `useLibrary` фильтрует зеркала по суффиксу `_EN`/`_RU`.
-- Файлы: `usePipelineProgress.ts`, `translationProject.ts`, `useLibrary.ts`, `useTranslationStorage.ts`.
+- Решение: `readProjectMetaForWrite()` с retry при первом `null`, блокировка записи если meta остаётся `null`.
+- Файлы: `usePipelineProgress.ts`.
 
 ### АА. Потеря профайлов персонажей после восстановления с сервера — ✅ РЕШЕНО (B31)
 - Проблема: после Wipe-and-Deploy профайлы персонажей (description, temperament, speech_style, speech_tags, psycho_tags) отображались как пустые, хотя данные присутствовали в БД. В `characters.json` данные хранились только во вложенном объекте `profile`, а UI читал верхнеуровневые поля (description, temperament и др.), которые были `null`.
