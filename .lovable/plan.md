@@ -1,46 +1,45 @@
 
-## ✅ Консолидация хранения перевода — ЗАВЕРШЕНО
+## Проблема
 
-Все фазы выполнены. Зеркальные OPFS-проекты устранены. Данные перевода хранятся в lang-поддиректориях основного проекта.
+После перехода на единый проект с `translationLanguages[]` в коде осталось ~100 упоминаний legacy зеркальной архитектуры: `targetLanguage`, `sourceProjectName`, `isMirrorByMeta`, суффиксы `_EN/_RU`. Эти проверки:
+1. Замедляют bootstrap (сканируют все OPFS-папки, читают project.json каждой)
+2. Создают false-negatives: зомби-зеркала путают резолвер
+3. Усложняют код костылями ("skip mirror", "filter mirror")
 
-### Фаза 1: Новые пути в projectPaths.ts ✅
+## План рефакторинга
 
-Добавлены lang-aware пути: `translationStoryboard`, `translationRadar`, `translationAudioMeta`, `translationMixerState`, `translationTtsClip`, `translationClipPlugins`.
+### 1. `localProjectResolver.ts` — упрощение
+- **Удалить** `isMirrorByMeta()` полностью
+- Резолвер ищет по bookId, без mirror-фильтрации — проект один, зеркалов больше нет
+- Убрать двойной проход (pre-built map → direct OPFS scan) — оставить только один путь
 
-### Фаза 2: radarStages.ts — lang-aware пути ✅
+### 2. `useLibrary.ts` — очистка сканирования
+- **Удалить** проверки `sourceProjectName`, `targetLanguage` в `mapLocalStructureToBook`
+- **Удалить** эвристику `_EN/_RU` суффиксов (строки 110-123)
+- **Удалить** повторные проверки в scanResults (строки 130-133)
 
-Функции `radarStagePath`, `readStageRadar`, `writeStageRadar` и др. получили параметр `lang?: string`.
+### 3. `useBookManager.ts` — очистка deleteBook
+- **Удалить** проверки `targetLanguage`/`sourceProjectName` при удалении (строки 214-218)
+- Удаление книги удаляет ВСЕ папки с этим bookId (переводы внутри папки, не в отдельных)
 
-### Фаза 3: Хуки перевода — единый storage ✅
+### 4. `projectCleanup.ts` — упрощение wipe
+- **Удалить** проверки mirror при Wipe-and-Deploy (строки 65-68)
+- Wipe удаляет все папки с bookId — зеркалов нет, защищать нечего
 
-Все хуки (`useSegmentTranslation`, `useSegmentLiteraryEdit`, `useSegmentCritique`, `useTranslationBatch`) работают с одним `storage` + `targetLang`.
+### 5. `LibraryView.tsx` — `resolveSourceProject`
+- **Удалить** проверки `targetLanguage`/`sourceProjectName` (строка 77, 87)
 
-### Фаза 4: translationPipeline.ts — единый storage ✅
+### 6. `projectStorage.ts` — deprecated типы
+- **Удалить** `TranslationProjectLink` interface
+- **Удалить** `translationProject`, `sourceProjectName`, `targetLanguage` из `ProjectMeta`
+- Оставить только `translationLanguages: string[]`
 
-`sourceStorage` и `targetStorage` заменены на один `storage`.
+### 7. НЕ трогаем
+- `migrateMirrorTranslation.ts` — утилита одноразовой миграции, пусть живёт
+- `translationBackup.ts` — чистый код, работает с `translationLanguages`
+- `translationPipeline.ts` — работает с подпапками, не с зеркалами
 
-### Фаза 5: BilingualSegmentsView — единый storage ✅
-
-Читает оригинал из `paths.storyboard(sceneId)`, перевод из `paths.translationStoryboard(sceneId, lang)`.
-
-### Фаза 6: Translation.tsx — убран useTranslationStorage ✅
-
-Guard заменён на проверку `meta?.translationLanguages`. Баннер зеркала удалён.
-
-### Фаза 7: QualityMonitorPanel, SegmentQualityChart — lang-aware ✅
-
-### Фаза 8: Инициализация перевода ✅
-
-`translationLanguages: ["en"]` в `project.json`. Степпер в библиотеке: один шаг `trans_activated`.
-
-### Фаза 9: Очистка мёртвого кода ✅
-
-Удалены: `useTranslationStorage`, `useSaveTranslation`, зеркальная логика из `translationProject.ts`, `_translation_link.json`.
-
-### Фаза 10: Облачная синхронизация (Storage ZIP) ✅
-
-`translationBackup.ts`: pack/push/restore. Интеграция в `useSaveBookToProject` и `serverDeploy.ts`.
-
-### project.json
-
-Поле `translationProject?: { projectName, targetLanguage, createdAt }` заменено на `translationLanguages?: string[]`.
+### Результат
+- Единая модель: один проект = один bookId = одна OPFS-папка
+- Bootstrap быстрее (нет N×2 чтений project.json для mirror-фильтрации)
+- Код проще на ~150 строк
