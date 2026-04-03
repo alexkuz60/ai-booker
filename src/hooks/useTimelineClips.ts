@@ -154,12 +154,13 @@ export function useTimelineClips(
 
       if (cancelled) return;
 
-      // Build audio duration map from OPFS
-      const audioDurationMap = new Map<string, { durationMs: number; audioPath: string }>();
+      // Build audio duration map from OPFS (includes both "ready" TTS and "estimated")
+      const audioDurationMap = new Map<string, { durationMs: number; audioPath: string; isReady: boolean }>();
       for (const [segId, entry] of audioMetaMap) {
         audioDurationMap.set(segId, {
           durationMs: entry.durationMs,
           audioPath: entry.audioPath,
+          isReady: entry.status === "ready",
         });
       }
 
