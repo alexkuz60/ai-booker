@@ -108,6 +108,9 @@ export async function saveStoryboardToLocal(
       generateDefaultClipPlugins(storage, sceneId, data.segments, chapterId),
       generateDefaultMixerState(storage, sceneId, chapterId),
     ]);
+
+    // Recalc positions after audio_meta entries are generated/updated
+    await recalcPositions(storage, sceneId, chapterId);
   } catch (err) {
     console.warn("[StoryboardSync] Failed to save:", err);
   }
