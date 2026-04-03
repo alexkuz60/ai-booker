@@ -64,6 +64,15 @@ export function useMixerPersistence(
     if (restoredForRef.current === restoreKey) return;
     restoredForRef.current = restoreKey;
 
+    // Build default mix state for all current tracks
+    const buildDefaults = (ids: string[]): SceneMixerState => {
+      const defaults: SceneMixerState = {};
+      for (const tid of ids) {
+        defaults[tid] = { volume: 80, pan: 0, preFxBypassed: false, reverbBypassed: true };
+      }
+      return defaults;
+    };
+
     // Try localStorage first (sync, fast)
     const saved = loadLocal(sceneId);
     if (saved) {
@@ -72,16 +81,27 @@ export function useMixerPersistence(
     }
 
     // Fallback: try OPFS (async)
-    if (storageRef.current) {
-      readMixerState(storageRef.current, sceneId).then((opfs) => {
-        if (!opfs) return;
-        const flat: SceneMixerState = {};
-        for (const [tid, entry] of Object.entries(opfs)) {
-          flat[tid] = entry.mix;
+    const s = storageRef.current;
+    if (s) {
+      readMixerState(s, sceneId).then((opfs) => {
+        const currentIds = trackIdsRef.current;
+        if (opfs && Object.keys(opfs).length > 0) {
+          const flat: SceneMixerState = {};
+          for (const [tid, entry] of Object.entries(opfs)) {
+            flat[tid] = entry.mix;
+          }
+          saveLocalCache(sceneId!, flat);
+          applyMixState(flat, currentIds, engine);
+        } else {
+          // Nothing persisted yet — seed with defaults for all tracks
+          const defaults = buildDefaults(currentIds);
+          saveLocalCache(sceneId!, defaults);
+          const snapshot: SceneMixerSnapshot = {};
+          for (const [tid, mix] of Object.entries(defaults)) {
+            snapshot[tid] = { mix };
+          }
+          writeMixerState(s, sceneId!, snapshot);
         }
-        // Also populate localStorage cache for next time
-        saveLocalCache(sceneId, flat);
-        applyMixState(flat, trackIdsRef.current, engine);
       });
     }
   }, [sceneId, restoreKey, engine, trackIds]);
