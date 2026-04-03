@@ -1,11 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { getAudioEngine } from "@/lib/audioEngine";
 
-import { ChevronUp, ChevronDown, Film, Play, Pause, Square, Volume2, VolumeX, PanelLeftClose, PanelLeftOpen, Download, Loader2, SlidersHorizontal, Repeat } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { renderScene, type RenderProgress } from "@/lib/sceneRenderer";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -19,13 +15,14 @@ import { TrackMixerStrip } from "./TrackMixerStrip";
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
 import { usePluginsPersistence } from "@/hooks/usePluginsPersistence";
 import { useClipPluginConfigs } from "@/hooks/useClipPluginConfigs";
-import { TimelineMasterMeter } from "./TimelineMasterMeter";
 import { TimelineRuler } from "./TimelineRuler";
 import { TimelineTrack } from "./TimelineTrack";
 import { Playhead } from "./TimelinePlayhead";
 import { ChannelPluginsPanel, type ClipInfo } from "./ChannelPluginsPanel";
-import { buildCharacterNameMap, deriveStoryboardCharacterIds, deriveStoryboardTypeMappings } from "@/lib/storyboardCharacterRouting";
 import { useAtmoClipManipulation } from "@/hooks/useAtmoClipManipulation";
+import { useClipFades } from "@/hooks/useClipFades";
+import { useCharacterTracks } from "@/hooks/useCharacterTracks";
+import { TimelineTransport } from "./TimelineTransport";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -43,19 +40,6 @@ const getFixedTracks = (isRu: boolean): TimelineTrackData[] => [
 
 const TRACK_LABELS_WIDTH_COLLAPSED = 112;
 const TRACK_LABELS_WIDTH_EXPANDED = 360;
-
-const NARRATOR_COLORS = [
-  "hsl(var(--primary))",
-  "hsl(var(--accent))",
-  "hsl(30 75% 60%)",
-  "hsl(280 60% 62%)",
-  "hsl(350 70% 62%)",
-  "hsl(160 55% 55%)",
-  "hsl(200 65% 58%)",
-  "hsl(45 80% 58%)",
-  "hsl(320 60% 58%)",
-  "hsl(100 50% 55%)",
-];
 
 // ─── Constants ──────────────────────────────────────────────
 export const TIMELINE_HEADER_HEIGHT = 41;
@@ -110,11 +94,9 @@ export function StudioTimeline({
       return;
     }
 
-    // Get audio duration by decoding a signed URL + cache the asset in OPFS
-    let durationMs = 10_000; // fallback 10s
+    let durationMs = 10_000;
     try {
       const { fetchAudioAssetWithCache } = await import("@/lib/audioAssetCache");
-      // Use file's actual storage category (not layer type) so cache key matches StorageTab checks
       const cacheCategory = file.category === "sfx" ? "sfx" as const : "atmosphere" as const;
       const buf = await fetchAudioAssetWithCache(cacheCategory, file.path);
       const ctx = new AudioContext();
@@ -125,7 +107,6 @@ export function StudioTimeline({
       // use fallback duration
     }
 
-    // Compute offset relative to scene start (atSec is absolute timeline position)
     const boundary = sceneBoundariesRef.current?.find(b => b.sceneId === sceneId);
     const sceneStartSec = boundary ? boundary.startSec + boundary.silenceSec : 0;
     const offsetMs = Math.max(0, Math.round((atSec - sceneStartSec) * 1000));
@@ -150,7 +131,6 @@ export function StudioTimeline({
       { description: `${layerType} · ${(durationMs / 1000).toFixed(1)}s` },
     );
 
-    // Trigger timeline clip refresh
     setLocalRefresh(prev => prev + 1);
   }, [sceneId, user, isRu, storage]);
 
@@ -171,7 +151,6 @@ export function StudioTimeline({
   const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
   const isRendering = renderProgress !== null && renderProgress.phase !== "done" && renderProgress.phase !== "error";
 
-  // Check if current scene already has a completed render
   const [hasExistingRender, setHasExistingRender] = useState(false);
   useEffect(() => {
     setHasExistingRender(false);
@@ -190,7 +169,6 @@ export function StudioTimeline({
     })();
   }, [sceneId]);
 
-  // Compute render percent for ruler
   const rulerRenderPercent = isRendering
     ? (renderProgress?.percent ?? 0)
     : renderProgress?.phase === "done" || hasExistingRender
@@ -212,7 +190,6 @@ export function StudioTimeline({
       );
       toast.success(isRu ? "Сцена отрендерена" : "Scene rendered");
       onSceneRendered?.(sceneId);
-      // Auto-set pipeline flag
       if (storage) {
         import("@/hooks/usePipelineProgress").then(({ writePipelineStep }) =>
           writePipelineStep(storage, "scene_render", true).catch(() => {}),
@@ -223,167 +200,16 @@ export function StudioTimeline({
     }
   }, [sceneId, user, isRendering, isRu, onSceneRendered]);
 
-  // Refs for render callback (avoid stale closures)
   const timelineClipsRef = useRef<typeof timelineClips>([]);
   const durationRef = useRef(0);
-  // ── Clip fades persistence (localStorage only, no cloud writes) ──────────
-  type FadeMap = Record<string, { fadeInSec: number; fadeOutSec: number }>;
-  const fadeLsKey = sceneId ? `clip_fades_${sceneId}` : "";
 
-  const [savedFades, setSavedFades] = useState<FadeMap>(() => {
-    if (!fadeLsKey) return {};
-    try {
-      const raw = localStorage.getItem(fadeLsKey);
-      return raw ? JSON.parse(raw) : {};
-    } catch { return {}; }
-  });
+  // ── Clip fades (extracted hook) ──────────────────────────
+  const { clipFades, handleSetFade } = useClipFades(sceneId, storage);
 
-  const savedFadesRef = useRef(savedFades);
-  savedFadesRef.current = savedFades;
-
-  // Reload fades from localStorage when scene changes
-  const prevFadeLsKey = useRef(fadeLsKey);
-  useEffect(() => {
-    if (fadeLsKey === prevFadeLsKey.current) return;
-    prevFadeLsKey.current = fadeLsKey;
-    if (!fadeLsKey) { setSavedFades({}); return; }
-    try {
-      const raw = localStorage.getItem(fadeLsKey);
-      setSavedFades(raw ? JSON.parse(raw) : {});
-    } catch { setSavedFades({}); }
-  }, [fadeLsKey]);
-
-  // Convert to Map for components
-  const clipFades = useMemo(() => {
-    const m = new Map<string, { fadeInSec: number; fadeOutSec: number }>();
-    for (const [k, v] of Object.entries(savedFades)) {
-      m.set(k, v);
-    }
-    return m;
-  }, [savedFades]);
-
-  // Restore fades to engine when scene loads
-  const fadesRestoredRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!sceneId || !fadeLsKey) return;
-    if (fadesRestoredRef.current === fadeLsKey) return;
-    fadesRestoredRef.current = fadeLsKey;
-    const engine = getAudioEngine();
-    for (const [clipId, f] of Object.entries(savedFadesRef.current)) {
-      engine.setTrackFadeIn(clipId, f.fadeInSec);
-      engine.setTrackFadeOut(clipId, f.fadeOutSec);
-    }
-  }, [fadeLsKey, sceneId]);
-
-  const handleSetFade = useCallback((clipId: string, fadeInSec: number, fadeOutSec: number) => {
-    const engine = getAudioEngine();
-    engine.setTrackFadeIn(clipId, fadeInSec);
-    engine.setTrackFadeOut(clipId, fadeOutSec);
-
-    // Save to localStorage
-    setSavedFades(prev => {
-      const next = { ...prev, [clipId]: { fadeInSec, fadeOutSec } };
-      if (fadeLsKey) {
-        try { localStorage.setItem(fadeLsKey, JSON.stringify(next)); } catch {}
-      }
-      return next;
-    });
-
-    // For atmo/sfx clips — also persist to OPFS atmospheres.json
-    if (clipId.startsWith("atmo-") && storage && sceneId) {
-      const atmoId = clipId.replace(/^atmo-/, "");
-      import("@/lib/localAtmospheres").then(({ updateAtmosphereClip }) => {
-        updateAtmosphereClip(storage, sceneId, atmoId, {
-          fade_in_ms: Math.round(fadeInSec * 1000),
-          fade_out_ms: Math.round(fadeOutSec * 1000),
-        });
-      });
-    }
-  }, [fadeLsKey, storage, sceneId]);
-
-  // ── Character tracks (LOCAL-FIRST from OPFS) ──────────────
-  const [charTracks, setCharTracks] = useState<TimelineTrackData[]>([]);
-  const [speakerToCharId, setSpeakerToCharId] = useState<Map<string, string>>(new Map());
-  const [typeMappings, setTypeMappings] = useState<TypeMappingsByScene>(new Map());
-  const [charDataReady, setCharDataReady] = useState(false);
-
-  const contextSceneIds = useMemo(() => sceneId ? [sceneId] : [], [sceneId]);
-
-  // Reset char data readiness when scene changes to prevent stale clips
-  const prevSceneIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (sceneId !== prevSceneIdRef.current) {
-      prevSceneIdRef.current = sceneId ?? null;
-      setCharDataReady(false);
-    }
-  }, [sceneId]);
-
-  useEffect(() => {
-    if (!bookId || contextSceneIds.length === 0) {
-      setCharTracks([]); setSpeakerToCharId(new Map()); setTypeMappings(new Map()); return;
-    }
-
-    (async () => {
-      if (!storage) return;
-
-      const sid = contextSceneIds[0];
-
-      // Read storyboard + character index in parallel from OPFS
-      const { readCharacterIndex } = await import("@/lib/localCharacters");
-      const { readStoryboardFromLocal } = await import("@/lib/storyboardSync");
-      const [allChars, storyboard] = await Promise.all([
-        readCharacterIndex(storage),
-        readStoryboardFromLocal(storage, sid),
-      ]);
-
-      const storyboardSegments = storyboard?.segments ?? [];
-      const derivedMappings = deriveStoryboardTypeMappings(
-        storyboardSegments,
-        allChars,
-        storyboard?.typeMappings ?? [],
-        storyboard?.inlineNarrationSpeaker ?? null,
-      );
-
-      // Build type mappings strictly from STORYBOARD (source of truth)
-      const tm: TypeMappingsByScene = new Map();
-      if (derivedMappings.length > 0) {
-        const sceneTypeMappings = new Map<string, string>();
-        for (const m of derivedMappings) {
-          sceneTypeMappings.set(m.segmentType, m.characterId);
-        }
-        tm.set(sid, sceneTypeMappings);
-      }
-      setTypeMappings(tm);
-
-      const charIdSet = deriveStoryboardCharacterIds(storyboardSegments, allChars, derivedMappings);
-
-      if (charIdSet.size === 0) {
-        setCharTracks([]); setSpeakerToCharId(new Map());
-        setCharDataReady(true);
-        return;
-      }
-
-      // Filter only chars appearing in this scene
-      const sceneChars = allChars.filter(c => charIdSet.has(c.id));
-      if (sceneChars.length === 0) {
-        setCharTracks([]); setSpeakerToCharId(new Map());
-        setCharDataReady(true);
-        return;
-      }
-
-      setSpeakerToCharId(buildCharacterNameMap(sceneChars));
-
-      setCharTracks(
-        sceneChars.map((c, i) => ({
-          id: `char-${c.id}`,
-          label: c.name,
-          color: c.color || NARRATOR_COLORS[i % NARRATOR_COLORS.length],
-          type: "narrator" as const,
-        }))
-      );
-      setCharDataReady(true);
-    })();
-  }, [bookId, sceneId, clipsRefreshToken, storage]);
+  // ── Character tracks (extracted hook) ─────────────────────
+  const { charTracks, speakerToCharId, typeMappings, charDataReady, contextSceneIds } = useCharacterTracks(
+    bookId, sceneId, storage, clipsRefreshToken,
+  );
 
   // ── Real clips from segments (wait for char data to be ready) ──
   const effectiveCharMap = charDataReady ? speakerToCharId : new Map<string, string>();
@@ -444,13 +270,12 @@ export function StudioTimeline({
     return map;
   }, [timelineClips]);
 
-  // ── Loop region from checked clips (Ctrl+click multi-select) ──
+  // ── Loop region from checked clips ──
   useEffect(() => {
     if (!checkedSegmentIds || checkedSegmentIds.size === 0) {
       player.clearLoopRegion();
       return;
     }
-    // Include selectedSegmentId if present
     const allIds = new Set(checkedSegmentIds);
     if (selectedSegmentId) allIds.add(selectedSegmentId);
 
@@ -475,18 +300,15 @@ export function StudioTimeline({
   const estimateDuration = sceneDurationSec && sceneDurationSec > 0 ? sceneDurationSec : 60;
   const duration = player.totalDuration > 0 ? player.totalDuration : estimateDuration;
 
-  // Keep refs current for render callback
   timelineClipsRef.current = timelineClips;
   durationRef.current = duration;
 
-  // Auto-add narrator-fallback + atmosphere tracks if clips reference them
+  // Auto-add narrator-fallback + atmosphere tracks
   const allTracks = useMemo(() => {
     const hasNarratorFallback = timelineClips.some(c => c.trackId === "narrator-fallback");
     const narratorTrack: TimelineTrackData[] = hasNarratorFallback
       ? [{ id: "narrator-fallback", label: isRu ? "Рассказчик" : "Narrator", color: "hsl(var(--primary))", type: "narrator" }]
       : [];
-
-    // Always show both atmosphere and SFX tracks
     return [...narratorTrack, ...charTracks, ...getFixedTracks(isRu)];
   }, [charTracks, timelineClips, isRu]);
 
@@ -572,15 +394,13 @@ export function StudioTimeline({
     }
   }, [fitZoom, player.positionSec]);
 
-  // ── Atmo clip manipulation (copy/paste/move/resize) ───────
-  // Save mixer state before refreshing clips to prevent volume reset
+  // ── Atmo clip manipulation ───────────────────────────────
   const atmoManip = useAtmoClipManipulation({
     sceneId,
     isRu,
     zoom,
     positionSec: player.positionSec,
     onRefresh: () => {
-      // Flush mixer state BEFORE clip refresh changes engineTrackIds
       onMixChangeRef.current?.();
       setLocalRefresh(prev => prev + 1);
     },
@@ -598,7 +418,6 @@ export function StudioTimeline({
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if ((e.target as HTMLElement)?.isContentEditable) return;
 
-      // Ctrl+C — copy selected atmo clip
       if ((e.ctrlKey || e.metaKey) && e.code === "KeyC") {
         const selectedAtmo = checkedSegmentIds ? [...checkedSegmentIds].find(id => id.startsWith("atmo-")) : null;
         if (selectedAtmo) {
@@ -608,7 +427,6 @@ export function StudioTimeline({
         return;
       }
 
-      // Ctrl+V — paste atmo clip at transport position
       if ((e.ctrlKey || e.metaKey) && e.code === "KeyV") {
         if (atmoManip.clipboard) {
           e.preventDefault();
@@ -656,18 +474,15 @@ export function StudioTimeline({
     });
   }, [zoom, sceneZoomPercent]);
 
-  // ── Timeline view mode: "tracks" or "plugins" ─────────────
+  // ── Timeline view mode ─────────────────────────────────────
   type TimelineView = "tracks" | "plugins";
   const [timelineView, setTimelineView] = useState<TimelineView>("tracks");
-
-  // Track selected for plugin editing — can be char, atmo, or sfx track
   const [selectedPluginTrackId, setSelectedPluginTrackId] = useState<string | null>(null);
 
-  // ── Drag guide line + start line (vertical position indicators across all tracks) ──
+  // ── Drag guide line ────────────────────────────────────────
   const [dragGuideX, setDragGuideX] = useState<number | null>(null);
   const [dragStartLineX, setDragStartLineX] = useState<number | null>(null);
   const [resizeSpeedHint, setResizeSpeedHint] = useState<string | null>(null);
-  // Safety: clear drag guide on any mouseup (in case track callback missed)
   useEffect(() => {
     const onMouseUp = () => {
       setTimeout(() => setDragGuideX(prev => prev !== null ? null : prev), 50);
@@ -676,12 +491,11 @@ export function StudioTimeline({
     return () => window.removeEventListener("mouseup", onMouseUp);
   }, []);
 
-  // Sync selectedCharacterId → selectedPluginTrackId for backwards compat
   useEffect(() => {
     if (selectedCharacterId) setSelectedPluginTrackId(`char-${selectedCharacterId}`);
   }, [selectedCharacterId]);
 
-  // Selected track clips for channel plugins (works for any track type)
+  // Selected track clips for channel plugins
   const pluginsClips = useMemo((): ClipInfo[] => {
     if (!selectedPluginTrackId) return [];
     const trackInfo = allTracks.find(t => t.id === selectedPluginTrackId);
@@ -698,7 +512,6 @@ export function StudioTimeline({
       }));
   }, [selectedPluginTrackId, timelineClips, allTracks]);
 
-  // ALL scene clips across all character tracks (for Panner3D multi-character view)
   const allSceneClips = useMemo((): ClipInfo[] => {
     return timelineClips
       .filter(c => c.trackId.startsWith("char-"))
@@ -725,7 +538,6 @@ export function StudioTimeline({
     return allTracks.find(t => t.id === selectedPluginTrackId)?.color;
   }, [selectedPluginTrackId, allTracks]);
 
-  // Per-clip plugin toggle/update handlers (delegated to useClipPluginConfigs)
   const handleTogglePlugin = useCallback((clipId: string, plugin: "eq" | "comp" | "limiter" | "panner3d" | "convolver") => {
     const trackId = selectedPluginTrackId ?? "";
     clipPlugins.togglePlugin(clipId, trackId, plugin);
@@ -790,18 +602,11 @@ export function StudioTimeline({
 
   const height = collapsed ? TIMELINE_HEADER_HEIGHT : size;
 
-  // Dynamic track height: fill available space evenly, clamped 28–56px
   const RESIZE_HANDLE_H = 8;
   const MIXER_COL_HEADER_H = 24;
   const trackCount = allTracks.length || 1;
   const availableForTracks = size - RESIZE_HANDLE_H - TIMELINE_HEADER_HEIGHT - MIXER_COL_HEADER_H;
   const dynamicTrackHeight = Math.max(28, Math.min(56, Math.floor(availableForTracks / trackCount)));
-
-  const formatTime = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return `${m}:${sec.toString().padStart(2, "0")}`;
-  };
 
   return (
     <div
@@ -818,126 +623,33 @@ export function StudioTimeline({
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={toggleCollapse}
-            className="flex items-center gap-1.5 hover:text-foreground transition-colors"
-          >
-            {collapsed ? (
-              <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-            )}
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-body">
-              {isRu ? "Таймлайн" : "Timeline"}
-            </span>
-          </button>
-
-          {/* Transport controls */}
-          <div className="flex items-center gap-0.5">
-            {player.state === "playing" ? (
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={player.pause} title={isRu ? "Пауза" : "Pause"}>
-                <Pause className="h-3.5 w-3.5" />
-              </Button>
-            ) : (
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={player.play} disabled={!player.hasAudio} title={isRu ? "Воспроизвести" : "Play"}>
-                <Play className="h-3.5 w-3.5" />
-              </Button>
-            )}
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={player.stop} disabled={player.state === "stopped"} title={isRu ? "Стоп" : "Stop"}>
-              <Square className="h-3 w-3" />
-            </Button>
-            <span className="text-[11px] text-muted-foreground font-mono min-w-[70px] text-center tabular-nums">
-              {formatTime(player.positionSec)} / {formatTime(player.totalDuration)}
-            </span>
-            <TimelineMasterMeter />
-            <div className="flex items-center gap-1 ml-1">
-              <button
-                onClick={() => player.changeVolume(player.volume > 0 ? 0 : 80)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                title={isRu ? "Громкость" : "Volume"}
-              >
-                {player.volume === 0 ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-              </button>
-              <input
-                type="range" min={0} max={100} value={player.volume}
-                onChange={e => player.changeVolume(Number(e.target.value))}
-                className="w-[72px] h-0.5 accent-primary cursor-pointer volume-slider-sm"
-                title={`${player.volume}%`}
-              />
-            </div>
-            {/* Loop toggle */}
-            <Button
-              variant={player.loopEnabled ? "secondary" : "ghost"}
-              size="icon"
-              className={`h-7 w-7 ${player.loopEnabled ? "text-accent-foreground" : ""}`}
-              onClick={player.toggleLoop}
-              disabled={!player.loopRegion}
-              title={isRu ? "Зацикливание региона (выберите клипы Ctrl+клик)" : "Loop region (select clips with Ctrl+click)"}
-            >
-              <Repeat className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-
-          {/* Scene label */}
-          <div className="flex items-center gap-1 text-[11px]">
-            <Film className="h-3 w-3 text-muted-foreground" />
-            <span className="text-muted-foreground font-body">{isRu ? "Сцена" : "Scene"}</span>
-          </div>
-
-          {charTracks.length > 0 && (
-            <span className="text-[10px] text-muted-foreground/60 font-body">
-              {charTracks.length} {isRu ? "дикт." : "narr."}
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1">
-          <Select value={String(sceneZoomPercent)} onValueChange={(v) => applySceneZoom(Number(v))}>
-            <SelectTrigger className="h-7 w-[80px] text-xs font-body border-none bg-transparent px-2">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SCENE_ZOOM_PRESETS.map((p) => (
-                <SelectItem key={p} value={String(p)} className="text-xs">{p}%</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <div className="w-px h-4 bg-border mx-1" />
-          <Button
-            variant={isRendering ? "secondary" : "outline"}
-            size="sm"
-            className="h-7 text-xs gap-1.5 font-body"
-            onClick={handleRenderScene}
-            disabled={isRendering || !sceneId || !player.hasAudio}
-            title={isRu ? "Рендер сцены (3 стема)" : "Render scene (3 stems)"}
-          >
-            {isRendering ? (
-              <>
-                <Loader2 className="h-3 w-3 animate-spin" />
-                {renderProgress?.percent ?? 0}%
-              </>
-            ) : (
-              <>
-                <Download className="h-3 w-3" />
-                {isRu ? "Рендер" : "Render"}
-              </>
-            )}
-          </Button>
-          <div className="w-px h-4 bg-border mx-1" />
-          <Button
-            variant={timelineView === "plugins" ? "secondary" : "ghost"}
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => setTimelineView(v => v === "plugins" ? "tracks" : "plugins")}
-            title={isRu ? "Канальные плагины" : "Channel Plugins"}
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </div>
+      {/* Header (extracted component) */}
+      <TimelineTransport
+        isRu={isRu}
+        collapsed={collapsed}
+        onToggleCollapse={toggleCollapse}
+        playerState={player.state}
+        hasAudio={player.hasAudio}
+        positionSec={player.positionSec}
+        totalDuration={player.totalDuration}
+        volume={player.volume}
+        loopEnabled={player.loopEnabled}
+        loopRegion={player.loopRegion}
+        onPlay={player.play}
+        onPause={player.pause}
+        onStop={player.stop}
+        onChangeVolume={player.changeVolume}
+        onToggleLoop={player.toggleLoop}
+        sceneZoomPercent={sceneZoomPercent}
+        onApplySceneZoom={applySceneZoom}
+        isRendering={isRendering}
+        renderPercent={renderProgress?.percent ?? 0}
+        sceneId={sceneId}
+        onRenderScene={handleRenderScene}
+        charTrackCount={charTracks.length}
+        timelineView={timelineView}
+        onToggleView={() => setTimelineView(v => v === "plugins" ? "tracks" : "plugins")}
+      />
 
       {/* Content: Mixer sidebar + Tracks + optional Plugins right sidebar */}
       {!collapsed && (
@@ -977,7 +689,6 @@ export function StudioTimeline({
               const engineClipIds = timelineClips
                 .filter(c => c.trackId === track.id && c.hasAudio && !!c.audioPath)
                 .map(c => c.id);
-              // All clip IDs on this track (for plugin state aggregation)
               const trackClipIds = timelineClips
                 .filter(c => c.trackId === track.id)
                 .map(c => c.id);
@@ -1089,20 +800,17 @@ export function StudioTimeline({
                   />
                   );
                 })}
-                {/* Start line — where drag/resize began (yellow dashed) */}
                 {dragStartLineX !== null && (
                   <div
                     className="absolute top-0 bottom-0 pointer-events-none z-[45]"
                     style={{ left: `${dragStartLineX}px`, width: '0px', borderLeft: '1px dashed #eab308' }}
                   />
                 )}
-                {/* Guide line — current position during drag/resize (yellow dashed) */}
                 {dragGuideX !== null && (
                   <div
                     className="absolute top-0 bottom-0 pointer-events-none z-[45]"
                     style={{ left: `${dragGuideX}px`, width: '0px', borderLeft: '1px dashed #facc15' }}
                   >
-                    {/* Speed hint label during resize */}
                     {resizeSpeedHint && (
                       <div
                         className="absolute top-1 left-2 text-[10px] font-mono font-bold whitespace-nowrap px-1 py-0.5 rounded"
