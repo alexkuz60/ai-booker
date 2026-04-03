@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import {
   FolderClosed, FolderOpen, Trash2, RefreshCw, Loader2,
   ChevronRight, ChevronDown, FileText, File, FileAudio, AlertTriangle, Eye,
+  ArrowRightLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,12 +11,17 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ResizableHandle, ResizablePanel, ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { isOPFSSupported } from "@/lib/projectStorage";
 import { JsonTreeView } from "./JsonTreeView";
+import { migrateMirrorToSubfolders, type MigrationProgress } from "@/lib/migrateMirrorTranslation";
 
 /* ─── Types ──────────────────────────────────────────── */
 
