@@ -424,104 +424,7 @@ export default function Translation() {
     );
   }
 
-  if (!transLoading && transProjectExists && !translationStorage) {
-    return (
-      <motion.div
-        className="flex-1 flex flex-col h-full items-center justify-center gap-4 px-6 text-center text-muted-foreground"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-      >
-        <Loader2 className="h-10 w-10 animate-spin opacity-40" />
-        <div className="space-y-2 max-w-2xl">
-          <p className="text-base text-foreground">
-            {isRu ? "Переподключаем проект перевода" : "Reconnecting translation project"}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {isRu
-              ? "Проект перевода для этой книги уже считается созданным. Повторите подключение или восстановите локальную копию с сервера."
-              : "This book already has a translation project. Retry the local connection or restore the local copy from the server."}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button
-            variant="secondary"
-            onClick={refreshTransStorage}
-            disabled={transLoading}
-            className="gap-1.5"
-          >
-            <RefreshCw className="h-4 w-4" />
-            {isRu ? "Переподключить" : "Retry connection"}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={restoreTranslation}
-            disabled={restoringTranslation || savingTranslation}
-            className="gap-1.5"
-          >
-            {restoringTranslation ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <CloudDownload className="h-4 w-4" />
-            )}
-            {isRu ? "Перевод ← сервер" : "Restore translation"}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => navigate("/library")}
-            className="gap-1.5"
-          >
-            <BookOpen className="h-4 w-4" />
-            {isRu ? "Открыть Библиотеку" : "Open Library"}
-          </Button>
-        </div>
-      </motion.div>
-    );
-  }
-
-  if (!transLoading && !transProjectExists) {
-    return (
-      <motion.div
-        className="flex-1 flex flex-col h-full items-center justify-center gap-4 px-6 text-center text-muted-foreground"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-      >
-        <Languages className="h-16 w-16 opacity-20" />
-        <div className="space-y-2 max-w-2xl">
-          <p className="text-base text-foreground">
-            {isRu ? "Проект перевода не создан" : "Translation project not created"}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {isRu
-              ? "Для этой книги пока нет локального проекта перевода. Создайте его в Библиотеке или восстановите перевод с сервера."
-              : "There is no local translation project for this book yet. Create it in the Library or restore it from the server."}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => navigate("/library")}
-            className="gap-1.5"
-          >
-            <BookOpen className="h-4 w-4" />
-            {isRu ? "Открыть Библиотеку" : "Open Library"}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={restoreTranslation}
-            disabled={restoringTranslation || savingTranslation}
-            className="gap-1.5"
-          >
-            {restoringTranslation ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <CloudDownload className="h-4 w-4" />
-            )}
-            {isRu ? "Перевод ← сервер" : "Restore translation"}
-          </Button>
-        </div>
-      </motion.div>
-    );
-  }
+  const showTranslationBanner = transLoading || !translationStorage;
 
   // ── Main layout ────────────────────────────────────────
   return (
@@ -596,8 +499,73 @@ export default function Translation() {
             )}
           </div>
         )}
-
       </div>
+
+      {showTranslationBanner && (
+        <div className="border-b bg-muted/20 px-4 py-3">
+          <div className="flex flex-wrap items-start gap-3">
+            <div className="mt-0.5 rounded-full border bg-background p-2">
+              {transLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : (
+                <Languages className="h-4 w-4 text-muted-foreground" />
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="text-sm font-medium text-foreground">
+                {transLoading
+                  ? (isRu ? "Проверяем локальный проект перевода" : "Checking local translation project")
+                  : (isRu ? "Локальный проект перевода сейчас недоступен" : "Local translation project is currently unavailable")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {transLoading
+                  ? (isRu
+                    ? "Рабочая область уже открыта. Если зеркало проекта найдено, оно подключится автоматически."
+                    : "The workspace is already open. If the project mirror is found, it will attach automatically.")
+                  : (isRu
+                    ? "Рабочая область открыта в режиме просмотра исходных сегментов. Можно переподключить локальный проект, открыть Библиотеку или восстановить перевод с сервера."
+                    : "The workspace is open in source-view mode. You can retry the local connection, open the Library, or restore the translation from the server.")}
+              </p>
+            </div>
+
+            {!transLoading && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={refreshTransStorage}
+                  disabled={transLoading}
+                  className="gap-1.5"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  {isRu ? "Переподключить" : "Retry connection"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/library")}
+                  className="gap-1.5"
+                >
+                  <BookOpen className="h-4 w-4" />
+                  {isRu ? "Открыть Библиотеку" : "Open Library"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={restoreTranslation}
+                  disabled={restoringTranslation || savingTranslation}
+                  className="gap-1.5"
+                >
+                  {restoringTranslation ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CloudDownload className="h-4 w-4" />
+                  )}
+                  {isRu ? "Перевод ← сервер" : "Restore translation"}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <ResizablePanelGroup
         direction="horizontal"
