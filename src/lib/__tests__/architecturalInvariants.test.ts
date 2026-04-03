@@ -22,7 +22,7 @@ function collectTsFiles(dir: string, result: string[] = []): string[] {
     const stat = statSync(fullPath);
     if (stat.isDirectory()) {
       collectTsFiles(fullPath, result);
-    } else if (/\.(ts|tsx)$/.test(entry) && !entry.endsWith(".d.ts")) {
+    } else if (/\.(ts|tsx)$/.test(entry) && !entry.endsWith(".d.ts") && !entry.includes("architecturalInvariants")) {
       result.push(fullPath);
     }
   }
