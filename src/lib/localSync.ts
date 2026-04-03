@@ -91,7 +91,6 @@ export async function syncStructureToLocal(
 
     // 3. Per-chapter scene data (leaf-only)
     const sanitizedResults = sanitizeChapterResultsForStructure(data.toc, data.chapterResults);
-    const leafChapterIds = new Set(getLeafChapterIds(data.toc, data.chapterIdMap));
 
     // NOTE: No automatic deletion of chapter or scene directories.
     // Deletion of user data is ONLY allowed via explicit user action (delete button).
