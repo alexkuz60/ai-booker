@@ -190,8 +190,8 @@
 
 ### Ф. Сброс pipeline-флагов перевода при перезагрузке — ✅ РЕШЕНО (B21)
 - Проблема: конкурентные записи в `project.json` при холодном старте перезаписывали метаданные без `pipelineProgress`.
-- Решение: `readProjectMetaForWrite()` с retry при первом `null`, блокировка записи если meta остаётся `null`. `useLibrary` фильтрует зеркала по суффиксу `_EN`/`_RU`.
-- Файлы: `usePipelineProgress.ts`, `translationProject.ts`, `useLibrary.ts`, `useTranslationStorage.ts`.
+- Решение: `readProjectMetaForWrite()` с retry при первом `null`, блокировка записи если meta остаётся `null`.
+- Файлы: `usePipelineProgress.ts`.
 
 ### АА. Потеря профайлов персонажей после восстановления с сервера — ✅ РЕШЕНО (B31)
 - Проблема: после Wipe-and-Deploy профайлы персонажей (description, temperament, speech_style, speech_tags, psycho_tags) отображались как пустые, хотя данные присутствовали в БД. В `characters.json` данные хранились только во вложенном объекте `profile`, а UI читал верхнеуровневые поля (description, temperament и др.), которые были `null`.
