@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { readStoryboardFromLocal } from "@/lib/storyboardSync";
 import { readAtmospheresForScenes, type TaggedAtmosphereClip } from "@/lib/localAtmospheres";
+import { readAudioMetaForScenes } from "@/lib/localAudioMeta";
 
 const CHARS_PER_SEC = 14;
 
