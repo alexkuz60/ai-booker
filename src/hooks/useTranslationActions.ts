@@ -1,11 +1,8 @@
 /**
  * useTranslationActions — extracted handlers for the Translation page.
  *
- * Consolidates translate/literary/critique per-segment and per-scene actions,
- * translation project creation, and batch chapter translation.
- *
- * Single-segment operations use `bilingualRef.patchSegment()` for flicker-free
- * in-place updates. Bulk operations (scene/chapter) call `bilingualRef.reload()`.
+ * Now uses single storage + targetLang for all operations.
+ * No more separate translation OPFS project.
  */
 
 import { useCallback, useState } from "react";
@@ -13,45 +10,37 @@ import { toast } from "sonner";
 import type { Segment } from "@/components/studio/storyboard/types";
 import type { ProjectStorage, ProjectMeta } from "@/lib/projectStorage";
 import type { TranslationReadiness } from "@/lib/translationProject";
-import { createTranslationProject, translationProjectExists } from "@/lib/translationProject";
 import type { SelectedSegmentData } from "@/components/translation/BilingualSegmentsView";
 import type { BilingualSegmentsHandle } from "@/components/translation/BilingualSegmentsView";
+import { paths } from "@/lib/projectPaths";
 
 interface Deps {
   storage: ProjectStorage | null;
   meta: ProjectMeta | null;
   isRu: boolean;
-  /** Currently selected scene */
+  targetLang: string;
   selectedSceneId: string | null;
-  /** Currently selected chapter */
   selectedChapter: { index: number; chapterId: string; title: string } | null;
-  /** Readiness data */
   readiness: TranslationReadiness | null;
-  /** Currently selected segment */
   selectedSegment: SelectedSegmentData | null;
   setSelectedSegment: React.Dispatch<React.SetStateAction<SelectedSegmentData | null>>;
-  /** Ref to BilingualSegmentsView for granular updates */
   bilingualRef: React.RefObject<BilingualSegmentsHandle | null>;
-  /** Callback to bump quality chart refresh */
   onQualityUpdate?: () => void;
-  /** Hooks */
   doTranslateSegments: (segments: Segment[], sceneId: string, chapterId: string) => Promise<any>;
   editSegment: (seg: Segment, sceneId: string, chapterId: string, originalText: string) => Promise<any>;
   critiqueSegment: (seg: Segment, sceneId: string, chapterId: string, originalText: string) => Promise<any>;
   translateSceneFull: (sceneId: string, chapterId: string) => Promise<any>;
   translateChapterBatch: (chapterIndex: number, chapterId: string) => Promise<any>;
-  refreshTransStorage: () => void;
 }
 
 export function useTranslationActions(deps: Deps) {
   const {
-    storage, meta, isRu,
+    storage, meta, isRu, targetLang,
     selectedSceneId, selectedChapter,
     readiness, selectedSegment, setSelectedSegment,
     bilingualRef, onQualityUpdate,
     doTranslateSegments, editSegment, critiqueSegment,
     translateSceneFull, translateChapterBatch,
-    refreshTransStorage,
   } = deps;
 
   const [creating, setCreating] = useState(false);
@@ -61,7 +50,6 @@ export function useTranslationActions(deps: Deps) {
     if (!selectedSceneId || !selectedChapter?.chapterId) return;
     const result = await doTranslateSegments(segments, selectedSceneId, selectedChapter.chapterId);
     if (result?.translations) {
-      // Patch each translated segment in-place
       for (const [segId, text] of result.translations) {
         bilingualRef.current?.patchSegment(segId, text, "literal");
       }
@@ -71,13 +59,13 @@ export function useTranslationActions(deps: Deps) {
 
   const handleLiteraryEdit = useCallback(async (seg: Segment) => {
     if (!selectedSceneId || !selectedChapter?.chapterId || !storage) return;
-    const srcSbPath = `chapters/${selectedChapter.chapterId}/scenes/${selectedSceneId}/storyboard.json`;
+    // Read original text from source storyboard
+    const srcSbPath = paths.storyboard(selectedSceneId, selectedChapter.chapterId);
     const srcData = await storage.readJSON<any>(srcSbPath);
     const srcSeg = srcData?.segments?.find((s: any) => s.segment_id === seg.segment_id);
     const originalText = srcSeg?.phrases?.map((p: any) => p.text).join(" ") ?? "";
     const result = await editSegment(seg, selectedSceneId, selectedChapter.chapterId, originalText);
     if (result) {
-      // Patch in-place
       bilingualRef.current?.patchSegment(seg.segment_id, result.text, "literary");
       if (selectedSegment?.segmentId === seg.segment_id) {
         setSelectedSegment({ ...selectedSegment, translatedText: result.text });
@@ -88,13 +76,12 @@ export function useTranslationActions(deps: Deps) {
 
   const handleCritique = useCallback(async (seg: Segment) => {
     if (!selectedSceneId || !selectedChapter?.chapterId || !storage) return;
-    const srcSbPath = `chapters/${selectedChapter.chapterId}/scenes/${selectedSceneId}/storyboard.json`;
+    const srcSbPath = paths.storyboard(selectedSceneId, selectedChapter.chapterId);
     const srcData = await storage.readJSON<any>(srcSbPath);
     const srcSeg = srcData?.segments?.find((s: any) => s.segment_id === seg.segment_id);
     const originalText = srcSeg?.phrases?.map((p: any) => p.text).join(" ") ?? "";
     const result = await critiqueSegment(seg, selectedSceneId, selectedChapter.chapterId, originalText);
     if (result) {
-      // Patch stage only — text stays as literary
       bilingualRef.current?.patchSegment(seg.segment_id, selectedSegment?.translatedText ?? "", "critique");
       if (selectedSegment?.segmentId === seg.segment_id) {
         setSelectedSegment(prev => prev ? { ...prev } : null);
@@ -113,6 +100,7 @@ export function useTranslationActions(deps: Deps) {
     await translateChapterBatch(selectedChapter.index, selectedChapter.chapterId);
   }, [translateChapterBatch, selectedChapter]);
 
+  /** Initialize translation by marking the target language in project.json */
   const handleCreateTranslation = useCallback(async () => {
     if (!storage || !meta || !readiness) return;
     const readyIndices = Array.from(readiness.readyChapters.keys());
@@ -123,40 +111,35 @@ export function useTranslationActions(deps: Deps) {
       return;
     }
 
-    const tLang = (meta.language === "ru" ? "en" : "ru") as "en" | "ru";
-
-    const exists = await translationProjectExists(storage, meta);
-    if (exists) {
-      toast.error(isRu
-        ? `Проект перевода "${storage.projectName}_${tLang.toUpperCase()}" уже существует`
-        : `Translation project "${storage.projectName}_${tLang.toUpperCase()}" already exists`);
-      return;
-    }
-
     setCreating(true);
     setCreateProgress(isRu ? "Подготовка…" : "Preparing…");
     try {
-      await createTranslationProject({
-        sourceStorage: storage,
-        sourceMeta: meta,
-        targetLanguage: tLang,
-        chapterIndices: readyIndices,
-        onProgress: (label) => setCreateProgress(label),
-      });
+      // Simply mark translation language in project.json
+      const currentMeta = await storage.readJSON<Record<string, unknown>>(paths.projectMeta());
+      if (!currentMeta) throw new Error("Cannot read project.json");
+
+      const existingLangs = (currentMeta.translationLanguages as string[]) ?? [];
+      if (!existingLangs.includes(targetLang)) {
+        await storage.writeJSON(paths.projectMeta(), {
+          ...currentMeta,
+          translationLanguages: [...existingLangs, targetLang],
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
       toast.success(
         isRu
-          ? `Проект перевода создан (${readyIndices.length} глав)`
-          : `Translation project created (${readyIndices.length} chapters)`,
+          ? `Перевод на ${targetLang.toUpperCase()} активирован (${readyIndices.length} глав)`
+          : `Translation to ${targetLang.toUpperCase()} activated (${readyIndices.length} chapters)`,
       );
-      refreshTransStorage();
     } catch (err) {
       console.error("[Translation] create error:", err);
-      toast.error(isRu ? "Ошибка создания проекта перевода" : "Failed to create translation project");
+      toast.error(isRu ? "Ошибка инициализации перевода" : "Failed to initialize translation");
     } finally {
       setCreating(false);
       setCreateProgress(null);
     }
-  }, [storage, meta, readiness, isRu, refreshTransStorage]);
+  }, [storage, meta, readiness, isRu, targetLang]);
 
   return {
     creating,

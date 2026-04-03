@@ -9,7 +9,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { Languages, Radar, BookOpen, Loader2, FileText, Wand2, Square, RefreshCw, CloudDownload, ScrollText } from "lucide-react";
+import { Languages, Radar, BookOpen, Loader2, FileText, Wand2, Square, ScrollText } from "lucide-react";
 import { getScoreLevel, SCORE_COLORS } from "@/lib/qualityRadar";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import {
@@ -25,13 +25,11 @@ import { SaveBookButton } from "@/components/SaveBookButton";
 import { AiRolesButton } from "@/components/AiRolesButton";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { useAiRoles } from "@/hooks/useAiRoles";
-import { useTranslationStorage } from "@/hooks/useTranslationStorage";
 import { useSegmentTranslation } from "@/hooks/useSegmentTranslation";
 import { useSegmentLiteraryEdit } from "@/hooks/useSegmentLiteraryEdit";
 import { useSegmentCritique } from "@/hooks/useSegmentCritique";
 import { useTranslationBatch } from "@/hooks/useTranslationBatch";
 import { useTranslationActions } from "@/hooks/useTranslationActions";
-import { useSaveTranslation } from "@/hooks/useSaveTranslation";
 import { paths } from "@/lib/projectPaths";
 import type { TocChapter, CharacterIndex } from "@/pages/parser/types";
 import { readCharacterIndex, getChapterCharacterIds, getSceneCharacterIds } from "@/lib/localCharacters";
@@ -94,21 +92,15 @@ export default function Translation() {
   const [synopsisOpen, setSynopsisOpen] = useState(false);
   const [excludedCharIds, setExcludedCharIds] = useState<Set<string>>(new Set());
 
-  // Translation storage (mirror OPFS project)
-  const { translationStorage, exists: transProjectExists, loading: transLoading, refresh: refreshTransStorage } =
-    useTranslationStorage(storage, meta);
-
-  const { saveTranslation, saving: savingTranslation, restoreTranslation, restoring: restoringTranslation } = useSaveTranslation({
-    translationStorage,
-    sourceStorage: storage,
-    sourceMeta: meta,
-    isRu,
-    onRestored: refreshTransStorage,
-  });
-
   // Compute source/target langs
   const sourceLang = meta?.language ?? "ru";
   const targetLang = sourceLang === "ru" ? "en" : "ru";
+
+  // Translation is "active" if translationLanguages includes targetLang
+  const translationActive = useMemo(() => {
+    const langs = (meta as any)?.translationLanguages as string[] | undefined;
+    return langs?.includes(targetLang) ?? false;
+  }, [meta, targetLang]);
 
   const selectedChapter = chapters.find((c) => c.index === selectedChapterIdx) ?? null;
 
@@ -119,8 +111,7 @@ export default function Translation() {
     translating,
     progressLabel,
   } = useSegmentTranslation({
-    sourceStorage: storage,
-    translationStorage,
+    storage,
     model: translationModel,
     userApiKeys: apiKeys,
     sourceLang,
@@ -130,7 +121,7 @@ export default function Translation() {
 
   const literaryModel = getModelForRole("literary_editor");
   const { editSegment, editing: literaryEditing } = useSegmentLiteraryEdit({
-    translationStorage,
+    storage,
     model: literaryModel,
     userApiKeys: apiKeys,
     sourceLang,
@@ -140,7 +131,7 @@ export default function Translation() {
 
   const critiqueModel = getModelForRole("translation_critic");
   const { critiqueSegment, critiquing: segCritiquing } = useSegmentCritique({
-    translationStorage,
+    storage,
     model: critiqueModel,
     userApiKeys: apiKeys,
     sourceLang,
@@ -154,8 +145,7 @@ export default function Translation() {
     progress: batchProgress,
     abort: abortBatch,
   } = useTranslationBatch({
-    sourceStorage: storage,
-    translationStorage,
+    storage,
     userApiKeys: apiKeys,
     sourceLang,
     targetLang,
@@ -174,7 +164,7 @@ export default function Translation() {
   // ── Synopsis context ────────────────────────────────────
   const synopsis = useTranslationSynopsis({
     sourceStorage: storage,
-    translationStorage,
+    translationStorage: null, // synopsis now lives in main project
     isRu,
     model: translationModel,
     userApiKeys: apiKeys,
@@ -208,7 +198,7 @@ export default function Translation() {
         const charIds = await getChapterCharacterIds(storage, chapterSceneIds);
         if (cancelled) return;
         if (charIds.size === 0) {
-          setChapterChars(allChars); // fallback: show all
+          setChapterChars(allChars);
         } else {
           setChapterChars(allChars.filter((c) => charIds.has(c.id)));
         }
@@ -219,7 +209,6 @@ export default function Translation() {
     return () => { cancelled = true; };
   }, [storage, selectedChapter?.chapterId]);
 
-  // ── Scene character IDs for highlighting ────────────────
   useEffect(() => {
     if (!storage || !selectedSceneId) { setSceneCharIds(new Set()); return; }
     let cancelled = false;
@@ -228,26 +217,23 @@ export default function Translation() {
     }).catch(() => { if (!cancelled) setSceneCharIds(new Set()); });
     return () => { cancelled = true; };
   }, [storage, selectedSceneId]);
-  // ── Load excluded chars from OPFS on chapter change ─────
+
+  // Load excluded chars from OPFS on chapter change
   useEffect(() => {
-    const store = translationStorage || storage;
-    if (!store || !selectedChapter?.chapterId) { setExcludedCharIds(new Set()); return; }
+    if (!storage || !selectedChapter?.chapterId) { setExcludedCharIds(new Set()); return; }
     let cancelled = false;
-    readExcludedChars(store, selectedChapter.chapterId).then((ids) => {
+    readExcludedChars(storage, selectedChapter.chapterId).then((ids) => {
       if (!cancelled) setExcludedCharIds(ids);
     }).catch(() => { if (!cancelled) setExcludedCharIds(new Set()); });
     return () => { cancelled = true; };
-  }, [storage, translationStorage, selectedChapter?.chapterId]);
+  }, [storage, selectedChapter?.chapterId]);
 
-  // ── Save excluded chars handler ─────────────────────────
   const handleExcludedCharsChange = useCallback((ids: Set<string>) => {
     setExcludedCharIds(ids);
-    const store = translationStorage || storage;
-    if (store && selectedChapter?.chapterId) {
-      saveExcludedChars(store, selectedChapter.chapterId, ids).catch(console.error);
+    if (storage && selectedChapter?.chapterId) {
+      saveExcludedChars(storage, selectedChapter.chapterId, ids).catch(console.error);
     }
-  }, [storage, translationStorage, selectedChapter?.chapterId]);
-
+  }, [storage, selectedChapter?.chapterId]);
 
   const {
     creating,
@@ -262,6 +248,7 @@ export default function Translation() {
     storage,
     meta,
     isRu,
+    targetLang,
     selectedSceneId,
     selectedChapter,
     readiness,
@@ -274,53 +261,17 @@ export default function Translation() {
     critiqueSegment,
     translateSceneFull,
     translateChapterBatch,
-    refreshTransStorage,
   });
 
   // ── Header ──────────────────────────────────────────────
-  const saveBookWithTranslation = useCallback(async (
-    onProgress?: any,
-    opts?: { syncAtmo?: boolean },
-  ) => {
-    await saveBook(onProgress, opts);
-    // Automatically push translation project if it exists
-    if (transProjectExists && translationStorage) {
-      try {
-        onProgress?.("translation", "running");
-        await saveTranslation();
-        onProgress?.("translation", "done");
-      } catch (err) {
-        console.error("[Translation] auto-sync translation failed:", err);
-        onProgress?.("translation", "error", err instanceof Error ? err.message : String(err));
-      }
-    } else {
-      onProgress?.("translation", "skipped", isRu ? "Нет проекта перевода" : "No translation project");
-    }
-  }, [saveBook, transProjectExists, translationStorage, saveTranslation, isRu]);
-
   const headerRight = useMemo(() => {
     if (!isOpen || !meta) return undefined;
     return (
       <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={restoreTranslation}
-          disabled={restoringTranslation || savingTranslation}
-          className="gap-1.5"
-          title={isRu ? "Восстановить перевод с сервера" : "Restore translation from server"}
-        >
-          {restoringTranslation ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <CloudDownload className="h-3.5 w-3.5" />
-          )}
-          {isRu ? "Перевод ← сервер" : "Restore translation"}
-        </Button>
         <SaveBookButton
           isRu={isRu}
-          onClick={saveBookWithTranslation}
-          loading={savingBook || savingTranslation}
+          onClick={saveBook}
+          loading={savingBook}
           disabled={!bookId}
           showDownloadZip={isProjectOpen}
           onDownloadZip={downloadZip}
@@ -335,7 +286,7 @@ export default function Translation() {
         />
       </div>
     );
-  }, [isOpen, meta, isRu, saveBookWithTranslation, savingBook, savingTranslation, bookId, isProjectOpen, downloadZip, importZip, apiKeys, restoreTranslation, restoringTranslation]);
+  }, [isOpen, meta, isRu, saveBook, savingBook, bookId, isProjectOpen, downloadZip, importZip, apiKeys]);
 
   const headerRightRef = useRef(headerRight);
   headerRightRef.current = headerRight;
@@ -379,10 +330,7 @@ export default function Translation() {
 
   // Check readiness
   useEffect(() => {
-    if (!storage || !isOpen) {
-      setReadiness(null);
-      return;
-    }
+    if (!storage || !isOpen) { setReadiness(null); return; }
     let cancelled = false;
     setChecking(true);
     checkTranslationReadiness(storage).then((r) => {
@@ -396,13 +344,10 @@ export default function Translation() {
     return (
       <motion.div
         className="flex-1 flex flex-col h-full items-center justify-center gap-4 text-muted-foreground"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
       >
         <Loader2 className="h-8 w-8 animate-spin opacity-40" />
-        <p className="text-base">
-          {isRu ? "Загрузка проекта…" : "Loading project…"}
-        </p>
+        <p className="text-base">{isRu ? "Загрузка проекта…" : "Loading project…"}</p>
       </motion.div>
     );
   }
@@ -411,28 +356,21 @@ export default function Translation() {
     return (
       <motion.div
         className="flex-1 flex flex-col h-full items-center justify-center gap-4 text-muted-foreground"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
       >
         <Languages className="h-16 w-16 opacity-20" />
         <p className="text-base">
-          {isRu
-            ? "Откройте проект в Парсере, чтобы начать перевод"
-            : "Open a project in Parser to start translation"}
+          {isRu ? "Откройте проект в Парсере, чтобы начать перевод" : "Open a project in Parser to start translation"}
         </p>
       </motion.div>
     );
   }
 
-  const showTranslationBanner = transLoading || !translationStorage;
-
   // ── Main layout ────────────────────────────────────────
   return (
     <motion.div
       className="flex-1 flex flex-col h-full overflow-hidden"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.3 }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}
     >
       {/* Header bar */}
       <div className="border-b px-4 py-2 flex items-center gap-3 shrink-0 flex-wrap">
@@ -456,32 +394,38 @@ export default function Translation() {
           </SelectContent>
         </Select>
 
-        {transProjectExists && selectedChapter && (
+        {translationActive && selectedChapter && (
           <Button
-            size="sm"
-            variant="secondary"
+            size="sm" variant="secondary"
             onClick={handleTranslateChapter}
             disabled={translating || batchProgress.running}
             className="h-8 text-sm px-3 gap-1.5"
           >
-            {batchProgress.running ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Languages className="h-3.5 w-3.5" />
-            )}
+            {batchProgress.running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
             {isRu ? "Перевести главу" : "Translate chapter"}
           </Button>
         )}
 
-        {transProjectExists && selectedChapter && selectedSceneId && (
+        {translationActive && selectedChapter && selectedSceneId && (
           <Button
-            size="sm"
-            variant="outline"
+            size="sm" variant="outline"
             onClick={() => setSynopsisOpen(true)}
             className="h-8 text-sm px-3 gap-1.5"
           >
             <ScrollText className="h-3.5 w-3.5" />
             {isRu ? "Контекст" : "Context"}
+          </Button>
+        )}
+
+        {!translationActive && readiness && readiness.totalReady > 0 && (
+          <Button
+            size="sm" variant="default"
+            onClick={handleCreateTranslation}
+            disabled={creating}
+            className="h-8 text-sm px-3 gap-1.5"
+          >
+            {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
+            {creating && createProgress ? createProgress : isRu ? `Активировать ${targetLang.toUpperCase()}` : `Activate ${targetLang.toUpperCase()}`}
           </Button>
         )}
 
@@ -492,84 +436,17 @@ export default function Translation() {
               {readiness.totalReady} / {readiness.totalScenes}
             </Badge>
             {checking && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            {transProjectExists && (
+            {translationActive && (
               <Badge variant="outline" className="text-xs px-1.5 py-0 text-primary border-primary/30">
-                {isRu ? "Проект перевода" : "Translation project"} ✓
+                {targetLang.toUpperCase()} ✓
               </Badge>
             )}
           </div>
         )}
       </div>
 
-      {showTranslationBanner && (
-        <div className="border-b bg-muted/20 px-4 py-3">
-          <div className="flex flex-wrap items-start gap-3">
-            <div className="mt-0.5 rounded-full border bg-background p-2">
-              {transLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              ) : (
-                <Languages className="h-4 w-4 text-muted-foreground" />
-              )}
-            </div>
-
-            <div className="min-w-0 flex-1 space-y-1">
-              <p className="text-sm font-medium text-foreground">
-                {transLoading
-                  ? (isRu ? "Проверяем локальный проект перевода" : "Checking local translation project")
-                  : (isRu ? "Локальный проект перевода сейчас недоступен" : "Local translation project is currently unavailable")}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {transLoading
-                  ? (isRu
-                    ? "Рабочая область уже открыта. Если зеркало проекта найдено, оно подключится автоматически."
-                    : "The workspace is already open. If the project mirror is found, it will attach automatically.")
-                  : (isRu
-                    ? "Рабочая область открыта в режиме просмотра исходных сегментов. Можно переподключить локальный проект, открыть Библиотеку или восстановить перевод с сервера."
-                    : "The workspace is open in source-view mode. You can retry the local connection, open the Library, or restore the translation from the server.")}
-              </p>
-            </div>
-
-            {!transLoading && (
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="secondary"
-                  onClick={refreshTransStorage}
-                  disabled={transLoading}
-                  className="gap-1.5"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  {isRu ? "Переподключить" : "Retry connection"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate("/library")}
-                  className="gap-1.5"
-                >
-                  <BookOpen className="h-4 w-4" />
-                  {isRu ? "Открыть Библиотеку" : "Open Library"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={restoreTranslation}
-                  disabled={restoringTranslation || savingTranslation}
-                  className="gap-1.5"
-                >
-                  {restoringTranslation ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <CloudDownload className="h-4 w-4" />
-                  )}
-                  {isRu ? "Перевод ← сервер" : "Restore translation"}
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       <ResizablePanelGroup
-        direction="horizontal"
-        className="flex-1"
+        direction="horizontal" className="flex-1"
         onLayout={(sizes) => setPanelSizes((prev) => ({ ...prev, main: sizes }))}
       >
         {/* Left: Bilingual storyboard + scene nav */}
@@ -608,7 +485,7 @@ export default function Translation() {
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     {isRu ? "Билингва" : "Bilingual"}
                   </span>
-                  {transProjectExists && selectedSceneId && (
+                  {translationActive && selectedSceneId && (
                     <div className="flex items-center gap-1.5 ml-auto">
                       {batchProgress.running && batchProgress.currentStage && (
                         <span className="text-xs text-muted-foreground tabular-nums">
@@ -623,23 +500,19 @@ export default function Translation() {
                         </span>
                       )}
                       <Button
-                        size="sm"
-                        variant="ghost"
+                        size="sm" variant="ghost"
                         onClick={handleTranslateSceneFull}
                         disabled={translating || batchProgress.running}
                         className="h-7 text-xs px-2 gap-1"
                       >
-                        {batchProgress.running && batchProgress.scenesTotal === 1 ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Wand2 className="h-3 w-3" />
-                        )}
+                        {batchProgress.running && batchProgress.scenesTotal === 1
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : <Wand2 className="h-3 w-3" />}
                         {isRu ? "Полный пайплайн" : "Full pipeline"}
                       </Button>
                       {batchProgress.running && (
                         <Button
-                          size="sm"
-                          variant="ghost"
+                          size="sm" variant="ghost"
                           onClick={abortBatch}
                           className="h-6 w-6 p-0 text-destructive hover:text-destructive"
                           title={isRu ? "Остановить" : "Stop"}
@@ -656,14 +529,15 @@ export default function Translation() {
                       <div className="p-3" key={selectedSceneId}>
                         <BilingualSegmentsView
                           ref={bilingualRef}
-                          sourceStorage={storage}
-                          translationStorage={translationStorage}
+                          storage={storage}
+                          targetLang={targetLang}
+                          translationActive={translationActive}
                           sceneId={selectedSceneId}
                           chapterId={selectedChapter?.chapterId ?? null}
                           isRu={isRu}
-                          onTranslateSegments={transProjectExists ? handleTranslateSegments : undefined}
-                          onLiteraryEdit={transProjectExists ? handleLiteraryEdit : undefined}
-                          onCritique={transProjectExists ? handleCritique : undefined}
+                          onTranslateSegments={translationActive ? handleTranslateSegments : undefined}
+                          onLiteraryEdit={translationActive ? handleLiteraryEdit : undefined}
+                          onCritique={translationActive ? handleCritique : undefined}
                           onSegmentsLoaded={setSceneSegmentIds}
                           translating={translating || batchProgress.running}
                           progressLabel={progressLabel}
@@ -672,9 +546,10 @@ export default function Translation() {
                         />
                       </div>
                     </ScrollArea>
-                    {transProjectExists && sceneSegmentIds.length > 0 && (
+                    {translationActive && sceneSegmentIds.length > 0 && (
                       <SegmentQualityChart
-                        translationStorage={translationStorage}
+                        translationStorage={storage}
+                        targetLang={targetLang}
                         sceneId={selectedSceneId}
                         chapterId={selectedChapter?.chapterId ?? null}
                         segmentIds={sceneSegmentIds}
@@ -728,7 +603,8 @@ export default function Translation() {
                   />
                 )}
                 <QualityMonitorPanel
-                  storage={translationStorage}
+                  storage={storage}
+                  targetLang={targetLang}
                   sceneId={selectedSceneId}
                   chapterId={selectedChapter?.chapterId ?? null}
                   isRu={isRu}
