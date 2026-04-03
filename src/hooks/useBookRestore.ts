@@ -186,16 +186,10 @@ export function useBookRestore({
 
     // ── Preserve source file from existing OPFS before wipe ──
     let preservedSourceBlob: Blob | null = null;
-    let preservedTranslationProject: ProjectMeta["translationProject"] | undefined;
     const existingProjects = localProjectNamesByBookId.get(book.id) || [];
     const existingSourceStore = await resolveLocalStorageForBook(book.id, resolverOpts());
     if (existingSourceStore?.isReady) {
       try {
-        const oldMeta = await existingSourceStore.readJSON<ProjectMeta>("project.json").catch(() => null);
-        if (oldMeta?.translationProject) {
-          preservedTranslationProject = oldMeta.translationProject;
-        }
-
         const found = await findSourceBlob(existingSourceStore);
         if (found) {
           preservedSourceBlob = found.blob;
