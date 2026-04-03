@@ -101,9 +101,13 @@ export async function saveStoryboardToLocal(
       await writePipelineStep(storage, "storyboard_done", true);
     }
 
-    // Generate/update audio_meta.json with estimated durations for segments
-    // that don't have real TTS audio yet. Preserves existing "ready" entries.
-    await generateEstimatedAudioMeta(storage, sceneId, data.segments, chapterId);
+    // Generate/update scene JSON files with defaults for segments.
+    // Preserves existing user-modified entries.
+    await Promise.all([
+      generateEstimatedAudioMeta(storage, sceneId, data.segments, chapterId),
+      generateDefaultClipPlugins(storage, sceneId, data.segments, chapterId),
+      generateDefaultMixerState(storage, sceneId, chapterId),
+    ]);
   } catch (err) {
     console.warn("[StoryboardSync] Failed to save:", err);
   }
