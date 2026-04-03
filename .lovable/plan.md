@@ -1,50 +1,46 @@
 
-## Фаза 1: Новые пути в projectPaths.ts
+## ✅ Консолидация хранения перевода — ЗАВЕРШЕНО
 
-Добавляем lang-aware пути для перевода:
-- `translationStoryboard(sceneId, lang, chapterId)` → `chapters/{ch}/scenes/{sc}/{lang}/storyboard.json`
-- `translationRadar(sceneId, lang, stage, chapterId)` → `chapters/{ch}/scenes/{sc}/{lang}/radar-{stage}.json`
-- `translationAudioMeta(sceneId, lang, chapterId)` → `chapters/{ch}/scenes/{sc}/{lang}/audio_meta.json`
-- `translationMixerState(sceneId, lang, chapterId)` → `chapters/{ch}/scenes/{sc}/{lang}/mixer_state.json`
-- `translationTtsClip(segId, sceneId, lang, chapterId)` → `chapters/{ch}/scenes/{sc}/{lang}/audio/tts/{segId}.mp3`
-- `translationSynopsis(type, id)` → `synopsis/{type}-{id}.json` (остаётся в основном проекте)
+Все фазы выполнены. Зеркальные OPFS-проекты устранены. Данные перевода хранятся в lang-поддиректориях основного проекта.
 
-## Фаза 2: radarStages.ts — добавляем lang-aware пути
+### Фаза 1: Новые пути в projectPaths.ts ✅
 
-Функции `radarStagePath`, `readStageRadar`, `writeStageRadar`, `readCritiqueRadar`, `writeCritiqueRadar`, `readAllStages` получают опциональный параметр `lang?: string`. Если `lang` задан, путь идёт в `chapters/{ch}/scenes/{sc}/{lang}/radar-{stage}.json`.
+Добавлены lang-aware пути: `translationStoryboard`, `translationRadar`, `translationAudioMeta`, `translationMixerState`, `translationTtsClip`, `translationClipPlugins`.
 
-## Фаза 3: Хуки перевода — убираем translationStorage
+### Фаза 2: radarStages.ts — lang-aware пути ✅
 
-Все хуки (`useSegmentTranslation`, `useSegmentLiteraryEdit`, `useSegmentCritique`, `useTranslationBatch`) теперь работают с одним `storage` + `targetLang`. Вместо записи в отдельный OPFS-проект пишут в поддиректорию `{lang}/` текущей сцены.
+Функции `radarStagePath`, `readStageRadar`, `writeStageRadar` и др. получили параметр `lang?: string`.
 
-## Фаза 4: translationPipeline.ts — единый storage
+### Фаза 3: Хуки перевода — единый storage ✅
 
-`sourceStorage` и `targetStorage` заменяются на один `storage`. Все пути идут через `paths.translationStoryboard(...)`.
+Все хуки (`useSegmentTranslation`, `useSegmentLiteraryEdit`, `useSegmentCritique`, `useTranslationBatch`) работают с одним `storage` + `targetLang`.
 
-## Фаза 5: BilingualSegmentsView — единый storage
+### Фаза 4: translationPipeline.ts — единый storage ✅
+
+`sourceStorage` и `targetStorage` заменены на один `storage`.
+
+### Фаза 5: BilingualSegmentsView — единый storage ✅
 
 Читает оригинал из `paths.storyboard(sceneId)`, перевод из `paths.translationStoryboard(sceneId, lang)`.
 
-## Фаза 6: Translation.tsx — убираем useTranslationStorage
+### Фаза 6: Translation.tsx — убран useTranslationStorage ✅
 
-Убираем `useTranslationStorage`, `useSaveTranslation` (перевод теперь часть основного ZIP). Убираем баннер "проект перевода недоступен". `transProjectExists` заменяется проверкой наличия `meta?.translationLanguages` или аналогичного поля.
+Guard заменён на проверку `meta?.translationLanguages`. Баннер зеркала удалён.
 
-## Фаза 7: QualityMonitorPanel, SegmentQualityChart — lang-aware
+### Фаза 7: QualityMonitorPanel, SegmentQualityChart — lang-aware ✅
 
-Передаём `lang` вместо `translationStorage`.
+### Фаза 8: Инициализация перевода ✅
 
-## Фаза 8: Инициализация перевода
+`translationLanguages: ["en"]` в `project.json`. Степпер в библиотеке: один шаг `trans_activated`.
 
-Вместо `createTranslationProject()` — простая запись `translationLanguages: ["en"]` в `project.json`. Никакого отдельного OPFS-проекта.
+### Фаза 9: Очистка мёртвого кода ✅
 
-## Фаза 9: Очистка мёртвого кода
+Удалены: `useTranslationStorage`, `useSaveTranslation`, зеркальная логика из `translationProject.ts`, `_translation_link.json`.
 
-Удаляем:
-- `src/hooks/useTranslationStorage.ts`
-- `src/hooks/useSaveTranslation.ts`  
-- `src/lib/translationProject.ts` (кроме `checkTranslationReadiness`)
-- `src/lib/translationMirrorResolver.ts`
+### Фаза 10: Облачная синхронизация (Storage ZIP) ✅
 
-## project.json изменение
+`translationBackup.ts`: pack/push/restore. Интеграция в `useSaveBookToProject` и `serverDeploy.ts`.
 
-Поле `translationProject?: { projectName, targetLanguage, createdAt }` заменяется на `translationLanguages?: string[]` (например `["en"]`).
+### project.json
+
+Поле `translationProject?: { projectName, targetLanguage, createdAt }` заменено на `translationLanguages?: string[]`.
