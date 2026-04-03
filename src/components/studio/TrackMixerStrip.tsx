@@ -8,7 +8,7 @@
  * - MIXED = some clips differ or have individual overrides
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { getAudioEngine, type TrackMeterData, type TrackMixState } from "@/lib/audioEngine";
 import { VuSlider } from "./VuSlider";
 import type { TrackPluginState } from "@/hooks/useClipPluginConfigs";
@@ -37,7 +37,7 @@ interface TrackMixerStripProps {
 /** Threshold in dB above which we consider signal "active" */
 const SIGNAL_THRESHOLD_DB = -50;
 
-export function TrackMixerStrip({
+export const TrackMixerStrip = memo(function TrackMixerStrip({
   trackId,
   allClipIds = [],
   fallbackEngineId,
@@ -247,4 +247,4 @@ export function TrackMixerStrip({
       </div>
     </div>
   );
-}
+});
