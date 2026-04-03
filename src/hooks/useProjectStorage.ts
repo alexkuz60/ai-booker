@@ -15,7 +15,7 @@ import { readSceneIndex } from "@/lib/sceneIndex";
 import { getProjectActivityMs } from "@/lib/projectActivity";
 
 const LAST_PROJECT_KEY = "booker_last_project";
-const LANG_SUFFIX_RE = /^(.*)_(EN|RU)$/i;
+
 const LOCAL_RESET_KEYS = [
   LAST_PROJECT_KEY,
   "parser-active-book",
