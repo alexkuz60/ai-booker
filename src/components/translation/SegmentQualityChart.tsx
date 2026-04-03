@@ -62,6 +62,7 @@ interface SegmentBar {
 
 interface Props {
   translationStorage: ProjectStorage | null;
+  targetLang: string;
   sceneId: string | null;
   chapterId: string | null;
   segmentIds: string[];
@@ -77,6 +78,7 @@ const OVERLAY_ORDER: RadarLayer[] = ["5R+Alt", "5R", "3R"];
 
 export function SegmentQualityChart({
   translationStorage,
+  targetLang,
   sceneId,
   chapterId,
   segmentIds,
@@ -107,7 +109,7 @@ export function SegmentQualityChart({
 
     (async () => {
       try {
-        const stages = await readAllStages(translationStorage, chapterId, sceneId);
+        const stages = await readAllStages(translationStorage, chapterId, sceneId, targetLang);
         if (cancelled) return;
 
         const literalMap = new Map<string, StageSegmentRadar>();
@@ -152,7 +154,7 @@ export function SegmentQualityChart({
     })();
 
     return () => { cancelled = true; };
-  }, [translationStorage, sceneId, chapterId, segmentIds, activeAxis, reloadTick]);
+  }, [translationStorage, targetLang, sceneId, chapterId, segmentIds, activeAxis, reloadTick]);
 
   const handleBarClick = useCallback((data: SegmentBar, idx: number) => {
     setHighlightedIdx(idx);

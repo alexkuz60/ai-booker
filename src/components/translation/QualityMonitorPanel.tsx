@@ -31,6 +31,7 @@ function hasAnyAxis(radar: RadarScores | null | undefined) {
 
 interface QualityMonitorPanelProps {
   storage: ProjectStorage | null;
+  targetLang: string;
   sceneId: string | null;
   chapterId: string | null;
   isRu: boolean;
@@ -40,6 +41,7 @@ interface QualityMonitorPanelProps {
 
 export function QualityMonitorPanel({
   storage,
+  targetLang,
   sceneId,
   chapterId,
   isRu,
@@ -92,7 +94,7 @@ export function QualityMonitorPanel({
       try {
         // 1. Staged radar files
         if (storage && sceneId && chapterId) {
-          const stages = stageCache.get(sceneId) ?? await readAllStages(storage, chapterId, sceneId);
+          const stages = stageCache.get(sceneId) ?? await readAllStages(storage, chapterId, sceneId, targetLang);
           if (stages) {
             stageCache.set(sceneId, stages);
             const critSeg = stages.critique?.segments.find(s => s.segmentId === selectedSegment.segmentId);
@@ -134,7 +136,7 @@ export function QualityMonitorPanel({
     })();
 
     return () => { cancelled = true; };
-  }, [selectedSegment?.segmentId, selectedSegment?.originalText, selectedSegment?.translatedText, storage, sceneId, chapterId, weights, cacheRevision]);
+  }, [selectedSegment?.segmentId, selectedSegment?.originalText, selectedSegment?.translatedText, storage, targetLang, sceneId, chapterId, weights, cacheRevision]);
 
   // Load stage radar files for layer overlays
   useEffect(() => {
@@ -148,7 +150,7 @@ export function QualityMonitorPanel({
       try {
         let stages = stageCache.get(sceneId);
         if (!stages) {
-          stages = await readAllStages(storage, chapterId, sceneId);
+          stages = await readAllStages(storage, chapterId, sceneId, targetLang);
           stageCache.set(sceneId, stages);
         }
         if (cancelled) return;
