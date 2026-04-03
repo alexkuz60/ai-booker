@@ -1,18 +1,14 @@
-export interface ProjectIdentityMeta {
-  bookId?: string;
-  sourceProjectName?: string;
-  targetLanguage?: string;
-}
-
 export interface PreferredProjectCandidate {
   score: number;
   isLegacyMirror: boolean;
 }
 
 export function isLegacyMirrorMeta(
-  meta: Pick<ProjectIdentityMeta, "sourceProjectName" | "targetLanguage"> | null | undefined,
+  meta: unknown,
 ): boolean {
-  return typeof meta?.sourceProjectName === "string" || typeof meta?.targetLanguage === "string";
+  if (!meta || typeof meta !== "object") return false;
+  const candidate = meta as Record<string, unknown>;
+  return typeof candidate.sourceProjectName === "string" || typeof candidate.targetLanguage === "string";
 }
 
 export function comparePreferredProjectCandidates<T extends PreferredProjectCandidate>(a: T, b: T): number {
