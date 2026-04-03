@@ -10,14 +10,9 @@ import { useStoryboardPersistence, type StoryboardSnapshot } from "@/hooks/useSt
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
 
 import { useBackgroundAnalysis } from "@/hooks/useBackgroundAnalysis";
-import { Loader2, Sparkles, BookOpen, AudioLines, CheckCircle2, XCircle, ScanSearch, MessageCircle, RefreshCw, Timer, Merge, Trash2, Eraser, SpellCheck, AlertTriangle, X } from "lucide-react";
-import { RoleBadge } from "@/components/ui/RoleBadge";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, Sparkles, AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   type PhraseAnnotation,
@@ -27,10 +22,9 @@ import {
 
 import type { Phrase, Segment, CharacterOption } from "./storyboard/types";
 import { SEGMENT_CONFIG } from "./storyboard/constants";
-import { EditablePhrase } from "./storyboard/EditablePhrase";
-import { SegmentTypeBadge } from "./storyboard/SegmentTypeBadge";
-import { SpeakerBadge } from "./storyboard/SpeakerBadge";
 import { StressReviewPanel, type StressSuggestion } from "./storyboard/StressReviewPanel";
+import { StoryboardToolbar } from "./storyboard/StoryboardToolbar";
+import { StoryboardSegmentRow } from "./storyboard/StoryboardSegmentRow";
 import type { LocalTypeMappingEntry } from "@/lib/storyboardSync";
 import { deriveStoryboardTypeMappings } from "@/lib/storyboardCharacterRouting";
 
