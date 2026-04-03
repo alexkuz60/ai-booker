@@ -94,7 +94,7 @@ export function QualityMonitorPanel({
       try {
         // 1. Staged radar files
         if (storage && sceneId && chapterId) {
-          const stages = stageCache.get(sceneId) ?? await readAllStages(storage, chapterId, sceneId);
+          const stages = stageCache.get(sceneId) ?? await readAllStages(storage, chapterId, sceneId, targetLang);
           if (stages) {
             stageCache.set(sceneId, stages);
             const critSeg = stages.critique?.segments.find(s => s.segmentId === selectedSegment.segmentId);
