@@ -113,6 +113,10 @@ export const paths = {
   clipPlugins: (sceneId: string, chapterId?: string) =>
     `chapters/${requireChapterId(sceneId, chapterId)}/scenes/${sceneId}/clip_plugins.json`,
 
+  /** Per-scene mixer state (volume, pan, preFx, reverb) + channel plugins (EQ, comp, limiter) */
+  mixerState: (sceneId: string, chapterId?: string) =>
+    `chapters/${requireChapterId(sceneId, chapterId)}/scenes/${sceneId}/mixer_state.json`,
+
   // ── Montage ────────────────────────────────────────────
 
   montageDir: () => "montage",
