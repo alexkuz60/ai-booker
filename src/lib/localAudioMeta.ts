@@ -137,8 +137,28 @@ export async function recalcPositions(
   const storyboard = await readStoryboardFromLocal(storage, sceneId, chapterId);
   if (!storyboard || storyboard.segments.length === 0) return;
 
-  const meta = await readAudioMeta(storage, sceneId, chapterId);
-  if (!meta) return;
+  let meta = await readAudioMeta(storage, sceneId, chapterId);
+
+  // Auto-generate estimated audio_meta if it doesn't exist yet (legacy storyboards)
+  if (!meta) {
+    const CHARS_PER_SEC = 14;
+    const entries: Record<string, LocalAudioEntry> = {};
+    for (const seg of storyboard.segments) {
+      const totalChars = (seg.phrases ?? []).reduce((sum: number, p: { text: string }) => sum + p.text.length, 0);
+      const estimatedMs = Math.max(500, Math.round((totalChars / CHARS_PER_SEC) * 1000));
+      entries[seg.segment_id] = {
+        segmentId: seg.segment_id,
+        status: "estimated",
+        durationMs: estimatedMs,
+        audioPath: "",
+      };
+    }
+    const silSec = silenceSecOverride ?? DEFAULT_SILENCE_SEC;
+    await writeAudioMeta(storage, sceneId, entries, chapterId, silSec);
+    meta = await readAudioMeta(storage, sceneId, chapterId);
+    if (!meta) return;
+    console.info(`[recalcPositions] Auto-generated audio_meta for scene ${sceneId} (${Object.keys(entries).length} entries)`);
+  }
 
   const silenceSec = silenceSecOverride ?? meta.silenceSec ?? DEFAULT_SILENCE_SEC;
   let offset = silenceSec;
