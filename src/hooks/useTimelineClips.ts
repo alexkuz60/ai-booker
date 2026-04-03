@@ -106,19 +106,21 @@ export function useTimelineClips(
     (async () => {
       // Local storyboard is the only source of truth for runtime text/segmentation data.
       // Atmosphere clips also come from OPFS (Local-Only K3).
-      const [localStoryboards, { data: sceneData }, localAtmoClips] = await Promise.all([
+      // Audio metadata now also comes from OPFS (audio_meta.json).
+      const [localStoryboards, localAtmoClips, audioMetaMap] = await Promise.all([
         Promise.all(
           sceneIds.map(async (sceneId) => ({
             sceneId,
             data: await readStoryboardFromLocal(storage, sceneId),
           })),
         ),
-        supabase
-          .from("book_scenes")
-          .select("id, silence_sec")
-          .in("id", sceneIds),
         readAtmospheresForScenes(storage, sceneIds),
+        readAudioMetaForScenes(storage, sceneIds),
       ]);
+
+      // Build silence map from storyboard data (or use default)
+      // silence_sec is stored per-scene in OPFS storyboard or as component prop
+      const sceneSilenceMap = new Map<string, number>();
 
       const segments = localStoryboards.flatMap(({ sceneId, data }) =>
         (data?.segments ?? []).map((segment) => ({
@@ -138,36 +140,27 @@ export function useTimelineClips(
         return;
       }
 
-      // Build scene silence map
-      const sceneSilenceMap = new Map<string, number>();
+      // Fallback: fetch silence_sec from DB only (lightweight metadata, not content)
+      const { data: sceneData } = await supabase
+        .from("book_scenes")
+        .select("id, silence_sec")
+        .in("id", sceneIds);
+
       if (sceneData) {
         for (const s of sceneData) {
           sceneSilenceMap.set(s.id, s.silence_sec ?? SCENE_SILENCE_SEC);
         }
       }
 
-      const segIds = segments.map(s => s.id);
-
-      // Load audio metadata only; text/phrases stay strictly local.
-      const [{ data: audioData }] = await Promise.all([
-        supabase
-          .from("segment_audio")
-          .select("segment_id, duration_ms, audio_path, status")
-          .in("segment_id", segIds)
-          .eq("status", "ready"),
-      ]);
-
       if (cancelled) return;
 
-      // Build audio duration map
+      // Build audio duration map from OPFS
       const audioDurationMap = new Map<string, { durationMs: number; audioPath: string }>();
-      if (audioData) {
-        for (const a of audioData) {
-          audioDurationMap.set(a.segment_id, {
-            durationMs: a.duration_ms,
-            audioPath: a.audio_path,
-          });
-        }
+      for (const [segId, entry] of audioMetaMap) {
+        audioDurationMap.set(segId, {
+          durationMs: entry.durationMs,
+          audioPath: entry.audioPath,
+        });
       }
 
       // Build clips: sequential timeline with per-scene silence gap
