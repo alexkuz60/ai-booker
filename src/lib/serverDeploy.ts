@@ -642,7 +642,127 @@ export async function deployFromServer({
     report("storyboards", "error");
   }
 
-  // ── 8a. Restore atmosphere clips from DB to OPFS ──────────
+  // ── 8a. Restore audio metadata from DB to OPFS ─────────────
+  report("audio_meta", "running");
+  let restoredAudioCount = 0;
+  try {
+    const allSceneIdsForAudio = allScenes.map(s => s.id);
+    if (allSceneIdsForAudio.length > 0) {
+      // Fetch all segment IDs for these scenes
+      type RawSegId = { id: string; scene_id: string };
+      const allSegRefs = await fetchChunked<RawSegId>(
+        "scene_segments",
+        "id, scene_id",
+        "scene_id",
+        allSceneIdsForAudio,
+        500,
+      );
+      const allSegIds = allSegRefs.map(s => s.id);
+
+      if (allSegIds.length > 0) {
+        type RawAudio = {
+          segment_id: string;
+          status: string;
+          duration_ms: number;
+          audio_path: string;
+          voice_config: any;
+        };
+        const serverAudio = await fetchChunked<RawAudio>(
+          "segment_audio",
+          "segment_id, status, duration_ms, audio_path, voice_config",
+          "segment_id",
+          allSegIds,
+          500,
+        );
+
+        if (serverAudio.length > 0) {
+          const { writeAudioMeta } = await import("@/lib/localAudioMeta");
+          type LocalAudioEntry = import("@/lib/localAudioMeta").LocalAudioEntry;
+
+          // Group by scene_id (reverse lookup via fetched segment refs)
+          const segToScene = new Map<string, string>();
+          for (const ref of allSegRefs) {
+            segToScene.set(ref.id, ref.scene_id);
+          }
+
+          const audioByScene = new Map<string, Record<string, LocalAudioEntry>>();
+          for (const a of serverAudio) {
+            if (a.status !== "ready") continue;
+            const sid = segToScene.get(a.segment_id);
+            if (!sid) continue;
+            const entries = audioByScene.get(sid) || {};
+            entries[a.segment_id] = {
+              segmentId: a.segment_id,
+              status: a.status,
+              durationMs: a.duration_ms,
+              audioPath: a.audio_path,
+              voiceConfig: a.voice_config as Record<string, unknown>,
+            };
+            audioByScene.set(sid, entries);
+          }
+
+          const audioWrites: Promise<void>[] = [];
+          for (const [sid, entries] of audioByScene) {
+            const chId = allScenes.find(s => s.id === sid)?.chapter_id;
+            audioWrites.push(writeAudioMeta(storage, sid, entries, chId));
+          }
+          await Promise.all(audioWrites);
+          restoredAudioCount = serverAudio.filter(a => a.status === "ready").length;
+          console.log(`[Deploy] Restored ${restoredAudioCount} audio metadata entries`);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[Deploy] Failed to restore audio metadata:", err);
+  }
+  report("audio_meta", restoredAudioCount > 0 ? "done" : "skipped", restoredAudioCount > 0 ? `${restoredAudioCount}` : undefined);
+
+  // ── 8b. Restore clip plugin configs from DB to OPFS ───────
+  report("clip_plugins", "running");
+  let restoredPluginCount = 0;
+  try {
+    const allSceneIdsForPlugins = allScenes.map(s => s.id);
+    if (allSceneIdsForPlugins.length > 0) {
+      type RawPluginCfg = {
+        scene_id: string;
+        clip_id: string;
+        track_id: string;
+        config: any;
+      };
+      const serverPlugins = await fetchChunked<RawPluginCfg>(
+        "clip_plugin_configs",
+        "scene_id, clip_id, track_id, config",
+        "scene_id",
+        allSceneIdsForPlugins,
+        200,
+      );
+
+      if (serverPlugins.length > 0) {
+        const { writeClipPlugins } = await import("@/lib/localClipPlugins");
+
+        const pluginsByScene = new Map<string, Record<string, { trackId: string; config: any }>>();
+        for (const p of serverPlugins) {
+          const entries = pluginsByScene.get(p.scene_id) || {};
+          entries[p.clip_id] = { trackId: p.track_id, config: p.config };
+          pluginsByScene.set(p.scene_id, entries);
+        }
+
+        const pluginWrites: Promise<void>[] = [];
+        for (const [sid, configs] of pluginsByScene) {
+          const chId = allScenes.find(s => s.id === sid)?.chapter_id;
+          pluginWrites.push(writeClipPlugins(storage, sid, configs, chId));
+        }
+        await Promise.all(pluginWrites);
+        restoredPluginCount = serverPlugins.length;
+        console.log(`[Deploy] Restored ${restoredPluginCount} clip plugin configs`);
+      }
+    }
+  } catch (err) {
+    console.warn("[Deploy] Failed to restore clip plugins:", err);
+  }
+  report("clip_plugins", restoredPluginCount > 0 ? "done" : "skipped", restoredPluginCount > 0 ? `${restoredPluginCount}` : undefined);
+
+  // ── 8c. Restore atmosphere clips from DB to OPFS ──────────
   report("atmospheres", "running");
   let restoredAtmoCount = 0;
   try {

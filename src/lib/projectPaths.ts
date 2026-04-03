@@ -101,6 +101,18 @@ export const paths = {
   renderStem: (fileName: string, sceneId?: string, chapterId?: string) =>
     `chapters/${requireChapterId(sceneId ?? "", chapterId)}/scenes/${sceneId}/audio/renders/${fileName}`,
 
+  // ── Audio metadata (segment_audio mirror) ──────────────
+
+  /** Per-scene audio metadata (durations, paths, status) — replaces DB reads */
+  audioMeta: (sceneId: string, chapterId?: string) =>
+    `chapters/${requireChapterId(sceneId, chapterId)}/scenes/${sceneId}/audio_meta.json`,
+
+  // ── Clip plugin configs ───────────────────────────────
+
+  /** Per-scene clip plugin configurations — replaces DB reads */
+  clipPlugins: (sceneId: string, chapterId?: string) =>
+    `chapters/${requireChapterId(sceneId, chapterId)}/scenes/${sceneId}/clip_plugins.json`,
+
   // ── Montage ────────────────────────────────────────────
 
   montageDir: () => "montage",
