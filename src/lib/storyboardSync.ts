@@ -9,7 +9,7 @@ import type { PhraseAnnotation, TtsProvider } from "@/components/studio/phraseAn
 import { touchProjectUpdatedAt } from "@/lib/projectActivity";
 import { paths } from "@/lib/projectPaths";
 import { markStoryboarded, unmarkStoryboarded, getCachedSceneIndex, readSceneIndex } from "@/lib/sceneIndex";
-import { readAudioMeta, writeAudioMeta, type LocalAudioEntry } from "@/lib/localAudioMeta";
+import { readAudioMeta, writeAudioMeta, recalcPositions, type LocalAudioEntry } from "@/lib/localAudioMeta";
 import { readClipPlugins, writeClipPlugins, type LocalClipPluginsData } from "@/lib/localClipPlugins";
 import { readMixerState, writeMixerState, type SceneMixerSnapshot } from "@/lib/localMixerState";
 import { DEFAULT_CLIP_PLUGIN_CONFIG, type ClipPluginConfig } from "@/hooks/useClipPluginConfigs";
@@ -108,6 +108,9 @@ export async function saveStoryboardToLocal(
       generateDefaultClipPlugins(storage, sceneId, data.segments, chapterId),
       generateDefaultMixerState(storage, sceneId, chapterId),
     ]);
+
+    // Recalc positions after audio_meta entries are generated/updated
+    await recalcPositions(storage, sceneId, chapterId);
   } catch (err) {
     console.warn("[StoryboardSync] Failed to save:", err);
   }

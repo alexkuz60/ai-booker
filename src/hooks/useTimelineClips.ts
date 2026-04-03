@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { readStoryboardFromLocal } from "@/lib/storyboardSync";
 import { readAtmospheresForScenes, type TaggedAtmosphereClip } from "@/lib/localAtmospheres";
-import { readAudioMetaForScenes } from "@/lib/localAudioMeta";
+import { readAudioMeta, readAudioMetaForScenes } from "@/lib/localAudioMeta";
 
 const CHARS_PER_SEC = 14;
 
@@ -106,7 +106,7 @@ export function useTimelineClips(
     (async () => {
       // Local storyboard is the only source of truth for runtime text/segmentation data.
       // Atmosphere clips also come from OPFS (Local-Only K3).
-      // Audio metadata now also comes from OPFS (audio_meta.json).
+      // Audio metadata (including persisted startSec) also comes from OPFS.
       const [localStoryboards, localAtmoClips, audioMetaMap] = await Promise.all([
         Promise.all(
           sceneIds.map(async (sceneId) => ({
@@ -118,9 +118,15 @@ export function useTimelineClips(
         readAudioMetaForScenes(storage, sceneIds),
       ]);
 
-      // Build silence map from storyboard data (or use default)
-      // silence_sec is stored per-scene in OPFS storyboard or as component prop
+      // Read per-scene silenceSec from audio_meta.json (persisted during recalcPositions)
       const sceneSilenceMap = new Map<string, number>();
+      const sceneMetaReads = sceneIds.map(async (sceneId) => {
+        const meta = await readAudioMeta(storage, sceneId);
+        if (meta?.silenceSec != null) {
+          sceneSilenceMap.set(sceneId, meta.silenceSec);
+        }
+      });
+      await Promise.all(sceneMetaReads);
 
       const segments = localStoryboards.flatMap(({ sceneId, data }) =>
         (data?.segments ?? []).map((segment) => ({
@@ -140,31 +146,20 @@ export function useTimelineClips(
         return;
       }
 
-      // Fallback: fetch silence_sec from DB only (lightweight metadata, not content)
-      const { data: sceneData } = await supabase
-        .from("book_scenes")
-        .select("id, silence_sec")
-        .in("id", sceneIds);
-
-      if (sceneData) {
-        for (const s of sceneData) {
-          sceneSilenceMap.set(s.id, s.silence_sec ?? SCENE_SILENCE_SEC);
-        }
-      }
-
       if (cancelled) return;
 
-      // Build audio duration map from OPFS (includes both "ready" TTS and "estimated")
-      const audioDurationMap = new Map<string, { durationMs: number; audioPath: string; isReady: boolean }>();
+      // Build audio map from OPFS (includes persisted startSec, durationMs)
+      const audioDurationMap = new Map<string, { durationMs: number; audioPath: string; isReady: boolean; startSec?: number }>();
       for (const [segId, entry] of audioMetaMap) {
         audioDurationMap.set(segId, {
           durationMs: entry.durationMs,
           audioPath: entry.audioPath,
           isReady: entry.status === "ready",
+          startSec: entry.startSec,
         });
       }
 
-      // Build clips: sequential timeline with per-scene silence gap
+      // Build clips: use persisted startSec when available, fallback to sequential calc
       const sceneOrder = sceneIds;
       let globalOffset = 0;
       const result: TimelineClip[] = [];
@@ -175,27 +170,27 @@ export function useTimelineClips(
           .filter(s => s.scene_id === sceneId)
           .sort((a, b) => a.segment_number - b.segment_number);
 
-        // Get per-scene silence duration
         const silenceSec = sceneSilenceMap.get(sceneId) ?? SCENE_SILENCE_SEC;
 
-        // Each scene starts with silenceSec silence
         const sceneStart = globalOffset;
         boundaries.push({ startSec: sceneStart, silenceSec, sceneId });
-        let sceneOffset = sceneStart + silenceSec;
 
         for (const seg of sceneSegments) {
           const audioInfo = audioDurationMap.get(seg.id);
           let durationSec: number;
 
           if (audioInfo && audioInfo.durationMs > 0) {
-            // Use duration from audio_meta (both "ready" TTS and "estimated")
             durationSec = audioInfo.durationMs / 1000;
           } else {
-            // Last resort fallback if no audio_meta entry exists
             const segPhrases = seg.phrases ?? [];
             const totalChars = segPhrases.reduce((sum, p) => sum + p.text.length, 0);
             durationSec = Math.max(0.5, totalChars / CHARS_PER_SEC);
           }
+
+          // Use persisted startSec (scene-local) + globalOffset, or fallback
+          const clipStartSec = audioInfo?.startSec != null
+            ? sceneStart + audioInfo.startSec
+            : undefined;
 
           // Determine track ID — routing priority:
           // 1. Dialogue: always use speaker name (never type mappings)
@@ -206,18 +201,15 @@ export function useTimelineClips(
           let trackId = "narrator-fallback";
 
           if (seg.segment_type === "dialogue" || seg.segment_type === "monologue" || seg.segment_type === "telephone") {
-            // Dialogue/monologue/telephone always routes by speaker name, never by type mapping
             const speakerKey = seg.speaker?.toLowerCase();
             if (speakerKey && characterMap.has(speakerKey)) {
               trackId = `char-${characterMap.get(speakerKey)}`;
             }
           } else {
-            // System types ALWAYS route to system characters (narrator→Рассказчик, footnote→Комментатор)
             const sysCharName = SYSTEM_TYPE_TO_CHAR[seg.segment_type];
             if (sysCharName && characterMap.has(sysCharName)) {
               trackId = `char-${characterMap.get(sysCharName)}`;
             } else {
-              // Non-system types: check explicit scene_type_mappings first
               const sceneTypeMappings = typeMappings?.get(sceneId);
               const mappedCharId = sceneTypeMappings?.get(seg.segment_type);
 
@@ -232,17 +224,11 @@ export function useTimelineClips(
             }
           }
 
-          // Check for split silence (e.g. 1s gap before second part of a split block)
-          const splitSilenceMs = typeof seg.split_silence_ms === "number" ? seg.split_silence_ms : 0;
-          if (splitSilenceMs > 0) {
-            sceneOffset += splitSilenceMs / 1000;
-          }
-
           result.push({
             id: seg.id,
             trackId,
             speaker: seg.speaker,
-            startSec: sceneOffset,
+            startSec: clipStartSec ?? (sceneStart + silenceSec),
             durationSec,
             label: (SYSTEM_TYPE_TO_CHAR[seg.segment_type] ? SEGMENT_TYPE_LABELS[seg.segment_type] : seg.speaker) || SEGMENT_TYPE_LABELS[seg.segment_type] || seg.segment_type,
             segmentType: seg.segment_type,
@@ -252,12 +238,10 @@ export function useTimelineClips(
           });
 
           // ── Inline narration overlay clips ──────────────────
-          // Audio overlays are attached after synthesis; runtime text still comes only from OPFS.
           const inlineNarrAudio: InlineNarrationAudio[] = [];
 
           let inlineTrackId = "narrator-fallback";
           const inlineMappings = typeMappings?.get(sceneId);
-          // Priority: explicit inline_narration mapping > first_person mapping > system Рассказчик
           const inlineCharId = inlineMappings?.get("inline_narration");
           if (inlineCharId) {
             inlineTrackId = `char-${inlineCharId}`;
@@ -274,7 +258,8 @@ export function useTimelineClips(
             const narr = inlineNarrAudio[n];
             if (!narr.audio_path || !narr.duration_ms) continue;
 
-            const narrStartSec = sceneOffset + (narr.offset_ms / 1000);
+            const baseStart = clipStartSec ?? (sceneStart + silenceSec);
+            const narrStartSec = baseStart + (narr.offset_ms / 1000);
             const narrDurationSec = narr.duration_ms / 1000;
 
             result.push({
@@ -290,11 +275,15 @@ export function useTimelineClips(
               sceneId,
             });
           }
-
-          sceneOffset += durationSec;
         }
 
-        globalOffset = sceneOffset;
+        // Advance globalOffset: find max end of clips in this scene
+        const sceneClipEnds = result
+          .filter(c => c.sceneId === sceneId)
+          .map(c => c.startSec + c.durationSec);
+        globalOffset = sceneClipEnds.length > 0
+          ? Math.max(...sceneClipEnds)
+          : sceneStart + silenceSec;
       }
 
       // ── Atmosphere layer clips ──────────────────────────────

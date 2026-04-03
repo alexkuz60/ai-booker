@@ -438,9 +438,14 @@ const Studio = () => {
     setSilenceSec(sec);
     if (selectedScene?.id) {
       await supabase.from("book_scenes").update({ silence_sec: sec }).eq("id", selectedScene.id);
+      // Recalc positions in audio_meta.json with new silence
+      if (storage) {
+        const { recalcPositions } = await import("@/lib/localAudioMeta");
+        await recalcPositions(storage, selectedScene.id, undefined, sec);
+      }
       setClipsRefreshToken(t => t + 1); // Refresh timeline
     }
-  }, [selectedScene?.id]);
+  }, [selectedScene?.id, storage]);
 
   const onSegmented = useCallback((sceneId: string) => {
     setSegmentedSceneIds(prev => new Set(prev).add(sceneId));
