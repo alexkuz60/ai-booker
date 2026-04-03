@@ -175,6 +175,9 @@ export function useTimelineClips(
         const sceneStart = globalOffset;
         boundaries.push({ startSec: sceneStart, silenceSec, sceneId });
 
+        // Fallback sequential offset when startSec not yet persisted
+        let fallbackOffset = sceneStart + silenceSec;
+
         for (const seg of sceneSegments) {
           const audioInfo = audioDurationMap.get(seg.id);
           let durationSec: number;
@@ -187,10 +190,16 @@ export function useTimelineClips(
             durationSec = Math.max(0.5, totalChars / CHARS_PER_SEC);
           }
 
-          // Use persisted startSec (scene-local) + globalOffset, or fallback
-          const clipStartSec = audioInfo?.startSec != null
-            ? sceneStart + audioInfo.startSec
-            : undefined;
+          // Use persisted startSec (scene-local) + sceneStart, or sequential fallback
+          let clipStartSec: number;
+          if (audioInfo?.startSec != null) {
+            clipStartSec = sceneStart + audioInfo.startSec;
+          } else {
+            // Legacy fallback: account for split_silence_ms
+            const splitSilenceMs = typeof seg.split_silence_ms === "number" ? seg.split_silence_ms : 0;
+            if (splitSilenceMs > 0) fallbackOffset += splitSilenceMs / 1000;
+            clipStartSec = fallbackOffset;
+          }
 
           // Determine track ID — routing priority:
           // 1. Dialogue: always use speaker name (never type mappings)
@@ -228,7 +237,7 @@ export function useTimelineClips(
             id: seg.id,
             trackId,
             speaker: seg.speaker,
-            startSec: clipStartSec ?? (sceneStart + silenceSec),
+            startSec: clipStartSec,
             durationSec,
             label: (SYSTEM_TYPE_TO_CHAR[seg.segment_type] ? SEGMENT_TYPE_LABELS[seg.segment_type] : seg.speaker) || SEGMENT_TYPE_LABELS[seg.segment_type] || seg.segment_type,
             segmentType: seg.segment_type,
@@ -258,8 +267,7 @@ export function useTimelineClips(
             const narr = inlineNarrAudio[n];
             if (!narr.audio_path || !narr.duration_ms) continue;
 
-            const baseStart = clipStartSec ?? (sceneStart + silenceSec);
-            const narrStartSec = baseStart + (narr.offset_ms / 1000);
+            const narrStartSec = clipStartSec + (narr.offset_ms / 1000);
             const narrDurationSec = narr.duration_ms / 1000;
 
             result.push({
@@ -275,6 +283,9 @@ export function useTimelineClips(
               sceneId,
             });
           }
+
+          // Advance fallback offset for next segment
+          fallbackOffset = clipStartSec + durationSec;
         }
 
         // Advance globalOffset: find max end of clips in this scene

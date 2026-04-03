@@ -204,6 +204,7 @@ export function ChapterNavigator({
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
   const [recalcRunning, setRecalcRunning] = useState(false);
+  const [recalcPosRunning, setRecalcPosRunning] = useState(false);
 
   // Book-wide stale scan
   const [scanning, setScanning] = useState(false);
@@ -389,6 +390,31 @@ export function ChapterNavigator({
     setRecalcRunning(false);
   };
 
+  // ── Recalc positions for all scenes in chapter ──
+  const handleRecalcPositions = useCallback(async () => {
+    const sceneIds = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
+    if (sceneIds.length === 0 || !projectStorage) return;
+    setRecalcPosRunning(true);
+    try {
+      const { recalcPositions } = await import("@/lib/localAudioMeta");
+      let updated = 0;
+      for (const sceneId of sceneIds) {
+        await recalcPositions(projectStorage, sceneId);
+        updated++;
+      }
+      toast.success(
+        isRu
+          ? `Позиции пересчитаны: ${updated} сцен`
+          : `Positions recalculated: ${updated} scenes`
+      );
+      onBatchResynthDone?.(); // triggers clipsRefreshToken bump
+    } catch (e) {
+      console.error("recalcPositions error:", e);
+      toast.error(isRu ? "Ошибка пересчёта позиций" : "Position recalc error");
+    }
+    setRecalcPosRunning(false);
+  }, [chapter.scenes, projectStorage, isRu, onBatchResynthDone]);
+
   // ── Book-wide stale scan ──
   const handleBookStaleScan = useCallback(async () => {
     if (!bookId) {
@@ -557,6 +583,20 @@ export function ChapterNavigator({
               <Loader2 className="h-3 w-3 animate-spin" />
             ) : (
               <Timer className="h-3 w-3" />
+            )}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 w-6 p-0"
+            disabled={recalcPosRunning}
+            onClick={handleRecalcPositions}
+            title={isRu ? "Пересчитать позиции клипов (startSec) для всех сцен главы" : "Recalculate clip positions (startSec) for all chapter scenes"}
+          >
+            {recalcPosRunning ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Clock className="h-3 w-3" />
             )}
           </Button>
           {(() => {
