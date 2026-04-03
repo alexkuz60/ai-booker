@@ -190,10 +190,10 @@ export function useClipPluginConfigs(sceneId: string | null) {
         ...(plugin === "convolver" ? { rvOverride: true } : {}),
       };
       applyConfigToEngine(engine, clipId, updated);
-      saveToDb(clipId, trackId, updated);
+      saveToLocal(clipId, trackId, updated);
       return { ...prev, [clipId]: updated };
     });
-  }, [saveToDb]);
+  }, [saveToLocal]);
 
   /** Update a full plugin config for a clip */
   const updateClipConfig = useCallback((
@@ -204,8 +204,8 @@ export function useClipPluginConfigs(sceneId: string | null) {
     const engine = getAudioEngine();
     applyConfigToEngine(engine, clipId, config);
     setConfigs(prev => ({ ...prev, [clipId]: config }));
-    saveToDb(clipId, trackId, config);
-  }, [saveToDb]);
+    saveToLocal(clipId, trackId, config);
+  }, [saveToLocal]);
 
   /** Update a single plugin section for a clip — marks as overridden */
   const updatePluginParams = useCallback((
@@ -225,10 +225,10 @@ export function useClipPluginConfigs(sceneId: string | null) {
         ...(plugin === "convolver" ? { rvOverride: true } : {}),
       };
       applyConfigToEngine(engine, clipId, updated);
-      saveToDb(clipId, trackId, updated);
+      saveToLocal(clipId, trackId, updated);
       return { ...prev, [clipId]: updated };
     });
-  }, [saveToDb]);
+  }, [saveToLocal]);
 
   /** Get all configs (for snapshot into scene_playlists) */
   const getAllConfigs = useCallback((): SceneClipConfigs => configs, [configs]);
@@ -289,12 +289,12 @@ export function useClipPluginConfigs(sceneId: string | null) {
           limiter: { ...current.limiter, enabled: newEnabled },
         };
         applyConfigToEngine(engine, clipId, updated);
-        saveToDb(clipId, trackId, updated);
+        saveToLocal(clipId, trackId, updated);
         next[clipId] = updated;
       }
       return next;
     });
-  }, [getTrackFxState, saveToDb]);
+  }, [getTrackFxState, saveToLocal]);
 
   /**
    * Toggle RV (Convolver) for all non-overridden clips on a track.
@@ -313,16 +313,16 @@ export function useClipPluginConfigs(sceneId: string | null) {
           convolver: { ...current.convolver, enabled: newEnabled },
         };
         applyConfigToEngine(engine, clipId, updated);
-        saveToDb(clipId, trackId, updated);
+        saveToLocal(clipId, trackId, updated);
         next[clipId] = updated;
       }
       return next;
     });
-  }, [getTrackRvState, saveToDb]);
+  }, [getTrackRvState, saveToLocal]);
 
   // Flush pending on unmount (HMR protection)
-  const flushRef = useRef(flushToDb);
-  flushRef.current = flushToDb;
+  const flushRef = useRef(flushToOpfs);
+  flushRef.current = flushToOpfs;
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
