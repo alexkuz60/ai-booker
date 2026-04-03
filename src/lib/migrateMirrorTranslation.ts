@@ -124,7 +124,26 @@ export async function migrateMirrorToSubfolders(
     result.scenesProcessed++;
   }
 
-  // 5. Update main project meta with translationLanguages
+  // 5. Copy synopsis directory (book-meta, chapter, scene synopses)
+  try {
+    const synopsisFiles = await mirrorStore.listDir("synopsis").catch(() => [] as string[]);
+    onProgress?.({ phase: `Synopsis (${synopsisFiles.length} files)`, current: sceneEntries.length, total: sceneEntries.length });
+    for (const fileName of synopsisFiles) {
+      try {
+        const data = await mirrorStore.readJSON(`synopsis/${fileName}`);
+        if (data) {
+          await mainStore.writeJSON(`synopsis/${fileName}`, data);
+          result.filesCopied++;
+        }
+      } catch {
+        result.errors.push(`Synopsis: failed to copy ${fileName}`);
+      }
+    }
+  } catch {
+    // No synopsis directory — ok
+  }
+
+  // 6. Update main project meta with translationLanguages
   const mainMeta = await mainStore.readJSON<ProjectMeta>("project.json");
   if (mainMeta) {
     const existing = mainMeta.translationLanguages ?? [];
