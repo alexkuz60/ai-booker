@@ -31,6 +31,7 @@ function hasAnyAxis(radar: RadarScores | null | undefined) {
 
 interface QualityMonitorPanelProps {
   storage: ProjectStorage | null;
+  targetLang: string;
   sceneId: string | null;
   chapterId: string | null;
   isRu: boolean;
