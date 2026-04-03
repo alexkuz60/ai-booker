@@ -359,7 +359,66 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       }
       report("storyboard", savedStoryboardCount > 0 ? "done" : "skipped", savedStoryboardCount > 0 ? `${savedStoryboardCount}` : undefined);
 
-      // ── 4c. Push atmosphere clips from OPFS to scene_atmospheres (ID-only dedup) ──
+      // ── 4c. Push clip plugin configs from OPFS to clip_plugin_configs ──
+      report("clip_plugins", "running");
+      let savedPluginCount = 0;
+      if (storage && user?.id) {
+        try {
+          const { readClipPlugins } = await import("@/lib/localClipPlugins");
+          const allSceneIds: string[] = [];
+          for (const idx of leafIndices) {
+            const result = normalizedResults.get(idx);
+            if (!result) continue;
+            for (const sc of result.scenes) {
+              if (sc.id) allSceneIds.push(sc.id);
+            }
+          }
+
+          const pluginRows: Array<{
+            scene_id: string;
+            clip_id: string;
+            track_id: string;
+            user_id: string;
+            config: import("@/integrations/supabase/types").Json;
+            updated_at: string;
+          }> = [];
+
+          for (const sid of allSceneIds) {
+            const data = await readClipPlugins(storage, sid);
+            if (!data || Object.keys(data.configs).length === 0) continue;
+            for (const [clipId, { trackId, config }] of Object.entries(data.configs)) {
+              pluginRows.push({
+                scene_id: sid,
+                clip_id: clipId,
+                track_id: trackId,
+                user_id: user.id,
+                config: config as unknown as import("@/integrations/supabase/types").Json,
+                updated_at: new Date().toISOString(),
+              });
+            }
+          }
+
+          if (pluginRows.length > 0) {
+            // Delete existing for these scenes, then insert fresh
+            for (let i = 0; i < allSceneIds.length; i += 200) {
+              const chunk = allSceneIds.slice(i, i + 200);
+              await supabase.from("clip_plugin_configs").delete().in("scene_id", chunk).eq("user_id", user.id);
+            }
+            for (let i = 0; i < pluginRows.length; i += 500) {
+              const chunk = pluginRows.slice(i, i + 500);
+              const { error } = await supabase.from("clip_plugin_configs").insert(chunk);
+              if (error) console.warn("[SaveToServer] clip_plugin_configs insert:", error);
+            }
+            savedPluginCount = pluginRows.length;
+            console.log(`[SaveToServer] Pushed ${savedPluginCount} clip plugin configs`);
+          }
+        } catch (e) {
+          console.warn("[SaveToServer] Clip plugins push failed:", e);
+        }
+      }
+      report("clip_plugins", savedPluginCount > 0 ? "done" : "skipped", savedPluginCount > 0 ? `${savedPluginCount}` : undefined);
+
+      // ── 4d. Push atmosphere clips from OPFS to scene_atmospheres (ID-only dedup) ──
       // Atmo clips are immutable after creation — all mixing is non-destructive via Tone.js.
       // Only sync new/deleted clips by ID, skip existing ones entirely.
       if (!syncAtmo) {
