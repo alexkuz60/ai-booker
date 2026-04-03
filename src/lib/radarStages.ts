@@ -79,8 +79,9 @@ export async function readStageRadar(
   chapterId: string,
   sceneId: string,
   stage: RadarStage,
+  lang?: string,
 ): Promise<StageRadarFile | null> {
-  const path = radarStagePath(chapterId, sceneId, stage);
+  const path = radarStagePath(chapterId, sceneId, stage, lang);
   return storage.readJSON<StageRadarFile>(path);
 }
 
@@ -88,8 +89,9 @@ export async function readCritiqueRadar(
   storage: ProjectStorage,
   chapterId: string,
   sceneId: string,
+  lang?: string,
 ): Promise<CritiqueRadarFile | null> {
-  const path = radarStagePath(chapterId, sceneId, "critique");
+  const path = radarStagePath(chapterId, sceneId, "critique", lang);
   return storage.readJSON<CritiqueRadarFile>(path);
 }
 
@@ -98,15 +100,16 @@ export async function readAllStages(
   storage: ProjectStorage,
   chapterId: string,
   sceneId: string,
+  lang?: string,
 ): Promise<{
   literal: StageRadarFile | null;
   literary: StageRadarFile | null;
   critique: CritiqueRadarFile | null;
 }> {
   const [literal, literary, critique] = await Promise.all([
-    readStageRadar(storage, chapterId, sceneId, "literal"),
-    readStageRadar(storage, chapterId, sceneId, "literary"),
-    readCritiqueRadar(storage, chapterId, sceneId),
+    readStageRadar(storage, chapterId, sceneId, "literal", lang),
+    readStageRadar(storage, chapterId, sceneId, "literary", lang),
+    readCritiqueRadar(storage, chapterId, sceneId, lang),
   ]);
   return { literal, literary, critique };
 }
@@ -119,6 +122,7 @@ export async function writeStageRadar(
   sceneId: string,
   stage: RadarStage,
   segments: StageSegmentRadar[],
+  lang?: string,
 ): Promise<void> {
   const data: StageRadarFile = {
     sceneId,
@@ -126,7 +130,7 @@ export async function writeStageRadar(
     updatedAt: new Date().toISOString(),
     segments,
   };
-  await storage.writeJSON(radarStagePath(chapterId, sceneId, stage), data);
+  await storage.writeJSON(radarStagePath(chapterId, sceneId, stage, lang), data);
 }
 
 export async function writeCritiqueRadar(
@@ -134,6 +138,7 @@ export async function writeCritiqueRadar(
   chapterId: string,
   sceneId: string,
   segments: CritiqueSegmentRadar[],
+  lang?: string,
 ): Promise<void> {
   const data: CritiqueRadarFile = {
     sceneId,
@@ -141,7 +146,7 @@ export async function writeCritiqueRadar(
     updatedAt: new Date().toISOString(),
     segments,
   };
-  await storage.writeJSON(radarStagePath(chapterId, sceneId, "critique"), data);
+  await storage.writeJSON(radarStagePath(chapterId, sceneId, "critique", lang), data);
 }
 
 // ── Stage detection ──────────────────────────────────────────────────────────
