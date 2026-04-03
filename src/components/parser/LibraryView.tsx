@@ -49,6 +49,8 @@ interface LibraryViewProps {
   progressMap?: Record<string, PipelineProgress>;
   /** Setter for progressMap (for local updates after toggle) */
   setProgressMap?: React.Dispatch<React.SetStateAction<Record<string, PipelineProgress>>>;
+  /** Pre-built bookId → project names map */
+  localProjectNamesByBookId?: Map<string, string[]>;
 }
 
 function LibraryViewInner({

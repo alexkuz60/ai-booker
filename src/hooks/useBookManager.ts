@@ -373,5 +373,6 @@ export function useBookManager({
     serverNewerBookId: serverSync.serverNewerBookId,
     dismissServerNewer: serverSync.dismissServerNewer,
     acceptServerVersion: serverSync.acceptServerVersion,
+    localProjectNamesByBookId: library.localProjectNamesByBookId,
   };
 }
