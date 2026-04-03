@@ -78,36 +78,17 @@ function LibraryViewInner({
       return { store: activeStorage, meta: activeMeta };
     }
 
-    const projects = await OPFSStorage.listProjects();
-    const candidates = await Promise.all(projects.map(async (projectName) => {
-      const store = await OPFSStorage.openExisting(projectName);
-      if (!store) return null;
+    // One book = one folder. Use localProjectNamesByBookId for direct lookup.
+    const projectNames = localProjectNamesByBookId.get(bookId);
+    if (!projectNames?.length) return null;
 
-      const meta = await store.readJSON<ProjectMeta>("project.json");
-      if (!meta || meta.bookId !== bookId) {
-        return null;
-      }
+    const store = await OPFSStorage.openExisting(projectNames[0]);
+    if (!store) return null;
 
-      const updatedAt = Number.isFinite(new Date(meta.updatedAt).getTime())
-        ? new Date(meta.updatedAt).getTime()
-        : 0;
-      const createdAt = Number.isFinite(new Date(meta.createdAt).getTime())
-        ? new Date(meta.createdAt).getTime()
-        : 0;
+    const meta = await store.readJSON<ProjectMeta>("project.json");
+    if (!meta || meta.bookId !== bookId) return null;
 
-      return {
-        store,
-        meta,
-        score: Math.max(updatedAt, createdAt),
-      };
-    }));
-
-    const sorted = candidates
-      .filter((candidate): candidate is NonNullable<typeof candidate> => !!candidate)
-      .sort((a, b) => b.score - a.score);
-
-    if (sorted.length === 0) return null;
-    return { store: sorted[0].store, meta: sorted[0].meta };
+    return { store, meta };
   }, [activeStorage, activeMeta]);
 
   const handleToggleStep = useCallback(async (bookId: string, stepId: PipelineStepId, done: boolean) => {
