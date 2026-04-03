@@ -112,10 +112,13 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
             return { candidate: null as LocalLibraryCandidate | null, projectName };
           }
 
-          // If this looks like SOURCE_EN / SOURCE_RU and SOURCE exists, skip as mirror
-          // even if project.json is temporarily unreadable.
-          if (isLikelyTranslationMirrorName(projectName, existingProjectSet)) {
-            return { candidate: null as LocalLibraryCandidate | null, projectName };
+          // Legacy: skip projects that look like translation mirrors by name suffix
+          const mirrorSuffixMatch = projectName.trim().match(/^(.*?)(?:[_\s-])(EN|RU)$/i);
+          if (mirrorSuffixMatch) {
+            const possibleSource = mirrorSuffixMatch[1]?.trim();
+            if (possibleSource && existingProjectSet.has(possibleSource)) {
+              return { candidate: null as LocalLibraryCandidate | null, projectName };
+            }
           }
 
           const store = await OPFSStorage.openExisting(projectName);
@@ -124,17 +127,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
           }
           const meta = await store.readJSON<Record<string, unknown>>("project.json").catch(() => null);
 
-          if (!meta && isLikelyTranslationMirrorName(projectName, existingProjectSet)) {
-            console.warn("[Library] project.json unreadable for likely mirror, skipping:", projectName);
-            return { candidate: null as LocalLibraryCandidate | null, projectName };
-          }
-
-          if (isNestedTranslationMirrorMeta(meta)) {
-            console.warn("[Library] Nested mirror by meta, skipping (not deleting):", projectName);
-            return { candidate: null as LocalLibraryCandidate | null, projectName };
-          }
-
-          // Skip translation mirror projects — they share bookId but are independent
+          // Skip legacy translation mirror projects — they have targetLanguage or sourceProjectName
           if (meta && ((meta as any).targetLanguage || (meta as any).sourceProjectName)) {
             return { candidate: null as LocalLibraryCandidate | null, projectName };
           }
