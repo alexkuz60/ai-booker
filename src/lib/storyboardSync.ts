@@ -106,7 +106,7 @@ export async function saveStoryboardToLocal(
     await Promise.all([
       generateEstimatedAudioMeta(storage, sceneId, data.segments, chapterId),
       generateDefaultClipPlugins(storage, sceneId, data.segments, chapterId),
-      generateDefaultMixerState(storage, sceneId, chapterId),
+      generateDefaultMixerState(storage, sceneId, chapterId, data.segments, data.typeMappings),
     ]);
 
     // Recalc positions after audio_meta entries are generated/updated
@@ -194,21 +194,35 @@ async function generateDefaultClipPlugins(
 
 /**
  * Generate mixer_state.json with default values if it doesn't exist yet.
+ * Seeds defaults for known tracks: unique character tracks + atmo + sfx.
  * Does NOT overwrite existing mixer state (user may have customized it).
  */
 async function generateDefaultMixerState(
   storage: ProjectStorage,
   sceneId: string,
   chapterId?: string,
+  segments?: Segment[],
+  typeMappings?: LocalTypeMappingEntry[],
 ): Promise<void> {
   try {
     const existing = await readMixerState(storage, sceneId);
     if (existing && Object.keys(existing).length > 0) return; // already configured
 
+    const defaultMix = { volume: 80, pan: 0, preFxBypassed: false, reverbBypassed: true };
     const defaultSnapshot: SceneMixerSnapshot = {};
-    // Write empty snapshot as a placeholder — tracks will be populated
-    // when the timeline loads and creates actual engine tracks.
-    // Having the file exist ensures OPFS browser shows it.
+
+    // Voice tracks from type mappings (char-{characterId})
+    if (typeMappings) {
+      const charIds = new Set(typeMappings.map(m => m.characterId));
+      for (const cid of charIds) {
+        defaultSnapshot[`char-${cid}`] = { mix: { ...defaultMix } };
+      }
+    }
+
+    // Fixed atmosphere + sfx tracks
+    defaultSnapshot[`atmo-${sceneId}`] = { mix: { ...defaultMix } };
+    defaultSnapshot[`sfx-${sceneId}`] = { mix: { ...defaultMix } };
+
     await writeMixerState(storage, sceneId, defaultSnapshot, chapterId);
   } catch (err) {
     console.warn("[StoryboardSync] Failed to generate mixer_state:", err);
