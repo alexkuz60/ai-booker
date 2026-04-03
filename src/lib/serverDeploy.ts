@@ -671,7 +671,8 @@ export async function deployFromServer({
         );
 
         if (serverAudio.length > 0) {
-          const { writeAudioMeta, type LocalAudioEntry } = await import("@/lib/localAudioMeta");
+          const { writeAudioMeta } = await import("@/lib/localAudioMeta");
+          type LocalAudioEntry = import("@/lib/localAudioMeta").LocalAudioEntry;
 
           // Group by scene_id (reverse lookup via segments)
           const segToScene = new Map<string, string>();
