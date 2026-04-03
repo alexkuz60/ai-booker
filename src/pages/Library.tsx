@@ -41,6 +41,7 @@ export default function Library() {
     reloadLibrary,
     serverBooks, loadingServerBooks, deleteServerBook,
     progressMap, setProgressMap,
+    localProjectNamesByBookId,
   } = useBookManager({
     userId: user?.id,
     isRu,
@@ -175,6 +176,7 @@ export default function Library() {
               onProjectReset={handleProjectReset}
               progressMap={progressMap}
               setProgressMap={setProgressMap}
+              localProjectNamesByBookId={localProjectNamesByBookId}
             />
           )}
           {step === "upload" && (

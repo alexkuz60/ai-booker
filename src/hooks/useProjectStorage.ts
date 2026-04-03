@@ -172,14 +172,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
 
     setLoading(true);
     try {
-      const existingProjects = await OPFSStorage.listProjects();
-      if (!existingProjects.includes(projectName)) {
-        return null;
-      }
-
-      // Always reopen a fresh OPFS handle instead of reusing the active one.
-      // This avoids "zombie" handles after Wipe-and-Deploy deletes a project
-      // and recreates it under the same directory name.
+      // Open directly by name — no need to scan all projects
       const store = await OPFSStorage.openExisting(projectName);
       if (!store) {
         return null;

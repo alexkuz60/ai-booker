@@ -12,19 +12,23 @@ import { ProjectStorageProvider } from "@/hooks/useProjectStorageContext";
 import { usePipelineGating } from "@/hooks/usePipelineGating";
 import { useLanguage } from "@/hooks/useLanguage";
 import { toast } from "sonner";
-import { useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
+
+// Critical path — loaded synchronously
 import Home from "./pages/Home";
 import Library from "./pages/Library";
-import Parser from "./pages/Parser";
-import Studio from "./pages/Studio";
-import Montage from "./pages/Montage";
-import Narrators from "./pages/Narrators";
-import Soundscape from "./pages/Soundscape";
-import Translation from "./pages/Translation";
-import Profile from "./pages/Profile";
-import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+
+// Heavy pages — lazy loaded
+const Parser = lazy(() => import("./pages/Parser"));
+const Studio = lazy(() => import("./pages/Studio"));
+const Montage = lazy(() => import("./pages/Montage"));
+const Narrators = lazy(() => import("./pages/Narrators"));
+const Soundscape = lazy(() => import("./pages/Soundscape"));
+const Translation = lazy(() => import("./pages/Translation"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Admin = lazy(() => import("./pages/Admin"));
 
 const queryClient = new QueryClient();
 
@@ -51,6 +55,12 @@ function GatedRoute({ route, children }: { route: string; children: React.ReactN
   return <>{children}</>;
 }
 
+const LazyFallback = () => (
+  <div className="min-h-[50vh] flex items-center justify-center">
+    <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+  </div>
+);
+
 function ProtectedRoutes() {
   const { user, loading } = useAuth();
 
@@ -68,25 +78,27 @@ function ProtectedRoutes() {
     <PageHeaderProvider>
       <ProjectStorageProvider>
         <AppLayout>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/library" element={<Library />} />
-            <Route path="/parser" element={<Parser />} />
-            <Route path="/studio" element={
-              <GatedRoute route="/studio"><Studio /></GatedRoute>
-            } />
-            <Route path="/montage" element={
-              <GatedRoute route="/montage"><Montage /></GatedRoute>
-            } />
-            <Route path="/narrators" element={<Narrators />} />
-            <Route path="/soundscape" element={<Soundscape />} />
-            <Route path="/translation" element={
-              <GatedRoute route="/translation"><Translation /></GatedRoute>
-            } />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <Suspense fallback={<LazyFallback />}>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/library" element={<Library />} />
+              <Route path="/parser" element={<Parser />} />
+              <Route path="/studio" element={
+                <GatedRoute route="/studio"><Studio /></GatedRoute>
+              } />
+              <Route path="/montage" element={
+                <GatedRoute route="/montage"><Montage /></GatedRoute>
+              } />
+              <Route path="/narrators" element={<Narrators />} />
+              <Route path="/soundscape" element={<Soundscape />} />
+              <Route path="/translation" element={
+                <GatedRoute route="/translation"><Translation /></GatedRoute>
+              } />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/admin" element={<Admin />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </AppLayout>
       </ProjectStorageProvider>
     </PageHeaderProvider>

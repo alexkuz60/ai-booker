@@ -1,45 +1,57 @@
 
-## Проблема
+# Оптимизация кодовой базы AI-Booker
 
-После перехода на единый проект с `translationLanguages[]` в коде осталось ~100 упоминаний legacy зеркальной архитектуры: `targetLanguage`, `sourceProjectName`, `isMirrorByMeta`, суффиксы `_EN/_RU`. Эти проверки:
-1. Замедляют bootstrap (сканируют все OPFS-папки, читают project.json каждой)
-2. Создают false-negatives: зомби-зеркала путают резолвер
-3. Усложняют код костылями ("skip mirror", "filter mirror")
+## Этап 1: Чистка мёртвого кода
 
-## План рефакторинга
+**1.1 Неиспользуемые импорты из `projectActivity`**
+- `getProjectActivityMs` больше не нужен в `useProjectStorage.ts` (удалён `resolveFreshestSourceProject`)
+- Проверить все файлы на мёртвые импорты после рефакторинга mirror-логики
 
-### 1. `localProjectResolver.ts` — упрощение
-- **Удалить** `isMirrorByMeta()` полностью
-- Резолвер ищет по bookId, без mirror-фильтрации — проект один, зеркалов больше нет
-- Убрать двойной проход (pre-built map → direct OPFS scan) — оставить только один путь
+**1.2 Удалить `resolveSourceProject` из LibraryView**
+- Сейчас LibraryView сканирует `listProjects()` самостоятельно — это дублирование логики из `useLibrary`. Можно прокинуть `localProjectNamesByBookId` из хука и убрать прямой скан.
 
-### 2. `useLibrary.ts` — очистка сканирования
-- **Удалить** проверки `sourceProjectName`, `targetLanguage` в `mapLocalStructureToBook`
-- **Удалить** эвристику `_EN/_RU` суффиксов (строки 110-123)
-- **Удалить** повторные проверки в scanResults (строки 130-133)
+**1.3 Проверить `openProject()` в useProjectStorage**
+- `openProject()` (строки 164-198) использует `listProjects()` + открывает первый проект — устаревшая логика для FSA-бэкенда. Возможно, мёртвый код.
 
-### 3. `useBookManager.ts` — очистка deleteBook
-- **Удалить** проверки `targetLanguage`/`sourceProjectName` при удалении (строки 214-218)
-- Удаление книги удаляет ВСЕ папки с этим bookId (переводы внутри папки, не в отдельных)
+## Этап 2: Lazy loading страниц
 
-### 4. `projectCleanup.ts` — упрощение wipe
-- **Удалить** проверки mirror при Wipe-and-Deploy (строки 65-68)
-- Wipe удаляет все папки с bookId — зеркалов нет, защищать нечего
+Все 10 страниц импортируются синхронно в `App.tsx`. Это увеличивает начальный бандл.
 
-### 5. `LibraryView.tsx` — `resolveSourceProject`
-- **Удалить** проверки `targetLanguage`/`sourceProjectName` (строка 77, 87)
+**Заменить на `React.lazy()` + `Suspense`:**
+- Studio (648 строк + тяжёлые компоненты)
+- Montage (216 строк + Tone.js)
+- Narrators (929 строк)
+- Translation (642 строк)
+- Admin (260 строк)
+- Profile (197 строк)
 
-### 6. `projectStorage.ts` — deprecated типы
-- **Удалить** `TranslationProjectLink` interface
-- **Удалить** `translationProject`, `sourceProjectName`, `targetLanguage` из `ProjectMeta`
-- Оставить только `translationLanguages: string[]`
+Оставить синхронными: Home, Library, Auth, NotFound (критический путь).
 
-### 7. НЕ трогаем
-- `migrateMirrorTranslation.ts` — утилита одноразовой миграции, пусть живёт
-- `translationBackup.ts` — чистый код, работает с `translationLanguages`
-- `translationPipeline.ts` — работает с подпапками, не с зеркалами
+## Этап 3: Крупные файлы — декомпозиция
 
-### Результат
-- Единая модель: один проект = один bookId = одна OPFS-папка
-- Bootstrap быстрее (нет N×2 чтений project.json для mirror-фильтрации)
-- Код проще на ~150 строк
+**Приоритет 1 (>900 строк, высокий риск регрессии):**
+| Файл | Строки | План |
+|------|--------|------|
+| `audioEngine.ts` | 1978 | Выделить: AudioGraph, AudioMixer, AudioEffects |
+| `StoryboardPanel.tsx` | 1552 | Выделить PhraseList, SegmentEditor, SpeakerControls |
+| `CharactersPanel.tsx` | 1238 | Выделить CharacterCard, VoiceConfig, CastingSection |
+| `ParserCharactersPanel.tsx` | 1125 | Выделить CharacterTable, MergeDialog, ProfileEditor |
+| `StudioTimeline.tsx` | 1124 | Выделить TrackList, ClipRenderer, SelectionHandler |
+| `serverDeploy.ts` | 1018 | Выделить DeployChapters, DeployCharacters, DeployAudio |
+| `Narrators.tsx` | 929 | Выделить NarratorsList, VoicePreview, AssignmentPanel |
+
+**Приоритет 2 (700-900 строк):**
+- `useSaveBookToProject.ts` (716) — выделить отдельные save-стратегии
+- `useChapterAnalysis.ts` (710) — выделить AI-prompt builder
+- `ChapterDetailPanel.tsx` (707) — выделить SceneList, ChapterHeader
+
+## Этап 4: Мемоизация и рендер-оптимизация
+
+- Обернуть тяжёлые компоненты в `React.memo()` (StoryboardPanel, Timeline)
+- Проверить `useCallback`/`useMemo` в хуках с большим количеством зависимостей
+- Виртуализация длинных списков (сцены, сегменты) через react-window или виртуальный скролл
+
+---
+
+**Порядок исполнения:** 1 → 2 → 3 (по одному файлу за итерацию) → 4
+**Принцип:** каждый шаг — отдельный коммит, тесты зелёные перед следующим шагом.

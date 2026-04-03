@@ -50,9 +50,8 @@ const SRC_DIR = join(__dirname, "../..");
 const LIST_PROJECTS_WHITELIST = new Set([
   "src/hooks/useLibrary.ts",             // Library scan
   "src/hooks/useBookManager.ts",         // Delete book, clear all
-  "src/hooks/useProjectStorage.ts",      // openProject, openProjectByName, hardReset
+  "src/hooks/useProjectStorage.ts",      // openProject, hardReset
   "src/lib/projectCleanup.ts",           // wipeProjectBrowserState diagnostic
-  "src/components/parser/LibraryView.tsx", // resolveSourceProject
   "src/components/profile/tabs/OpfsBrowserPanel.tsx", // Admin OPFS browser
 ]);
 
