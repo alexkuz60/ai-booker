@@ -20,7 +20,6 @@ type LocalLibraryCandidate = {
   dedupeKey: string;
   progress: PipelineProgress;
   score: number;
-  isLegacyMirror: boolean;
 };
 
 interface UseLibraryParams {

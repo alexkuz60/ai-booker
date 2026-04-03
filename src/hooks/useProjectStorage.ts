@@ -345,36 +345,21 @@ export function useProjectStorage(): UseProjectStorageReturn {
           return;
         }
 
-        let activeStore: ProjectStorage = store;
-        let activeMeta = projectMeta;
-        let activeName = targetName;
-        const savedWasLegacyMirror = isLegacyMirrorMeta(projectMeta);
-
-        // Resolve to the freshest project for this bookId
-        if (activeMeta.bookId) {
-          const freshestSource = await resolveFreshestSourceProject(activeMeta.bookId);
-          if (freshestSource && (savedWasLegacyMirror || freshestSource.name !== activeName)) {
-            activeStore = freshestSource.store;
-            activeMeta = freshestSource.meta;
-            activeName = freshestSource.name;
-            console.info("[ProjectStorage] Redirected bootstrap to preferred source project:", targetName, "→", activeName);
-          }
-        }
-
-        // Load scene index into memory
-        await readSceneIndex(activeStore);
+        // One book = one folder. No multi-candidate resolution.
+        // Use exactly the project from LAST_PROJECT_KEY.
+        await readSceneIndex(store);
 
         if (!cancelled) {
-          setStorage(activeStore);
-          setMeta(activeMeta);
+          setStorage(store);
+          setMeta(projectMeta);
           try {
             localStorage.setItem(LAST_PROJECT_KEY, JSON.stringify({
-              name: activeName,
+              name: targetName,
               backend,
-              bookId: activeMeta.bookId,
+              bookId: projectMeta.bookId,
             }));
           } catch {}
-          console.info("[ProjectStorage] Restored project:", activeName, "bookId:", activeMeta.bookId);
+          console.info("[ProjectStorage] Restored project:", targetName, "bookId:", projectMeta.bookId);
         }
       } catch (err) {
         console.warn("[ProjectStorage] Bootstrap error:", err);
