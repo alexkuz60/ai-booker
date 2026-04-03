@@ -156,28 +156,9 @@ export function useBookManager({
 
     let savedBookId = sessionStorage.getItem(ACTIVE_BOOK_KEY);
 
-    // Fallback: if no ACTIVE_BOOK_KEY but projectStorage is already open with a bookId,
-    // use it — this happens when navigating to Parser from sidebar while a project is active.
-    if (!savedBookId && projectStorage && projectStorageInitialized) {
-      const contextBookId = (projectStorage as any)?._cachedMeta?.bookId;
-      // If no cached meta, try to read it asynchronously — but for now check meta from context
-      if (!contextBookId) {
-        // Read meta from storage to recover bookId
-        projectStorage.readJSON<{ bookId?: string }>("project.json").then(meta => {
-          if (meta?.bookId) {
-            sessionStorage.setItem(ACTIVE_BOOK_KEY, meta.bookId);
-            // Re-trigger by not marking as restored
-            setRestoredOnce(false);
-          } else {
-            if (step === "extracting_toc") setStep("library");
-            setRestoredOnce(true);
-          }
-        }).catch(() => {
-          if (step === "extracting_toc") setStep("library");
-          setRestoredOnce(true);
-        });
-        return;
-      }
+    // Fallback: project is open in context but ACTIVE_BOOK_KEY is missing
+    // (e.g. navigating to Parser from sidebar while project is active)
+    if (!savedBookId && contextBookId && projectStorageInitialized) {
       savedBookId = contextBookId;
       sessionStorage.setItem(ACTIVE_BOOK_KEY, contextBookId);
     }
@@ -204,7 +185,7 @@ export function useBookManager({
     userId, restoredOnce,
     restore.restoreFromLocal,
     storageBackend, projectStorageInitialized,
-    projectStorage,
+    contextBookId,
     step,
   ]);
 
