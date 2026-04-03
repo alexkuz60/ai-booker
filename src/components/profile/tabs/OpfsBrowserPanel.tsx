@@ -213,6 +213,13 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
   const [jsonViewer, setJsonViewer] = useState<{ name: string; path: string; content: string } | null>(null);
   const [jsonLoading, setJsonLoading] = useState(false);
 
+  // Migration state
+  const [migrationDialog, setMigrationDialog] = useState(false);
+  const [migrating, setMigrating] = useState(false);
+  const [migrationProgress, setMigrationProgress] = useState<MigrationProgress | null>(null);
+  const [mirrorName, setMirrorName] = useState("");
+  const [mainName, setMainName] = useState("");
+
   const supported = isOPFSSupported();
 
   const scan = useCallback(async () => {
