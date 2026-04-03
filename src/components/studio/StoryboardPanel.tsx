@@ -1130,7 +1130,6 @@ export function StoryboardPanel({
   }
 
   const totalPhrases = segments.reduce((a, s) => a + s.phrases.length, 0);
-  const dialogueCount = segments.filter(s => s.segment_type === "dialogue").length;
 
   return (
     <div className="h-full flex flex-col">
