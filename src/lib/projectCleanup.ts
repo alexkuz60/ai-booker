@@ -50,7 +50,6 @@ export async function wipeProjectBrowserState(
   localProjectNames: string[],
 ): Promise<void> {
   // 1. Delete OPFS project folders for this bookId.
-  //    ONLY delete folders that are confirmed source projects (not mirrors, not unopenable).
   for (const projectName of localProjectNames) {
     try {
       const store = await OPFSStorage.openExisting(projectName);
@@ -58,11 +57,7 @@ export async function wipeProjectBrowserState(
         console.warn(`[Wipe] Skipping unopenable OPFS project (not deleting): ${projectName}`);
         continue;
       }
-      const meta = await store.readJSON<ProjectMeta>("project.json");
-      if (meta?.targetLanguage || meta?.sourceProjectName) {
-        console.log(`[Wipe] Skipping translation mirror: ${projectName}`);
-        continue;
-      }
+      const meta = await store.readJSON<{ bookId?: string }>("project.json");
       if (meta?.bookId && meta.bookId !== bookId) {
         console.warn(`[Wipe] Skipping project with different bookId: ${projectName} (has ${meta.bookId}, expected ${bookId})`);
         continue;
