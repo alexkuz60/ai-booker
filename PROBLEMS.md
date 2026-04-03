@@ -130,11 +130,11 @@
 
 ---
 
-### Т. Зомби-скан удаляет проекты-зеркала перевода — ✅ РЕШЕНО (B21)
-- Проблема: `wipeProjectBrowserState` при восстановлении книги (Wipe-and-Deploy) сканировал OPFS на «зомби» по `bookId`. Зеркальные проекты арт-перевода (например, `Book_EN`) имеют тот же `bookId`, что и исходный проект — они попадали под удаление.
-- Решение: зомби-скан в `projectCleanup.ts` явно пропускает проекты с `targetLanguage` или `sourceProjectName` в метаданных. Также `booker_last_project` не очищается при целевом wipe (только при `hardReset`), чтобы контекст сессии сохранялся.
-- Инвариант: **зеркальные проекты перевода неприкосновенны при wipe исходного проекта**. Удаление зеркала — только при ручном удалении или `hardResetLocalData`.
-- Файлы: `src/lib/projectCleanup.ts`, `src/hooks/useProjectStorage.ts`.
+### Т. Зомби-скан удаляет проекты-зеркала перевода — ✅ УСТАРЕЛО (B21)
+- Проблема: зеркальные OPFS-проекты перевода (`Book_EN`) имели тот же `bookId` и попадали под удаление при Wipe-and-Deploy.
+- Решение (v1): mirror-фильтрация по `targetLanguage`/`sourceProjectName`.
+- Решение (v2, текущее): **зеркальная архитектура полностью удалена**. Переводы хранятся в `{lang}/` подпапках внутри единого проекта. `ProjectMeta` больше не содержит `targetLanguage`, `sourceProjectName`, `translationProject`. Wipe удаляет все папки с bookId без mirror-проверок.
+- Файлы: `src/lib/projectCleanup.ts`, `src/lib/localProjectResolver.ts`, `src/lib/projectStorage.ts`.
 
 ### У. Bootstrap авто-детект — ✅ ОТКАТАНО (B22)
 - Проблема: при отсутствии `LAST_PROJECT_KEY` в localStorage была добавлена логика сканирования OPFS для автоматического выбора «лучшего» проекта. Это создавало ложную надёжность и лишние обращения к OPFS на каждом монтировании.
