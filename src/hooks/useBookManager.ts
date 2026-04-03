@@ -50,12 +50,14 @@ interface UseBookManagerParams {
   openProjectByName?: (projectName: string) => Promise<ProjectStorage | null>;
   pendingProjectName?: string | null;
   bumpProgressVersion?: () => void;
+  /** BookId from context meta — used as fallback when ACTIVE_BOOK_KEY is missing */
+  contextBookId?: string | null;
 }
 
 export function useBookManager({
   userId, isRu, projectStorage, projectStorageInitialized = false,
   storageBackend = "none", createProject, openProjectByName, pendingProjectName,
-  bumpProgressVersion,
+  bumpProgressVersion, contextBookId,
 }: UseBookManagerParams) {
   // ── Shared state ──────────────────────────────────────────
   const [step, setStep] = useState<Step>(() => {
