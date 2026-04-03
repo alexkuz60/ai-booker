@@ -15,6 +15,7 @@ import { OPFSStorage } from "@/lib/projectStorage";
 import type { ProjectMeta } from "@/lib/projectStorage";
 import { setCachedSceneIndex } from "@/lib/sceneIndex";
 import { clearChapterTextsCache } from "@/lib/chapterTextsCache";
+import { snapshotBeforeWipe } from "@/lib/storageGuard";
 
 // ── SessionStorage keys that belong to a book project ──
 
@@ -57,7 +58,6 @@ export async function wipeProjectBrowserState(
     try {
       const store = await OPFSStorage.openExisting(projectName);
       if (!store) {
-        // Directory can't be opened — DO NOT delete, may be a transient OPFS glitch.
         console.warn(`[Wipe] Skipping unopenable OPFS project (not deleting): ${projectName}`);
         continue;
       }
@@ -70,6 +70,8 @@ export async function wipeProjectBrowserState(
         console.warn(`[Wipe] Skipping project with different bookId: ${projectName} (has ${meta.bookId}, expected ${bookId})`);
         continue;
       }
+      // Create safety snapshot before deletion
+      await snapshotBeforeWipe(store, bookId);
       await OPFSStorage.deleteProject(projectName);
       console.log(`[Wipe] Deleted OPFS project: ${projectName}`);
     } catch (err) {

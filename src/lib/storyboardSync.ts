@@ -273,7 +273,8 @@ export async function deleteStoryboardFromLocal(
   try {
     const filePath = await resolveStoryboardPath(storage, sceneId, chapterId);
     if (!filePath) return;
-    await storage.delete(filePath);
+    const { guardedDelete } = await import("@/lib/storageGuard");
+    await guardedDelete(storage, filePath, "deleteStoryboardFromLocal");
     await unmarkStoryboarded(storage, sceneId);
     await touchProjectUpdatedAt(storage);
   } catch {

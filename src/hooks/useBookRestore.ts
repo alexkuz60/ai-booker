@@ -27,6 +27,7 @@ import {
   ensureWritableLocalStorage,
 } from "@/lib/localProjectResolver";
 import { deployFromServer } from "@/lib/serverDeploy";
+import { assertIntegrity } from "@/lib/storageGuard";
 
 interface UseBookRestoreParams {
   userId: string | undefined;
@@ -271,6 +272,9 @@ export function useBookRestore({
         ? ` (${isRu ? `${formatLabel} сохранён` : `${formatLabel} preserved`})`
         : ` (${isRu ? `${formatLabel} не найден, только просмотр` : `${formatLabel} not found, view only`})`;
       toast.success(`${t("bookLoaded", isRu)}: «${book.title}»${sourceStatus}`);
+
+      // Post-deploy integrity check
+      assertIntegrity(targetStorage, "openSavedBook/deployFromServer").catch(() => {});
     } catch (err: any) {
       console.error("Failed to open book:", err);
       setErrorMsg(err.message || "Unknown error");
