@@ -251,26 +251,48 @@ export function StoryboardPanel({
     if (segIds.length === 0) return;
     const { data } = await supabase
       .from("segment_audio")
-      .select("segment_id, status, duration_ms, created_at")
+      .select("segment_id, status, duration_ms, audio_path, voice_config, created_at")
       .in("segment_id", segIds)
       .order("created_at", { ascending: false });
 
     const map = new Map<string, { status: string; durationMs: number }>();
+    const opfsEntries: Record<string, LocalAudioEntry> = {};
     if (data) {
       for (const a of data) {
         const prev = map.get(a.segment_id);
         if (!prev) {
           map.set(a.segment_id, { status: a.status, durationMs: a.duration_ms });
+          if (a.status === "ready") {
+            opfsEntries[a.segment_id] = {
+              segmentId: a.segment_id,
+              status: a.status,
+              durationMs: a.duration_ms,
+              audioPath: a.audio_path,
+              voiceConfig: a.voice_config as Record<string, unknown>,
+            };
+          }
           continue;
         }
         if (prev.status !== "ready" && a.status === "ready") {
           map.set(a.segment_id, { status: a.status, durationMs: a.duration_ms });
+          opfsEntries[a.segment_id] = {
+            segmentId: a.segment_id,
+            status: a.status,
+            durationMs: a.duration_ms,
+            audioPath: a.audio_path,
+            voiceConfig: a.voice_config as Record<string, unknown>,
+          };
         }
       }
     }
     setAudioStatus(map);
     persist(buildSnapshot(undefined, map));
-  }, [persist, buildSnapshot]);
+
+    // Persist to OPFS audio_meta.json
+    if (storage && sceneId && Object.keys(opfsEntries).length > 0) {
+      writeAudioMeta(storage, sceneId, opfsEntries, chapterId ?? undefined).catch(() => {});
+    }
+  }, [persist, buildSnapshot, storage, sceneId, chapterId]);
 
   /** Apply loaded segments to component state */
   const applySegments = useCallback((builtSegments: Segment[]) => {
