@@ -78,6 +78,7 @@ const OVERLAY_ORDER: RadarLayer[] = ["5R+Alt", "5R", "3R"];
 
 export function SegmentQualityChart({
   translationStorage,
+  targetLang,
   sceneId,
   chapterId,
   segmentIds,
