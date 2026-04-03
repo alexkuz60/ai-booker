@@ -294,6 +294,7 @@ export function buildRestoreSteps(isRu: boolean): SyncStep[] {
     { id: "download_atmo", label: isRu ? "Загрузка атмосферы" : "Downloading atmosphere", status: "pending" },
     { id: "download_sfx", label: isRu ? "Загрузка SFX" : "Downloading SFX", status: "pending" },
     { id: "source_file", label: isRu ? "Сохранение файла" : "Saving source file", status: "pending" },
+    { id: "translation", label: isRu ? "Проект перевода" : "Translation project", status: "pending" },
     { id: "finalize", label: isRu ? "Завершение" : "Finalizing", status: "pending" },
   ];
 }

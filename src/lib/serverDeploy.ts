@@ -986,7 +986,32 @@ export async function deployFromServer({
   } catch {}
   report("source_file", sourceFilePreserved ? "done" : "skipped");
 
-  // ── 10. Finalize ──────────────────────────────────────────
+  // ── 10. Restore translation backup from Storage ──────────
+  report("translation", "running");
+  try {
+    const deployUserId = paramUserId || "";
+    if (deployUserId && book.id) {
+      const { restoreTranslationBackup } = await import("@/lib/translationBackup");
+      const transResult = await restoreTranslationBackup(
+        storage,
+        book.id,
+        deployUserId,
+        (detail) => report("translation", "running", detail),
+      );
+      report(
+        "translation",
+        transResult.fileCount > 0 ? "done" : "skipped",
+        transResult.fileCount > 0 ? `${transResult.fileCount} files, ${transResult.langs.join(",")}` : undefined,
+      );
+    } else {
+      report("translation", "skipped");
+    }
+  } catch (err) {
+    console.warn("[Deploy] Translation restore failed:", err);
+    report("translation", "error");
+  }
+
+  // ── 11. Finalize ──────────────────────────────────────────
   report("finalize", "done");
 
   return { toc, chapterIdMap, partIdMap, chapterResults, pdfProxy, totalPages, sourceFilePreserved };
