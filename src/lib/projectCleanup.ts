@@ -9,7 +9,6 @@
  */
 
 import { OPFSStorage } from "@/lib/projectStorage";
-import type { ProjectMeta } from "@/lib/projectStorage";
 import { setCachedSceneIndex } from "@/lib/sceneIndex";
 import { clearChapterTextsCache } from "@/lib/chapterTextsCache";
 import { snapshotBeforeWipe } from "@/lib/storageGuard";
