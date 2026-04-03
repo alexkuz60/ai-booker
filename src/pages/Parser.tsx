@@ -88,7 +88,7 @@ export default function Parser() {
     partIdMap, chapterResults, setChapterResults, fileInputRef,
     openSavedBook, handleFileSelect, handleReset: bookReset, ensurePdfLoaded,
     serverNewerBookId, dismissServerNewer, acceptServerVersion,
-  } = useBookManager({ userId: user?.id, isRu, projectStorage, projectStorageInitialized, storageBackend, createProject, openProjectByName, bumpProgressVersion });
+  } = useBookManager({ userId: user?.id, isRu, projectStorage, projectStorageInitialized, storageBackend, createProject, openProjectByName, bumpProgressVersion, contextBookId: projectMeta?.bookId });
 
   // ── Redirect to Library if no active book ──
   useEffect(() => {
