@@ -648,11 +648,16 @@ export async function deployFromServer({
   try {
     const allSceneIdsForAudio = allScenes.map(s => s.id);
     if (allSceneIdsForAudio.length > 0) {
-      // Collect all segment IDs
-      const allSegIds: string[] = [];
-      for (const segs of segmentsByScene?.values() ?? []) {
-        for (const seg of segs) allSegIds.push(seg.id);
-      }
+      // Fetch all segment IDs for these scenes
+      type RawSegId = { id: string; scene_id: string };
+      const allSegRefs = await fetchChunked<RawSegId>(
+        "scene_segments",
+        "id, scene_id",
+        "scene_id",
+        allSceneIdsForAudio,
+        500,
+      );
+      const allSegIds = allSegRefs.map(s => s.id);
 
       if (allSegIds.length > 0) {
         type RawAudio = {
