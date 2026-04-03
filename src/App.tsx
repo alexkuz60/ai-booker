@@ -55,6 +55,12 @@ function GatedRoute({ route, children }: { route: string; children: React.ReactN
   return <>{children}</>;
 }
 
+const LazyFallback = () => (
+  <div className="min-h-[50vh] flex items-center justify-center">
+    <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+  </div>
+);
+
 function ProtectedRoutes() {
   const { user, loading } = useAuth();
 
@@ -72,25 +78,27 @@ function ProtectedRoutes() {
     <PageHeaderProvider>
       <ProjectStorageProvider>
         <AppLayout>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/library" element={<Library />} />
-            <Route path="/parser" element={<Parser />} />
-            <Route path="/studio" element={
-              <GatedRoute route="/studio"><Studio /></GatedRoute>
-            } />
-            <Route path="/montage" element={
-              <GatedRoute route="/montage"><Montage /></GatedRoute>
-            } />
-            <Route path="/narrators" element={<Narrators />} />
-            <Route path="/soundscape" element={<Soundscape />} />
-            <Route path="/translation" element={
-              <GatedRoute route="/translation"><Translation /></GatedRoute>
-            } />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <Suspense fallback={<LazyFallback />}>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/library" element={<Library />} />
+              <Route path="/parser" element={<Parser />} />
+              <Route path="/studio" element={
+                <GatedRoute route="/studio"><Studio /></GatedRoute>
+              } />
+              <Route path="/montage" element={
+                <GatedRoute route="/montage"><Montage /></GatedRoute>
+              } />
+              <Route path="/narrators" element={<Narrators />} />
+              <Route path="/soundscape" element={<Soundscape />} />
+              <Route path="/translation" element={
+                <GatedRoute route="/translation"><Translation /></GatedRoute>
+              } />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/admin" element={<Admin />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </AppLayout>
       </ProjectStorageProvider>
     </PageHeaderProvider>
