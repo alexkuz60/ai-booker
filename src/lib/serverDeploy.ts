@@ -762,6 +762,39 @@ export async function deployFromServer({
   }
   report("clip_plugins", restoredPluginCount > 0 ? "done" : "skipped", restoredPluginCount > 0 ? `${restoredPluginCount}` : undefined);
 
+  // ── 8b2. Restore mixer state from user_settings to OPFS ────
+  report("mixer_state", "running");
+  let restoredMixerCount = 0;
+  try {
+    const { data: mixerSettings } = await supabase
+      .from("user_settings")
+      .select("setting_key, setting_value")
+      .like("setting_key", "mixer-scene-%");
+
+    if (mixerSettings && mixerSettings.length > 0) {
+      const { writeMixerState } = await import("@/lib/localMixerState");
+      type SceneMixerSnapshot = import("@/lib/localMixerState").SceneMixerSnapshot;
+
+      const allSceneIdSet = new Set(allScenes.map(s => s.id));
+      const writes: Promise<void>[] = [];
+
+      for (const row of mixerSettings) {
+        const sid = row.setting_key.replace("mixer-scene-", "");
+        if (!allSceneIdSet.has(sid)) continue;
+        const snapshot = row.setting_value as unknown as SceneMixerSnapshot;
+        if (!snapshot || Object.keys(snapshot).length === 0) continue;
+        const chId = allScenes.find(s => s.id === sid)?.chapter_id;
+        writes.push(writeMixerState(storage, sid, snapshot, chId));
+        restoredMixerCount++;
+      }
+      await Promise.all(writes);
+      console.log(`[Deploy] Restored ${restoredMixerCount} mixer state snapshots`);
+    }
+  } catch (err) {
+    console.warn("[Deploy] Failed to restore mixer state:", err);
+  }
+  report("mixer_state", restoredMixerCount > 0 ? "done" : "skipped", restoredMixerCount > 0 ? `${restoredMixerCount}` : undefined);
+
   // ── 8c. Restore atmosphere clips from DB to OPFS ──────────
   report("atmospheres", "running");
   let restoredAtmoCount = 0;
