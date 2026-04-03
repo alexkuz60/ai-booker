@@ -506,13 +506,21 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
                   if (result.errors.length > 0) {
                     console.warn("[Migration] errors:", result.errors);
                   }
+                  if (result.errors.length > 0 && result.filesCopied === 0) {
+                    toast.error(
+                      isRu
+                        ? `Миграция не выполнена: ${result.errors[0]}`
+                        : `Migration failed: ${result.errors[0]}`,
+                    );
+                    return;
+                  }
                   toast.success(
                     isRu
                       ? `Миграция: ${result.scenesProcessed} сцен, ${result.filesCopied} файлов`
                       : `Migration: ${result.scenesProcessed} scenes, ${result.filesCopied} files`,
                   );
                   setMigrationDialog(false);
-                  scan(); // refresh tree
+                  await scan();
                 } catch (err: any) {
                   toast.error(err.message || "Migration failed");
                 } finally {

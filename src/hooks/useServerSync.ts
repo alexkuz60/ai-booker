@@ -5,10 +5,10 @@
 
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
+import type { ProjectStorage } from "@/lib/projectStorage";
 import type { BookRecord } from "@/pages/parser/types";
-import { wipeProjectBrowserState } from "@/lib/projectCleanup";
 import type { SyncProgressCallback } from "@/components/SyncProgressDialog";
+import { resolveLocalStorageForBook } from "@/lib/localProjectResolver";
 
 const BROWSER_ID_KEY = "booker_browser_id";
 const SERVER_SYNC_PREFIX = "booker_server_sync_checked";
@@ -66,30 +66,11 @@ export function useServerSync({
   }, []);
 
   const getLocalStorageForBook = useCallback(async (targetBookId: string): Promise<ProjectStorage | null> => {
-    if (storageBackend === "opfs") {
-      const projectNames = localProjectNamesByBookId.get(targetBookId);
-      if (projectNames?.length) {
-        try {
-          const store = await OPFSStorage.openExisting(projectNames[0]);
-          if (store) return store;
-        } catch (err) {
-          console.warn("[SyncCheck] Failed to open OPFS project:", projectNames[0], err);
-        }
-      }
-    }
-
-    if (projectStorage?.isReady) {
-      try {
-        const meta = await projectStorage.readJSON<{ bookId?: string }>("project.json");
-        if (meta?.bookId === targetBookId) {
-          return projectStorage;
-        }
-      } catch (err) {
-        console.warn("[SyncCheck] Failed to inspect active project:", err);
-      }
-    }
-
-    return null;
+    return resolveLocalStorageForBook(targetBookId, {
+      storageBackend,
+      localProjectNamesByBookId,
+      projectStorage,
+    });
   }, [storageBackend, localProjectNamesByBookId, projectStorage]);
 
   const checkServerNewer = useCallback(async (
