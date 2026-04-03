@@ -418,7 +418,61 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       }
       report("clip_plugins", savedPluginCount > 0 ? "done" : "skipped", savedPluginCount > 0 ? `${savedPluginCount}` : undefined);
 
-      // ── 4d. Push atmosphere clips from OPFS to scene_atmospheres (ID-only dedup) ──
+      // ── 4d2. Push mixer state from OPFS to user_settings ──
+      report("mixer_state", "running");
+      let savedMixerCount = 0;
+      if (storage && user?.id) {
+        try {
+          const { readMixerState } = await import("@/lib/localMixerState");
+          const allSceneIds: string[] = [];
+          for (const idx of leafIndices) {
+            const result = normalizedResults.get(idx);
+            if (!result) continue;
+            for (const sc of result.scenes) {
+              if (sc.id) allSceneIds.push(sc.id);
+            }
+          }
+
+          const settingRows: Array<{
+            user_id: string;
+            setting_key: string;
+            setting_value: import("@/integrations/supabase/types").Json;
+            updated_at: string;
+          }> = [];
+
+          for (const sid of allSceneIds) {
+            const data = await readMixerState(storage, sid);
+            if (!data || Object.keys(data).length === 0) continue;
+            settingRows.push({
+              user_id: user.id,
+              setting_key: `mixer-scene-${sid}`,
+              setting_value: data as unknown as import("@/integrations/supabase/types").Json,
+              updated_at: new Date().toISOString(),
+            });
+          }
+
+          if (settingRows.length > 0) {
+            // Delete existing mixer settings, then insert fresh
+            const keys = settingRows.map(r => r.setting_key);
+            for (let i = 0; i < keys.length; i += 200) {
+              const chunk = keys.slice(i, i + 200);
+              await supabase.from("user_settings").delete().in("setting_key", chunk).eq("user_id", user.id);
+            }
+            for (let i = 0; i < settingRows.length; i += 500) {
+              const chunk = settingRows.slice(i, i + 500);
+              const { error } = await supabase.from("user_settings").insert(chunk);
+              if (error) console.warn("[SaveToServer] mixer_state insert:", error);
+            }
+            savedMixerCount = settingRows.length;
+            console.log(`[SaveToServer] Pushed ${savedMixerCount} mixer state snapshots`);
+          }
+        } catch (e) {
+          console.warn("[SaveToServer] Mixer state push failed:", e);
+        }
+      }
+      report("mixer_state", savedMixerCount > 0 ? "done" : "skipped", savedMixerCount > 0 ? `${savedMixerCount}` : undefined);
+
+      // ── 4e. Push atmosphere clips from OPFS to scene_atmospheres (ID-only dedup) ──
       // Atmo clips are immutable after creation — all mixing is non-destructive via Tone.js.
       // Only sync new/deleted clips by ID, skip existing ones entirely.
       if (!syncAtmo) {
