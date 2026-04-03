@@ -204,6 +204,7 @@ export function ChapterNavigator({
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
   const [recalcRunning, setRecalcRunning] = useState(false);
+  const [recalcPosRunning, setRecalcPosRunning] = useState(false);
 
   // Book-wide stale scan
   const [scanning, setScanning] = useState(false);
