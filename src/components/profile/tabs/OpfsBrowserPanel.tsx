@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   FolderClosed, FolderOpen, Trash2, RefreshCw, Loader2,
   ChevronRight, ChevronDown, FileText, File, FileAudio, AlertTriangle, Eye,
@@ -223,6 +223,9 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
     }
   }, [supported]);
 
+  // Auto-scan on mount
+  useEffect(() => { scan(); }, [scan]);
+
   const handleViewJson = useCallback(async (path: string, name: string) => {
     setJsonLoading(true);
     setJsonViewer({ name, path, content: "" });
@@ -302,7 +305,7 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
         </div>
         <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5" onClick={scan} disabled={loading}>
           <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-          {isRu ? "Сканировать" : "Scan"}
+          {isRu ? "Обновить" : "Refresh"}
         </Button>
       </div>
 
@@ -314,9 +317,7 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
             <div className="h-full overflow-auto p-2">
               {entries === null && !loading && (
                 <div className="text-center py-6 text-xs text-muted-foreground">
-                  {isRu
-                    ? 'Нажмите «Сканировать» для просмотра'
-                    : 'Click "Scan" to browse'}
+                  {isRu ? "Нет данных" : "No data"}
                 </div>
               )}
               {loading && (
