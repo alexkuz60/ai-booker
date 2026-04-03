@@ -109,7 +109,7 @@ export function SegmentQualityChart({
 
     (async () => {
       try {
-        const stages = await readAllStages(translationStorage, chapterId, sceneId);
+        const stages = await readAllStages(translationStorage, chapterId, sceneId, targetLang);
         if (cancelled) return;
 
         const literalMap = new Map<string, StageSegmentRadar>();
