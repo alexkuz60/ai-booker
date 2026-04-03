@@ -91,6 +91,7 @@ export default function Translation() {
   const [sceneSegmentIds, setSceneSegmentIds] = useState<string[]>([]);
   const [synopsisOpen, setSynopsisOpen] = useState(false);
   const [excludedCharIds, setExcludedCharIds] = useState<Set<string>>(new Set());
+  const [storedTranslationLangs, setStoredTranslationLangs] = useState<string[] | null>(null);
 
   // Compute source/target langs
   const sourceLang = meta?.language ?? "ru";
@@ -98,9 +99,9 @@ export default function Translation() {
 
   // Translation is "active" if translationLanguages includes targetLang
   const translationActive = useMemo(() => {
-    const langs = (meta as any)?.translationLanguages as string[] | undefined;
-    return langs?.includes(targetLang) ?? false;
-  }, [meta, targetLang]);
+    const langs = storedTranslationLangs ?? ((meta as any)?.translationLanguages as string[] | undefined) ?? [];
+    return langs.includes(targetLang);
+  }, [storedTranslationLangs, meta, targetLang]);
 
   const selectedChapter = chapters.find((c) => c.index === selectedChapterIdx) ?? null;
 
@@ -327,6 +328,29 @@ export default function Translation() {
 
     return () => { cancelled = true; };
   }, [storage, isOpen, isRu]);
+
+  useEffect(() => {
+    if (!storage || !isOpen) {
+      setStoredTranslationLangs(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const liveMeta = await storage.readJSON<{ translationLanguages?: string[] }>(paths.projectMeta());
+        if (!cancelled) {
+          setStoredTranslationLangs(liveMeta?.translationLanguages ?? []);
+        }
+      } catch {
+        if (!cancelled) {
+          setStoredTranslationLangs(null);
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [storage, isOpen, bookId, creating]);
 
   // Check readiness
   useEffect(() => {
