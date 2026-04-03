@@ -78,8 +78,7 @@ export const PIPELINE_STEP_IDS = [
   "mastering",
   "final_render",
   // Translation pipeline
-  "trans_storage_created",
-  "trans_migration_done",
+  "trans_activated",
   "trans_literal_done",
   "trans_literary_done",
   "trans_critique_done",
