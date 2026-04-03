@@ -136,7 +136,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
         projectsByDedupeKey.set(candidate.dedupeKey, existingProjects);
 
         const existing = byDedupeKey.get(candidate.dedupeKey);
-        if (!existing || comparePreferredProjectCandidates(candidate, existing) < 0) {
+        if (!existing || candidate.score > existing.score) {
           byDedupeKey.set(candidate.dedupeKey, candidate);
         }
       }
