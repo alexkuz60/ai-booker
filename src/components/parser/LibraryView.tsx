@@ -25,6 +25,7 @@ import { writePipelineStep } from "@/hooks/usePipelineProgress";
 import { OPFSStorage } from "@/lib/projectStorage";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { checkTranslationReadiness } from "@/lib/translationProject";
+import { paths } from "@/lib/projectPaths";
 import { toast } from "sonner";
 
 interface LibraryViewProps {
