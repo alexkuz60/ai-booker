@@ -62,7 +62,13 @@ const STAGE_FILES: Record<RadarStage, string> = {
   critique: "radar-critique.json",
 };
 
-export function radarStagePath(chapterId: string, sceneId: string, stage: RadarStage): string {
+/**
+ * Build radar file path. If `lang` is provided, uses the translation subfolder.
+ */
+export function radarStagePath(chapterId: string, sceneId: string, stage: RadarStage, lang?: string): string {
+  if (lang) {
+    return `chapters/${chapterId}/scenes/${sceneId}/${lang}/${STAGE_FILES[stage]}`;
+  }
   return `chapters/${chapterId}/scenes/${sceneId}/${STAGE_FILES[stage]}`;
 }
 
