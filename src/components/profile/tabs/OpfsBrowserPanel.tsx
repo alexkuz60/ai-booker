@@ -316,10 +316,30 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
             </p>
           )}
         </div>
-        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5" onClick={scan} disabled={loading}>
-          <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-          {isRu ? "Обновить" : "Refresh"}
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="ghost" size="sm" className="h-7 text-xs gap-1.5"
+            onClick={() => {
+              // Auto-detect mirror projects from the tree
+              const mirrorDirs = (entries ?? [])
+                .filter(e => e.kind === "directory" && /[_\s-](EN|RU)$/i.test(e.name));
+              if (mirrorDirs.length > 0) {
+                const m = mirrorDirs[0].name;
+                setMirrorName(m);
+                const match = m.match(/^(.*?)(?:[_\s-])(EN|RU)$/i);
+                if (match) setMainName(match[1].trim());
+              }
+              setMigrationDialog(true);
+            }}
+          >
+            <ArrowRightLeft className="h-3.5 w-3.5" />
+            {isRu ? "Миграция" : "Migrate"}
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5" onClick={scan} disabled={loading}>
+            <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+            {isRu ? "Обновить" : "Refresh"}
+          </Button>
+        </div>
       </div>
 
       {/* Split panel */}
