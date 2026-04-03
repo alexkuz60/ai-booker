@@ -12,19 +12,23 @@ import { ProjectStorageProvider } from "@/hooks/useProjectStorageContext";
 import { usePipelineGating } from "@/hooks/usePipelineGating";
 import { useLanguage } from "@/hooks/useLanguage";
 import { toast } from "sonner";
-import { useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
+
+// Critical path — loaded synchronously
 import Home from "./pages/Home";
 import Library from "./pages/Library";
-import Parser from "./pages/Parser";
-import Studio from "./pages/Studio";
-import Montage from "./pages/Montage";
-import Narrators from "./pages/Narrators";
-import Soundscape from "./pages/Soundscape";
-import Translation from "./pages/Translation";
-import Profile from "./pages/Profile";
-import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+
+// Heavy pages — lazy loaded
+const Parser = lazy(() => import("./pages/Parser"));
+const Studio = lazy(() => import("./pages/Studio"));
+const Montage = lazy(() => import("./pages/Montage"));
+const Narrators = lazy(() => import("./pages/Narrators"));
+const Soundscape = lazy(() => import("./pages/Soundscape"));
+const Translation = lazy(() => import("./pages/Translation"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Admin = lazy(() => import("./pages/Admin"));
 
 const queryClient = new QueryClient();
 
