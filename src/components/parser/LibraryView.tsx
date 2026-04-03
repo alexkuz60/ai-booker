@@ -97,7 +97,7 @@ function LibraryViewInner({
       return {
         store,
         meta,
-        score: Math.max(updatedAt, createdAt) + (meta.translationProject?.projectName ? 1_000_000_000_000_000 : 0),
+        score: Math.max(updatedAt, createdAt),
       };
     }));
 
