@@ -175,6 +175,7 @@ export default function Library() {
               onProjectReset={handleProjectReset}
               progressMap={progressMap}
               setProgressMap={setProgressMap}
+              localProjectNamesByBookId={localProjectNamesByBookId}
             />
           )}
           {step === "upload" && (
