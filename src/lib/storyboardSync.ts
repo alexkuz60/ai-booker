@@ -9,6 +9,9 @@ import type { PhraseAnnotation, TtsProvider } from "@/components/studio/phraseAn
 import { touchProjectUpdatedAt } from "@/lib/projectActivity";
 import { paths } from "@/lib/projectPaths";
 import { markStoryboarded, unmarkStoryboarded, getCachedSceneIndex, readSceneIndex } from "@/lib/sceneIndex";
+import { readAudioMeta, writeAudioMeta, type LocalAudioEntry } from "@/lib/localAudioMeta";
+
+const CHARS_PER_SEC = 14;
 
 // ─── Types ──────────────────────────────────────────────────
 
