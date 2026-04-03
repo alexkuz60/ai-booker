@@ -110,7 +110,7 @@ export async function migrateMirrorToSubfolders(
         try {
           const blob = await mirrorStore.readBlob(`${ttsDir}/${ttsFile}`);
           if (blob) {
-            await mainStore.writeBlob(`${mainTargetBase}/audio/tts/${ttsFile}`, blob, "audio/mpeg");
+            await mainStore.writeBlob(`${mainTargetBase}/audio/tts/${ttsFile}`, blob);
             result.filesCopied++;
           }
         } catch {
