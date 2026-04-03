@@ -61,8 +61,8 @@ export async function migrateMirrorToSubfolders(
     return result;
   }
 
-  // 2. Determine target language from mirror meta
-  const mirrorMeta = await mirrorStore.readJSON<ProjectMeta>("project.json");
+  // 2. Determine target language from mirror meta (legacy fields, not in ProjectMeta)
+  const mirrorMeta = await mirrorStore.readJSON<{ targetLanguage?: string }>("project.json");
   const targetLang = mirrorMeta?.targetLanguage ?? "en";
 
   // 3. Read scene index from mirror to get chapter→scene mappings

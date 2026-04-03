@@ -4,15 +4,11 @@
  * Centralizes all browser state cleanup needed before deploying
  * a server copy of a project into OPFS.
  *
- * Architecture: Local-Only. See ARCHITECTURE.md §1.8 step 5.
- *
- * IMPORTANT: Zombie scan must skip translation mirror projects
- * (those with targetLanguage/sourceProjectName) because they share
- * the same bookId as the source project.
+ * Architecture: ONE project per bookId. No mirror projects.
+ * Translations live inside the project in {lang}/ subdirectories.
  */
 
 import { OPFSStorage } from "@/lib/projectStorage";
-import type { ProjectMeta } from "@/lib/projectStorage";
 import { setCachedSceneIndex } from "@/lib/sceneIndex";
 import { clearChapterTextsCache } from "@/lib/chapterTextsCache";
 import { snapshotBeforeWipe } from "@/lib/storageGuard";
@@ -53,7 +49,6 @@ export async function wipeProjectBrowserState(
   localProjectNames: string[],
 ): Promise<void> {
   // 1. Delete OPFS project folders for this bookId.
-  //    ONLY delete folders that are confirmed source projects (not mirrors, not unopenable).
   for (const projectName of localProjectNames) {
     try {
       const store = await OPFSStorage.openExisting(projectName);
@@ -61,11 +56,7 @@ export async function wipeProjectBrowserState(
         console.warn(`[Wipe] Skipping unopenable OPFS project (not deleting): ${projectName}`);
         continue;
       }
-      const meta = await store.readJSON<ProjectMeta>("project.json");
-      if (meta?.targetLanguage || meta?.sourceProjectName) {
-        console.log(`[Wipe] Skipping translation mirror: ${projectName}`);
-        continue;
-      }
+      const meta = await store.readJSON<{ bookId?: string }>("project.json");
       if (meta?.bookId && meta.bookId !== bookId) {
         console.warn(`[Wipe] Skipping project with different bookId: ${projectName} (has ${meta.bookId}, expected ${bookId})`);
         continue;
@@ -79,16 +70,16 @@ export async function wipeProjectBrowserState(
     }
   }
 
-  // 1b. Log surviving folders with same bookId (no auto-deletion).
+  // 1b. Log surviving folders with same bookId (diagnostic only).
   try {
     const surviving = await OPFSStorage.listProjects();
     for (const projectName of surviving) {
       try {
         const store = await OPFSStorage.openExisting(projectName);
         if (!store) continue;
-        const meta = await store.readJSON<ProjectMeta>("project.json");
-        if (meta?.bookId === bookId && !meta.targetLanguage && !meta.sourceProjectName) {
-          console.warn(`[Wipe] ⚠️ Source folder survived wipe: ${projectName} (bookId=${bookId}). NOT auto-deleting.`);
+        const meta = await store.readJSON<{ bookId?: string }>("project.json");
+        if (meta?.bookId === bookId) {
+          console.warn(`[Wipe] ⚠️ Folder survived wipe: ${projectName} (bookId=${bookId}). NOT auto-deleting.`);
         }
       } catch {
         // Can't read project.json — skip
