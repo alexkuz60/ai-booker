@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { RoleBadge } from "@/components/ui/RoleBadge";
-import type { CharacterIndex } from "@/lib/localCharacters";
+import type { CharacterIndex } from "@/pages/parser/types";
 
 // ─── Constants (shared with CharactersPanel) ─────────────
 export const GENDER_LABELS: Record<string, { ru: string; en: string }> = {
