@@ -385,30 +385,8 @@ export function useProjectStorage(): UseProjectStorageReturn {
         let activeMeta = projectMeta;
         let activeName = targetName;
 
-        // Never bootstrap a translation mirror as the active project.
-        // Translation module must anchor to source project + mirror resolved separately.
-        if (projectMeta.targetLanguage || projectMeta.sourceProjectName) {
-          const existingProjects = await OPFSStorage.listProjects();
-          const inferredSourceName =
-            projectMeta.sourceProjectName || targetName.match(LANG_SUFFIX_RE)?.[1] || null;
-
-          if (inferredSourceName && existingProjects.includes(inferredSourceName)) {
-            const sourceStore = await OPFSStorage.openExisting(inferredSourceName);
-            if (!sourceStore) {
-              console.warn("[ProjectStorage] Source project missing for translation bootstrap:", inferredSourceName);
-              return;
-            }
-            const sourceMeta = await sourceStore.readJSON<ProjectMeta>("project.json");
-            if (sourceMeta && !sourceMeta.targetLanguage && !sourceMeta.sourceProjectName) {
-              activeStore = sourceStore;
-              activeMeta = sourceMeta;
-              activeName = inferredSourceName;
-              console.info("[ProjectStorage] Redirected bootstrap from translation mirror to source:", targetName, "→", inferredSourceName);
-            }
-          }
-        }
-
-        if (activeMeta.bookId && !activeMeta.targetLanguage && !activeMeta.sourceProjectName) {
+        // Resolve to the freshest project for this bookId
+        if (activeMeta.bookId) {
           const freshestSource = await resolveFreshestSourceProject(activeMeta.bookId);
           if (freshestSource && freshestSource.name !== activeName) {
             activeStore = freshestSource.store;

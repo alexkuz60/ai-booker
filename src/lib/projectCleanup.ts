@@ -71,16 +71,16 @@ export async function wipeProjectBrowserState(
     }
   }
 
-  // 1b. Log surviving folders with same bookId (no auto-deletion).
+  // 1b. Log surviving folders with same bookId (diagnostic only).
   try {
     const surviving = await OPFSStorage.listProjects();
     for (const projectName of surviving) {
       try {
         const store = await OPFSStorage.openExisting(projectName);
         if (!store) continue;
-        const meta = await store.readJSON<ProjectMeta>("project.json");
-        if (meta?.bookId === bookId && !meta.targetLanguage && !meta.sourceProjectName) {
-          console.warn(`[Wipe] ⚠️ Source folder survived wipe: ${projectName} (bookId=${bookId}). NOT auto-deleting.`);
+        const meta = await store.readJSON<{ bookId?: string }>("project.json");
+        if (meta?.bookId === bookId) {
+          console.warn(`[Wipe] ⚠️ Folder survived wipe: ${projectName} (bookId=${bookId}). NOT auto-deleting.`);
         }
       } catch {
         // Can't read project.json — skip

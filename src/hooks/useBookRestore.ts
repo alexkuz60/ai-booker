@@ -235,20 +235,7 @@ export function useBookRestore({
         userId,
       });
 
-      if (preservedTranslationProject) {
-        try {
-          const targetMeta = await targetStorage.readJSON<ProjectMeta>("project.json");
-          if (targetMeta) {
-            await targetStorage.writeJSON("project.json", {
-              ...targetMeta,
-              translationProject: targetMeta.translationProject ?? preservedTranslationProject,
-              updatedAt: new Date().toISOString(),
-            });
-          }
-        } catch (err) {
-          console.warn("[OpenBook] Failed to restore translation backlink:", err);
-        }
-      }
+      // Translation data preserved via translationBackup (ZIP in Storage)
 
       // Apply results to React state
       updatePdfRef(result.pdfProxy);
