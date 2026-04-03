@@ -154,7 +154,7 @@ export function SegmentQualityChart({
     })();
 
     return () => { cancelled = true; };
-  }, [translationStorage, sceneId, chapterId, segmentIds, activeAxis, reloadTick]);
+  }, [translationStorage, targetLang, sceneId, chapterId, segmentIds, activeAxis, reloadTick]);
 
   const handleBarClick = useCallback((data: SegmentBar, idx: number) => {
     setHighlightedIdx(idx);

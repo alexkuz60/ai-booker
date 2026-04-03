@@ -150,7 +150,7 @@ export function QualityMonitorPanel({
       try {
         let stages = stageCache.get(sceneId);
         if (!stages) {
-          stages = await readAllStages(storage, chapterId, sceneId);
+          stages = await readAllStages(storage, chapterId, sceneId, targetLang);
           stageCache.set(sceneId, stages);
         }
         if (cancelled) return;
