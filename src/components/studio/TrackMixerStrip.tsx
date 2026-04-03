@@ -8,7 +8,7 @@
  * - MIXED = some clips differ or have individual overrides
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { getAudioEngine, type TrackMeterData, type TrackMixState } from "@/lib/audioEngine";
 import { VuSlider } from "./VuSlider";
 import type { TrackPluginState } from "@/hooks/useClipPluginConfigs";
