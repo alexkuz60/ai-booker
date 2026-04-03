@@ -12,8 +12,6 @@ import { downloadBlob } from "@/lib/projectZip";
 import { paths } from "@/lib/projectPaths";
 import { findSourceBlob, getMimeType, detectFileFormat } from "@/lib/fileFormatUtils";
 import { readSceneIndex } from "@/lib/sceneIndex";
-import { getProjectActivityMs } from "@/lib/projectActivity";
-import { isLegacyMirrorMeta, pickPreferredProjectCandidate } from "@/lib/projectSourcePolicy";
 
 const LAST_PROJECT_KEY = "booker_last_project";
 
@@ -23,42 +21,6 @@ const LOCAL_RESET_KEYS = [
   "parser-nav-state",
   // К4: docx_chapter_texts and docx_html removed — now in-memory only
 ];
-
-async function resolveFreshestSourceProject(bookId: string): Promise<{
-  name: string;
-  store: ProjectStorage;
-  meta: ProjectMeta;
-} | null> {
-  const projectNames = await OPFSStorage.listProjects();
-  const candidates = await Promise.all(projectNames.map(async (projectName) => {
-    const store = await OPFSStorage.openExisting(projectName);
-    if (!store) return null;
-
-    const meta = await store.readJSON<ProjectMeta & { sourceProjectName?: string; targetLanguage?: string }>("project.json");
-    if (!meta || meta.bookId !== bookId) {
-      return null;
-    }
-
-    const freshness = await getProjectActivityMs(store);
-
-    return {
-      name: projectName,
-      store,
-      meta,
-      score: freshness,
-      isLegacyMirror: isLegacyMirrorMeta(meta),
-    };
-  }));
-
-  const preferred = pickPreferredProjectCandidate(
-    candidates.filter((candidate): candidate is NonNullable<typeof candidate> => !!candidate),
-  );
-
-  if (!preferred) return null;
-
-  const { name, store, meta } = preferred;
-  return { name, store, meta };
-}
 
 interface UseProjectStorageReturn {
   /** Current storage instance (null = no project open) */
