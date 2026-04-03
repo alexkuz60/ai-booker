@@ -125,13 +125,13 @@ export async function runTranslationPipeline(
   const totalSegs = segments.length;
 
   // ── 2. Determine which segments to process ─────────────────────────────
-  let completedSegmentIds = new Set<string>();
-  if (skipCompleted) {
-    const existingCritique = await readCritiqueRadar(storage, chapterId, sceneId, lang);
-    if (existingCritique?.segments?.length) {
-      for (const s of existingCritique.segments) {
-        if (s.segmentId && s.radar?.weighted > 0) completedSegmentIds.add(s.segmentId);
-      }
+  const existingCritique = skipCompleted
+    ? await readCritiqueRadar(storage, chapterId, sceneId, lang)
+    : null;
+  const completedSegmentIds = new Set<string>();
+  if (existingCritique?.segments?.length) {
+    for (const s of existingCritique.segments) {
+      if (s.segmentId && s.radar?.weighted > 0) completedSegmentIds.add(s.segmentId);
     }
   }
 
@@ -155,6 +155,23 @@ export async function runTranslationPipeline(
     literalMap.set(seg.segment_id, (literalResults[i] || "").trim());
   });
 
+  const literalSeedResults: TranslationSegmentResult[] = segmentsToProcess
+    .map((seg) => ({
+      segmentId: seg.segment_id,
+      original: seg.phrases.map((p) => p.text).join(" ").trim(),
+      literal: literalMap.get(seg.segment_id) || "",
+      literary: "",
+      critiqueNotes: [],
+      radarHistory: [],
+      radar: { semantic: 0, sentiment: 0, rhythm: 0, phonetic: 0, cultural: 0, weighted: 0 },
+      iterations: 0,
+    }))
+    .filter((result) => !!result.literal);
+
+  if (literalSeedResults.length > 0) {
+    await saveTranslationResults(storage, sceneId, chapterId, lang, sourceSb, literalSeedResults);
+  }
+
   // ── 4. Per-segment: literary → radar → critique → iterate ─────────────
   const results: TranslationSegmentResult[] = [];
 
@@ -163,27 +180,11 @@ export async function runTranslationPipeline(
     const seg = segments[si];
     const originalText = seg.phrases.map(p => p.text).join(" ").trim();
 
-    if (completedSegmentIds.has(seg.segment_id)) {
-      results.push({
-        segmentId: seg.segment_id, original: originalText,
-        literal: "", literary: "", critiqueNotes: [], radarHistory: [],
-        radar: { semantic: 0, sentiment: 0, rhythm: 0, phonetic: 0, cultural: 0, weighted: 0 },
-        iterations: 0,
-      });
-      continue;
-    }
+    if (completedSegmentIds.has(seg.segment_id)) continue;
 
     const literalText = literalMap.get(seg.segment_id) || originalText;
 
-    if (!originalText) {
-      results.push({
-        segmentId: seg.segment_id, original: "",
-        literal: "", literary: "", critiqueNotes: [], radarHistory: [],
-        radar: { semantic: 0, sentiment: 0, rhythm: 0, phonetic: 0, cultural: 0, weighted: 0 },
-        iterations: 0,
-      });
-      continue;
-    }
+    if (!originalText) continue;
 
     let currentLiterary = "";
     let critiqueNotes: string[] = [];
@@ -258,9 +259,12 @@ export async function runTranslationPipeline(
 
     // Incremental persistence
     try {
-      await saveStageRadarFiles(storage, sceneId, chapterId, lang, [segResult]);
+      await Promise.all([
+        saveStageRadarFiles(storage, sceneId, chapterId, lang, [segResult]),
+        saveTranslationResults(storage, sceneId, chapterId, lang, sourceSb, [segResult]),
+      ]);
     } catch (e) {
-      console.warn("[Pipeline] Incremental radar write failed for segment", seg.segment_id, e);
+      console.warn("[Pipeline] Incremental translation write failed for segment", seg.segment_id, e);
     }
 
     onSegmentComplete?.(seg.segment_id, segResult);
@@ -269,12 +273,21 @@ export async function runTranslationPipeline(
   // ── 5. Save to lang-subfolder storyboard ──────────────────────────────
   checkAbort();
   progress({ stage: "saving", fraction: 0.95, message: isRu ? "Сохранение перевода…" : "Saving translation…" });
-  await saveTranslationResults(storage, sceneId, chapterId, lang, sourceSb, results);
-  await saveStageRadarFiles(storage, sceneId, chapterId, lang, results);
+  if (results.length > 0) {
+    await saveTranslationResults(storage, sceneId, chapterId, lang, sourceSb, results);
+    await saveStageRadarFiles(storage, sceneId, chapterId, lang, results);
+  }
 
-  const aggregateScore = results.length > 0
-    ? results.reduce((sum, r) => sum + r.radar.weighted, 0) / results.length
-    : 0;
+  const finalCritique = await readCritiqueRadar(storage, chapterId, sceneId, lang).catch(() => null);
+  const weightedScores = finalCritique?.segments
+    ?.map((segment) => segment.radar?.weighted)
+    .filter((score): score is number => typeof score === "number" && Number.isFinite(score)) ?? [];
+
+  const aggregateScore = weightedScores.length > 0
+    ? weightedScores.reduce((sum, score) => sum + score, 0) / weightedScores.length
+    : results.length > 0
+      ? results.reduce((sum, r) => sum + r.radar.weighted, 0) / results.length
+      : 0;
 
   progress({ stage: "done", fraction: 1, message: isRu ? "Готово" : "Done" });
   return { sceneId, chapterId, segments: results, aggregateScore };
@@ -368,28 +381,55 @@ async function saveTranslationResults(
   storage: ProjectStorage, sceneId: string, chapterId: string, lang: string,
   sourceSb: LocalStoryboardData, results: TranslationSegmentResult[],
 ): Promise<void> {
+  if (results.length === 0) return;
+
   const resultMap = new Map(results.map(r => [r.segmentId, r]));
+  const storyboardPath = paths.translationStoryboard(sceneId, lang, chapterId);
+  const existingSb = await storage.readJSON<LocalStoryboardData>(storyboardPath);
+  const existingSegments = new Map((existingSb?.segments ?? []).map((seg) => [seg.segment_id, seg]));
 
   const translatedSb: LocalStoryboardData = {
-    ...sourceSb,
+    ...(existingSb ?? sourceSb),
     updatedAt: new Date().toISOString(),
     segments: sourceSb.segments.map(seg => {
       const result = resultMap.get(seg.segment_id);
-      if (!result) return seg;
-      const translatedPhrases = splitTranslationIntoPhrases(result.literary, seg.phrases.length);
+      const baseSeg = (existingSegments.get(seg.segment_id) ?? createEmptyTranslatedSegment(seg)) as Segment & {
+        _literal?: string;
+        _literary?: string;
+      };
+
+      if (!result) return baseSeg;
+
+      const nextLiteral = result.literal || baseSeg._literal || "";
+      const nextLiterary = result.literary || baseSeg._literary || "";
+      const displayText = nextLiterary || nextLiteral;
+      if (!displayText) return baseSeg;
+
+      const translatedPhrases = splitTranslationIntoPhrases(displayText, seg.phrases.length);
       return {
-        ...seg,
-        _literal: result.literal,
-        _literary: result.literary,
+        ...baseSeg,
+        _literal: nextLiteral || undefined,
+        _literary: nextLiterary || undefined,
         phrases: seg.phrases.map((ph, pi) => ({
-          ...ph, text: translatedPhrases[pi] ?? result.literary,
+          ...(baseSeg.phrases[pi] ?? ph),
+          text: translatedPhrases[pi] ?? (pi === 0 ? displayText : ""),
         })),
       };
     }),
-    audioStatus: {},
+    audioStatus: existingSb?.audioStatus ?? {},
   };
 
-  await storage.writeJSON(paths.translationStoryboard(sceneId, lang, chapterId), translatedSb);
+  await storage.writeJSON(storyboardPath, translatedSb);
+}
+
+function createEmptyTranslatedSegment(segment: Segment): Segment {
+  return {
+    ...segment,
+    phrases: segment.phrases.map((phrase) => ({
+      ...phrase,
+      text: "",
+    })),
+  };
 }
 
 async function saveStageRadarFiles(
