@@ -74,7 +74,7 @@ function LibraryViewInner({
   }, [progressMap]);
 
   const resolveSourceProject = useCallback(async (bookId: string) => {
-    if (activeStorage && activeMeta?.bookId === bookId && !activeMeta.targetLanguage && !activeMeta.sourceProjectName) {
+    if (activeStorage && activeMeta?.bookId === bookId) {
       return { store: activeStorage, meta: activeMeta };
     }
 
