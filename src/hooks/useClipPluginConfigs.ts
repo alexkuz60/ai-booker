@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { getAudioEngine } from "@/lib/audioEngine";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { readClipPlugins, writeClipPlugins, toSceneClipConfigs } from "@/lib/localClipPlugins";
 
 // ─── Types ──────────────────────────────────────────────────
 
