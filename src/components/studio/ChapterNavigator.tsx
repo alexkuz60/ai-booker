@@ -390,6 +390,31 @@ export function ChapterNavigator({
     setRecalcRunning(false);
   };
 
+  // ── Recalc positions for all scenes in chapter ──
+  const handleRecalcPositions = useCallback(async () => {
+    const sceneIds = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
+    if (sceneIds.length === 0 || !projectStorage) return;
+    setRecalcPosRunning(true);
+    try {
+      const { recalcPositions } = await import("@/lib/localAudioMeta");
+      let updated = 0;
+      for (const sceneId of sceneIds) {
+        await recalcPositions(projectStorage, sceneId);
+        updated++;
+      }
+      toast.success(
+        isRu
+          ? `Позиции пересчитаны: ${updated} сцен`
+          : `Positions recalculated: ${updated} scenes`
+      );
+      onBatchResynthDone?.(); // triggers clipsRefreshToken bump
+    } catch (e) {
+      console.error("recalcPositions error:", e);
+      toast.error(isRu ? "Ошибка пересчёта позиций" : "Position recalc error");
+    }
+    setRecalcPosRunning(false);
+  }, [chapter.scenes, projectStorage, isRu, onBatchResynthDone]);
+
   // ── Book-wide stale scan ──
   const handleBookStaleScan = useCallback(async () => {
     if (!bookId) {
