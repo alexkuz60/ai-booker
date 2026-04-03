@@ -41,6 +41,7 @@ interface QualityMonitorPanelProps {
 
 export function QualityMonitorPanel({
   storage,
+  targetLang,
   sceneId,
   chapterId,
   isRu,
