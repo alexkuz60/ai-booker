@@ -192,9 +192,8 @@ function LibraryViewInner({
         ? `Перевод активирован (${readyIndices.length} глав)`
         : `Translation activated (${readyIndices.length} chapters)`);
 
-      // Update progress flags
-      await handleToggleStep(book.id, "trans_storage_created" as PipelineStepId, true);
-      await handleToggleStep(book.id, "trans_migration_done" as PipelineStepId, true);
+      // Update progress flag
+      await handleToggleStep(book.id, "trans_activated" as PipelineStepId, true);
     } catch (err) {
       console.error("[LibraryView] create translation error:", err);
       toast.error(isRu ? "Ошибка активации перевода" : "Failed to activate translation");

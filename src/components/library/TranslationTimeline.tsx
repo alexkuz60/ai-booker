@@ -46,8 +46,7 @@ const STAGES: StageDef[] = [
     icon: FolderOpen,
     hasContextMenu: true,
     subSteps: [
-      { id: "trans_storage_created", labelRu: "Хранилище создано", labelEn: "Storage created" },
-      { id: "trans_migration_done", labelRu: "Миграция из Студии", labelEn: "Migration from Studio" },
+      { id: "trans_activated", labelRu: "Перевод активирован", labelEn: "Translation activated" },
     ],
   },
   {
