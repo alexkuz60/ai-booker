@@ -553,7 +553,7 @@ export function StoryboardPanel({
         "postgres_changes",
         { event: "*", schema: "public", table: "segment_audio" },
         (payload) => {
-          const row = payload.new as { segment_id: string; status: string; duration_ms: number } | undefined;
+          const row = payload.new as { segment_id: string; status: string; duration_ms: number; audio_path?: string; voice_config?: Record<string, unknown> } | undefined;
           if (!row || !segmentIdSet.has(row.segment_id)) return;
           if (!synthIdsRef.current.has(row.segment_id)) return;
 
@@ -568,6 +568,17 @@ export function StoryboardPanel({
             next.set(row.segment_id, { status: row.status, durationMs: row.duration_ms });
             return next;
           });
+
+          // Write to OPFS audio_meta.json
+          if (storage && sceneId && row.status === "ready" && row.audio_path) {
+            upsertAudioEntry(storage, sceneId, {
+              segmentId: row.segment_id,
+              status: row.status,
+              durationMs: row.duration_ms,
+              audioPath: row.audio_path,
+              voiceConfig: row.voice_config,
+            }, chapterId ?? undefined).catch(() => {});
+          }
         }
       )
       .subscribe();
