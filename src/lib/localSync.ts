@@ -93,11 +93,9 @@ export async function syncStructureToLocal(
     const sanitizedResults = sanitizeChapterResultsForStructure(data.toc, data.chapterResults);
     const leafChapterIds = new Set(getLeafChapterIds(data.toc, data.chapterIdMap));
 
-    // Clean up stale chapter directories
-    const existingChapters = await storage.listDir("chapters").catch(() => []);
-    const staleDeletes = existingChapters
-      .filter((dirName) => !leafChapterIds.has(dirName))
-      .map((dirName) => storage.delete(`chapters/${dirName}`).catch(() => undefined));
+    // NOTE: No automatic deletion of chapter or scene directories.
+    // Deletion of user data is ONLY allowed via explicit user action (delete button).
+    // "Stale" directories are harmless — they just take disk space.
 
     const sceneWrites: Promise<void>[] = [];
     sanitizedResults.forEach((result, idx) => {
@@ -113,39 +111,12 @@ export async function syncStructureToLocal(
       sceneWrites.push(storage.writeJSON(paths.chapterContent(chapterId), chapterData));
     });
 
-    await Promise.all([...staleDeletes, ...sceneWrites]);
+    await Promise.all(sceneWrites);
 
-    // 4. Build and write scene index (prunes stale scene IDs)
+    // 4. Build and write scene index
     const existingIndex = await readSceneIndex(storage);
     const sceneIndex = buildSceneIndex(data.chapterIdMap, sanitizedResults, existingIndex);
     await writeSceneIndex(storage, sceneIndex);
-
-    // 5. Clean up OPFS files for scenes that no longer exist
-    // SAFETY: only delete scene dirs that have NO storyboard/audio data to prevent data loss
-    if (existingIndex) {
-      const validSceneIds = new Set(Object.keys(sceneIndex.entries));
-      const staleSceneIds = Object.keys(existingIndex.entries).filter(id => !validSceneIds.has(id));
-      if (staleSceneIds.length > 0) {
-        const staleCleanups: Promise<void>[] = [];
-        for (const staleId of staleSceneIds) {
-          const entry = existingIndex.entries[staleId];
-          if (!entry?.chapterId) continue;
-          const scenePath = `chapters/${entry.chapterId}/scenes/${staleId}`;
-          // Guard: check if scene has storyboard or audio data — refuse to delete if so
-          const hasStoryboard = await storage.exists(`${scenePath}/storyboard.json`).catch(() => false);
-          const hasAudio = await storage.exists(`${scenePath}/audio_meta.json`).catch(() => false);
-          if (hasStoryboard || hasAudio) {
-            console.warn(`[LocalSync] ⚠️ REFUSING to delete scene ${staleId} — has storyboard/audio data. Keeping.`);
-            continue;
-          }
-          staleCleanups.push(storage.delete(scenePath).catch(() => undefined));
-        }
-        await Promise.all(staleCleanups);
-        if (staleCleanups.length > 0) {
-          console.debug(`[LocalSync] Cleaned up ${staleCleanups.length} empty stale scene(s)`);
-        }
-      }
-    }
 
     // ── Auto-set pipeline flags ──
     await writePipelineStep(storage, "toc_extracted", true);
