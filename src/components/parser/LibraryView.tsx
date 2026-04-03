@@ -78,17 +78,15 @@ function LibraryViewInner({
       return { store: activeStorage, meta: activeMeta };
     }
 
-    // One book = one folder. Use localProjectNamesByBookId for direct lookup.
-    const projectNames = localProjectNamesByBookId.get(bookId);
-    if (!projectNames?.length) return null;
-
-    const store = await OPFSStorage.openExisting(projectNames[0]);
-    if (!store) return null;
-
-    const meta = await store.readJSON<ProjectMeta>("project.json");
-    if (!meta || meta.bookId !== bookId) return null;
-
-    return { store, meta };
+    // One book = one folder. Find the project by bookId directly.
+    const projects = await OPFSStorage.listProjects();
+    for (const projectName of projects) {
+      const store = await OPFSStorage.openExisting(projectName);
+      if (!store) continue;
+      const meta = await store.readJSON<ProjectMeta>("project.json");
+      if (meta?.bookId === bookId) return { store, meta };
+    }
+    return null;
   }, [activeStorage, activeMeta]);
 
   const handleToggleStep = useCallback(async (bookId: string, stepId: PipelineStepId, done: boolean) => {
