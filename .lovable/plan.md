@@ -23,11 +23,17 @@
 - Character tracks → `useCharacterTracks.ts`
 - Transport header → `TimelineTransport.tsx` (с `React.memo`)
 
+### CharactersPanel.tsx (1238 → 841 строк) ✅
+- Список персонажей → `CharacterListSidebar.tsx` (235 строк, `React.memo`)
+- Редактор профиля → `CharacterProfileEditor.tsx` (287 строк, `React.memo`)
+
+### StoryboardPanel.tsx (1552 → 1236 строк) ✅
+- Тулбар → `StoryboardToolbar.tsx`
+- Строка сегмента → `StoryboardSegmentRow.tsx`
+
 ### Ожидают (приоритет 1):
 | Файл | Строки | Статус |
 |------|--------|--------|
-| StoryboardPanel.tsx | 1552 | 🔲 |
-| CharactersPanel.tsx | 1238 | 🔲 |
 | serverDeploy.ts | 1018 | ⏸️ отложен (монолитный пайплайн) |
 
 ## Этап 4: Мемоизация ✅ (частично)
