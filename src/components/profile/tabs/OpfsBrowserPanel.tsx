@@ -223,6 +223,9 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
     }
   }, [supported]);
 
+  // Auto-scan on mount
+  useEffect(() => { scan(); }, [scan]);
+
   const handleViewJson = useCallback(async (path: string, name: string) => {
     setJsonLoading(true);
     setJsonViewer({ name, path, content: "" });
