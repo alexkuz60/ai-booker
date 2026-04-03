@@ -679,10 +679,10 @@ export async function deployFromServer({
           const { writeAudioMeta } = await import("@/lib/localAudioMeta");
           type LocalAudioEntry = import("@/lib/localAudioMeta").LocalAudioEntry;
 
-          // Group by scene_id (reverse lookup via segments)
+          // Group by scene_id (reverse lookup via fetched segment refs)
           const segToScene = new Map<string, string>();
-          for (const [sceneId, segs] of segmentsByScene ?? []) {
-            for (const seg of segs) segToScene.set(seg.id, sceneId);
+          for (const ref of allSegRefs) {
+            segToScene.set(ref.id, ref.scene_id);
           }
 
           const audioByScene = new Map<string, Record<string, LocalAudioEntry>>();
