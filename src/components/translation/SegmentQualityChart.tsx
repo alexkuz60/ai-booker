@@ -62,6 +62,7 @@ interface SegmentBar {
 
 interface Props {
   translationStorage: ProjectStorage | null;
+  targetLang: string;
   sceneId: string | null;
   chapterId: string | null;
   segmentIds: string[];
