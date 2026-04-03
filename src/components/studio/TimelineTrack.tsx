@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, memo } from "react";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 import type { TimelineTrackData } from "./StudioTimeline";
 import type { StorageAudioFile } from "@/hooks/useStorageAudioList";
