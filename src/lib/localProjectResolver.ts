@@ -12,6 +12,7 @@
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
 import { getProjectActivityMs } from "@/lib/projectActivity";
 import { stripFileExtension } from "@/lib/fileFormatUtils";
+import { isLegacyMirrorMeta, pickPreferredProjectCandidate } from "@/lib/projectSourcePolicy";
 
 // ── Read bookId from an arbitrary ProjectStorage ────────────
 
@@ -35,6 +36,42 @@ export interface ResolveOptions {
   activate?: boolean;
 }
 
+type StoredProjectIdentity = {
+  bookId?: string;
+  sourceProjectName?: string;
+  targetLanguage?: string;
+};
+
+interface RankedProjectCandidate {
+  projectName: string;
+  store: ProjectStorage;
+  score: number;
+  isLegacyMirror: boolean;
+}
+
+async function readRankedProjectCandidate(
+  projectName: string,
+  targetBookId: string,
+): Promise<RankedProjectCandidate | null> {
+  try {
+    const store = await OPFSStorage.openExisting(projectName);
+    if (!store) return null;
+
+    const meta = await store.readJSON<StoredProjectIdentity>("project.json");
+    const resolvedBookId = meta?.bookId ?? await getBookIdFromStorage(store);
+    if (resolvedBookId !== targetBookId) return null;
+
+    return {
+      projectName,
+      store,
+      score: await getProjectActivityMs(store),
+      isLegacyMirror: isLegacyMirrorMeta(meta),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function resolveLocalStorageForBook(
   targetBookId: string,
   opts: {
@@ -48,83 +85,57 @@ export async function resolveLocalStorageForBook(
   const activate = resolveOpts?.activate ?? false;
 
   // Prefer already active storage first
-  const activeBookId = await getBookIdFromStorage(opts.projectStorage);
-  if (opts.projectStorage?.isReady && activeBookId === targetBookId) {
+  const activeMeta = await opts.projectStorage?.readJSON<StoredProjectIdentity>("project.json").catch(() => null);
+  const activeBookId = activeMeta?.bookId ?? await getBookIdFromStorage(opts.projectStorage);
+  if (
+    opts.projectStorage?.isReady &&
+    activeBookId === targetBookId &&
+    !isLegacyMirrorMeta(activeMeta)
+  ) {
     return opts.projectStorage;
   }
 
   if (opts.storageBackend === "opfs") {
     // Get candidate project names from the pre-built map
-    let projectNames = opts.localProjectNamesByBookId.get(targetBookId) || [];
+    const projectNames = opts.localProjectNamesByBookId.get(targetBookId) || [];
+    const seenProjectNames = new Set(projectNames);
+    const rankedCandidates = (
+      await Promise.all(projectNames.map((projectName) => readRankedProjectCandidate(projectName, targetBookId)))
+    ).filter((candidate): candidate is RankedProjectCandidate => !!candidate);
 
-    // Fallback: if map is empty (e.g. auto-restore before library loaded),
-    // do a direct OPFS scan to find the project by bookId in project.json.
-    if (!projectNames.length) {
+    const needsFallbackScan = rankedCandidates.length === 0 || rankedCandidates.every((candidate) => candidate.isLegacyMirror);
+
+    // Fallback: if map is empty/incomplete or contains only legacy mirrors,
+    // do a direct OPFS scan to find the best source project by bookId.
+    if (needsFallbackScan) {
       try {
         const allProjects = await OPFSStorage.listProjects();
         for (const projectName of allProjects) {
-          try {
-            const store = await OPFSStorage.openExisting(projectName);
-            if (!store) continue;
-            const meta = await store.readJSON<{ bookId?: string }>("project.json");
-            if (meta?.bookId === targetBookId) {
-              projectNames.push(projectName);
-            }
-          } catch { /* skip unreadable */ }
+          if (seenProjectNames.has(projectName)) continue;
+          seenProjectNames.add(projectName);
+          const candidate = await readRankedProjectCandidate(projectName, targetBookId);
+          if (candidate) rankedCandidates.push(candidate);
         }
       } catch { /* listProjects failed */ }
     }
 
-    if (!projectNames.length) return null;
+    if (!rankedCandidates.length) return null;
 
-    // If only one candidate — fast path
-    if (projectNames.length === 1) {
-      const name = projectNames[0];
-      if (activate && opts.openProjectByName) {
-        const activated = await opts.openProjectByName(name);
-        if (activated?.isReady) return activated;
-      }
-      const store = await OPFSStorage.openExisting(name);
-      return store?.isReady ? store : null;
+    if (rankedCandidates.length > 1) {
+      console.warn(
+        `[Resolver] ⚠️ MULTIPLE OPFS projects for bookId=${targetBookId}: [${rankedCandidates.map((candidate) => candidate.projectName).join(", ")}]. Preferring non-legacy source project.`
+      );
     }
 
-    // Multiple candidates — pick freshest by deep activity scan
-    console.warn(
-      `[Resolver] ⚠️ MULTIPLE OPFS projects for bookId=${targetBookId}: [${projectNames.join(", ")}]. Picking freshest.`
-    );
-    try {
-      const ranked = (
-        await Promise.all(
-          projectNames.map(async (projectName) => {
-            try {
-              const store = await OPFSStorage.openExisting(projectName);
-              if (!store) return null;
-              return {
-                projectName,
-                store,
-                activityMs: await getProjectActivityMs(store),
-              };
-            } catch {
-              return null;
-            }
-          }),
-        )
-      )
-        .filter((c): c is NonNullable<typeof c> => !!c)
-        .sort((a, b) => b.activityMs - a.activityMs);
+    const preferred = pickPreferredProjectCandidate(rankedCandidates);
+    if (!preferred) return null;
 
-      const freshest = ranked[0];
-      if (!freshest) return null;
-
-      if (activate && opts.openProjectByName) {
-        const activated = await opts.openProjectByName(freshest.projectName);
-        if (activated?.isReady) return activated;
-      }
-
-      return freshest.store.isReady ? freshest.store : null;
-    } catch (err) {
-      console.warn("[Resolver] Failed to open freshest OPFS project for book:", targetBookId, err);
+    if (activate && opts.openProjectByName) {
+      const activated = await opts.openProjectByName(preferred.projectName);
+      if (activated?.isReady) return activated;
     }
+
+    return preferred.store.isReady ? preferred.store : null;
   }
 
   return null;

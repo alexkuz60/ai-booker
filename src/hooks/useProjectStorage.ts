@@ -13,6 +13,7 @@ import { paths } from "@/lib/projectPaths";
 import { findSourceBlob, getMimeType, detectFileFormat } from "@/lib/fileFormatUtils";
 import { readSceneIndex } from "@/lib/sceneIndex";
 import { getProjectActivityMs } from "@/lib/projectActivity";
+import { isLegacyMirrorMeta, pickPreferredProjectCandidate } from "@/lib/projectSourcePolicy";
 
 const LAST_PROJECT_KEY = "booker_last_project";
 
@@ -33,7 +34,7 @@ async function resolveFreshestSourceProject(bookId: string): Promise<{
     const store = await OPFSStorage.openExisting(projectName);
     if (!store) return null;
 
-    const meta = await store.readJSON<ProjectMeta>("project.json");
+    const meta = await store.readJSON<ProjectMeta & { sourceProjectName?: string; targetLanguage?: string }>("project.json");
     if (!meta || meta.bookId !== bookId) {
       return null;
     }
@@ -45,16 +46,17 @@ async function resolveFreshestSourceProject(bookId: string): Promise<{
       store,
       meta,
       score: freshness,
+      isLegacyMirror: isLegacyMirrorMeta(meta),
     };
   }));
 
-  const sorted = candidates
-    .filter((candidate): candidate is NonNullable<typeof candidate> => !!candidate)
-    .sort((a, b) => b.score - a.score);
+  const preferred = pickPreferredProjectCandidate(
+    candidates.filter((candidate): candidate is NonNullable<typeof candidate> => !!candidate),
+  );
 
-  if (sorted.length === 0) return null;
+  if (!preferred) return null;
 
-  const { name, store, meta } = sorted[0];
+  const { name, store, meta } = preferred;
   return { name, store, meta };
 }
 
@@ -384,15 +386,16 @@ export function useProjectStorage(): UseProjectStorageReturn {
         let activeStore: ProjectStorage = store;
         let activeMeta = projectMeta;
         let activeName = targetName;
+        const savedWasLegacyMirror = isLegacyMirrorMeta(projectMeta);
 
         // Resolve to the freshest project for this bookId
         if (activeMeta.bookId) {
           const freshestSource = await resolveFreshestSourceProject(activeMeta.bookId);
-          if (freshestSource && freshestSource.name !== activeName) {
+          if (freshestSource && (savedWasLegacyMirror || freshestSource.name !== activeName)) {
             activeStore = freshestSource.store;
             activeMeta = freshestSource.meta;
             activeName = freshestSource.name;
-            console.info("[ProjectStorage] Redirected bootstrap to freshest source project:", targetName, "→", activeName);
+            console.info("[ProjectStorage] Redirected bootstrap to preferred source project:", targetName, "→", activeName);
           }
         }
 
