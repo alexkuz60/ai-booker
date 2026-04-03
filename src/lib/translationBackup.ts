@@ -125,16 +125,19 @@ export async function pushTranslationBackup(
     throw new Error(`Translation backup upload failed: ${error.message}`);
   }
 
-  // Save translationLanguages metadata to user_settings
-  await supabase.from("user_settings").upsert(
-    {
-      user_id: userId,
-      setting_key: `translation-langs-${bookId}`,
-      setting_value: langs as any,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id,setting_key" },
-  );
+  // Save translationLanguages metadata to user_settings (delete + insert pattern)
+  const settingKey = `translation-langs-${bookId}`;
+  await supabase
+    .from("user_settings")
+    .delete()
+    .eq("user_id", userId)
+    .eq("setting_key", settingKey);
+  await supabase.from("user_settings").insert({
+    user_id: userId,
+    setting_key: settingKey,
+    setting_value: langs as any,
+    updated_at: new Date().toISOString(),
+  });
 
   console.log(`[TranslationBackup] Uploaded ${storagePath} (${(zipBlob.size / 1024).toFixed(1)}KB)`);
   return { fileCount: Object.keys(await countFilesInZip(zipBlob)).length, uploaded: true };
