@@ -58,6 +58,7 @@ function LibraryViewInner({
   serverBooks = [], loadingServerBooks = false, onOpenServerBook, onDeleteServerBook,
   onStageNavigate, onProjectReset,
   progressMap: externalProgressMap, setProgressMap: externalSetProgressMap,
+  localProjectNamesByBookId = new Map(),
 }: LibraryViewProps) {
   const { bumpProgressVersion, storage: activeStorage, meta: activeMeta } = useProjectStorageContext();
   const syncedBookIds = useMemo(() => new Set(serverBooks.map(b => b.id)), [serverBooks]);
@@ -80,16 +81,18 @@ function LibraryViewInner({
       return { store: activeStorage, meta: activeMeta };
     }
 
-    // One book = one folder. Find the project by bookId directly.
-    const projects = await OPFSStorage.listProjects();
-    for (const projectName of projects) {
-      const store = await OPFSStorage.openExisting(projectName);
-      if (!store) continue;
-      const meta = await store.readJSON<ProjectMeta>("project.json");
-      if (meta?.bookId === bookId) return { store, meta };
-    }
+    // One book = one folder. Use pre-built map for direct lookup.
+    const projectNames = localProjectNamesByBookId.get(bookId);
+    if (!projectNames?.length) return null;
+
+    const store = await OPFSStorage.openExisting(projectNames[0]);
+    if (!store) return null;
+
+    const meta = await store.readJSON<ProjectMeta>("project.json");
+    if (meta?.bookId === bookId) return { store, meta };
+
     return null;
-  }, [activeStorage, activeMeta]);
+  }, [activeStorage, activeMeta, localProjectNamesByBookId]);
 
   const handleToggleStep = useCallback(async (bookId: string, stepId: PipelineStepId, done: boolean) => {
     // Update local state immediately
