@@ -18,7 +18,7 @@ import { t } from "@/pages/parser/i18n";
 import type { Scene, TocChapter, Step, ChapterStatus, BookRecord } from "@/pages/parser/types";
 import { normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import type { ProjectStorage, ProjectMeta } from "@/lib/projectStorage";
-import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
+import { readStructureFromLocal } from "@/lib/localSync";
 import { normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 import { detectFileFormat, getSourcePath, findSourceBlob, type FileFormat } from "@/lib/fileFormatUtils";
 import { wipeProjectBrowserState } from "@/lib/projectCleanup";
