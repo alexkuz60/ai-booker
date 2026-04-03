@@ -40,11 +40,10 @@ function JsonNode({ label, value, depth, defaultOpen = false }: JsonNodeProps) {
   }
 
   if (typeof value === "string") {
-    const truncated = value.length > 120 ? value.slice(0, 120) + "…" : value;
     return (
       <div className="flex items-baseline gap-1 min-w-0" style={{ paddingLeft: depth * 16 }}>
         <span className="text-muted-foreground shrink-0">{label}:</span>
-        <span className="text-green-400 break-all">"{truncated}"</span>
+        <span className="text-green-400 break-all whitespace-pre-wrap">"{value}"</span>
       </div>
     );
   }
