@@ -50,12 +50,14 @@ interface UseBookManagerParams {
   openProjectByName?: (projectName: string) => Promise<ProjectStorage | null>;
   pendingProjectName?: string | null;
   bumpProgressVersion?: () => void;
+  /** BookId from context meta — used as fallback when ACTIVE_BOOK_KEY is missing */
+  contextBookId?: string | null;
 }
 
 export function useBookManager({
   userId, isRu, projectStorage, projectStorageInitialized = false,
   storageBackend = "none", createProject, openProjectByName, pendingProjectName,
-  bumpProgressVersion,
+  bumpProgressVersion, contextBookId,
 }: UseBookManagerParams) {
   // ── Shared state ──────────────────────────────────────────
   const [step, setStep] = useState<Step>(() => {
@@ -151,7 +153,15 @@ export function useBookManager({
 
   useEffect(() => {
     if (restoredOnce || !userId) return;
-    const savedBookId = sessionStorage.getItem(ACTIVE_BOOK_KEY);
+
+    let savedBookId = sessionStorage.getItem(ACTIVE_BOOK_KEY);
+
+    // Fallback: project is open in context but ACTIVE_BOOK_KEY is missing
+    // (e.g. navigating to Parser from sidebar while project is active)
+    if (!savedBookId && contextBookId && projectStorageInitialized) {
+      savedBookId = contextBookId;
+      sessionStorage.setItem(ACTIVE_BOOK_KEY, contextBookId);
+    }
 
     if (!savedBookId) {
       if (step === "extracting_toc") setStep("library");
@@ -175,6 +185,7 @@ export function useBookManager({
     userId, restoredOnce,
     restore.restoreFromLocal,
     storageBackend, projectStorageInitialized,
+    contextBookId,
     step,
   ]);
 
