@@ -108,7 +108,7 @@ export type TrackPluginState = "on" | "off" | "mixed";
  * Returns current configs + update/toggle functions.
  */
 export function useClipPluginConfigs(sceneId: string | null) {
-  const { user } = useAuth();
+  const { storage } = useProjectStorageContext();
   const [configs, setConfigs] = useState<SceneClipConfigs>({});
   const [loaded, setLoaded] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -118,68 +118,55 @@ export function useClipPluginConfigs(sceneId: string | null) {
   const pendingRef = useRef<Map<string, { trackId: string; config: ClipPluginConfig }>>(new Map());
   const sceneIdRef = useRef(sceneId);
   sceneIdRef.current = sceneId;
-  const userRef = useRef(user);
-  userRef.current = user;
+  const storageRef = useRef(storage);
+  storageRef.current = storage;
 
-  // Flush all pending configs to DB
-  const flushToDb = useCallback(async () => {
+  // Flush all pending configs to OPFS
+  const flushToOpfs = useCallback(async () => {
     const sid = sceneIdRef.current;
-    const u = userRef.current;
-    if (!sid || !u || pendingRef.current.size === 0) return;
+    const store = storageRef.current;
+    if (!sid || !store || pendingRef.current.size === 0) return;
 
     const entries = Array.from(pendingRef.current.entries());
     pendingRef.current.clear();
 
-    const rows = entries.map(([clipId, { trackId, config }]) => ({
-      scene_id: sid,
-      clip_id: clipId,
-      track_id: trackId,
-      user_id: u.id,
-      config: config as unknown as import("@/integrations/supabase/types").Json,
-      updated_at: new Date().toISOString(),
-    }));
-
-    await supabase.from("clip_plugin_configs").upsert(rows, {
-      onConflict: "scene_id,clip_id,user_id",
-    });
+    // Read current file to merge
+    const existing = await readClipPlugins(store, sid);
+    const merged = existing?.configs ?? {};
+    for (const [clipId, data] of entries) {
+      merged[clipId] = data;
+    }
+    await writeClipPlugins(store, sid, merged);
   }, []);
 
-  // Load configs from DB when scene changes
+  // Load configs from OPFS when scene changes
   useEffect(() => {
-    if (!sceneId || !user) { setLoaded(true); return; }
+    if (!sceneId || !storage) { setLoaded(true); return; }
     if (restoredRef.current === sceneId) return;
     restoredRef.current = sceneId;
 
     (async () => {
-      const { data } = await supabase
-        .from("clip_plugin_configs")
-        .select("clip_id, config")
-        .eq("scene_id", sceneId)
-        .eq("user_id", user.id);
-
-      const result: SceneClipConfigs = {};
-      if (data) {
-        for (const row of data) {
-          result[row.clip_id] = {
-            ...DEFAULT_CLIP_PLUGIN_CONFIG,
-            ...(row.config as unknown as Partial<ClipPluginConfig>),
-          };
-        }
+      const data = await readClipPlugins(storage, sceneId);
+      const result = toSceneClipConfigs(data);
+      // Merge with defaults
+      const merged: SceneClipConfigs = {};
+      for (const [clipId, cfg] of Object.entries(result)) {
+        merged[clipId] = { ...DEFAULT_CLIP_PLUGIN_CONFIG, ...cfg };
       }
-      setConfigs(result);
+      setConfigs(merged);
       setLoaded(true);
     })();
-  }, [sceneId, user]);
+  }, [sceneId, storage]);
 
-  // Debounced save to DB — accumulates pending, flushes after 400ms idle
-  const saveToDb = useCallback((clipId: string, trackId: string, config: ClipPluginConfig) => {
-    if (!sceneIdRef.current || !userRef.current) return;
+  // Debounced save to OPFS — accumulates pending, flushes after 400ms idle
+  const saveToLocal = useCallback((clipId: string, trackId: string, config: ClipPluginConfig) => {
+    if (!sceneIdRef.current || !storageRef.current) return;
     pendingRef.current.set(clipId, { trackId, config });
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      flushToDb();
+      flushToOpfs();
     }, 400);
-  }, [flushToDb]);
+  }, [flushToOpfs]);
   /** Get config for a clip (returns default if none set) */
   const getClipConfig = useCallback((clipId: string): ClipPluginConfig => {
     return configs[clipId] ?? { ...DEFAULT_CLIP_PLUGIN_CONFIG };
