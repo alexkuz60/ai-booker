@@ -65,12 +65,26 @@
 │       ├── content.json   — { chapterId, scenes[], status }
 │       └── 📁 scenes/
 │           └── 📁 {sceneId}/
-│               ├── storyboard.json — LocalStoryboardData (segments, typeMappings, audioStatus, contentHash)
-│               ├── characters.json — SceneCharacterMap (speakers, typeMappings)
-│               └── 📁 audio/
-│                   ├── 📁 tts/        — {segmentId}.mp3
-│                   ├── 📁 atmosphere/ — атмосферные слои
-│                   └── 📁 renders/    — финальные рендеры сцен
+│               ├── storyboard.json  — LocalStoryboardData (segments, typeMappings, audioStatus, contentHash)
+│               ├── characters.json  — SceneCharacterMap (speakers, typeMappings)
+│               ├── audio_meta.json  — LocalAudioMeta (segmentId → status, durationMs, audioPath, startSec, silenceSec)
+│               ├── clip_plugins.json — LocalClipPluginsData (segmentId → per-clip plugin config: eq, comp, limiter, panner3d, convolver)
+│               ├── mixer_state.json — SceneMixerSnapshot (trackId → mix {volume, pan, preFxBypassed, reverbBypassed} + plugins {eq, comp, limiter})
+│               ├── 📁 audio/
+│               │   ├── 📁 tts/        — {segmentId}.mp3
+│               │   ├── 📁 atmosphere/ — атмосферные слои
+│               │   └── 📁 renders/    — финальные рендеры сцен
+│               └── 📁 {lang}/         — языковая поддиректория перевода (en, ru, …)
+│                   ├── storyboard.json  — переведённая раскадровка
+│                   ├── radar-literal.json  — радар после буквального перевода
+│                   ├── radar-literary.json — радар после литературной редакции
+│                   ├── radar-critique.json — радар после критики
+│                   ├── audio_meta.json  — метаданные TTS перевода
+│                   ├── clip_plugins.json — плагины клипов перевода
+│                   ├── mixer_state.json — микшер перевода
+│                   └── 📁 audio/
+│                       └── 📁 tts/      — {segmentId}.mp3 (озвучка перевода)
+└── 📁 synopsis/           — синопсисы для контекста перевода
 └── 📁 montage/
 ```
 
