@@ -740,426 +740,71 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
 
   // ─── UI ───────────────────────────────────────────────
 
+  const handleFilterModeChange = useCallback(() => {
+    setFilterMode(prev =>
+      prev === "chapter" ? (sceneId ? "scene" : "all")
+        : prev === "scene" ? "all"
+        : "chapter"
+    );
+  }, [sceneId]);
+
+  const speechContext = selectedChar && sceneId
+    ? speechContextMap.get(`${selectedChar.id}:${sceneId}`)
+    : undefined;
+
   return (
     <div className="h-full flex">
       {/* Left: character list */}
-      <div className="w-56 shrink-0 border-r border-border flex flex-col">
-        <div className="p-3 border-b border-border flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold font-display text-foreground flex items-center gap-1.5">
-              {isRu ? "Персонажи" : "Characters"}
-              <RoleBadge roleId="profiler" model={getModelForRole("profiler")} isRu={isRu} size={13} />
-              <RoleBadge roleId="director" model={getModelForRole("director")} isRu={isRu} size={13} />
-            </span>
-            <div className="flex items-center gap-1">
-              <Button
-                variant={filterMode !== "all" ? "secondary" : "ghost"}
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => setFilterMode(prev =>
-                  prev === "chapter" ? (sceneId ? "scene" : "all")
-                    : prev === "scene" ? "all"
-                    : "chapter"
-                )}
-                title={filterMode === "chapter"
-                  ? (isRu ? "Фильтр: глава" : "Filter: chapter")
-                  : filterMode === "scene"
-                    ? (isRu ? "Фильтр: сцена" : "Filter: scene")
-                    : (isRu ? "Фильтр: все" : "Filter: all")}
-              >
-                <Filter className={`h-3 w-3 ${filterMode !== "all" ? "text-primary" : ""}`} />
-              </Button>
-              {filterMode !== "all" && (
-                <span className="text-[9px] text-primary font-medium">
-                  {filterMode === "chapter" ? (isRu ? "гл." : "ch.") : (isRu ? "сц." : "sc.")}
-                </span>
-              )}
-              {selectedId && !multiSelect && (
-                <Button
-                  variant={isExtra(selectedId) ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={() => toggleExtra(selectedId)}
-                  title={isExtra(selectedId)
-                    ? (isRu ? "Убрать из массовки" : "Remove from extras")
-                    : (isRu ? "Пометить как массовку" : "Mark as extra")}
-                >
-                  <UsersRound className={`h-3 w-3 ${isExtra(selectedId) ? "text-primary" : ""}`} />
-                </Button>
-              )}
-              {characters.length > 1 && (
-                <Button
-                  variant={multiSelect ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={toggleMultiSelect}
-                  title={isRu ? "Мультивыбор для слияния" : "Multi-select for merge"}
-                >
-                  {multiSelect ? <X className="h-3 w-3" /> : <CheckSquare className="h-3 w-3" />}
-                </Button>
-              )}
-              {characters.length > 0 && (
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                  {filterMode === "scene" && effectiveSceneCharIds.size > 0 ? filteredCharacters.length : characters.length}
-                </Badge>
-              )}
-            </div>
-          </div>
-          {multiSelect && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full gap-1.5 text-xs"
-              onClick={handleMerge}
-              disabled={merging || selectedIds.size < 2}
-            >
-              {merging ? <Loader2 className="h-3 w-3 animate-spin" /> : <Merge className="h-3 w-3" />}
-              {merging
-                ? (isRu ? "Слияние..." : "Merging...")
-                : (isRu ? `Объединить (${selectedIds.size})` : `Merge (${selectedIds.size})`)}
-            </Button>
-          )}
-          {!multiSelect && characters.length > 0 && (
-            <div className="flex gap-1.5">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 gap-1.5 text-xs"
-                onClick={handleProfile}
-                disabled={profiling || cleaningDupes}
-              >
-                {profiling ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                {profiling
-                  ? (isRu ? "Анализ..." : "Profiling...")
-                  : hasProfiles
-                    ? (isRu ? "Обновить профайлы" : "Re-profile")
-                    : (isRu ? "AI-профайлинг" : "AI Profile")}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1 text-xs px-2"
-                onClick={handleAutoCleanDuplicates}
-                disabled={cleaningDupes || profiling}
-                title={isRu ? "Найти и объединить дубликаты" : "Find & merge duplicates"}
-              >
-                {cleaningDupes ? <Loader2 className="h-3 w-3 animate-spin" /> : <SearchCheck className="h-3 w-3" />}
-              </Button>
-            </div>
-          )}
-        </div>
-
-        <ScrollArea className="flex-1">
-          {loading ? (
-            <div className="p-4 flex justify-center">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : filteredCharacters.length === 0 ? (
-            <div className="p-4 text-center">
-              <Users className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
-              <p className="text-xs text-muted-foreground">
-                {filterMode === "scene"
-                  ? (isRu ? "Повествовательная сцена — нет персонажей с диалогами. Используйте Рассказчика и Комментатора." : "Narrative scene — no dialogue characters. Use Narrator and Commentator.")
-                  : (isRu ? "Персонажи появятся после сегментации сцен" : "Characters will appear after scene segmentation")}
-              </p>
-            </div>
-          ) : (
-            <div className="p-1 space-y-0.5">
-              {filteredCharacters.map(ch => (
-                <button
-                  key={ch.id}
-                  onClick={() => {
-                    if (multiSelect) {
-                      toggleCharInSelection(ch.id);
-                    } else {
-                      handleSelectCharacter(ch.id);
-                    }
-                  }}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                    multiSelect
-                      ? selectedIds.has(ch.id)
-                        ? "bg-primary/15 text-accent-foreground ring-1 ring-primary/30"
-                        : "text-muted-foreground hover:bg-muted/50"
-                      : selectedId === ch.id
-                        ? "bg-accent/15 text-accent-foreground"
-                        : "text-muted-foreground hover:bg-muted/50"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {multiSelect && (
-                      <div className={`h-3.5 w-3.5 rounded border shrink-0 flex items-center justify-center ${
-                        selectedIds.has(ch.id) ? "bg-primary border-primary" : "border-muted-foreground/40"
-                      }`}>
-                        {selectedIds.has(ch.id) && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
-                      </div>
-                    )}
-                    <span className="truncate font-medium">{ch.name}</span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      {isExtra(ch.id) && (
-                        <span title={isRu ? "Массовка" : "Extra"}><UsersRound className="h-3 w-3 text-muted-foreground/50" /></span>
-                      )}
-                      {ch.description && <User className="h-3 w-3 text-primary/60" />}
-                      {ch.voice_config?.voice_id && <Volume2 className="h-3 w-3 text-primary/60" />}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                    {ch.gender !== "unknown" && (
-                      <span className="text-[10px] text-muted-foreground/60">
-                        {ch.gender === "female" ? "♀" : "♂"}
-                      </span>
-                    )}
-                    {ch.temperament && (
-                      <span className="text-[10px] text-muted-foreground/50 truncate">
-                        {TEMPERAMENT_LABELS[ch.temperament]?.[isRu ? "ru" : "en"] ?? ch.temperament}
-                      </span>
-                    )}
-                    {((ch.psycho_tags?.length ?? 0) > 0 || (ch.speech_tags?.length ?? 0) > 0) && (
-                      <span className="text-[10px] text-violet-400/70" title={[...(ch.psycho_tags || []), ...(ch.speech_tags || [])].join(", ")}>
-                        🎭{(ch.psycho_tags?.length ?? 0) + (ch.speech_tags?.length ?? 0)}
-                      </span>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </ScrollArea>
-      </div>
+      <CharacterListSidebar
+        isRu={isRu}
+        characters={characters}
+        filteredCharacters={filteredCharacters}
+        loading={loading}
+        selectedId={selectedId}
+        filterMode={filterMode}
+        sceneId={sceneId}
+        effectiveSceneCharIds={effectiveSceneCharIds}
+        multiSelect={multiSelect}
+        selectedIds={selectedIds}
+        merging={merging}
+        profiling={profiling}
+        cleaningDupes={cleaningDupes}
+        hasProfiles={hasProfiles}
+        segmentCounts={segmentCounts}
+        profilerModel={getModelForRole("profiler")}
+        directorModel={getModelForRole("director")}
+        isExtra={isExtra}
+        onFilterModeChange={handleFilterModeChange}
+        onToggleExtra={toggleExtra}
+        onToggleMultiSelect={toggleMultiSelect}
+        onSelectCharacter={handleSelectCharacter}
+        onToggleCharInSelection={toggleCharInSelection}
+        onMerge={handleMerge}
+        onProfile={handleProfile}
+        onAutoCleanDuplicates={handleAutoCleanDuplicates}
+      />
 
       {/* Right: two-column layout — Profile + Voice */}
       <div className="flex-1 min-w-0 overflow-hidden flex">
         {/* Column 1: Profile */}
         <div className="flex-1 min-w-0 border-r border-border">
           <ScrollArea className="h-full">
-            <div className="p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  {isRu ? "Профайл" : "Profile"}
-                  <RoleBadge roleId="profiler" model={getModelForRole("profiler")} isRu={isRu} size={12} />
-                </h3>
-                {selectedChar && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 gap-1 text-xs"
-                    onClick={handleProfile}
-                    disabled={profiling}
-                  >
-                    {profiling ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                    {isRu ? "Обновить профайл" : "Re-profile"}
-                  </Button>
-                )}
-              </div>
-
-              {selectedChar ? (
-                <>
-                  <div>
-                    <h4 className="text-base font-semibold font-display text-foreground mb-2 flex items-center gap-2">
-                      {selectedChar.name}
-                      {isExtra(selectedChar.id) && (
-                        <span title={isRu ? "Массовка" : "Extra"}><UsersRound className="h-4 w-4 text-muted-foreground/60" /></span>
-                      )}
-                    </h4>
-                    {selectedChar.description && (
-                      <p className="text-sm text-foreground/90 leading-relaxed mb-3">
-                        {selectedChar.description}
-                      </p>
-                    )}
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button type="button" className="inline-flex items-center">
-                            <Badge
-                              variant="outline"
-                              className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
-                                selectedChar.gender === "unknown" ? "border-dashed border-warning text-warning" : ""
-                              }`}
-                            >
-                              {GENDER_LABELS[selectedChar.gender]?.[isRu ? "ru" : "en"] ?? selectedChar.gender}
-                              {selectedChar.gender === "unknown" && " ▾"}
-                            </Badge>
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-1.5" align="start">
-                          <div className="grid gap-0.5">
-                            {GENDER_OPTIONS.map(g => (
-                              <button
-                                key={g}
-                                className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${
-                                  selectedChar.gender === g
-                                    ? "bg-accent text-accent-foreground"
-                                    : "hover:bg-muted text-foreground"
-                                }`}
-                                onClick={() => handleGenderChange(selectedChar.id, g)}
-                              >
-                                {GENDER_LABELS[g]?.[isRu ? "ru" : "en"]}
-                              </button>
-                            ))}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button type="button" className="inline-flex items-center">
-                            <Badge
-                              variant="outline"
-                              className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
-                                (selectedChar.age_group || "unknown") === "unknown" ? "border-dashed border-warning text-warning" : ""
-                              }`}
-                            >
-                              {getAgeLabel(selectedChar.age_group || "unknown", selectedChar.gender, isRu)}
-                              {(selectedChar.age_group || "unknown") === "unknown" && " ▾"}
-                            </Badge>
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-1.5" align="start">
-                          <div className="grid gap-0.5">
-                            {AGE_OPTIONS.map(age => (
-                              <button
-                                key={age}
-                                className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${
-                                  selectedChar.age_group === age
-                                    ? "bg-accent text-accent-foreground"
-                                    : "hover:bg-muted text-foreground"
-                                }`}
-                                onClick={() => handleAgeChange(selectedChar.id, age)}
-                              >
-                                {getAgeLabel(age, selectedChar.gender, isRu)}
-                              </button>
-                            ))}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button type="button" className="inline-flex items-center">
-                            <Badge
-                              variant="secondary"
-                              className={`text-xs cursor-pointer transition-colors hover:bg-accent/20 ${
-                                !selectedChar.temperament ? "border-dashed border-warning text-warning" : ""
-                              }`}
-                            >
-                              {selectedChar.temperament
-                                ? (TEMPERAMENT_LABELS[selectedChar.temperament]?.[isRu ? "ru" : "en"] ?? selectedChar.temperament)
-                                : (isRu ? "Темперамент ▾" : "Temperament ▾")}
-                            </Badge>
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-1.5" align="start">
-                          <div className="grid gap-0.5">
-                            {TEMPERAMENT_OPTIONS.map(t => (
-                              <button
-                                key={t}
-                                className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${
-                                  selectedChar.temperament === t
-                                    ? "bg-accent text-accent-foreground"
-                                    : "hover:bg-muted text-foreground"
-                                }`}
-                                onClick={() => handleTemperamentChange(selectedChar.id, t)}
-                              >
-                                {TEMPERAMENT_LABELS[t]?.[isRu ? "ru" : "en"]}
-                              </button>
-                            ))}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    {/* Speech & Psycho tags */}
-                    {((selectedChar.speech_tags?.length ?? 0) > 0 || (selectedChar.psycho_tags?.length ?? 0) > 0) && (
-                      <div className="mt-3 space-y-2">
-                        {(selectedChar.speech_tags?.length ?? 0) > 0 && (
-                          <div>
-                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                              {isRu ? "Манера речи" : "Speech manner"}
-                            </span>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {selectedChar.speech_tags!.map((tag, i) => (
-                                <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 border-sky-500/40 text-sky-400">
-                                  {tag}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {(selectedChar.psycho_tags?.length ?? 0) > 0 && (
-                          <div>
-                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                              {isRu ? "Психотип" : "Psychotype"}
-                            </span>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {selectedChar.psycho_tags!.map((tag, i) => (
-                                <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 border-violet-500/40 text-violet-400">
-                                  {tag}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {selectedChar.speech_style && (
-                      <div className="mt-2">
-                        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                          {isRu ? "Стиль речи" : "Speech Style"}
-                        </span>
-                        <p className="text-xs text-muted-foreground mt-1 italic">
-                          {selectedChar.speech_style}
-                        </p>
-                      </div>
-                    )}
-                    {selectedChar.aliases.length > 0 && (
-                      <div className="mt-2">
-                        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                          {isRu ? "Также известен как" : "Also known as"}
-                        </span>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {selectedChar.aliases.join(", ")}
-                        </p>
-                      </div>
-                    )}
-                    {/* Scene-level Speech Refinement */}
-                    {sceneId && effectiveSceneCharIds.has(selectedChar.id) && (
-                      <div className="mt-4 pt-3 border-t border-border">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                            <MessageSquareQuote className="h-3 w-3" />
-                            {isRu ? "Речь в сцене" : "Speech in Scene"}
-                          </span>
-                          <Button variant="outline" size="sm" className="h-6 px-2 gap-1 text-xs" onClick={handleRefineSpeech} disabled={refiningSpeech || profiling}>
-                            {refiningSpeech ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                            {refiningSpeech ? (isRu ? "Анализ…" : "Analyzing…") : (isRu ? "Уточнить речь" : "Refine Speech")}
-                          </Button>
-                        </div>
-                        {(() => {
-                          const ctx = speechContextMap.get(`${selectedChar.id}:${sceneId}`);
-                          if (!ctx) return (<p className="text-[10px] text-muted-foreground/50 italic">{isRu ? "Нажмите «Уточнить речь» для анализа манеры в этой сцене" : "Click 'Refine Speech' to analyze manner in this scene"}</p>);
-                          return (
-                            <div className="space-y-1.5">
-                              {ctx.emotion && (<div className="flex items-center gap-2"><Badge variant="secondary" className="text-[10px] px-1.5 py-0">{isRu ? "Эмоция" : "Emotion"}</Badge><span className="text-xs text-foreground">{String(ctx.emotion)}</span></div>)}
-                              <div className="flex flex-wrap gap-1.5">
-                                {ctx.tempo && (<Badge variant="outline" className="text-[10px] px-1.5 py-0">⏱ {String(ctx.tempo)}</Badge>)}
-                                {ctx.volume_hint && (<Badge variant="outline" className="text-[10px] px-1.5 py-0">🔊 {String(ctx.volume_hint)}</Badge>)}
-                              </div>
-                              {ctx.manner && (<p className="text-xs text-muted-foreground italic">{String(ctx.manner)}</p>)}
-                              {(ctx.tts_instructions_ru || ctx.tts_instructions_en) && (
-                                <div className="mt-1 p-2 rounded-md bg-muted/30 border border-border">
-                                  <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "TTS инструкции" : "TTS Instructions"}</span>
-                                  <p className="text-[11px] text-foreground/80 mt-0.5">{String(isRu ? (ctx.tts_instructions_ru || ctx.tts_instructions_en) : (ctx.tts_instructions_en || ctx.tts_instructions_ru))}</p>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-                  {isRu ? "Выберите персонажа" : "Select a character"}
-                </div>
-              )}
-            </div>
+            <CharacterProfileEditor
+              isRu={isRu}
+              selectedChar={selectedChar ?? null}
+              isExtra={selectedChar ? isExtra(selectedChar.id) : false}
+              profiling={profiling}
+              sceneId={sceneId}
+              effectiveSceneCharIds={effectiveSceneCharIds}
+              speechContext={speechContext}
+              refiningSpeech={refiningSpeech}
+              getModelForRole={getModelForRole}
+              onProfile={handleProfile}
+              onGenderChange={handleGenderChange}
+              onAgeChange={handleAgeChange}
+              onTemperamentChange={handleTemperamentChange}
+              onRefineSpeech={handleRefineSpeech}
+            />
           </ScrollArea>
         </div>
 
