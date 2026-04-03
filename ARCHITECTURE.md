@@ -95,6 +95,32 @@
 
 > **V1 → V2 миграция завершена.** Устаревшие плоские директории (`scenes/`, `audio/` в корне проекта) больше не создаются при инициализации. Код не выполняет фолбэки на V1-пути. Если в OPFS остались старые V1-папки — их можно безопасно удалить через OPFS Browser.
 
+### 1.6 Защита данных (StorageGuard)
+
+> **Инфраструктура `src/lib/storageGuard.ts` — обязательный контракт.**
+
+Все операции удаления файлов внутри проекта проходят через `guardedDelete()`, который проверяет путь по белому списку. Операции вне списка — блокируются и логируются.
+
+**Белый список (что МОЖНО удалить):**
+- `chapters/{ch}/scenes/{sc}/storyboard.json` — при пере-анализе сцены
+- `chapters/{ch}/scenes/{sc}/audio/**` — при пере-синтезе
+- `chapters/{ch}/scenes/{sc}/{lang}/storyboard.json` — при пере-переводе
+- `chapters/{ch}/scenes/{sc}/{lang}/audio/**` — при пере-озвучке перевода
+
+**Защищённые файлы (удаление ЗАБЛОКИРОВАНО):**
+- `project.json`, `characters.json`, `structure/*`, `synopsis/*`
+- `audio_meta.json`, `clip_plugins.json`, `mixer_state.json`, `content.json`
+- Любая целая директория (`chapters/`, `scenes/`)
+
+**Дополнительные механизмы:**
+- `snapshotBeforeWipe(storage, bookId)` — автоматический ZIP-бэкап перед Wipe-and-Deploy
+- `assertIntegrity(storage, operation)` — проверка критичных файлов после деструктивных операций
+- `getDestructiveJournal()` — in-memory журнал всех попыток удаления (разрешённых и заблокированных)
+
+**Правило:** `syncStructureToLocal()` — строго write-only. Вызов `storage.delete()` из этой функции ЗАПРЕЩЁН.
+
+**Тесты:** `src/lib/__tests__/storageGuard.test.ts` — 14 тестов на whitelist, блокировку и integrity check.
+
 #### Реестр персонажей — детали
 
 | Файл | Тип | Назначение |
