@@ -22,18 +22,19 @@ export interface SelectedSegmentData {
 
 /** Imperative API exposed via ref for granular updates */
 export interface BilingualSegmentsHandle {
-  /** Update a single segment's translation text + stage without full reload */
   patchSegment: (segmentId: string, translatedText: string, stage?: RadarStage | null) => void;
-  /** Force full reload from OPFS (for bulk operations) */
   reload: () => void;
 }
 
 interface Props {
-  sourceStorage: ProjectStorage | null;
-  translationStorage: ProjectStorage | null;
+  storage: ProjectStorage | null;
+  /** Target language for translation subfolder */
+  targetLang: string;
   sceneId: string | null;
   chapterId: string | null;
   isRu: boolean;
+  /** Whether translation is initialized for this project */
+  translationActive: boolean;
   onTranslateSegments?: (segments: Segment[]) => Promise<void>;
   onLiteraryEdit?: (segment: Segment) => Promise<void>;
   onCritique?: (segment: Segment) => Promise<void>;
@@ -51,11 +52,12 @@ interface SegmentWithTranslation {
 }
 
 export const BilingualSegmentsView = forwardRef<BilingualSegmentsHandle, Props>(function BilingualSegmentsView({
-  sourceStorage,
-  translationStorage,
+  storage,
+  targetLang,
   sceneId,
   chapterId,
   isRu,
+  translationActive,
   onTranslateSegments,
   onLiteraryEdit,
   onCritique,
@@ -74,21 +76,23 @@ export const BilingualSegmentsView = forwardRef<BilingualSegmentsHandle, Props>(
 
   // ── Full load from OPFS ─────────────────────────────────
   const loadAll = useCallback(async () => {
-    if (!sourceStorage || !sceneId || !chapterId) {
+    if (!storage || !sceneId || !chapterId) {
       setItems([]);
       return;
     }
     setLoading(true);
     try {
-      const sourceData = await sourceStorage.readJSON<LocalStoryboardData>(
+      // Read source storyboard (original text)
+      const sourceData = await storage.readJSON<LocalStoryboardData>(
         paths.storyboard(sceneId, chapterId),
       );
       const segments = sourceData?.segments ?? [];
 
+      // Read translation storyboard from lang subfolder
       let translationSegments: Segment[] = [];
-      if (translationStorage) {
-        const transData = await translationStorage.readJSON<LocalStoryboardData>(
-          `chapters/${chapterId}/scenes/${sceneId}/storyboard.json`,
+      if (translationActive) {
+        const transData = await storage.readJSON<LocalStoryboardData>(
+          paths.translationStoryboard(sceneId, targetLang, chapterId),
         );
         translationSegments = transData?.segments ?? [];
       }
@@ -119,14 +123,11 @@ export const BilingualSegmentsView = forwardRef<BilingualSegmentsHandle, Props>(
     } finally {
       setLoading(false);
     }
-  }, [sourceStorage, translationStorage, sceneId, chapterId, onSegmentsLoaded]);
+  }, [storage, targetLang, translationActive, sceneId, chapterId, onSegmentsLoaded]);
 
-  // Load on scene change
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  useEffect(() => { loadAll(); }, [loadAll]);
 
-  // ── Imperative handle for granular updates ──────────────
+  // ── Imperative handle ──────────────────────────────────
   useImperativeHandle(ref, () => ({
     patchSegment(segmentId: string, translatedText: string, stage?: RadarStage | null) {
       setItems(prev => prev.map(item =>
@@ -145,25 +146,22 @@ export const BilingualSegmentsView = forwardRef<BilingualSegmentsHandle, Props>(
     reload: loadAll,
   }), [loadAll]);
 
-  // Track segment IDs separately to avoid re-reading stages when items
-  // change due to patchSegment (which already sets stages directly).
   const segmentIdList = useMemo(
     () => items.map(i => i.segment.segment_id),
-    // Only recalculate when segment count or identity changes (not text)
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [items.length, items.map(i => i.segment.segment_id).join(",")],
   );
 
-  // Load segment stage info from radar files — only on scene change, NOT on items patch
+  // Load segment stage info from radar files in lang subfolder
   useEffect(() => {
-    if (!translationStorage || !sceneId || !chapterId || segmentIdList.length === 0) {
+    if (!storage || !sceneId || !chapterId || segmentIdList.length === 0 || !translationActive) {
       setSegmentStages(new Map());
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const stages = await readAllStages(translationStorage, chapterId, sceneId);
+        const stages = await readAllStages(storage, chapterId, sceneId, targetLang);
         if (cancelled) return;
         const map = new Map<string, RadarStage | null>();
         for (const id of segmentIdList) {
@@ -175,36 +173,27 @@ export const BilingualSegmentsView = forwardRef<BilingualSegmentsHandle, Props>(
       }
     })();
     return () => { cancelled = true; };
-  }, [translationStorage, sceneId, chapterId, segmentIdList]);
+  }, [storage, sceneId, chapterId, targetLang, translationActive, segmentIdList]);
 
   const handleTranslateSegment = useCallback(async (seg: Segment) => {
     if (!onTranslateSegments) return;
     setTranslatingIds(prev => new Set(prev).add(seg.segment_id));
-    try {
-      await onTranslateSegments([seg]);
-    } finally {
-      setTranslatingIds(prev => { const next = new Set(prev); next.delete(seg.segment_id); return next; });
-    }
+    try { await onTranslateSegments([seg]); }
+    finally { setTranslatingIds(prev => { const next = new Set(prev); next.delete(seg.segment_id); return next; }); }
   }, [onTranslateSegments]);
 
   const handleLiteraryEdit = useCallback(async (seg: Segment) => {
     if (!onLiteraryEdit) return;
     setEditingIds(prev => new Set(prev).add(seg.segment_id));
-    try {
-      await onLiteraryEdit(seg);
-    } finally {
-      setEditingIds(prev => { const next = new Set(prev); next.delete(seg.segment_id); return next; });
-    }
+    try { await onLiteraryEdit(seg); }
+    finally { setEditingIds(prev => { const next = new Set(prev); next.delete(seg.segment_id); return next; }); }
   }, [onLiteraryEdit]);
 
   const handleCritique = useCallback(async (seg: Segment) => {
     if (!onCritique) return;
     setCritiquingIds(prev => new Set(prev).add(seg.segment_id));
-    try {
-      await onCritique(seg);
-    } finally {
-      setCritiquingIds(prev => { const next = new Set(prev); next.delete(seg.segment_id); return next; });
-    }
+    try { await onCritique(seg); }
+    finally { setCritiquingIds(prev => { const next = new Set(prev); next.delete(seg.segment_id); return next; }); }
   }, [onCritique]);
 
   if (loading) {
@@ -231,20 +220,13 @@ export const BilingualSegmentsView = forwardRef<BilingualSegmentsHandle, Props>(
       {onTranslateSegments && (
         <div className="flex items-center justify-between">
           <Button
-            size="sm"
-            variant="outline"
+            size="sm" variant="outline"
             onClick={() => onTranslateSegments(items.map(i => i.segment))}
             disabled={translating}
             className="h-7 text-xs gap-1.5"
           >
-            {translating ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Languages className="h-3 w-3" />
-            )}
-            {translating && progressLabel
-              ? progressLabel
-              : isRu ? "Перевести сцену" : "Translate scene"}
+            {translating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Languages className="h-3 w-3" />}
+            {translating && progressLabel ? progressLabel : isRu ? "Перевести сцену" : "Translate scene"}
           </Button>
           <span className="text-[10px] text-muted-foreground">
             {items.filter(i => i.hasLiteral).length}/{items.length} {isRu ? "переведено" : "translated"}
@@ -253,44 +235,39 @@ export const BilingualSegmentsView = forwardRef<BilingualSegmentsHandle, Props>(
       )}
 
       <Accordion type="single" collapsible value={openValue} onValueChange={(val) => {
-          if (!val) {
-            onSelectSegment?.(null);
-          } else {
-            const found = items.find(i => i.segment.segment_id === val);
-            if (found) {
-              const fullText = found.segment.phrases.map(p => p.text).join(" ");
-              onSelectSegment?.({
-                segmentId: found.segment.segment_id,
-                originalText: fullText,
-                translatedText: found.translatedText,
-                segmentType: found.segment.segment_type,
-                speaker: found.segment.speaker ?? null,
-              });
-            }
+        if (!val) { onSelectSegment?.(null); }
+        else {
+          const found = items.find(i => i.segment.segment_id === val);
+          if (found) {
+            const fullText = found.segment.phrases.map(p => p.text).join(" ");
+            onSelectSegment?.({
+              segmentId: found.segment.segment_id,
+              originalText: fullText,
+              translatedText: found.translatedText,
+              segmentType: found.segment.segment_type,
+              speaker: found.segment.speaker ?? null,
+            });
           }
-        }} className="space-y-1.5">
-        {items.map(({ segment: seg, translatedText, hasLiteral }) => {
-          const isSelected = selectedSegmentId === seg.segment_id;
-
-          return (
-            <BilingualSegmentRow
-              key={seg.segment_id}
-              segment={seg}
-              translatedText={translatedText}
-              hasLiteral={hasLiteral}
-              currentStage={segmentStages.get(seg.segment_id) ?? null}
-              isSelected={isSelected}
-              isRu={isRu}
-              translating={translating}
-              isSegTranslating={translatingIds.has(seg.segment_id)}
-              isSegEditing={editingIds.has(seg.segment_id)}
-              isSegCritiquing={critiquingIds.has(seg.segment_id)}
-              onTranslate={handleTranslateSegment}
-              onLiteraryEdit={onLiteraryEdit ? handleLiteraryEdit : undefined}
-              onCritique={onCritique ? handleCritique : undefined}
-            />
-          );
-        })}
+        }
+      }} className="space-y-1.5">
+        {items.map(({ segment: seg, translatedText, hasLiteral }) => (
+          <BilingualSegmentRow
+            key={seg.segment_id}
+            segment={seg}
+            translatedText={translatedText}
+            hasLiteral={hasLiteral}
+            currentStage={segmentStages.get(seg.segment_id) ?? null}
+            isSelected={selectedSegmentId === seg.segment_id}
+            isRu={isRu}
+            translating={translating}
+            isSegTranslating={translatingIds.has(seg.segment_id)}
+            isSegEditing={editingIds.has(seg.segment_id)}
+            isSegCritiquing={critiquingIds.has(seg.segment_id)}
+            onTranslate={handleTranslateSegment}
+            onLiteraryEdit={onLiteraryEdit ? handleLiteraryEdit : undefined}
+            onCritique={onCritique ? handleCritique : undefined}
+          />
+        ))}
       </Accordion>
     </div>
   );
