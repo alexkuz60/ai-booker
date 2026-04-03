@@ -92,7 +92,7 @@ export async function upsertAudioEntry(
 
 /**
  * Batch-read audio metadata for multiple scenes.
- * Returns a flat map: segmentId → entry.
+ * Returns a flat map: segmentId → entry (both "ready" and "estimated").
  */
 export async function readAudioMetaForScenes(
   storage: ProjectStorage,
@@ -103,9 +103,7 @@ export async function readAudioMetaForScenes(
     const meta = await readAudioMeta(storage, sceneId);
     if (!meta) return;
     for (const [segId, entry] of Object.entries(meta.entries)) {
-      if (entry.status === "ready") {
-        result.set(segId, entry);
-      }
+      result.set(segId, entry);
     }
   });
   await Promise.all(reads);

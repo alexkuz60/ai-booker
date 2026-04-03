@@ -9,6 +9,9 @@ import type { PhraseAnnotation, TtsProvider } from "@/components/studio/phraseAn
 import { touchProjectUpdatedAt } from "@/lib/projectActivity";
 import { paths } from "@/lib/projectPaths";
 import { markStoryboarded, unmarkStoryboarded, getCachedSceneIndex, readSceneIndex } from "@/lib/sceneIndex";
+import { readAudioMeta, writeAudioMeta, type LocalAudioEntry } from "@/lib/localAudioMeta";
+
+const CHARS_PER_SEC = 14;
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -94,8 +97,53 @@ export async function saveStoryboardToLocal(
       const { writePipelineStep } = await import("@/hooks/usePipelineProgress");
       await writePipelineStep(storage, "storyboard_done", true);
     }
+
+    // Generate/update audio_meta.json with estimated durations for segments
+    // that don't have real TTS audio yet. Preserves existing "ready" entries.
+    await generateEstimatedAudioMeta(storage, sceneId, data.segments, chapterId);
   } catch (err) {
     console.warn("[StoryboardSync] Failed to save:", err);
+  }
+}
+
+/**
+ * Generate audio_meta.json with estimated durations from phrase char counts.
+ * Preserves entries that already have status "ready" (real TTS audio).
+ */
+async function generateEstimatedAudioMeta(
+  storage: ProjectStorage,
+  sceneId: string,
+  segments: Segment[],
+  chapterId?: string,
+): Promise<void> {
+  try {
+    const existing = await readAudioMeta(storage, sceneId, chapterId);
+    const entries: Record<string, LocalAudioEntry> = existing?.entries ?? {};
+
+    for (const seg of segments) {
+      // Don't overwrite real TTS data
+      if (entries[seg.segment_id]?.status === "ready") continue;
+
+      const totalChars = (seg.phrases ?? []).reduce((sum, p) => sum + p.text.length, 0);
+      const estimatedMs = Math.max(500, Math.round((totalChars / CHARS_PER_SEC) * 1000));
+
+      entries[seg.segment_id] = {
+        segmentId: seg.segment_id,
+        status: "estimated",
+        durationMs: estimatedMs,
+        audioPath: "",
+      };
+    }
+
+    // Remove entries for segments that no longer exist
+    const segIds = new Set(segments.map(s => s.segment_id));
+    for (const key of Object.keys(entries)) {
+      if (!segIds.has(key)) delete entries[key];
+    }
+
+    await writeAudioMeta(storage, sceneId, entries, chapterId);
+  } catch (err) {
+    console.warn("[StoryboardSync] Failed to generate audio_meta:", err);
   }
 }
 

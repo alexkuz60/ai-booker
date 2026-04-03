@@ -154,12 +154,13 @@ export function useTimelineClips(
 
       if (cancelled) return;
 
-      // Build audio duration map from OPFS
-      const audioDurationMap = new Map<string, { durationMs: number; audioPath: string }>();
+      // Build audio duration map from OPFS (includes both "ready" TTS and "estimated")
+      const audioDurationMap = new Map<string, { durationMs: number; audioPath: string; isReady: boolean }>();
       for (const [segId, entry] of audioMetaMap) {
         audioDurationMap.set(segId, {
           durationMs: entry.durationMs,
           audioPath: entry.audioPath,
+          isReady: entry.status === "ready",
         });
       }
 
@@ -187,8 +188,10 @@ export function useTimelineClips(
           let durationSec: number;
 
           if (audioInfo && audioInfo.durationMs > 0) {
+            // Use duration from audio_meta (both "ready" TTS and "estimated")
             durationSec = audioInfo.durationMs / 1000;
           } else {
+            // Last resort fallback if no audio_meta entry exists
             const segPhrases = seg.phrases ?? [];
             const totalChars = segPhrases.reduce((sum, p) => sum + p.text.length, 0);
             durationSec = Math.max(0.5, totalChars / CHARS_PER_SEC);
@@ -243,8 +246,8 @@ export function useTimelineClips(
             durationSec,
             label: (SYSTEM_TYPE_TO_CHAR[seg.segment_type] ? SEGMENT_TYPE_LABELS[seg.segment_type] : seg.speaker) || SEGMENT_TYPE_LABELS[seg.segment_type] || seg.segment_type,
             segmentType: seg.segment_type,
-            hasAudio: !!audioInfo,
-            audioPath: audioInfo?.audioPath,
+            hasAudio: !!audioInfo?.isReady,
+            audioPath: audioInfo?.isReady ? audioInfo.audioPath : undefined,
             sceneId,
           });
 
