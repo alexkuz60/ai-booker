@@ -121,6 +121,7 @@ export async function syncStructureToLocal(
     await writeSceneIndex(storage, sceneIndex);
 
     // 5. Clean up OPFS files for scenes that no longer exist
+    // SAFETY: only delete scene dirs that have NO storyboard/audio data to prevent data loss
     if (existingIndex) {
       const validSceneIds = new Set(Object.keys(sceneIndex.entries));
       const staleSceneIds = Object.keys(existingIndex.entries).filter(id => !validSceneIds.has(id));
@@ -130,10 +131,19 @@ export async function syncStructureToLocal(
           const entry = existingIndex.entries[staleId];
           if (!entry?.chapterId) continue;
           const scenePath = `chapters/${entry.chapterId}/scenes/${staleId}`;
+          // Guard: check if scene has storyboard or audio data — refuse to delete if so
+          const hasStoryboard = await storage.exists(`${scenePath}/storyboard.json`).catch(() => false);
+          const hasAudio = await storage.exists(`${scenePath}/audio_meta.json`).catch(() => false);
+          if (hasStoryboard || hasAudio) {
+            console.warn(`[LocalSync] ⚠️ REFUSING to delete scene ${staleId} — has storyboard/audio data. Keeping.`);
+            continue;
+          }
           staleCleanups.push(storage.delete(scenePath).catch(() => undefined));
         }
         await Promise.all(staleCleanups);
-        console.debug(`[LocalSync] Cleaned up ${staleSceneIds.length} stale scene(s):`, staleSceneIds);
+        if (staleCleanups.length > 0) {
+          console.debug(`[LocalSync] Cleaned up ${staleCleanups.length} empty stale scene(s)`);
+        }
       }
     }
 

@@ -18,7 +18,7 @@ import { t } from "@/pages/parser/i18n";
 import type { Scene, TocChapter, Step, ChapterStatus, BookRecord } from "@/pages/parser/types";
 import { normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import type { ProjectStorage, ProjectMeta } from "@/lib/projectStorage";
-import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
+import { readStructureFromLocal } from "@/lib/localSync";
 import { normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 import { detectFileFormat, getSourcePath, findSourceBlob, type FileFormat } from "@/lib/fileFormatUtils";
 import { wipeProjectBrowserState } from "@/lib/projectCleanup";
@@ -118,15 +118,12 @@ export function useBookRestore({
       sessionStorage.setItem(ACTIVE_BOOK_KEY, savedBookId);
       setStep("workspace");
 
-      await syncStructureToLocal(storage, {
-        bookId: savedBookId,
-        title: structure.title,
-        fileName: structure.fileName,
-        toc: normalizedToc,
-        parts: structure.parts,
-        chapterIdMap: localChIdMap,
-        chapterResults: sanitizedLocalResults,
-      });
+      // NOTE: We intentionally do NOT call syncStructureToLocal here.
+      // The data was already read from OPFS — re-writing it is redundant and
+      // the stale cleanup in syncStructureToLocal can destroy scene-level files
+      // (audio_meta, clip_plugins, mixer_state, translations) if TOC normalization
+      // produces even slightly different folder/leaf classification.
+      // Scene index is loaded in useProjectStorage bootstrap (readSceneIndex).
 
       const localMeta = await storage.readJSON<Record<string, unknown>>("project.json");
       const localFormat: FileFormat = (localMeta?.fileFormat as FileFormat) || detectFileFormat(structure.fileName);
