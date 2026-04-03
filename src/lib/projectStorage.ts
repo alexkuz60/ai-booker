@@ -93,13 +93,6 @@ export function createEmptyPipelineProgress(): PipelineProgress {
   return p;
 }
 
-// ─── Translation project link (legacy — kept for backward compat) ────
-export interface TranslationProjectLink {
-  projectName: string;
-  targetLanguage: "en" | "ru";
-  createdAt: string;
-}
-
 // ─── Project metadata ────────────────────────────────────
 
 export interface ProjectMeta {
@@ -117,15 +110,8 @@ export interface ProjectMeta {
   pipelineProgress?: PipelineProgress;
 
   // ─── Art Translation ───────────────────────────────────
-  /** Active translation languages (e.g. ["en"]). New unified field. */
+  /** Active translation languages (e.g. ["en"]). */
   translationLanguages?: string[];
-
-  /** @deprecated Legacy link to separate mirror project. Kept for backward compat / migration. */
-  translationProject?: TranslationProjectLink;
-  /** @deprecated OPFS project name of the source project. Legacy mirror projects only. */
-  sourceProjectName?: string;
-  /** @deprecated Target language. Legacy mirror projects only. */
-  targetLanguage?: "en" | "ru";
 }
 
 export const PROJECT_META_VERSION = 1;
