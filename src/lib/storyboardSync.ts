@@ -154,6 +154,64 @@ async function generateEstimatedAudioMeta(
   }
 }
 
+/**
+ * Generate clip_plugins.json with default-off plugin configs for each segment.
+ * Preserves entries that were already configured by the user.
+ */
+async function generateDefaultClipPlugins(
+  storage: ProjectStorage,
+  sceneId: string,
+  segments: Segment[],
+  chapterId?: string,
+): Promise<void> {
+  try {
+    const existing = await readClipPlugins(storage, sceneId, chapterId);
+    const configs = existing?.configs ?? {};
+
+    for (const seg of segments) {
+      // Don't overwrite user-configured entries
+      if (configs[seg.segment_id]) continue;
+      configs[seg.segment_id] = {
+        trackId: "",
+        config: { ...DEFAULT_CLIP_PLUGIN_CONFIG },
+      };
+    }
+
+    // Remove entries for segments that no longer exist
+    const segIds = new Set(segments.map(s => s.segment_id));
+    for (const key of Object.keys(configs)) {
+      if (!segIds.has(key)) delete configs[key];
+    }
+
+    await writeClipPlugins(storage, sceneId, configs, chapterId);
+  } catch (err) {
+    console.warn("[StoryboardSync] Failed to generate clip_plugins:", err);
+  }
+}
+
+/**
+ * Generate mixer_state.json with default values if it doesn't exist yet.
+ * Does NOT overwrite existing mixer state (user may have customized it).
+ */
+async function generateDefaultMixerState(
+  storage: ProjectStorage,
+  sceneId: string,
+  chapterId?: string,
+): Promise<void> {
+  try {
+    const existing = await readMixerState(storage, sceneId);
+    if (existing && Object.keys(existing).length > 0) return; // already configured
+
+    const defaultSnapshot: SceneMixerSnapshot = {};
+    // Write empty snapshot as a placeholder — tracks will be populated
+    // when the timeline loads and creates actual engine tracks.
+    // Having the file exist ensures OPFS browser shows it.
+    await writeMixerState(storage, sceneId, defaultSnapshot, chapterId);
+  } catch (err) {
+    console.warn("[StoryboardSync] Failed to generate mixer_state:", err);
+  }
+}
+
 // ─── Read ───────────────────────────────────────────────────
 
 export async function readStoryboardFromLocal(
