@@ -41,6 +41,7 @@ export default function Library() {
     reloadLibrary,
     serverBooks, loadingServerBooks, deleteServerBook,
     progressMap, setProgressMap,
+    localProjectNamesByBookId,
   } = useBookManager({
     userId: user?.id,
     isRu,
