@@ -1,12 +1,13 @@
 /**
  * useSegmentLiteraryEdit — calls translate-literary for a single segment
- * and persists the result + writes radar-literary.json.
+ * and persists the result + writes radar-literary in the lang subfolder.
  */
 
 import { useState, useCallback } from "react";
 import type { Segment } from "@/components/studio/storyboard/types";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { LocalStoryboardData } from "@/lib/storyboardSync";
+import { paths } from "@/lib/projectPaths";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
 import { computeProgrammaticAxes, computeSemanticScore } from "@/lib/qualityRadar";
 import { invalidateRadarCache } from "@/lib/radarCache";
@@ -18,7 +19,7 @@ import {
 import { toast } from "sonner";
 
 interface Opts {
-  translationStorage: ProjectStorage | null;
+  storage: ProjectStorage | null;
   model: string;
   userApiKeys: Record<string, string>;
   sourceLang: string;
@@ -27,7 +28,7 @@ interface Opts {
 }
 
 export function useSegmentLiteraryEdit(opts: Opts) {
-  const { translationStorage, model, userApiKeys, sourceLang, targetLang, isRu } = opts;
+  const { storage, model, userApiKeys, sourceLang, targetLang, isRu } = opts;
   const [editing, setEditing] = useState(false);
 
   const editSegment = useCallback(async (
@@ -36,11 +37,10 @@ export function useSegmentLiteraryEdit(opts: Opts) {
     chapterId: string,
     originalText: string,
   ) => {
-    if (!translationStorage) return null;
+    if (!storage) return null;
 
-    // Read current storyboard to get the literal translation
-    const sbPath = `chapters/${chapterId}/scenes/${sceneId}/storyboard.json`;
-    const sbData = await translationStorage.readJSON<LocalStoryboardData>(sbPath);
+    const sbPath = paths.translationStoryboard(sceneId, targetLang, chapterId);
+    const sbData = await storage.readJSON<LocalStoryboardData>(sbPath);
     const transSeg = sbData?.segments?.find(s => s.segment_id === segment.segment_id);
     const literalText = (transSeg as any)?._literal
       || transSeg?.phrases?.map(p => p.text).filter(Boolean).join(" ")
@@ -79,7 +79,7 @@ export function useSegmentLiteraryEdit(opts: Opts) {
         return null;
       }
 
-      // Update storyboard with literary text
+      // Update translation storyboard
       if (sbData?.segments) {
         const updated: LocalStoryboardData = {
           ...sbData,
@@ -96,26 +96,15 @@ export function useSegmentLiteraryEdit(opts: Opts) {
             };
           }),
         };
-        await translationStorage.writeJSON(sbPath, updated);
+        await storage.writeJSON(sbPath, updated);
       }
 
-      // Compute full 5R for literary stage so the overlay is a real pentagon
-      const prog = computeProgrammaticAxes(
-        originalText,
-        data.text,
-        sourceLang as "ru" | "en",
-        targetLang as "ru" | "en",
-      );
+      // Compute 5R
+      const prog = computeProgrammaticAxes(originalText, data.text, sourceLang as "ru" | "en", targetLang as "ru" | "en");
       const [semantic, critique] = await Promise.all([
         computeSemanticScore(originalText, data.text, userApiKeys),
         invokeWithFallback<{
-          scores: {
-            semantic: number;
-            sentiment: number;
-            rhythm: number;
-            phonetics: number;
-            cultural: number;
-          };
+          scores: { semantic: number; sentiment: number; rhythm: number; phonetics: number; cultural: number };
         }>({
           functionName: "critique-translation",
           body: {
@@ -123,12 +112,8 @@ export function useSegmentLiteraryEdit(opts: Opts) {
             translation: data.text,
             type: segment.segment_type,
             speaker: segment.speaker ?? undefined,
-            sourceLang,
-            targetLang,
-            embeddingDeltas: {
-              rhythm: prog.rhythm,
-              phonetic: prog.phonetic,
-            },
+            sourceLang, targetLang,
+            embeddingDeltas: { rhythm: prog.rhythm, phonetic: prog.phonetic },
             model,
           },
           userApiKeys,
@@ -139,37 +124,19 @@ export function useSegmentLiteraryEdit(opts: Opts) {
       const normCritiqueAxis = (value?: number) => Math.max(0, Math.min(1, (value ?? 0) / 100));
       const critiqueScores = critique.data?.scores;
 
-      // Read existing literary radar to merge / clean stale segment data
-      const existingRadar = await readStageRadar(translationStorage, chapterId, sceneId, "literary");
-      const existingSegments = existingRadar?.segments ?? [];
-      const otherSegments = existingSegments.filter(s => s.segmentId !== segment.segment_id);
+      const existingRadar = await readStageRadar(storage, chapterId, sceneId, "literary", targetLang);
+      const otherSegments = (existingRadar?.segments ?? []).filter(s => s.segmentId !== segment.segment_id);
 
       if (critique.error || !critiqueScores) {
-        // Save radar with programmatic axes only (don't delete the entry)
         const fallbackRadar: StageSegmentRadar = {
           segmentId: segment.segment_id,
-          radar: {
-            semantic: semantic ?? 0,
-            sentiment: 0,
-            rhythm: prog.rhythm,
-            phonetic: prog.phonetic,
-            cultural: 0,
-            weighted: 0,
-          },
+          radar: { semantic: semantic ?? 0, sentiment: 0, rhythm: prog.rhythm, phonetic: prog.phonetic, cultural: 0, weighted: 0 },
           critiqueNotes: data.notes,
           literary: data.text,
         };
-        await writeStageRadar(
-          translationStorage,
-          chapterId,
-          sceneId,
-          "literary",
-          [...otherSegments, fallbackRadar],
-        );
+        await writeStageRadar(storage, chapterId, sceneId, "literary", [...otherSegments, fallbackRadar], targetLang);
         invalidateRadarCache(sceneId, segment.segment_id);
-        toast.warning(isRu
-          ? "Арт-правка сохранена, 5R частичный (без LLM-оценки)"
-          : "Art edit saved, 5R partial (no LLM scores)");
+        toast.warning(isRu ? "Арт-правка сохранена, 5R частичный" : "Art edit saved, 5R partial");
         return { text: data.text, notes: data.notes };
       }
 
@@ -177,25 +144,17 @@ export function useSegmentLiteraryEdit(opts: Opts) {
         segmentId: segment.segment_id,
         radar: {
           semantic: normCritiqueAxis(critiqueScores.semantic),
-          sentiment: normCritiqueAxis(critiqueScores?.sentiment),
+          sentiment: normCritiqueAxis(critiqueScores.sentiment),
           rhythm: prog.rhythm,
           phonetic: prog.phonetic,
-          cultural: normCritiqueAxis(critiqueScores?.cultural),
+          cultural: normCritiqueAxis(critiqueScores.cultural),
           weighted: 0,
         },
         critiqueNotes: data.notes,
         literary: data.text,
       };
 
-      await writeStageRadar(
-        translationStorage,
-        chapterId,
-        sceneId,
-        "literary",
-        [...otherSegments, newSegRadar],
-      );
-
-      // Invalidate monitor caches so it re-reads from OPFS
+      await writeStageRadar(storage, chapterId, sceneId, "literary", [...otherSegments, newSegRadar], targetLang);
       invalidateRadarCache(sceneId, segment.segment_id);
 
       toast.success(isRu ? "Арт-правка выполнена" : "Art edit complete");
@@ -207,7 +166,7 @@ export function useSegmentLiteraryEdit(opts: Opts) {
     } finally {
       setEditing(false);
     }
-  }, [translationStorage, model, userApiKeys, sourceLang, targetLang, isRu]);
+  }, [storage, model, userApiKeys, sourceLang, targetLang, isRu]);
 
   return { editSegment, editing };
 }

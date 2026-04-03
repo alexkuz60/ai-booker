@@ -1,12 +1,13 @@
 /**
  * useSegmentTranslation — calls translate-literal for segments
- * and persists results to the translation project storage.
+ * and persists results to the lang subfolder within the main project.
  */
 
 import { useState, useCallback, useRef } from "react";
 import type { Segment } from "@/components/studio/storyboard/types";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import type { LocalStoryboardData } from "@/lib/storyboardSync";
+import { paths } from "@/lib/projectPaths";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
 import { computeProgrammaticAxes, computeSemanticScore } from "@/lib/qualityRadar";
 import { readStageRadar, readCritiqueRadar, writeStageRadar, writeCritiqueRadar, type StageSegmentRadar } from "@/lib/radarStages";
@@ -19,21 +20,17 @@ interface TranslationResult {
 }
 
 interface UseSegmentTranslationReturn {
-  /** Translate specific segments */
   translateSegments: (
     segments: Segment[],
     sceneId: string,
     chapterId: string,
   ) => Promise<TranslationResult | null>;
-  /** Currently translating */
   translating: boolean;
-  /** Progress label */
   progressLabel: string | null;
 }
 
 interface Opts {
-  sourceStorage: ProjectStorage | null;
-  translationStorage: ProjectStorage | null;
+  storage: ProjectStorage | null;
   model: string;
   userApiKeys: Record<string, string>;
   sourceLang: string;
@@ -42,7 +39,7 @@ interface Opts {
 }
 
 export function useSegmentTranslation(opts: Opts): UseSegmentTranslationReturn {
-  const { sourceStorage, translationStorage, model, userApiKeys, sourceLang, targetLang, isRu } = opts;
+  const { storage, model, userApiKeys, sourceLang, targetLang, isRu } = opts;
   const [translating, setTranslating] = useState(false);
   const [progressLabel, setProgressLabel] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -52,7 +49,7 @@ export function useSegmentTranslation(opts: Opts): UseSegmentTranslationReturn {
     sceneId: string,
     chapterId: string,
   ): Promise<TranslationResult | null> => {
-    if (!sourceStorage || !translationStorage || segments.length === 0) return null;
+    if (!storage || segments.length === 0) return null;
 
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -93,27 +90,19 @@ export function useSegmentTranslation(opts: Opts): UseSegmentTranslationReturn {
         return null;
       }
 
-      // Build result map
       const translations = new Map<string, string>();
       segments.forEach((seg, i) => {
         const translated = data.translations[i]?.translation ?? "";
         translations.set(seg.segment_id, translated);
       });
 
-      // Persist to translation project storyboard
+      // Persist to translation subfolder storyboard
       setProgressLabel(isRu ? "Сохранение…" : "Saving…");
-      await persistTranslations(translationStorage, sceneId, chapterId, translations);
-      // Clean stale literary/critique data for re-translated segments
-      await cleanDownstreamRadar(translationStorage, sceneId, chapterId, new Set(translations.keys()));
+      await persistTranslations(storage, sceneId, chapterId, targetLang, translations);
+      await cleanDownstreamRadar(storage, sceneId, chapterId, targetLang, new Set(translations.keys()));
       await persistLiteralRadar(
-        translationStorage,
-        sceneId,
-        chapterId,
-        segments,
-        translations,
-        sourceLang,
-        targetLang,
-        userApiKeys,
+        storage, sceneId, chapterId, targetLang,
+        segments, translations, sourceLang, targetLang, userApiKeys,
       );
       invalidateRadarCache(sceneId);
 
@@ -131,24 +120,31 @@ export function useSegmentTranslation(opts: Opts): UseSegmentTranslationReturn {
       setTranslating(false);
       setProgressLabel(null);
     }
-  }, [sourceStorage, translationStorage, model, userApiKeys, sourceLang, targetLang, isRu]);
+  }, [storage, model, userApiKeys, sourceLang, targetLang, isRu]);
 
   return { translateSegments, translating, progressLabel };
 }
 
 /**
- * Persist literal translations into the translation project's storyboard.
- * Merges with existing storyboard — only updates segments that were translated.
+ * Persist literal translations into the lang-subfolder storyboard.
+ * Creates storyboard.json from source if it doesn't exist yet.
  */
 async function persistTranslations(
   store: ProjectStorage,
   sceneId: string,
   chapterId: string,
+  lang: string,
   translations: Map<string, string>,
 ): Promise<void> {
-  const sbPath = `chapters/${chapterId}/scenes/${sceneId}/storyboard.json`;
-  const existing = await store.readJSON<LocalStoryboardData>(sbPath);
-  if (!existing?.segments) return;
+  const transPath = paths.translationStoryboard(sceneId, lang, chapterId);
+  let existing = await store.readJSON<LocalStoryboardData>(transPath);
+
+  // If translation storyboard doesn't exist, clone from source
+  if (!existing?.segments) {
+    const sourceSb = await store.readJSON<LocalStoryboardData>(paths.storyboard(sceneId, chapterId));
+    if (!sourceSb?.segments) return;
+    existing = { ...sourceSb, audioStatus: {} };
+  }
 
   const updated: LocalStoryboardData = {
     ...existing,
@@ -156,8 +152,6 @@ async function persistTranslations(
     segments: existing.segments.map(seg => {
       const translatedText = translations.get(seg.segment_id);
       if (translatedText == null) return seg;
-
-      // Store literal translation; clear stale literary data
       return {
         ...seg,
         _literal: translatedText,
@@ -170,32 +164,29 @@ async function persistTranslations(
     }),
   };
 
-  await store.writeJSON(sbPath, updated);
+  await store.writeJSON(transPath, updated);
 }
 
-/**
- * Remove re-translated segments from literary and critique radar files
- * so stale 5R/5R+Alt data doesn't persist after re-translation.
- */
 async function cleanDownstreamRadar(
   store: ProjectStorage,
   sceneId: string,
   chapterId: string,
+  lang: string,
   segmentIds: Set<string>,
 ): Promise<void> {
   const [literary, critique] = await Promise.all([
-    readStageRadar(store, chapterId, sceneId, "literary"),
-    readCritiqueRadar(store, chapterId, sceneId),
+    readStageRadar(store, chapterId, sceneId, "literary", lang),
+    readCritiqueRadar(store, chapterId, sceneId, lang),
   ]);
 
   if (literary?.segments.some(s => segmentIds.has(s.segmentId))) {
     const kept = literary.segments.filter(s => !segmentIds.has(s.segmentId));
-    await writeStageRadar(store, chapterId, sceneId, "literary", kept);
+    await writeStageRadar(store, chapterId, sceneId, "literary", kept, lang);
   }
 
   if (critique?.segments.some(s => segmentIds.has(s.segmentId))) {
     const kept = critique.segments.filter(s => !segmentIds.has(s.segmentId));
-    await writeCritiqueRadar(store, chapterId, sceneId, kept);
+    await writeCritiqueRadar(store, chapterId, sceneId, kept, lang);
   }
 }
 
@@ -203,41 +194,34 @@ async function persistLiteralRadar(
   store: ProjectStorage,
   sceneId: string,
   chapterId: string,
+  lang: string,
   segments: Segment[],
   translations: Map<string, string>,
   sourceLang: string,
   targetLang: string,
   userApiKeys: Record<string, string>,
 ): Promise<void> {
-  const existingRadar = await readStageRadar(store, chapterId, sceneId, "literal");
+  const existingRadar = await readStageRadar(store, chapterId, sceneId, "literal", lang);
   const translatedIds = new Set(translations.keys());
-  const otherSegments = (existingRadar?.segments ?? []).filter((segment) => !translatedIds.has(segment.segmentId));
+  const otherSegments = (existingRadar?.segments ?? []).filter(s => !translatedIds.has(s.segmentId));
 
   const newSegments = await Promise.all(
     segments.map(async (segment): Promise<StageSegmentRadar | null> => {
       const translatedText = translations.get(segment.segment_id);
       if (!translatedText) return null;
 
-      const originalText = segment.phrases.map((phrase) => phrase.text).join(" ");
+      const originalText = segment.phrases.map(phrase => phrase.text).join(" ");
       const [programmatic, semantic] = await Promise.all([
-        Promise.resolve(computeProgrammaticAxes(
-          originalText,
-          translatedText,
-          sourceLang as "ru" | "en",
-          targetLang as "ru" | "en",
-        )),
+        Promise.resolve(computeProgrammaticAxes(originalText, translatedText, sourceLang as "ru" | "en", targetLang as "ru" | "en")),
         computeSemanticScore(originalText, translatedText, userApiKeys),
       ]);
 
       return {
         segmentId: segment.segment_id,
         radar: {
-          semantic: semantic ?? 0,
-          sentiment: 0,
-          rhythm: programmatic.rhythm,
-          phonetic: programmatic.phonetic,
-          cultural: 0,
-          weighted: 0,
+          semantic: semantic ?? 0, sentiment: 0,
+          rhythm: programmatic.rhythm, phonetic: programmatic.phonetic,
+          cultural: 0, weighted: 0,
         },
         literal: translatedText,
       };
@@ -245,10 +229,8 @@ async function persistLiteralRadar(
   );
 
   await writeStageRadar(
-    store,
-    chapterId,
-    sceneId,
-    "literal",
-    [...otherSegments, ...newSegments.filter((segment): segment is StageSegmentRadar => !!segment)],
+    store, chapterId, sceneId, "literal",
+    [...otherSegments, ...newSegments.filter((s): s is StageSegmentRadar => !!s)],
+    lang,
   );
 }
