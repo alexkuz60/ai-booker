@@ -13,16 +13,20 @@ import { readSceneIndex } from "@/lib/sceneIndex";
 
 export interface LocalAudioEntry {
   segmentId: string;
-  status: string;         // "ready" | "pending" | "error"
+  status: string;         // "ready" | "pending" | "error" | "estimated"
   durationMs: number;
   audioPath: string;
   voiceConfig?: Record<string, unknown>;
+  /** Absolute start position on scene timeline (seconds) — persisted, not computed */
+  startSec?: number;
 }
 
 export interface LocalAudioMeta {
   sceneId: string;
   updatedAt: string;
   entries: Record<string, LocalAudioEntry>; // keyed by segmentId
+  /** Scene-level silence gap before first clip (seconds) */
+  silenceSec?: number;
 }
 
 // ─── Path resolution ────────────────────────────────────────
@@ -61,6 +65,7 @@ export async function writeAudioMeta(
   sceneId: string,
   entries: Record<string, LocalAudioEntry>,
   chapterId?: string,
+  silenceSec?: number,
 ): Promise<void> {
   const p = await resolvedPath(storage, sceneId, chapterId);
   if (!p) {
@@ -71,6 +76,7 @@ export async function writeAudioMeta(
     sceneId,
     updatedAt: new Date().toISOString(),
     entries,
+    silenceSec,
   };
   await storage.writeJSON(p, data);
 }
@@ -87,7 +93,7 @@ export async function upsertAudioEntry(
   const existing = await readAudioMeta(storage, sceneId, chapterId);
   const entries = existing?.entries ?? {};
   entries[entry.segmentId] = entry;
-  await writeAudioMeta(storage, sceneId, entries, chapterId);
+  await writeAudioMeta(storage, sceneId, entries, chapterId, existing?.silenceSec);
 }
 
 /**
@@ -108,4 +114,54 @@ export async function readAudioMetaForScenes(
   });
   await Promise.all(reads);
   return result;
+}
+
+// ─── Position recalculation ─────────────────────────────────
+
+const DEFAULT_SILENCE_SEC = 2;
+
+/**
+ * Recalculate startSec for all entries in a scene's audio_meta.json.
+ * Uses segment ordering from storyboard.json to determine sequence.
+ * Call after: storyboard save, silence_sec change, TTS synthesis,
+ * merge/split, split_silence_ms change, inline edits.
+ */
+export async function recalcPositions(
+  storage: ProjectStorage,
+  sceneId: string,
+  chapterId?: string,
+  silenceSecOverride?: number,
+): Promise<void> {
+  // Read storyboard for segment ordering
+  const { readStoryboardFromLocal } = await import("@/lib/storyboardSync");
+  const storyboard = await readStoryboardFromLocal(storage, sceneId, chapterId);
+  if (!storyboard || storyboard.segments.length === 0) return;
+
+  const meta = await readAudioMeta(storage, sceneId, chapterId);
+  if (!meta) return;
+
+  const silenceSec = silenceSecOverride ?? meta.silenceSec ?? DEFAULT_SILENCE_SEC;
+  let offset = silenceSec;
+
+  // Sort segments by segment_number (same order as storyboard)
+  const orderedSegments = [...storyboard.segments].sort(
+    (a, b) => a.segment_number - b.segment_number,
+  );
+
+  for (const seg of orderedSegments) {
+    const entry = meta.entries[seg.segment_id];
+    if (!entry) continue;
+
+    // split_silence_ms gap before this segment
+    const splitSilenceMs = typeof seg.split_silence_ms === "number" ? seg.split_silence_ms : 0;
+    if (splitSilenceMs > 0) {
+      offset += splitSilenceMs / 1000;
+    }
+
+    entry.startSec = offset;
+    offset += entry.durationMs / 1000;
+  }
+
+  // Persist updated silenceSec along with recalculated positions
+  await writeAudioMeta(storage, sceneId, meta.entries, chapterId, silenceSec);
 }

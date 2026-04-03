@@ -9,7 +9,7 @@ import type { PhraseAnnotation, TtsProvider } from "@/components/studio/phraseAn
 import { touchProjectUpdatedAt } from "@/lib/projectActivity";
 import { paths } from "@/lib/projectPaths";
 import { markStoryboarded, unmarkStoryboarded, getCachedSceneIndex, readSceneIndex } from "@/lib/sceneIndex";
-import { readAudioMeta, writeAudioMeta, type LocalAudioEntry } from "@/lib/localAudioMeta";
+import { readAudioMeta, writeAudioMeta, recalcPositions, type LocalAudioEntry } from "@/lib/localAudioMeta";
 import { readClipPlugins, writeClipPlugins, type LocalClipPluginsData } from "@/lib/localClipPlugins";
 import { readMixerState, writeMixerState, type SceneMixerSnapshot } from "@/lib/localMixerState";
 import { DEFAULT_CLIP_PLUGIN_CONFIG, type ClipPluginConfig } from "@/hooks/useClipPluginConfigs";
