@@ -12,7 +12,6 @@ import { detectFileFormat } from "@/lib/fileFormatUtils";
 import { getProjectActivityMs } from "@/lib/projectActivity";
 import { paths } from "@/lib/projectPaths";
 import { readPipelineProgress } from "@/hooks/usePipelineProgress";
-import { comparePreferredProjectCandidates, isLegacyMirrorMeta } from "@/lib/projectSourcePolicy";
 const OPFS_NON_PROJECT_DIRS = new Set(["atmo-cache", "ir-cache", "sfx-cache"]);
 
 type LocalLibraryCandidate = {
