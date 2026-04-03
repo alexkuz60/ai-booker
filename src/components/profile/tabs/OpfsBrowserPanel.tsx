@@ -317,9 +317,7 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
             <div className="h-full overflow-auto p-2">
               {entries === null && !loading && (
                 <div className="text-center py-6 text-xs text-muted-foreground">
-                  {isRu
-                    ? 'Нажмите «Сканировать» для просмотра'
-                    : 'Click "Scan" to browse'}
+                  {isRu ? "Нет данных" : "No data"}
                 </div>
               )}
               {loading && (
