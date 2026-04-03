@@ -585,6 +585,20 @@ export function ChapterNavigator({
               <Timer className="h-3 w-3" />
             )}
           </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 w-6 p-0"
+            disabled={recalcPosRunning}
+            onClick={handleRecalcPositions}
+            title={isRu ? "Пересчитать позиции клипов (startSec) для всех сцен главы" : "Recalculate clip positions (startSec) for all chapter scenes"}
+          >
+            {recalcPosRunning ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Clock className="h-3 w-3" />
+            )}
+          </Button>
           {(() => {
             const unsegCount = chapter.scenes.filter(s => s.id && !segmentedSceneIds?.has(s.id)).length;
             const tip = unsegCount > 0
