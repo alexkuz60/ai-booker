@@ -4,11 +4,8 @@
  * Centralizes all browser state cleanup needed before deploying
  * a server copy of a project into OPFS.
  *
- * Architecture: Local-Only. See ARCHITECTURE.md §1.8 step 5.
- *
- * IMPORTANT: Zombie scan must skip translation mirror projects
- * (those with targetLanguage/sourceProjectName) because they share
- * the same bookId as the source project.
+ * Architecture: ONE project per bookId. No mirror projects.
+ * Translations live inside the project in {lang}/ subdirectories.
  */
 
 import { OPFSStorage } from "@/lib/projectStorage";
