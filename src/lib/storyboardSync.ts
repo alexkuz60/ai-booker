@@ -106,7 +106,7 @@ export async function saveStoryboardToLocal(
     await Promise.all([
       generateEstimatedAudioMeta(storage, sceneId, data.segments, chapterId),
       generateDefaultClipPlugins(storage, sceneId, data.segments, chapterId),
-      generateDefaultMixerState(storage, sceneId, chapterId),
+      generateDefaultMixerState(storage, sceneId, chapterId, data.segments, data.typeMappings),
     ]);
 
     // Recalc positions after audio_meta entries are generated/updated
