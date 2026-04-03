@@ -115,7 +115,7 @@ function displayName(name: string, maxLen = 28): string {
   return base.length > maxLen ? base.slice(0, maxLen) + "…" : base;
 }
 
-export function TimelineTrack({
+export const TimelineTrack = memo(function TimelineTrack({
   track,
   zoom,
   duration,
