@@ -24,7 +24,8 @@ import { createEmptyPipelineProgress } from "@/lib/projectStorage";
 import { writePipelineStep } from "@/hooks/usePipelineProgress";
 import { OPFSStorage } from "@/lib/projectStorage";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
-import { translationProjectExists, checkTranslationReadiness, createTranslationProject } from "@/lib/translationProject";
+import { checkTranslationReadiness } from "@/lib/translationProject";
+import { paths } from "@/lib/projectPaths";
 import { toast } from "sonner";
 
 interface LibraryViewProps {
@@ -97,7 +98,7 @@ function LibraryViewInner({
       return {
         store,
         meta,
-        score: Math.max(updatedAt, createdAt) + (meta.translationProject?.projectName ? 1_000_000_000_000_000 : 0),
+        score: Math.max(updatedAt, createdAt),
       };
     }));
 
@@ -172,24 +173,31 @@ function LibraryViewInner({
         return;
       }
 
-      const tLang = (source.meta.language === "ru" ? "en" : "ru") as "en" | "ru";
-      await createTranslationProject({
-        sourceStorage: source.store,
-        sourceMeta: source.meta,
-        targetLanguage: tLang,
-        chapterIndices: readyIndices,
-      });
+      const tLang = source.meta.language === "ru" ? "en" : "ru";
+
+      // Write translationLanguages to project.json (unified storage — no separate OPFS project)
+      const freshMeta = await source.store.readJSON<ProjectMeta>(paths.projectMeta());
+      if (freshMeta) {
+        const existing = freshMeta.translationLanguages ?? [];
+        if (!existing.includes(tLang)) {
+          await source.store.writeJSON(paths.projectMeta(), {
+            ...freshMeta,
+            translationLanguages: [...existing, tLang],
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
 
       toast.success(isRu
-        ? `Проект перевода создан (${readyIndices.length} глав)`
-        : `Translation project created (${readyIndices.length} chapters)`);
+        ? `Перевод активирован (${readyIndices.length} глав)`
+        : `Translation activated (${readyIndices.length} chapters)`);
 
       // Update progress flags
       await handleToggleStep(book.id, "trans_storage_created" as PipelineStepId, true);
       await handleToggleStep(book.id, "trans_migration_done" as PipelineStepId, true);
     } catch (err) {
       console.error("[LibraryView] create translation error:", err);
-      toast.error(isRu ? "Ошибка создания проекта перевода" : "Failed to create translation project");
+      toast.error(isRu ? "Ошибка активации перевода" : "Failed to activate translation");
     } finally {
       setTransCreating(false);
       setTransCreateConfirm(null);
@@ -198,16 +206,15 @@ function LibraryViewInner({
 
   const handleTranslationStageClick = useCallback(async (book: BookRecord, stageId: string) => {
     if (stageId === "trans_project") {
-      // First stage — create translation project (with confirm if exists)
+      // First stage — activate translation
       try {
         const source = await resolveSourceProject(book.id);
         if (!source) return;
 
-        const exists = await translationProjectExists(source.store, source.meta);
-        if (exists) {
+        const hasLangs = (source.meta.translationLanguages?.length ?? 0) > 0;
+        if (hasLangs) {
           setTransCreateConfirm({ book, exists: true });
         } else {
-          // Create directly
           await doCreateTranslationProject(book);
         }
       } catch (err) {
