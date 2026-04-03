@@ -37,7 +37,7 @@ interface TrackMixerStripProps {
 /** Threshold in dB above which we consider signal "active" */
 const SIGNAL_THRESHOLD_DB = -50;
 
-export function TrackMixerStrip({
+export const TrackMixerStrip = memo(function TrackMixerStrip({
   trackId,
   allClipIds = [],
   fallbackEngineId,
