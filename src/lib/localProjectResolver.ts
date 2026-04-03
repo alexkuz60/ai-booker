@@ -2,17 +2,13 @@
  * localProjectResolver — helpers for finding / creating the correct
  * OPFS ProjectStorage instance for a given bookId.
  *
- * Extracted from useBookRestore to keep the hook lean and allow
- * reuse from other modules (e.g. serverDeploy, useSaveBookToProject).
- *
  * Architecture: ONE project per bookId. No mirror projects.
  * Translations live inside the project in {lang}/ subdirectories.
+ * No multi-candidate ranking. Direct lookup only.
  */
 
 import { OPFSStorage, type ProjectStorage } from "@/lib/projectStorage";
-import { getProjectActivityMs } from "@/lib/projectActivity";
 import { stripFileExtension } from "@/lib/fileFormatUtils";
-import { isLegacyMirrorMeta, pickPreferredProjectCandidate } from "@/lib/projectSourcePolicy";
 
 // ── Read bookId from an arbitrary ProjectStorage ────────────
 
@@ -30,46 +26,10 @@ export async function getBookIdFromStorage(
   }
 }
 
-// ── Find the freshest OPFS project for a bookId ──────────
+// ── Find the OPFS project for a bookId ──────────
 
 export interface ResolveOptions {
   activate?: boolean;
-}
-
-type StoredProjectIdentity = {
-  bookId?: string;
-  sourceProjectName?: string;
-  targetLanguage?: string;
-};
-
-interface RankedProjectCandidate {
-  projectName: string;
-  store: ProjectStorage;
-  score: number;
-  isLegacyMirror: boolean;
-}
-
-async function readRankedProjectCandidate(
-  projectName: string,
-  targetBookId: string,
-): Promise<RankedProjectCandidate | null> {
-  try {
-    const store = await OPFSStorage.openExisting(projectName);
-    if (!store) return null;
-
-    const meta = await store.readJSON<StoredProjectIdentity>("project.json");
-    const resolvedBookId = meta?.bookId ?? await getBookIdFromStorage(store);
-    if (resolvedBookId !== targetBookId) return null;
-
-    return {
-      projectName,
-      store,
-      score: await getProjectActivityMs(store),
-      isLegacyMirror: isLegacyMirrorMeta(meta),
-    };
-  } catch {
-    return null;
-  }
 }
 
 export async function resolveLocalStorageForBook(
@@ -85,57 +45,31 @@ export async function resolveLocalStorageForBook(
   const activate = resolveOpts?.activate ?? false;
 
   // Prefer already active storage first
-  const activeMeta = await opts.projectStorage?.readJSON<StoredProjectIdentity>("project.json").catch(() => null);
-  const activeBookId = activeMeta?.bookId ?? await getBookIdFromStorage(opts.projectStorage);
-  if (
-    opts.projectStorage?.isReady &&
-    activeBookId === targetBookId &&
-    !isLegacyMirrorMeta(activeMeta)
-  ) {
+  const activeBookId = await getBookIdFromStorage(opts.projectStorage);
+  if (opts.projectStorage?.isReady && activeBookId === targetBookId) {
     return opts.projectStorage;
   }
 
   if (opts.storageBackend === "opfs") {
-    // Get candidate project names from the pre-built map
+    // Get project name from the pre-built map (one book = one folder)
     const projectNames = opts.localProjectNamesByBookId.get(targetBookId) || [];
-    const seenProjectNames = new Set(projectNames);
-    const rankedCandidates = (
-      await Promise.all(projectNames.map((projectName) => readRankedProjectCandidate(projectName, targetBookId)))
-    ).filter((candidate): candidate is RankedProjectCandidate => !!candidate);
+    if (projectNames.length === 0) return null;
 
-    const needsFallbackScan = rankedCandidates.length === 0 || rankedCandidates.every((candidate) => candidate.isLegacyMirror);
-
-    // Fallback: if map is empty/incomplete or contains only legacy mirrors,
-    // do a direct OPFS scan to find the best source project by bookId.
-    if (needsFallbackScan) {
-      try {
-        const allProjects = await OPFSStorage.listProjects();
-        for (const projectName of allProjects) {
-          if (seenProjectNames.has(projectName)) continue;
-          seenProjectNames.add(projectName);
-          const candidate = await readRankedProjectCandidate(projectName, targetBookId);
-          if (candidate) rankedCandidates.push(candidate);
-        }
-      } catch { /* listProjects failed */ }
-    }
-
-    if (!rankedCandidates.length) return null;
-
-    if (rankedCandidates.length > 1) {
+    // Use the first (and ideally only) project name
+    const projectName = projectNames[0];
+    if (projectNames.length > 1) {
       console.warn(
-        `[Resolver] ⚠️ MULTIPLE OPFS projects for bookId=${targetBookId}: [${rankedCandidates.map((candidate) => candidate.projectName).join(", ")}]. Preferring non-legacy source project.`
+        `[Resolver] ⚠️ Multiple OPFS folders for bookId=${targetBookId}: [${projectNames.join(", ")}]. Using first: ${projectName}`
       );
     }
 
-    const preferred = pickPreferredProjectCandidate(rankedCandidates);
-    if (!preferred) return null;
-
     if (activate && opts.openProjectByName) {
-      const activated = await opts.openProjectByName(preferred.projectName);
+      const activated = await opts.openProjectByName(projectName);
       if (activated?.isReady) return activated;
     }
 
-    return preferred.store.isReady ? preferred.store : null;
+    const store = await OPFSStorage.openExisting(projectName);
+    return store?.isReady ? store : null;
   }
 
   return null;

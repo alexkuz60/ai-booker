@@ -12,8 +12,6 @@ import { downloadBlob } from "@/lib/projectZip";
 import { paths } from "@/lib/projectPaths";
 import { findSourceBlob, getMimeType, detectFileFormat } from "@/lib/fileFormatUtils";
 import { readSceneIndex } from "@/lib/sceneIndex";
-import { getProjectActivityMs } from "@/lib/projectActivity";
-import { isLegacyMirrorMeta, pickPreferredProjectCandidate } from "@/lib/projectSourcePolicy";
 
 const LAST_PROJECT_KEY = "booker_last_project";
 
@@ -23,42 +21,6 @@ const LOCAL_RESET_KEYS = [
   "parser-nav-state",
   // К4: docx_chapter_texts and docx_html removed — now in-memory only
 ];
-
-async function resolveFreshestSourceProject(bookId: string): Promise<{
-  name: string;
-  store: ProjectStorage;
-  meta: ProjectMeta;
-} | null> {
-  const projectNames = await OPFSStorage.listProjects();
-  const candidates = await Promise.all(projectNames.map(async (projectName) => {
-    const store = await OPFSStorage.openExisting(projectName);
-    if (!store) return null;
-
-    const meta = await store.readJSON<ProjectMeta & { sourceProjectName?: string; targetLanguage?: string }>("project.json");
-    if (!meta || meta.bookId !== bookId) {
-      return null;
-    }
-
-    const freshness = await getProjectActivityMs(store);
-
-    return {
-      name: projectName,
-      store,
-      meta,
-      score: freshness,
-      isLegacyMirror: isLegacyMirrorMeta(meta),
-    };
-  }));
-
-  const preferred = pickPreferredProjectCandidate(
-    candidates.filter((candidate): candidate is NonNullable<typeof candidate> => !!candidate),
-  );
-
-  if (!preferred) return null;
-
-  const { name, store, meta } = preferred;
-  return { name, store, meta };
-}
 
 interface UseProjectStorageReturn {
   /** Current storage instance (null = no project open) */
@@ -383,36 +345,21 @@ export function useProjectStorage(): UseProjectStorageReturn {
           return;
         }
 
-        let activeStore: ProjectStorage = store;
-        let activeMeta = projectMeta;
-        let activeName = targetName;
-        const savedWasLegacyMirror = isLegacyMirrorMeta(projectMeta);
-
-        // Resolve to the freshest project for this bookId
-        if (activeMeta.bookId) {
-          const freshestSource = await resolveFreshestSourceProject(activeMeta.bookId);
-          if (freshestSource && (savedWasLegacyMirror || freshestSource.name !== activeName)) {
-            activeStore = freshestSource.store;
-            activeMeta = freshestSource.meta;
-            activeName = freshestSource.name;
-            console.info("[ProjectStorage] Redirected bootstrap to preferred source project:", targetName, "→", activeName);
-          }
-        }
-
-        // Load scene index into memory
-        await readSceneIndex(activeStore);
+        // One book = one folder. No multi-candidate resolution.
+        // Use exactly the project from LAST_PROJECT_KEY.
+        await readSceneIndex(store);
 
         if (!cancelled) {
-          setStorage(activeStore);
-          setMeta(activeMeta);
+          setStorage(store);
+          setMeta(projectMeta);
           try {
             localStorage.setItem(LAST_PROJECT_KEY, JSON.stringify({
-              name: activeName,
+              name: targetName,
               backend,
-              bookId: activeMeta.bookId,
+              bookId: projectMeta.bookId,
             }));
           } catch {}
-          console.info("[ProjectStorage] Restored project:", activeName, "bookId:", activeMeta.bookId);
+          console.info("[ProjectStorage] Restored project:", targetName, "bookId:", projectMeta.bookId);
         }
       } catch (err) {
         console.warn("[ProjectStorage] Bootstrap error:", err);

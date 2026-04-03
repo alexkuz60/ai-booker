@@ -78,36 +78,15 @@ function LibraryViewInner({
       return { store: activeStorage, meta: activeMeta };
     }
 
+    // One book = one folder. Find the project by bookId directly.
     const projects = await OPFSStorage.listProjects();
-    const candidates = await Promise.all(projects.map(async (projectName) => {
+    for (const projectName of projects) {
       const store = await OPFSStorage.openExisting(projectName);
-      if (!store) return null;
-
+      if (!store) continue;
       const meta = await store.readJSON<ProjectMeta>("project.json");
-      if (!meta || meta.bookId !== bookId) {
-        return null;
-      }
-
-      const updatedAt = Number.isFinite(new Date(meta.updatedAt).getTime())
-        ? new Date(meta.updatedAt).getTime()
-        : 0;
-      const createdAt = Number.isFinite(new Date(meta.createdAt).getTime())
-        ? new Date(meta.createdAt).getTime()
-        : 0;
-
-      return {
-        store,
-        meta,
-        score: Math.max(updatedAt, createdAt),
-      };
-    }));
-
-    const sorted = candidates
-      .filter((candidate): candidate is NonNullable<typeof candidate> => !!candidate)
-      .sort((a, b) => b.score - a.score);
-
-    if (sorted.length === 0) return null;
-    return { store: sorted[0].store, meta: sorted[0].meta };
+      if (meta?.bookId === bookId) return { store, meta };
+    }
+    return null;
   }, [activeStorage, activeMeta]);
 
   const handleToggleStep = useCallback(async (bookId: string, stepId: PipelineStepId, done: boolean) => {
