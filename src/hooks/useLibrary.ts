@@ -90,7 +90,6 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       dedupeKey,
       progress,
       score: activityMs,
-      isLegacyMirror: isLegacyMirrorMeta(meta),
     };
   }, []);
 
