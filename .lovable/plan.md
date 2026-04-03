@@ -42,9 +42,13 @@
 - `TrackMixerStrip` → `React.memo`
 - `TimelineTransport` → `React.memo`
 
-### Ожидают:
-- Виртуализация длинных списков (сцены, сегменты) → `react-window`
-- `React.memo` для StoryboardPanel sub-components
+### Решения:
+- Виртуализация (`react-window`) — **отложена**: сегменты переменной высоты (фразы, аннотации, inline narrations), типичная сцена 10-50 блоков — ROI минимален
+- `React.memo` для StoryboardPanel sub-components — **не требуется**: SpeakerBadge/SegmentTypeBadge имеют внутренний state (Popover), StoryboardSegmentRow уже обёрнут в `memo`
+
+## Этап 5: Итоги
+
+Все практически значимые оптимизации завершены. Оставшиеся кандидаты (виртуализация, serverDeploy декомпозиция) отложены как низкоприоритетные.
 
 ---
 
