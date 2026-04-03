@@ -209,3 +209,14 @@
 - `src/lib/__tests__/pdfMerge.test.ts` — сохранение иерархии TOC (B5)
 - `src/lib/__tests__/localSync.test.ts` — roundtrip локального хранилища (B9, B11)
 - `src/lib/__tests__/tocStructure.test.ts` — resolvePageRange и контейнерные узлы (К1, К2)
+- `src/lib/__tests__/storageGuard.test.ts` — whitelist-only delete, блокировка защищённых файлов, integrity check (B32)
+
+### ВВ. Потеря данных сцен при восстановлении сессии — ✅ РЕШЕНО (B32)
+- Проблема: legacy-логика «stale cleanup» в `syncStructureToLocal()` при каждой синхронизации структуры сканировала OPFS-папки глав и сцен и удаляла «осиротевшие» директории. При рестарте браузера и повторной синхронизации TOC из OPFS эта логика ошибочно классифицировала папки сцен как «устаревшие» и рекурсивно удаляла их содержимое: `audio_meta.json`, `clip_plugins.json`, `mixer_state.json`, языковые поддиректории перевода (`{lang}/`) со всеми результатами.
+- Корневая причина: `syncStructureToLocal` вызывался из `restoreFromLocal` (при восстановлении сессии) → stale cleanup запускался при КАЖДОМ открытии книги, а не только при изменении структуры.
+- Решение (3 уровня):
+  1. **Удаление stale cleanup**: из `localSync.ts` полностью удалён код автоматического удаления папок. Функция стала строго write-only.
+  2. **guardedDelete() + whitelist**: создан `src/lib/storageGuard.ts` — единственный разрешённый способ удаления файлов внутри проекта. Белый список ограничен: storyboard.json, audio/. Структурные файлы заблокированы.
+  3. **snapshotBeforeWipe()**: автоматический ZIP-бэкап перед Wipe-and-Deploy. assertIntegrity() — пост-операционная проверка.
+- Инвариант: **АБСОЛЮТНЫЙ ЗАПРЕТ на автоматическое удаление файлов/папок в OPFS**. Удаление — только по явному действию пользователя и только через `guardedDelete()`.
+- Файлы: `src/lib/localSync.ts`, `src/lib/storageGuard.ts`, `src/lib/projectCleanup.ts`, `src/hooks/useBookRestore.ts`, `src/lib/storyboardSync.ts`.
