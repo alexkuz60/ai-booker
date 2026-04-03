@@ -570,6 +570,30 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       }
       report("source_file", "done");
 
+      // ── 5b. Push translation backup (lang-subfolders + synopsis) ──
+      report("translation", "running");
+      if (storage && user?.id) {
+        try {
+          const { pushTranslationBackup } = await import("@/lib/translationBackup");
+          const transResult = await pushTranslationBackup(
+            storage,
+            currentBookId,
+            user.id,
+            (detail) => report("translation", "running", detail),
+          );
+          report(
+            "translation",
+            transResult.uploaded ? "done" : "skipped",
+            transResult.uploaded ? `${transResult.fileCount} files` : undefined,
+          );
+        } catch (e) {
+          console.warn("[SaveToServer] Translation backup failed:", e);
+          report("translation", "error", e instanceof Error ? e.message : String(e));
+        }
+      } else {
+        report("translation", "skipped");
+      }
+
       // ── 6. Update local project.json (browser state) ──
       report("browser_state", "running");
       // LIR-3 + LIR-4: read title/meta from storage, not stale React context
