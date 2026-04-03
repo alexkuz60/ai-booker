@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, it, expect, vi } from "vitest";
 import { guardedDelete, assertIntegrity, getDestructiveJournal } from "../storageGuard";
 import type { ProjectStorage } from "../projectStorage";
