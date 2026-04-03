@@ -14,166 +14,47 @@
 
 import * as Tone from "tone";
 import { fetchWithStemCache } from "@/lib/stemCache";
+import {
+  type FilterBandParams,
+  type MultibandCompParams,
+  type MultibandCompBandParams,
+  type TrackConfig,
+  type LoadProgress,
+  type LoadTracksResult,
+  type EngineState,
+  type TrackMeterData,
+  type MasterMeterData,
+  type ChannelEqState,
+  type ChannelCompState,
+  type ChannelLimiterState,
+  type TrackMixState,
+  type EngineSnapshot,
+  type StateListener,
+  DEFAULT_MULTIBAND_COMP,
+  DEFAULT_FILTER_BANDS,
+  volumeToDB,
+} from "@/lib/audioEngineTypes";
 
-// ─── Types ──────────────────────────────────────────────────
-
-export type FilterType = "lowpass" | "highpass" | "bandpass" | "lowshelf" | "highshelf" | "notch" | "allpass" | "peaking";
-export type FilterRolloff = -12 | -24 | -48 | -96;
-
-export interface FilterBandParams {
-  frequency: number;
-  type: FilterType;
-  Q: number;
-  gain: number;
-  rolloff: FilterRolloff;
-}
-
-export interface MultibandCompBandParams {
-  threshold: number;
-  ratio: number;
-  attack: number;
-  release: number;
-  knee: number;
-}
-
-export interface MultibandCompParams {
-  low: MultibandCompBandParams;
-  mid: MultibandCompBandParams;
-  high: MultibandCompBandParams;
-  lowFrequency: number;   // crossover low→mid
-  highFrequency: number;  // crossover mid→high
-}
-
-export const DEFAULT_MULTIBAND_COMP: MultibandCompParams = {
-  low:  { threshold: -24, ratio: 4, attack: 0.01, release: 0.2, knee: 10 },
-  mid:  { threshold: -18, ratio: 3, attack: 0.005, release: 0.15, knee: 8 },
-  high: { threshold: -12, ratio: 2, attack: 0.003, release: 0.1, knee: 6 },
-  lowFrequency: 250,
-  highFrequency: 3500,
+// Re-export all types for backward compatibility
+export type {
+  FilterBandParams,
+  MultibandCompParams,
+  MultibandCompBandParams,
+  TrackConfig,
+  LoadProgress,
+  LoadTracksResult,
+  EngineState,
+  TrackMeterData,
+  MasterMeterData,
+  ChannelEqState,
+  ChannelCompState,
+  ChannelLimiterState,
+  TrackMixState,
+  EngineSnapshot,
+  StateListener,
 };
-
-export const DEFAULT_FILTER_BANDS: FilterBandParams[] = [
-  { frequency: 30, type: "highpass", Q: 0.707, gain: 0, rolloff: -12 },
-  { frequency: 200, type: "lowshelf", Q: 0.707, gain: 0, rolloff: -12 },
-  { frequency: 1000, type: "peaking", Q: 1, gain: 0, rolloff: -12 },
-  { frequency: 8000, type: "highshelf", Q: 0.707, gain: 0, rolloff: -12 },
-  { frequency: 18000, type: "lowpass", Q: 0.707, gain: 0, rolloff: -12 },
-];
-
-export interface TrackConfig {
-  id: string;
-  url: string;
-  startSec: number;
-  durationSec: number;
-  overlay?: boolean;
-  volume?: number;
-  pan?: number;
-  /** Bus routing: voice (default), atmosphere, sfx */
-  bus?: "voice" | "atmosphere" | "sfx";
-  /** Fade-in duration in seconds (applied via Tone.Player) */
-  fadeInSec?: number;
-  /** Fade-out duration in seconds (applied via Tone.Player) */
-  fadeOutSec?: number;
-  /** If true, the clip loops to fill durationSec. Original clip length in _clipLenSec. */
-  loop?: boolean;
-  /** Original single-iteration clip length (seconds). Required when loop=true. */
-  clipLenSec?: number;
-  /** Crossfade overlap between loop iterations (seconds). Default 1. */
-  loopCrossfadeSec?: number;
-  /** Human-readable label for progress display */
-  label?: string;
-  /** Stable cache key (e.g. storage audioPath). If set, Cache API is used. */
-  cacheKey?: string;
-  /** Segment type from storyboard — used for auto-FX (e.g. 'telephone') */
-  segmentType?: string;
-}
-
-export interface LoadProgress {
-  /** Total number of tracks to load */
-  total: number;
-  /** Number of tracks processed so far */
-  done: number;
-  /** Successfully loaded tracks */
-  loaded: number;
-  /** Failed tracks */
-  failed: number;
-  /** ID of the track currently loading */
-  currentId: string;
-  /** Label of the currently loading track */
-  currentLabel: string;
-}
-
-export interface LoadTracksResult {
-  total: number;
-  loaded: number;
-  dropped: number;
-}
-
-export type EngineState = "stopped" | "playing" | "paused";
-
-export interface TrackMeterData {
-  level: number;       // dB, mono pre-pan
-  levelL: number;      // dB, post-pan left
-  levelR: number;      // dB, post-pan right
-}
-
-export interface MasterMeterData {
-  levelL: number;
-  levelR: number;
-  peakL: number;
-  peakR: number;
-}
-
-export interface ChannelEqState {
-  low: number;   // dB, -12..12
-  mid: number;
-  high: number;
-  bypassed: boolean;
-}
-
-export interface ChannelCompState {
-  threshold: number;
-  ratio: number;
-  knee: number;
-  attack: number;
-  release: number;
-  bypassed: boolean;
-}
-
-export interface ChannelLimiterState {
-  threshold: number;  // dB, -30..0
-  bypassed: boolean;
-}
-
-export interface TrackMixState {
-  volume: number;       // 0-100
-  pan: number;          // -1..1
-  reverbWet: number;    // 0-1
-  reverbBypassed: boolean;
-  preFxBypassed: boolean;
-  muted: boolean;
-  solo: boolean;
-  eq: ChannelEqState;
-  comp: ChannelCompState;
-  limiter: ChannelLimiterState;
-}
-
-export interface EngineSnapshot {
-  state: EngineState;
-  positionSec: number;
-  totalDuration: number;
-  volume: number;
-}
-
-type StateListener = (snapshot: EngineSnapshot) => void;
-
-// ─── Utility ────────────────────────────────────────────────
-
-/** Convert 0-100 linear volume to dB (-Infinity…0) using Tone.js native */
-function volumeToDB(v: number): number {
-  if (v <= 0) return -Infinity;
-  return Tone.gainToDb(v / 100);
-}
+export type { FilterType, FilterRolloff } from "@/lib/audioEngineTypes";
+export { DEFAULT_MULTIBAND_COMP, DEFAULT_FILTER_BANDS };
 
 // ─── EngineTrack ────────────────────────────────────────────
 
