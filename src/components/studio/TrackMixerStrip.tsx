@@ -247,4 +247,4 @@ export const TrackMixerStrip = memo(function TrackMixerStrip({
       </div>
     </div>
   );
-}
+});

@@ -602,4 +602,4 @@ export const TimelineTrack = memo(function TimelineTrack({
   }
 
   return trackContent;
-}
+});
