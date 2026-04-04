@@ -277,7 +277,10 @@ function label(key: string, isRu: boolean): string {
 }
 
 /**
- * Validate that all JSON files referenced in the book map actually exist in storage.
+ * Validate that CRITICAL files referenced in the book map exist in storage.
+ * Only checks: project.json, characters.json, chapter content.json.
+ * Scene-level files (storyboard, audioMeta, etc.) are created on demand
+ * during the pipeline — their absence is normal, not an error.
  * Returns an array of human-readable error strings for missing files.
  * Does NOT attempt any repairs — report only.
  */
@@ -288,7 +291,7 @@ export async function validateBookMapIntegrity(
 ): Promise<string[]> {
   const missing: string[] = [];
 
-  // Root-level files
+  // Root-level critical files
   for (const rootFile of ["project.json", "characters.json"]) {
     const exists = await storage.exists(rootFile).catch(() => false);
     if (!exists) {
@@ -296,36 +299,11 @@ export async function validateBookMapIntegrity(
     }
   }
 
-  // Per-chapter
-  for (const [chapterId, chapter] of Object.entries(map.chapters)) {
-    // content.json
+  // Per-chapter: only content.json is critical
+  for (const [_chapterId, chapter] of Object.entries(map.chapters)) {
     const contentExists = await storage.exists(chapter.contentPath).catch(() => false);
     if (!contentExists) {
       missing.push(`${label("contentPath", isRu)} (ch ${chapter.index}): ${chapter.contentPath}`);
-    }
-
-    // Per-scene JSON files
-    for (const [sceneId, scene] of Object.entries(chapter.scenes)) {
-      for (const key of SCENE_JSON_KEYS) {
-        const path = scene[key];
-        if (typeof path !== "string") continue;
-        const exists = await storage.exists(path).catch(() => false);
-        if (!exists) {
-          missing.push(`${label(key, isRu)} (сц.${scene.sceneNumber}): ${path}`);
-        }
-      }
-
-      // Translation subfolders
-      for (const [lang, trans] of Object.entries(scene.translations)) {
-        for (const tKey of TRANS_JSON_KEYS) {
-          const path = trans[tKey];
-          if (typeof path !== "string") continue;
-          const exists = await storage.exists(path).catch(() => false);
-          if (!exists) {
-            missing.push(`[${lang}] ${label(tKey, isRu)} (сц.${scene.sceneNumber}): ${path}`);
-          }
-        }
-      }
     }
   }
 
