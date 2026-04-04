@@ -16,6 +16,9 @@ import LibraryView from "@/components/parser/LibraryView";
 import UploadView from "@/components/parser/UploadView";
 import { ExtractingTocView, ErrorView } from "@/components/parser/StatusViews";
 import type { BookRecord } from "@/pages/parser/types";
+import { readBookMap, validateBookMapIntegrity } from "@/lib/bookMap";
+import { OPFSStorage } from "@/lib/projectStorage";
+import { toast } from "sonner";
 
 export default function Library() {
   const { user } = useAuth();
