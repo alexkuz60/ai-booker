@@ -217,8 +217,8 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
   const [migrationDialog, setMigrationDialog] = useState(false);
   const [migrating, setMigrating] = useState(false);
   const [migrationProgress, setMigrationProgress] = useState<MigrationProgress | null>(null);
-  const [mirrorName, setMirrorName] = useState("");
-  const [mainName, setMainName] = useState("");
+  const [mirrorName, setMirrorName] = useState("Собачье сердце_EN");
+  const [mainName, setMainName] = useState("Собачье сердце");
 
   const supported = isOPFSSupported();
 
