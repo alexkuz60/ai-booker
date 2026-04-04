@@ -932,5 +932,5 @@ export async function deployFromServer({
   // ── 11. Finalize ──────────────────────────────────────────
   report("finalize", "done");
 
-  return { toc, chapterIdMap, partIdMap, chapterResults, pdfProxy, totalPages, sourceFilePreserved };
+  return { toc, chapterIdMap, partIdMap, chapterResults, pdfProxy, totalPages };
 }
