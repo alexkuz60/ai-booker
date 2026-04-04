@@ -171,8 +171,8 @@ export async function addToBookImpulseManifest(
     if (!meta) return;
     const existing: string[] = (meta.usedImpulseIds as string[]) ?? [];
     if (existing.includes(impulseId)) return;
-    meta.usedImpulseIds = [...existing, impulseId];
-    await storage.writeJSON("project.json", meta);
+    const { sanitizeProjectMeta } = await import("@/lib/projectStorage");
+    await storage.writeJSON("project.json", sanitizeProjectMeta(meta as Record<string, unknown>));
   } catch (e) {
     console.warn("[irCache] Failed to update manifest:", e);
   }
