@@ -330,7 +330,7 @@ async function seedEmptySceneFiles(
 
   // Seed translation files
   langFileChecks.forEach((entry, i) => {
-    const exists = results[3 + i]; // offset by 3 base checks
+    const exists = results[4 + i]; // offset by 4 base checks
     if (exists) return;
 
     if (entry.file === "storyboard.json") {
