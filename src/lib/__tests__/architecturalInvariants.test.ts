@@ -140,16 +140,24 @@ describe("Architectural invariants", () => {
     }
   });
 
-  it("no isLegacyMirrorMeta usage outside migration utility", () => {
+  it("no isLegacyMirrorMeta usage anywhere", () => {
     const matches = searchFiles(SRC_DIR, /isLegacyMirrorMeta/);
-    const violations = matches.filter(
-      (m) => !m.file.includes("migrateMirrorTranslation")
-    );
 
-    if (violations.length > 0) {
-      const msg = violations.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
+    if (matches.length > 0) {
+      const msg = matches.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
       expect.fail(
-        `isLegacyMirrorMeta used outside migration utility:\n${msg}`
+        `isLegacyMirrorMeta still referenced:\n${msg}`
+      );
+    }
+  });
+
+  it("no migrateMirrorTranslation module exists", () => {
+    const matches = searchFiles(SRC_DIR, /migrateMirrorTranslation/);
+
+    if (matches.length > 0) {
+      const msg = matches.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
+      expect.fail(
+        `migrateMirrorTranslation still referenced:\n${msg}`
       );
     }
   });
