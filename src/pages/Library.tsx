@@ -147,11 +147,14 @@ export default function Library() {
 
     const missing = await validateBookMapIntegrity(store, map, isRu);
     if (missing.length > 0) {
-      console.warn("[Library] Missing files:", missing);
-      for (const msg of missing) {
-        toast.error(isRu ? `Не найден: ${msg}` : `Missing: ${msg}`);
-      }
-      // Still open — user sees what's missing but can work
+      console.warn("[Library] Missing critical files:", missing);
+      const summary = missing.join("\n• ");
+      toast.error(
+        isRu
+          ? `Загрузка остановлена. Отсутствуют критические файлы:\n• ${summary}`
+          : `Loading stopped. Missing critical files:\n• ${summary}`,
+      );
+      return; // STOP — do not proceed with opening
     }
 
     setShouldRedirect(true);
