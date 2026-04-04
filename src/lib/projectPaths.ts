@@ -12,7 +12,7 @@
  */
 
 import { resolveChapterId, getCachedSceneIndex } from "@/lib/sceneIndex";
-import { resolveChapterFromMap } from "@/lib/bookMap";
+import { resolveChapterFromMap, getCachedBookMap } from "@/lib/bookMap";
 
 // ─── Helper: resolve chapterId for nested paths ─────────────
 
@@ -37,22 +37,14 @@ function requireChapterId(sceneId: string, provided?: string): string {
   const fromIndex = resolveChapterId(sceneId);
   if (fromIndex) return fromIndex;
 
+  const mapSize = Object.keys(getCachedBookMap()?.sceneToChapter ?? {}).length;
+  const indexSize = Object.keys(getCachedSceneIndex()?.entries ?? {}).length;
   console.error(
     `[projectPaths] ❌ Cannot resolve chapterId for scene ${sceneId}! ` +
-    `BookMap has ${Object.keys(getCachedBookMapSafe()).length} scenes, ` +
-    `SceneIndex has ${Object.keys(getCachedSceneIndex()?.entries ?? {}).length} entries. ` +
+    `BookMap has ${mapSize} scenes, SceneIndex has ${indexSize} entries. ` +
     `This will cause data loss — writes will be skipped.`,
   );
   return "__unresolved__";
-}
-
-function getCachedBookMapSafe(): Record<string, string> {
-  try {
-    const { getCachedBookMap } = require("@/lib/bookMap");
-    return getCachedBookMap()?.sceneToChapter ?? {};
-  } catch {
-    return {};
-  }
 }
 
 // ─── Project-level paths ─────────────────────────────────────
