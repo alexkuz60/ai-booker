@@ -238,61 +238,145 @@ const TRANS_JSON_KEYS: (keyof TranslationPathEntry)[] = [
   "audioMeta", "mixerState", "clipPlugins",
 ];
 
-/** Human-readable labels for toast messages */
-const PATH_LABELS: Record<string, Record<string, string>> = {
+export interface BookMapIntegrityIssue {
+  message: string;
+  description: string;
+  path: string;
+}
+
+type IntegrityMessageKey =
+  | "projectMeta"
+  | "characterRegistry"
+  | "chapterContent"
+  | "storyboard"
+  | "audioMeta"
+  | "mixerState"
+  | "clipPlugins"
+  | "sceneCharacters"
+  | "atmospheres"
+  | "translationStoryboard"
+  | "translationAudioMeta"
+  | "translationMixerState"
+  | "translationClipPlugins"
+  | "radarLiteral"
+  | "radarLiterary"
+  | "radarCritique";
+
+const INTEGRITY_MESSAGES: Record<"ru" | "en", Record<IntegrityMessageKey, string>> = {
   ru: {
-    "book_map.json": "Карта книги",
-    "project.json": "Метаданные проекта",
-    "characters.json": "Реестр персонажей",
-    storyboard: "Раскадровка",
-    audioMeta: "Аудио-метаданные",
-    mixerState: "Настройки микшера",
-    clipPlugins: "Настройки плагинов",
-    characters: "Персонажи сцены",
-    atmospheres: "Атмосфера сцены",
-    contentPath: "Текст главы",
-    radarLiteral: "Радар (буквальный)",
-    radarLiterary: "Радар (литературный)",
-    radarCritique: "Радар (критика)",
+    projectMeta: "Не могу загрузить метаданные проекта",
+    characterRegistry: "Не могу загрузить реестр персонажей",
+    chapterContent: "Не могу загрузить текст главы",
+    storyboard: "Не могу загрузить раскадровку",
+    audioMeta: "Не могу загрузить аудио-метаданные",
+    mixerState: "Не могу загрузить настройки микшера для студии",
+    clipPlugins: "Не могу загрузить настройки плагинов для студии",
+    sceneCharacters: "Не могу загрузить персонажей сцены",
+    atmospheres: "Не могу загрузить атмосферу сцены",
+    translationStoryboard: "Не могу загрузить перевод книги",
+    translationAudioMeta: "Не могу загрузить аудио-метаданные перевода",
+    translationMixerState: "Не могу загрузить настройки микшера перевода",
+    translationClipPlugins: "Не могу загрузить настройки плагинов перевода",
+    radarLiteral: "Не могу загрузить данные буквального перевода",
+    radarLiterary: "Не могу загрузить данные литературного перевода",
+    radarCritique: "Не могу загрузить критику перевода",
   },
   en: {
-    "book_map.json": "Book map",
-    "project.json": "Project metadata",
-    "characters.json": "Character registry",
-    storyboard: "Storyboard",
-    audioMeta: "Audio metadata",
-    mixerState: "Mixer settings",
-    clipPlugins: "Plugin settings",
-    characters: "Scene characters",
-    atmospheres: "Scene atmospheres",
-    contentPath: "Chapter text",
-    radarLiteral: "Radar (literal)",
-    radarLiterary: "Radar (literary)",
-    radarCritique: "Radar (critique)",
+    projectMeta: "Can't load project metadata",
+    characterRegistry: "Can't load character registry",
+    chapterContent: "Can't load chapter text",
+    storyboard: "Can't load storyboard",
+    audioMeta: "Can't load audio metadata",
+    mixerState: "Can't load studio mixer settings",
+    clipPlugins: "Can't load studio plugin settings",
+    sceneCharacters: "Can't load scene characters",
+    atmospheres: "Can't load scene atmosphere",
+    translationStoryboard: "Can't load book translation",
+    translationAudioMeta: "Can't load translation audio metadata",
+    translationMixerState: "Can't load translation mixer settings",
+    translationClipPlugins: "Can't load translation plugin settings",
+    radarLiteral: "Can't load literal translation data",
+    radarLiterary: "Can't load literary translation data",
+    radarCritique: "Can't load translation critique",
   },
 };
 
-function label(key: string, isRu: boolean): string {
-  return (isRu ? PATH_LABELS.ru[key] : PATH_LABELS.en[key]) || key;
+function getIntegrityMessage(key: IntegrityMessageKey, isRu: boolean): string {
+  return INTEGRITY_MESSAGES[isRu ? "ru" : "en"][key];
+}
+
+function createIntegrityIssue(
+  key: IntegrityMessageKey,
+  path: string,
+  isRu: boolean,
+): BookMapIntegrityIssue {
+  return {
+    message: getIntegrityMessage(key, isRu),
+    description: path,
+    path,
+  };
+}
+
+function getSceneIntegrityMessageKey(key: keyof ScenePathEntry): IntegrityMessageKey | null {
+  switch (key) {
+    case "storyboard":
+      return "storyboard";
+    case "audioMeta":
+      return "audioMeta";
+    case "mixerState":
+      return "mixerState";
+    case "clipPlugins":
+      return "clipPlugins";
+    case "characters":
+      return "sceneCharacters";
+    case "atmospheres":
+      return "atmospheres";
+    default:
+      return null;
+  }
+}
+
+function getTranslationIntegrityMessageKey(key: keyof TranslationPathEntry): IntegrityMessageKey | null {
+  switch (key) {
+    case "storyboard":
+      return "translationStoryboard";
+    case "audioMeta":
+      return "translationAudioMeta";
+    case "mixerState":
+      return "translationMixerState";
+    case "clipPlugins":
+      return "translationClipPlugins";
+    case "radarLiteral":
+      return "radarLiteral";
+    case "radarLiterary":
+      return "radarLiterary";
+    case "radarCritique":
+      return "radarCritique";
+    default:
+      return null;
+  }
 }
 
 /**
  * Validate that ALL JSON files referenced in the book map exist in storage.
- * Returns an array of human-readable error strings for missing files.
+ * Returns the FIRST missing file as a fail-fast diagnostic issue.
  * Does NOT attempt any repairs — report only.
  */
 export async function validateBookMapIntegrity(
   storage: ProjectStorage,
   map: BookMap,
   isRu: boolean,
-): Promise<string[]> {
-  const missing: string[] = [];
+): Promise<BookMapIntegrityIssue | null> {
 
   // Root-level files
-  for (const rootFile of ["project.json", "characters.json"]) {
+  for (const rootFile of ["project.json", "characters.json"] as const) {
     const exists = await storage.exists(rootFile).catch(() => false);
     if (!exists) {
-      missing.push(`${label(rootFile, isRu)}: ${rootFile}`);
+      return createIntegrityIssue(
+        rootFile === "project.json" ? "projectMeta" : "characterRegistry",
+        rootFile,
+        isRu,
+      );
     }
   }
 
@@ -300,18 +384,19 @@ export async function validateBookMapIntegrity(
   for (const [_chapterId, chapter] of Object.entries(map.chapters)) {
     const contentExists = await storage.exists(chapter.contentPath).catch(() => false);
     if (!contentExists) {
-      missing.push(`${label("contentPath", isRu)} (ch ${chapter.index}): ${chapter.contentPath}`);
+      return createIntegrityIssue("chapterContent", chapter.contentPath, isRu);
     }
 
-    for (const [sceneId, scene] of Object.entries(chapter.scenes)) {
-      const sceneLabel = `ch${chapter.index}/sc${scene.sceneNumber}`;
-
+    for (const [_sceneId, scene] of Object.entries(chapter.scenes)) {
       for (const key of SCENE_JSON_KEYS) {
         const path = scene[key];
         if (typeof path !== "string") continue;
         const exists = await storage.exists(path).catch(() => false);
         if (!exists) {
-          missing.push(`${label(key, isRu)} (${sceneLabel}): ${path}`);
+          const messageKey = getSceneIntegrityMessageKey(key);
+          if (messageKey) {
+            return createIntegrityIssue(messageKey, path, isRu);
+          }
         }
       }
 
@@ -322,12 +407,15 @@ export async function validateBookMapIntegrity(
           if (typeof path !== "string") continue;
           const exists = await storage.exists(path).catch(() => false);
           if (!exists) {
-            missing.push(`${label(tKey, isRu)} [${lang}] (${sceneLabel}): ${path}`);
+            const messageKey = getTranslationIntegrityMessageKey(tKey);
+            if (messageKey) {
+              return createIntegrityIssue(messageKey, path, isRu);
+            }
           }
         }
       }
     }
   }
 
-  return missing;
+  return null;
 }

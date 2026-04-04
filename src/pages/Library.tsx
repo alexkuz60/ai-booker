@@ -77,6 +77,54 @@ export default function Library() {
   const [restoreDownloadAtmo, setRestoreDownloadAtmo] = useState(true);
   const [restoreDownloadSfx, setRestoreDownloadSfx] = useState(true);
 
+  const showBlockingOpenError = useCallback((message: string, description?: string) => {
+    toast.error(message, {
+      duration: Infinity,
+      description,
+    });
+  }, []);
+
+  const validateExistingBookJsons = useCallback(async (book: BookRecord) => {
+    const projectNames = localProjectNamesByBookId?.get(book.id);
+    const projectName = projectNames?.[0];
+    if (!projectName) {
+      showBlockingOpenError(
+        isRu ? "Проект не найден в хранилище" : "Project not found in storage",
+      );
+      return false;
+    }
+
+    const store = await OPFSStorage.openExisting(projectName);
+    if (!store) {
+      showBlockingOpenError(
+        isRu ? "Не удалось открыть хранилище проекта" : "Failed to open project storage",
+      );
+      return false;
+    }
+
+    const map = await readBookMap(store);
+    if (!map) {
+      showBlockingOpenError(
+        isRu ? "Не удалось загрузить карту книги (book_map.json)" : "Failed to load book map (book_map.json)",
+      );
+      return false;
+    }
+
+    const issue = await validateBookMapIntegrity(store, map, isRu);
+    if (issue) {
+      console.error("[Library] Book open blocked by missing JSON from book map", {
+        bookId: book.id,
+        projectName,
+        path: issue.path,
+        message: issue.message,
+      });
+      showBlockingOpenError(issue.message, issue.description);
+      return false;
+    }
+
+    return true;
+  }, [isRu, localProjectNamesByBookId, showBlockingOpenError]);
+
   const handleRestoreClick = useCallback((book: BookRecord) => {
     setRestoreTargetBook(book);
     setRestoreSteps(buildRestoreSteps(isRu));
@@ -124,51 +172,23 @@ export default function Library() {
   }, [setStep]);
 
   const handleOpenBook = useCallback(async (book: BookRecord) => {
-    // Find the OPFS project for this book
-    const projectNames = localProjectNamesByBookId?.get(book.id);
-    const projectName = projectNames?.[0];
-    if (!projectName) {
-      toast.error(isRu ? "Проект не найден в хранилище" : "Project not found in storage");
-      return;
-    }
-
-    const store = await OPFSStorage.openExisting(projectName);
-    if (!store) {
-      toast.error(isRu ? "Не удалось открыть хранилище проекта" : "Failed to open project storage");
-      return;
-    }
-
-    // Read book map and validate all paths
-    const map = await readBookMap(store);
-    if (!map) {
-      toast.error(isRu ? "Не удалось загрузить карту книги (book_map.json)" : "Failed to load book map (book_map.json)");
-      return;
-    }
-
-    const missing = await validateBookMapIntegrity(store, map, isRu);
-    if (missing.length > 0) {
-      console.warn("[Library] Missing critical files:", missing);
-      const summary = missing.join("\n• ");
-      toast.error(
-        isRu
-          ? `Загрузка остановлена. Отсутствуют критические файлы:\n• ${summary}`
-          : `Loading stopped. Missing critical files:\n• ${summary}`,
-      );
-      return; // STOP — do not proceed with opening
-    }
+    const canOpen = await validateExistingBookJsons(book);
+    if (!canOpen) return;
 
     setShouldRedirect(true);
-    openSavedBook(book);
-  }, [openSavedBook, localProjectNamesByBookId, isRu]);
+    await openSavedBook(book);
+  }, [openSavedBook, validateExistingBookJsons]);
 
   /** Timeline stage click: open book then navigate to the stage's route */
   const handleStageNavigate = useCallback((book: BookRecord, route: string) => {
     // Open the book, then navigate to the target route
     (async () => {
+      const canOpen = await validateExistingBookJsons(book);
+      if (!canOpen) return;
       await openSavedBook(book);
       navigate(route);
     })();
-  }, [openSavedBook, navigate]);
+  }, [openSavedBook, navigate, validateExistingBookJsons]);
 
   /** Project reset: re-upload the book file (wipe progress) */
   const handleProjectReset = useCallback((book: BookRecord) => {
