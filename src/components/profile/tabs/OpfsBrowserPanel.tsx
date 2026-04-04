@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect } from "react";
 import {
   FolderClosed, FolderOpen, Trash2, RefreshCw, Loader2,
   ChevronRight, ChevronDown, FileText, File, FileAudio, AlertTriangle, Eye,
-  ArrowRightLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
