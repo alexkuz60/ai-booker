@@ -13,12 +13,12 @@ export function detectFileFormat(fileName: string): FileFormat {
   return /\.docx?$/i.test(fileName) ? "docx" : "pdf";
 }
 
-/** Get the local storage path for the source file */
+/** @deprecated Source file no longer stored in OPFS. Metadata lives in project.json.source */
 export function getSourcePath(format: FileFormat): string {
   return paths.sourceFile(format);
 }
 
-/** Try to find the source file in local storage, checking all formats */
+/** @deprecated Source file no longer stored in OPFS. Use project.json.source instead. */
 export async function findSourceBlob(
   storage: { readBlob: (path: string) => Promise<Blob | null> },
 ): Promise<{ blob: Blob; format: FileFormat } | null> {
