@@ -184,21 +184,6 @@ export function useBookRestore({
       }
     }
 
-    // ── Preserve source file from existing OPFS before wipe ──
-    let preservedSourceBlob: Blob | null = null;
-    const existingProjects = localProjectNamesByBookId.get(book.id) || [];
-    const existingSourceStore = await resolveLocalStorageForBook(book.id, resolverOpts());
-    if (existingSourceStore?.isReady) {
-      try {
-        const found = await findSourceBlob(existingSourceStore);
-        if (found) {
-          preservedSourceBlob = found.blob;
-          console.log(`[OpenBook] Preserved source file (${found.format}) before wipe`);
-        }
-      } catch (err) {
-        console.warn("[OpenBook] Failed to preserve source file:", err);
-      }
-    }
 
     // ── Wipe-and-Deploy ─────────────────────────────────────
     report("wipe", "running");
