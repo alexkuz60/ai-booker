@@ -582,7 +582,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         if (freshMeta.bookId && freshMeta.bookId !== currentBookId) {
           console.error("[SaveToServer] bookId mismatch! storage=%s, target=%s — aborting meta write", freshMeta.bookId, currentBookId);
         } else {
-          const nextMeta: ProjectMeta = {
+          const nextMeta = sanitizeProjectMeta({
             ...freshMeta,
             version: PROJECT_META_VERSION,
             bookId: currentBookId,
@@ -591,7 +591,7 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
             createdAt: freshMeta.createdAt || nowIso,
             updatedAt: nowIso,
             language: freshMeta.language || (isRu ? "ru" : "en"),
-          };
+          });
           await storage.writeJSON("project.json", nextMeta);
         }
       }
