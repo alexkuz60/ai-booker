@@ -506,12 +506,21 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
                   if (result.errors.length > 0) {
                     console.warn("[Migration] errors:", result.errors);
                   }
-                  if (result.errors.length > 0 && result.filesCopied === 0) {
+                  if (result.errors.length > 0 && result.filesCopied === 0 && result.scenesProcessed === 0) {
                     toast.error(
                       isRu
                         ? `Миграция не выполнена: ${result.errors[0]}`
                         : `Migration failed: ${result.errors[0]}`,
                     );
+                    return;
+                  }
+                  if (result.scenesProcessed > 0 && result.filesCopied === 0) {
+                    toast.success(
+                      isRu
+                        ? `Данные перевода уже на месте (${result.scenesProcessed} сцен)`
+                        : `Translation data already in place (${result.scenesProcessed} scenes)`,
+                    );
+                    setMigrationDialog(false);
                     return;
                   }
                   toast.success(
