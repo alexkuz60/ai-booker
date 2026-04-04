@@ -887,7 +887,6 @@ export async function deployFromServer({
 
   // ── 9. Source metadata (no blob storage) ──
   report("source_file", "running");
-  const sourceFilePreserved = false;
   try {
     const projMeta = await storage.readJSON<Record<string, unknown>>(
       "project.json",
