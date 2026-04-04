@@ -305,12 +305,8 @@ export function useChapterAnalysis({
           // ── Text-mode path (DOCX/FB2): get chapter HTML, strip to plain text ──
           let chapterHtml = getChapterTextFromCache(idx);
           if (!chapterHtml) {
-            // Cache miss (e.g. restored session) — re-extract from OPFS source
-            addLog(isRu ? "🔄 Перечитываю исходный файл..." : "🔄 Re-reading source file...");
-            const extracted = await reExtractChapterTexts();
-            if (extracted) {
-              chapterHtml = getChapterTextFromCache(idx);
-            }
+            // Source blob no longer in OPFS — cache must be populated from initial upload
+            addLog(isRu ? "⚠️ Текст главы не найден в кэше" : "⚠️ Chapter text not found in cache");
           }
           text = chapterHtml ? stripHtml(chapterHtml) : "";
           const detectedFmt = fileFormat || (fileName ? detectFileFormat(fileName) : null);
