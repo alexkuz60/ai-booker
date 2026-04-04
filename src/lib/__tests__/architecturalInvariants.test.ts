@@ -109,13 +109,9 @@ describe("Architectural invariants", () => {
 
   it("projectSourcePolicy module does not exist (dead code removed)", () => {
     const matches = searchFiles(SRC_DIR, /projectSourcePolicy/);
-    // Allow only this test file and migrateMirrorTranslation.ts
-    const violations = matches.filter(
-      (m) => !m.file.includes("migrateMirrorTranslation")
-    );
 
-    if (violations.length > 0) {
-      const msg = violations.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
+    if (matches.length > 0) {
+      const msg = matches.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
       expect.fail(
         `References to projectSourcePolicy found (should be fully removed):\n${msg}`
       );
