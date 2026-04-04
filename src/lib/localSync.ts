@@ -323,6 +323,11 @@ async function seedEmptySceneFiles(
     }));
   }
 
+  if (!hasSoundscapeCache) {
+    // Create .keep file to ensure directory exists in OPFS
+    writes.push(storage.writeJSON(soundscapeCachePath, { created: now }));
+  }
+
   // Seed translation files
   langFileChecks.forEach((entry, i) => {
     const exists = results[3 + i]; // offset by 3 base checks
