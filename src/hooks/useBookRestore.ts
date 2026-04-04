@@ -222,12 +222,7 @@ export function useBookRestore({
       setStep("workspace");
       bumpProgressVersion?.();
 
-      const bookFormat = detectFileFormat(book.file_name);
-      const formatLabel = bookFormat.toUpperCase();
-      const sourceStatus = result.sourceFilePreserved
-        ? ` (${isRu ? `${formatLabel} сохранён` : `${formatLabel} preserved`})`
-        : ` (${isRu ? `${formatLabel} не найден, только просмотр` : `${formatLabel} not found, view only`})`;
-      toast.success(`${t("bookLoaded", isRu)}: «${book.title}»${sourceStatus}`);
+      toast.success(`${t("bookLoaded", isRu)}: «${book.title}»`);
 
       // Post-deploy integrity check
       assertIntegrity(targetStorage, "openSavedBook/deployFromServer").catch(() => {});
