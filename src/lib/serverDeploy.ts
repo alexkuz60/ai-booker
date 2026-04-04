@@ -827,7 +827,8 @@ export async function deployFromServer({
             const projMeta = await storage.readJSON<Record<string, unknown>>("project.json");
             if (projMeta) {
               projMeta.usedImpulseIds = ids;
-              await storage.writeJSON("project.json", projMeta);
+              const { sanitizeProjectMeta } = await import("@/lib/projectStorage");
+              await storage.writeJSON("project.json", sanitizeProjectMeta(projMeta));
             }
           } catch {}
 

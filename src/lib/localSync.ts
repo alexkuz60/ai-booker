@@ -75,8 +75,11 @@ export async function syncStructureToLocal(
     try {
       const projectMeta = await storage.readJSON<Record<string, unknown>>(paths.projectMeta());
       if (projectMeta) {
-        projectMeta.updatedAt = structure.updatedAt;
-        await storage.writeJSON(paths.projectMeta(), projectMeta);
+        const { sanitizeProjectMeta } = await import("@/lib/projectStorage");
+        await storage.writeJSON(paths.projectMeta(), sanitizeProjectMeta({
+          ...projectMeta,
+          updatedAt: structure.updatedAt,
+        }));
       }
     } catch {
       // non-critical — project.json may not exist yet
