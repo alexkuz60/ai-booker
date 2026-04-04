@@ -200,11 +200,13 @@ export async function readStructureFromLocal(
     const sanitizedResults = sanitizeChapterResultsForStructure(structure.toc, chapterResults);
 
     // Load or rebuild book map
+    const projMeta = await storage.readJSON<{ translationLanguages?: string[] }>(paths.projectMeta());
+    const transLangs = projMeta?.translationLanguages ?? [];
     let bookMap = await readBookMap(storage);
     if (!bookMap) {
       // book_map.json missing (legacy project or first restore) — rebuild it
       console.info("[LocalSync] book_map.json missing, rebuilding from structure");
-      bookMap = buildBookMap(structure.bookId, structure.toc, chapterIdMap, sanitizedResults);
+      bookMap = buildBookMap(structure.bookId, structure.toc, chapterIdMap, sanitizedResults, transLangs);
       await writeBookMap(storage, bookMap);
     }
 
