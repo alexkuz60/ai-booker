@@ -130,82 +130,8 @@ export async function deployFromServer({
   report("fetch_structure", "done", `${chapters.length}`);
 
 
-  // ── 2. Parse PDF (if applicable) ──────────────────────────
-  const bookFormat = detectFileFormat(book.file_name);
-  const isBookPdf = bookFormat === "pdf";
-
-  report("parse_pdf", "running");
-  let pdfProxy: any = null;
-  let totalPages = 0;
-  let tocFromPdf: { startPage: number; endPage: number; level: number }[] = [];
-
-  if (false) { // Source file no longer stored in OPFS — PDF parsing disabled on restore
-    try {
-      const arrayBuffer = await localSourceBlob.arrayBuffer();
-      const { getDocument } = await import("pdfjs-dist");
-      const pdf = await getDocument({ data: arrayBuffer }).promise;
-      pdfProxy = pdf;
-      totalPages = pdf.numPages;
-
-      const rawOutline = await pdf.getOutline();
-      if (rawOutline && rawOutline.length > 0) {
-        const flat = flattenTocWithRanges(
-          await (async function parseItems(
-            items: any[],
-            level: number,
-          ): Promise<TocEntry[]> {
-            const entries: TocEntry[] = [];
-            for (const item of items) {
-              let pageNumber = 1;
-              try {
-                if (item.dest) {
-                  const dest =
-                    typeof item.dest === "string"
-                      ? await pdf.getDestination(item.dest)
-                      : item.dest;
-                  if (dest && dest[0]) {
-                    const pageIndex = await pdf.getPageIndex(dest[0]);
-                    pageNumber = pageIndex + 1;
-                  }
-                }
-              } catch {}
-              const children = item.items?.length
-                ? await parseItems(item.items, level + 1)
-                : [];
-              entries.push({
-                title: item.title || "Untitled",
-                pageNumber,
-                level,
-                children,
-              });
-            }
-            return entries;
-          })(rawOutline, 0),
-          pdf.numPages,
-        );
-
-        tocFromPdf = chapters.map((ch, i) => {
-          const byTitle = flat.find((f) => f.title === ch.title);
-          if (byTitle)
-            return {
-              startPage: byTitle.startPage,
-              endPage: byTitle.endPage,
-              level: byTitle.level,
-            };
-          if (i < flat.length)
-            return {
-              startPage: flat[i].startPage,
-              endPage: flat[i].endPage,
-              level: flat[i].level,
-            };
-          return { startPage: 0, endPage: 0, level: 0 };
-        });
-      }
-    } catch (pdfErr) {
-      console.warn("Could not restore PDF for analysis:", pdfErr);
-    }
-  }
-  report("parse_pdf", !isBookPdf ? "skipped" : pdfProxy ? "done" : "skipped");
+  // Source file no longer stored in OPFS — PDF parsing disabled on restore
+  report("parse_pdf", "skipped");
 
   // ── 3. Build TOC ──────────────────────────────────────────
   report("build_toc", "running");
