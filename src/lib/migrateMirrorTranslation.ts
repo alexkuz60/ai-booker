@@ -48,7 +48,38 @@ export async function migrateMirrorToSubfolders(
 ): Promise<MigrationResult> {
   const result: MigrationResult = { scenesProcessed: 0, filesCopied: 0, errors: [] };
 
-  // 1. Open both projects
+  // 1. Open main project first to check if migration already done
+  const mainStore = await OPFSStorage.openExisting(mainProjectName);
+  if (!mainStore) {
+    result.errors.push(`Main project "${mainProjectName}" not found`);
+    return result;
+  }
+
+  // Check if translation data already exists in subfolders
+  const mainMeta = await mainStore.readJSON<ProjectMeta>("project.json");
+  const existingLangs = mainMeta?.translationLanguages ?? [];
+  if (existingLangs.length > 0) {
+    // Verify at least one lang subfolder has actual data
+    const mainSceneIndex = await mainStore.readJSON<SceneIndexData>(paths.sceneIndex());
+    if (mainSceneIndex?.entries) {
+      const firstSceneId = Object.keys(mainSceneIndex.entries)[0];
+      if (firstSceneId) {
+        const chId = mainSceneIndex.entries[firstSceneId].chapterId;
+        for (const lang of existingLangs) {
+          const testPath = `chapters/${chId}/scenes/${firstSceneId}/${lang}/storyboard.json`;
+          const exists = await mainStore.readJSON(testPath);
+          if (exists) {
+            result.scenesProcessed = Object.keys(mainSceneIndex.entries).length;
+            result.filesCopied = 0; // already there
+            onProgress?.({ phase: "Already migrated", current: 1, total: 1 });
+            return result;
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Open mirror project
   const mirrorStore = await OPFSStorage.openExisting(mirrorProjectName);
   if (!mirrorStore) {
     result.errors.push(`Mirror project "${mirrorProjectName}" not found`);
