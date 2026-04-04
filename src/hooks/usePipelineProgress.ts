@@ -89,11 +89,11 @@ export function usePipelineProgress(
 
       // Merge: never overwrite OPFS progress with stale React state
       const existing = (meta.pipelineProgress as PipelineProgress) ?? {};
-      await s.writeJSON("project.json", {
+      await s.writeJSON("project.json", sanitizeProjectMeta({
         ...meta,
         pipelineProgress: { ...existing, ...updated },
         updatedAt: new Date().toISOString(),
-      });
+      }));
     } catch (e) {
       console.error("[PipelineProgress] Failed to persist:", e);
     }
