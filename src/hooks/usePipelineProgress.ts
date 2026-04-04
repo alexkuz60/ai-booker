@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProjectStorage, PipelineProgress, PipelineStepId } from "@/lib/projectStorage";
+import { sanitizeProjectMeta } from "@/lib/projectStorage";
 import { createEmptyPipelineProgress } from "@/lib/projectStorage";
 
 const PROJECT_META_READ_RETRY_MS = 30;
@@ -88,11 +89,11 @@ export function usePipelineProgress(
 
       // Merge: never overwrite OPFS progress with stale React state
       const existing = (meta.pipelineProgress as PipelineProgress) ?? {};
-      await s.writeJSON("project.json", {
+      await s.writeJSON("project.json", sanitizeProjectMeta({
         ...meta,
         pipelineProgress: { ...existing, ...updated },
         updatedAt: new Date().toISOString(),
-      });
+      }));
     } catch (e) {
       console.error("[PipelineProgress] Failed to persist:", e);
     }
@@ -148,11 +149,11 @@ export async function writePipelineStep(
     // Always merge with defaults to avoid losing keys
     const progress = { ...createEmptyPipelineProgress(), ...((meta.pipelineProgress as PipelineProgress) ?? {}) };
     progress[stepId] = done;
-    await storage.writeJSON("project.json", {
+    await storage.writeJSON("project.json", sanitizeProjectMeta({
       ...meta,
       pipelineProgress: progress,
       updatedAt: new Date().toISOString(),
-    });
+    }));
   } catch (e) {
     console.error("[PipelineProgress] writePipelineStep failed:", e);
   }

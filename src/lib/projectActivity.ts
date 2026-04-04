@@ -3,6 +3,7 @@
  */
 
 import type { ProjectStorage } from "@/lib/projectStorage";
+import { sanitizeProjectMeta } from "@/lib/projectStorage";
 import { paths } from "@/lib/projectPaths";
 
 interface TimestampedRecord {
@@ -112,10 +113,10 @@ export async function touchProjectUpdatedAt(storage: ProjectStorage): Promise<vo
   try {
     const projectMeta = await storage.readJSON<Record<string, unknown>>(paths.projectMeta());
     if (!projectMeta) return;
-    await storage.writeJSON(paths.projectMeta(), {
+    await storage.writeJSON(paths.projectMeta(), sanitizeProjectMeta({
       ...projectMeta,
       updatedAt: new Date().toISOString(),
-    });
+    }));
   } catch (err) {
     console.warn("[projectActivity] Failed to update project timestamp:", err);
   }

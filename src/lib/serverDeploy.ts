@@ -827,7 +827,8 @@ export async function deployFromServer({
             const projMeta = await storage.readJSON<Record<string, unknown>>("project.json");
             if (projMeta) {
               projMeta.usedImpulseIds = ids;
-              await storage.writeJSON("project.json", projMeta);
+              const { sanitizeProjectMeta } = await import("@/lib/projectStorage");
+              await storage.writeJSON("project.json", sanitizeProjectMeta(projMeta));
             }
           } catch {}
 
@@ -892,14 +893,17 @@ export async function deployFromServer({
       "project.json",
     );
     if (projMeta) {
-      projMeta.fileFormat = bookFormat;
-      projMeta.source = {
-        title: book.title || "",
-        fileName: book.file_name || "",
-        format: bookFormat,
-      };
-      projMeta.updatedAt = new Date().toISOString();
-      await storage.writeJSON("project.json", projMeta);
+      const { sanitizeProjectMeta } = await import("@/lib/projectStorage");
+      await storage.writeJSON("project.json", sanitizeProjectMeta({
+        ...projMeta,
+        fileFormat: bookFormat,
+        source: {
+          title: book.title || "",
+          fileName: book.file_name || "",
+          format: bookFormat,
+        },
+        updatedAt: new Date().toISOString(),
+      }));
     }
   } catch {}
   report("source_file", "done");

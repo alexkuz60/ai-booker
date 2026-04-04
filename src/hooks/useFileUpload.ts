@@ -18,6 +18,7 @@ import { t } from "@/pages/parser/i18n";
 import type { Scene, TocChapter, Step, ChapterStatus } from "@/pages/parser/types";
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import type { ProjectStorage } from "@/lib/projectStorage";
+import { sanitizeProjectMeta } from "@/lib/projectStorage";
 import { syncStructureToLocal } from "@/lib/localSync";
 import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 import { stripFileExtension } from "@/lib/fileFormatUtils";
@@ -265,7 +266,7 @@ export function useFileUpload({
 
           const existingMeta = await targetStorage.readJSON<Record<string, unknown>>("project.json").catch(() => null);
           const existingProgress = (existingMeta?.pipelineProgress as Record<string, boolean>) ?? {};
-          await targetStorage.writeJSON("project.json", {
+          await targetStorage.writeJSON("project.json", sanitizeProjectMeta({
             ...existingMeta,
             version: Number(existingMeta?.version) || 1,
             bookId: resolvedBookId,
@@ -285,7 +286,7 @@ export function useFileUpload({
               file_uploaded: true,
               opfs_created: true,
             },
-          });
+          }));
 
           await syncStructureToLocal(targetStorage, {
             bookId: resolvedBookId,
