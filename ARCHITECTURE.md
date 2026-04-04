@@ -214,7 +214,7 @@ interface ProjectStorage {
 ┌─────────────────────────────────────────────────────────────────┐
 │  1. ИНИЦИАЛИЗАЦИЯ                                               │
 │     Upload (PDF/DOCX/FB2) → createProject() → project.json     │
-│     + source/book.{ext}                                         │
+│     (source metadata записывается в project.json.source)        │
 │     Запись начальной структуры (TOC, parts) в structure/        │
 │     БД НЕ ТРОГАЕТСЯ. Все ID генерируются на клиенте.           │
 ├─────────────────────────────────────────────────────────────────┤
