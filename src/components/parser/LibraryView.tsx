@@ -396,6 +396,14 @@ function LibraryViewInner({
                 </h3>
                 {books.map(book => renderBookCard(book, (
                   <>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="sm" onClick={() => onOpen(book)} className="h-7 w-7 p-0 text-primary hover:text-primary">
+                          <FolderOpen className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{isRu ? "Открыть" : "Open"}</TooltipContent>
+                    </Tooltip>
                     {onRename && (
                       <Button variant="ghost" size="sm" onClick={() => startRename(book)} className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
                         <Pencil className="h-3 w-3" />
