@@ -217,7 +217,7 @@ export function useBookRestore({
         downloadImpulses: options?.downloadImpulses ?? false,
         downloadAtmosphere: options?.downloadAtmosphere ?? false,
         downloadSfx: options?.downloadSfx ?? false,
-        preservedSourceBlob,
+        
         userId,
       });
 
