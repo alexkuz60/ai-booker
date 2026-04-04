@@ -39,7 +39,6 @@ export interface ScenePathEntry {
   ttsDir: string;
   atmosphereDir: string;
   rendersDir: string;
-  soundscapeCache: string;
   /** Language subfolders for translations (e.g. { en: { ... } }) */
   translations: Record<string, TranslationPathEntry>;
 }
@@ -126,7 +125,6 @@ export function buildBookMap(
         ttsDir: `${base}/audio/tts`,
         atmosphereDir: `${base}/audio/atmosphere`,
         rendersDir: `${base}/audio/renders`,
-        soundscapeCache: `${base}/soundscape_cache`,
         translations,
       };
       sceneToChapter[sceneId] = chapterId;

@@ -116,10 +116,6 @@ export const paths = {
   renderStem: (fileName: string, sceneId?: string, chapterId?: string) =>
     `chapters/${requireChapterId(sceneId ?? "", chapterId)}/scenes/${sceneId}/audio/renders/${fileName}`,
 
-  /** Scene-level soundscape cache directory (atmo/sfx/ir per scene) */
-  soundscapeCache: (sceneId: string, chapterId?: string) =>
-    `chapters/${requireChapterId(sceneId, chapterId)}/scenes/${sceneId}/soundscape_cache`,
-
   // ── Audio metadata (segment_audio mirror) ──────────────
 
   /** Per-scene audio metadata (durations, paths, status) — replaces DB reads */
