@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client"; // used only for auth
 import { getModelRegistryEntry } from "@/config/modelRegistry";
 import { extractTextByPageRange } from "@/lib/pdf-extract";
 import { extractFromDocx, stripHtml } from "@/lib/docx-extract";
-import { extractFromFb2 } from "@/lib/fb2-extract";
+
 import { detectFileFormat } from "@/lib/fileFormatUtils";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import { t } from "@/pages/parser/i18n";
