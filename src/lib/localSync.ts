@@ -116,7 +116,11 @@ export async function syncStructureToLocal(
 
     await Promise.all(sceneWrites);
 
-    // 3b. Seed empty scene-level JSON files (audio_meta, mixer_state, clip_plugins)
+    // Read translationLanguages from project.json for map & seed
+    const projMeta = await storage.readJSON<{ translationLanguages?: string[] }>(paths.projectMeta());
+    const transLangs = projMeta?.translationLanguages ?? [];
+
+    // 3b. Seed empty scene-level JSON files (audio_meta, mixer_state, clip_plugins, translation)
     // Only creates files that don't already exist — never overwrites user data.
     const seedWrites: Promise<void>[] = [];
     sanitizedResults.forEach((result, idx) => {
@@ -126,7 +130,7 @@ export async function syncStructureToLocal(
       for (const scene of result.scenes) {
         const sceneId = (scene as any).id;
         if (!sceneId) continue;
-        seedWrites.push(seedEmptySceneFiles(storage, sceneId, chapterId));
+        seedWrites.push(seedEmptySceneFiles(storage, sceneId, chapterId, transLangs));
       }
     });
     await Promise.all(seedWrites);
@@ -137,9 +141,6 @@ export async function syncStructureToLocal(
     await writeSceneIndex(storage, sceneIndex);
 
     // 5. Build and write book map (precomputed path map)
-    // Read translationLanguages from project.json for map generation
-    const projMeta = await storage.readJSON<{ translationLanguages?: string[] }>(paths.projectMeta());
-    const transLangs = projMeta?.translationLanguages ?? [];
     const bookMap = buildBookMap(data.bookId, data.toc, data.chapterIdMap, sanitizedResults, transLangs);
     await writeBookMap(storage, bookMap);
 
