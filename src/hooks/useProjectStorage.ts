@@ -9,8 +9,6 @@ import {
   OPFSStorage,
 } from "@/lib/projectStorage";
 import { downloadBlob } from "@/lib/projectZip";
-import { paths } from "@/lib/projectPaths";
-import { findSourceBlob, getMimeType, detectFileFormat } from "@/lib/fileFormatUtils";
 import { readSceneIndex } from "@/lib/sceneIndex";
 import { readBookMap } from "@/lib/bookMap";
 
