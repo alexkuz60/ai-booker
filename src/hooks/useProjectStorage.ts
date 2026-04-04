@@ -279,20 +279,6 @@ export function useProjectStorage(): UseProjectStorageReturn {
     }
   }, [backend]);
 
-  // ── Source file helpers (PDF or DOCX) ────────────────────
-
-  const saveSourceFile = useCallback(async (file: File) => {
-    if (!storage) throw new Error("No project open");
-    const format = detectFileFormat(file.name);
-    await storage.writeBlob(paths.sourceFile(format), file);
-  }, [storage]);
-
-  const readSourceFile = useCallback(async (): Promise<File | null> => {
-    if (!storage) return null;
-    const found = await findSourceBlob(storage);
-    if (!found) return null;
-    return new File([found.blob], `book.${found.format}`, { type: getMimeType(found.format) });
-  }, [storage]);
 
   // ── Auto-restore OPFS project on mount ──────────────────
 
