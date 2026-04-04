@@ -192,38 +192,7 @@ export function useChapterAnalysis({
 
   // К4: getChapterTextFromCache imported from chapterTextsCache module
 
-  /** Re-extract chapter texts from OPFS source file and populate in-memory cache */
-  const reExtractChapterTexts = async (): Promise<boolean> => {
-    if (!projectStorage) return false;
-    // Detect format: explicit metadata → fileName extension → fallback to docx
-    let fmt = fileFormat || null;
-    if (!fmt && fileName) {
-      const ext = fileName.split('.').pop()?.toLowerCase();
-      if (ext === "fb2") fmt = "fb2";
-      else if (ext === "docx" || ext === "doc") fmt = "docx";
-    }
-    if (!fmt) fmt = "docx";
-    const sourcePath = getSourcePath(fmt);
-    try {
-      const blob = await projectStorage.readBlob(sourcePath);
-      if (!blob) return false;
-      const file = new File([blob], `book.${fmt}`, { type: blob.type });
-      let chapterTexts: Map<number, string>;
-      if (fmt === "fb2") {
-        const result = await extractFromFb2(file);
-        chapterTexts = result.chapterTexts;
-      } else {
-        const result = await extractFromDocx(file);
-        chapterTexts = result.chapterTexts;
-      }
-      // К4: store in memory only, never in sessionStorage
-      setChapterTextsCache(chapterTexts);
-      return true;
-    } catch (err) {
-      console.warn("[ChapterAnalysis] Failed to re-extract chapter texts:", err);
-      return false;
-    }
-  };
+  /** @deprecated Source blob no longer stored in OPFS — chapter texts must be in cache from initial upload */
 
   // B4/B7 fix: text-first mode for DOCX and FB2 (no PDF rendering needed)
   const isTextMode = (): boolean => {
