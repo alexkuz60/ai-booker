@@ -344,6 +344,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
         // One book = one folder. No multi-candidate resolution.
         // Use exactly the project from LAST_PROJECT_KEY.
         await readSceneIndex(store);
+        await readBookMap(store);
 
         if (!cancelled) {
           setStorage(store);
