@@ -130,8 +130,8 @@ export function useBookRestore({
       const localFormat: FileFormat = (localMeta?.fileFormat as FileFormat) || detectFileFormat(structure.fileName);
 
       if (localFormat === "pdf") {
-        const sourcePath = getSourcePath(localFormat);
-        storage.readBlob(sourcePath).then(async (pdfBlob) => {
+        // Source file no longer stored in OPFS — PDF preview unavailable after restore
+        console.info("[Restore] PDF source not stored locally, skipping PDF preview");
           if (!pdfBlob) return;
           try {
             const arrayBuffer = await pdfBlob.arrayBuffer();
