@@ -185,6 +185,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
       }
 
       await readSceneIndex(store);
+      await readBookMap(store);
 
       setStorage(store);
       setMeta(projectMeta);
