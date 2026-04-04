@@ -235,7 +235,7 @@ interface ProjectStorage {
 │     Библиотека: читает ТОЛЬКО project.json из каждого проекта   │
 │     При выборе: ТОЛЬКО локальный ProjectStorage                 │
 │     НЕ делать авто-fallback на сервер                           │
-│     Затем: toc.json → chapters/ → characters.json → source/     │
+│     Затем: toc.json → chapters/ → characters.json               │
 ├─────────────────────────────────────────────────────────────────┤
 │  5. ВОССТАНОВЛЕНИЕ С СЕРВЕРА (Wipe-and-Deploy)                  │
 │     Книга есть на сервере, нужно развернуть на этом устройстве: │
