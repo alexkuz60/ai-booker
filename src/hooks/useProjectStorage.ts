@@ -12,6 +12,7 @@ import { downloadBlob } from "@/lib/projectZip";
 import { paths } from "@/lib/projectPaths";
 import { findSourceBlob, getMimeType, detectFileFormat } from "@/lib/fileFormatUtils";
 import { readSceneIndex } from "@/lib/sceneIndex";
+import { readBookMap } from "@/lib/bookMap";
 
 const LAST_PROJECT_KEY = "booker_last_project";
 
@@ -104,6 +105,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
 
       await store.writeJSON("project.json", projectMeta);
       await readSceneIndex(store);
+      await readBookMap(store);
       setStorage(store);
       setMeta(projectMeta);
 
@@ -165,6 +167,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
     if (backend !== "opfs") {
       if (storage?.projectName === projectName && meta) {
         await readSceneIndex(storage);
+        await readBookMap(storage);
         return storage;
       }
       return null;
@@ -183,6 +186,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
       }
 
       await readSceneIndex(store);
+      await readBookMap(store);
 
       setStorage(store);
       setMeta(projectMeta);
@@ -341,6 +345,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
         // One book = one folder. No multi-candidate resolution.
         // Use exactly the project from LAST_PROJECT_KEY.
         await readSceneIndex(store);
+        await readBookMap(store);
 
         if (!cancelled) {
           setStorage(store);

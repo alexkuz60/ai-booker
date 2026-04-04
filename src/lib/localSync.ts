@@ -12,6 +12,7 @@ import {
 import { paths } from "@/lib/projectPaths";
 import { buildSceneIndex, writeSceneIndex, readSceneIndex } from "@/lib/sceneIndex";
 import { writePipelineStep } from "@/hooks/usePipelineProgress";
+import { buildBookMap, writeBookMap, readBookMap } from "@/lib/bookMap";
 
 export interface LocalBookStructure {
   bookId: string;
@@ -116,6 +117,10 @@ export async function syncStructureToLocal(
     const sceneIndex = buildSceneIndex(data.chapterIdMap, sanitizedResults, existingIndex);
     await writeSceneIndex(storage, sceneIndex);
 
+    // 5. Build and write book map (precomputed path map)
+    const bookMap = buildBookMap(data.bookId, data.toc, data.chapterIdMap, sanitizedResults);
+    await writeBookMap(storage, bookMap);
+
     // ── Auto-set pipeline flags ──
     await writePipelineStep(storage, "toc_extracted", true);
     const hasScenes = Array.from(data.chapterResults.values()).some(r => r.scenes.length > 0);
@@ -171,6 +176,10 @@ export async function readStructureFromLocal(
     await Promise.all(reads);
 
     const sanitizedResults = sanitizeChapterResultsForStructure(structure.toc, chapterResults);
+
+    // Load book map into memory cache
+    await readBookMap(storage);
+
     return { structure, chapterIdMap, chapterResults: sanitizedResults };
   } catch (err) {
     console.warn("[LocalSync] Failed to read structure:", err);
