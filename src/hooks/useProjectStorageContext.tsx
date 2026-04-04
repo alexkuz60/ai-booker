@@ -29,8 +29,6 @@ export function ProjectStorageProvider({ children }: { children: ReactNode }) {
       value.downloadProjectAsZip,
       value.closeProject,
       value.hardResetLocalData,
-      value.saveSourceFile,
-      value.readSourceFile,
     ],
   );
 

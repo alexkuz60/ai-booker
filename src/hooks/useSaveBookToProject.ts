@@ -22,7 +22,7 @@ import {
   getLeafIndices,
   sanitizeChapterResultsForStructure,
 } from "@/lib/tocStructure";
-import { findSourceBlob } from "@/lib/fileFormatUtils";
+
 
 export interface LocalBookSnapshot {
   toc: TocChapter[];
@@ -539,36 +539,8 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
         report("atmospheres", savedAtmoCount > 0 ? "done" : "skipped", savedAtmoCount > 0 ? `${savedAtmoCount}` : undefined);
       }
 
-      // ── 5. Upload source file to server if not already there ──
-      report("source_file", "running");
-      if (storage) {
-        const sourceResult = await findSourceBlob(storage);
-        if (sourceResult) {
-          const { data: bookRow } = await supabase
-            .from("books")
-            .select("file_path")
-            .eq("id", currentBookId)
-            .maybeSingle();
-
-          const serverHasFile = !!bookRow?.file_path;
-
-          if (!serverHasFile && user?.id) {
-            const ext = sourceResult.format === "fb2" ? "book.fb2" : sourceResult.format === "docx" ? "book.docx" : "book.pdf";
-            const filePath = `${user.id}/${Date.now()}_${ext}`;
-            const { error: uploadError } = await supabase.storage
-              .from("book-uploads")
-              .upload(filePath, sourceResult.blob);
-
-            if (!uploadError) {
-              await supabase
-                .from("books")
-                .update({ file_path: filePath })
-                .eq("id", currentBookId);
-            }
-          }
-        }
-      }
-      report("source_file", "done");
+      // ── 5. Source file metadata (no blob upload — source is metadata-only) ──
+      report("source_file", "skipped");
 
       // ── 5b. Push translation backup (lang-subfolders + synopsis) ──
       report("translation", "running");

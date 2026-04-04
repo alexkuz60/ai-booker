@@ -9,8 +9,6 @@ import {
   OPFSStorage,
 } from "@/lib/projectStorage";
 import { downloadBlob } from "@/lib/projectZip";
-import { paths } from "@/lib/projectPaths";
-import { findSourceBlob, getMimeType, detectFileFormat } from "@/lib/fileFormatUtils";
 import { readSceneIndex } from "@/lib/sceneIndex";
 import { readBookMap } from "@/lib/bookMap";
 
@@ -55,11 +53,6 @@ interface UseProjectStorageReturn {
   closeProject: () => void;
   /** Hard-reset all locally persisted parser data for this browser */
   hardResetLocalData: () => Promise<void>;
-
-  /** Save source file (PDF or DOCX) into project */
-  saveSourceFile: (file: File) => Promise<void>;
-  /** Read source file from project (tries PDF then DOCX) */
-  readSourceFile: () => Promise<File | null>;
 }
 
 export function useProjectStorage(): UseProjectStorageReturn {
@@ -286,20 +279,6 @@ export function useProjectStorage(): UseProjectStorageReturn {
     }
   }, [backend]);
 
-  // ── Source file helpers (PDF or DOCX) ────────────────────
-
-  const saveSourceFile = useCallback(async (file: File) => {
-    if (!storage) throw new Error("No project open");
-    const format = detectFileFormat(file.name);
-    await storage.writeBlob(paths.sourceFile(format), file);
-  }, [storage]);
-
-  const readSourceFile = useCallback(async (): Promise<File | null> => {
-    if (!storage) return null;
-    const found = await findSourceBlob(storage);
-    if (!found) return null;
-    return new File([found.blob], `book.${found.format}`, { type: getMimeType(found.format) });
-  }, [storage]);
 
   // ── Auto-restore OPFS project on mount ──────────────────
 
@@ -389,7 +368,5 @@ export function useProjectStorage(): UseProjectStorageReturn {
     downloadProjectAsZip,
     closeProject,
     hardResetLocalData,
-    saveSourceFile,
-    readSourceFile,
   };
 }

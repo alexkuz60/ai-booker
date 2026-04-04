@@ -20,7 +20,7 @@ import { normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import type { ProjectStorage, ProjectMeta } from "@/lib/projectStorage";
 import { readStructureFromLocal } from "@/lib/localSync";
 import { normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
-import { detectFileFormat, getSourcePath, findSourceBlob, type FileFormat } from "@/lib/fileFormatUtils";
+import { detectFileFormat, type FileFormat } from "@/lib/fileFormatUtils";
 import { wipeProjectBrowserState } from "@/lib/projectCleanup";
 import {
   resolveLocalStorageForBook,
@@ -130,19 +130,8 @@ export function useBookRestore({
       const localFormat: FileFormat = (localMeta?.fileFormat as FileFormat) || detectFileFormat(structure.fileName);
 
       if (localFormat === "pdf") {
-        const sourcePath = getSourcePath(localFormat);
-        storage.readBlob(sourcePath).then(async (pdfBlob) => {
-          if (!pdfBlob) return;
-          try {
-            const arrayBuffer = await pdfBlob.arrayBuffer();
-            const { getDocument } = await import("pdfjs-dist");
-            const pdf = await getDocument({ data: arrayBuffer }).promise;
-            updatePdfRef(pdf);
-            updateTotalPages(pdf.numPages);
-          } catch (pdfErr) {
-            console.warn("[LocalRestore] Failed to parse local PDF:", pdfErr);
-          }
-        });
+        // Source file no longer stored in OPFS — PDF preview unavailable after restore
+        console.info("[Restore] PDF source not stored locally, skipping PDF preview");
       }
 
       toast.success(isRu ? `Книга «${structure.title}» загружена` : `Book "${structure.title}" loaded`);
@@ -184,24 +173,10 @@ export function useBookRestore({
       }
     }
 
-    // ── Preserve source file from existing OPFS before wipe ──
-    let preservedSourceBlob: Blob | null = null;
-    const existingProjects = localProjectNamesByBookId.get(book.id) || [];
-    const existingSourceStore = await resolveLocalStorageForBook(book.id, resolverOpts());
-    if (existingSourceStore?.isReady) {
-      try {
-        const found = await findSourceBlob(existingSourceStore);
-        if (found) {
-          preservedSourceBlob = found.blob;
-          console.log(`[OpenBook] Preserved source file (${found.format}) before wipe`);
-        }
-      } catch (err) {
-        console.warn("[OpenBook] Failed to preserve source file:", err);
-      }
-    }
 
     // ── Wipe-and-Deploy ─────────────────────────────────────
     report("wipe", "running");
+    const existingProjects = localProjectNamesByBookId.get(book.id) || [];
     await wipeProjectBrowserState(book.id, existingProjects);
     clearTransientBookState();
     setStep("extracting_toc");
@@ -231,7 +206,7 @@ export function useBookRestore({
         downloadImpulses: options?.downloadImpulses ?? false,
         downloadAtmosphere: options?.downloadAtmosphere ?? false,
         downloadSfx: options?.downloadSfx ?? false,
-        preservedSourceBlob,
+        
         userId,
       });
 
@@ -247,12 +222,7 @@ export function useBookRestore({
       setStep("workspace");
       bumpProgressVersion?.();
 
-      const bookFormat = detectFileFormat(book.file_name);
-      const formatLabel = bookFormat.toUpperCase();
-      const sourceStatus = result.sourceFilePreserved
-        ? ` (${isRu ? `${formatLabel} сохранён` : `${formatLabel} preserved`})`
-        : ` (${isRu ? `${formatLabel} не найден, только просмотр` : `${formatLabel} not found, view only`})`;
-      toast.success(`${t("bookLoaded", isRu)}: «${book.title}»${sourceStatus}`);
+      toast.success(`${t("bookLoaded", isRu)}: «${book.title}»`);
 
       // Post-deploy integrity check
       assertIntegrity(targetStorage, "openSavedBook/deployFromServer").catch(() => {});
@@ -303,7 +273,7 @@ export function useBookRestore({
 
     if (storage?.isReady) {
       try {
-        const localBlob = await storage.readBlob(getSourcePath("pdf"));
+        const localBlob = await storage.readBlob("source/book.pdf");
         if (localBlob) return await loadPdf(await localBlob.arrayBuffer());
       } catch (err) {
         console.warn("[EnsurePDF] Local read failed:", err);

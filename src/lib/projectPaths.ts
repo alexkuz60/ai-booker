@@ -67,8 +67,8 @@ export const paths = {
   /** Legacy characters path (kept for migration reads) */
   structureCharactersLegacy: () => "structure/characters.json",
 
-  // ── Source file ────────────────────────────────────────
-
+  // ── Source file (DEPRECATED — source metadata now in project.json) ──
+  // Kept temporarily for legacy reads during migration
   sourceFile: (format: "pdf" | "docx" | "fb2") =>
     `source/book.${format}`,
 

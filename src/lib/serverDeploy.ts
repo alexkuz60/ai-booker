@@ -31,7 +31,7 @@ import {
   normalizeTocRanges,
   sanitizeChapterResultsForStructure,
 } from "@/lib/tocStructure";
-import { detectFileFormat, getSourcePath, stripFileExtension } from "@/lib/fileFormatUtils";
+import { detectFileFormat, stripFileExtension } from "@/lib/fileFormatUtils";
 import { saveCharacterIndex, saveSceneCharacterMap } from "@/lib/localCharacters";
 import {
   saveStoryboardToLocal,
@@ -63,8 +63,6 @@ interface DeployParams {
   downloadAtmosphere?: boolean;
   /** Whether to download SFX audio files into OPFS cache */
   downloadSfx?: boolean;
-  /** Source file blob preserved from the old OPFS project before wipe */
-  preservedSourceBlob?: Blob | null;
   /** User ID for downloading per-user audio assets */
   userId?: string;
 }
@@ -100,7 +98,7 @@ export async function deployFromServer({
   downloadImpulses = false,
   downloadAtmosphere = false,
   downloadSfx = false,
-  preservedSourceBlob,
+  
   userId: paramUserId,
 }: DeployParams): Promise<DeployResult> {
   // ── 1. Fetch structure (parts + chapters) ─────────────────
@@ -131,85 +129,13 @@ export async function deployFromServer({
   }
   report("fetch_structure", "done", `${chapters.length}`);
 
-  // Use locally preserved source blob (never from server)
-  const localSourceBlob = preservedSourceBlob ?? null;
 
-  // ── 2. Parse PDF (if applicable) ──────────────────────────
+  // ── 2. PDF parsing disabled — source file no longer stored in OPFS ──
   const bookFormat = detectFileFormat(book.file_name);
-  const isBookPdf = bookFormat === "pdf";
-
-  report("parse_pdf", "running");
-  let pdfProxy: any = null;
-  let totalPages = 0;
-  let tocFromPdf: { startPage: number; endPage: number; level: number }[] = [];
-
-  if (isBookPdf && localSourceBlob) {
-    try {
-      const arrayBuffer = await localSourceBlob.arrayBuffer();
-      const { getDocument } = await import("pdfjs-dist");
-      const pdf = await getDocument({ data: arrayBuffer }).promise;
-      pdfProxy = pdf;
-      totalPages = pdf.numPages;
-
-      const rawOutline = await pdf.getOutline();
-      if (rawOutline && rawOutline.length > 0) {
-        const flat = flattenTocWithRanges(
-          await (async function parseItems(
-            items: any[],
-            level: number,
-          ): Promise<TocEntry[]> {
-            const entries: TocEntry[] = [];
-            for (const item of items) {
-              let pageNumber = 1;
-              try {
-                if (item.dest) {
-                  const dest =
-                    typeof item.dest === "string"
-                      ? await pdf.getDestination(item.dest)
-                      : item.dest;
-                  if (dest && dest[0]) {
-                    const pageIndex = await pdf.getPageIndex(dest[0]);
-                    pageNumber = pageIndex + 1;
-                  }
-                }
-              } catch {}
-              const children = item.items?.length
-                ? await parseItems(item.items, level + 1)
-                : [];
-              entries.push({
-                title: item.title || "Untitled",
-                pageNumber,
-                level,
-                children,
-              });
-            }
-            return entries;
-          })(rawOutline, 0),
-          pdf.numPages,
-        );
-
-        tocFromPdf = chapters.map((ch, i) => {
-          const byTitle = flat.find((f) => f.title === ch.title);
-          if (byTitle)
-            return {
-              startPage: byTitle.startPage,
-              endPage: byTitle.endPage,
-              level: byTitle.level,
-            };
-          if (i < flat.length)
-            return {
-              startPage: flat[i].startPage,
-              endPage: flat[i].endPage,
-              level: flat[i].level,
-            };
-          return { startPage: 0, endPage: 0, level: 0 };
-        });
-      }
-    } catch (pdfErr) {
-      console.warn("Could not restore PDF for analysis:", pdfErr);
-    }
-  }
-  report("parse_pdf", !isBookPdf ? "skipped" : pdfProxy ? "done" : "skipped");
+  const pdfProxy: any = null;
+  const totalPages = 0;
+  const tocFromPdf: { startPage: number; endPage: number; level: number }[] = [];
+  report("parse_pdf", "skipped");
 
   // ── 3. Build TOC ──────────────────────────────────────────
   report("build_toc", "running");
@@ -961,30 +887,25 @@ export async function deployFromServer({
     report("download_sfx", "skipped");
   }
 
-  // ── 9. Source file (preserved from local, never from server) ──
+  // ── 9. Source metadata (no blob storage) ──
   report("source_file", "running");
-  let sourceFilePreserved = false;
-  if (localSourceBlob) {
-    const sourcePath = getSourcePath(bookFormat);
-    try {
-      await storage.writeBlob(sourcePath, localSourceBlob);
-      sourceFilePreserved = true;
-    } catch (err) {
-      console.warn("[Deploy] Failed to save preserved source file:", err);
-    }
-  }
-
+  const sourceFilePreserved = false;
   try {
     const projMeta = await storage.readJSON<Record<string, unknown>>(
       "project.json",
     );
     if (projMeta) {
       projMeta.fileFormat = bookFormat;
+      projMeta.source = {
+        title: book.title || "",
+        fileName: book.file_name || "",
+        format: bookFormat,
+      };
       projMeta.updatedAt = new Date().toISOString();
       await storage.writeJSON("project.json", projMeta);
     }
   } catch {}
-  report("source_file", sourceFilePreserved ? "done" : "skipped");
+  report("source_file", "done");
 
   // ── 10. Restore translation backup from Storage ──────────
   report("translation", "running");
