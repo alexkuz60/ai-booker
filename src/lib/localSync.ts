@@ -283,6 +283,7 @@ async function seedEmptySceneFiles(
   const audioMetaPath = `${base}/audio_meta.json`;
   const mixerStatePath = `${base}/mixer_state.json`;
   const clipPluginsPath = `${base}/clip_plugins.json`;
+  const soundscapeCachePath = `${base}/soundscape_cache/.keep`;
 
   const existChecks: Promise<boolean>[] = [
     storage.exists(audioMetaPath),
