@@ -303,7 +303,7 @@ async function seedEmptySceneFiles(
   }
 
   const results = await Promise.all(existChecks);
-  const [hasAudio, hasMixer, hasClip] = results;
+  const [hasAudio, hasMixer, hasClip, hasSoundscapeCache] = results;
 
   const writes: Promise<void>[] = [];
 
