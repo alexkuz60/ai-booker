@@ -39,6 +39,7 @@ export interface ScenePathEntry {
   ttsDir: string;
   atmosphereDir: string;
   rendersDir: string;
+  soundscapeCache: string;
   /** Language subfolders for translations (e.g. { en: { ... } }) */
   translations: Record<string, TranslationPathEntry>;
 }
