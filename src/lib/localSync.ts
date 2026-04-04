@@ -116,6 +116,21 @@ export async function syncStructureToLocal(
 
     await Promise.all(sceneWrites);
 
+    // 3b. Seed empty scene-level JSON files (audio_meta, mixer_state, clip_plugins)
+    // Only creates files that don't already exist — never overwrites user data.
+    const seedWrites: Promise<void>[] = [];
+    sanitizedResults.forEach((result, idx) => {
+      if (isFolderNode(data.toc, idx)) return;
+      const chapterId = data.chapterIdMap.get(idx);
+      if (!chapterId) return;
+      for (const scene of result.scenes) {
+        const sceneId = (scene as any).id;
+        if (!sceneId) continue;
+        seedWrites.push(seedEmptySceneFiles(storage, sceneId, chapterId));
+      }
+    });
+    await Promise.all(seedWrites);
+
     // 4. Build and write scene index
     const existingIndex = await readSceneIndex(storage);
     const sceneIndex = buildSceneIndex(data.chapterIdMap, sanitizedResults, existingIndex);
