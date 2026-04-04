@@ -289,6 +289,7 @@ async function seedEmptySceneFiles(
     storage.exists(audioMetaPath),
     storage.exists(mixerStatePath),
     storage.exists(clipPluginsPath),
+    storage.exists(soundscapeCachePath),
   ];
 
   // Check translation files too
