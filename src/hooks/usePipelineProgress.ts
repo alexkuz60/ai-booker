@@ -149,11 +149,11 @@ export async function writePipelineStep(
     // Always merge with defaults to avoid losing keys
     const progress = { ...createEmptyPipelineProgress(), ...((meta.pipelineProgress as PipelineProgress) ?? {}) };
     progress[stepId] = done;
-    await storage.writeJSON("project.json", {
+    await storage.writeJSON("project.json", sanitizeProjectMeta({
       ...meta,
       pipelineProgress: progress,
       updatedAt: new Date().toISOString(),
-    });
+    }));
   } catch (e) {
     console.error("[PipelineProgress] writePipelineStep failed:", e);
   }
