@@ -129,8 +129,6 @@ export async function deployFromServer({
   }
   report("fetch_structure", "done", `${chapters.length}`);
 
-  // Use locally preserved source blob (never from server)
-  const localSourceBlob = preservedSourceBlob ?? null;
 
   // ── 2. Parse PDF (if applicable) ──────────────────────────
   const bookFormat = detectFileFormat(book.file_name);
