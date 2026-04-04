@@ -3,31 +3,12 @@
  * Prevents hardcoding "source/book.pdf" across the codebase.
  */
 
-import { paths } from "@/lib/projectPaths";
-
 export type FileFormat = "pdf" | "docx" | "fb2";
 
 /** Detect format from file name */
 export function detectFileFormat(fileName: string): FileFormat {
   if (/\.fb2$/i.test(fileName)) return "fb2";
   return /\.docx?$/i.test(fileName) ? "docx" : "pdf";
-}
-
-/** @deprecated Source file no longer stored in OPFS. Metadata lives in project.json.source */
-export function getSourcePath(format: FileFormat): string {
-  return paths.sourceFile(format);
-}
-
-/** @deprecated Source file no longer stored in OPFS. Use project.json.source instead. */
-export async function findSourceBlob(
-  storage: { readBlob: (path: string) => Promise<Blob | null> },
-): Promise<{ blob: Blob; format: FileFormat } | null> {
-  const formats: FileFormat[] = ["pdf", "docx", "fb2"];
-  for (const fmt of formats) {
-    const blob = await storage.readBlob(paths.sourceFile(fmt));
-    if (blob) return { blob, format: fmt };
-  }
-  return null;
 }
 
 /** Strip file extension from name for display purposes */

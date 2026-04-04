@@ -48,8 +48,6 @@ export interface DeployResult {
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
   pdfProxy: any | null;
   totalPages: number;
-  /** True when the source file was preserved from the local project */
-  sourceFilePreserved: boolean;
 }
 
 interface DeployParams {
@@ -889,7 +887,6 @@ export async function deployFromServer({
 
   // ── 9. Source metadata (no blob storage) ──
   report("source_file", "running");
-  const sourceFilePreserved = false;
   try {
     const projMeta = await storage.readJSON<Record<string, unknown>>(
       "project.json",
@@ -935,5 +932,5 @@ export async function deployFromServer({
   // ── 11. Finalize ──────────────────────────────────────────
   report("finalize", "done");
 
-  return { toc, chapterIdMap, partIdMap, chapterResults, pdfProxy, totalPages, sourceFilePreserved };
+  return { toc, chapterIdMap, partIdMap, chapterResults, pdfProxy, totalPages };
 }

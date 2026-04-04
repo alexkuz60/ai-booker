@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { getChapterTextFromCache, setChapterTextsCache, hasChapterTextsCache } from "@/lib/chapterTextsCache";
+import { getChapterTextFromCache, hasChapterTextsCache } from "@/lib/chapterTextsCache";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client"; // used only for auth token in edge function calls
 import { getModelRegistryEntry } from "@/config/modelRegistry";
 import { extractTextByPageRange } from "@/lib/pdf-extract";
 import { extractFromDocx, stripHtml } from "@/lib/docx-extract";
-import { extractFromFb2 } from "@/lib/fb2-extract";
-import { getSourcePath, detectFileFormat } from "@/lib/fileFormatUtils";
+
+import { detectFileFormat } from "@/lib/fileFormatUtils";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import { t } from "@/pages/parser/i18n";
 
@@ -192,38 +192,7 @@ export function useChapterAnalysis({
 
   // К4: getChapterTextFromCache imported from chapterTextsCache module
 
-  /** Re-extract chapter texts from OPFS source file and populate in-memory cache */
-  const reExtractChapterTexts = async (): Promise<boolean> => {
-    if (!projectStorage) return false;
-    // Detect format: explicit metadata → fileName extension → fallback to docx
-    let fmt = fileFormat || null;
-    if (!fmt && fileName) {
-      const ext = fileName.split('.').pop()?.toLowerCase();
-      if (ext === "fb2") fmt = "fb2";
-      else if (ext === "docx" || ext === "doc") fmt = "docx";
-    }
-    if (!fmt) fmt = "docx";
-    const sourcePath = getSourcePath(fmt);
-    try {
-      const blob = await projectStorage.readBlob(sourcePath);
-      if (!blob) return false;
-      const file = new File([blob], `book.${fmt}`, { type: blob.type });
-      let chapterTexts: Map<number, string>;
-      if (fmt === "fb2") {
-        const result = await extractFromFb2(file);
-        chapterTexts = result.chapterTexts;
-      } else {
-        const result = await extractFromDocx(file);
-        chapterTexts = result.chapterTexts;
-      }
-      // К4: store in memory only, never in sessionStorage
-      setChapterTextsCache(chapterTexts);
-      return true;
-    } catch (err) {
-      console.warn("[ChapterAnalysis] Failed to re-extract chapter texts:", err);
-      return false;
-    }
-  };
+  /** @deprecated Source blob no longer stored in OPFS — chapter texts must be in cache from initial upload */
 
   // B4/B7 fix: text-first mode for DOCX and FB2 (no PDF rendering needed)
   const isTextMode = (): boolean => {
@@ -336,12 +305,8 @@ export function useChapterAnalysis({
           // ── Text-mode path (DOCX/FB2): get chapter HTML, strip to plain text ──
           let chapterHtml = getChapterTextFromCache(idx);
           if (!chapterHtml) {
-            // Cache miss (e.g. restored session) — re-extract from OPFS source
-            addLog(isRu ? "🔄 Перечитываю исходный файл..." : "🔄 Re-reading source file...");
-            const extracted = await reExtractChapterTexts();
-            if (extracted) {
-              chapterHtml = getChapterTextFromCache(idx);
-            }
+            // Source blob no longer in OPFS — cache must be populated from initial upload
+            addLog(isRu ? "⚠️ Текст главы не найден в кэше" : "⚠️ Chapter text not found in cache");
           }
           text = chapterHtml ? stripHtml(chapterHtml) : "";
           const detectedFmt = fileFormat || (fileName ? detectFileFormat(fileName) : null);

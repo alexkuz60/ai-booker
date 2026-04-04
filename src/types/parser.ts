@@ -9,8 +9,6 @@
 export type { FileFormat } from "@/lib/fileFormatUtils";
 export {
   detectFileFormat,
-  getSourcePath,
-  findSourceBlob,
   stripFileExtension,
   getMimeType,
 } from "@/lib/fileFormatUtils";
