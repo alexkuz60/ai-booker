@@ -54,7 +54,10 @@
 ```
 📁 BookTitle/
 ├── project.json           — ProjectMeta (version, bookId, title, userId, language, fileFormat,
-│                             pipelineProgress, source: {title, fileName, format})
+│                             pipelineProgress, source: {title, fileName, format},
+│                             translationLanguages[], usedImpulseIds[])
+│                             ⚠ Все записи фильтруются через sanitizeProjectMeta() —
+│                             неизвестные/legacy-поля автоматически удаляются при каждой записи.
 ├── book_map.json          — BookMap: прекомпилированные пути ко всем сущностям (chapters/scenes)
 ├── scene_index.json       — SceneIndexData: sceneId→chapterId маппинг, хеши контента, маркеры storyboarded/characterMapped
 ├── characters.json        — CharacterIndex[] (глобальный реестр персонажей книги)
