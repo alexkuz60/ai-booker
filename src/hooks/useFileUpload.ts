@@ -285,7 +285,7 @@ export function useFileUpload({
               file_uploaded: true,
               opfs_created: true,
             },
-          });
+          }));
 
           await syncStructureToLocal(targetStorage, {
             bookId: resolvedBookId,
