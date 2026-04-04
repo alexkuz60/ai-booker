@@ -4,7 +4,7 @@
  */
 
 import type { ProjectStorage } from "@/lib/projectStorage";
-import { DEFAULT_CLIP_PLUGIN_CONFIG } from "@/hooks/useClipPluginConfigs";
+
 import type { TocChapter, Scene, ChapterStatus, LocalCharacter } from "@/pages/parser/types";
 import {
   isFolderNode,
