@@ -5,7 +5,6 @@ import {
   type StorageBackend,
   PROJECT_META_VERSION,
   detectStorageBackend,
-  getProjectTranslationLanguages,
   LocalFSStorage,
   OPFSStorage,
 } from "@/lib/projectStorage";
