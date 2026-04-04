@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { getChapterTextFromCache, setChapterTextsCache, hasChapterTextsCache } from "@/lib/chapterTextsCache";
+import { getChapterTextFromCache, hasChapterTextsCache } from "@/lib/chapterTextsCache";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client"; // used only for auth token in edge function calls
 import { getModelRegistryEntry } from "@/config/modelRegistry";
