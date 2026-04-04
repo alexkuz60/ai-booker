@@ -219,7 +219,7 @@ export async function readStructureFromLocal(
       for (const scene of result.scenes) {
         const sceneId = (scene as any).id;
         if (!sceneId) continue;
-        seedPromises.push(seedEmptySceneFiles(storage, sceneId, chapterId));
+        seedPromises.push(seedEmptySceneFiles(storage, sceneId, chapterId, transLangs));
       }
     });
     if (seedPromises.length > 0) await Promise.all(seedPromises);
