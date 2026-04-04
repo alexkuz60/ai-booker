@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import type { SyncProgressCallback } from "@/components/SyncProgressDialog";
 import { syncStructureToLocal, readStructureFromLocal } from "@/lib/localSync";
+import { sanitizeProjectMeta } from "@/lib/projectStorage";
 import { useStoryboardPersistence } from "@/hooks/useStoryboardPersistence";
 import { readCharacterIndex } from "@/lib/localCharacters";
 import type { CharacterIndex } from "@/pages/parser/types";
