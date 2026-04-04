@@ -4,7 +4,7 @@
  */
 
 import type { ProjectStorage } from "@/lib/projectStorage";
-import { DEFAULT_CLIP_PLUGIN_CONFIG } from "@/hooks/useClipPluginConfigs";
+
 import type { TocChapter, Scene, ChapterStatus, LocalCharacter } from "@/pages/parser/types";
 import {
   isFolderNode,
@@ -116,7 +116,11 @@ export async function syncStructureToLocal(
 
     await Promise.all(sceneWrites);
 
-    // 3b. Seed empty scene-level JSON files (audio_meta, mixer_state, clip_plugins)
+    // Read translationLanguages from project.json for map & seed
+    const projMeta = await storage.readJSON<{ translationLanguages?: string[] }>(paths.projectMeta());
+    const transLangs = projMeta?.translationLanguages ?? [];
+
+    // 3b. Seed empty scene-level JSON files (audio_meta, mixer_state, clip_plugins, translation)
     // Only creates files that don't already exist — never overwrites user data.
     const seedWrites: Promise<void>[] = [];
     sanitizedResults.forEach((result, idx) => {
@@ -126,7 +130,7 @@ export async function syncStructureToLocal(
       for (const scene of result.scenes) {
         const sceneId = (scene as any).id;
         if (!sceneId) continue;
-        seedWrites.push(seedEmptySceneFiles(storage, sceneId, chapterId));
+        seedWrites.push(seedEmptySceneFiles(storage, sceneId, chapterId, transLangs));
       }
     });
     await Promise.all(seedWrites);
@@ -137,7 +141,7 @@ export async function syncStructureToLocal(
     await writeSceneIndex(storage, sceneIndex);
 
     // 5. Build and write book map (precomputed path map)
-    const bookMap = buildBookMap(data.bookId, data.toc, data.chapterIdMap, sanitizedResults);
+    const bookMap = buildBookMap(data.bookId, data.toc, data.chapterIdMap, sanitizedResults, transLangs);
     await writeBookMap(storage, bookMap);
 
     // ── Auto-set pipeline flags ──
@@ -197,11 +201,13 @@ export async function readStructureFromLocal(
     const sanitizedResults = sanitizeChapterResultsForStructure(structure.toc, chapterResults);
 
     // Load or rebuild book map
+    const projMeta = await storage.readJSON<{ translationLanguages?: string[] }>(paths.projectMeta());
+    const transLangs = projMeta?.translationLanguages ?? [];
     let bookMap = await readBookMap(storage);
     if (!bookMap) {
       // book_map.json missing (legacy project or first restore) — rebuild it
       console.info("[LocalSync] book_map.json missing, rebuilding from structure");
-      bookMap = buildBookMap(structure.bookId, structure.toc, chapterIdMap, sanitizedResults);
+      bookMap = buildBookMap(structure.bookId, structure.toc, chapterIdMap, sanitizedResults, transLangs);
       await writeBookMap(storage, bookMap);
     }
 
@@ -214,7 +220,7 @@ export async function readStructureFromLocal(
       for (const scene of result.scenes) {
         const sceneId = (scene as any).id;
         if (!sceneId) continue;
-        seedPromises.push(seedEmptySceneFiles(storage, sceneId, chapterId));
+        seedPromises.push(seedEmptySceneFiles(storage, sceneId, chapterId, transLangs));
       }
     });
     if (seedPromises.length > 0) await Promise.all(seedPromises);
@@ -253,35 +259,55 @@ export async function readCharactersFromLocal(
 
 // ─── Seed empty scene-level files ────────────────────────────
 
+const TRANSLATION_SEED_FILES = [
+  "storyboard.json",
+  "radar-literal.json",
+  "radar-literary.json",
+  "radar-critique.json",
+] as const;
+
 /**
  * Create empty audio_meta.json, mixer_state.json, clip_plugins.json
- * for a scene if they don't already exist.
+ * for a scene (and translation lang subfolders) if they don't already exist.
  * NEVER overwrites existing files — preserves user data.
  */
 async function seedEmptySceneFiles(
   storage: ProjectStorage,
   sceneId: string,
   chapterId: string,
+  translationLanguages: string[] = [],
 ): Promise<void> {
   const base = `chapters/${chapterId}/scenes/${sceneId}`;
+  const now = new Date().toISOString();
 
   const audioMetaPath = `${base}/audio_meta.json`;
   const mixerStatePath = `${base}/mixer_state.json`;
   const clipPluginsPath = `${base}/clip_plugins.json`;
 
-  const [hasAudio, hasMixer, hasClip] = await Promise.all([
+  const existChecks: Promise<boolean>[] = [
     storage.exists(audioMetaPath),
     storage.exists(mixerStatePath),
     storage.exists(clipPluginsPath),
-  ]);
+  ];
+
+  // Check translation files too
+  const langFileChecks: { lang: string; file: string; path: string }[] = [];
+  for (const lang of translationLanguages) {
+    for (const file of TRANSLATION_SEED_FILES) {
+      const p = `${base}/${lang}/${file}`;
+      langFileChecks.push({ lang, file, path: p });
+      existChecks.push(storage.exists(p));
+    }
+  }
+
+  const results = await Promise.all(existChecks);
+  const [hasAudio, hasMixer, hasClip] = results;
 
   const writes: Promise<void>[] = [];
 
   if (!hasAudio) {
     writes.push(storage.writeJSON(audioMetaPath, {
-      sceneId,
-      updatedAt: new Date().toISOString(),
-      entries: {},
+      sceneId, updatedAt: now, entries: {},
     }));
   }
 
@@ -291,11 +317,27 @@ async function seedEmptySceneFiles(
 
   if (!hasClip) {
     writes.push(storage.writeJSON(clipPluginsPath, {
-      sceneId,
-      updatedAt: new Date().toISOString(),
-      configs: {},
+      sceneId, updatedAt: now, configs: {},
     }));
   }
+
+  // Seed translation files
+  langFileChecks.forEach((entry, i) => {
+    const exists = results[3 + i]; // offset by 3 base checks
+    if (exists) return;
+
+    if (entry.file === "storyboard.json") {
+      writes.push(storage.writeJSON(entry.path, {
+        sceneId, updatedAt: now, segments: [], typeMappings: [],
+        audioStatus: {}, inlineNarrationSpeaker: null,
+      }));
+    } else {
+      // radar-*.json — empty radar placeholder
+      writes.push(storage.writeJSON(entry.path, {
+        sceneId, updatedAt: now, segments: [],
+      }));
+    }
+  });
 
   if (writes.length > 0) {
     await Promise.all(writes);

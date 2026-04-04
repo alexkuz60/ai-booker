@@ -173,6 +173,16 @@ function LibraryViewInner({
         }
       }
 
+      // Rebuild book map with new lang & seed empty translation files
+      const { readStructureFromLocal, syncStructureToLocal } = await import("@/lib/localSync");
+      const local = await readStructureFromLocal(source.store);
+      if (local?.structure) {
+        // Force rebuild book map (readStructureFromLocal only rebuilds if missing)
+        const { buildBookMap, writeBookMap } = await import("@/lib/bookMap");
+        const updatedLangs = [...new Set([...(source.meta.translationLanguages ?? []), tLang])];
+        const newMap = buildBookMap(local.structure.bookId, local.structure.toc, local.chapterIdMap, local.chapterResults, updatedLangs);
+        await writeBookMap(source.store, newMap);
+      }
       toast.success(isRu
         ? `Перевод активирован (${readyIndices.length} глав)`
         : `Translation activated (${readyIndices.length} chapters)`);
