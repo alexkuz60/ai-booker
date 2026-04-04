@@ -123,10 +123,40 @@ export default function Library() {
     setStep("upload");
   }, [setStep]);
 
-  const handleOpenBook = useCallback((book: BookRecord) => {
+  const handleOpenBook = useCallback(async (book: BookRecord) => {
+    // Find the OPFS project for this book
+    const projectNames = localProjectNamesByBookId?.get(book.id);
+    const projectName = projectNames?.[0];
+    if (!projectName) {
+      toast.error(isRu ? "Проект не найден в хранилище" : "Project not found in storage");
+      return;
+    }
+
+    const store = await OPFSStorage.openExisting(projectName);
+    if (!store) {
+      toast.error(isRu ? "Не удалось открыть хранилище проекта" : "Failed to open project storage");
+      return;
+    }
+
+    // Read book map and validate all paths
+    const map = await readBookMap(store);
+    if (!map) {
+      toast.error(isRu ? "Не удалось загрузить карту книги (book_map.json)" : "Failed to load book map (book_map.json)");
+      return;
+    }
+
+    const missing = await validateBookMapIntegrity(store, map, isRu);
+    if (missing.length > 0) {
+      console.warn("[Library] Missing files:", missing);
+      for (const msg of missing) {
+        toast.error(isRu ? `Не найден: ${msg}` : `Missing: ${msg}`);
+      }
+      // Still open — user sees what's missing but can work
+    }
+
     setShouldRedirect(true);
     openSavedBook(book);
-  }, [openSavedBook]);
+  }, [openSavedBook, localProjectNamesByBookId, isRu]);
 
   /** Timeline stage click: open book then navigate to the stage's route */
   const handleStageNavigate = useCallback((book: BookRecord, route: string) => {
