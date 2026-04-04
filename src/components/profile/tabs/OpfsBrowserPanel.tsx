@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { isOPFSSupported } from "@/lib/projectStorage";
 import { JsonTreeView } from "./JsonTreeView";
-import { migrateMirrorToSubfolders, type MigrationProgress } from "@/lib/migrateMirrorTranslation";
+
 
 /* ─── Types ──────────────────────────────────────────── */
 
