@@ -86,11 +86,7 @@ export async function migrateMirrorToSubfolders(
     return result;
   }
 
-  const mainStore = await OPFSStorage.openExisting(mainProjectName);
-  if (!mainStore) {
-    result.errors.push(`Main project "${mainProjectName}" not found`);
-    return result;
-  }
+  // mainStore already opened above
 
   // 2. Determine target language from mirror meta (legacy fields, not in ProjectMeta)
   const mirrorMeta = await mirrorStore.readJSON<{ targetLanguage?: string }>("project.json");
