@@ -368,7 +368,5 @@ export function useProjectStorage(): UseProjectStorageReturn {
     downloadProjectAsZip,
     closeProject,
     hardResetLocalData,
-    saveSourceFile,
-    readSourceFile,
   };
 }

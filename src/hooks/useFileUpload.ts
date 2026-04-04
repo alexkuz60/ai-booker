@@ -275,6 +275,11 @@ export function useFileUpload({
             updatedAt: new Date().toISOString(),
             language: (existingMeta?.language === "en" ? "en" : (isRu ? "ru" : "en")),
             fileFormat: isFb2 ? "fb2" : (isDocx ? "docx" : "pdf"),
+            source: {
+              title: pendingProjectName || stripFileExtension(f.name),
+              fileName: f.name,
+              format: isFb2 ? "fb2" : (isDocx ? "docx" : "pdf"),
+            },
             pipelineProgress: {
               ...existingProgress,
               file_uploaded: true,
@@ -291,9 +296,6 @@ export function useFileUpload({
             chapterIdMap: newChapterIdMap,
             chapterResults: initMap,
           });
-
-          const localSourceName = isFb2 ? "source/book.fb2" : (isDocx ? "source/book.docx" : "source/book.pdf");
-          await targetStorage.writeBlob(localSourceName, f).catch(() => {});
         }
       } catch (storageErr) {
         console.warn("[Upload] Local storage save failed (non-fatal):", storageErr);

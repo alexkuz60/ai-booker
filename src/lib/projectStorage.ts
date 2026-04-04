@@ -104,7 +104,17 @@ export interface ProjectMeta {
   updatedAt: string;
   language: "ru" | "en";
   /** File format of the source book — strict type from fileFormatUtils */
-  fileFormat?: "pdf" | "docx";
+  fileFormat?: "pdf" | "docx" | "fb2";
+
+  /** Source file metadata (replaces physical source/ folder) */
+  source?: {
+    /** Display title (e.g. "Собачье сердце") */
+    title: string;
+    /** Original filename as uploaded (e.g. "Собачье сердце.fb2") */
+    fileName: string;
+    /** Detected format */
+    format: "pdf" | "docx" | "fb2";
+  };
 
   // ─── Pipeline progress (единый источник готовности) ──────
   pipelineProgress?: PipelineProgress;
