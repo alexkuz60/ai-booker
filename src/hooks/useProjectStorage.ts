@@ -5,6 +5,7 @@ import {
   type StorageBackend,
   PROJECT_META_VERSION,
   detectStorageBackend,
+  getProjectTranslationLanguages,
   LocalFSStorage,
   OPFSStorage,
 } from "@/lib/projectStorage";
@@ -20,6 +21,15 @@ const LOCAL_RESET_KEYS = [
   "parser-nav-state",
   // К4: docx_chapter_texts and docx_html removed — now in-memory only
 ];
+
+function hydrateRuntimeMeta(raw: Record<string, unknown>): ProjectMeta {
+  const translationLanguages = getProjectTranslationLanguages(raw);
+
+  return {
+    ...raw,
+    ...(translationLanguages.length > 0 ? { translationLanguages } : {}),
+  } as ProjectMeta;
+}
 
 interface UseProjectStorageReturn {
   /** Current storage instance (null = no project open) */
@@ -132,10 +142,11 @@ export function useProjectStorage(): UseProjectStorageReturn {
         store = maybeStore;
       }
 
-      const projectMeta = await store.readJSON<ProjectMeta>("project.json");
-      if (!projectMeta) {
+      const rawMeta = await store.readJSON<Record<string, unknown>>("project.json");
+      if (!rawMeta) {
         throw new Error("Not a valid Booker project (project.json not found)");
       }
+      const projectMeta = hydrateRuntimeMeta(rawMeta);
 
       setStorage(store);
       setMeta(projectMeta);
@@ -173,10 +184,11 @@ export function useProjectStorage(): UseProjectStorageReturn {
       if (!store) {
         return null;
       }
-      const projectMeta = await store.readJSON<ProjectMeta>("project.json");
-      if (!projectMeta) {
+      const rawMeta = await store.readJSON<Record<string, unknown>>("project.json");
+      if (!rawMeta) {
         throw new Error("Not a valid Booker project (project.json not found)");
       }
+      const projectMeta = hydrateRuntimeMeta(rawMeta);
 
       await readSceneIndex(store);
       await readBookMap(store);
@@ -215,10 +227,11 @@ export function useProjectStorage(): UseProjectStorageReturn {
 
       await store.importZip(file);
 
-      const projectMeta = await store.readJSON<ProjectMeta>("project.json");
-      if (!projectMeta) {
+      const rawMeta = await store.readJSON<Record<string, unknown>>("project.json");
+      if (!rawMeta) {
         throw new Error("ZIP does not contain a valid Booker project (project.json not found)");
       }
+      const projectMeta = hydrateRuntimeMeta(rawMeta);
 
       setStorage(store);
       setMeta(projectMeta);
@@ -320,22 +333,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
           console.warn("[ProjectStorage] project.json missing in", targetName);
           return;
         }
-
-        // Migrate legacy translation fields → translationLanguages before sanitizing
-        if (!rawMeta.translationLanguages || !(rawMeta.translationLanguages as string[]).length) {
-          const legacyLang =
-            (rawMeta.targetLanguage as string) ||
-            ((rawMeta.translationProject as Record<string, unknown>)?.targetLanguage as string);
-          if (legacyLang) {
-            rawMeta.translationLanguages = [legacyLang];
-            console.info("[ProjectStorage] Migrated legacy targetLanguage →", legacyLang);
-          }
-        }
-
-        // Sanitize — strip zombie fields (translationProject, targetLanguage, etc.)
-        const { sanitizeProjectMeta } = await import("@/lib/projectStorage");
-        const projectMeta = sanitizeProjectMeta(rawMeta) as ProjectMeta;
-        await store.writeJSON("project.json", projectMeta);
+        const projectMeta = hydrateRuntimeMeta(rawMeta);
 
         // One book = one folder. No multi-candidate resolution.
         // Use exactly the project from LAST_PROJECT_KEY.

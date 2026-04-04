@@ -4,6 +4,7 @@ import { usePageHeader } from "@/hooks/usePageHeader";
 import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
+import { getProjectTranslationLanguages } from "@/lib/projectStorage";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -99,7 +100,7 @@ export default function Translation() {
 
   // Translation is "active" if translationLanguages includes targetLang
   const translationActive = useMemo(() => {
-    const langs = storedTranslationLangs ?? ((meta as any)?.translationLanguages as string[] | undefined) ?? [];
+    const langs = storedTranslationLangs ?? getProjectTranslationLanguages((meta as unknown as Record<string, unknown> | null));
     return langs.includes(targetLang);
   }, [storedTranslationLangs, meta, targetLang]);
 
@@ -338,9 +339,9 @@ export default function Translation() {
     let cancelled = false;
     (async () => {
       try {
-        const liveMeta = await storage.readJSON<{ translationLanguages?: string[] }>(paths.projectMeta());
+        const liveMeta = await storage.readJSON<Record<string, unknown>>(paths.projectMeta());
         if (!cancelled) {
-          setStoredTranslationLangs(liveMeta?.translationLanguages ?? []);
+          setStoredTranslationLangs(getProjectTranslationLanguages(liveMeta));
         }
       } catch {
         if (!cancelled) {
