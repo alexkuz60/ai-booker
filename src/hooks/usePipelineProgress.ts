@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProjectStorage, PipelineProgress, PipelineStepId } from "@/lib/projectStorage";
+import { sanitizeProjectMeta } from "@/lib/projectStorage";
 import { createEmptyPipelineProgress } from "@/lib/projectStorage";
 
 const PROJECT_META_READ_RETRY_MS = 30;
