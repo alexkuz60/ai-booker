@@ -957,30 +957,25 @@ export async function deployFromServer({
     report("download_sfx", "skipped");
   }
 
-  // ── 9. Source file (preserved from local, never from server) ──
+  // ── 9. Source metadata (no blob storage) ──
   report("source_file", "running");
-  let sourceFilePreserved = false;
-  if (localSourceBlob) {
-    const sourcePath = getSourcePath(bookFormat);
-    try {
-      await storage.writeBlob(sourcePath, localSourceBlob);
-      sourceFilePreserved = true;
-    } catch (err) {
-      console.warn("[Deploy] Failed to save preserved source file:", err);
-    }
-  }
-
+  const sourceFilePreserved = false;
   try {
     const projMeta = await storage.readJSON<Record<string, unknown>>(
       "project.json",
     );
     if (projMeta) {
       projMeta.fileFormat = bookFormat;
+      projMeta.source = {
+        title: book.title || "",
+        fileName: book.file_name || "",
+        format: bookFormat,
+      };
       projMeta.updatedAt = new Date().toISOString();
       await storage.writeJSON("project.json", projMeta);
     }
   } catch {}
-  report("source_file", sourceFilePreserved ? "done" : "skipped");
+  report("source_file", "done");
 
   // ── 10. Restore translation backup from Storage ──────────
   report("translation", "running");
