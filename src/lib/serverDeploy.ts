@@ -130,7 +130,11 @@ export async function deployFromServer({
   report("fetch_structure", "done", `${chapters.length}`);
 
 
-  // Source file no longer stored in OPFS — PDF parsing disabled on restore
+  // ── 2. PDF parsing disabled — source file no longer stored in OPFS ──
+  const bookFormat = detectFileFormat(book.file_name);
+  const pdfProxy: any = null;
+  const totalPages = 0;
+  const tocFromPdf: { startPage: number; endPage: number; level: number }[] = [];
   report("parse_pdf", "skipped");
 
   // ── 3. Build TOC ──────────────────────────────────────────
