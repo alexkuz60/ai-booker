@@ -137,7 +137,10 @@ export async function syncStructureToLocal(
     await writeSceneIndex(storage, sceneIndex);
 
     // 5. Build and write book map (precomputed path map)
-    const bookMap = buildBookMap(data.bookId, data.toc, data.chapterIdMap, sanitizedResults);
+    // Read translationLanguages from project.json for map generation
+    const projMeta = await storage.readJSON<{ translationLanguages?: string[] }>(paths.projectMeta());
+    const transLangs = projMeta?.translationLanguages ?? [];
+    const bookMap = buildBookMap(data.bookId, data.toc, data.chapterIdMap, sanitizedResults, transLangs);
     await writeBookMap(storage, bookMap);
 
     // ── Auto-set pipeline flags ──
