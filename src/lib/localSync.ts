@@ -230,3 +230,55 @@ export async function readCharactersFromLocal(
     return [];
   }
 }
+
+// ─── Seed empty scene-level files ────────────────────────────
+
+/**
+ * Create empty audio_meta.json, mixer_state.json, clip_plugins.json
+ * for a scene if they don't already exist.
+ * NEVER overwrites existing files — preserves user data.
+ */
+async function seedEmptySceneFiles(
+  storage: ProjectStorage,
+  sceneId: string,
+  chapterId: string,
+): Promise<void> {
+  const base = `chapters/${chapterId}/scenes/${sceneId}`;
+
+  const audioMetaPath = `${base}/audio_meta.json`;
+  const mixerStatePath = `${base}/mixer_state.json`;
+  const clipPluginsPath = `${base}/clip_plugins.json`;
+
+  const [hasAudio, hasMixer, hasClip] = await Promise.all([
+    storage.exists(audioMetaPath),
+    storage.exists(mixerStatePath),
+    storage.exists(clipPluginsPath),
+  ]);
+
+  const writes: Promise<void>[] = [];
+
+  if (!hasAudio) {
+    writes.push(storage.writeJSON(audioMetaPath, {
+      sceneId,
+      updatedAt: new Date().toISOString(),
+      entries: {},
+    }));
+  }
+
+  if (!hasMixer) {
+    writes.push(storage.writeJSON(mixerStatePath, {}));
+  }
+
+  if (!hasClip) {
+    writes.push(storage.writeJSON(clipPluginsPath, {
+      sceneId,
+      updatedAt: new Date().toISOString(),
+      configs: {},
+    }));
+  }
+
+  if (writes.length > 0) {
+    await Promise.all(writes);
+    console.debug(`[LocalSync] Seeded ${writes.length} empty files for scene ${sceneId}`);
+  }
+}
