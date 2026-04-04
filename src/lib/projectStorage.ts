@@ -323,7 +323,7 @@ export class LocalFSStorage implements ProjectStorage {
     const parent = await (window as any).showDirectoryPicker({ mode: "readwrite" });
     const root = await parent.getDirectoryHandle(projectName, { create: true });
     // Pre-create directory structure
-    await root.getDirectoryHandle("source", { create: true });
+    // source/ directory no longer needed — metadata in project.json
     await root.getDirectoryHandle("structure", { create: true });
     await root.getDirectoryHandle("chapters", { create: true });
     await root.getDirectoryHandle("montage", { create: true });
