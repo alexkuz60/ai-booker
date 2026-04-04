@@ -93,6 +93,10 @@
 - [x] **Фоновый параллельный анализ сцен** — `BackgroundAnalysisProvider` (до 3 параллельных задач), результаты пишутся напрямую в OPFS, индикация в ChapterNavigator (Loader2 спиннер), автоперезагрузка StoryboardPanel через `completionToken`, защита от race condition при переключении сцен
 - [x] **Унификация пакетного анализа** — `BatchSegmentationPanel` удалён, его функциональность (включая Model Pool) перенесена в `BackgroundAnalysisProvider`. Кнопки ✨ и «Анализ выбранных» в навигаторе вызывают `bgAnalysis.submit()` напрямую. Pool mode активируется автоматически при наличии пула + 2+ сцен
 
+## Студия — Soundscape Cache
+
+- [ ] **Разработать структуру soundscape_cache и реализовать его заполнение в Студии** — заменяет глобальные OPFS-кэши `atmo-cache/`, `sfx-cache/`, `ir-cache/` на per-scene директории `chapters/{ch}/scenes/{sc}/soundscape_cache/`. Разработать формат хранения (атмосфера, SFX, IR), миграцию чтения/записи в audioEngine и AtmospherePanel, удалить старые глобальные кэши
+
 ## Студия / Раскадровка (после завершения Парсера)
 
 ## Архитектура (открытые вопросы)
