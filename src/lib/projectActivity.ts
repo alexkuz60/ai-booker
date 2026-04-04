@@ -3,6 +3,7 @@
  */
 
 import type { ProjectStorage } from "@/lib/projectStorage";
+import { sanitizeProjectMeta } from "@/lib/projectStorage";
 import { paths } from "@/lib/projectPaths";
 
 interface TimestampedRecord {
