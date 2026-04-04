@@ -278,7 +278,7 @@ export function useBookRestore({
 
     if (storage?.isReady) {
       try {
-        const localBlob = await storage.readBlob(getSourcePath("pdf"));
+        const localBlob = await storage.readBlob("source/book.pdf");
         if (localBlob) return await loadPdf(await localBlob.arrayBuffer());
       } catch (err) {
         console.warn("[EnsurePDF] Local read failed:", err);
