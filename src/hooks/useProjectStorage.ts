@@ -23,7 +23,7 @@ const LOCAL_RESET_KEYS = [
 ];
 
 function hydrateRuntimeMeta(raw: Record<string, unknown>): ProjectMeta {
-  return raw as ProjectMeta;
+  return raw as unknown as ProjectMeta;
 }
 
 interface UseProjectStorageReturn {
