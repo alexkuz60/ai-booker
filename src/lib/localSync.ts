@@ -258,35 +258,55 @@ export async function readCharactersFromLocal(
 
 // ─── Seed empty scene-level files ────────────────────────────
 
+const TRANSLATION_SEED_FILES = [
+  "storyboard.json",
+  "radar-literal.json",
+  "radar-literary.json",
+  "radar-critique.json",
+] as const;
+
 /**
  * Create empty audio_meta.json, mixer_state.json, clip_plugins.json
- * for a scene if they don't already exist.
+ * for a scene (and translation lang subfolders) if they don't already exist.
  * NEVER overwrites existing files — preserves user data.
  */
 async function seedEmptySceneFiles(
   storage: ProjectStorage,
   sceneId: string,
   chapterId: string,
+  translationLanguages: string[] = [],
 ): Promise<void> {
   const base = `chapters/${chapterId}/scenes/${sceneId}`;
+  const now = new Date().toISOString();
 
   const audioMetaPath = `${base}/audio_meta.json`;
   const mixerStatePath = `${base}/mixer_state.json`;
   const clipPluginsPath = `${base}/clip_plugins.json`;
 
-  const [hasAudio, hasMixer, hasClip] = await Promise.all([
+  const existChecks: Promise<boolean>[] = [
     storage.exists(audioMetaPath),
     storage.exists(mixerStatePath),
     storage.exists(clipPluginsPath),
-  ]);
+  ];
+
+  // Check translation files too
+  const langFileChecks: { lang: string; file: string; path: string }[] = [];
+  for (const lang of translationLanguages) {
+    for (const file of TRANSLATION_SEED_FILES) {
+      const p = `${base}/${lang}/${file}`;
+      langFileChecks.push({ lang, file, path: p });
+      existChecks.push(storage.exists(p));
+    }
+  }
+
+  const results = await Promise.all(existChecks);
+  const [hasAudio, hasMixer, hasClip] = results;
 
   const writes: Promise<void>[] = [];
 
   if (!hasAudio) {
     writes.push(storage.writeJSON(audioMetaPath, {
-      sceneId,
-      updatedAt: new Date().toISOString(),
-      entries: {},
+      sceneId, updatedAt: now, entries: {},
     }));
   }
 
@@ -296,11 +316,27 @@ async function seedEmptySceneFiles(
 
   if (!hasClip) {
     writes.push(storage.writeJSON(clipPluginsPath, {
-      sceneId,
-      updatedAt: new Date().toISOString(),
-      configs: {},
+      sceneId, updatedAt: now, configs: {},
     }));
   }
+
+  // Seed translation files
+  langFileChecks.forEach((entry, i) => {
+    const exists = results[3 + i]; // offset by 3 base checks
+    if (exists) return;
+
+    if (entry.file === "storyboard.json") {
+      writes.push(storage.writeJSON(entry.path, {
+        sceneId, updatedAt: now, segments: [], typeMappings: [],
+        audioStatus: {}, inlineNarrationSpeaker: null,
+      }));
+    } else {
+      // radar-*.json — empty radar placeholder
+      writes.push(storage.writeJSON(entry.path, {
+        sceneId, updatedAt: now, segments: [],
+      }));
+    }
+  });
 
   if (writes.length > 0) {
     await Promise.all(writes);
