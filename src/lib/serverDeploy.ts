@@ -48,8 +48,6 @@ export interface DeployResult {
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>;
   pdfProxy: any | null;
   totalPages: number;
-  /** True when the source file was preserved from the local project */
-  sourceFilePreserved: boolean;
 }
 
 interface DeployParams {
