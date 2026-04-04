@@ -117,6 +117,10 @@ export async function syncStructureToLocal(
     const sceneIndex = buildSceneIndex(data.chapterIdMap, sanitizedResults, existingIndex);
     await writeSceneIndex(storage, sceneIndex);
 
+    // 5. Build and write book map (precomputed path map)
+    const bookMap = buildBookMap(data.bookId, data.toc, data.chapterIdMap, sanitizedResults);
+    await writeBookMap(storage, bookMap);
+
     // ── Auto-set pipeline flags ──
     await writePipelineStep(storage, "toc_extracted", true);
     const hasScenes = Array.from(data.chapterResults.values()).some(r => r.scenes.length > 0);
