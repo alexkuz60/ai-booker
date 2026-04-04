@@ -16,6 +16,17 @@ import type { TocChapter } from "@/pages/parser/types";
 
 // ─── Types ──────────────────────────────────────────────────
 
+export interface TranslationPathEntry {
+  storyboard: string;
+  radarLiteral: string;
+  radarLiterary: string;
+  radarCritique: string;
+  audioMeta: string;
+  mixerState: string;
+  clipPlugins: string;
+  ttsDir: string;
+}
+
 export interface ScenePathEntry {
   sceneNumber: number;
   basePath: string;
@@ -28,6 +39,8 @@ export interface ScenePathEntry {
   ttsDir: string;
   atmosphereDir: string;
   rendersDir: string;
+  /** Language subfolders for translations (e.g. { en: { ... } }) */
+  translations: Record<string, TranslationPathEntry>;
 }
 
 export interface ChapterMapEntry {
