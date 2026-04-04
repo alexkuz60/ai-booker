@@ -54,11 +54,10 @@
 ```
 📁 BookTitle/
 ├── project.json           — ProjectMeta (version, bookId, title, userId, language, fileFormat,
-│                             pipelineProgress, translationProject?, layoutVersion: 2)
+│                             pipelineProgress, source: {title, fileName, format})
+├── book_map.json          — BookMap: прекомпилированные пути ко всем сущностям (chapters/scenes)
 ├── scene_index.json       — SceneIndexData: sceneId→chapterId маппинг, хеши контента, маркеры storyboarded/characterMapped
 ├── characters.json        — CharacterIndex[] (глобальный реестр персонажей книги)
-├── 📁 source/
-│   └── book.{pdf|docx|fb2} — исходный файл (ТОЛЬКО ЛОКАЛЬНО)
 ├── 📁 structure/
 │   ├── toc.json           — LocalBookStructure (bookId, title, fileName, parts[], toc[])
 │   └── chapters.json      — маппинг index → chapterId
