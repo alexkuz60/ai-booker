@@ -31,7 +31,7 @@ import {
   normalizeTocRanges,
   sanitizeChapterResultsForStructure,
 } from "@/lib/tocStructure";
-import { detectFileFormat, getSourcePath, stripFileExtension } from "@/lib/fileFormatUtils";
+import { detectFileFormat, stripFileExtension } from "@/lib/fileFormatUtils";
 import { saveCharacterIndex, saveSceneCharacterMap } from "@/lib/localCharacters";
 import {
   saveStoryboardToLocal,
