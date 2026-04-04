@@ -196,8 +196,28 @@ export async function readStructureFromLocal(
 
     const sanitizedResults = sanitizeChapterResultsForStructure(structure.toc, chapterResults);
 
-    // Load book map into memory cache
-    await readBookMap(storage);
+    // Load or rebuild book map
+    let bookMap = await readBookMap(storage);
+    if (!bookMap) {
+      // book_map.json missing (legacy project or first restore) — rebuild it
+      console.info("[LocalSync] book_map.json missing, rebuilding from structure");
+      bookMap = buildBookMap(structure.bookId, structure.toc, chapterIdMap, sanitizedResults);
+      await writeBookMap(storage, bookMap);
+    }
+
+    // Seed empty scene-level files for any scenes that are missing them
+    const seedPromises: Promise<void>[] = [];
+    sanitizedResults.forEach((result, idx) => {
+      if (isFolderNode(structure.toc, idx)) return;
+      const chapterId = chapterIdMap.get(idx);
+      if (!chapterId) return;
+      for (const scene of result.scenes) {
+        const sceneId = (scene as any).id;
+        if (!sceneId) continue;
+        seedPromises.push(seedEmptySceneFiles(storage, sceneId, chapterId));
+      }
+    });
+    if (seedPromises.length > 0) await Promise.all(seedPromises);
 
     return { structure, chapterIdMap, chapterResults: sanitizedResults };
   } catch (err) {
