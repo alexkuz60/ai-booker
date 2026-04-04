@@ -139,7 +139,7 @@ export async function deployFromServer({
   let totalPages = 0;
   let tocFromPdf: { startPage: number; endPage: number; level: number }[] = [];
 
-  if (isBookPdf && localSourceBlob) {
+  if (false) { // Source file no longer stored in OPFS — PDF parsing disabled on restore
     try {
       const arrayBuffer = await localSourceBlob.arrayBuffer();
       const { getDocument } = await import("pdfjs-dist");
