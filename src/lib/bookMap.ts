@@ -126,6 +126,7 @@ export function buildBookMap(
         ttsDir: `${base}/audio/tts`,
         atmosphereDir: `${base}/audio/atmosphere`,
         rendersDir: `${base}/audio/renders`,
+        soundscapeCache: `${base}/soundscape_cache`,
         translations,
       };
       sceneToChapter[sceneId] = chapterId;
