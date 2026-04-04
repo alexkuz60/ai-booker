@@ -315,11 +315,16 @@ export function useProjectStorage(): UseProjectStorageReturn {
           console.warn("[ProjectStorage] Saved OPFS project not found:", targetName);
           return;
         }
-        const projectMeta = await store.readJSON<ProjectMeta>("project.json");
-        if (!projectMeta) {
+        const rawMeta = await store.readJSON<Record<string, unknown>>("project.json");
+        if (!rawMeta) {
           console.warn("[ProjectStorage] project.json missing in", targetName);
           return;
         }
+
+        // Sanitize once on load — strip zombie fields (translationProject, targetLanguage, etc.)
+        const { sanitizeProjectMeta } = await import("@/lib/projectStorage");
+        const projectMeta = sanitizeProjectMeta(rawMeta) as ProjectMeta;
+        await store.writeJSON("project.json", projectMeta);
 
         // One book = one folder. No multi-candidate resolution.
         // Use exactly the project from LAST_PROJECT_KEY.
