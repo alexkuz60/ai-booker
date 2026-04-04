@@ -49,8 +49,6 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
       updatedAt?: string;
       language?: string;
       fileFormat?: string;
-      sourceProjectName?: string;
-      targetLanguage?: string;
     }>("project.json");
 
     const needStructure = !meta?.bookId || !meta?.title || !meta?.fileFormat;
@@ -60,12 +58,6 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
 
     const resolvedId = meta?.bookId || structure?.bookId;
     if (!resolvedId) return null;
-
-    // Skip legacy mirror projects (zombie _EN/_RU folders) — they have targetLanguage
-    if (meta?.targetLanguage) {
-      console.info(`[Library] Skipping legacy mirror project: ${storage.projectName} (targetLanguage=${meta.targetLanguage})`);
-      return null;
-    }
 
     const resolvedTitle = meta?.title || structure?.title || storage.projectName;
     const resolvedFormat = meta?.fileFormat || detectFileFormat(structure?.fileName || resolvedTitle);

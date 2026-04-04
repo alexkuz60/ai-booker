@@ -5,7 +5,6 @@ import {
   type StorageBackend,
   PROJECT_META_VERSION,
   detectStorageBackend,
-  getProjectTranslationLanguages,
   LocalFSStorage,
   OPFSStorage,
 } from "@/lib/projectStorage";
@@ -23,12 +22,7 @@ const LOCAL_RESET_KEYS = [
 ];
 
 function hydrateRuntimeMeta(raw: Record<string, unknown>): ProjectMeta {
-  const translationLanguages = getProjectTranslationLanguages(raw);
-
-  return {
-    ...raw,
-    ...(translationLanguages.length > 0 ? { translationLanguages } : {}),
-  } as ProjectMeta;
+  return raw as unknown as ProjectMeta;
 }
 
 interface UseProjectStorageReturn {

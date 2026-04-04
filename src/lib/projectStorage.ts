@@ -144,49 +144,22 @@ function normalizeTranslationLanguages(value: unknown): string[] {
   )];
 }
 
-function readLegacyTargetLanguage(raw: Record<string, unknown>): string | null {
-  if (typeof raw.targetLanguage === "string" && raw.targetLanguage.trim()) {
-    return raw.targetLanguage.trim();
-  }
-
-  const translationProject = raw.translationProject;
-  if (!translationProject || typeof translationProject !== "object") {
-    return null;
-  }
-
-  const nestedTargetLanguage = (translationProject as Record<string, unknown>).targetLanguage;
-  return typeof nestedTargetLanguage === "string" && nestedTargetLanguage.trim()
-    ? nestedTargetLanguage.trim()
-    : null;
-}
-
 export function getProjectTranslationLanguages(
   raw: Record<string, unknown> | null | undefined,
 ): string[] {
   if (!raw) return [];
-
-  const explicit = normalizeTranslationLanguages(raw.translationLanguages);
-  if (explicit.length > 0) return explicit;
-
-  const legacy = readLegacyTargetLanguage(raw);
-  return legacy ? [legacy] : [];
+  return normalizeTranslationLanguages(raw.translationLanguages);
 }
 
 /**
- * Strip unknown/legacy fields from a project.json object.
- * Prevents zombie fields (e.g. translationProject, targetLanguage) from persisting forever via spread.
+ * Strip unknown fields from a project.json object.
+ * Only keeps fields listed in PROJECT_META_KEYS.
  */
 export function sanitizeProjectMeta(raw: Record<string, unknown>): ProjectMeta {
   const clean: Record<string, unknown> = {};
   for (const key of PROJECT_META_KEYS) {
     if (key in raw) clean[key] = raw[key];
   }
-
-  const translationLanguages = getProjectTranslationLanguages(raw);
-  if (translationLanguages.length > 0) {
-    clean.translationLanguages = translationLanguages;
-  }
-
   return clean as unknown as ProjectMeta;
 }
 

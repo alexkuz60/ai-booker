@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect } from "react";
 import {
   FolderClosed, FolderOpen, Trash2, RefreshCw, Loader2,
   ChevronRight, ChevronDown, FileText, File, FileAudio, AlertTriangle, Eye,
-  ArrowRightLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,17 +10,13 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter,
-  DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import {
   ResizableHandle, ResizablePanel, ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { isOPFSSupported } from "@/lib/projectStorage";
 import { JsonTreeView } from "./JsonTreeView";
-import { migrateMirrorToSubfolders, type MigrationProgress } from "@/lib/migrateMirrorTranslation";
+
 
 /* ─── Types ──────────────────────────────────────────── */
 
@@ -213,12 +208,6 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
   const [jsonViewer, setJsonViewer] = useState<{ name: string; path: string; content: string } | null>(null);
   const [jsonLoading, setJsonLoading] = useState(false);
 
-  // Migration state
-  const [migrationDialog, setMigrationDialog] = useState(false);
-  const [migrating, setMigrating] = useState(false);
-  const [migrationProgress, setMigrationProgress] = useState<MigrationProgress | null>(null);
-  const [mirrorName, setMirrorName] = useState("Собачье сердце_EN");
-  const [mainName, setMainName] = useState("Собачье сердце");
 
   const supported = isOPFSSupported();
 
@@ -317,24 +306,6 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
           )}
         </div>
         <div className="flex items-center gap-1.5">
-          <Button
-            variant="ghost" size="sm" className="h-7 text-xs gap-1.5"
-            onClick={() => {
-              // Auto-detect mirror projects from the tree
-              const mirrorDirs = (entries ?? [])
-                .filter(e => e.kind === "directory" && /[_\s-](EN|RU)$/i.test(e.name));
-              if (mirrorDirs.length > 0) {
-                const m = mirrorDirs[0].name;
-                setMirrorName(m);
-                const match = m.match(/^(.*?)(?:[_\s-])(EN|RU)$/i);
-                if (match) setMainName(match[1].trim());
-              }
-              setMigrationDialog(true);
-            }}
-          >
-            <ArrowRightLeft className="h-3.5 w-3.5" />
-            {isRu ? "Миграция" : "Migrate"}
-          </Button>
           <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5" onClick={scan} disabled={loading}>
             <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
             {isRu ? "Обновить" : "Refresh"}
@@ -440,109 +411,6 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Migration dialog */}
-      <Dialog open={migrationDialog} onOpenChange={(open) => { if (!migrating) { setMigrationDialog(open); setMigrationProgress(null); } }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ArrowRightLeft className="h-5 w-5 text-primary" />
-              {isRu ? "Миграция зеркала перевода" : "Migrate translation mirror"}
-            </DialogTitle>
-            <DialogDescription>
-              {isRu
-                ? "Копирует данные перевода из отдельного OPFS-проекта в подпапки {lang}/ основного проекта."
-                : "Copies translation data from a separate OPFS project into {lang}/ subfolders of the main project."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 py-2">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                {isRu ? "Зеркало (источник)" : "Mirror (source)"}
-              </label>
-              <input
-                className="w-full px-2 py-1.5 text-sm border rounded-md bg-background"
-                value={mirrorName}
-                onChange={e => setMirrorName(e.target.value)}
-                placeholder="Собачье сердце_EN"
-                disabled={migrating}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                {isRu ? "Основной проект (цель)" : "Main project (target)"}
-              </label>
-              <input
-                className="w-full px-2 py-1.5 text-sm border rounded-md bg-background"
-                value={mainName}
-                onChange={e => setMainName(e.target.value)}
-                placeholder="Собачье сердце"
-                disabled={migrating}
-              />
-            </div>
-
-            {migrationProgress && (
-              <div className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
-                {migrationProgress.phase} ({migrationProgress.current}/{migrationProgress.total})
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setMigrationDialog(false)} disabled={migrating}>
-              {isRu ? "Отмена" : "Cancel"}
-            </Button>
-            <Button
-              disabled={migrating || !mirrorName.trim() || !mainName.trim()}
-              onClick={async () => {
-                setMigrating(true);
-                try {
-                  const result = await migrateMirrorToSubfolders(
-                    mirrorName.trim(),
-                    mainName.trim(),
-                    setMigrationProgress,
-                  );
-                  if (result.errors.length > 0) {
-                    console.warn("[Migration] errors:", result.errors);
-                  }
-                  if (result.errors.length > 0 && result.filesCopied === 0 && result.scenesProcessed === 0) {
-                    toast.error(
-                      isRu
-                        ? `Миграция не выполнена: ${result.errors[0]}`
-                        : `Migration failed: ${result.errors[0]}`,
-                    );
-                    return;
-                  }
-                  if (result.scenesProcessed > 0 && result.filesCopied === 0) {
-                    toast.success(
-                      isRu
-                        ? `Данные перевода уже на месте (${result.scenesProcessed} сцен)`
-                        : `Translation data already in place (${result.scenesProcessed} scenes)`,
-                    );
-                    setMigrationDialog(false);
-                    return;
-                  }
-                  toast.success(
-                    isRu
-                      ? `Миграция: ${result.scenesProcessed} сцен, ${result.filesCopied} файлов`
-                      : `Migration: ${result.scenesProcessed} scenes, ${result.filesCopied} files`,
-                  );
-                  setMigrationDialog(false);
-                  await scan();
-                } catch (err: any) {
-                  toast.error(err.message || "Migration failed");
-                } finally {
-                  setMigrating(false);
-                }
-              }}
-            >
-              {migrating && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
-              {isRu ? "Запустить" : "Run"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
