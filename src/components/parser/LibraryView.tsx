@@ -160,15 +160,16 @@ function LibraryViewInner({
       const tLang = source.meta.language === "ru" ? "en" : "ru";
 
       // Write translationLanguages to project.json (unified storage — no separate OPFS project)
-      const freshMeta = await source.store.readJSON<ProjectMeta>(paths.projectMeta());
+      const freshMeta = await source.store.readJSON<Record<string, unknown>>(paths.projectMeta());
       if (freshMeta) {
-        const existing = freshMeta.translationLanguages ?? [];
+        const existing = (freshMeta.translationLanguages as string[]) ?? [];
         if (!existing.includes(tLang)) {
-          await source.store.writeJSON(paths.projectMeta(), {
+          const { sanitizeProjectMeta } = await import("@/lib/projectStorage");
+          await source.store.writeJSON(paths.projectMeta(), sanitizeProjectMeta({
             ...freshMeta,
             translationLanguages: [...existing, tLang],
             updatedAt: new Date().toISOString(),
-          });
+          }));
         }
       }
 

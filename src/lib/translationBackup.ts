@@ -223,16 +223,17 @@ export async function restoreTranslationBackup(
 
   // 4. Update project.json with translationLanguages
   try {
-    const meta = await storage.readJSON<ProjectMeta>("project.json");
+    const meta = await storage.readJSON<Record<string, unknown>>("project.json");
     if (meta) {
-      const existing = meta.translationLanguages ?? [];
+      const existing = (meta.translationLanguages as string[]) ?? [];
       const merged = [...new Set([...existing, ...langs])];
       if (merged.length !== existing.length || merged.some((l, i) => l !== existing[i])) {
-        await storage.writeJSON("project.json", {
+        const { sanitizeProjectMeta } = await import("@/lib/projectStorage");
+        await storage.writeJSON("project.json", sanitizeProjectMeta({
           ...meta,
           translationLanguages: merged,
           updatedAt: new Date().toISOString(),
-        });
+        }));
       }
     }
   } catch {}

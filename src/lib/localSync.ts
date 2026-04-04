@@ -4,6 +4,7 @@
  */
 
 import type { ProjectStorage } from "@/lib/projectStorage";
+import { DEFAULT_CLIP_PLUGIN_CONFIG } from "@/hooks/useClipPluginConfigs";
 import type { TocChapter, Scene, ChapterStatus, LocalCharacter } from "@/pages/parser/types";
 import {
   isFolderNode,
@@ -115,6 +116,21 @@ export async function syncStructureToLocal(
 
     await Promise.all(sceneWrites);
 
+    // 3b. Seed empty scene-level JSON files (audio_meta, mixer_state, clip_plugins)
+    // Only creates files that don't already exist — never overwrites user data.
+    const seedWrites: Promise<void>[] = [];
+    sanitizedResults.forEach((result, idx) => {
+      if (isFolderNode(data.toc, idx)) return;
+      const chapterId = data.chapterIdMap.get(idx);
+      if (!chapterId) return;
+      for (const scene of result.scenes) {
+        const sceneId = (scene as any).id;
+        if (!sceneId) continue;
+        seedWrites.push(seedEmptySceneFiles(storage, sceneId, chapterId));
+      }
+    });
+    await Promise.all(seedWrites);
+
     // 4. Build and write scene index
     const existingIndex = await readSceneIndex(storage);
     const sceneIndex = buildSceneIndex(data.chapterIdMap, sanitizedResults, existingIndex);
@@ -180,8 +196,28 @@ export async function readStructureFromLocal(
 
     const sanitizedResults = sanitizeChapterResultsForStructure(structure.toc, chapterResults);
 
-    // Load book map into memory cache
-    await readBookMap(storage);
+    // Load or rebuild book map
+    let bookMap = await readBookMap(storage);
+    if (!bookMap) {
+      // book_map.json missing (legacy project or first restore) — rebuild it
+      console.info("[LocalSync] book_map.json missing, rebuilding from structure");
+      bookMap = buildBookMap(structure.bookId, structure.toc, chapterIdMap, sanitizedResults);
+      await writeBookMap(storage, bookMap);
+    }
+
+    // Seed empty scene-level files for any scenes that are missing them
+    const seedPromises: Promise<void>[] = [];
+    sanitizedResults.forEach((result, idx) => {
+      if (isFolderNode(structure.toc, idx)) return;
+      const chapterId = chapterIdMap.get(idx);
+      if (!chapterId) return;
+      for (const scene of result.scenes) {
+        const sceneId = (scene as any).id;
+        if (!sceneId) continue;
+        seedPromises.push(seedEmptySceneFiles(storage, sceneId, chapterId));
+      }
+    });
+    if (seedPromises.length > 0) await Promise.all(seedPromises);
 
     return { structure, chapterIdMap, chapterResults: sanitizedResults };
   } catch (err) {
@@ -212,5 +248,57 @@ export async function readCharactersFromLocal(
     return data || [];
   } catch {
     return [];
+  }
+}
+
+// ─── Seed empty scene-level files ────────────────────────────
+
+/**
+ * Create empty audio_meta.json, mixer_state.json, clip_plugins.json
+ * for a scene if they don't already exist.
+ * NEVER overwrites existing files — preserves user data.
+ */
+async function seedEmptySceneFiles(
+  storage: ProjectStorage,
+  sceneId: string,
+  chapterId: string,
+): Promise<void> {
+  const base = `chapters/${chapterId}/scenes/${sceneId}`;
+
+  const audioMetaPath = `${base}/audio_meta.json`;
+  const mixerStatePath = `${base}/mixer_state.json`;
+  const clipPluginsPath = `${base}/clip_plugins.json`;
+
+  const [hasAudio, hasMixer, hasClip] = await Promise.all([
+    storage.exists(audioMetaPath),
+    storage.exists(mixerStatePath),
+    storage.exists(clipPluginsPath),
+  ]);
+
+  const writes: Promise<void>[] = [];
+
+  if (!hasAudio) {
+    writes.push(storage.writeJSON(audioMetaPath, {
+      sceneId,
+      updatedAt: new Date().toISOString(),
+      entries: {},
+    }));
+  }
+
+  if (!hasMixer) {
+    writes.push(storage.writeJSON(mixerStatePath, {}));
+  }
+
+  if (!hasClip) {
+    writes.push(storage.writeJSON(clipPluginsPath, {
+      sceneId,
+      updatedAt: new Date().toISOString(),
+      configs: {},
+    }));
+  }
+
+  if (writes.length > 0) {
+    await Promise.all(writes);
+    console.debug(`[LocalSync] Seeded ${writes.length} empty files for scene ${sceneId}`);
   }
 }

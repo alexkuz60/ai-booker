@@ -171,16 +171,16 @@ export async function migrateMirrorToSubfolders(
   }
 
   // 6. Update main project meta with translationLanguages
-  const updatedMeta = await mainStore.readJSON<ProjectMeta>("project.json");
-  const finalMeta = await mainStore.readJSON<ProjectMeta>("project.json");
+  const finalMeta = await mainStore.readJSON<Record<string, unknown>>("project.json");
   if (finalMeta) {
-    const existing = finalMeta.translationLanguages ?? [];
+    const existing = (finalMeta.translationLanguages as string[]) ?? [];
     if (!existing.includes(targetLang)) {
-      await mainStore.writeJSON("project.json", {
+      const { sanitizeProjectMeta } = await import("@/lib/projectStorage");
+      await mainStore.writeJSON("project.json", sanitizeProjectMeta({
         ...finalMeta,
         translationLanguages: [...existing, targetLang],
         updatedAt: new Date().toISOString(),
-      });
+      }));
     }
   }
 
