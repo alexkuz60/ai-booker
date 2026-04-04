@@ -53,11 +53,6 @@ interface UseProjectStorageReturn {
   closeProject: () => void;
   /** Hard-reset all locally persisted parser data for this browser */
   hardResetLocalData: () => Promise<void>;
-
-  /** Save source file (PDF or DOCX) into project */
-  saveSourceFile: (file: File) => Promise<void>;
-  /** Read source file from project (tries PDF then DOCX) */
-  readSourceFile: () => Promise<File | null>;
 }
 
 export function useProjectStorage(): UseProjectStorageReturn {
