@@ -12,6 +12,7 @@ import {
 import { paths } from "@/lib/projectPaths";
 import { buildSceneIndex, writeSceneIndex, readSceneIndex } from "@/lib/sceneIndex";
 import { writePipelineStep } from "@/hooks/usePipelineProgress";
+import { buildBookMap, writeBookMap, readBookMap } from "@/lib/bookMap";
 
 export interface LocalBookStructure {
   bookId: string;
