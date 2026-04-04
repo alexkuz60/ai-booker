@@ -445,7 +445,7 @@ export class OPFSStorage implements ProjectStorage {
     const opfsRoot = await navigator.storage.getDirectory();
     const projectDir = await opfsRoot.getDirectoryHandle(projectName, { create: true }) as unknown as FileSystemDirectoryHandle;
     // Ensure subdirs
-    await projectDir.getDirectoryHandle("source", { create: true });
+    // source/ directory no longer needed — metadata in project.json
     await projectDir.getDirectoryHandle("structure", { create: true });
     await projectDir.getDirectoryHandle("chapters", { create: true });
     await projectDir.getDirectoryHandle("montage", { create: true });
