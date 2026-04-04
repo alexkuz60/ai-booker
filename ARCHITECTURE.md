@@ -263,7 +263,7 @@ interface ProjectStorage {
 
 | Триггер | Что записывается | Куда |
 |---------|------------------|------|
-| `handleFileSelect` (загрузка файла) | project.json + toc.json + chapters.json + source/book.{ext} + scene_index.json | Local |
+| `handleFileSelect` (загрузка файла) | project.json (+ source metadata) + toc.json + chapters.json + scene_index.json | Local |
 | Анализ главы завершён | `chapters/{chapterId}/content.json` + scene_index.json (хеши контента) | Local |
 | Ручная правка TOC (уровень, заголовок, страница) | toc.json + chapters.json | Local |
 | Удаление/слияние глав | toc.json + удаление директории chapters/{chapterId}/ + очистка stale scene dirs и scene_index (storyboarded/characterMapped) | Local |
