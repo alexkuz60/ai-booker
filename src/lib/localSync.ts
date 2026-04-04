@@ -3,7 +3,7 @@
  * Writes JSON snapshots of the book's structure so it can be restored offline.
  */
 
-import type { ProjectStorage } from "@/lib/projectStorage";
+import { type ProjectStorage, getProjectTranslationLanguages } from "@/lib/projectStorage";
 
 import type { TocChapter, Scene, ChapterStatus, LocalCharacter } from "@/pages/parser/types";
 import {
@@ -117,8 +117,8 @@ export async function syncStructureToLocal(
     await Promise.all(sceneWrites);
 
     // Read translationLanguages from project.json for map & seed
-    const projMeta = await storage.readJSON<{ translationLanguages?: string[] }>(paths.projectMeta());
-    const transLangs = projMeta?.translationLanguages ?? [];
+    const projMeta = await storage.readJSON<Record<string, unknown>>(paths.projectMeta());
+    const transLangs = getProjectTranslationLanguages(projMeta);
 
     // 3b. Seed empty scene-level JSON files (audio_meta, mixer_state, clip_plugins, translation)
     // Only creates files that don't already exist — never overwrites user data.
@@ -201,8 +201,8 @@ export async function readStructureFromLocal(
     const sanitizedResults = sanitizeChapterResultsForStructure(structure.toc, chapterResults);
 
     // Load or rebuild book map
-    const projMeta = await storage.readJSON<{ translationLanguages?: string[] }>(paths.projectMeta());
-    const transLangs = projMeta?.translationLanguages ?? [];
+    const projMeta = await storage.readJSON<Record<string, unknown>>(paths.projectMeta());
+    const transLangs = getProjectTranslationLanguages(projMeta);
     let bookMap = await readBookMap(storage);
     if (!bookMap) {
       // book_map.json missing (legacy project or first restore) — rebuild it

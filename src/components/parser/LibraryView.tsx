@@ -20,7 +20,7 @@ import type { BookRecord } from "@/pages/parser/types";
 import { PipelineTimeline } from "@/components/library/PipelineTimeline";
 import { TranslationTimeline } from "@/components/library/TranslationTimeline";
 import type { PipelineProgress, PipelineStepId, ProjectMeta } from "@/lib/projectStorage";
-import { createEmptyPipelineProgress } from "@/lib/projectStorage";
+import { createEmptyPipelineProgress, getProjectTranslationLanguages } from "@/lib/projectStorage";
 import { writePipelineStep } from "@/hooks/usePipelineProgress";
 import { OPFSStorage } from "@/lib/projectStorage";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
@@ -88,7 +88,11 @@ function LibraryViewInner({
     const store = await OPFSStorage.openExisting(projectNames[0]);
     if (!store) return null;
 
-    const meta = await store.readJSON<ProjectMeta>("project.json");
+    const rawMeta = await store.readJSON<Record<string, unknown>>("project.json");
+    const meta = rawMeta ? {
+      ...rawMeta,
+      translationLanguages: getProjectTranslationLanguages(rawMeta),
+    } as ProjectMeta : null;
     if (meta?.bookId === bookId) return { store, meta };
 
     return null;
@@ -162,7 +166,7 @@ function LibraryViewInner({
       // Write translationLanguages to project.json (unified storage — no separate OPFS project)
       const freshMeta = await source.store.readJSON<Record<string, unknown>>(paths.projectMeta());
       if (freshMeta) {
-        const existing = (freshMeta.translationLanguages as string[]) ?? [];
+        const existing = getProjectTranslationLanguages(freshMeta);
         if (!existing.includes(tLang)) {
           const { sanitizeProjectMeta } = await import("@/lib/projectStorage");
           await source.store.writeJSON(paths.projectMeta(), sanitizeProjectMeta({
@@ -179,7 +183,7 @@ function LibraryViewInner({
       if (local?.structure) {
         // Force rebuild book map (readStructureFromLocal only rebuilds if missing)
         const { buildBookMap, writeBookMap } = await import("@/lib/bookMap");
-        const updatedLangs = [...new Set([...(source.meta.translationLanguages ?? []), tLang])];
+        const updatedLangs = [...new Set([...getProjectTranslationLanguages(source.meta as unknown as Record<string, unknown>), tLang])];
         const newMap = buildBookMap(local.structure.bookId, local.structure.toc, local.chapterIdMap, local.chapterResults, updatedLangs);
         await writeBookMap(source.store, newMap);
       }
@@ -205,7 +209,7 @@ function LibraryViewInner({
         const source = await resolveSourceProject(book.id);
         if (!source) return;
 
-        const hasLangs = (source.meta.translationLanguages?.length ?? 0) > 0;
+        const hasLangs = getProjectTranslationLanguages(source.meta as unknown as Record<string, unknown>).length > 0;
         if (hasLangs) {
           setTransCreateConfirm({ book, exists: true });
         } else {
