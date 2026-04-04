@@ -80,6 +80,7 @@ export function buildBookMap(
   toc: TocChapter[],
   chapterIdMap: Map<number, string>,
   chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>,
+  translationLanguages: string[] = [],
 ): BookMap {
   const chapters: Record<string, ChapterMapEntry> = {};
   const sceneToChapter: Record<string, string> = {};
@@ -95,6 +96,23 @@ export function buildBookMap(
       if (!sceneId) return;
 
       const base = `chapters/${chapterId}/scenes/${sceneId}`;
+
+      // Build translation path entries for each active language
+      const translations: Record<string, TranslationPathEntry> = {};
+      for (const lang of translationLanguages) {
+        const langBase = `${base}/${lang}`;
+        translations[lang] = {
+          storyboard: `${langBase}/storyboard.json`,
+          radarLiteral: `${langBase}/radar-literal.json`,
+          radarLiterary: `${langBase}/radar-literary.json`,
+          radarCritique: `${langBase}/radar-critique.json`,
+          audioMeta: `${langBase}/audio_meta.json`,
+          mixerState: `${langBase}/mixer_state.json`,
+          clipPlugins: `${langBase}/clip_plugins.json`,
+          ttsDir: `${langBase}/audio/tts`,
+        };
+      }
+
       scenes[sceneId] = {
         sceneNumber: i + 1,
         basePath: base,
@@ -107,6 +125,7 @@ export function buildBookMap(
         ttsDir: `${base}/audio/tts`,
         atmosphereDir: `${base}/audio/atmosphere`,
         rendersDir: `${base}/audio/renders`,
+        translations,
       };
       sceneToChapter[sceneId] = chapterId;
     });
