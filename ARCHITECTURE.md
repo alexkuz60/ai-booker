@@ -21,12 +21,14 @@
 
 **Исходный файл книги (PDF/DOCX/FB2) НИКОГДА не покидает устройство пользователя.**
 
-- Файл хранится в `source/book.{pdf|docx|fb2}` внутри ProjectStorage и читается оттуда при необходимости.
+- Исходный файл используется **только для первичного извлечения текста и структуры**. После успешного создания проекта (TOC + chapters) физический блоб **не сохраняется** ни в OPFS, ни на сервере.
+- Метаданные об источнике хранятся в `project.json.source`: `{ title, fileName, format }`.
 - Формат определяется автоматически через `detectFileFormat()` из `fileFormatUtils.ts`.
 - На сервер отправляются **ТОЛЬКО**:
   - Извлечённые текстовые блоки глав → для семантического анализа ИИ (edge functions).
   - Текст фраз/сегментов → для запросов на TTS-синтез.
   - Структурные метаданные (TOC, части, главы, сцены) → при ручном пуше «На сервер».
+- Физический файл книги **НЕ загружается на сервер** и **НЕ хранится в OPFS** после обработки.
 
 ### 1.3 Поддерживаемые форматы файлов
 
@@ -52,11 +54,10 @@
 ```
 📁 BookTitle/
 ├── project.json           — ProjectMeta (version, bookId, title, userId, language, fileFormat,
-│                             pipelineProgress, translationProject?, layoutVersion: 2)
+│                             pipelineProgress, source: {title, fileName, format})
+├── book_map.json          — BookMap: прекомпилированные пути ко всем сущностям (chapters/scenes)
 ├── scene_index.json       — SceneIndexData: sceneId→chapterId маппинг, хеши контента, маркеры storyboarded/characterMapped
 ├── characters.json        — CharacterIndex[] (глобальный реестр персонажей книги)
-├── 📁 source/
-│   └── book.{pdf|docx|fb2} — исходный файл (ТОЛЬКО ЛОКАЛЬНО)
 ├── 📁 structure/
 │   ├── toc.json           — LocalBookStructure (bookId, title, fileName, parts[], toc[])
 │   └── chapters.json      — маппинг index → chapterId
@@ -213,7 +214,7 @@ interface ProjectStorage {
 ┌─────────────────────────────────────────────────────────────────┐
 │  1. ИНИЦИАЛИЗАЦИЯ                                               │
 │     Upload (PDF/DOCX/FB2) → createProject() → project.json     │
-│     + source/book.{ext}                                         │
+│     (source metadata записывается в project.json.source)        │
 │     Запись начальной структуры (TOC, parts) в structure/        │
 │     БД НЕ ТРОГАЕТСЯ. Все ID генерируются на клиенте.           │
 ├─────────────────────────────────────────────────────────────────┤
@@ -234,7 +235,7 @@ interface ProjectStorage {
 │     Библиотека: читает ТОЛЬКО project.json из каждого проекта   │
 │     При выборе: ТОЛЬКО локальный ProjectStorage                 │
 │     НЕ делать авто-fallback на сервер                           │
-│     Затем: toc.json → chapters/ → characters.json → source/     │
+│     Затем: toc.json → chapters/ → characters.json               │
 ├─────────────────────────────────────────────────────────────────┤
 │  5. ВОССТАНОВЛЕНИЕ С СЕРВЕРА (Wipe-and-Deploy)                  │
 │     Книга есть на сервере, нужно развернуть на этом устройстве: │
@@ -262,7 +263,7 @@ interface ProjectStorage {
 
 | Триггер | Что записывается | Куда |
 |---------|------------------|------|
-| `handleFileSelect` (загрузка файла) | project.json + toc.json + chapters.json + source/book.{ext} + scene_index.json | Local |
+| `handleFileSelect` (загрузка файла) | project.json (+ source metadata) + toc.json + chapters.json + scene_index.json | Local |
 | Анализ главы завершён | `chapters/{chapterId}/content.json` + scene_index.json (хеши контента) | Local |
 | Ручная правка TOC (уровень, заголовок, страница) | toc.json + chapters.json | Local |
 | Удаление/слияние глав | toc.json + удаление директории chapters/{chapterId}/ + очистка stale scene dirs и scene_index (storyboarded/characterMapped) | Local |
