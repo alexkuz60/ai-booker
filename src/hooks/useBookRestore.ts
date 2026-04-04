@@ -187,6 +187,7 @@ export function useBookRestore({
 
     // ── Wipe-and-Deploy ─────────────────────────────────────
     report("wipe", "running");
+    const existingProjects = localProjectNamesByBookId.get(book.id) || [];
     await wipeProjectBrowserState(book.id, existingProjects);
     clearTransientBookState();
     setStep("extracting_toc");
