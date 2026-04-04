@@ -98,7 +98,7 @@ export async function deployFromServer({
   downloadImpulses = false,
   downloadAtmosphere = false,
   downloadSfx = false,
-  preservedSourceBlob,
+  
   userId: paramUserId,
 }: DeployParams): Promise<DeployResult> {
   // ── 1. Fetch structure (parts + chapters) ─────────────────
