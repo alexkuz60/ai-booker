@@ -173,6 +173,11 @@ function LibraryViewInner({
         }
       }
 
+      // Rebuild book map & seed empty translation files via readStructureFromLocal
+      // (it auto-seeds missing scene files including translation subdirs)
+      const { readStructureFromLocal } = await import("@/lib/localSync");
+      await readStructureFromLocal(source.store);
+
       toast.success(isRu
         ? `Перевод активирован (${readyIndices.length} глав)`
         : `Translation activated (${readyIndices.length} chapters)`);
