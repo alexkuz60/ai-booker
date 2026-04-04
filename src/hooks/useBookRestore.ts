@@ -132,17 +132,6 @@ export function useBookRestore({
       if (localFormat === "pdf") {
         // Source file no longer stored in OPFS — PDF preview unavailable after restore
         console.info("[Restore] PDF source not stored locally, skipping PDF preview");
-          if (!pdfBlob) return;
-          try {
-            const arrayBuffer = await pdfBlob.arrayBuffer();
-            const { getDocument } = await import("pdfjs-dist");
-            const pdf = await getDocument({ data: arrayBuffer }).promise;
-            updatePdfRef(pdf);
-            updateTotalPages(pdf.numPages);
-          } catch (pdfErr) {
-            console.warn("[LocalRestore] Failed to parse local PDF:", pdfErr);
-          }
-        });
       }
 
       toast.success(isRu ? `Книга «${structure.title}» загружена` : `Book "${structure.title}" loaded`);
