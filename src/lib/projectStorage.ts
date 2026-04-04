@@ -152,20 +152,14 @@ export function getProjectTranslationLanguages(
 }
 
 /**
- * Strip unknown/legacy fields from a project.json object.
- * Prevents zombie fields (e.g. translationProject, targetLanguage) from persisting forever via spread.
+ * Strip unknown fields from a project.json object.
+ * Only keeps fields listed in PROJECT_META_KEYS.
  */
 export function sanitizeProjectMeta(raw: Record<string, unknown>): ProjectMeta {
   const clean: Record<string, unknown> = {};
   for (const key of PROJECT_META_KEYS) {
     if (key in raw) clean[key] = raw[key];
   }
-
-  const translationLanguages = getProjectTranslationLanguages(raw);
-  if (translationLanguages.length > 0) {
-    clean.translationLanguages = translationLanguages;
-  }
-
   return clean as unknown as ProjectMeta;
 }
 

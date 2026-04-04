@@ -23,12 +23,7 @@ const LOCAL_RESET_KEYS = [
 ];
 
 function hydrateRuntimeMeta(raw: Record<string, unknown>): ProjectMeta {
-  const translationLanguages = getProjectTranslationLanguages(raw);
-
-  return {
-    ...raw,
-    ...(translationLanguages.length > 0 ? { translationLanguages } : {}),
-  } as ProjectMeta;
+  return raw as ProjectMeta;
 }
 
 interface UseProjectStorageReturn {
