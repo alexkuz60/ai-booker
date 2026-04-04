@@ -167,6 +167,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
     if (backend !== "opfs") {
       if (storage?.projectName === projectName && meta) {
         await readSceneIndex(storage);
+        await readBookMap(storage);
         return storage;
       }
       return null;
