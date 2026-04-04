@@ -176,6 +176,10 @@ export async function readStructureFromLocal(
     await Promise.all(reads);
 
     const sanitizedResults = sanitizeChapterResultsForStructure(structure.toc, chapterResults);
+
+    // Load book map into memory cache
+    await readBookMap(storage);
+
     return { structure, chapterIdMap, chapterResults: sanitizedResults };
   } catch (err) {
     console.warn("[LocalSync] Failed to read structure:", err);
