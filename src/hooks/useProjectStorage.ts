@@ -321,7 +321,18 @@ export function useProjectStorage(): UseProjectStorageReturn {
           return;
         }
 
-        // Sanitize once on load — strip zombie fields (translationProject, targetLanguage, etc.)
+        // Migrate legacy translation fields → translationLanguages before sanitizing
+        if (!rawMeta.translationLanguages || !(rawMeta.translationLanguages as string[]).length) {
+          const legacyLang =
+            (rawMeta.targetLanguage as string) ||
+            ((rawMeta.translationProject as Record<string, unknown>)?.targetLanguage as string);
+          if (legacyLang) {
+            rawMeta.translationLanguages = [legacyLang];
+            console.info("[ProjectStorage] Migrated legacy targetLanguage →", legacyLang);
+          }
+        }
+
+        // Sanitize — strip zombie fields (translationProject, targetLanguage, etc.)
         const { sanitizeProjectMeta } = await import("@/lib/projectStorage");
         const projectMeta = sanitizeProjectMeta(rawMeta) as ProjectMeta;
         await store.writeJSON("project.json", projectMeta);
