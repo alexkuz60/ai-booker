@@ -224,3 +224,110 @@ export function diagnosePath(
     );
   }
 }
+
+// ─── Integrity validation ───────────────────────────────────
+
+/** JSON file keys from ScenePathEntry to validate */
+const SCENE_JSON_KEYS: (keyof ScenePathEntry)[] = [
+  "storyboard", "audioMeta", "mixerState", "clipPlugins", "characters", "atmospheres",
+];
+
+/** JSON file keys from TranslationPathEntry to validate */
+const TRANS_JSON_KEYS: (keyof TranslationPathEntry)[] = [
+  "storyboard", "radarLiteral", "radarLiterary", "radarCritique",
+  "audioMeta", "mixerState", "clipPlugins",
+];
+
+/** Human-readable labels for toast messages */
+const PATH_LABELS: Record<string, Record<string, string>> = {
+  ru: {
+    "book_map.json": "Карта книги",
+    "project.json": "Метаданные проекта",
+    "characters.json": "Реестр персонажей",
+    storyboard: "Раскадровка",
+    audioMeta: "Аудио-метаданные",
+    mixerState: "Настройки микшера",
+    clipPlugins: "Настройки плагинов",
+    characters: "Персонажи сцены",
+    atmospheres: "Атмосфера сцены",
+    contentPath: "Текст главы",
+    radarLiteral: "Радар (буквальный)",
+    radarLiterary: "Радар (литературный)",
+    radarCritique: "Радар (критика)",
+  },
+  en: {
+    "book_map.json": "Book map",
+    "project.json": "Project metadata",
+    "characters.json": "Character registry",
+    storyboard: "Storyboard",
+    audioMeta: "Audio metadata",
+    mixerState: "Mixer settings",
+    clipPlugins: "Plugin settings",
+    characters: "Scene characters",
+    atmospheres: "Scene atmospheres",
+    contentPath: "Chapter text",
+    radarLiteral: "Radar (literal)",
+    radarLiterary: "Radar (literary)",
+    radarCritique: "Radar (critique)",
+  },
+};
+
+function label(key: string, isRu: boolean): string {
+  return (isRu ? PATH_LABELS.ru[key] : PATH_LABELS.en[key]) || key;
+}
+
+/**
+ * Validate that all JSON files referenced in the book map actually exist in storage.
+ * Returns an array of human-readable error strings for missing files.
+ * Does NOT attempt any repairs — report only.
+ */
+export async function validateBookMapIntegrity(
+  storage: ProjectStorage,
+  map: BookMap,
+  isRu: boolean,
+): Promise<string[]> {
+  const missing: string[] = [];
+
+  // Root-level files
+  for (const rootFile of ["project.json", "characters.json"]) {
+    const exists = await storage.exists(rootFile).catch(() => false);
+    if (!exists) {
+      missing.push(`${label(rootFile, isRu)}: ${rootFile}`);
+    }
+  }
+
+  // Per-chapter
+  for (const [chapterId, chapter] of Object.entries(map.chapters)) {
+    // content.json
+    const contentExists = await storage.exists(chapter.contentPath).catch(() => false);
+    if (!contentExists) {
+      missing.push(`${label("contentPath", isRu)} (ch ${chapter.index}): ${chapter.contentPath}`);
+    }
+
+    // Per-scene JSON files
+    for (const [sceneId, scene] of Object.entries(chapter.scenes)) {
+      for (const key of SCENE_JSON_KEYS) {
+        const path = scene[key];
+        if (typeof path !== "string") continue;
+        const exists = await storage.exists(path).catch(() => false);
+        if (!exists) {
+          missing.push(`${label(key, isRu)} (сц.${scene.sceneNumber}): ${path}`);
+        }
+      }
+
+      // Translation subfolders
+      for (const [lang, trans] of Object.entries(scene.translations)) {
+        for (const tKey of TRANS_JSON_KEYS) {
+          const path = trans[tKey];
+          if (typeof path !== "string") continue;
+          const exists = await storage.exists(path).catch(() => false);
+          if (!exists) {
+            missing.push(`[${lang}] ${label(tKey, isRu)} (сц.${scene.sceneNumber}): ${path}`);
+          }
+        }
+      }
+    }
+  }
+
+  return missing;
+}
