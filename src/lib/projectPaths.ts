@@ -12,20 +12,47 @@
  */
 
 import { resolveChapterId, getCachedSceneIndex } from "@/lib/sceneIndex";
+import { resolveChapterFromMap } from "@/lib/bookMap";
 
 // ─── Helper: resolve chapterId for nested paths ─────────────
 
 function requireChapterId(sceneId: string, provided?: string): string {
   if (provided) return provided;
-  const cid = resolveChapterId(sceneId);
-  if (!cid) {
-    console.error(
-      `[projectPaths] ❌ Cannot resolve chapterId for scene ${sceneId}! ` +
-      `Scene index has ${Object.keys(getCachedSceneIndex()?.entries ?? {}).length} entries. ` +
-      `This will cause data loss — writes will be skipped.`
-    );
+
+  // 1. Primary: book map (precomputed, authoritative)
+  const fromMap = resolveChapterFromMap(sceneId);
+  if (fromMap) {
+    // Diagnostic: cross-check with scene index
+    const fromIndex = resolveChapterId(sceneId);
+    if (fromIndex && fromIndex !== fromMap) {
+      console.error(
+        `[projectPaths] ❌ MISMATCH: bookMap says chapterId=${fromMap}, ` +
+        `sceneIndex says ${fromIndex} for scene ${sceneId}`,
+      );
+    }
+    return fromMap;
   }
-  return cid ?? "__unresolved__";
+
+  // 2. Fallback: scene index (for backward compat during migration)
+  const fromIndex = resolveChapterId(sceneId);
+  if (fromIndex) return fromIndex;
+
+  console.error(
+    `[projectPaths] ❌ Cannot resolve chapterId for scene ${sceneId}! ` +
+    `BookMap has ${Object.keys(getCachedBookMapSafe()).length} scenes, ` +
+    `SceneIndex has ${Object.keys(getCachedSceneIndex()?.entries ?? {}).length} entries. ` +
+    `This will cause data loss — writes will be skipped.`,
+  );
+  return "__unresolved__";
+}
+
+function getCachedBookMapSafe(): Record<string, string> {
+  try {
+    const { getCachedBookMap } = require("@/lib/bookMap");
+    return getCachedBookMap()?.sceneToChapter ?? {};
+  } catch {
+    return {};
+  }
 }
 
 // ─── Project-level paths ─────────────────────────────────────
