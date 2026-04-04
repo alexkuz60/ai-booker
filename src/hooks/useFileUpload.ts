@@ -18,6 +18,7 @@ import { t } from "@/pages/parser/i18n";
 import type { Scene, TocChapter, Step, ChapterStatus } from "@/pages/parser/types";
 import { classifySection, normalizeLevels, ACTIVE_BOOK_KEY } from "@/pages/parser/types";
 import type { ProjectStorage } from "@/lib/projectStorage";
+import { sanitizeProjectMeta } from "@/lib/projectStorage";
 import { syncStructureToLocal } from "@/lib/localSync";
 import { isFolderNode, normalizeTocRanges, sanitizeChapterResultsForStructure } from "@/lib/tocStructure";
 import { stripFileExtension } from "@/lib/fileFormatUtils";
