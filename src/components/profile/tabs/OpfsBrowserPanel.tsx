@@ -103,7 +103,8 @@ function EntryNode({
   selectedPath?: string;
   onDelete: (path: string, name: string, kind: "file" | "directory") => void;
 }) {
-  const [open, setOpen] = useState(depth < 1);
+  const isAudioCache = entry.kind === "directory" && /^(audio|tts|atmosphere|renders|soundscape_cache)$/.test(entry.name);
+  const [open, setOpen] = useState(depth < 1 && !isAudioCache);
   const isJson = entry.name.endsWith(".json");
   const isSelected = isJson && entry.path === selectedPath;
 
