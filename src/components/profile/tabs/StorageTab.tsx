@@ -111,6 +111,8 @@ export function StorageTab({ isRu, userId, onStatsReady }: StorageTabProps) {
   const [activeUploadCategory, setActiveUploadCategory] = useState<Category | null>(null);
   /** Map: audio_path → FileUsageEntry[] */
   const [usageMap, setUsageMap] = useState<Map<string, FileUsageEntry[]>>(new Map());
+  const [persistStatus, setPersistStatus] = useState<'unknown' | 'granted' | 'denied'>('unknown');
+  const [persistRequesting, setPersistRequesting] = useState(false);
 
   /* Load usage info: which audio files are referenced in scene_atmospheres */
   const loadUsageMap = useCallback(async () => {
