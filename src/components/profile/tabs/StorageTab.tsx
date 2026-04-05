@@ -3,7 +3,7 @@ import {
   HardDrive, FolderOpen, FileAudio, Search, Loader2, Trash2, Eye,
   Download, RefreshCw, Upload, Music, Waves, CloudRain, AudioLines,
   FileText, File, FileImage, ChevronDown, ChevronRight, FolderClosed,
-  Ghost, ScanSearch, Trash, DatabaseBackup,
+  Ghost, ScanSearch, Trash, DatabaseBackup, ShieldCheck, ShieldAlert,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -111,6 +111,8 @@ export function StorageTab({ isRu, userId, onStatsReady }: StorageTabProps) {
   const [activeUploadCategory, setActiveUploadCategory] = useState<Category | null>(null);
   /** Map: audio_path → FileUsageEntry[] */
   const [usageMap, setUsageMap] = useState<Map<string, FileUsageEntry[]>>(new Map());
+  const [persistStatus, setPersistStatus] = useState<'unknown' | 'granted' | 'denied'>('unknown');
+  const [persistRequesting, setPersistRequesting] = useState(false);
 
   /* Load usage info: which audio files are referenced in scene_atmospheres */
   const loadUsageMap = useCallback(async () => {
@@ -217,6 +219,38 @@ export function StorageTab({ isRu, userId, onStatsReady }: StorageTabProps) {
   }, [userId]);
 
   useEffect(() => { loadFiles(); loadUsageMap(); }, [loadFiles, loadUsageMap]);
+
+  /* ─── Persistent storage status ──────────────────────────── */
+  useEffect(() => {
+    if (navigator.storage?.persisted) {
+      navigator.storage.persisted().then(granted => {
+        setPersistStatus(granted ? 'granted' : 'denied');
+      }).catch(() => {});
+    }
+  }, []);
+
+  const handleRequestPersist = useCallback(async () => {
+    if (!navigator.storage?.persist) {
+      toast.warning(isRu
+        ? 'Браузер не поддерживает постоянное хранилище'
+        : 'Browser does not support persistent storage');
+      return;
+    }
+    setPersistRequesting(true);
+    try {
+      const granted = await navigator.storage.persist();
+      setPersistStatus(granted ? 'granted' : 'denied');
+      if (!granted) {
+        toast.warning(isRu
+          ? '⚠️ Браузер отклонил запрос на постоянное хранилище. Данные могут быть удалены при нехватке места.'
+          : '⚠️ Browser denied persistent storage request. Data may be cleared under storage pressure.');
+      }
+    } catch {
+      toast.error(isRu ? 'Ошибка запроса' : 'Request failed');
+    } finally {
+      setPersistRequesting(false);
+    }
+  }, [isRu]);
 
   /* Upload */
   const handleUploadClick = (cat: Category) => {
@@ -400,6 +434,33 @@ export function StorageTab({ isRu, userId, onStatsReady }: StorageTabProps) {
           <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={loadFiles}>
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
           </Button>
+          {/* Persist storage button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={persistStatus === 'granted' ? 'ghost' : 'outline'}
+                size="icon"
+                className={cn(
+                  'h-8 w-8 shrink-0',
+                  persistStatus === 'granted' && 'text-green-500',
+                  persistStatus === 'denied' && 'text-muted-foreground',
+                )}
+                disabled={persistStatus === 'granted' || persistRequesting}
+                onClick={handleRequestPersist}
+              >
+                {persistRequesting
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : persistStatus === 'granted'
+                    ? <ShieldCheck className="h-4 w-4" />
+                    : <ShieldAlert className="h-4 w-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {persistStatus === 'granted'
+                ? (isRu ? 'Хранилище защищено от очистки' : 'Storage is persistent')
+                : (isRu ? 'Запросить постоянное хранилище' : 'Request persistent storage')}
+            </TooltipContent>
+          </Tooltip>
         </div>
 
         {/* File list grouped by category */}
