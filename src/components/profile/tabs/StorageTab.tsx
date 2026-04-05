@@ -434,6 +434,33 @@ export function StorageTab({ isRu, userId, onStatsReady }: StorageTabProps) {
           <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={loadFiles}>
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
           </Button>
+          {/* Persist storage button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={persistStatus === 'granted' ? 'ghost' : 'outline'}
+                size="icon"
+                className={cn(
+                  'h-8 w-8 shrink-0',
+                  persistStatus === 'granted' && 'text-green-500',
+                  persistStatus === 'denied' && 'text-muted-foreground',
+                )}
+                disabled={persistStatus === 'granted' || persistRequesting}
+                onClick={handleRequestPersist}
+              >
+                {persistRequesting
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : persistStatus === 'granted'
+                    ? <ShieldCheck className="h-4 w-4" />
+                    : <ShieldAlert className="h-4 w-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {persistStatus === 'granted'
+                ? (isRu ? 'Хранилище защищено от очистки' : 'Storage is persistent')
+                : (isRu ? 'Запросить постоянное хранилище' : 'Request persistent storage')}
+            </TooltipContent>
+          </Tooltip>
         </div>
 
         {/* File list grouped by category */}
