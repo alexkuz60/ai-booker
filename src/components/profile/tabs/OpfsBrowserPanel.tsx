@@ -244,10 +244,10 @@ function PersistentStorageButton({ isRu }: { isRu: boolean }) {
         <ShieldOff className="h-3.5 w-3.5" />
       )}
       {persisted
-        ? (isRu ? "Persistent ✓" : "Persistent ✓")
+        ? (isRu ? "Квота увеличена ✓" : "Persistent ✓")
         : requesting
           ? (isRu ? "Запрос…" : "Requesting…")
-          : (isRu ? "Persistent Storage" : "Persistent Storage")}
+          : (isRu ? "Увеличить квоту (Гб)" : "Persistent Storage")}
     </Button>
   );
 }
