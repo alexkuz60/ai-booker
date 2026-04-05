@@ -374,6 +374,12 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
             <p className="text-[11px] text-muted-foreground mt-0.5">
               {isRu ? "Всего:" : "Total:"} {totalStats.dirs} {isRu ? "папок" : "dirs"}, {totalStats.files} {isRu ? "файлов" : "files"}
               {totalStats.bytes > 0 && ` (${formatBytes(totalStats.bytes)})`}
+              {quota && quota.quota > 0 && (
+                <span className="ml-2 opacity-70">
+                  · {isRu ? "Квота:" : "Quota:"} {formatBytes(quota.usage)} / {formatBytes(quota.quota)}
+                  {" "}({((quota.usage / quota.quota) * 100).toFixed(1)}%)
+                </span>
+              )}
             </p>
           )}
         </div>
