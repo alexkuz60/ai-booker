@@ -308,6 +308,7 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
           )}
         </div>
         <div className="flex items-center gap-1.5">
+          <PersistentStorageButton isRu={isRu} />
           <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5" onClick={scan} disabled={loading}>
             <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
             {isRu ? "Обновить" : "Refresh"}
