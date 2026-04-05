@@ -220,6 +220,38 @@ export function StorageTab({ isRu, userId, onStatsReady }: StorageTabProps) {
 
   useEffect(() => { loadFiles(); loadUsageMap(); }, [loadFiles, loadUsageMap]);
 
+  /* ─── Persistent storage status ──────────────────────────── */
+  useEffect(() => {
+    if (navigator.storage?.persisted) {
+      navigator.storage.persisted().then(granted => {
+        setPersistStatus(granted ? 'granted' : 'denied');
+      }).catch(() => {});
+    }
+  }, []);
+
+  const handleRequestPersist = useCallback(async () => {
+    if (!navigator.storage?.persist) {
+      toast.warning(isRu
+        ? 'Браузер не поддерживает постоянное хранилище'
+        : 'Browser does not support persistent storage');
+      return;
+    }
+    setPersistRequesting(true);
+    try {
+      const granted = await navigator.storage.persist();
+      setPersistStatus(granted ? 'granted' : 'denied');
+      if (!granted) {
+        toast.warning(isRu
+          ? '⚠️ Браузер отклонил запрос на постоянное хранилище. Данные могут быть удалены при нехватке места.'
+          : '⚠️ Browser denied persistent storage request. Data may be cleared under storage pressure.');
+      }
+    } catch {
+      toast.error(isRu ? 'Ошибка запроса' : 'Request failed');
+    } finally {
+      setPersistRequesting(false);
+    }
+  }, [isRu]);
+
   /* Upload */
   const handleUploadClick = (cat: Category) => {
     setActiveUploadCategory(cat);
