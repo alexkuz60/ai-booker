@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import {
   FolderClosed, FolderOpen, Trash2, RefreshCw, Loader2,
   ChevronRight, ChevronDown, FileText, File, FileAudio, AlertTriangle, Eye,
+  ShieldCheck, ShieldOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -193,6 +194,64 @@ function EntryNode({
   );
 }
 
+/* ─── Persistent Storage button ──────────────────────── */
+
+function PersistentStorageButton({ isRu }: { isRu: boolean }) {
+  const [persisted, setPersisted] = useState<boolean | null>(null);
+  const [requesting, setRequesting] = useState(false);
+
+  const supported = typeof navigator !== "undefined" && !!navigator.storage?.persist;
+
+  useEffect(() => {
+    if (!supported) return;
+    navigator.storage.persisted().then(setPersisted);
+  }, [supported]);
+
+  const handleRequest = async () => {
+    if (!supported) {
+      toast.warning(isRu ? "Ваш браузер не поддерживает Persistent Storage" : "Your browser does not support Persistent Storage");
+      return;
+    }
+    setRequesting(true);
+    try {
+      const granted = await navigator.storage.persist();
+      setPersisted(granted);
+      if (granted) {
+        toast.success(isRu ? "Persistent Storage активирован" : "Persistent Storage granted");
+      } else {
+        toast.warning(isRu ? "Браузер отклонил запрос Persistent Storage. Попробуйте добавить сайт в закладки или установить как PWA." : "Browser denied Persistent Storage. Try bookmarking the site or installing as PWA.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Persist request failed");
+    } finally {
+      setRequesting(false);
+    }
+  };
+
+  if (!supported) return null;
+
+  return (
+    <Button
+      variant={persisted ? "outline" : "default"}
+      size="sm"
+      className="h-7 text-xs gap-1.5"
+      onClick={handleRequest}
+      disabled={persisted === true || requesting}
+    >
+      {persisted ? (
+        <ShieldCheck className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" />
+      ) : (
+        <ShieldOff className="h-3.5 w-3.5" />
+      )}
+      {persisted
+        ? (isRu ? "Persistent ✓" : "Persistent ✓")
+        : requesting
+          ? (isRu ? "Запрос…" : "Requesting…")
+          : (isRu ? "Persistent Storage" : "Persistent Storage")}
+    </Button>
+  );
+}
+
 /* ─── Main panel ─────────────────────────────────────── */
 
 interface OpfsBrowserPanelProps {
@@ -307,6 +366,7 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
           )}
         </div>
         <div className="flex items-center gap-1.5">
+          <PersistentStorageButton isRu={isRu} />
           <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5" onClick={scan} disabled={loading}>
             <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
             {isRu ? "Обновить" : "Refresh"}
