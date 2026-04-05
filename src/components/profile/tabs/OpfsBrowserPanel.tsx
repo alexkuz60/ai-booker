@@ -268,8 +268,19 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
   const [jsonViewer, setJsonViewer] = useState<{ name: string; path: string; content: string } | null>(null);
   const [jsonLoading, setJsonLoading] = useState(false);
 
+  // Storage quota
+  const [quota, setQuota] = useState<{ usage: number; quota: number } | null>(null);
 
   const supported = isOPFSSupported();
+
+  const fetchQuota = useCallback(async () => {
+    try {
+      if (navigator.storage?.estimate) {
+        const est = await navigator.storage.estimate();
+        setQuota({ usage: est.usage ?? 0, quota: est.quota ?? 0 });
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   const scan = useCallback(async () => {
     if (!supported) return;
@@ -283,7 +294,8 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
     } finally {
       setLoading(false);
     }
-  }, [supported]);
+    fetchQuota();
+  }, [supported, fetchQuota]);
 
   // Auto-scan on mount
   useEffect(() => { scan(); }, [scan]);
