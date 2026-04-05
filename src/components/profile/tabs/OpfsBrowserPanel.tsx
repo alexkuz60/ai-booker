@@ -239,7 +239,7 @@ function PersistentStorageButton({ isRu }: { isRu: boolean }) {
       disabled={persisted === true || requesting}
     >
       {persisted ? (
-        <ShieldCheck className="h-3.5 w-3.5 text-green-500" />
+        <ShieldCheck className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" />
       ) : (
         <ShieldOff className="h-3.5 w-3.5" />
       )}
