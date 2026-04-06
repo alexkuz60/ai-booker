@@ -96,7 +96,7 @@ function countEntries(entries: OpfsEntry[]): { files: number; dirs: number; byte
 /* ─── Tree node ──────────────────────────────────────── */
 
 function EntryNode({
-  entry, depth, isRu, onViewJson, selectedPath, onDelete,
+  entry, depth, isRu, onViewJson, selectedPath, onDelete, onCreateJson,
 }: {
   entry: OpfsEntry;
   depth: number;
@@ -104,6 +104,7 @@ function EntryNode({
   onViewJson: (path: string, name: string) => void;
   selectedPath?: string;
   onDelete: (path: string, name: string, kind: "file" | "directory") => void;
+  onCreateJson: (dirPath: string) => void;
 }) {
   const isAudioCache = entry.kind === "directory" && /^(audio|tts|atmosphere|renders|soundscape_cache)$/.test(entry.name);
   const [open, setOpen] = useState(depth < 1 && !isAudioCache);
