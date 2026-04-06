@@ -534,6 +534,41 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create JSON dialog */}
+      <AlertDialog open={!!createJsonDir} onOpenChange={open => !open && setCreateJsonDir(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <FilePlus className="h-5 w-5 text-primary" />
+              {isRu ? "Создать JSON файл" : "Create JSON file"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isRu ? "Папка:" : "Folder:"} <span className="font-mono">{createJsonDir}</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            placeholder={isRu ? "имя_файла.json" : "filename.json"}
+            value={newJsonName}
+            onChange={e => setNewJsonName(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleCreateJson()}
+            className="text-sm"
+            autoFocus
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={creating}>
+              {isRu ? "Отмена" : "Cancel"}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCreateJson}
+              disabled={creating || !newJsonName.trim()}
+            >
+              {creating && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
+              {isRu ? "Создать" : "Create"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
