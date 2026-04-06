@@ -3,11 +3,11 @@ import {
   type ProjectStorage,
   type ProjectMeta,
   type StorageBackend,
-  PROJECT_META_VERSION,
   detectStorageBackend,
   LocalFSStorage,
   OPFSStorage,
 } from "@/lib/projectStorage";
+import { getProjectMetaDefault } from "@/lib/bookTemplateOPFS";
 import { downloadBlob } from "@/lib/projectZip";
 import { readSceneIndex } from "@/lib/sceneIndex";
 import { readBookMap } from "@/lib/bookMap";
@@ -90,16 +90,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
         store = await OPFSStorage.openOrCreate(folderName);
       }
 
-      const projectMeta: ProjectMeta = {
-        version: PROJECT_META_VERSION,
-        bookId,
-        title,
-        userId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        language,
-      };
-
+      const projectMeta = getProjectMetaDefault(title, bookId, userId, language);
       await store.writeJSON("project.json", projectMeta);
       await readSceneIndex(store);
       await readBookMap(store);

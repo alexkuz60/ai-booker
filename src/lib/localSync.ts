@@ -12,6 +12,7 @@ import {
 } from "@/lib/tocStructure";
 import { paths } from "@/lib/projectPaths";
 import { buildSceneIndex, writeSceneIndex, readSceneIndex } from "@/lib/sceneIndex";
+import { getSceneFileDefaults, getTranslationFileDefaults } from "@/lib/bookTemplateOPFS";
 import { writePipelineStep } from "@/hooks/usePipelineProgress";
 import { buildBookMap, writeBookMap, readBookMap } from "@/lib/bookMap";
 
@@ -259,17 +260,10 @@ export async function readCharactersFromLocal(
 
 // ─── Seed empty scene-level files ────────────────────────────
 
-const TRANSLATION_SEED_FILES = [
-  "storyboard.json",
-  "radar-literal.json",
-  "radar-literary.json",
-  "radar-critique.json",
-] as const;
-
 /**
- * Create empty audio_meta.json, mixer_state.json, clip_plugins.json
- * for a scene (and translation lang subfolders) if they don't already exist.
- * NEVER overwrites existing files — preserves user data.
+ * Create empty scene-level JSON files (and translation lang subfolders)
+ * if they don't already exist. NEVER overwrites existing files — preserves user data.
+ * All default values come from bookTemplateOPFS (single source of truth).
  */
 async function seedEmptySceneFiles(
   storage: ProjectStorage,
@@ -278,65 +272,39 @@ async function seedEmptySceneFiles(
   translationLanguages: string[] = [],
 ): Promise<void> {
   const base = `chapters/${chapterId}/scenes/${sceneId}`;
-  const now = new Date().toISOString();
 
-  const audioMetaPath = `${base}/audio_meta.json`;
-  const mixerStatePath = `${base}/mixer_state.json`;
-  const clipPluginsPath = `${base}/clip_plugins.json`;
+  // Collect all files to check: scene-level + per-language translation files
+  const sceneDefaults = getSceneFileDefaults(sceneId);
+  const sceneFiles = Object.keys(sceneDefaults);
 
-  const existChecks: Promise<boolean>[] = [
-    storage.exists(audioMetaPath),
-    storage.exists(mixerStatePath),
-    storage.exists(clipPluginsPath),
-  ];
-
-  // Check translation files too
-  const langFileChecks: { lang: string; file: string; path: string }[] = [];
+  const langFileEntries: { path: string; defaultValue: unknown }[] = [];
   for (const lang of translationLanguages) {
-    for (const file of TRANSLATION_SEED_FILES) {
-      const p = `${base}/${lang}/${file}`;
-      langFileChecks.push({ lang, file, path: p });
-      existChecks.push(storage.exists(p));
+    const transDefaults = getTranslationFileDefaults(sceneId);
+    for (const [file, value] of Object.entries(transDefaults)) {
+      langFileEntries.push({ path: `${base}/${lang}/${file}`, defaultValue: value });
     }
   }
 
-  const results = await Promise.all(existChecks);
-  const [hasAudio, hasMixer, hasClip] = results;
+  // Batch existence checks
+  const allPaths = [
+    ...sceneFiles.map((f) => `${base}/${f}`),
+    ...langFileEntries.map((e) => e.path),
+  ];
+  const results = await Promise.all(allPaths.map((p) => storage.exists(p)));
 
   const writes: Promise<void>[] = [];
 
-  if (!hasAudio) {
-    writes.push(storage.writeJSON(audioMetaPath, {
-      sceneId, updatedAt: now, entries: {},
-    }));
-  }
-
-  if (!hasMixer) {
-    writes.push(storage.writeJSON(mixerStatePath, {}));
-  }
-
-  if (!hasClip) {
-    writes.push(storage.writeJSON(clipPluginsPath, {
-      sceneId, updatedAt: now, configs: {},
-    }));
-  }
+  // Seed scene-level files
+  sceneFiles.forEach((file, i) => {
+    if (results[i]) return;
+    writes.push(storage.writeJSON(`${base}/${file}`, sceneDefaults[file]));
+  });
 
   // Seed translation files
-  langFileChecks.forEach((entry, i) => {
-    const exists = results[3 + i]; // offset by 3 base checks
-    if (exists) return;
-
-    if (entry.file === "storyboard.json") {
-      writes.push(storage.writeJSON(entry.path, {
-        sceneId, updatedAt: now, segments: [], typeMappings: [],
-        audioStatus: {}, inlineNarrationSpeaker: null,
-      }));
-    } else {
-      // radar-*.json — empty radar placeholder
-      writes.push(storage.writeJSON(entry.path, {
-        sceneId, updatedAt: now, segments: [],
-      }));
-    }
+  const offset = sceneFiles.length;
+  langFileEntries.forEach((entry, i) => {
+    if (results[offset + i]) return;
+    writes.push(storage.writeJSON(entry.path, entry.defaultValue));
   });
 
   if (writes.length > 0) {
