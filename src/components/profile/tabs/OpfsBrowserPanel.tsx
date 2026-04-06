@@ -338,6 +338,35 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
     setDeleteTarget({ path, name, kind });
   }, []);
 
+  const handleRequestCreateJson = useCallback((dirPath: string) => {
+    setCreateJsonDir(dirPath);
+    setNewJsonName("");
+  }, []);
+
+  const handleCreateJson = async () => {
+    if (!createJsonDir || !newJsonName.trim()) return;
+    setCreating(true);
+    try {
+      const fileName = newJsonName.trim().endsWith(".json") ? newJsonName.trim() : `${newJsonName.trim()}.json`;
+      const parts = createJsonDir.split("/").filter(Boolean);
+      let dir: FileSystemDirectoryHandle = await navigator.storage.getDirectory() as unknown as FileSystemDirectoryHandle;
+      for (const p of parts) {
+        dir = await dir.getDirectoryHandle(p);
+      }
+      const fileHandle = await dir.getFileHandle(fileName, { create: true });
+      const writable = await (fileHandle as any).createWritable();
+      await writable.write("{}");
+      await writable.close();
+      toast.success(`${isRu ? "Создан" : "Created"}: ${createJsonDir}/${fileName}`);
+      setCreateJsonDir(null);
+      await scan();
+    } catch (err: any) {
+      toast.error(err.message || "Create failed");
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
