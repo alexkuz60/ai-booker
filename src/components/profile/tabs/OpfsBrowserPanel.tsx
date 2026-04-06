@@ -2,9 +2,10 @@ import { useState, useCallback, useEffect } from "react";
 import {
   FolderClosed, FolderOpen, Trash2, RefreshCw, Loader2,
   ChevronRight, ChevronDown, FileText, File, FileAudio, AlertTriangle, Eye,
-  ShieldCheck, ShieldOff,
+  ShieldCheck, ShieldOff, FilePlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -95,7 +96,7 @@ function countEntries(entries: OpfsEntry[]): { files: number; dirs: number; byte
 /* ─── Tree node ──────────────────────────────────────── */
 
 function EntryNode({
-  entry, depth, isRu, onViewJson, selectedPath, onDelete,
+  entry, depth, isRu, onViewJson, selectedPath, onDelete, onCreateJson,
 }: {
   entry: OpfsEntry;
   depth: number;
@@ -103,6 +104,7 @@ function EntryNode({
   onViewJson: (path: string, name: string) => void;
   selectedPath?: string;
   onDelete: (path: string, name: string, kind: "file" | "directory") => void;
+  onCreateJson: (dirPath: string) => void;
 }) {
   const isAudioCache = entry.kind === "directory" && /^(audio|tts|atmosphere|renders|soundscape_cache)$/.test(entry.name);
   const [open, setOpen] = useState(depth < 1 && !isAudioCache);
@@ -172,6 +174,14 @@ function EntryNode({
         </button>
         <Button
           variant="ghost" size="icon"
+          className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0 text-primary hover:text-primary"
+          onClick={() => onCreateJson(entry.path)}
+          title={isRu ? "Создать JSON" : "Create JSON"}
+        >
+          <FilePlus className="h-3 w-3" />
+        </Button>
+        <Button
+          variant="ghost" size="icon"
           className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0 text-destructive hover:text-destructive"
           onClick={() => onDelete(entry.path, entry.name, "directory")}
         >
@@ -181,7 +191,7 @@ function EntryNode({
       {open && entry.children && (
         <div>
           {entry.children.map(child => (
-            <EntryNode key={child.name} entry={child} depth={depth + 1} isRu={isRu} onViewJson={onViewJson} selectedPath={selectedPath} onDelete={onDelete} />
+            <EntryNode key={child.name} entry={child} depth={depth + 1} isRu={isRu} onViewJson={onViewJson} selectedPath={selectedPath} onDelete={onDelete} onCreateJson={onCreateJson} />
           ))}
           {entry.children.length === 0 && (
             <div className="text-[10px] text-muted-foreground italic py-0.5" style={{ paddingLeft: (depth + 1) * 16 }}>
@@ -264,6 +274,11 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
   const [deleteTarget, setDeleteTarget] = useState<{ path: string; name: string; kind: "file" | "directory" } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Create JSON dialog
+  const [createJsonDir, setCreateJsonDir] = useState<string | null>(null);
+  const [newJsonName, setNewJsonName] = useState("");
+  const [creating, setCreating] = useState(false);
+
   // JSON viewer — inline in right panel
   const [jsonViewer, setJsonViewer] = useState<{ name: string; path: string; content: string } | null>(null);
   const [jsonLoading, setJsonLoading] = useState(false);
@@ -322,6 +337,35 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
   const handleRequestDelete = useCallback((path: string, name: string, kind: "file" | "directory") => {
     setDeleteTarget({ path, name, kind });
   }, []);
+
+  const handleRequestCreateJson = useCallback((dirPath: string) => {
+    setCreateJsonDir(dirPath);
+    setNewJsonName("");
+  }, []);
+
+  const handleCreateJson = async () => {
+    if (!createJsonDir || !newJsonName.trim()) return;
+    setCreating(true);
+    try {
+      const fileName = newJsonName.trim().endsWith(".json") ? newJsonName.trim() : `${newJsonName.trim()}.json`;
+      const parts = createJsonDir.split("/").filter(Boolean);
+      let dir: FileSystemDirectoryHandle = await navigator.storage.getDirectory() as unknown as FileSystemDirectoryHandle;
+      for (const p of parts) {
+        dir = await dir.getDirectoryHandle(p);
+      }
+      const fileHandle = await dir.getFileHandle(fileName, { create: true });
+      const writable = await (fileHandle as any).createWritable();
+      await writable.write("{}");
+      await writable.close();
+      toast.success(`${isRu ? "Создан" : "Created"}: ${createJsonDir}/${fileName}`);
+      setCreateJsonDir(null);
+      await scan();
+    } catch (err: any) {
+      toast.error(err.message || "Create failed");
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -411,10 +455,10 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
               {entries !== null && !loading && (
                 <div className="space-y-0.5">
                   {topFolders.map(folder => (
-                    <EntryNode key={folder.name} entry={folder} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} onDelete={handleRequestDelete} />
+                    <EntryNode key={folder.name} entry={folder} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} onDelete={handleRequestDelete} onCreateJson={handleRequestCreateJson} />
                   ))}
                   {topFiles.map(f => (
-                    <EntryNode key={f.name} entry={f} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} onDelete={handleRequestDelete} />
+                    <EntryNode key={f.name} entry={f} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} onDelete={handleRequestDelete} onCreateJson={handleRequestCreateJson} />
                   ))}
                   {entries.length === 0 && (
                     <div className="text-center py-4 text-xs text-muted-foreground">
@@ -486,6 +530,41 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
             >
               {deleting && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
               {isRu ? "Удалить" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Create JSON dialog */}
+      <AlertDialog open={!!createJsonDir} onOpenChange={open => !open && setCreateJsonDir(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <FilePlus className="h-5 w-5 text-primary" />
+              {isRu ? "Создать JSON файл" : "Create JSON file"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isRu ? "Папка:" : "Folder:"} <span className="font-mono">{createJsonDir}</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            placeholder={isRu ? "имя_файла.json" : "filename.json"}
+            value={newJsonName}
+            onChange={e => setNewJsonName(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleCreateJson()}
+            className="text-sm"
+            autoFocus
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={creating}>
+              {isRu ? "Отмена" : "Cancel"}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCreateJson}
+              disabled={creating || !newJsonName.trim()}
+            >
+              {creating && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
+              {isRu ? "Создать" : "Create"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
