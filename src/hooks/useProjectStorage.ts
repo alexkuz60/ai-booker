@@ -3,11 +3,11 @@ import {
   type ProjectStorage,
   type ProjectMeta,
   type StorageBackend,
-  PROJECT_META_VERSION,
   detectStorageBackend,
   LocalFSStorage,
   OPFSStorage,
 } from "@/lib/projectStorage";
+import { getProjectMetaDefault } from "@/lib/bookTemplateOPFS";
 import { downloadBlob } from "@/lib/projectZip";
 import { readSceneIndex } from "@/lib/sceneIndex";
 import { readBookMap } from "@/lib/bookMap";
