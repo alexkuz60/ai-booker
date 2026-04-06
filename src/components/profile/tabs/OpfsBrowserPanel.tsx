@@ -191,7 +191,7 @@ function EntryNode({
       {open && entry.children && (
         <div>
           {entry.children.map(child => (
-            <EntryNode key={child.name} entry={child} depth={depth + 1} isRu={isRu} onViewJson={onViewJson} selectedPath={selectedPath} onDelete={onDelete} />
+            <EntryNode key={child.name} entry={child} depth={depth + 1} isRu={isRu} onViewJson={onViewJson} selectedPath={selectedPath} onDelete={onDelete} onCreateJson={onCreateJson} />
           ))}
           {entry.children.length === 0 && (
             <div className="text-[10px] text-muted-foreground italic py-0.5" style={{ paddingLeft: (depth + 1) * 16 }}>
@@ -421,10 +421,10 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
               {entries !== null && !loading && (
                 <div className="space-y-0.5">
                   {topFolders.map(folder => (
-                    <EntryNode key={folder.name} entry={folder} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} onDelete={handleRequestDelete} />
+                    <EntryNode key={folder.name} entry={folder} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} onDelete={handleRequestDelete} onCreateJson={handleRequestCreateJson} />
                   ))}
                   {topFiles.map(f => (
-                    <EntryNode key={f.name} entry={f} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} onDelete={handleRequestDelete} />
+                    <EntryNode key={f.name} entry={f} depth={0} isRu={isRu} onViewJson={handleViewJson} selectedPath={jsonViewer?.path} onDelete={handleRequestDelete} onCreateJson={handleRequestCreateJson} />
                   ))}
                   {entries.length === 0 && (
                     <div className="text-center py-4 text-xs text-muted-foreground">
