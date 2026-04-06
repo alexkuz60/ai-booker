@@ -274,6 +274,11 @@ export function OpfsBrowserPanel({ isRu }: OpfsBrowserPanelProps) {
   const [deleteTarget, setDeleteTarget] = useState<{ path: string; name: string; kind: "file" | "directory" } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Create JSON dialog
+  const [createJsonDir, setCreateJsonDir] = useState<string | null>(null);
+  const [newJsonName, setNewJsonName] = useState("");
+  const [creating, setCreating] = useState(false);
+
   // JSON viewer — inline in right panel
   const [jsonViewer, setJsonViewer] = useState<{ name: string; path: string; content: string } | null>(null);
   const [jsonLoading, setJsonLoading] = useState(false);
