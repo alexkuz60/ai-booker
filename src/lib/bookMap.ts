@@ -236,8 +236,7 @@ const SCENE_JSON_KEYS: (keyof ScenePathEntry)[] = [
 /** JSON file keys from TranslationPathEntry to validate */
 const TRANS_JSON_KEYS: (keyof TranslationPathEntry)[] = [
   "storyboard", "radarLiteral", "radarLiterary", "radarCritique",
-  // NOTE: "audioMeta" intentionally excluded — created lazily on first TTS
-  "mixerState", "clipPlugins",
+  // NOTE: "audioMeta", "mixerState", "clipPlugins" intentionally excluded — created lazily
 ];
 
 export interface BookMapIntegrityIssue {
