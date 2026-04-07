@@ -185,17 +185,17 @@ export function useBookRestore({
     report("wipe", "done");
 
     try {
-      const opts = resolverOpts();
-      const targetStorage = await ensureWritableLocalStorage(
-        book.id,
-        book.title || book.file_name,
-        book.file_name,
-        opts,
-      );
-
-      if (!targetStorage?.isReady) {
+      // Wipe-and-Deploy: always create a fresh project — no resolvers, no reuse
+      if (!createProject || !userId) {
         throw new Error(isRu ? "Не удалось создать локальный проект" : "Failed to create local project");
       }
+      const lang = isRu ? ("ru" as const) : ("en" as const);
+      const targetStorage = await createProject(
+        book.title || book.file_name,
+        book.id,
+        userId,
+        lang,
+      );
 
       const result = await deployFromServer({
         book,
