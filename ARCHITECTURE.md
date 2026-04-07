@@ -51,6 +51,8 @@
 
 ### 1.5 Структура папки проекта (иерархическая)
 
+**Единый источник истины структуры**: `src/lib/bookTemplateOPFS.ts` — все дефолтные значения и иерархия папок определены в этом файле. Никакой другой модуль не должен хардкодить дефолты.
+
 ```
 📁 BookTitle/
 ├── project.json           — ProjectMeta (version, bookId, title, userId, language, fileFormat,
@@ -67,17 +69,18 @@
 ├── 📁 chapters/
 │   └── 📁 {chapterId}/
 │       ├── content.json   — { chapterId, scenes[], status }
+│       ├── 📁 renders/    — финальные рендеры главы
 │       └── 📁 scenes/
 │           └── 📁 {sceneId}/
 │               ├── storyboard.json  — LocalStoryboardData (segments, typeMappings, audioStatus, contentHash)
 │               ├── characters.json  — SceneCharacterMap (speakers, typeMappings)
+│               ├── atmospheres.json — { sceneId, updatedAt, atmo: LocalAtmosphereClip[], sfx: LocalAtmosphereClip[] }
 │               ├── audio_meta.json  — LocalAudioMeta (segmentId → status, durationMs, audioPath, startSec, silenceSec)
 │               ├── clip_plugins.json — LocalClipPluginsData (segmentId → per-clip plugin config: eq, comp, limiter, panner3d, convolver)
 │               ├── mixer_state.json — SceneMixerSnapshot (trackId → mix {volume, pan, preFxBypassed, reverbBypassed} + plugins {eq, comp, limiter})
+│               ├── 📁 tts/          — синтезированные TTS-клипы ({segmentId}.mp3)
 │               ├── 📁 audio/
-│               │   ├── 📁 tts/        — {segmentId}.mp3
-│               │   ├── 📁 atmosphere/ — атмосферные слои
-│               │   └── 📁 renders/    — финальные рендеры сцен
+│               │   └── 📁 atmosphere/ — атмосферные аудио-слои
 │               └── 📁 {lang}/         — языковая поддиректория перевода (en, ru, …)
 │                   ├── storyboard.json  — переведённая раскадровка
 │                   ├── radar-literal.json  — радар после буквального перевода
@@ -88,16 +91,15 @@
 │                   ├── mixer_state.json — микшер перевода
 │                   └── 📁 audio/
 │                       └── 📁 tts/      — {segmentId}.mp3 (озвучка перевода)
-└── 📁 synopsis/           — синопсисы для контекста перевода
+├── 📁 synopsis/           — синопсисы для контекста перевода
 └── 📁 montage/
 ```
 
-**Преимущества иерархической структуры (V2, `layoutVersion: 2`):**
-- **Структурная изоляция**: данные сцены физически вложены в папку главы → невозможно случайно обратиться к данным чужой главы
-- **Атомарное удаление**: удаление главы = удаление одной директории рекурсивно
-- **Самодокументирующийся ZIP**: при экспорте структура папок читаема без парсинга ID
-
-> **V1 → V2 миграция завершена.** Устаревшие плоские директории (`scenes/`, `audio/` в корне проекта) больше не создаются при инициализации. Код не выполняет фолбэки на V1-пути. Если в OPFS остались старые V1-папки — их можно безопасно удалить через OPFS Browser.
+**Ключевые изменения V2.1 (2026-04-07):**
+- `tts/` — на уровне сцены (не внутри `audio/`)
+- `renders/` — на уровне главы (не внутри каждой сцены)
+- `atmospheres.json` — две секции `{ atmo: [], sfx: [] }` вместо плоского `clips[]`
+- Все дефолты определены в `bookTemplateOPFS.ts` (SSOT)
 
 ### 1.6 Защита данных (StorageGuard)
 
@@ -154,37 +156,44 @@
 
 | Файл | Назначение |
 |------|------------|
+| `src/lib/bookTemplateOPFS.ts` | **SSOT структуры OPFS** — `ROOT_DIRS`, `CHAPTER_DIRS`, `SCENE_DIRS`, фабрики дефолтов для всех JSON-файлов |
 | `src/lib/projectStorage.ts` | Интерфейс `ProjectStorage` + классы `LocalFSStorage`, `OPFSStorage` |
 | `src/lib/projectPaths.ts` | **Централизованный резолвер путей** — иерархическая структура, все пути через `paths.*` |
+| `src/lib/bookMap.ts` | **Прекомпилированная карта** — BookMap с путями ко всем сущностям |
 | `src/lib/sceneIndex.ts` | **Индекс сцен** — sceneId→chapterId маппинг, dirty-маркеры, storyboarded/characterMapped |
 | `src/lib/contentHash.ts` | **FNV-1a 32-bit хеш** — контроль целостности контента сцен |
-| `src/lib/serverDeploy.ts` | **Wipe-and-Deploy pipeline** — чистая async-функция `deployFromServer()`: загрузка данных с сервера → запись в OPFS (10 шагов). Батчинг запросов через `fetchChunked()` для >1000 записей |
-| `src/lib/localProjectResolver.ts` | **Резолвер проектов** — поиск/активация/создание OPFS ProjectStorage по bookId. `resolveLocalStorageForBook()`, `ensureWritableLocalStorage()` |
+| `src/lib/serverDeploy.ts` | **Wipe-and-Deploy pipeline** — чистая async-функция `deployFromServer()`: загрузка данных с сервера → запись в OPFS |
+| `src/lib/localProjectResolver.ts` | **Резолвер проектов** — `resolveLocalStorageForBook()` для поиска OPFS-проекта по bookId |
 | `src/lib/projectCleanup.ts` | **Очистка browser state** — `wipeProjectBrowserState()` (по bookId) и `wipeAllBrowserState()` |
 | `src/hooks/useProjectStorage.ts` | React-хук: create / open / close / import / export проекта |
 
-### 1.6a OPFS-гигиена: защита от зомби-директорий
+### 1.6a OPFS-инициализация: три функции вместо `openOrCreate`
 
-> **Правило:** `OPFSStorage.openOrCreate()` ЗАПРЕЩЕНО использовать для поиска, сканирования или проверки существования проектов — он автоматически создаёт пустую директорию, если проект не найден (зомби-директория).
+> **`OPFSStorage.openOrCreate()` УДАЛЕНА НАВСЕГДА.** Любая попытка вернуть её — баг.
 
-**Разрешённые методы по контексту:**
+Инициализация проекта строго разделена на три специализированные функции:
 
-| Контекст | Метод | Обоснование |
-|----------|-------|-------------|
-| Поиск / сканирование / bootstrap | `OPFSStorage.openExisting()` | Возвращает `null` если проект не найден, НЕ создаёт директорию |
-| Проверка существования | `OPFSStorage.listProjects()` + проверка по имени | Список без побочных эффектов |
-| Создание нового проекта | `OPFSStorage.openOrCreate()` | **Только по явному действию пользователя** |
+| Функция | Назначение | Создаёт структуру? |
+|---------|-----------|-------------------|
+| `OPFSStorage.createNewProject(name)` | Новый проект по шаблону `bookTemplateOPFS` | ✅ Создаёт `ROOT_DIRS` |
+| `OPFSStorage.openExisting(name)` | Открытие существующего проекта | ❌ Возвращает `null` если нет |
+| `OPFSStorage.restoreProjectFromBackup(name, zip)` | Восстановление из ZIP-бэкапа | ❌ ZIP определяет структуру |
 
-**Легитимные точки вызова `openOrCreate` (исчерпывающий список):**
+**Легитимные точки вызова (контролируется архитектурным тестом):**
 
-| # | Файл | Триггер | Действие пользователя |
-|---|------|---------|-----------------------|
-| 1 | `useProjectStorage.ts` → `createProject()` | Создание проекта книги | Кнопка «Создать проект» в Библиотеке |
-| 2 | `useProjectStorage.ts` → `importProjectFromZip()` | Импорт из ZIP | Выбор ZIP-файла |
-| 3 | `translationProject.ts` → `createTranslationProject()` | Создание проекта перевода | Клик по шагу «Проект» степпера + подтверждение |
-| 4 | `useSaveTranslation.ts` → `restoreTranslation()` | Восстановление перевода из облака | Кнопка «Перевод ← сервер» |
+| Функция | Файл | Действие пользователя |
+|---------|------|-----------------------|
+| `createNewProject` | `useProjectStorage.ts` → `createProject()` | Загрузка книги / создание проекта |
+| `restoreProjectFromBackup` | `useProjectStorage.ts` → `importProjectFromZip()` | Импорт ZIP-файла |
+| `openExisting` | Любой сканер/резолвер | Поиск, библиотека, bootstrap |
 
-**Любые другие вызовы `openOrCreate` — баг.** Все сканеры (useLibrary, useTranslationStorage, localProjectResolver, bootstrap в useProjectStorage) ОБЯЗАНЫ использовать `openExisting`.
+**Wipe-and-Deploy** (`useBookRestore.ts` → `openSavedBook`):
+1. `wipeProjectBrowserState()` — удаление OPFS-папки + очистка browser state
+2. `createProject()` → `OPFSStorage.createNewProject()` — создание чистого проекта
+3. `deployFromServer()` — запись всех данных с сервера
+4. `assertIntegrity()` — проверка целостности
+
+**Удалённый код:** `ensureWritableLocalStorage()` из `localProjectResolver.ts` — мёртвый код, удалён. Wipe-and-Deploy теперь вызывает `createProject` напрямую.
 | `src/hooks/useProjectStorageContext.tsx` | React Context + Provider для глобального доступа |
 | `src/lib/localSync.ts` | `syncStructureToLocal()` / `readStructureFromLocal()` — запись/чтение структуры |
 | `src/lib/projectZip.ts` | ZIP экспорт/импорт через `fflate` |
@@ -192,6 +201,7 @@
 | `src/hooks/useImperativeSave.ts` | Мгновенное автосохранение без debounce, сериализованная очередь |
 | `src/hooks/useSaveBookToProject.ts` | Кнопка «На сервер»: upsert в Supabase + `autoSaveToLocal()` |
 | `src/lib/storyboardSync.ts` | `saveStoryboardToLocal()` / `readStoryboardFromLocal()` — раскадровка сцен |
+| `src/lib/localAtmospheres.ts` | Атмосфера/SFX клипы — CRUD с двухсекционной структурой `{ atmo: [], sfx: [] }` |
 
 ### 1.7 Интерфейс ProjectStorage
 
