@@ -513,7 +513,7 @@ export class OPFSStorage implements ProjectStorage {
   /**
    * Open an existing project in OPFS WITHOUT creating anything.
    * Returns null if the directory does not exist.
-   * Use this for scanning / searching — never openOrCreate.
+   * Use this for read-only access and scanning.
    */
   static async openExisting(projectName: string): Promise<OPFSStorage | null> {
     try {
