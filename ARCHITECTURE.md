@@ -51,6 +51,8 @@
 
 ### 1.5 Структура папки проекта (иерархическая)
 
+**Единый источник истины структуры**: `src/lib/bookTemplateOPFS.ts` — все дефолтные значения и иерархия папок определены в этом файле. Никакой другой модуль не должен хардкодить дефолты.
+
 ```
 📁 BookTitle/
 ├── project.json           — ProjectMeta (version, bookId, title, userId, language, fileFormat,
@@ -67,17 +69,18 @@
 ├── 📁 chapters/
 │   └── 📁 {chapterId}/
 │       ├── content.json   — { chapterId, scenes[], status }
+│       ├── 📁 renders/    — финальные рендеры главы
 │       └── 📁 scenes/
 │           └── 📁 {sceneId}/
 │               ├── storyboard.json  — LocalStoryboardData (segments, typeMappings, audioStatus, contentHash)
 │               ├── characters.json  — SceneCharacterMap (speakers, typeMappings)
+│               ├── atmospheres.json — { sceneId, updatedAt, atmo: LocalAtmosphereClip[], sfx: LocalAtmosphereClip[] }
 │               ├── audio_meta.json  — LocalAudioMeta (segmentId → status, durationMs, audioPath, startSec, silenceSec)
 │               ├── clip_plugins.json — LocalClipPluginsData (segmentId → per-clip plugin config: eq, comp, limiter, panner3d, convolver)
 │               ├── mixer_state.json — SceneMixerSnapshot (trackId → mix {volume, pan, preFxBypassed, reverbBypassed} + plugins {eq, comp, limiter})
+│               ├── 📁 tts/          — синтезированные TTS-клипы ({segmentId}.mp3)
 │               ├── 📁 audio/
-│               │   ├── 📁 tts/        — {segmentId}.mp3
-│               │   ├── 📁 atmosphere/ — атмосферные слои
-│               │   └── 📁 renders/    — финальные рендеры сцен
+│               │   └── 📁 atmosphere/ — атмосферные аудио-слои
 │               └── 📁 {lang}/         — языковая поддиректория перевода (en, ru, …)
 │                   ├── storyboard.json  — переведённая раскадровка
 │                   ├── radar-literal.json  — радар после буквального перевода
@@ -88,16 +91,15 @@
 │                   ├── mixer_state.json — микшер перевода
 │                   └── 📁 audio/
 │                       └── 📁 tts/      — {segmentId}.mp3 (озвучка перевода)
-└── 📁 synopsis/           — синопсисы для контекста перевода
+├── 📁 synopsis/           — синопсисы для контекста перевода
 └── 📁 montage/
 ```
 
-**Преимущества иерархической структуры (V2, `layoutVersion: 2`):**
-- **Структурная изоляция**: данные сцены физически вложены в папку главы → невозможно случайно обратиться к данным чужой главы
-- **Атомарное удаление**: удаление главы = удаление одной директории рекурсивно
-- **Самодокументирующийся ZIP**: при экспорте структура папок читаема без парсинга ID
-
-> **V1 → V2 миграция завершена.** Устаревшие плоские директории (`scenes/`, `audio/` в корне проекта) больше не создаются при инициализации. Код не выполняет фолбэки на V1-пути. Если в OPFS остались старые V1-папки — их можно безопасно удалить через OPFS Browser.
+**Ключевые изменения V2.1 (2026-04-07):**
+- `tts/` — на уровне сцены (не внутри `audio/`)
+- `renders/` — на уровне главы (не внутри каждой сцены)
+- `atmospheres.json` — две секции `{ atmo: [], sfx: [] }` вместо плоского `clips[]`
+- Все дефолты определены в `bookTemplateOPFS.ts` (SSOT)
 
 ### 1.6 Защита данных (StorageGuard)
 
