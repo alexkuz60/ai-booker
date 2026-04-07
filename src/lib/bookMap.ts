@@ -229,7 +229,8 @@ export function diagnosePath(
 
 /** JSON file keys from ScenePathEntry to validate */
 const SCENE_JSON_KEYS: (keyof ScenePathEntry)[] = [
-  "storyboard", "audioMeta", "mixerState", "clipPlugins", "characters", "atmospheres",
+  "storyboard", "audioMeta", "mixerState", "clipPlugins", "characters",
+  // NOTE: "atmospheres" intentionally excluded — optional data, created on first use
 ];
 
 /** JSON file keys from TranslationPathEntry to validate */
