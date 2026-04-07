@@ -117,38 +117,3 @@ export async function resolveLocalStorageForBook(
   return null;
 }
 
-// ── Ensure a writable project exists (find or create) ──────
-
-export async function ensureWritableLocalStorage(
-  targetBookId: string,
-  targetTitle: string,
-  targetFileName: string,
-  opts: {
-    storageBackend: "fs-access" | "opfs" | "none";
-    localProjectNamesByBookId: Map<string, string[]>;
-    projectStorage?: ProjectStorage | null;
-    openProjectByName?: (name: string) => Promise<ProjectStorage | null>;
-    createProject?: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<ProjectStorage>;
-    userId?: string;
-    isRu: boolean;
-  },
-): Promise<ProjectStorage | null> {
-  const existing = await resolveLocalStorageForBook(targetBookId, opts, { activate: true });
-  if (existing?.isReady) return existing;
-
-  if (opts.storageBackend === "opfs" && opts.createProject && opts.userId) {
-    try {
-      const lang = opts.isRu ? ("ru" as const) : ("en" as const);
-      return await opts.createProject(
-        targetTitle || stripFileExtension(targetFileName),
-        targetBookId,
-        opts.userId,
-        lang,
-      );
-    } catch (err) {
-      console.warn("[Resolver] Failed to create local project:", err);
-    }
-  }
-
-  return null;
-}
