@@ -5,6 +5,7 @@ import {
   readAtmospheresFromLocal,
   updateAtmosphereClip,
   addAtmosphereClip,
+  allClips,
   type LocalAtmosphereClip,
 } from "@/lib/localAtmospheres";
 
@@ -50,7 +51,7 @@ export function useAtmoClipManipulation({
     if (!storage || !sceneId) return;
     const atmoId = clipId.replace(/^atmo-/, "");
     const data = await readAtmospheresFromLocal(storage, sceneId);
-    const clip = data?.clips.find(c => c.id === atmoId);
+    const clip = data ? allClips(data).find(c => c.id === atmoId) : undefined;
     if (!clip) return;
     setClipboard({
       sceneId,

@@ -20,6 +20,9 @@ import {
 /** Directories created at project root */
 export const ROOT_DIRS = ["structure", "synopsis", "chapters"] as const;
 
+/** Sub-directories created inside each chapter folder */
+export const CHAPTER_DIRS = ["scenes", "renders"] as const;
+
 // ─── Root-level file defaults ────────────────────────────
 
 export function getProjectMetaDefault(
@@ -76,9 +79,8 @@ export function getChapterContentDefault(
 
 /** Sub-directories created inside each scene folder */
 export const SCENE_DIRS = [
-  "audio/tts",
+  "tts",
   "audio/atmosphere",
-  "audio/renders",
 ] as const;
 
 /**
@@ -108,7 +110,12 @@ export function getSceneFileDefaults(sceneId: string): Record<string, unknown> {
       configs: {},
     },
     "characters.json": {},
-    "atmospheres.json": {},
+    "atmospheres.json": {
+      sceneId,
+      updatedAt: now,
+      atmo: [],
+      sfx: [],
+    },
   };
 }
 

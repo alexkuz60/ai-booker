@@ -4,6 +4,8 @@
  * Path: chapters/{chapterId}/scenes/{sceneId}/atmospheres.json
  * This is the ONLY source of truth for atmosphere clip metadata at runtime.
  * DB (scene_atmospheres) is used only for backup (Push) and restore (Wipe-and-Deploy).
+ *
+ * Structure: { sceneId, updatedAt, atmo: [...], sfx: [...] }
  */
 
 import type { ProjectStorage } from "@/lib/projectStorage";
@@ -29,13 +31,26 @@ export interface LocalAtmosphereClip {
 export interface LocalAtmosphereData {
   sceneId: string;
   updatedAt: string;
-  clips: LocalAtmosphereClip[];
+  atmo: LocalAtmosphereClip[];
+  sfx: LocalAtmosphereClip[];
 }
 
 // ── Path helper ─────────────────────────────────────────────
 
 function atmoPath(sceneId: string, chapterId?: string): string {
   return paths.storyboard(sceneId, chapterId).replace("storyboard.json", "atmospheres.json");
+}
+
+// ── Helpers ─────────────────────────────────────────────────
+
+/** Get all clips as a flat array (convenience for consumers that don't care about sections) */
+export function allClips(data: LocalAtmosphereData): LocalAtmosphereClip[] {
+  return [...data.atmo, ...data.sfx];
+}
+
+/** Determine which section a clip belongs to based on layer_type */
+function sectionKey(clip: Pick<LocalAtmosphereClip, "layer_type">): "atmo" | "sfx" {
+  return clip.layer_type === "sfx" ? "sfx" : "atmo";
 }
 
 // ── Read ────────────────────────────────────────────────────
@@ -47,14 +62,26 @@ export async function readAtmospheresFromLocal(
 ): Promise<LocalAtmosphereData | null> {
   try {
     let p = atmoPath(sceneId, chapterId);
-    // If scene index cache is empty, re-read it (same fallback as storyboardSync)
     if (p.includes("__unresolved__")) {
       await readSceneIndex(storage);
       p = atmoPath(sceneId, chapterId);
       if (p.includes("__unresolved__")) return null;
     }
-    const data = await storage.readJSON<LocalAtmosphereData>(p);
-    return data ?? null;
+    const raw = await storage.readJSON<Record<string, unknown>>(p);
+    if (!raw) return null;
+
+    // Migration: old format had flat `clips[]` — convert to {atmo, sfx}
+    if (Array.isArray((raw as any).clips)) {
+      const clips = (raw as any).clips as LocalAtmosphereClip[];
+      return {
+        sceneId: (raw as any).sceneId ?? sceneId,
+        updatedAt: (raw as any).updatedAt ?? new Date().toISOString(),
+        atmo: clips.filter(c => sectionKey(c) === "atmo"),
+        sfx: clips.filter(c => sectionKey(c) === "sfx"),
+      };
+    }
+
+    return raw as unknown as LocalAtmosphereData;
   } catch {
     return null;
   }
@@ -65,7 +92,8 @@ export async function readAtmospheresFromLocal(
 export async function saveAtmospheresToLocal(
   storage: ProjectStorage,
   sceneId: string,
-  clips: LocalAtmosphereClip[],
+  atmo: LocalAtmosphereClip[],
+  sfx: LocalAtmosphereClip[],
   chapterId?: string,
 ): Promise<void> {
   let p = atmoPath(sceneId, chapterId);
@@ -80,7 +108,8 @@ export async function saveAtmospheresToLocal(
   const data: LocalAtmosphereData = {
     sceneId,
     updatedAt: new Date().toISOString(),
-    clips,
+    atmo,
+    sfx,
   };
   await storage.writeJSON(p, data);
 }
@@ -94,9 +123,12 @@ export async function addAtmosphereClip(
   chapterId?: string,
 ): Promise<void> {
   const existing = await readAtmospheresFromLocal(storage, sceneId, chapterId);
-  const clips = existing?.clips ?? [];
-  clips.push(clip);
-  await saveAtmospheresToLocal(storage, sceneId, clips, chapterId);
+  const atmo = existing?.atmo ?? [];
+  const sfx = existing?.sfx ?? [];
+  const key = sectionKey(clip);
+  if (key === "sfx") sfx.push(clip);
+  else atmo.push(clip);
+  await saveAtmospheresToLocal(storage, sceneId, atmo, sfx, chapterId);
 }
 
 export async function deleteAtmosphereClip(
@@ -107,8 +139,12 @@ export async function deleteAtmosphereClip(
 ): Promise<void> {
   const existing = await readAtmospheresFromLocal(storage, sceneId, chapterId);
   if (!existing) return;
-  const clips = existing.clips.filter(c => c.id !== clipId);
-  await saveAtmospheresToLocal(storage, sceneId, clips, chapterId);
+  await saveAtmospheresToLocal(
+    storage, sceneId,
+    existing.atmo.filter(c => c.id !== clipId),
+    existing.sfx.filter(c => c.id !== clipId),
+    chapterId,
+  );
 }
 
 export async function updateAtmosphereClip(
@@ -120,10 +156,14 @@ export async function updateAtmosphereClip(
 ): Promise<void> {
   const existing = await readAtmospheresFromLocal(storage, sceneId, chapterId);
   if (!existing) return;
-  const clips = existing.clips.map(c =>
-    c.id === clipId ? { ...c, ...updates } : c,
+  const updater = (c: LocalAtmosphereClip) =>
+    c.id === clipId ? { ...c, ...updates } : c;
+  await saveAtmospheresToLocal(
+    storage, sceneId,
+    existing.atmo.map(updater),
+    existing.sfx.map(updater),
+    chapterId,
   );
-  await saveAtmospheresToLocal(storage, sceneId, clips, chapterId);
 }
 
 // ── Batch read for multiple scenes ──────────────────────────
@@ -140,7 +180,8 @@ export async function readAtmospheresForScenes(
   const results = await Promise.all(
     sceneIds.map(async sid => {
       const data = await readAtmospheresFromLocal(storage, sid);
-      return (data?.clips ?? []).map(c => ({ ...c, scene_id: sid }));
+      if (!data) return [];
+      return allClips(data).map(c => ({ ...c, scene_id: sid }));
     }),
   );
   return results.flat();

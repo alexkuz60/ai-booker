@@ -641,7 +641,8 @@ function AutoAtmospherePanel({
     if (storage) {
       const { readAtmospheresFromLocal } = await import("@/lib/localAtmospheres");
       const data = await readAtmospheresFromLocal(storage, sceneId);
-      setExistingLayers((data?.clips ?? []).map(c => ({
+      const { allClips } = await import("@/lib/localAtmospheres");
+      setExistingLayers((data ? allClips(data) : []).map(c => ({
         id: c.id,
         layer_type: c.layer_type,
         prompt_used: c.prompt_used,
