@@ -409,6 +409,16 @@ function LibraryViewInner({
                         <Pencil className="h-3 w-3" />
                       </Button>
                     )}
+                    {syncedBookIds.has(book.id) && onOpenServerBook && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="sm" onClick={() => onOpenServerBook(book)} className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
+                            <Download className="h-3 w-3" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{isRu ? "Скачать с сервера" : "Download from server"}</TooltipContent>
+                      </Tooltip>
+                    )}
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-7 w-7 p-0">
@@ -430,6 +440,34 @@ function LibraryViewInner({
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
+                    {syncedBookIds.has(book.id) && onDeleteServerBook && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="sm" className="text-destructive/60 hover:text-destructive h-7 w-7 p-0">
+                                <Cloud className="h-3 w-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>{isRu ? "Удалить с сервера" : "Delete from server"}</TooltipContent>
+                          </Tooltip>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>{t("deleteBookTitle", isRu)}</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {isRu ? `«${book.title}» ` : `"${book.title}" `}{t("libraryServerDeleteDesc", isRu)}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>{t("cancel", isRu)}</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => onDeleteServerBook(book.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                              {t("libraryServerDelete", isRu)}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </>
                 ), (
                   <PipelineTimeline
@@ -451,7 +489,7 @@ function LibraryViewInner({
             )}
 
             {/* Empty state */}
-            {books.length === 0 && serverBooks.length === 0 && !loadingServerBooks && (
+            {books.length === 0 && !loadingServerBooks && (
               <Card className="border-dashed">
                 <CardContent className="py-16 flex flex-col items-center gap-4 text-muted-foreground">
                   <Library className="h-12 w-12 opacity-30" />
@@ -462,59 +500,6 @@ function LibraryViewInner({
                   </Button>
                 </CardContent>
               </Card>
-            )}
-
-            {/* Server books section */}
-            {(loadingServerBooks || serverBooks.length > 0) && (
-              <div className="space-y-2 pt-4 border-t border-border">
-                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <Cloud className="h-3.5 w-3.5" />
-                  {t("libraryServerTitle", isRu)}
-                </h3>
-                {loadingServerBooks ? (
-                  <div className="flex items-center justify-center py-8 gap-3 text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm">{t("libraryServerLoading", isRu)}</span>
-                  </div>
-                ) : (
-                  serverBooks.map(book => renderBookCard(book, (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onOpenServerBook?.(book)}
-                        className="gap-1.5 text-xs"
-                      >
-                        <Download className="h-3 w-3" />
-                        {t("libraryServerDownload", isRu)}
-                      </Button>
-                      {onDeleteServerBook && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-8 w-8 p-0">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>{t("deleteBookTitle", isRu)}</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                {isRu ? `«${book.title}» ` : `"${book.title}" `}{t("libraryServerDeleteDesc", isRu)}
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>{t("cancel", isRu)}</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => onDeleteServerBook(book.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                {t("libraryServerDelete", isRu)}
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
-                    </>
-                  )))
-                )}
-              </div>
             )}
           </>
         )}
