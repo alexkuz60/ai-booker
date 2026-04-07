@@ -751,11 +751,11 @@ export async function deployFromServer({
         const { saveAtmospheresToLocal } = await import("@/lib/localAtmospheres");
         type LocalAtmoClip = import("@/lib/localAtmospheres").LocalAtmosphereClip;
 
-        // Group by scene_id
-        const atmoByScene = new Map<string, LocalAtmoClip[]>();
+        // Group by scene_id and split by layer_type
+        const atmoByScene = new Map<string, { atmo: LocalAtmoClip[]; sfx: LocalAtmoClip[] }>();
         for (const a of serverAtmo) {
-          const list = atmoByScene.get(a.scene_id) || [];
-          list.push({
+          const entry = atmoByScene.get(a.scene_id) || { atmo: [], sfx: [] };
+          const clip: LocalAtmoClip = {
             id: a.id,
             layer_type: a.layer_type,
             audio_path: a.audio_path,
@@ -767,14 +767,16 @@ export async function deployFromServer({
             prompt_used: a.prompt_used,
             speed: a.speed ?? 1,
             created_at: a.created_at,
-          });
-          atmoByScene.set(a.scene_id, list);
+          };
+          if (a.layer_type === "sfx") entry.sfx.push(clip);
+          else entry.atmo.push(clip);
+          atmoByScene.set(a.scene_id, entry);
         }
 
         const atmoWrites: Promise<void>[] = [];
-        for (const [sid, clips] of atmoByScene) {
+        for (const [sid, sections] of atmoByScene) {
           const chId = allScenes.find(s => s.id === sid)?.chapter_id;
-          atmoWrites.push(saveAtmospheresToLocal(storage, sid, clips, chId));
+          atmoWrites.push(saveAtmospheresToLocal(storage, sid, sections.atmo, sections.sfx, chId));
         }
         await Promise.all(atmoWrites);
         restoredAtmoCount = serverAtmo.length;

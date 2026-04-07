@@ -496,8 +496,11 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
             const localClipMap = new Map<string, Record<string, unknown>>();
             for (const sid of allSceneIds) {
               const data = await readAtmospheresFromLocal(storage, sid);
-              if (!data?.clips.length) continue;
-              for (const c of data.clips) {
+              if (!data) continue;
+              const { allClips } = await import("@/lib/localAtmospheres");
+              const flat = allClips(data);
+              if (!flat.length) continue;
+              for (const c of flat) {
                 localClipMap.set(c.id, {
                   id: c.id, scene_id: sid, layer_type: c.layer_type,
                   audio_path: c.audio_path, duration_ms: c.duration_ms,
