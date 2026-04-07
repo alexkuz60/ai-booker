@@ -24,7 +24,6 @@ import { detectFileFormat, type FileFormat } from "@/lib/fileFormatUtils";
 import { wipeProjectBrowserState } from "@/lib/projectCleanup";
 import {
   resolveLocalStorageForBook,
-  ensureWritableLocalStorage,
 } from "@/lib/localProjectResolver";
 import { deployFromServer } from "@/lib/serverDeploy";
 import { assertIntegrity } from "@/lib/storageGuard";
