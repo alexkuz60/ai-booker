@@ -102,7 +102,7 @@ export const paths = {
 
   /** TTS audio clip for a segment */
   ttsClip: (segmentId: string, sceneId?: string, chapterId?: string) =>
-    `chapters/${requireChapterId(sceneId ?? "", chapterId)}/scenes/${sceneId}/audio/tts/${segmentId}.mp3`,
+    `chapters/${requireChapterId(sceneId ?? "", chapterId)}/scenes/${sceneId}/tts/${segmentId}.mp3`,
 
   /** Scene atmosphere/sfx clip metadata */
   sceneAtmospheres: (sceneId: string, chapterId?: string) =>
@@ -112,9 +112,9 @@ export const paths = {
   atmosphereClip: (fileName: string, sceneId?: string, chapterId?: string) =>
     `chapters/${requireChapterId(sceneId ?? "", chapterId)}/scenes/${sceneId}/audio/atmosphere/${fileName}`,
 
-  /** Scene render stem */
-  renderStem: (fileName: string, sceneId?: string, chapterId?: string) =>
-    `chapters/${requireChapterId(sceneId ?? "", chapterId)}/scenes/${sceneId}/audio/renders/${fileName}`,
+  /** Scene render stem (stored at chapter level) */
+  renderStem: (fileName: string, chapterId: string) =>
+    `chapters/${chapterId}/renders/${fileName}`,
 
   // ── Audio metadata (segment_audio mirror) ──────────────
 

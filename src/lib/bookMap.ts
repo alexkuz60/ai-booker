@@ -38,7 +38,6 @@ export interface ScenePathEntry {
   atmospheres: string;
   ttsDir: string;
   atmosphereDir: string;
-  rendersDir: string;
   /** Language subfolders for translations (e.g. { en: { ... } }) */
   translations: Record<string, TranslationPathEntry>;
 }
@@ -47,6 +46,7 @@ export interface ChapterMapEntry {
   index: number;
   contentPath: string;
   scenesDir: string;
+  rendersDir: string;
   scenes: Record<string, ScenePathEntry>;
 }
 
@@ -122,9 +122,8 @@ export function buildBookMap(
         clipPlugins: `${base}/clip_plugins.json`,
         characters: `${base}/characters.json`,
         atmospheres: `${base}/atmospheres.json`,
-        ttsDir: `${base}/audio/tts`,
+        ttsDir: `${base}/tts`,
         atmosphereDir: `${base}/audio/atmosphere`,
-        rendersDir: `${base}/audio/renders`,
         translations,
       };
       sceneToChapter[sceneId] = chapterId;
@@ -134,6 +133,7 @@ export function buildBookMap(
       index: chapterIndex,
       contentPath: `chapters/${chapterId}/content.json`,
       scenesDir: `chapters/${chapterId}/scenes`,
+      rendersDir: `chapters/${chapterId}/renders`,
       scenes,
     };
   });
