@@ -87,7 +87,7 @@ export function useProjectStorage(): UseProjectStorageReturn {
       if (backend === "fs-access") {
         store = await LocalFSStorage.createProject(folderName);
       } else {
-        store = await OPFSStorage.openOrCreate(folderName);
+        store = await OPFSStorage.createNewProject(folderName);
       }
 
       const projectMeta = getProjectMetaDefault(title, bookId, userId, language);
@@ -200,17 +200,15 @@ export function useProjectStorage(): UseProjectStorageReturn {
   const importProjectFromZip = useCallback(async (file: File): Promise<ProjectStorage> => {
     setLoading(true);
     try {
-      // Derive project name from ZIP filename
       const projectName = file.name.replace(/\.zip$/i, "").trim() || "ImportedProject";
 
       let store: ProjectStorage;
       if (backend === "fs-access") {
         store = await LocalFSStorage.createProject(projectName);
+        await store.importZip(file);
       } else {
-        store = await OPFSStorage.openOrCreate(projectName);
+        store = await OPFSStorage.restoreProjectFromBackup(projectName, file);
       }
-
-      await store.importZip(file);
 
       const rawMeta = await store.readJSON<Record<string, unknown>>("project.json");
       if (!rawMeta) {
