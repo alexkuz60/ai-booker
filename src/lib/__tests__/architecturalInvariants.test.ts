@@ -55,9 +55,16 @@ const LIST_PROJECTS_WHITELIST = new Set([
   "src/components/profile/tabs/OpfsBrowserPanel.tsx", // Admin OPFS browser
 ]);
 
-/** Files allowed to call OPFSStorage.openOrCreate() */
-const OPEN_OR_CREATE_WHITELIST = new Set([
-  "src/hooks/useProjectStorage.ts", // createProject, importProjectFromZip
+/** Files allowed to call OPFSStorage.createNewProject() */
+const CREATE_NEW_PROJECT_WHITELIST = new Set([
+  "src/hooks/useProjectStorage.ts", // createProject
+]);
+
+/** Files allowed to call OPFSStorage.restoreProjectFromBackup() */
+const RESTORE_BACKUP_WHITELIST = new Set([
+  "src/hooks/useProjectStorage.ts", // importProjectFromZip
+  "src/lib/serverDeploy.ts",        // Wipe-and-Deploy restore
+  "src/hooks/useBookRestore.ts",    // restore from server
 ]);
 
 /** Files allowed to call storage.delete() */
@@ -81,15 +88,38 @@ describe("Architectural invariants", () => {
     }
   });
 
-  it("OPFSStorage.openOrCreate() is only called from whitelisted files", () => {
+  it("OPFSStorage.openOrCreate() must not exist anywhere (replaced by createNewProject / restoreProjectFromBackup)", () => {
     const matches = searchFiles(SRC_DIR, /OPFSStorage\.openOrCreate\s*\(/);
-    const violations = matches.filter((m) => !OPEN_OR_CREATE_WHITELIST.has(m.file));
+    if (matches.length > 0) {
+      const msg = matches.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
+      expect.fail(
+        `OPFSStorage.openOrCreate() is BANNED. Use createNewProject() or restoreProjectFromBackup().\n${msg}`
+      );
+    }
+  });
+
+  it("OPFSStorage.createNewProject() is only called from whitelisted files", () => {
+    const matches = searchFiles(SRC_DIR, /OPFSStorage\.createNewProject\s*\(/);
+    const violations = matches.filter((m) => !CREATE_NEW_PROJECT_WHITELIST.has(m.file));
 
     if (violations.length > 0) {
       const msg = violations.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
       expect.fail(
-        `OPFSStorage.openOrCreate() found in non-whitelisted files:\n${msg}\n\n` +
-        `Allowed files: ${[...OPEN_OR_CREATE_WHITELIST].join(", ")}`
+        `OPFSStorage.createNewProject() found in non-whitelisted files:\n${msg}\n\n` +
+        `Allowed files: ${[...CREATE_NEW_PROJECT_WHITELIST].join(", ")}`
+      );
+    }
+  });
+
+  it("OPFSStorage.restoreProjectFromBackup() is only called from whitelisted files", () => {
+    const matches = searchFiles(SRC_DIR, /OPFSStorage\.restoreProjectFromBackup\s*\(/);
+    const violations = matches.filter((m) => !RESTORE_BACKUP_WHITELIST.has(m.file));
+
+    if (violations.length > 0) {
+      const msg = violations.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
+      expect.fail(
+        `OPFSStorage.restoreProjectFromBackup() found in non-whitelisted files:\n${msg}\n\n` +
+        `Allowed files: ${[...RESTORE_BACKUP_WHITELIST].join(", ")}`
       );
     }
   });

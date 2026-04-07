@@ -357,13 +357,12 @@ export class LocalFSStorage implements ProjectStorage {
 
   /** Create a new project inside a user-chosen parent folder */
   static async createProject(projectName: string): Promise<LocalFSStorage> {
+    const { ROOT_DIRS, CHAPTER_DIRS } = await import("@/lib/bookTemplateOPFS");
     const parent = await (window as any).showDirectoryPicker({ mode: "readwrite" });
     const root = await parent.getDirectoryHandle(projectName, { create: true });
-    // Pre-create directory structure
-    // source/ directory no longer needed — metadata in project.json
-    await root.getDirectoryHandle("structure", { create: true });
-    await root.getDirectoryHandle("chapters", { create: true });
-    await root.getDirectoryHandle("montage", { create: true });
+    for (const d of ROOT_DIRS) {
+      await root.getDirectoryHandle(d, { create: true });
+    }
     return new LocalFSStorage(root);
   }
 }
@@ -477,22 +476,44 @@ export class OPFSStorage implements ProjectStorage {
     await importProjectZip(this, zip);
   }
 
-  /** Create or open project in OPFS (creates directories if missing) */
-  static async openOrCreate(projectName: string): Promise<OPFSStorage> {
+  /**
+   * Create a brand-new project in OPFS.
+   * Builds the full directory tree from bookTemplateOPFS (single source of truth).
+   * NEVER use for opening existing projects — use openExisting() instead.
+   */
+  static async createNewProject(projectName: string): Promise<OPFSStorage> {
+    const { ROOT_DIRS } = await import("@/lib/bookTemplateOPFS");
     const opfsRoot = await navigator.storage.getDirectory();
     const projectDir = await opfsRoot.getDirectoryHandle(projectName, { create: true }) as unknown as FileSystemDirectoryHandle;
-    // Ensure subdirs
-    // source/ directory no longer needed — metadata in project.json
-    await projectDir.getDirectoryHandle("structure", { create: true });
-    await projectDir.getDirectoryHandle("chapters", { create: true });
-    await projectDir.getDirectoryHandle("montage", { create: true });
+    for (const d of ROOT_DIRS) {
+      await projectDir.getDirectoryHandle(d, { create: true });
+    }
     return new OPFSStorage(projectDir, projectName);
+  }
+
+  /**
+   * Restore a project from a backup ZIP.
+   * Creates an empty OPFS directory (or overwrites existing) and imports the ZIP contents.
+   * No pre-created subdirectories — the ZIP defines the full structure.
+   */
+  static async restoreProjectFromBackup(projectName: string, zip: Blob): Promise<OPFSStorage> {
+    const opfsRoot = await navigator.storage.getDirectory();
+    // Delete existing project if present (full wipe before restore)
+    try {
+      await opfsRoot.removeEntry(projectName, { recursive: true });
+    } catch {
+      // Not found — fine
+    }
+    const projectDir = await opfsRoot.getDirectoryHandle(projectName, { create: true }) as unknown as FileSystemDirectoryHandle;
+    const storage = new OPFSStorage(projectDir, projectName);
+    await storage.importZip(zip);
+    return storage;
   }
 
   /**
    * Open an existing project in OPFS WITHOUT creating anything.
    * Returns null if the directory does not exist.
-   * Use this for scanning / searching — never openOrCreate.
+   * Use this for read-only access and scanning.
    */
   static async openExisting(projectName: string): Promise<OPFSStorage | null> {
     try {
