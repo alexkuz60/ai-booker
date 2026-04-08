@@ -149,16 +149,5 @@ export function getTranslationFileDefaults(sceneId: string): Record<string, unkn
     "radar-literal.json": { ...radarDefault },
     "radar-literary.json": { ...radarDefault },
     "radar-critique.json": { ...radarDefault },
-    "audio_meta.json": {
-      sceneId,
-      updatedAt: now,
-      entries: {},
-    },
-    "mixer_state.json": {},
-    "clip_plugins.json": {
-      sceneId,
-      updatedAt: now,
-      configs: {},
-    },
   };
 }
