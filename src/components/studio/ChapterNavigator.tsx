@@ -203,7 +203,26 @@ export function ChapterNavigator({
   const navigate = useNavigate();
   const { storage: projectStorage } = useProjectStorageContext();
   const bgAnalysis = useBackgroundAnalysis();
-  const [chapterOpen, setChapterOpen] = useState(true);
+  // Chapter list for selector
+  const [chapterList, setChapterList] = useState<Array<{ id: string; title: string; sceneCount: number }>>([]);
+  useEffect(() => {
+    if (!projectStorage) return;
+    let cancelled = false;
+    (async () => {
+      const local = await readStructureFromLocal(projectStorage);
+      if (cancelled || !local?.structure) return;
+      const list: Array<{ id: string; title: string; sceneCount: number }> = [];
+      for (const [idx, tocEntry] of local.structure.toc.entries()) {
+        const chId = local.chapterIdMap.get(idx);
+        const result = local.chapterResults.get(idx);
+        if (chId && result) {
+          list.push({ id: chId, title: tocEntry.title, sceneCount: result.scenes.length });
+        }
+      }
+      if (!cancelled) setChapterList(list);
+    })();
+    return () => { cancelled = true; };
+  }, [projectStorage, chapter.chapterId]);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
   const [recalcRunning, setRecalcRunning] = useState(false);
