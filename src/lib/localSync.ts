@@ -304,25 +304,26 @@ async function seedEmptySceneFiles(
   }
 
   // Ensure empty subdirectories exist (tts/, audio/atmosphere/)
+  // We write a tiny .gitkeep file to force OPFS directory creation
+  const dirWrites: Promise<void>[] = [];
   for (const subDir of SCENE_DIRS) {
-    const dirPath = `${base}/${subDir}`;
-    if (!(await storage.exists(dirPath))) {
-      // Write and delete a placeholder to force directory creation
-      const placeholder = `${dirPath}/.keep`;
-      await storage.writeJSON(placeholder, null);
-      await storage.delete(placeholder);
+    const keepPath = `${base}/${subDir}/.gitkeep`;
+    if (!(await storage.exists(keepPath))) {
+      dirWrites.push(storage.writeJSON(keepPath, null));
     }
   }
 
   // Ensure translation audio subdirectories exist ({lang}/audio/tts/)
   for (const lang of translationLanguages) {
     for (const subDir of TRANSLATION_DIRS) {
-      const dirPath = `${base}/${lang}/${subDir}`;
-      if (!(await storage.exists(dirPath))) {
-        const placeholder = `${dirPath}/.keep`;
-        await storage.writeJSON(placeholder, null);
-        await storage.delete(placeholder);
+      const keepPath = `${base}/${lang}/${subDir}/.gitkeep`;
+      if (!(await storage.exists(keepPath))) {
+        dirWrites.push(storage.writeJSON(keepPath, null));
       }
     }
+  }
+
+  if (dirWrites.length > 0) {
+    await Promise.all(dirWrites);
   }
 }
