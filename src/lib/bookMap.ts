@@ -21,10 +21,6 @@ export interface TranslationPathEntry {
   radarLiteral: string;
   radarLiterary: string;
   radarCritique: string;
-  audioMeta: string;
-  mixerState: string;
-  clipPlugins: string;
-  ttsDir: string;
 }
 
 export interface ScenePathEntry {
