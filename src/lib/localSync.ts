@@ -316,7 +316,3 @@ async function seedEmptySceneFiles(
   if (dirWrites.length > 0) {
     await Promise.all(dirWrites);
   }
-}
-    await Promise.all(dirWrites);
-  }
-}
