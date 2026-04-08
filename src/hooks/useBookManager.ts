@@ -282,7 +282,7 @@ export function useBookManager({
       // К4: clear in-memory docx cache
       clearChapterTextsCache();
 
-      // Clean up local OPFS structure only (keep project.json and source/)
+      // Clean up local OPFS structure only (keep project.json)
       if (storageBackend === "opfs") {
         const projectNames = library.localProjectNamesByBookId.get(bookId);
         if (projectNames?.length) {

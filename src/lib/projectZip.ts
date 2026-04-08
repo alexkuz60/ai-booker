@@ -56,16 +56,34 @@ export async function exportProjectZip(storage: ProjectStorage): Promise<Blob> {
 /**
  * Import a ZIP blob into a ProjectStorage, overwriting existing files.
  */
+/**
+ * Root-level legacy directories that must never be restored from ZIP.
+ * These are V1 remnants and have no place in V2 project structure.
+ */
+const LEGACY_ROOT_PREFIXES = ["source/", "audio/", "montage/", "scenes/"];
+
+function isLegacyPath(path: string): boolean {
+  return LEGACY_ROOT_PREFIXES.some((p) => path.startsWith(p));
+}
+
 export async function importProjectZip(storage: ProjectStorage, zipBlob: Blob): Promise<number> {
   const buf = new Uint8Array(await zipBlob.arrayBuffer());
   const unzipped = unzipSync(buf);
 
   const writes: Promise<void>[] = [];
   let count = 0;
+  let skipped = 0;
 
   for (const [path, data] of Object.entries(unzipped)) {
     // Skip directory entries (empty content, path ends with /)
     if (path.endsWith("/") || data.length === 0) continue;
+
+    // Block legacy root-level directories from being restored
+    if (isLegacyPath(path)) {
+      skipped++;
+      continue;
+    }
+
     count++;
 
     const blob = new Blob([data.buffer as ArrayBuffer]);
@@ -83,6 +101,10 @@ export async function importProjectZip(storage: ProjectStorage, zipBlob: Blob): 
     }
 
     writes.push(storage.writeBlob(path, blob));
+  }
+
+  if (skipped > 0) {
+    console.warn(`[importProjectZip] Skipped ${skipped} legacy files (source/, audio/, montage/, scenes/)`);
   }
 
   await Promise.all(writes);
