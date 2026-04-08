@@ -212,19 +212,10 @@ export async function readStructureFromLocal(
       await writeBookMap(storage, bookMap);
     }
 
-    // Seed empty scene-level files for any scenes that are missing them
-    const seedPromises: Promise<void>[] = [];
-    sanitizedResults.forEach((result, idx) => {
-      if (isFolderNode(structure.toc, idx)) return;
-      const chapterId = chapterIdMap.get(idx);
-      if (!chapterId) return;
-      for (const scene of result.scenes) {
-        const sceneId = (scene as any).id;
-        if (!sceneId) continue;
-        seedPromises.push(seedEmptySceneFiles(storage, sceneId, chapterId, transLangs));
-      }
-    });
-    if (seedPromises.length > 0) await Promise.all(seedPromises);
+    // NOTE: No seeding here — readStructureFromLocal is a READ-ONLY operation.
+    // All scene-level JSON files are created exclusively during syncStructureToLocal
+    // (project creation / structure save). Lazy creation during reads risks race-condition
+    // overwrites of existing data.
 
     return { structure, chapterIdMap, chapterResults: sanitizedResults };
   } catch (err) {
