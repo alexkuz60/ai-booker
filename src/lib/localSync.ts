@@ -12,7 +12,7 @@ import {
 } from "@/lib/tocStructure";
 import { paths } from "@/lib/projectPaths";
 import { buildSceneIndex, writeSceneIndex, readSceneIndex } from "@/lib/sceneIndex";
-import { getSceneFileDefaults, getTranslationFileDefaults } from "@/lib/bookTemplateOPFS";
+import { getSceneFileDefaults, getTranslationFileDefaults, SCENE_DIRS, TRANSLATION_DIRS } from "@/lib/bookTemplateOPFS";
 import { writePipelineStep } from "@/hooks/usePipelineProgress";
 import { buildBookMap, writeBookMap, readBookMap } from "@/lib/bookMap";
 
@@ -301,5 +301,29 @@ async function seedEmptySceneFiles(
   if (writes.length > 0) {
     await Promise.all(writes);
     console.debug(`[LocalSync] Seeded ${writes.length} empty files for scene ${sceneId}`);
+  }
+
+  // Ensure empty subdirectories exist (tts/, audio/atmosphere/)
+  // We write a tiny .gitkeep file to force OPFS directory creation
+  const dirWrites: Promise<void>[] = [];
+  for (const subDir of SCENE_DIRS) {
+    const keepPath = `${base}/${subDir}/.gitkeep`;
+    if (!(await storage.exists(keepPath))) {
+      dirWrites.push(storage.writeJSON(keepPath, null));
+    }
+  }
+
+  // Ensure translation audio subdirectories exist ({lang}/audio/tts/)
+  for (const lang of translationLanguages) {
+    for (const subDir of TRANSLATION_DIRS) {
+      const keepPath = `${base}/${lang}/${subDir}/.gitkeep`;
+      if (!(await storage.exists(keepPath))) {
+        dirWrites.push(storage.writeJSON(keepPath, null));
+      }
+    }
+  }
+
+  if (dirWrites.length > 0) {
+    await Promise.all(dirWrites);
   }
 }
