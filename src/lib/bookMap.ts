@@ -102,10 +102,6 @@ export function buildBookMap(
           radarLiteral: `${langBase}/radar-literal.json`,
           radarLiterary: `${langBase}/radar-literary.json`,
           radarCritique: `${langBase}/radar-critique.json`,
-          audioMeta: `${langBase}/audio_meta.json`,
-          mixerState: `${langBase}/mixer_state.json`,
-          clipPlugins: `${langBase}/clip_plugins.json`,
-          ttsDir: `${langBase}/audio/tts`,
         };
       }
 
@@ -253,9 +249,6 @@ type IntegrityMessageKey =
   | "sceneCharacters"
   | "atmospheres"
   | "translationStoryboard"
-  | "translationAudioMeta"
-  | "translationMixerState"
-  | "translationClipPlugins"
   | "radarLiteral"
   | "radarLiterary"
   | "radarCritique";
@@ -272,9 +265,6 @@ const INTEGRITY_MESSAGES: Record<"ru" | "en", Record<IntegrityMessageKey, string
     sceneCharacters: "Не могу загрузить персонажей сцены",
     atmospheres: "Не могу загрузить атмосферу сцены",
     translationStoryboard: "Не могу загрузить перевод книги",
-    translationAudioMeta: "Не могу загрузить аудио-метаданные перевода",
-    translationMixerState: "Не могу загрузить настройки микшера перевода",
-    translationClipPlugins: "Не могу загрузить настройки плагинов перевода",
     radarLiteral: "Не могу загрузить данные буквального перевода",
     radarLiterary: "Не могу загрузить данные литературного перевода",
     radarCritique: "Не могу загрузить критику перевода",
@@ -290,9 +280,6 @@ const INTEGRITY_MESSAGES: Record<"ru" | "en", Record<IntegrityMessageKey, string
     sceneCharacters: "Can't load scene characters",
     atmospheres: "Can't load scene atmosphere",
     translationStoryboard: "Can't load book translation",
-    translationAudioMeta: "Can't load translation audio metadata",
-    translationMixerState: "Can't load translation mixer settings",
-    translationClipPlugins: "Can't load translation plugin settings",
     radarLiteral: "Can't load literal translation data",
     radarLiterary: "Can't load literary translation data",
     radarCritique: "Can't load translation critique",
@@ -338,12 +325,6 @@ function getTranslationIntegrityMessageKey(key: keyof TranslationPathEntry): Int
   switch (key) {
     case "storyboard":
       return "translationStoryboard";
-    case "audioMeta":
-      return "translationAudioMeta";
-    case "mixerState":
-      return "translationMixerState";
-    case "clipPlugins":
-      return "translationClipPlugins";
     case "radarLiteral":
       return "radarLiteral";
     case "radarLiterary":
