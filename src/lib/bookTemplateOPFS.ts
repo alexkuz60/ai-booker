@@ -121,8 +121,8 @@ export function getSceneFileDefaults(sceneId: string): Record<string, unknown> {
 
 // ─── Translation scene template ──────────────────────────
 
-/** Sub-directories created inside each {lang}/ folder of a scene */
-export const TRANSLATION_DIRS = ["audio/tts"] as const;
+/** Translation scenes have NO audio subdirectories — audio is created
+ *  by exporting the translation as a new standalone book project (see TODO). */
 
 /**
  * Returns a map of filename → default JSON value for all files
@@ -149,16 +149,5 @@ export function getTranslationFileDefaults(sceneId: string): Record<string, unkn
     "radar-literal.json": { ...radarDefault },
     "radar-literary.json": { ...radarDefault },
     "radar-critique.json": { ...radarDefault },
-    "audio_meta.json": {
-      sceneId,
-      updatedAt: now,
-      entries: {},
-    },
-    "mixer_state.json": {},
-    "clip_plugins.json": {
-      sceneId,
-      updatedAt: now,
-      configs: {},
-    },
   };
 }

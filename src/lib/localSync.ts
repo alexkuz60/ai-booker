@@ -12,7 +12,7 @@ import {
 } from "@/lib/tocStructure";
 import { paths } from "@/lib/projectPaths";
 import { buildSceneIndex, writeSceneIndex, readSceneIndex } from "@/lib/sceneIndex";
-import { getSceneFileDefaults, getTranslationFileDefaults, SCENE_DIRS, TRANSLATION_DIRS } from "@/lib/bookTemplateOPFS";
+import { getSceneFileDefaults, getTranslationFileDefaults, SCENE_DIRS } from "@/lib/bookTemplateOPFS";
 import { writePipelineStep } from "@/hooks/usePipelineProgress";
 import { buildBookMap, writeBookMap, readBookMap } from "@/lib/bookMap";
 
@@ -310,16 +310,6 @@ async function seedEmptySceneFiles(
     const keepPath = `${base}/${subDir}/.gitkeep`;
     if (!(await storage.exists(keepPath))) {
       dirWrites.push(storage.writeJSON(keepPath, null));
-    }
-  }
-
-  // Ensure translation audio subdirectories exist ({lang}/audio/tts/)
-  for (const lang of translationLanguages) {
-    for (const subDir of TRANSLATION_DIRS) {
-      const keepPath = `${base}/${lang}/${subDir}/.gitkeep`;
-      if (!(await storage.exists(keepPath))) {
-        dirWrites.push(storage.writeJSON(keepPath, null));
-      }
     }
   }
 

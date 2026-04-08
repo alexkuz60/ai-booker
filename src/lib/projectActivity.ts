@@ -86,9 +86,6 @@ export async function getProjectActivityMs(storage: ProjectStorage): Promise<num
         latest,
         await readLatestFromPaths(storage, [
           paths.translationStoryboard(sceneId, lang, chapterId),
-          paths.translationAudioMeta(sceneId, lang, chapterId),
-          paths.translationClipPlugins(sceneId, lang, chapterId),
-          paths.translationMixerState(sceneId, lang, chapterId),
           ...TRANSLATION_RADAR_STAGES.map((stage) =>
             paths.translationRadar(sceneId, lang, stage, chapterId),
           ),

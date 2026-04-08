@@ -142,21 +142,9 @@ export const paths = {
   translationRadar: (sceneId: string, lang: string, stage: string, chapterId?: string) =>
     `chapters/${requireChapterId(sceneId, chapterId)}/scenes/${sceneId}/${lang}/radar-${stage}.json`,
 
-  /** Translation TTS clip */
-  translationTtsClip: (segmentId: string, sceneId: string, lang: string, chapterId?: string) =>
-    `chapters/${requireChapterId(sceneId, chapterId)}/scenes/${sceneId}/${lang}/audio/tts/${segmentId}.mp3`,
+  // Translation audio paths REMOVED — translation audio will be created
+  // by exporting the translation as a new standalone book project (see TODO).
 
-  /** Translation audio metadata */
-  translationAudioMeta: (sceneId: string, lang: string, chapterId?: string) =>
-    `chapters/${requireChapterId(sceneId, chapterId)}/scenes/${sceneId}/${lang}/audio_meta.json`,
-
-  /** Translation mixer state */
-  translationMixerState: (sceneId: string, lang: string, chapterId?: string) =>
-    `chapters/${requireChapterId(sceneId, chapterId)}/scenes/${sceneId}/${lang}/mixer_state.json`,
-
-  /** Translation clip plugins */
-  translationClipPlugins: (sceneId: string, lang: string, chapterId?: string) =>
-    `chapters/${requireChapterId(sceneId, chapterId)}/scenes/${sceneId}/${lang}/clip_plugins.json`,
 
   // ── Montage ────────────────────────────────────────────
 
