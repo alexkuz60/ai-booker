@@ -328,6 +328,7 @@ export function useBookManager({
   const handleReset = useCallback(() => {
     setStep("library");
     sessionStorage.removeItem(ACTIVE_BOOK_KEY);
+    sessionStorage.removeItem("RESTORE_TOAST_SHOWN");
     setFileName("");
     setErrorMsg("");
     setBookId(null);

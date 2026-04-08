@@ -133,7 +133,12 @@ export function useBookRestore({
         console.info("[Restore] PDF source not stored locally, skipping PDF preview");
       }
 
-      toast.success(isRu ? `Книга «${structure.title}» загружена` : `Book "${structure.title}" loaded`);
+      // Only show toast if this is a fresh restore, not a re-mount of an already-active book
+      const alreadyActive = sessionStorage.getItem("RESTORE_TOAST_SHOWN") === savedBookId;
+      if (!alreadyActive) {
+        sessionStorage.setItem("RESTORE_TOAST_SHOWN", savedBookId);
+        toast.success(isRu ? `Книга «${structure.title}» загружена` : `Book "${structure.title}" loaded`);
+      }
       return true;
     } catch (err) {
       console.warn("[LocalRestore] Failed:", err);
