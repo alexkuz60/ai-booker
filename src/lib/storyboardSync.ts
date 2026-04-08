@@ -101,12 +101,13 @@ export async function saveStoryboardToLocal(
       await writePipelineStep(storage, "storyboard_done", true);
     }
 
-    // Generate/update scene JSON files with defaults for segments.
+    // Update existing scene JSON files with segment data.
+    // Files MUST already exist from project init (bookTemplateOPFS).
     // Preserves existing user-modified entries.
     await Promise.all([
-      generateEstimatedAudioMeta(storage, sceneId, data.segments, chapterId),
-      generateDefaultClipPlugins(storage, sceneId, data.segments, chapterId),
-      generateDefaultMixerState(storage, sceneId, chapterId, data.segments, data.typeMappings),
+      updateEstimatedAudioMeta(storage, sceneId, data.segments, chapterId),
+      updateClipPlugins(storage, sceneId, data.segments, chapterId),
+      updateMixerState(storage, sceneId, chapterId, data.segments, data.typeMappings),
     ]);
 
     // Recalc positions after audio_meta entries are generated/updated
@@ -117,10 +118,11 @@ export async function saveStoryboardToLocal(
 }
 
 /**
- * Generate audio_meta.json with estimated durations from phrase char counts.
+ * Update audio_meta.json with estimated durations from phrase char counts.
+ * The file MUST already exist (created at project init from bookTemplateOPFS).
  * Preserves entries that already have status "ready" (real TTS audio).
  */
-async function generateEstimatedAudioMeta(
+async function updateEstimatedAudioMeta(
   storage: ProjectStorage,
   sceneId: string,
   segments: Segment[],
@@ -128,7 +130,11 @@ async function generateEstimatedAudioMeta(
 ): Promise<void> {
   try {
     const existing = await readAudioMeta(storage, sceneId, chapterId);
-    const entries: Record<string, LocalAudioEntry> = existing?.entries ?? {};
+    if (!existing) {
+      console.warn(`[StoryboardSync] audio_meta.json not found for scene ${sceneId} — skipping update (file should exist from init)`);
+      return;
+    }
+    const entries: Record<string, LocalAudioEntry> = existing.entries ?? {};
 
     for (const seg of segments) {
       // Don't overwrite real TTS data
@@ -153,15 +159,16 @@ async function generateEstimatedAudioMeta(
 
     await writeAudioMeta(storage, sceneId, entries, chapterId);
   } catch (err) {
-    console.warn("[StoryboardSync] Failed to generate audio_meta:", err);
+    console.warn("[StoryboardSync] Failed to update audio_meta:", err);
   }
 }
 
 /**
- * Generate clip_plugins.json with default-off plugin configs for each segment.
+ * Update clip_plugins.json with default-off plugin configs for new segments.
+ * The file MUST already exist (created at project init from bookTemplateOPFS).
  * Preserves entries that were already configured by the user.
  */
-async function generateDefaultClipPlugins(
+async function updateClipPlugins(
   storage: ProjectStorage,
   sceneId: string,
   segments: Segment[],
@@ -169,7 +176,11 @@ async function generateDefaultClipPlugins(
 ): Promise<void> {
   try {
     const existing = await readClipPlugins(storage, sceneId, chapterId);
-    const configs = existing?.configs ?? {};
+    if (!existing) {
+      console.warn(`[StoryboardSync] clip_plugins.json not found for scene ${sceneId} — skipping update (file should exist from init)`);
+      return;
+    }
+    const configs = existing.configs ?? {};
 
     for (const seg of segments) {
       // Don't overwrite user-configured entries
@@ -188,16 +199,16 @@ async function generateDefaultClipPlugins(
 
     await writeClipPlugins(storage, sceneId, configs, chapterId);
   } catch (err) {
-    console.warn("[StoryboardSync] Failed to generate clip_plugins:", err);
+    console.warn("[StoryboardSync] Failed to update clip_plugins:", err);
   }
 }
 
 /**
- * Generate mixer_state.json with default values if it doesn't exist yet.
- * Seeds defaults for known tracks: unique character tracks + atmo + sfx.
+ * Update mixer_state.json with default track entries if they're missing.
+ * The file MUST already exist (created at project init from bookTemplateOPFS).
  * Does NOT overwrite existing mixer state (user may have customized it).
  */
-async function generateDefaultMixerState(
+async function updateMixerState(
   storage: ProjectStorage,
   sceneId: string,
   chapterId?: string,
@@ -206,26 +217,36 @@ async function generateDefaultMixerState(
 ): Promise<void> {
   try {
     const existing = await readMixerState(storage, sceneId);
-    if (existing && Object.keys(existing).length > 0) return; // already configured
+    if (!existing) {
+      console.warn(`[StoryboardSync] mixer_state.json not found for scene ${sceneId} — skipping update (file should exist from init)`);
+      return;
+    }
+    if (Object.keys(existing).length > 0) return; // already configured by user
 
     const defaultMix = { volume: 80, pan: 0, preFxBypassed: false, reverbBypassed: true };
-    const defaultSnapshot: SceneMixerSnapshot = {};
+    const defaultSnapshot: SceneMixerSnapshot = { ...existing };
 
     // Voice tracks from type mappings (char-{characterId})
     if (typeMappings) {
       const charIds = new Set(typeMappings.map(m => m.characterId));
       for (const cid of charIds) {
-        defaultSnapshot[`char-${cid}`] = { mix: { ...defaultMix } };
+        if (!defaultSnapshot[`char-${cid}`]) {
+          defaultSnapshot[`char-${cid}`] = { mix: { ...defaultMix } };
+        }
       }
     }
 
     // Fixed atmosphere + sfx tracks
-    defaultSnapshot[`atmo-${sceneId}`] = { mix: { ...defaultMix } };
-    defaultSnapshot[`sfx-${sceneId}`] = { mix: { ...defaultMix } };
+    if (!defaultSnapshot[`atmo-${sceneId}`]) {
+      defaultSnapshot[`atmo-${sceneId}`] = { mix: { ...defaultMix } };
+    }
+    if (!defaultSnapshot[`sfx-${sceneId}`]) {
+      defaultSnapshot[`sfx-${sceneId}`] = { mix: { ...defaultMix } };
+    }
 
     await writeMixerState(storage, sceneId, defaultSnapshot, chapterId);
   } catch (err) {
-    console.warn("[StoryboardSync] Failed to generate mixer_state:", err);
+    console.warn("[StoryboardSync] Failed to update mixer_state:", err);
   }
 }
 
