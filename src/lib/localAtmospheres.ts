@@ -45,7 +45,7 @@ function atmoPath(sceneId: string, chapterId?: string): string {
 
 /** Get all clips as a flat array (convenience for consumers that don't care about sections) */
 export function allClips(data: LocalAtmosphereData): LocalAtmosphereClip[] {
-  return [...data.atmo, ...data.sfx];
+  return [...(data.atmo ?? []), ...(data.sfx ?? [])];
 }
 
 /** Determine which section a clip belongs to based on layer_type */
@@ -81,7 +81,13 @@ export async function readAtmospheresFromLocal(
       };
     }
 
-    return raw as unknown as LocalAtmosphereData;
+    // Normalize: ensure atmo/sfx are always arrays
+    return {
+      sceneId: (raw as any).sceneId ?? sceneId,
+      updatedAt: (raw as any).updatedAt ?? new Date().toISOString(),
+      atmo: Array.isArray((raw as any).atmo) ? (raw as any).atmo : [],
+      sfx: Array.isArray((raw as any).sfx) ? (raw as any).sfx : [],
+    } as LocalAtmosphereData;
   } catch {
     return null;
   }
