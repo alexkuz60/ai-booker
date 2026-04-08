@@ -49,6 +49,8 @@ export function useCharacterTracks(
       setCharTracks([]); setSpeakerToCharId(new Map()); setTypeMappings(new Map()); return;
     }
 
+    console.info(`[CharacterTracks] Loading for bookId=${bookId}, sceneId=${contextSceneIds[0]}`);
+
     (async () => {
       if (!storage) return;
 
