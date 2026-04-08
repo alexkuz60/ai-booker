@@ -262,25 +262,9 @@ export function useBookRestore({
     // Only PDF format needs a proxy loader; DOCX and FB2 don't use pdfjs
     if (format !== "pdf") return null;
 
-    const loadPdf = async (arrayBuffer: ArrayBuffer) => {
-      const { getDocument } = await import("pdfjs-dist");
-      const pdf = await getDocument({ data: arrayBuffer }).promise;
-      updatePdfRef(pdf);
-      updateTotalPages(pdf.numPages);
-      return pdf;
-    };
-
-    if (storage?.isReady) {
-      try {
-        const localBlob = await storage.readBlob("source/book.pdf");
-        if (localBlob) return await loadPdf(await localBlob.arrayBuffer());
-      } catch (err) {
-        console.warn("[EnsurePDF] Local read failed:", err);
-      }
-    }
-
-    // К3: No server fallback
-    console.warn("[EnsurePDF] PDF not found in local project.");
+    // V2: PDF source files are NOT stored in OPFS (legacy source/ folder removed).
+    // User must re-upload the file if PDF proxy is needed.
+    console.warn("[EnsurePDF] PDF source not stored in OPFS (V2). Re-upload required.");
     return null;
   }, [pdfRef, bookId, resolverOpts, fileName, updatePdfRef, updateTotalPages]);
 
