@@ -181,6 +181,7 @@ export function ChapterNavigator({
   onPlaylistDurationsLoaded,
   selectedSceneIndices,
   onSelectedSceneIndicesChange,
+  onChapterChange,
 }: {
   chapter: StudioChapter;
   selectedSceneIdx: number | null;
@@ -197,6 +198,7 @@ export function ChapterNavigator({
   onPlaylistDurationsLoaded?: (m: Map<string, number>) => void;
   selectedSceneIndices?: Set<number>;
   onSelectedSceneIndicesChange?: (indices: Set<number>) => void;
+  onChapterChange?: (chapterId: string) => void;
 }) {
   const navigate = useNavigate();
   const { storage: projectStorage } = useProjectStorageContext();
