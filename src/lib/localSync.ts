@@ -302,4 +302,27 @@ async function seedEmptySceneFiles(
     await Promise.all(writes);
     console.debug(`[LocalSync] Seeded ${writes.length} empty files for scene ${sceneId}`);
   }
+
+  // Ensure empty subdirectories exist (tts/, audio/atmosphere/)
+  for (const subDir of SCENE_DIRS) {
+    const dirPath = `${base}/${subDir}`;
+    if (!(await storage.exists(dirPath))) {
+      // Write and delete a placeholder to force directory creation
+      const placeholder = `${dirPath}/.keep`;
+      await storage.writeJSON(placeholder, null);
+      await storage.delete(placeholder);
+    }
+  }
+
+  // Ensure translation audio subdirectories exist ({lang}/audio/tts/)
+  for (const lang of translationLanguages) {
+    for (const subDir of TRANSLATION_DIRS) {
+      const dirPath = `${base}/${lang}/${subDir}`;
+      if (!(await storage.exists(dirPath))) {
+        const placeholder = `${dirPath}/.keep`;
+        await storage.writeJSON(placeholder, null);
+        await storage.delete(placeholder);
+      }
+    }
+  }
 }
