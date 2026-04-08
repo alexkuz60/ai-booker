@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useBackgroundAnalysis } from "@/hooks/useBackgroundAnalysis";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, ChevronDown, Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2, Clock, Timer, BookOpen, Scissors, Disc, Sparkles } from "lucide-react";
+import { Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2, Clock, Timer, BookOpen, Scissors, Disc, Sparkles } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { readStructureFromLocal } from "@/lib/localSync";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -180,6 +181,7 @@ export function ChapterNavigator({
   onPlaylistDurationsLoaded,
   selectedSceneIndices,
   onSelectedSceneIndicesChange,
+  onChapterChange,
 }: {
   chapter: StudioChapter;
   selectedSceneIdx: number | null;
@@ -196,11 +198,31 @@ export function ChapterNavigator({
   onPlaylistDurationsLoaded?: (m: Map<string, number>) => void;
   selectedSceneIndices?: Set<number>;
   onSelectedSceneIndicesChange?: (indices: Set<number>) => void;
+  onChapterChange?: (chapterId: string) => void;
 }) {
   const navigate = useNavigate();
   const { storage: projectStorage } = useProjectStorageContext();
   const bgAnalysis = useBackgroundAnalysis();
-  const [chapterOpen, setChapterOpen] = useState(true);
+  // Chapter list for selector
+  const [chapterList, setChapterList] = useState<Array<{ id: string; title: string; sceneCount: number }>>([]);
+  useEffect(() => {
+    if (!projectStorage) return;
+    let cancelled = false;
+    (async () => {
+      const local = await readStructureFromLocal(projectStorage);
+      if (cancelled || !local?.structure) return;
+      const list: Array<{ id: string; title: string; sceneCount: number }> = [];
+      for (const [idx, tocEntry] of local.structure.toc.entries()) {
+        const chId = local.chapterIdMap.get(idx);
+        const result = local.chapterResults.get(idx);
+        if (chId && result) {
+          list.push({ id: chId, title: tocEntry.title, sceneCount: result.scenes.length });
+        }
+      }
+      if (!cancelled) setChapterList(list);
+    })();
+    return () => { cancelled = true; };
+  }, [projectStorage, chapter.chapterId]);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
   const [recalcRunning, setRecalcRunning] = useState(false);
@@ -684,20 +706,34 @@ export function ChapterNavigator({
       </div>
       <ScrollArea type="always" className="flex-1 min-h-0">
         <div className="py-2 px-1">
-          <Collapsible open={chapterOpen} onOpenChange={setChapterOpen}>
-            <CollapsibleTrigger asChild>
-              <button
-                className={cn(
-                  "w-full flex items-center gap-2 px-3 py-2 text-base font-body rounded-md transition-colors",
-                  "hover:bg-accent/50 font-semibold text-foreground"
-                )}
-                onClick={() => onSelectScene(null)}
+          {/* Chapter selector */}
+          {chapterList.length > 1 && onChapterChange && (
+            <div className="px-2 pb-2">
+              <Select
+                value={chapter.chapterId || ""}
+                onValueChange={(val) => {
+                  if (val && val !== chapter.chapterId) {
+                    onChapterChange(val);
+                  }
+                }}
               >
-                {chapterOpen ? (
-                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                )}
+                <SelectTrigger className="h-8 text-sm font-body">
+                  <SelectValue placeholder={chapter.chapterTitle} />
+                </SelectTrigger>
+                <SelectContent>
+                  {chapterList.map((ch) => (
+                    <SelectItem key={ch.id} value={ch.id}>
+                      <span className="truncate">{ch.title}</span>
+                      <span className="ml-2 text-[10px] text-muted-foreground">({ch.sceneCount})</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {chapterList.length <= 1 && (
+            <div className="px-3 pb-1">
+              <div className="flex items-center gap-2 text-sm font-body font-semibold text-foreground">
                 <span className="truncate flex-1">{chapter.chapterTitle}</span>
                 {chapterTotalSec > 0 && (
                   <span className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono shrink-0">
@@ -708,99 +744,98 @@ export function ChapterNavigator({
                 <Badge variant="outline" className="text-[11px] shrink-0">
                   {chapter.scenes.length}
                 </Badge>
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="space-y-0.5">
-              {chapter.scenes.map((scene, idx) => {
-                  const colorClass = SCENE_TYPE_COLORS[scene.scene_type] || SCENE_TYPE_COLORS.mixed;
-                  const est = estimateSceneDuration(scene);
-                  const actualMs = scene.id ? playlistDurations.get(scene.id) : undefined;
-                   const actualSec = actualMs && actualMs > 0 ? Math.round(actualMs / 1000) : null;
-                   const displayDuration = actualSec ? formatDuration(actualSec) : est.formatted;
-                   const isStale = staleAudioSceneIds?.has(scene.id || "");
-                   const isActual = !!actualSec;
-                   const sceneRender = scene.id ? renderStatus.get(scene.id) : undefined;
-                    const isMultiSelected = selectedSceneIndices?.has(idx);
-                    const isDirty = dirtySceneIds.has(scene.id || "");
-                    const isBgAnalyzing = scene.id ? bgAnalysis.isAnalyzing(scene.id) : false;
-
-                  const durationColor = isStale
-                    ? "text-yellow-500"
-                    : isActual
-                      ? "text-emerald-500"
-                      : "text-muted-foreground";
-
-                  return (
-                    <button
-                      key={idx}
-                      onClick={(e) => handleSceneClick(idx, e)}
-                      className={cn(
-                        "w-full flex items-center gap-2 pl-9 pr-3 py-2 text-sm font-body rounded-md transition-colors text-left",
-                        "hover:bg-accent/50",
-                        isMultiSelected && "bg-primary/15 border-l-2 border-primary",
-                        !isMultiSelected && selectedSceneIdx === idx && "bg-primary/10 text-primary border-r-2 border-primary"
-                      )}
-                    >
-                      <span className={cn("px-1.5 py-0.5 rounded text-[10px] border shrink-0", colorClass)}>
-                        {isRu ? (SCENE_TYPE_RU[scene.scene_type] || scene.scene_type) : scene.scene_type}
-                      </span>
-                       <span className="truncate flex-1">{scene.title}</span>
-                       {isBgAnalyzing && (
-                         <span title={isRu ? "Анализ в фоне…" : "Analyzing in background…"}>
-                           <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
-                         </span>
-                       )}
-                       {isDirty && !isBgAnalyzing && (
-                         <span title={isRu ? "Контент изменён в Парсере — нужен переанализ" : "Content edited in Parser — re-analysis needed"}>
-                           <RefreshCw className="h-3 w-3 text-orange-500 shrink-0" />
-                         </span>
-                       )}
-                       {isStale && (
-                         <span title={isRu ? "Голос изменился — аудио устарело" : "Voice changed — audio outdated"}>
-                           <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0" />
-                         </span>
-                       )}
-                       {sceneRender === "full" ? (
-                         <span title={isRu ? "Рендер готов (3 стема)" : "Render ready (3 stems)"}>
-                           <Disc className="h-3 w-3 text-emerald-500 shrink-0" />
-                         </span>
-                       ) : sceneRender === "partial" ? (
-                         <span title={isRu ? "Частичный рендер" : "Partial render"}>
-                           <Disc className="h-3 w-3 text-yellow-500 shrink-0" />
-                         </span>
-                       ) : null}
-                      {fullyRenderedSceneIds?.has(scene.id || "") ? (
-                        <span title={isRu ? "Все клипы готовы" : "All clips ready"}>
-                          <Volume2 className="h-3 w-3 text-foreground shrink-0" />
-                        </span>
-                      ) : renderedSceneIds?.has(scene.id || "") ? (
-                        <span title={isRu ? "Частично отрендерено" : "Partially rendered"}>
-                          <Volume2 className="h-3 w-3 text-muted-foreground shrink-0" strokeWidth={1.5} />
-                        </span>
-                      ) : segmentedSceneIds?.has(scene.id || "") ? (
-                        <span title={isRu ? "Сегментировано" : "Segmented"}>
-                          <Film className="h-3 w-3 text-primary shrink-0" />
-                        </span>
-                      ) : null}
-                      <span
-                        className={cn("text-[11px] font-mono shrink-0", durationColor)}
-                        title={
-                          isStale
-                            ? (isRu ? "Аудио устарело — требуется ре-синтез" : "Audio stale — re-synthesis needed")
-                            : isActual
-                              ? `${isRu ? "Фактическое время" : "Actual duration"} (${est.chars} ${isRu ? "сим." : "chars"})`
-                              : `≈ ${est.chars} ${isRu ? "сим." : "chars"}`
-                        }
-                      >
-                        {!isActual && "≈"}{displayDuration}
-                      </span>
-                    </button>
-                  );
-                })}
               </div>
-            </CollapsibleContent>
-          </Collapsible>
+            </div>
+          )}
+
+          <div className="space-y-0.5">
+            {chapter.scenes.map((scene, idx) => {
+              const colorClass = SCENE_TYPE_COLORS[scene.scene_type] || SCENE_TYPE_COLORS.mixed;
+              const est = estimateSceneDuration(scene);
+              const actualMs = scene.id ? playlistDurations.get(scene.id) : undefined;
+              const actualSec = actualMs && actualMs > 0 ? Math.round(actualMs / 1000) : null;
+              const displayDuration = actualSec ? formatDuration(actualSec) : est.formatted;
+              const isStale = staleAudioSceneIds?.has(scene.id || "");
+              const isActual = !!actualSec;
+              const sceneRender = scene.id ? renderStatus.get(scene.id) : undefined;
+              const isMultiSelected = selectedSceneIndices?.has(idx);
+              const isDirty = dirtySceneIds.has(scene.id || "");
+              const isBgAnalyzing = scene.id ? bgAnalysis.isAnalyzing(scene.id) : false;
+
+              const durationColor = isStale
+                ? "text-yellow-500"
+                : isActual
+                  ? "text-emerald-500"
+                  : "text-muted-foreground";
+
+              return (
+                <button
+                  key={idx}
+                  onClick={(e) => handleSceneClick(idx, e)}
+                  className={cn(
+                    "w-full flex items-center gap-2 pl-5 pr-3 py-2 text-sm font-body rounded-md transition-colors text-left",
+                    "hover:bg-accent/50",
+                    isMultiSelected && "bg-primary/15 border-l-2 border-primary",
+                    !isMultiSelected && selectedSceneIdx === idx && "bg-primary/10 text-primary border-r-2 border-primary"
+                  )}
+                >
+                  <span className={cn("px-1.5 py-0.5 rounded text-[10px] border shrink-0", colorClass)}>
+                    {isRu ? (SCENE_TYPE_RU[scene.scene_type] || scene.scene_type) : scene.scene_type}
+                  </span>
+                  <span className="truncate flex-1">{scene.title}</span>
+                  {isBgAnalyzing && (
+                    <span title={isRu ? "Анализ в фоне…" : "Analyzing in background…"}>
+                      <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
+                    </span>
+                  )}
+                  {isDirty && !isBgAnalyzing && (
+                    <span title={isRu ? "Контент изменён в Парсере — нужен переанализ" : "Content edited in Parser — re-analysis needed"}>
+                      <RefreshCw className="h-3 w-3 text-orange-500 shrink-0" />
+                    </span>
+                  )}
+                  {isStale && (
+                    <span title={isRu ? "Голос изменился — аудио устарело" : "Voice changed — audio outdated"}>
+                      <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0" />
+                    </span>
+                  )}
+                  {sceneRender === "full" ? (
+                    <span title={isRu ? "Рендер готов (3 стема)" : "Render ready (3 stems)"}>
+                      <Disc className="h-3 w-3 text-emerald-500 shrink-0" />
+                    </span>
+                  ) : sceneRender === "partial" ? (
+                    <span title={isRu ? "Частичный рендер" : "Partial render"}>
+                      <Disc className="h-3 w-3 text-yellow-500 shrink-0" />
+                    </span>
+                  ) : null}
+                  {fullyRenderedSceneIds?.has(scene.id || "") ? (
+                    <span title={isRu ? "Все клипы готовы" : "All clips ready"}>
+                      <Volume2 className="h-3 w-3 text-foreground shrink-0" />
+                    </span>
+                  ) : renderedSceneIds?.has(scene.id || "") ? (
+                    <span title={isRu ? "Частично отрендерено" : "Partially rendered"}>
+                      <Volume2 className="h-3 w-3 text-muted-foreground shrink-0" strokeWidth={1.5} />
+                    </span>
+                  ) : segmentedSceneIds?.has(scene.id || "") ? (
+                    <span title={isRu ? "Сегментировано" : "Segmented"}>
+                      <Film className="h-3 w-3 text-primary shrink-0" />
+                    </span>
+                  ) : null}
+                  <span
+                    className={cn("text-[11px] font-mono shrink-0", durationColor)}
+                    title={
+                      isStale
+                        ? (isRu ? "Аудио устарело — требуется ре-синтез" : "Audio stale — re-synthesis needed")
+                        : isActual
+                          ? `${isRu ? "Фактическое время" : "Actual duration"} (${est.chars} ${isRu ? "сим." : "chars"})`
+                          : `≈ ${est.chars} ${isRu ? "сим." : "chars"}`
+                    }
+                  >
+                    {!isActual && "≈"}{displayDuration}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </ScrollArea>
 

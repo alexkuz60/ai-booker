@@ -460,6 +460,42 @@ const Studio = () => {
     }
   }, [storage]);
 
+  // ── Chapter switching from navigator ──────────────────────
+  const handleChapterChange = useCallback(async (chapterId: string) => {
+    if (!storage) return;
+    const local = await readStructureFromLocal(storage);
+    if (!local?.structure) return;
+
+    let chapterIndex: number | null = null;
+    for (const [idx, id] of local.chapterIdMap.entries()) {
+      if (id === chapterId) { chapterIndex = idx; break; }
+    }
+    if (chapterIndex === null) return;
+
+    const result = local.chapterResults.get(chapterIndex);
+    const tocEntry = local.structure.toc[chapterIndex];
+    if (!result || !tocEntry) return;
+
+    const newChapter: StudioChapter = {
+      chapterId,
+      chapterTitle: tocEntry.title,
+      bookTitle: local.structure.title || chapter?.bookTitle || "",
+      bookId: local.structure.bookId || chapter?.bookId,
+      scenes: result.scenes.map((scene) => ({
+        id: scene.id,
+        scene_number: scene.scene_number,
+        title: scene.title,
+        scene_type: scene.scene_type || "mixed",
+        mood: scene.mood || "",
+        bpm: scene.bpm || 120,
+      })),
+    };
+    setChapter(newChapter);
+    setSelectedSceneIdx(newChapter.scenes.length > 0 ? 0 : null);
+    setSelectedSceneIndices(new Set());
+    setClipsRefreshToken(t => t + 1);
+  }, [storage, chapter?.bookTitle, chapter?.bookId, setChapter, setSelectedSceneIdx]);
+
   const { setPageHeader } = usePageHeader();
 
   const studioTitle = isRu ? 'АУДИО СТУДИЯ "ОК"' : 'AUDIO STUDIO "OK"';
@@ -583,6 +619,7 @@ const Studio = () => {
                     onPlaylistDurationsLoaded={handlePlaylistDurationsLoaded}
                     selectedSceneIndices={selectedSceneIndices}
                     onSelectedSceneIndicesChange={setSelectedSceneIndices}
+                    onChapterChange={handleChapterChange}
                   />
                 ) : (
                   <EmptyNavigator isRu={isRu} />
