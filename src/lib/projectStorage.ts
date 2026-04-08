@@ -5,29 +5,31 @@
  *   📁 BookTitle/
  *   ├── project.json              — метаданные проекта
  *   ├── characters.json           — глобальный реестр персонажей
+ *   ├── book_map.json             — карта книги (authoritative paths)
  *   ├── scene_index.json          — индекс сцен (sceneId → chapterId)
- *   ├── 📁 source/
- *   │   └── book.pdf / book.docx / book.fb2
  *   ├── 📁 structure/
  *   │   ├── toc.json              — оглавление (TocChapter[])
  *   │   ├── chapters.json         — chapterIndex → uuid
  *   │   └── characters.json       — (legacy, только для миграции)
+ *   ├── 📁 synopsis/
  *   ├── 📁 chapters/
  *   │   └── {chapterId}/
  *   │       ├── content.json      — сцены главы
+ *   │       ├── 📁 renders/
  *   │       └── 📁 scenes/
  *   │           └── {sceneId}/
  *   │               ├── storyboard.json
  *   │               ├── characters.json
+ *   │               ├── audio_meta.json
+ *   │               ├── clip_plugins.json
+ *   │               ├── mixer_state.json
  *   │               ├── atmospheres.json
- *   │               └── 📁 audio/
- *   │                   ├── 📁 tts/          — {segmentId}.mp3
- *   │                   ├── 📁 atmosphere/   — атмосферные слои
- *   │                   └── 📁 renders/      — финальные рендеры
- *   └── 📁 montage/
+ *   │               ├── 📁 tts/              — {segmentId}.mp3
+ *   │               ├── 📁 audio/atmosphere/ — атмосферные слои
+ *   │               └── 📁 {lang}/audio/tts/ — переводной TTS
  *
- * ⚠️  Плоские папки V1 (scenes/, audio/) в корне — устаревшие артефакты.
- *     Код НЕ читает и НЕ пишет в них. Безопасно удалять вручную.
+ * 🚫  Root-level legacy directories `audio/`, `source/`, `montage/`, `scenes/`
+ *     are FORBIDDEN and must never be created by current code.
  */
 
 // ─── Interface ───────────────────────────────────────────
@@ -227,6 +229,34 @@ function splitPath(path: string): { dir: string; file: string } {
   return { dir: normalized.slice(0, lastSlash), file: normalized.slice(lastSlash + 1) };
 }
 
+async function hasChildDirectory(
+  parent: FileSystemDirectoryHandle,
+  name: string,
+): Promise<boolean> {
+  try {
+    await parent.getDirectoryHandle(name);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveUniqueProjectName(
+  parent: FileSystemDirectoryHandle,
+  desiredName: string,
+): Promise<string> {
+  const baseName = desiredName.trim() || "BookProject";
+  let candidate = baseName;
+  let suffix = 2;
+
+  while (await hasChildDirectory(parent, candidate)) {
+    candidate = `${baseName} (${suffix})`;
+    suffix += 1;
+  }
+
+  return candidate;
+}
+
 // ─── LocalFSStorage (File System Access API) ─────────────
 
 export class LocalFSStorage implements ProjectStorage {
@@ -357,9 +387,15 @@ export class LocalFSStorage implements ProjectStorage {
 
   /** Create a new project inside a user-chosen parent folder */
   static async createProject(projectName: string): Promise<LocalFSStorage> {
-    const { ROOT_DIRS, CHAPTER_DIRS } = await import("@/lib/bookTemplateOPFS");
+    const { ROOT_DIRS } = await import("@/lib/bookTemplateOPFS");
     const parent = await (window as any).showDirectoryPicker({ mode: "readwrite" });
-    const root = await parent.getDirectoryHandle(projectName, { create: true });
+    const uniqueProjectName = await resolveUniqueProjectName(parent, projectName);
+    if (uniqueProjectName !== projectName) {
+      console.warn(
+        `[ProjectStorage] Project folder "${projectName}" already exists; creating fresh folder "${uniqueProjectName}" instead to avoid reusing stale OPFS data.`,
+      );
+    }
+    const root = await parent.getDirectoryHandle(uniqueProjectName, { create: true });
     for (const d of ROOT_DIRS) {
       await root.getDirectoryHandle(d, { create: true });
     }
@@ -479,16 +515,23 @@ export class OPFSStorage implements ProjectStorage {
   /**
    * Create a brand-new project in OPFS.
    * Builds the full directory tree from bookTemplateOPFS (single source of truth).
+   * NEVER reuses an existing folder name — creates a fresh unique directory instead.
    * NEVER use for opening existing projects — use openExisting() instead.
    */
   static async createNewProject(projectName: string): Promise<OPFSStorage> {
     const { ROOT_DIRS } = await import("@/lib/bookTemplateOPFS");
     const opfsRoot = await navigator.storage.getDirectory();
-    const projectDir = await opfsRoot.getDirectoryHandle(projectName, { create: true }) as unknown as FileSystemDirectoryHandle;
+    const uniqueProjectName = await resolveUniqueProjectName(opfsRoot as unknown as FileSystemDirectoryHandle, projectName);
+    if (uniqueProjectName !== projectName) {
+      console.warn(
+        `[ProjectStorage] OPFS project folder "${projectName}" already exists; creating fresh folder "${uniqueProjectName}" instead to avoid inheriting legacy files.`,
+      );
+    }
+    const projectDir = await opfsRoot.getDirectoryHandle(uniqueProjectName, { create: true }) as unknown as FileSystemDirectoryHandle;
     for (const d of ROOT_DIRS) {
       await projectDir.getDirectoryHandle(d, { create: true });
     }
-    return new OPFSStorage(projectDir, projectName);
+    return new OPFSStorage(projectDir, uniqueProjectName);
   }
 
   /**
