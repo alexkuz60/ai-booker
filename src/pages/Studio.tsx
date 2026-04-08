@@ -619,6 +619,7 @@ const Studio = () => {
                     onPlaylistDurationsLoaded={handlePlaylistDurationsLoaded}
                     selectedSceneIndices={selectedSceneIndices}
                     onSelectedSceneIndicesChange={setSelectedSceneIndices}
+                    onChapterChange={handleChapterChange}
                   />
                 ) : (
                   <EmptyNavigator isRu={isRu} />
