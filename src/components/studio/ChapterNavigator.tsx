@@ -397,10 +397,6 @@ export function ChapterNavigator({
     setRecalcPosRunning(true);
     try {
       const { recalcPositions } = await import("@/lib/localAudioMeta");
-      const { readStoryboardFromLocal } = await import("@/lib/storyboardSync");
-      const { readClipPlugins, writeClipPlugins } = await import("@/lib/localClipPlugins");
-      const { readMixerState, writeMixerState } = await import("@/lib/localMixerState");
-      const { DEFAULT_CLIP_PLUGIN_CONFIG } = await import("@/hooks/useClipPluginConfigs");
 
       let updated = 0;
       for (const sceneId of sceneIds) {
