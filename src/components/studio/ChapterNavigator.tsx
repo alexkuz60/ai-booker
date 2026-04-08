@@ -397,34 +397,10 @@ export function ChapterNavigator({
     setRecalcPosRunning(true);
     try {
       const { recalcPositions } = await import("@/lib/localAudioMeta");
-      const { readStoryboardFromLocal } = await import("@/lib/storyboardSync");
-      const { readClipPlugins, writeClipPlugins } = await import("@/lib/localClipPlugins");
-      const { readMixerState, writeMixerState } = await import("@/lib/localMixerState");
-      const { DEFAULT_CLIP_PLUGIN_CONFIG } = await import("@/hooks/useClipPluginConfigs");
 
       let updated = 0;
       for (const sceneId of sceneIds) {
         await recalcPositions(projectStorage, sceneId);
-
-        // Ensure clip_plugins.json exists
-        const storyboard = await readStoryboardFromLocal(projectStorage, sceneId);
-        if (storyboard && storyboard.segments.length > 0) {
-          const existingPlugins = await readClipPlugins(projectStorage, sceneId);
-          if (!existingPlugins || Object.keys(existingPlugins.configs ?? {}).length === 0) {
-            const configs: Record<string, { trackId: string; config: typeof DEFAULT_CLIP_PLUGIN_CONFIG }> = {};
-            for (const seg of storyboard.segments) {
-              configs[seg.segment_id] = { trackId: "", config: { ...DEFAULT_CLIP_PLUGIN_CONFIG } };
-            }
-            await writeClipPlugins(projectStorage, sceneId, configs);
-          }
-        }
-
-        // Ensure mixer_state.json exists
-        const existingMixer = await readMixerState(projectStorage, sceneId);
-        if (!existingMixer || Object.keys(existingMixer).length === 0) {
-          await writeMixerState(projectStorage, sceneId, {});
-        }
-
         updated++;
       }
       toast.success(
