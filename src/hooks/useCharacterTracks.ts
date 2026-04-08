@@ -49,6 +49,8 @@ export function useCharacterTracks(
       setCharTracks([]); setSpeakerToCharId(new Map()); setTypeMappings(new Map()); return;
     }
 
+    console.info(`[CharacterTracks] Loading for bookId=${bookId}, sceneId=${contextSceneIds[0]}`);
+
     (async () => {
       if (!storage) return;
 
@@ -82,6 +84,7 @@ export function useCharacterTracks(
       const charIdSet = deriveStoryboardCharacterIds(storyboardSegments, allChars, derivedMappings);
 
       if (charIdSet.size === 0) {
+        console.warn(`[CharacterTracks] ⚠️ No character IDs derived for scene ${sid} (storyboard segs: ${storyboardSegments.length}, allChars: ${allChars.length})`);
         setCharTracks([]); setSpeakerToCharId(new Map());
         setCharDataReady(true);
         return;
@@ -89,6 +92,7 @@ export function useCharacterTracks(
 
       const sceneChars = allChars.filter(c => charIdSet.has(c.id));
       if (sceneChars.length === 0) {
+        console.warn(`[CharacterTracks] ⚠️ charIdSet has ${charIdSet.size} IDs but none found in allChars (${allChars.length} total)`);
         setCharTracks([]); setSpeakerToCharId(new Map());
         setCharDataReady(true);
         return;

@@ -118,6 +118,16 @@ export function useTimelineClips(
         readAudioMetaForScenes(storage, sceneIds),
       ]);
 
+      // ── Diagnostic: trace storyboard + audio meta loading results ──
+      for (const { sceneId, data } of localStoryboards) {
+        if (!data) {
+          console.warn(`[TimelineClips] ⚠️ No storyboard data for scene ${sceneId}`);
+        } else {
+          console.info(`[TimelineClips] ✅ Storyboard loaded for scene ${sceneId}: ${data.segments?.length ?? 0} segments`);
+        }
+      }
+      console.info(`[TimelineClips] AudioMeta entries: ${audioMetaMap.size}, AtmoClips: ${localAtmoClips.length}`);
+
       // Read per-scene silenceSec from audio_meta.json (persisted during recalcPositions)
       const sceneSilenceMap = new Map<string, number>();
       const sceneMetaReads = sceneIds.map(async (sceneId) => {
@@ -142,7 +152,10 @@ export function useTimelineClips(
       );
 
       if (cancelled || segments.length === 0) {
-        if (!cancelled) { setClips([]); setSceneBoundaries([]); setLoading(false); }
+        if (!cancelled) {
+          console.warn(`[TimelineClips] ⚠️ No segments found for scenes [${sceneIds.join(", ")}] — timeline will be empty`);
+          setClips([]); setSceneBoundaries([]); setLoading(false);
+        }
         return;
       }
 
