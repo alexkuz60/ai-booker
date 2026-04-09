@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAiRoles } from "@/hooks/useAiRoles";
-import { enrichBodyWithKeys } from "@/lib/invokeWithFallback";
+import { enrichBodyWithKeys, invokeWithFallback } from "@/lib/invokeWithFallback";
 import { YANDEX_VOICES } from "@/config/yandexVoices";
 import { VoiceCastingTable } from "@/components/studio/VoiceCastingTable";
 import { CastingCandidatesPanel, type CastingCharacter } from "@/components/studio/CastingCandidatesPanel";
@@ -266,9 +266,9 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
     setDirty(false);
   }, [selectedId]);
 
-  // ── AI Profiling ───────────────
+  // ── AI Profiling (local-first: reads scene content from OPFS) ───────
   const runProfile = async (sceneIdsForIncremental?: string[]) => {
-    if (!bookId) return;
+    if (!bookId || !storage) return;
     setProfiling(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -277,39 +277,73 @@ export const CharactersPanel = forwardRef<CharactersPanelHandle, CharactersPanel
         return;
       }
 
-      const body: Record<string, unknown> = { book_id: bookId, language: isRu ? "ru" : "en", model: getModelForRole("profiler") };
-      if (sceneIdsForIncremental?.length) body.scene_ids = sceneIdsForIncremental;
-      const enrichedBody = enrichBodyWithKeys(body, String(body.model || ""), userApiKeys);
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/profile-characters`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify(enrichedBody),
-        }
-      );
-
-      if (!response.ok) {
-        const d = await response.json().catch(() => ({}));
-        throw new Error(d.error || `HTTP ${response.status}`);
+      // Build scene excerpts from OPFS
+      const { readStructureFromLocal } = await import("@/lib/localSync");
+      const structResult = await readStructureFromLocal(storage);
+      const scenesPayload: Array<{ title: string; text: string }> = [];
+      if (structResult) {
+        const targetSceneIds = sceneIdsForIncremental ? new Set(sceneIdsForIncremental) : null;
+        structResult.chapterResults.forEach((result) => {
+          if (!result.scenes?.length) return;
+          for (const scene of result.scenes) {
+            if (targetSceneIds && !targetSceneIds.has(scene.id)) continue;
+            if (scene.content && scene.content.length > 20) {
+              scenesPayload.push({ title: scene.title, text: scene.content });
+            }
+          }
+        });
       }
 
-      const result = await response.json();
-      const skippedMsg = result.skipped > 0
-        ? (isRu ? `, пропущено: ${result.skipped}` : `, skipped: ${result.skipped}`)
-        : "";
+      if (scenesPayload.length === 0) {
+        toast.info(isRu ? "Нет сцен для анализа" : "No scenes for analysis");
+        return;
+      }
+
+      // 🚫 К3: Use profile-characters-local (no DB reads)
+      const { invokeWithFallback } = await import("@/lib/invokeWithFallback");
+      const { data, error } = await invokeWithFallback({
+        functionName: "profile-characters-local",
+        body: {
+          characters: characters.map(c => ({ name: c.name, aliases: c.aliases })),
+          scenes: scenesPayload.slice(0, 30),
+          lang: isRu ? "ru" : "en",
+          model: getModelForRole("profiler"),
+        },
+        userApiKeys,
+        modelField: "model",
+        isRu,
+      });
+
+      if (error) throw error;
+      const result = data as Record<string, unknown> | null;
+      const profiles = (result?.profiles || []) as Array<{
+        name: string; age_group?: string; temperament?: string;
+        speech_style?: string; description?: string;
+        speech_tags?: string[]; psycho_tags?: string[];
+      }>;
+
+      if (profiles.length > 0) {
+        const profileByName = new Map(profiles.map(p => [p.name.toLowerCase(), p]));
+        for (const c of characters) {
+          const p = profileByName.get(c.name.toLowerCase())
+            || [...profileByName.values()].find(pp => c.aliases.some(a => a.toLowerCase() === pp.name.toLowerCase()));
+          if (!p) continue;
+          await localChars.updateCharacter(c.id, {
+            description: p.description || c.description,
+            temperament: p.temperament || c.temperament,
+            speech_style: p.speech_style || c.speech_style,
+            age_group: p.age_group || c.age_group || "unknown",
+            speech_tags: p.speech_tags?.length ? p.speech_tags : c.speech_tags,
+            psycho_tags: p.psycho_tags?.length ? p.psycho_tags : c.psycho_tags,
+          });
+        }
+      }
+
       toast.success(
         isRu
-          ? `Профайлинг завершён: ${result.profiled} из ${result.total}${skippedMsg}`
-          : `Profiling complete: ${result.profiled} of ${result.total}${skippedMsg}`
+          ? `Профайлинг завершён: ${profiles.length} из ${characters.length}`
+          : `Profiling complete: ${profiles.length} of ${characters.length}`
       );
-      // Reload from OPFS (profiling edge function should update DB, we sync back)
-      await localChars.reload();
     } catch (e) {
       console.error("Profiling error:", e);
       toast.error(e instanceof Error ? e.message : (isRu ? "Ошибка профайлинга" : "Profiling error"), { duration: Infinity, style: { background: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', border: '1px solid', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' } });

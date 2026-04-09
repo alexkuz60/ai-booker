@@ -854,14 +854,38 @@ export function StoryboardPanel({
     setCurrentlySynthesizingIds(targetIds);
     onSynthesizingChange?.(targetIds);
     onErrorSegmentsChange?.(new Set());
-    setSynthProgress(isRu ? "Синхронизация с сервером…" : "Syncing to server…");
+    setSynthProgress(isRu ? "Подготовка…" : "Preparing…");
     try {
-      // Push OPFS → DB before TTS (edge functions read segments from DB)
-      await pushToDb(sceneId, buildSnapshot());
       setSynthProgress(isRu ? "Запуск синтеза…" : "Starting synthesis…");
 
-      // Send voice configs from OPFS directly (П1: OPFS is source of truth)
+      // Send voice configs from OPFS directly (К4: OPFS is source of truth)
       const voice_configs = await buildVoiceConfigsPayload(projectStorage);
+
+      // 🚫 К3: Send segments+phrases from OPFS directly — no pushToDb
+      const synthSegments = segments.map(seg => ({
+        segment_id: seg.segment_id,
+        segment_number: seg.segment_number,
+        segment_type: seg.segment_type,
+        speaker: seg.speaker,
+        metadata: (seg as any).metadata ?? {},
+        phrases: seg.phrases.map(p => ({
+          phrase_id: p.phrase_id,
+          text: p.text,
+          annotations: p.annotations ?? [],
+        })),
+      }));
+
+      // Read scene_meta (mood, scene_type) from OPFS
+      let scene_meta: Record<string, unknown> | undefined;
+      if (projectStorage && sceneId && chapterId) {
+        try {
+          const contentData = await projectStorage.readJSON<{ scenes?: Array<{ id: string; mood?: string; scene_type?: string }> }>(`chapters/${chapterId}/content.json`);
+          const sceneData = contentData?.scenes?.find(s => s.id === sceneId);
+          if (sceneData) {
+            scene_meta = { mood: sceneData.mood ?? null, scene_type: sceneData.scene_type ?? null };
+          }
+        } catch { /* ignore */ }
+      }
 
       // Use streaming NDJSON to avoid edge function memory limit on large scenes
       const { data: session } = await supabase.auth.getSession();
@@ -870,7 +894,10 @@ export function StoryboardPanel({
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-      const requestBody: Record<string, unknown> = { scene_id: sceneId, language: isRu ? "ru" : "en", voice_configs };
+      const requestBody: Record<string, unknown> = {
+        scene_id: sceneId, language: isRu ? "ru" : "en",
+        voice_configs, segments: synthSegments, scene_meta,
+      };
       // Pass segment_ids filter only when subset is selected
       if (mergeChecked.size > 0) {
         requestBody.segment_ids = [...targetIds];
@@ -1000,10 +1027,33 @@ export function StoryboardPanel({
     setCurrentlySynthesizingIds(new Set([segmentId]));
     onSynthesizingChange?.(new Set([segmentId]));
     try {
-      // Push current segment state to DB before re-synth
-      await pushToDb(sceneId, buildSnapshot());
-
       const voice_configs = await buildVoiceConfigsPayload(projectStorage);
+
+      // 🚫 К3: Send segments+phrases from OPFS directly — no pushToDb
+      const synthSegments = segments.map(seg => ({
+        segment_id: seg.segment_id,
+        segment_number: seg.segment_number,
+        segment_type: seg.segment_type,
+        speaker: seg.speaker,
+        metadata: (seg as any).metadata ?? {},
+        phrases: seg.phrases.map(p => ({
+          phrase_id: p.phrase_id,
+          text: p.text,
+          annotations: p.annotations ?? [],
+        })),
+      }));
+
+      // Read scene_meta from OPFS
+      let scene_meta: Record<string, unknown> | undefined;
+      if (projectStorage && sceneId && chapterId) {
+        try {
+          const contentData = await projectStorage.readJSON<{ scenes?: Array<{ id: string; mood?: string; scene_type?: string }> }>(`chapters/${chapterId}/content.json`);
+          const sceneData = contentData?.scenes?.find(s => s.id === sceneId);
+          if (sceneData) {
+            scene_meta = { mood: sceneData.mood ?? null, scene_type: sceneData.scene_type ?? null };
+          }
+        } catch { /* ignore */ }
+      }
 
       // Use streaming NDJSON (same as runSynthesis)
       const { data: session } = await supabase.auth.getSession();
@@ -1019,7 +1069,10 @@ export function StoryboardPanel({
           Authorization: `Bearer ${token}`,
           apikey: anonKey,
         },
-        body: JSON.stringify({ scene_id: sceneId, language: isRu ? "ru" : "en", force: true, segment_ids: [segmentId], voice_configs }),
+        body: JSON.stringify({
+          scene_id: sceneId, language: isRu ? "ru" : "en", force: true,
+          segment_ids: [segmentId], voice_configs, segments: synthSegments, scene_meta,
+        }),
       });
 
       if (!resp.ok) {
