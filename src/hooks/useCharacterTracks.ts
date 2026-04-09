@@ -22,6 +22,52 @@ const NARRATOR_COLORS = [
   "hsl(100 50% 55%)",
 ];
 
+/** Ensure a hex/hsl color has enough lightness to be visible on a dark timeline background.
+ *  If lightness < 40%, boost it to 55%. */
+function ensureTrackVisibility(color: string): string {
+  // Handle hex colors (#rrggbb or #rgb)
+  const hexMatch = color.match(/^#([0-9a-f]{3,8})$/i);
+  if (hexMatch) {
+    let r: number, g: number, b: number;
+    const hex = hexMatch[1];
+    if (hex.length === 3) {
+      r = parseInt(hex[0] + hex[0], 16);
+      g = parseInt(hex[1] + hex[1], 16);
+      b = parseInt(hex[2] + hex[2], 16);
+    } else {
+      r = parseInt(hex.slice(0, 2), 16);
+      g = parseInt(hex.slice(2, 4), 16);
+      b = parseInt(hex.slice(4, 6), 16);
+    }
+    // Relative luminance approximation
+    const lightness = (Math.max(r, g, b) + Math.min(r, g, b)) / 2 / 255;
+    if (lightness < 0.4) {
+      // Convert to HSL and boost lightness
+      const rn = r / 255, gn = g / 255, bn = b / 255;
+      const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+      const d = max - min;
+      let h = 0;
+      if (d !== 0) {
+        if (max === rn) h = ((gn - bn) / d + 6) % 6;
+        else if (max === gn) h = (bn - rn) / d + 2;
+        else h = (rn - gn) / d + 4;
+        h *= 60;
+      }
+      const s = d === 0 ? 0 : d / (1 - Math.abs(max + min - 1));
+      return `hsl(${Math.round(h)} ${Math.round(Math.min(s * 100, 80))}% 55%)`;
+    }
+  }
+  // Handle hsl(h s% l%) — check if lightness is too low
+  const hslMatch = color.match(/hsl\(\s*(\d+)\s+(\d+)%\s+(\d+)%\s*\)/);
+  if (hslMatch) {
+    const l = parseInt(hslMatch[3], 10);
+    if (l < 40) {
+      return `hsl(${hslMatch[1]} ${hslMatch[2]}% 55%)`;
+    }
+  }
+  return color;
+}
+
 export function useCharacterTracks(
   bookId: string | null | undefined,
   sceneId: string | null | undefined,
