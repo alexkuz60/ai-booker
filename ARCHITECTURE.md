@@ -133,7 +133,8 @@
 - `chapters/{ch}/scenes/{sc}/storyboard.json` — при пере-анализе сцены
 - `chapters/{ch}/scenes/{sc}/audio/**` — при пере-синтезе
 - `chapters/{ch}/scenes/{sc}/{lang}/storyboard.json` — при пере-переводе
-- `chapters/{ch}/scenes/{sc}/{lang}/audio/**` — при пере-озвучке перевода
+- `chapters/{ch}/scenes/{sc}/{lang}/radar-*.json` — при пере-оценке перевода
+- Legacy: `chapters/{ch}/scenes/{sc}/{lang}/audio_meta.json|clip_plugins.json|mixer_state.json` — очистка устаревших файлов
 
 **Защищённые файлы (удаление ЗАБЛОКИРОВАНО):**
 - `project.json`, `characters.json`, `structure/*`, `synopsis/*`
