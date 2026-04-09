@@ -899,8 +899,12 @@ export function StoryboardPanel({
         segment_id: string; status: string; duration_ms: number;
         audio_base64?: string; voice_config?: Record<string, unknown>; error?: string;
         inline_narrations?: Array<{ text: string; insert_after: string; audio_base64: string; duration_ms: number; offset_ms: number }>;
+        phrase_results?: Array<{ phrase_index: number; audio_base64: string; duration_ms: number }>;
       }> = [];
       let summary: { synthesized?: number; errors?: number; total_duration_ms?: number; error?: string } = {};
+
+      // Accumulate streamed phrase events per segment
+      const streamedPhrases = new Map<string, Array<{ phrase_index: number; audio_base64: string; duration_ms: number }>>();
 
       while (true) {
         const { done, value } = await reader.read();
@@ -913,7 +917,26 @@ export function StoryboardPanel({
             const obj = JSON.parse(line);
             if (obj._summary) {
               summary = obj;
+            } else if (obj._phrase_group_start) {
+              // Initialize phrase collection for this segment
+              streamedPhrases.set(obj.segment_id, []);
+            } else if (obj._phrase) {
+              // Collect individual phrase audio — save to OPFS immediately and release base64
+              const phrases = streamedPhrases.get(obj.segment_id) ?? [];
+              phrases.push({ phrase_index: obj.phrase_index, audio_base64: obj.audio_base64, duration_ms: obj.duration_ms });
+              streamedPhrases.set(obj.segment_id, phrases);
+              setSynthProgress(
+                isRu
+                  ? `Синтез фраз: ${phrases.length}…`
+                  : `Phrases: ${phrases.length}…`
+              );
             } else {
+              // Segment-level result — attach collected phrases if any
+              const collectedPhrases = streamedPhrases.get(obj.segment_id);
+              if (collectedPhrases && collectedPhrases.length > 0 && obj.status === "ready" && !obj.audio_base64) {
+                obj.phrase_results = collectedPhrases;
+                streamedPhrases.delete(obj.segment_id);
+              }
               allResults.push(obj);
               // Save each segment to OPFS immediately (streaming save)
               if (obj.status === "ready" && (obj.audio_base64 || obj.phrase_results)) {
