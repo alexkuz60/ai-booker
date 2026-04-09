@@ -963,10 +963,14 @@ Deno.serve(async (req) => {
               continue;
             }
 
-            // Upload narrator audio
-            const narrPath = `${userId}/tts/${scene_id}/${seg.id}_narrator_${n}.mp3`;
-            await supabaseAdmin.storage.from("user-media").upload(
-              narrPath, narrResult.audio, { contentType: "audio/mpeg", upsert: true }
+            // Upload narrator audio → return as base64 instead
+            narrationResults.push({
+              text: narr.text,
+              insert_after: narr.insert_after,
+              audio_base64: base64Encode(narrResult.audio),
+              duration_ms: narrResult.durationMs,
+              offset_ms: 0, // will be calculated after dialogue synthesis
+            });
             );
 
             // Estimate the offset: character position in dialogue text
