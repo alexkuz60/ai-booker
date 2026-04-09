@@ -145,6 +145,9 @@ export async function syncStructureToLocal(
     const bookMap = buildBookMap(data.bookId, data.toc, data.chapterIdMap, sanitizedResults, transLangs);
     await writeBookMap(storage, bookMap);
 
+    // 6. Clean up legacy audio files from translation subdirs
+    await cleanLegacyTranslationAudioFiles(storage, data.chapterIdMap, sanitizedResults, transLangs);
+
     // ── Auto-set pipeline flags ──
     await writePipelineStep(storage, "toc_extracted", true);
     const hasScenes = Array.from(data.chapterResults.values()).some(r => r.scenes.length > 0);
