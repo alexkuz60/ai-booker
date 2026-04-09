@@ -689,7 +689,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { scene_id, language, force, segment_ids: filterSegIds, voice_configs: clientVoiceConfigs } = await req.json();
+    const {
+      scene_id, language, force, segment_ids: filterSegIds,
+      voice_configs: clientVoiceConfigs,
+      segments: clientSegments,
+      scene_meta: clientSceneMeta,
+    } = await req.json();
     const isRu = language === "ru";
     const forceResynthesize = force === true;
     const filterSet = Array.isArray(filterSegIds) && filterSegIds.length > 0
@@ -704,36 +709,34 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Load segments + phrases + metadata
-    const { data: segments, error: segErr } = await supabase
-      .from("scene_segments")
-      .select("id, segment_number, segment_type, speaker, metadata")
-      .eq("scene_id", scene_id)
-      .order("segment_number");
-
-    if (segErr) throw segErr;
-    if (!segments?.length) {
+    // 🚫 К3: NEVER read segments/phrases from DB — OPFS is the only source of truth.
+    // Client MUST send segments (with phrases) from local storyboard.
+    if (!clientSegments || !Array.isArray(clientSegments) || clientSegments.length === 0) {
       return new Response(
-        JSON.stringify({ error: isRu ? "Нет сегментов" : "No segments found" }),
+        JSON.stringify({ error: "segments array required — send storyboard segments from OPFS" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const segIds = segments.map((s) => s.id);
-    const { data: phrases } = await supabase
-      .from("segment_phrases")
-      .select("id, segment_id, phrase_number, text, metadata")
-      .in("segment_id", segIds)
-      .order("phrase_number");
+    // Map client segments to internal format
+    const segments = clientSegments.map((s: any, i: number) => ({
+      id: s.segment_id || s.id,
+      segment_number: s.segment_number ?? i + 1,
+      segment_type: s.segment_type,
+      speaker: s.speaker ?? null,
+      metadata: s.metadata ?? {},
+    }));
 
-    // Group phrases by segment (with annotations and IDs)
+    // Group phrases by segment (from client data)
     const phrasesBySegment = new Map<string, Array<{ id: string; text: string; annotations: PhraseAnnotation[] }>>();
-    for (const p of phrases ?? []) {
-      const list = phrasesBySegment.get(p.segment_id) ?? [];
-      const meta = (p.metadata ?? {}) as Record<string, unknown>;
-      const annotations = (meta.annotations ?? []) as PhraseAnnotation[];
-      list.push({ id: p.id, text: p.text, annotations });
-      phrasesBySegment.set(p.segment_id, list);
+    for (const cs of clientSegments) {
+      const segId = cs.segment_id || cs.id;
+      const phrases = (cs.phrases || []).map((p: any, pi: number) => ({
+        id: p.phrase_id || p.id || `${segId}_p${pi}`,
+        text: p.text || "",
+        annotations: (p.annotations ?? p.metadata?.annotations ?? []) as PhraseAnnotation[],
+      }));
+      phrasesBySegment.set(segId, phrases);
     }
 
     // Load character voice configs — prefer client-sent configs from OPFS (source of truth)
