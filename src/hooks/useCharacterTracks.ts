@@ -150,7 +150,7 @@ export function useCharacterTracks(
         sceneChars.map((c, i) => ({
           id: `char-${c.id}`,
           label: c.name,
-          color: c.color || NARRATOR_COLORS[i % NARRATOR_COLORS.length],
+          color: c.color ? ensureTrackVisibility(c.color) : NARRATOR_COLORS[i % NARRATOR_COLORS.length],
           type: "narrator" as const,
         }))
       );
