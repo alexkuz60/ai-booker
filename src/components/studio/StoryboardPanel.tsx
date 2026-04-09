@@ -842,12 +842,14 @@ export function StoryboardPanel({
     onErrorSegmentsChange?.(new Set());
     setSynthProgress(isRu ? "Синхронизация с сервером…" : "Syncing to server…");
     try {
-      // Push OPFS → DB before TTS (edge functions read from DB)
+      // Push OPFS → DB before TTS (edge functions read segments from DB)
       await pushToDb(sceneId, buildSnapshot());
       setSynthProgress(isRu ? "Запуск синтеза…" : "Starting synthesis…");
 
+      // Send voice configs from OPFS directly (П1: OPFS is source of truth)
+      const voice_configs = await buildVoiceConfigsPayload(projectStorage);
       const { data, error } = await supabase.functions.invoke("synthesize-scene", {
-        body: { scene_id: sceneId, language: isRu ? "ru" : "en" },
+        body: { scene_id: sceneId, language: isRu ? "ru" : "en", voice_configs },
       });
       if (error) throw error;
       const synth = data as { synthesized: number; errors: number; total_duration_ms: number; results?: Array<{ segment_id: string; status: string; error?: string }> };
