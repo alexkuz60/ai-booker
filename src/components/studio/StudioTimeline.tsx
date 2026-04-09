@@ -178,9 +178,10 @@ export function StudioTimeline({
   const clipPluginsRef = useRef<Record<string, import("@/hooks/useClipPluginConfigs").ClipPluginConfig>>({});
 
   const handleRenderScene = useCallback(async () => {
-    if (!sceneId || !user || isRendering) return;
+    if (!sceneId || !user || isRendering || !storage) return;
     try {
       await renderScene(
+        storage,
         sceneId,
         timelineClipsRef.current,
         durationRef.current,
