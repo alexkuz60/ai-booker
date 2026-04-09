@@ -11,6 +11,8 @@ import type { TimelineClip } from "@/hooks/useTimelineClips";
 import { getAudioEngine } from "./audioEngine";
 import type { ClipPluginConfig, SceneClipConfigs } from "@/hooks/useClipPluginConfigs";
 import { DEFAULT_CLIP_PLUGIN_CONFIG } from "@/hooks/useClipPluginConfigs";
+import type { ProjectStorage } from "@/lib/projectStorage";
+import { getAudioBuffer } from "@/lib/localAudioProvider";
 
 export interface RenderProgress {
   phase: "loading" | "rendering" | "encoding" | "uploading" | "done" | "error";
@@ -38,19 +40,15 @@ function classifyClip(clip: TimelineClip): BusType {
 /* ─── Audio loading ─── */
 
 async function fetchAudioBuffer(
+  storage: ProjectStorage,
   audioPath: string,
   sampleRate: number,
 ): Promise<AudioBuffer | null> {
   try {
-    const { data: urlData } = await supabase.storage
-      .from("user-media")
-      .createSignedUrl(audioPath, 600);
-    if (!urlData?.signedUrl) return null;
-
-    const resp = await fetch(urlData.signedUrl);
-    const arrayBuf = await resp.arrayBuffer();
+    const arrayBuf = await getAudioBuffer(storage, audioPath);
+    if (!arrayBuf) return null;
     const decodeCtx = new OfflineAudioContext(2, 1, sampleRate);
-    return await decodeCtx.decodeAudioData(arrayBuf);
+    return await decodeCtx.decodeAudioData(arrayBuf.slice(0));
   } catch {
     return null;
   }
@@ -58,6 +56,7 @@ async function fetchAudioBuffer(
 
 /** Pre-load all clip buffers with per-clip progress */
 async function preloadClipBuffers(
+  storage: ProjectStorage,
   clips: TimelineClip[],
   sampleRate: number,
   onClipLoaded?: (loaded: number, total: number) => void,
@@ -67,7 +66,7 @@ async function preloadClipBuffers(
   let loaded = 0;
 
   for (const clip of loadable) {
-    const buffer = await fetchAudioBuffer(clip.audioPath!, sampleRate);
+    const buffer = await fetchAudioBuffer(storage, clip.audioPath!, sampleRate);
     if (buffer) buffers.set(clip.id, buffer);
     loaded++;
     onClipLoaded?.(loaded, loadable.length);
