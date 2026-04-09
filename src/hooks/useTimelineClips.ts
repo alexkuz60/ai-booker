@@ -30,6 +30,12 @@ const SYSTEM_TYPE_TO_CHAR: Record<string, string> = {
   footnote: "комментатор",
 };
 
+export interface PhraseClipInfo {
+  index: number;
+  durationMs: number;
+  audioPath: string;
+}
+
 export interface TimelineClip {
   id: string;
   trackId: string; // "char-{characterId}" or "narrator-fallback"
@@ -53,6 +59,8 @@ export interface TimelineClip {
   speed?: number;
   /** Original duration_ms from DB (for resize calculations) */
   originalDurationMs?: number;
+  /** Per-phrase sub-clips for merged segments — each phrase is a separate audio file */
+  phraseClips?: PhraseClipInfo[];
 }
 
 export interface SceneBoundary {
