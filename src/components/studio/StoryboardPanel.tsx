@@ -905,8 +905,8 @@ export function StoryboardPanel({
               }
               setSynthProgress(
                 isRu
-                  ? `Синтез: ${allResults.length}/${segments.length}`
-                  : `Synthesis: ${allResults.length}/${segments.length}`
+                  ? `Синтез: ${allResults.length}/${targetSegments.length}`
+                  : `Synthesis: ${allResults.length}/${targetSegments.length}`
               );
             }
           } catch { /* skip malformed lines */ }
