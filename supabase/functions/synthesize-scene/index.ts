@@ -843,400 +843,397 @@ Deno.serve(async (req) => {
       return { text: textParts.join(" "), extraInstructions: allInstructions };
     }
 
-    // ── Synthesize each segment ──────────────────────────────────────
-    const results: SegmentResult[] = [];
-    let cachedCount = 0;
+    // ── Synthesize each segment (NDJSON streaming) ─────────────────
+    // Each segment result is written to the stream immediately to avoid
+    // accumulating all audio base64 in memory (prevents WORKER_LIMIT OOM).
 
-    for (let i = 0; i < segments.length; i++) {
-      const seg = segments[i];
-      const text = segmentTexts[i];
+    const encoder = new TextEncoder();
+    const { readable, writable } = new TransformStream();
+    const writer = writable.getWriter();
 
-      // Skip segments not in filter (if filter specified)
-      if (filterSet && !filterSet.has(seg.id)) {
-        // Include cached result for playlist completeness
-        const cached = existingAudioMap.get(seg.id);
-        results.push({
-          segment_id: seg.id,
-          status: cached ? "ready" : "skipped",
-          duration_ms: cached?.duration_ms ?? 0,
-          
-        });
-        continue;
-      }
+    // Kick off async processing without blocking the response
+    const processSegments = async () => {
+      let cachedCount = 0;
+      let successCount = 0;
+      let errorCount = 0;
+      let totalDurationMs = 0;
+      const playlistSegments: Array<Record<string, unknown>> = [];
 
-      if (!text.trim()) {
-        results.push({ segment_id: seg.id, status: "skipped", duration_ms: 0 });
-        continue;
-      }
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        const text = segmentTexts[i];
 
-      // Check for inline narrations in metadata
-      const metadata = (seg.metadata ?? {}) as Record<string, unknown>;
-      const inlineNarrations = (metadata.inline_narrations ?? []) as InlineNarration[];
-      const hasInlineNarrations = inlineNarrations.length > 0 && seg.segment_type === "dialogue";
-
-      const voiceConfig = resolveVoice(seg.speaker, voiceConfigMap, narratorVoice);
-
-      // ── Apply mood + scene_type context for narrator-like segments ──
-      const ttsCtx = getSceneTtsContext(seg.segment_type);
-      if (ttsCtx.rateMultiplier !== 1.0) {
-        (voiceConfig as any).speed = Math.round(((voiceConfig as any).speed || 1.0) * ttsCtx.rateMultiplier * 100) / 100;
-      }
-      if (ttsCtx.roleHint && NARRATOR_SEGMENT_TYPES.has(seg.segment_type) && !(voiceConfig as any).instructions) {
-        // Only override role for Yandex narrator segments without custom instructions
-        // П2: Validate roleHint against voice capabilities
-        if ((voiceConfig as any).provider === "yandex" || !(voiceConfig as any).provider) {
-          const validatedRole = validateRole(voiceConfig.voice, ttsCtx.roleHint);
-          (voiceConfig as any).role = validatedRole;
-        }
-      }
-      // Append mood instructions + speech_context for ProxyAPI
-      if ((voiceConfig as any).provider === "proxyapi") {
-        const existing = (voiceConfig as any).instructions || "";
-        const speechCtx = (metadata.speech_context as Record<string, string> | undefined);
-        const ctxInstr = speechCtx?.tts_instructions_ru && isRu ? speechCtx.tts_instructions_ru
-          : speechCtx?.tts_instructions_en ? speechCtx.tts_instructions_en : "";
-        (voiceConfig as any).instructions = [existing, ttsCtx.instructionText, ctxInstr].filter(Boolean).join(". ");
-      }
-
-      // ── Cache check: skip if audio exists with same voice config ──
-      // Include annotations in hash so annotation changes trigger re-synthesis
-      const annotSuffix = segmentHasAnnotations[i]
-        ? JSON.stringify((phrasesBySegment.get(seg.id) ?? []).map(p => p.annotations))
-        : "";
-      // Include mood in hash so mood changes trigger re-synthesis for narrator segments
-      const moodSuffix = NARRATOR_SEGMENT_TYPES.has(seg.segment_type) ? `|mood:${sceneMood}|st:${sceneType}` : "";
-      const textHashForCache = hashText(text + annotSuffix + moodSuffix);
-      const cached = existingAudioMap.get(seg.id);
-      if (cached && !forceResynthesize && !voiceConfigChanged(voiceConfig, cached.voice_config, textHashForCache)) {
-        // Also check that the text hasn't changed by verifying the file still exists
-        // (we trust the DB record — if segment_audio says "ready", it's good)
-        console.log(`Cache hit for segment ${seg.id}: voice=${voiceConfig.voice}, skipping TTS`);
-        results.push({
-          segment_id: seg.id,
-          status: "ready",
-          duration_ms: cached.duration_ms,
-          
-          inline_narrations: (metadata.inline_narrations_audio as InlineNarrationResult[] | undefined) ?? undefined,
-        });
-        cachedCount++;
-        continue;
-      }
-
-      const isUnassigned = !voiceConfigMap.get(seg.speaker?.toLowerCase() ?? "")?.voice && !voiceConfigMap.get(seg.speaker?.toLowerCase() ?? "")?.voice_id;
-      if (isUnassigned) {
-        console.log(`Unassigned segment ${seg.id}: random voice=${voiceConfig.voice}, role=${voiceConfig.role}`);
-      }
-
-      const isProxyApiVoice = (voiceConfig as any).provider === "proxyapi";
-      const isSaluteSpeechVoice = (voiceConfig as any).provider === "salutespeech";
-      const isV3Voice = !isProxyApiVoice && !isSaluteSpeechVoice && V3_ONLY_VOICES.has(voiceConfig.voice);
-      const apiVersion = isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1";
-      const estimatedChunks = isV3Voice ? Math.max(1, Math.ceil(text.length / 240)) : 1;
-      const moodInfo = ttsCtx.instructionText ? `, mood=${sceneMood}, ctx="${ttsCtx.instructionText.slice(0, 60)}"` : "";
-      console.log(`▶ Segment ${i + 1}/${segments.length} [${seg.id}]: speaker=${seg.speaker || seg.segment_type}, api=${apiVersion}, voice=${voiceConfig.voice}, speed=${(voiceConfig as any).speed}, role=${voiceConfig.role}, chars=${text.length}${moodInfo}${hasInlineNarrations ? `, narrations=${inlineNarrations.length}` : ""}`);
-
-      try {
-        let dialogueDurationMs: number;
-        let dialogueAudio: Uint8Array;
-        const narrationResults: InlineNarrationResult[] = [];
-
-        if (hasInlineNarrations) {
-          // ── TWO-PASS SYNTHESIS ──────────────────────────────
-
-          // PASS 1: Synthesize each narrator insertion → get exact duration
-          let offsetAccumulator = 0;
-          for (let n = 0; n < inlineNarrations.length; n++) {
-            const narr = inlineNarrations[n];
-            console.log(`Pass 1: narrator insertion "${narr.text}" for segment ${seg.id}`);
-
-            const narrResult = await callTts(yandexTtsUrl, authHeader, {
-              text: narr.text,
-              voice: narratorVoice.voice,
-              role: narratorVoice.role,
-              speed: narratorVoice.speed,
-              pitchShift: narratorVoice.pitchShift,
-              volume: narratorVoice.volume,
-              lang: langCode,
-            });
-
-            if ("error" in narrResult) {
-              console.error(`Narrator TTS failed for "${narr.text}":`, narrResult.error);
-              continue;
-            }
-
-            // Return narrator audio as base64 (no server upload)
-            narrationResults.push({
-              text: narr.text,
-              insert_after: narr.insert_after,
-              audio_base64: base64Encode(narrResult.audio),
-              duration_ms: narrResult.durationMs,
-              offset_ms: 0, // will be calculated after dialogue synthesis
-            });
-
-            offsetAccumulator += narrResult.durationMs;
-          }
-
-          // PASS 2: Synthesize dialogue
-          // For v3-only voices: plain text (yandex-tts handles auto-splitting at sentence boundaries)
-          // For v1 voices: SSML with <break> pauses baked in
-          // isV3Voice already computed above
-
-          if (narrationResults.length > 0) {
-            let dialogueResult: { audio: Uint8Array; durationMs: number } | { error: string };
-
-            if (isV3Voice) {
-              // V3: synthesize plain text — narrator overlays are separate audio tracks
-              console.log(`Pass 2 (v3): plain text for segment ${seg.id}, ${text.length} chars`);
-              dialogueResult = await callTts(yandexTtsUrl, authHeader, {
-                text,
-                voice: voiceConfig.voice,
-                role: voiceConfig.role,
-                speed: voiceConfig.speed,
-                pitchShift: voiceConfig.pitchShift,
-                volume: voiceConfig.volume,
-                lang: langCode,
-              });
-            } else {
-              // V1: use SSML with <break> pauses for narrator insertions
-              const ssml = buildDialogueSsml(
-                text,
-                narrationResults.map(nr => ({
-                  insert_after: nr.insert_after,
-                  duration_ms: nr.duration_ms,
-                }))
-              );
-              console.log(`Pass 2 (v1 SSML): segment ${seg.id}, ${ssml.length} chars`);
-              dialogueResult = await callTts(yandexTtsUrl, authHeader, {
-                ssml,
-                voice: voiceConfig.voice,
-                speed: voiceConfig.speed,
-                lang: langCode,
-              });
-            }
-
-            if ("error" in dialogueResult) {
-              console.error(`Dialogue TTS failed for segment ${seg.id}:`, dialogueResult.error);
-              // Fallback: synthesize plain text without any special handling
-              const fallbackResult = await callTts(yandexTtsUrl, authHeader, {
-                text,
-                voice: voiceConfig.voice,
-                role: voiceConfig.role,
-                speed: voiceConfig.speed,
-                pitchShift: voiceConfig.pitchShift,
-                volume: voiceConfig.volume,
-                lang: langCode,
-              });
-              if ("error" in fallbackResult) {
-                results.push({ segment_id: seg.id, status: "error", duration_ms: 0, error: fallbackResult.error });
-                continue;
-              }
-              dialogueAudio = fallbackResult.audio;
-              dialogueDurationMs = fallbackResult.durationMs;
-            } else {
-              dialogueAudio = dialogueResult.audio;
-              dialogueDurationMs = dialogueResult.durationMs;
-            }
-          } else {
-            // No narrations succeeded — just synthesize plain text
-            const plainResult = await callTts(yandexTtsUrl, authHeader, {
-              text,
-              voice: voiceConfig.voice,
-              role: voiceConfig.role,
-              speed: voiceConfig.speed,
-              pitchShift: voiceConfig.pitchShift,
-              volume: voiceConfig.volume,
-              lang: langCode,
-            });
-            if ("error" in plainResult) {
-              results.push({ segment_id: seg.id, status: "error", duration_ms: 0, error: plainResult.error });
-              continue;
-            }
-            dialogueAudio = plainResult.audio;
-            dialogueDurationMs = plainResult.durationMs;
-          }
-
-          // Calculate narrator offsets based on dialogue character positions
-          const totalChars = text.length;
-          for (const nr of narrationResults) {
-            const insertIdx = text.indexOf(nr.insert_after);
-            const charPos = insertIdx >= 0 ? insertIdx + nr.insert_after.length : 0;
-            // Scale position proportionally to actual duration
-            // (the dialogue audio already has pauses baked in, so offset = proportional position)
-            nr.offset_ms = Math.round((charPos / totalChars) * dialogueDurationMs);
-          }
-
-        } else {
-          // ── STANDARD SINGLE-PASS SYNTHESIS ────────────────
-          let result: { audio: Uint8Array; durationMs: number } | { error: string };
-          const hasAnnot = segmentHasAnnotations[i];
-          const isLyric = seg.segment_type === "lyric";
-
-          if (isSaluteSpeechVoice) {
-            // SaluteSpeech: use SSML for lyrics or annotations, plain text otherwise
-            if (isLyric || hasAnnot) {
-              const ssml = isLyric && !hasAnnot ? buildLyricSsml(text) : buildSegmentSsml(seg.id);
-              console.log(`SaluteSpeech ${isLyric ? 'lyric ' : ''}SSML for segment ${seg.id}: ${ssml.length} chars`);
-              result = await callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, {
-                ssml,
-                voice: voiceConfig.voice,
-                lang: langCode,
-              });
-            } else {
-              result = await callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, {
-                text,
-                voice: voiceConfig.voice,
-                lang: langCode,
-              });
-            }
-          } else if (isProxyApiVoice && proxyApiKey) {
-            // ProxyAPI: apply text markers + extra instructions from annotations / lyrics
-            const annotated = hasAnnot
-              ? buildSegmentAnnotatedText(seg.id)
-              : isLyric
-                ? formatLyricText(text)
-                : { text, extraInstructions: [] };
-            const baseInstructions = (voiceConfig as any).instructions || "";
-            const fullInstructions = [baseInstructions, ...annotated.extraInstructions].filter(Boolean).join(". ");
-            result = await callProxyApiTts(proxyApiKey, {
-              text: annotated.text,
-              voice: voiceConfig.voice,
-              model: (voiceConfig as any).model,
-              speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
-              instructions: fullInstructions || undefined,
-            });
-          } else if (!isV3Voice && (hasAnnot || isLyric)) {
-            // Yandex v1: use SSML with annotation tags or lyric prosody
-            const ssml = isLyric && !hasAnnot ? buildLyricSsml(text) : buildSegmentSsml(seg.id);
-            console.log(`${isLyric ? 'Lyric ' : 'Annotated '}SSML for segment ${seg.id}: ${ssml.length} chars`);
-            result = await callTts(yandexTtsUrl, authHeader, {
-              ssml,
-              voice: voiceConfig.voice,
-              speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
-              lang: langCode,
-            });
-          } else if (isV3Voice && (hasAnnot || isLyric)) {
-            // Yandex v3: apply text markers or lyric formatting
-            const annotated = hasAnnot
-              ? buildSegmentAnnotatedText(seg.id)
-              : formatLyricText(text);
-            result = await callTts(yandexTtsUrl, authHeader, {
-              text: annotated.text,
-              voice: voiceConfig.voice,
-              role: voiceConfig.role,
-              speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
-              pitchShift: voiceConfig.pitchShift,
-              volume: voiceConfig.volume,
-              lang: langCode,
-            });
-          } else {
-            result = await callTts(yandexTtsUrl, authHeader, {
-              text,
-              voice: voiceConfig.voice,
-              role: voiceConfig.role,
-              speed: voiceConfig.speed,
-              pitchShift: voiceConfig.pitchShift,
-              volume: voiceConfig.volume,
-              lang: langCode,
-            });
-          }
-
-          if ("error" in result) {
-            results.push({ segment_id: seg.id, status: "error", duration_ms: 0, error: result.error });
-            continue;
-          }
-          dialogueAudio = result.audio;
-          dialogueDurationMs = result.durationMs;
-        }
-
-        // Validate audio is not empty
-        if (!dialogueAudio || dialogueAudio.length === 0) {
-          console.error(`Empty audio returned for segment ${seg.id} (voice=${voiceConfig.voice})`);
-          results.push({ segment_id: seg.id, status: "error", duration_ms: 0, error: "Empty audio returned from TTS" });
+        // Skip segments not in filter (if filter specified)
+        if (filterSet && !filterSet.has(seg.id)) {
+          const cached = existingAudioMap.get(seg.id);
+          const r = {
+            segment_id: seg.id,
+            status: cached ? "ready" : "skipped",
+            duration_ms: cached?.duration_ms ?? 0,
+          };
+          totalDurationMs += r.duration_ms;
+          playlistSegments.push({
+            segment_id: r.segment_id,
+            segment_number: seg.segment_number,
+            speaker: seg.speaker,
+            segment_type: seg.segment_type,
+            duration_ms: r.duration_ms,
+            status: r.status,
+            inline_narrations: null,
+          });
+          await writer.write(encoder.encode(JSON.stringify(r) + "\n"));
           continue;
         }
 
-        // ── Return audio as base64 (no server upload) ──
-        const audioBase64 = base64Encode(dialogueAudio);
+        if (!text.trim()) {
+          const r = { segment_id: seg.id, status: "skipped", duration_ms: 0 };
+          playlistSegments.push({
+            segment_id: r.segment_id,
+            segment_number: seg.segment_number,
+            speaker: seg.speaker,
+            segment_type: seg.segment_type,
+            duration_ms: 0,
+            status: "skipped",
+            inline_narrations: null,
+          });
+          await writer.write(encoder.encode(JSON.stringify(r) + "\n"));
+          continue;
+        }
 
-        // Build voice_config metadata for client-side caching
-        const voiceConfigMeta = {
-          provider: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : "yandex",
-          voice: voiceConfig.voice,
-          role: voiceConfig.role,
-          speed: voiceConfig.speed,
-          pitchShift: voiceConfig.pitchShift,
-          volume: voiceConfig.volume,
-          model: isProxyApiVoice ? (voiceConfig as any).model : undefined,
-          instructions: isProxyApiVoice ? (voiceConfig as any).instructions : undefined,
-          textHash: textHashForCache,
-          apiVersion: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1",
-        };
+        // Check for inline narrations in metadata
+        const metadata = (seg.metadata ?? {}) as Record<string, unknown>;
+        const inlineNarrations = (metadata.inline_narrations ?? []) as InlineNarration[];
+        const hasInlineNarrations = inlineNarrations.length > 0 && seg.segment_type === "dialogue";
 
-        results.push({
-          segment_id: seg.id,
-          status: "ready",
-          duration_ms: dialogueDurationMs,
-          audio_base64: audioBase64,
-          voice_config: voiceConfigMeta,
-          inline_narrations: narrationResults.length > 0 ? narrationResults : undefined,
-        });
+        const voiceConfig = resolveVoice(seg.speaker, voiceConfigMap, narratorVoice);
 
-        console.log(`✅ Segment ${i + 1}/${segments.length}: ${seg.speaker || seg.segment_type}, api=${apiVersion}, chunks≈${estimatedChunks}, ${text.length}ch → ${dialogueDurationMs}ms, audio=${dialogueAudio.length}B${narrationResults.length > 0 ? ` (+${narrationResults.length} narrator overlays)` : ""}`);
+        // ── Apply mood + scene_type context for narrator-like segments ──
+        const ttsCtx = getSceneTtsContext(seg.segment_type);
+        if (ttsCtx.rateMultiplier !== 1.0) {
+          (voiceConfig as any).speed = Math.round(((voiceConfig as any).speed || 1.0) * ttsCtx.rateMultiplier * 100) / 100;
+        }
+        if (ttsCtx.roleHint && NARRATOR_SEGMENT_TYPES.has(seg.segment_type) && !(voiceConfig as any).instructions) {
+          if ((voiceConfig as any).provider === "yandex" || !(voiceConfig as any).provider) {
+            const validatedRole = validateRole(voiceConfig.voice, ttsCtx.roleHint);
+            (voiceConfig as any).role = validatedRole;
+          }
+        }
+        // Append mood instructions + speech_context for ProxyAPI
+        if ((voiceConfig as any).provider === "proxyapi") {
+          const existing = (voiceConfig as any).instructions || "";
+          const speechCtx = (metadata.speech_context as Record<string, string> | undefined);
+          const ctxInstr = speechCtx?.tts_instructions_ru && isRu ? speechCtx.tts_instructions_ru
+            : speechCtx?.tts_instructions_en ? speechCtx.tts_instructions_en : "";
+          (voiceConfig as any).instructions = [existing, ttsCtx.instructionText, ctxInstr].filter(Boolean).join(". ");
+        }
 
-      } catch (err) {
-        console.error(`Error synthesizing segment ${seg.id}:`, err);
-        results.push({
-          segment_id: seg.id,
-          status: "error",
-          duration_ms: 0,
-          error: err instanceof Error ? err.message : "Unknown error",
-        });
+        // ── Cache check ──
+        const annotSuffix = segmentHasAnnotations[i]
+          ? JSON.stringify((phrasesBySegment.get(seg.id) ?? []).map(p => p.annotations))
+          : "";
+        const moodSuffix = NARRATOR_SEGMENT_TYPES.has(seg.segment_type) ? `|mood:${sceneMood}|st:${sceneType}` : "";
+        const textHashForCache = hashText(text + annotSuffix + moodSuffix);
+        const cached = existingAudioMap.get(seg.id);
+        if (cached && !forceResynthesize && !voiceConfigChanged(voiceConfig, cached.voice_config, textHashForCache)) {
+          console.log(`Cache hit for segment ${seg.id}: voice=${voiceConfig.voice}, skipping TTS`);
+          const r: Record<string, unknown> = {
+            segment_id: seg.id,
+            status: "ready",
+            duration_ms: cached.duration_ms,
+            inline_narrations: (metadata.inline_narrations_audio as InlineNarrationResult[] | undefined) ?? undefined,
+          };
+          cachedCount++;
+          successCount++;
+          totalDurationMs += cached.duration_ms;
+          playlistSegments.push({
+            segment_id: seg.id,
+            segment_number: seg.segment_number,
+            speaker: seg.speaker,
+            segment_type: seg.segment_type,
+            duration_ms: cached.duration_ms,
+            status: "ready",
+            inline_narrations: r.inline_narrations || null,
+          });
+          await writer.write(encoder.encode(JSON.stringify(r) + "\n"));
+          continue;
+        }
+
+        const isUnassigned = !voiceConfigMap.get(seg.speaker?.toLowerCase() ?? "")?.voice && !voiceConfigMap.get(seg.speaker?.toLowerCase() ?? "")?.voice_id;
+        if (isUnassigned) {
+          console.log(`Unassigned segment ${seg.id}: random voice=${voiceConfig.voice}, role=${voiceConfig.role}`);
+        }
+
+        const isProxyApiVoice = (voiceConfig as any).provider === "proxyapi";
+        const isSaluteSpeechVoice = (voiceConfig as any).provider === "salutespeech";
+        const isV3Voice = !isProxyApiVoice && !isSaluteSpeechVoice && V3_ONLY_VOICES.has(voiceConfig.voice);
+        const apiVersion = isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1";
+        const estimatedChunks = isV3Voice ? Math.max(1, Math.ceil(text.length / 240)) : 1;
+        const moodInfo = ttsCtx.instructionText ? `, mood=${sceneMood}, ctx="${ttsCtx.instructionText.slice(0, 60)}"` : "";
+        console.log(`▶ Segment ${i + 1}/${segments.length} [${seg.id}]: speaker=${seg.speaker || seg.segment_type}, api=${apiVersion}, voice=${voiceConfig.voice}, speed=${(voiceConfig as any).speed}, role=${voiceConfig.role}, chars=${text.length}${moodInfo}${hasInlineNarrations ? `, narrations=${inlineNarrations.length}` : ""}`);
+
+        try {
+          let dialogueDurationMs: number;
+          let dialogueAudio: Uint8Array;
+          const narrationResults: InlineNarrationResult[] = [];
+
+          if (hasInlineNarrations) {
+            // ── TWO-PASS SYNTHESIS ──────────────────────────────
+            let offsetAccumulator = 0;
+            for (let n = 0; n < inlineNarrations.length; n++) {
+              const narr = inlineNarrations[n];
+              console.log(`Pass 1: narrator insertion "${narr.text}" for segment ${seg.id}`);
+              const narrResult = await callTts(yandexTtsUrl, authHeader, {
+                text: narr.text,
+                voice: narratorVoice.voice,
+                role: narratorVoice.role,
+                speed: narratorVoice.speed,
+                pitchShift: narratorVoice.pitchShift,
+                volume: narratorVoice.volume,
+                lang: langCode,
+              });
+              if ("error" in narrResult) {
+                console.error(`Narrator TTS failed for "${narr.text}":`, narrResult.error);
+                continue;
+              }
+              narrationResults.push({
+                text: narr.text,
+                insert_after: narr.insert_after,
+                audio_base64: base64Encode(narrResult.audio),
+                duration_ms: narrResult.durationMs,
+                offset_ms: 0,
+              });
+              offsetAccumulator += narrResult.durationMs;
+            }
+
+            // PASS 2: Synthesize dialogue
+            if (narrationResults.length > 0) {
+              let dialogueResult: { audio: Uint8Array; durationMs: number } | { error: string };
+              if (isV3Voice) {
+                console.log(`Pass 2 (v3): plain text for segment ${seg.id}, ${text.length} chars`);
+                dialogueResult = await callTts(yandexTtsUrl, authHeader, {
+                  text, voice: voiceConfig.voice, role: voiceConfig.role,
+                  speed: voiceConfig.speed, pitchShift: voiceConfig.pitchShift,
+                  volume: voiceConfig.volume, lang: langCode,
+                });
+              } else {
+                const ssml = buildDialogueSsml(text, narrationResults.map(nr => ({
+                  insert_after: nr.insert_after, duration_ms: nr.duration_ms,
+                })));
+                console.log(`Pass 2 (v1 SSML): segment ${seg.id}, ${ssml.length} chars`);
+                dialogueResult = await callTts(yandexTtsUrl, authHeader, {
+                  ssml, voice: voiceConfig.voice, speed: voiceConfig.speed, lang: langCode,
+                });
+              }
+
+              if ("error" in dialogueResult) {
+                console.error(`Dialogue TTS failed for segment ${seg.id}:`, dialogueResult.error);
+                const fallbackResult = await callTts(yandexTtsUrl, authHeader, {
+                  text, voice: voiceConfig.voice, role: voiceConfig.role,
+                  speed: voiceConfig.speed, pitchShift: voiceConfig.pitchShift,
+                  volume: voiceConfig.volume, lang: langCode,
+                });
+                if ("error" in fallbackResult) {
+                  const r = { segment_id: seg.id, status: "error", duration_ms: 0, error: fallbackResult.error };
+                  errorCount++;
+                  playlistSegments.push({ ...r, segment_number: seg.segment_number, speaker: seg.speaker, segment_type: seg.segment_type, inline_narrations: null });
+                  await writer.write(encoder.encode(JSON.stringify(r) + "\n"));
+                  continue;
+                }
+                dialogueAudio = fallbackResult.audio;
+                dialogueDurationMs = fallbackResult.durationMs;
+              } else {
+                dialogueAudio = dialogueResult.audio;
+                dialogueDurationMs = dialogueResult.durationMs;
+              }
+            } else {
+              const plainResult = await callTts(yandexTtsUrl, authHeader, {
+                text, voice: voiceConfig.voice, role: voiceConfig.role,
+                speed: voiceConfig.speed, pitchShift: voiceConfig.pitchShift,
+                volume: voiceConfig.volume, lang: langCode,
+              });
+              if ("error" in plainResult) {
+                const r = { segment_id: seg.id, status: "error", duration_ms: 0, error: plainResult.error };
+                errorCount++;
+                playlistSegments.push({ ...r, segment_number: seg.segment_number, speaker: seg.speaker, segment_type: seg.segment_type, inline_narrations: null });
+                await writer.write(encoder.encode(JSON.stringify(r) + "\n"));
+                continue;
+              }
+              dialogueAudio = plainResult.audio;
+              dialogueDurationMs = plainResult.durationMs;
+            }
+
+            // Calculate narrator offsets
+            const totalChars = text.length;
+            for (const nr of narrationResults) {
+              const insertIdx = text.indexOf(nr.insert_after);
+              const charPos = insertIdx >= 0 ? insertIdx + nr.insert_after.length : 0;
+              nr.offset_ms = Math.round((charPos / totalChars) * dialogueDurationMs);
+            }
+
+          } else {
+            // ── STANDARD SINGLE-PASS SYNTHESIS ────────────────
+            let result: { audio: Uint8Array; durationMs: number } | { error: string };
+            const hasAnnot = segmentHasAnnotations[i];
+            const isLyric = seg.segment_type === "lyric";
+
+            if (isSaluteSpeechVoice) {
+              if (isLyric || hasAnnot) {
+                const ssml = isLyric && !hasAnnot ? buildLyricSsml(text) : buildSegmentSsml(seg.id);
+                result = await callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, { ssml, voice: voiceConfig.voice, lang: langCode });
+              } else {
+                result = await callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, { text, voice: voiceConfig.voice, lang: langCode });
+              }
+            } else if (isProxyApiVoice && proxyApiKey) {
+              const annotated = hasAnnot ? buildSegmentAnnotatedText(seg.id) : isLyric ? formatLyricText(text) : { text, extraInstructions: [] };
+              const baseInstructions = (voiceConfig as any).instructions || "";
+              const fullInstructions = [baseInstructions, ...annotated.extraInstructions].filter(Boolean).join(". ");
+              result = await callProxyApiTts(proxyApiKey, {
+                text: annotated.text, voice: voiceConfig.voice, model: (voiceConfig as any).model,
+                speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
+                instructions: fullInstructions || undefined,
+              });
+            } else if (!isV3Voice && (hasAnnot || isLyric)) {
+              const ssml = isLyric && !hasAnnot ? buildLyricSsml(text) : buildSegmentSsml(seg.id);
+              result = await callTts(yandexTtsUrl, authHeader, {
+                ssml, voice: voiceConfig.voice,
+                speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
+                lang: langCode,
+              });
+            } else if (isV3Voice && (hasAnnot || isLyric)) {
+              const annotated = hasAnnot ? buildSegmentAnnotatedText(seg.id) : formatLyricText(text);
+              result = await callTts(yandexTtsUrl, authHeader, {
+                text: annotated.text, voice: voiceConfig.voice, role: voiceConfig.role,
+                speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
+                pitchShift: voiceConfig.pitchShift, volume: voiceConfig.volume, lang: langCode,
+              });
+            } else {
+              result = await callTts(yandexTtsUrl, authHeader, {
+                text, voice: voiceConfig.voice, role: voiceConfig.role, speed: voiceConfig.speed,
+                pitchShift: voiceConfig.pitchShift, volume: voiceConfig.volume, lang: langCode,
+              });
+            }
+
+            if ("error" in result) {
+              const r = { segment_id: seg.id, status: "error", duration_ms: 0, error: result.error };
+              errorCount++;
+              playlistSegments.push({ ...r, segment_number: seg.segment_number, speaker: seg.speaker, segment_type: seg.segment_type, inline_narrations: null });
+              await writer.write(encoder.encode(JSON.stringify(r) + "\n"));
+              continue;
+            }
+            dialogueAudio = result.audio;
+            dialogueDurationMs = result.durationMs;
+          }
+
+          // Validate audio is not empty
+          if (!dialogueAudio || dialogueAudio.length === 0) {
+            console.error(`Empty audio returned for segment ${seg.id} (voice=${voiceConfig.voice})`);
+            const r = { segment_id: seg.id, status: "error", duration_ms: 0, error: "Empty audio returned from TTS" };
+            errorCount++;
+            playlistSegments.push({ ...r, segment_number: seg.segment_number, speaker: seg.speaker, segment_type: seg.segment_type, inline_narrations: null });
+            await writer.write(encoder.encode(JSON.stringify(r) + "\n"));
+            continue;
+          }
+
+          // ── Encode + write to stream immediately (release memory) ──
+          const audioBase64 = base64Encode(dialogueAudio);
+          // Release raw audio immediately after encoding
+          dialogueAudio = null!;
+
+          const voiceConfigMeta = {
+            provider: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : "yandex",
+            voice: voiceConfig.voice, role: voiceConfig.role, speed: voiceConfig.speed,
+            pitchShift: voiceConfig.pitchShift, volume: voiceConfig.volume,
+            model: isProxyApiVoice ? (voiceConfig as any).model : undefined,
+            instructions: isProxyApiVoice ? (voiceConfig as any).instructions : undefined,
+            textHash: textHashForCache,
+            apiVersion: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1",
+          };
+
+          const r: SegmentResult = {
+            segment_id: seg.id,
+            status: "ready",
+            duration_ms: dialogueDurationMs,
+            audio_base64: audioBase64,
+            voice_config: voiceConfigMeta,
+            inline_narrations: narrationResults.length > 0 ? narrationResults : undefined,
+          };
+
+          successCount++;
+          totalDurationMs += dialogueDurationMs;
+          playlistSegments.push({
+            segment_id: seg.id,
+            segment_number: seg.segment_number,
+            speaker: seg.speaker,
+            segment_type: seg.segment_type,
+            duration_ms: dialogueDurationMs,
+            status: "ready",
+            inline_narrations: r.inline_narrations || null,
+          });
+
+          // Write to stream and release
+          await writer.write(encoder.encode(JSON.stringify(r) + "\n"));
+
+          console.log(`✅ Segment ${i + 1}/${segments.length}: ${seg.speaker || seg.segment_type}, api=${apiVersion}, chunks≈${estimatedChunks}, ${text.length}ch → ${dialogueDurationMs}ms${narrationResults.length > 0 ? ` (+${narrationResults.length} narrator overlays)` : ""}`);
+
+        } catch (err) {
+          console.error(`Error synthesizing segment ${seg.id}:`, err);
+          const r = {
+            segment_id: seg.id,
+            status: "error",
+            duration_ms: 0,
+            error: err instanceof Error ? err.message : "Unknown error",
+          };
+          errorCount++;
+          playlistSegments.push({ ...r, segment_number: seg.segment_number, speaker: seg.speaker, segment_type: seg.segment_type, inline_narrations: null });
+          await writer.write(encoder.encode(JSON.stringify(r) + "\n"));
+        }
       }
-    }
 
-    const totalDurationMs = results.reduce((sum, r) => sum + r.duration_ms, 0);
-    const successCount = results.filter(r => r.status === "ready").length;
-    const errorCount = results.filter(r => r.status === "error").length;
+      // Save playlist snapshot
+      const playlistStatus = errorCount === 0 ? "ready" : successCount > 0 ? "partial" : "error";
+      await supabaseAdmin.from("scene_playlists").upsert(
+        {
+          scene_id,
+          total_duration_ms: totalDurationMs,
+          status: playlistStatus,
+          segments: playlistSegments,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "scene_id" }
+      );
 
-    // Save playlist snapshot
-    const playlistSegments = results.map((r, idx) => ({
-      segment_id: r.segment_id,
-      segment_number: segments[idx].segment_number,
-      speaker: segments[idx].speaker,
-      segment_type: segments[idx].segment_type,
-      
-      duration_ms: r.duration_ms,
-      status: r.status,
-      inline_narrations: r.inline_narrations || null,
-    }));
-
-    const playlistStatus = errorCount === 0 ? "ready" : successCount > 0 ? "partial" : "error";
-
-    await supabaseAdmin.from("scene_playlists").upsert(
-      {
-        scene_id,
-        total_duration_ms: totalDurationMs,
-        status: playlistStatus,
-        segments: playlistSegments,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "scene_id" }
-    );
-
-    console.log(`Playlist saved for scene ${scene_id}: ${playlistStatus}, ${totalDurationMs}ms (cached: ${cachedCount}, synthesized: ${successCount - cachedCount}, errors: ${errorCount})`);
-
-    return new Response(
-      JSON.stringify({
+      // Write summary as last NDJSON line
+      const summary = {
+        _summary: true,
         scene_id,
         total_segments: segments.length,
         synthesized: successCount - cachedCount,
         cached: cachedCount,
         errors: errorCount,
         total_duration_ms: totalDurationMs,
-        results,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+      };
+      await writer.write(encoder.encode(JSON.stringify(summary) + "\n"));
+      await writer.close();
+
+      console.log(`Playlist saved for scene ${scene_id}: ${playlistStatus}, ${totalDurationMs}ms (cached: ${cachedCount}, synthesized: ${successCount - cachedCount}, errors: ${errorCount})`);
+    };
+
+    // Start processing (non-blocking)
+    processSegments().catch(async (err) => {
+      console.error("Stream processing error:", err);
+      try {
+        await writer.write(encoder.encode(JSON.stringify({ _summary: true, error: err instanceof Error ? err.message : "Unknown error" }) + "\n"));
+        await writer.close();
+      } catch { /* stream may already be closed */ }
+    });
+
+    return new Response(readable, {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/x-ndjson",
+        "Transfer-Encoding": "chunked",
+      },
+    });
   } catch (e) {
     console.error("synthesize-scene error:", e);
     return new Response(
