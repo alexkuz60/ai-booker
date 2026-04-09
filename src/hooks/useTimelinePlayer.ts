@@ -1,16 +1,17 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getAudioEngine, type EngineState, type TrackConfig, type LoadProgress } from "@/lib/audioEngine";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 import { loadLocal as loadMixerState } from "@/hooks/useMixerPersistence";
-
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { getAudioBlobUrl, revokeAudioUrl } from "@/lib/localAudioProvider";
 export type PlayerState = EngineState;
 
 /**
  * Manages playback of timeline audio clips via the Tone.js-based AudioEngine.
  */
 export function useTimelinePlayer(clips: TimelineClip[]) {
+  const { storage } = useProjectStorageContext();
 
   const engine = getAudioEngine();
 
@@ -50,7 +51,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     if (clipsKey === loadedKeyRef.current) return;
     loadedKeyRef.current = clipsKey;
 
-    if (audioClips.length === 0) {
+    if (audioClips.length === 0 || !storage) {
       engine.loadTracks([]);
       setFailedConfigs([]);
       return;
@@ -65,17 +66,12 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       const sceneId = audioClips[0]?.sceneId;
       const savedMix = sceneId ? loadMixerState(sceneId) : null;
 
+      // Load audio from OPFS as Blob URLs
       const urlResults = await Promise.all(
         audioClips.map(async (clip) => {
-          const { data, error } = await supabase.storage
-            .from("user-media")
-            .createSignedUrl(clip.audioPath!, 3600);
-          if (error || !data?.signedUrl) return null;
-          const rawUrl = data.signedUrl;
-          const absoluteUrl = rawUrl.startsWith("http")
-            ? rawUrl
-            : `${import.meta.env.VITE_SUPABASE_URL}/storage/v1${rawUrl}`;
-          return { clip, url: absoluteUrl };
+          const blobUrl = await getAudioBlobUrl(storage!, clip.audioPath!);
+          if (!blobUrl) return null;
+          return { clip, url: blobUrl };
         })
       );
 

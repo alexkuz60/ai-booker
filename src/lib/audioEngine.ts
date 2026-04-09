@@ -13,7 +13,7 @@
  */
 
 import * as Tone from "tone";
-import { fetchWithStemCache } from "@/lib/stemCache";
+// stemCache removed — audio loaded from OPFS blob URLs directly
 import {
   type FilterBandParams,
   type MultibandCompParams,
@@ -292,10 +292,8 @@ class AudioEngine {
       let buffer: Tone.ToneAudioBuffer | null = null;
 
       try {
-        // Fetch audio data (cache-first if cacheKey provided)
-        const arrayBuf = cfg.cacheKey
-          ? await fetchWithStemCache(cfg.cacheKey, cfg.url)
-          : await fetch(cfg.url).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.arrayBuffer(); });
+        // Fetch audio data from blob URL (OPFS-backed)
+        const arrayBuf = await fetch(cfg.url).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.arrayBuffer(); });
 
         // Decode into ToneAudioBuffer
         const audioCtx = Tone.getContext().rawContext as AudioContext;
@@ -377,9 +375,7 @@ class AudioEngine {
       let buffer: Tone.ToneAudioBuffer | null = null;
 
       try {
-        const arrayBuf = cfg.cacheKey
-          ? await fetchWithStemCache(cfg.cacheKey, cfg.url)
-          : await fetch(cfg.url).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.arrayBuffer(); });
+        const arrayBuf = await fetch(cfg.url).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.arrayBuffer(); });
         const audioCtx = Tone.getContext().rawContext as AudioContext;
         const decoded = await audioCtx.decodeAudioData(arrayBuf.slice(0));
         buffer = new Tone.ToneAudioBuffer(decoded);

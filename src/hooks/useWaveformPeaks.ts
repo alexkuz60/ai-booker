@@ -8,8 +8,8 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { fetchWithStemCache } from "@/lib/stemCache";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { getAudioBuffer } from "@/lib/localAudioProvider";
 import {
   type MultiLodPeaks,
   type StereoPeaks,
@@ -110,6 +110,7 @@ export function useWaveformPeaks(
   sceneDuration: number = 0,
   displayWidthPx: number = 1600,
 ): WaveformPeaksState {
+  const { storage } = useProjectStorageContext();
   const [state, setState] = useState<WaveformPeaksState>({
     status: "idle",
     peaks: null,
@@ -126,7 +127,7 @@ export function useWaveformPeaks(
     .join("|") + `|dur=${sceneDuration.toFixed(2)}`;
 
   const loadPeaks = useCallback(async () => {
-    if (!trackId || !clipsKey || sceneDuration <= 0) {
+    if (!trackId || !clipsKey || sceneDuration <= 0 || !storage) {
       setState({ status: "idle", peaks: null, error: null });
       return;
     }
@@ -162,17 +163,11 @@ export function useWaveformPeaks(
           if (abort.signal.aborted) return;
 
           const path = clip.audioPath!;
-          const { data: signedData, error: signError } = await supabase.storage
-            .from("user-media")
-            .createSignedUrl(path, 600);
-
-          if (signError || !signedData?.signedUrl) {
-            console.warn(`[useWaveformPeaks] Skip clip ${clip.id}: ${signError?.message}`);
+          const arrayBuf = await getAudioBuffer(storage!, path);
+          if (!arrayBuf) {
+            console.warn(`[useWaveformPeaks] Skip clip ${clip.id}: not found in OPFS`);
             continue;
           }
-          if (abort.signal.aborted) return;
-
-          const arrayBuf = await fetchWithStemCache(path, signedData.signedUrl);
           if (abort.signal.aborted) return;
 
           const buffer = await audioCtx.decodeAudioData(arrayBuf.slice(0));

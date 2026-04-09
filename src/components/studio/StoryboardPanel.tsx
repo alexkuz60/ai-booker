@@ -3,7 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { upsertAudioEntry, writeAudioMeta, recalcPositions, type LocalAudioEntry } from "@/lib/localAudioMeta";
-import { removeStemCacheEntries } from "@/lib/stemCache";
+import { writeTtsClip, writeNarrationClip, parseWavDurationMs } from "@/lib/localTtsStorage";
+import { revokeAudioUrl } from "@/lib/localAudioProvider";
+import { paths } from "@/lib/projectPaths";
 
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
@@ -242,64 +244,79 @@ export function StoryboardPanel({
     })();
   }, [bookId, storage]);
 
-  // Load audio status: from OPFS snapshot (already loaded by loadSegments).
-  // This DB-based loader is kept only for post-synthesis refresh.
-  const refreshAudioStatusFromDb = useCallback(async (segIds: string[]) => {
-    if (segIds.length === 0) return;
-    const { data } = await supabase
-      .from("segment_audio")
-      .select("segment_id, status, duration_ms, audio_path, voice_config, created_at")
-      .in("segment_id", segIds)
-      .order("created_at", { ascending: false });
+  /**
+   * Save synthesis results to OPFS: decode base64 WAV → write TTS clips → update audio_meta.
+   * Fully local — no DB reads for audio status.
+   */
+  const saveSynthResultsToOpfs = useCallback(async (
+    results: Array<{
+      segment_id: string;
+      status: string;
+      duration_ms: number;
+      audio_base64?: string;
+      voice_config?: Record<string, unknown>;
+      error?: string;
+      inline_narrations?: Array<{
+        text: string;
+        insert_after: string;
+        audio_base64: string;
+        duration_ms: number;
+        offset_ms: number;
+      }>;
+    }>,
+  ) => {
+    if (!storage || !sceneId) return;
 
     const map = new Map<string, { status: string; durationMs: number }>();
     const opfsEntries: Record<string, LocalAudioEntry> = {};
-    if (data) {
-      for (const a of data) {
-        const prev = map.get(a.segment_id);
-        if (!prev) {
-          map.set(a.segment_id, { status: a.status, durationMs: a.duration_ms });
-          if (a.status === "ready") {
-            opfsEntries[a.segment_id] = {
-              segmentId: a.segment_id,
-              status: a.status,
-              durationMs: a.duration_ms,
-              audioPath: a.audio_path,
-              voiceConfig: a.voice_config as Record<string, unknown>,
-            };
+
+    for (const r of results) {
+      map.set(r.segment_id, { status: r.status, durationMs: r.duration_ms });
+
+      if (r.status === "ready" && r.audio_base64) {
+        // Decode base64 → ArrayBuffer and write to OPFS
+        const binary = atob(r.audio_base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const wavData = bytes.buffer;
+
+        await writeTtsClip(storage, sceneId, r.segment_id, wavData, chapterId ?? undefined);
+
+        // Revoke any cached blob URL for this clip (force reload)
+        const clipPath = paths.ttsClip(r.segment_id, sceneId, chapterId ?? undefined);
+        revokeAudioUrl(clipPath);
+
+        opfsEntries[r.segment_id] = {
+          segmentId: r.segment_id,
+          status: "ready",
+          durationMs: r.duration_ms,
+          audioPath: clipPath,
+          voiceConfig: r.voice_config,
+        };
+
+        // Write inline narration overlays
+        if (r.inline_narrations) {
+          for (let n = 0; n < r.inline_narrations.length; n++) {
+            const narr = r.inline_narrations[n];
+            if (!narr.audio_base64) continue;
+            const narrBin = atob(narr.audio_base64);
+            const narrBytes = new Uint8Array(narrBin.length);
+            for (let j = 0; j < narrBin.length; j++) narrBytes[j] = narrBin.charCodeAt(j);
+            await writeNarrationClip(storage, sceneId, r.segment_id, n, narrBytes.buffer, chapterId ?? undefined);
           }
-          continue;
-        }
-        if (prev.status !== "ready" && a.status === "ready") {
-          map.set(a.segment_id, { status: a.status, durationMs: a.duration_ms });
-          opfsEntries[a.segment_id] = {
-            segmentId: a.segment_id,
-            status: a.status,
-            durationMs: a.duration_ms,
-            audioPath: a.audio_path,
-            voiceConfig: a.voice_config as Record<string, unknown>,
-          };
         }
       }
     }
+
     setAudioStatus(map);
     persist(buildSnapshot(undefined, map));
 
-    // Invalidate stem cache for re-synthesized segments so timeline fetches fresh audio
-    const cachePaths = Object.values(opfsEntries)
-      .filter(e => e.audioPath)
-      .map(e => e.audioPath);
-    if (cachePaths.length > 0) {
-      removeStemCacheEntries(cachePaths).catch(() => {});
-    }
-
     // Persist to OPFS audio_meta.json and recalc positions
-    if (storage && sceneId && Object.keys(opfsEntries).length > 0) {
-      writeAudioMeta(storage, sceneId, opfsEntries, chapterId ?? undefined)
-        .then(() => recalcPositions(storage, sceneId, chapterId ?? undefined))
-        .catch(() => {});
+    if (Object.keys(opfsEntries).length > 0) {
+      await writeAudioMeta(storage, sceneId, opfsEntries, chapterId ?? undefined);
+      await recalcPositions(storage, sceneId, chapterId ?? undefined);
     }
-  }, [persist, buildSnapshot, storage, sceneId, chapterId]);
+  }, [storage, sceneId, chapterId, persist, buildSnapshot]);
 
   /** Apply loaded segments to component state */
   const applySegments = useCallback((builtSegments: Segment[]) => {
@@ -861,7 +878,26 @@ export function StoryboardPanel({
         body: { scene_id: sceneId, language: isRu ? "ru" : "en", voice_configs },
       });
       if (error) throw error;
-      const synth = data as { synthesized: number; errors: number; total_duration_ms: number; results?: Array<{ segment_id: string; status: string; error?: string }> };
+      const synth = data as {
+        synthesized: number;
+        errors: number;
+        total_duration_ms: number;
+        results?: Array<{
+          segment_id: string;
+          status: string;
+          duration_ms: number;
+          audio_base64?: string;
+          voice_config?: Record<string, unknown>;
+          error?: string;
+          inline_narrations?: Array<{
+            text: string;
+            insert_after: string;
+            audio_base64: string;
+            duration_ms: number;
+            offset_ms: number;
+          }>;
+        }>;
+      };
       const durSec = (synth.total_duration_ms / 1000).toFixed(1);
 
       const errorIds = new Set<string>();
@@ -885,8 +921,11 @@ export function StoryboardPanel({
             : `Synthesis done: ${synth.synthesized} seg., ${durSec}s`
         );
       }
+      // Save WAV audio to OPFS and update audio_meta
+      if (synth.results) {
+        await saveSynthResultsToOpfs(synth.results);
+      }
       onSegmented?.(sceneId);
-      refreshAudioStatusFromDb(segments.map(s => s.segment_id));
     } catch (err: any) {
       console.error("Synthesis failed:", err);
       toast.error(isRu ? "Ошибка синтеза" : "Synthesis failed");
@@ -895,7 +934,7 @@ export function StoryboardPanel({
     setCurrentlySynthesizingIds(new Set());
     onSynthesizingChange?.(new Set());
     setSynthProgress("");
-  }, [sceneId, segments, isRu, onSegmented, refreshAudioStatusFromDb, onSynthesizingChange, onErrorSegmentsChange, pushToDb, buildSnapshot]);
+  }, [sceneId, segments, isRu, onSegmented, saveSynthResultsToOpfs, onSynthesizingChange, onErrorSegmentsChange, pushToDb, buildSnapshot]);
 
   const resynthSegment = useCallback(async (segmentId: string) => {
     if (!sceneId) return;
@@ -914,7 +953,21 @@ export function StoryboardPanel({
 
       const synth = data as {
         errors?: number;
-        results?: Array<{ segment_id: string; status: string; error?: string }>;
+        results?: Array<{
+          segment_id: string;
+          status: string;
+          duration_ms: number;
+          audio_base64?: string;
+          voice_config?: Record<string, unknown>;
+          error?: string;
+          inline_narrations?: Array<{
+            text: string;
+            insert_after: string;
+            audio_base64: string;
+            duration_ms: number;
+            offset_ms: number;
+          }>;
+        }>;
       };
       const segmentResult = synth.results?.find((r) => r.segment_id === segmentId);
 
@@ -926,20 +979,22 @@ export function StoryboardPanel({
 
       toast.success(isRu ? "Блок пересинтезирован" : "Segment re-synthesized");
       onErrorSegmentsChange?.(new Set());
+      // Save re-synthesized audio to OPFS
+      if (synth.results) {
+        await saveSynthResultsToOpfs(synth.results);
+      }
       onSegmented?.(sceneId);
-      await refreshAudioStatusFromDb(segments.map(s => s.segment_id));
     } catch (err: any) {
       console.error("Re-synth failed:", err);
       toast.error(isRu ? "Ошибка ре-синтеза" : "Re-synthesis failed", {
         description: err?.message,
       });
       onErrorSegmentsChange?.(new Set([segmentId]));
-      await refreshAudioStatusFromDb(segments.map(s => s.segment_id));
     }
     setResynthSegId(null);
     setCurrentlySynthesizingIds(new Set());
     onSynthesizingChange?.(new Set());
-  }, [sceneId, isRu, onSegmented, refreshAudioStatusFromDb, segments, onSynthesizingChange, onErrorSegmentsChange, pushToDb, buildSnapshot]);
+  }, [sceneId, isRu, onSegmented, saveSynthResultsToOpfs, segments, onSynthesizingChange, onErrorSegmentsChange, pushToDb, buildSnapshot]);
 
   // ─── Detection & Stress ───────────────────────────────────
 

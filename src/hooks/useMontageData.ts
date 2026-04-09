@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { readStructureFromLocal } from "@/lib/localSync";
-import { clearStemCache } from "@/lib/stemCache";
+import { revokeAllAudioUrls } from "@/lib/localAudioProvider";
 import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 
 // ─── Types ──────────────────────────────────────────────────
@@ -109,10 +109,10 @@ export function useMontageData() {
     setLoading(false);
   }, []);
 
-  // ── Clear stem cache when chapter changes ──
+  // ── Revoke blob URLs when chapter changes ──
   useEffect(() => {
     if (chapterId && prevChapterIdRef.current && chapterId !== prevChapterIdRef.current) {
-      clearStemCache();
+      revokeAllAudioUrls();
     }
     prevChapterIdRef.current = chapterId;
   }, [chapterId]);

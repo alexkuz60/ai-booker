@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FileAudio, Download, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { renderChapter, type ChapterRenderProgress, type ExportFormat, type WavBitDepth, type Mp3Bitrate } from "@/lib/chapterRenderer";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 
 interface RenderDialogProps {
   open: boolean;
@@ -68,6 +69,7 @@ export function RenderDialog({
   open, onOpenChange, clips, totalDurationSec, userId,
   bookTitle, chapterTitle, partNumber, isRu,
 }: RenderDialogProps) {
+  const { storage } = useProjectStorageContext();
 
   const defaultName = [
     sanitizeFileName(bookTitle),
@@ -94,7 +96,7 @@ export function RenderDialog({
     : `MP3 ${mp3Bitrate} kbps / 44100 Hz / Stereo`;
 
   const handleRender = useCallback(async () => {
-    if (!userId || clips.length === 0) return;
+    if (!userId || clips.length === 0 || !storage) return;
     setRendering(true);
     setProgress(null);
     setResult(null);
@@ -103,6 +105,7 @@ export function RenderDialog({
 
     try {
       const res = await renderChapter({
+        storage,
         clips,
         totalDurationSec,
         normalize,
