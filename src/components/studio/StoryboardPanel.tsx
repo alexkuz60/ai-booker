@@ -567,48 +567,9 @@ export function StoryboardPanel({
   const synthIdsRef = useRef<Set<string>>(new Set());
   synthIdsRef.current = currentlySynthesizingIds;
 
-  useEffect(() => {
-    if (segments.length === 0) return;
-
-    const segmentIdSet = new Set(segments.map(s => s.segment_id));
-    const channel = supabase
-      .channel(`segment_audio_${sceneId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "segment_audio" },
-        (payload) => {
-          const row = payload.new as { segment_id: string; status: string; duration_ms: number; audio_path?: string; voice_config?: Record<string, unknown> } | undefined;
-          if (!row || !segmentIdSet.has(row.segment_id)) return;
-          if (!synthIdsRef.current.has(row.segment_id)) return;
-
-          setCurrentlySynthesizingIds(prev => {
-            const next = new Set(prev);
-            next.delete(row.segment_id);
-            onSynthesizingChange?.(next);
-            return next;
-          });
-          setAudioStatus(prev => {
-            const next = new Map(prev);
-            next.set(row.segment_id, { status: row.status, durationMs: row.duration_ms });
-            return next;
-          });
-
-          // Write to OPFS audio_meta.json
-          if (storage && sceneId && row.status === "ready" && row.audio_path) {
-            upsertAudioEntry(storage, sceneId, {
-              segmentId: row.segment_id,
-              status: row.status,
-              durationMs: row.duration_ms,
-              audioPath: row.audio_path,
-              voiceConfig: row.voice_config,
-            }, chapterId ?? undefined).catch(() => {});
-          }
-        }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [segments.map(s => s.segment_id).join(","), sceneId, onSynthesizingChange]);
+  // Synthesis progress is now tracked locally via saveSynthResultsToOpfs.
+  // No realtime subscription to segment_audio DB table needed (K3).
+  // Synthesizing IDs are managed by runSynthesis/resynthSegment callbacks.
 
   // ─── AI Actions (Background) ───────────────────────────────
   const bgAnalysis = useBackgroundAnalysis();

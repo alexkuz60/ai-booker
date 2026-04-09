@@ -65,99 +65,82 @@ async function scanBookForStaleAudio(
     providerBreakdown: new Map(),
   };
 
+  if (!storage) return report;
+
   // ── Build character voice map from local index (K4) ──
   const charVoiceMap = new Map<string, Record<string, unknown>>();
-
-  if (storage) {
-    const { readCharacterIndex } = await import("@/lib/localCharacters");
-    const chars = await readCharacterIndex(storage);
-    for (const c of chars) {
-      const vc = (c.voice_config || {}) as Record<string, unknown>;
-      charVoiceMap.set(c.name.toLowerCase(), vc);
-      for (const alias of c.aliases) {
-        if (alias) charVoiceMap.set(alias.toLowerCase(), vc);
-      }
+  const { readCharacterIndex } = await import("@/lib/localCharacters");
+  const chars = await readCharacterIndex(storage);
+  for (const c of chars) {
+    const vc = (c.voice_config || {}) as Record<string, unknown>;
+    charVoiceMap.set(c.name.toLowerCase(), vc);
+    for (const alias of c.aliases) {
+      if (alias) charVoiceMap.set(alias.toLowerCase(), vc);
     }
   }
 
-  // LOCAL-ONLY: if no local characters, return empty report (K4 — no DB fallback)
   if (charVoiceMap.size === 0) return report;
 
-  if (charVoiceMap.size === 0) return report;
+  // ── Read all scenes from local structure ──
+  const { readStructureFromLocal } = await import("@/lib/localSync");
+  const local = await readStructureFromLocal(storage);
+  if (!local?.structure) return report;
 
-  // Load all chapters -> scenes -> segments -> audio for the book
-  const { data: chapters } = await supabase
-    .from("book_chapters")
-    .select("id")
-    .eq("book_id", bookId);
-  if (!chapters?.length) return report;
-
-  const chapterIds = chapters.map(c => c.id);
-  const { data: scenes } = await supabase
-    .from("book_scenes")
-    .select("id")
-    .in("chapter_id", chapterIds);
-  if (!scenes?.length) return report;
-
-  const sceneIds = scenes.map(s => s.id);
-
-  const { data: segments } = await supabase
-    .from("scene_segments")
-    .select("id, scene_id, speaker")
-    .in("scene_id", sceneIds);
-  if (!segments?.length) return report;
-
-  const segIds = segments.map(s => s.id);
-
-  const { data: audioData } = await supabase
-    .from("segment_audio")
-    .select("segment_id, voice_config, status")
-    .in("segment_id", segIds)
-    .eq("status", "ready");
-  if (!audioData?.length) return report;
-
-  report.totalAudioSegments = audioData.length;
-
-  const segToSpeaker = new Map(segments.map(s => [s.id, s.speaker]));
-  const segToScene = new Map(segments.map(s => [s.id, s.scene_id]));
+  const { readAudioMeta } = await import("@/lib/localAudioMeta");
+  const { readStoryboardFromLocal } = await import("@/lib/storyboardSync");
 
   const COMPARE_KEYS = ["voice", "role", "speed", "pitchShift", "volume", "provider", "model"];
 
-  for (const a of audioData) {
-    const speaker = segToSpeaker.get(a.segment_id);
-    if (!speaker) continue;
+  for (const [chIdx, result] of local.chapterResults) {
+    const chId = local.chapterIdMap.get(chIdx);
+    if (!chId) continue;
 
-    const currentVc = charVoiceMap.get(speaker.toLowerCase());
-    if (!currentVc || !currentVc.voice) continue;
+    for (const scene of result.scenes) {
+      if (!scene.id) continue;
+      const meta = await readAudioMeta(storage, scene.id, chId);
+      if (!meta) continue;
 
-    const savedVc = (a.voice_config || {}) as Record<string, unknown>;
+      const storyboard = await readStoryboardFromLocal(storage, scene.id, chId);
+      const speakerMap = new Map(
+        (storyboard?.segments ?? []).map(s => [s.segment_id, s.speaker])
+      );
 
-    const changed = COMPARE_KEYS.some(k => {
-      const cur = currentVc[k];
-      const sav = savedVc[k];
-      const curStr = (cur !== undefined && cur !== null && cur !== "") ? String(cur) : "";
-      const savStr = (sav !== undefined && sav !== null && sav !== "") ? String(sav) : "";
-      if (k === "speed" || k === "pitchShift" || k === "volume") {
-        const curNum = curStr ? Number(curStr) : -999;
-        const savNum = savStr ? Number(savStr) : -999;
-        return Math.abs(curNum - savNum) > 0.01;
+      const readyEntries = Object.values(meta.entries).filter(e => e.status === "ready");
+      report.totalAudioSegments += readyEntries.length;
+
+      for (const entry of readyEntries) {
+        const speaker = speakerMap.get(entry.segmentId);
+        if (!speaker) continue;
+
+        const currentVc = charVoiceMap.get(speaker.toLowerCase());
+        if (!currentVc || !currentVc.voice) continue;
+
+        const savedVc = (entry.voiceConfig || {}) as Record<string, unknown>;
+        const changed = COMPARE_KEYS.some(k => {
+          const cur = currentVc[k];
+          const sav = savedVc[k];
+          const curStr = (cur !== undefined && cur !== null && cur !== "") ? String(cur) : "";
+          const savStr = (sav !== undefined && sav !== null && sav !== "") ? String(sav) : "";
+          if (k === "speed" || k === "pitchShift" || k === "volume") {
+            return Math.abs((curStr ? Number(curStr) : -999) - (savStr ? Number(savStr) : -999)) > 0.01;
+          }
+          return curStr !== savStr;
+        });
+
+        if (changed) {
+          report.staleSegments.push({
+            segmentId: entry.segmentId,
+            sceneId: scene.id,
+            speaker,
+            currentVoice: String(currentVc.voice || ""),
+            savedVoice: String(savedVc.voice || ""),
+          });
+          report.scenesAffected.add(scene.id);
+
+          const provider = String(currentVc.provider || savedVc.provider || "yandex");
+          report.providerBreakdown.set(provider, (report.providerBreakdown.get(provider) || 0) + 1);
+        }
       }
-      return curStr !== savStr;
-    });
-
-    if (changed) {
-      const sceneId = segToScene.get(a.segment_id) || "";
-      report.staleSegments.push({
-        segmentId: a.segment_id,
-        sceneId,
-        speaker,
-        currentVoice: String(currentVc.voice || ""),
-        savedVoice: String(savedVc.voice || ""),
-      });
-      report.scenesAffected.add(sceneId);
-
-      const provider = String(currentVc.provider || savedVc.provider || "yandex");
-      report.providerBreakdown.set(provider, (report.providerBreakdown.get(provider) || 0) + 1);
     }
   }
 
