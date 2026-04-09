@@ -192,6 +192,7 @@ export function WaveformEditor({
   canUndo,
   canRedo,
 }: WaveformEditorProps) {
+  const { storage } = useProjectStorageContext();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const editorScrollRef = useRef<HTMLDivElement>(null);
@@ -647,14 +648,13 @@ export function WaveformEditor({
 
   // ── Static spectrum computation ──────────────────────────────
   const loadAudioBuffer = useCallback(async () => {
-    if (loadingBufferRef.current || audioBufferRef.current) return audioBufferRef.current;
+    if (loadingBufferRef.current || audioBufferRef.current || !storage) return audioBufferRef.current;
     const clip = sceneClips.find(c => c.hasAudio && c.audioPath);
     if (!clip?.audioPath) return null;
     loadingBufferRef.current = true;
     try {
-      const { data } = await supabase.storage.from("user-media").createSignedUrl(clip.audioPath, 600);
-      if (!data?.signedUrl) return null;
-      const arrayBuf = await fetchWithStemCache(clip.audioPath, data.signedUrl);
+      const arrayBuf = await getAudioBuffer(storage, clip.audioPath);
+      if (!arrayBuf) return null;
       const decodeCtx = new OfflineAudioContext(2, 44100 * 60, 44100);
       const decoded = await decodeCtx.decodeAudioData(arrayBuf.slice(0));
       audioBufferRef.current = decoded;
@@ -665,7 +665,7 @@ export function WaveformEditor({
     } finally {
       loadingBufferRef.current = false;
     }
-  }, [sceneClips]);
+  }, [sceneClips, storage]);
 
   // Clear buffer when scene changes
   useEffect(() => {
