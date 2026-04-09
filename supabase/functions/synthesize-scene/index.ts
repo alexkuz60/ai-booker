@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,7 +17,7 @@ interface InlineNarration {
 interface InlineNarrationResult {
   text: string;
   insert_after: string;
-  audio_path: string;
+  audio_base64: string;
   duration_ms: number;
   offset_ms: number; // position in the dialogue timeline where narrator starts
 }
@@ -25,7 +26,8 @@ interface SegmentResult {
   segment_id: string;
   status: string;
   duration_ms: number;
-  audio_path: string;
+  audio_base64?: string;
+  voice_config?: Record<string, unknown>;
   error?: string;
   inline_narrations?: InlineNarrationResult[];
 }
@@ -97,78 +99,30 @@ function resolveVoice(
 }
 
 // ── MP3 duration parser ──────────────────────────────────────────────
-// Parses MP3 frame headers to calculate accurate duration instead of
-// rough byte-size estimation which varies with VBR encoding.
+// ── WAV duration parser ──────────────────────────────────────────────
 
-const MP3_BITRATES_V1_L3 = [0,32,40,48,56,64,80,96,112,128,160,192,224,256,320,0];
-const MP3_SAMPLERATES_V1  = [44100, 48000, 32000, 0];
-
-function parseMp3Duration(data: Uint8Array): number {
-  let totalMs = 0;
-  let i = 0;
-  let frameCount = 0;
-
-  // Skip ID3v2 tag if present
-  if (data.length > 10 && data[0] === 0x49 && data[1] === 0x44 && data[2] === 0x33) {
-    const size = ((data[6] & 0x7F) << 21) | ((data[7] & 0x7F) << 14) |
-                 ((data[8] & 0x7F) << 7) | (data[9] & 0x7F);
-    i = 10 + size;
-  }
-
-  while (i < data.length - 4) {
-    // Look for frame sync (0xFF 0xE0+)
-    if (data[i] === 0xFF && (data[i + 1] & 0xE0) === 0xE0) {
-      const b1 = data[i + 1];
-      const b2 = data[i + 2];
-
-      const version = (b1 >> 3) & 0x03;     // 0=2.5, 1=reserved, 2=v2, 3=v1
-      const layer   = (b1 >> 1) & 0x03;     // 1=L3, 2=L2, 3=L1
-      const brIdx   = (b2 >> 4) & 0x0F;
-      const srIdx   = (b2 >> 2) & 0x03;
-      const padding = (b2 >> 1) & 0x01;
-
-      if (version === 1 || layer === 0 || brIdx === 0 || brIdx === 15 || srIdx === 3) {
-        i++;
-        continue;
-      }
-
-      let bitrate: number;
-      let sampleRate: number;
-      let samplesPerFrame: number;
-
-      if (version === 3) { // MPEG1
-        bitrate = MP3_BITRATES_V1_L3[brIdx] * 1000;
-        sampleRate = MP3_SAMPLERATES_V1[srIdx];
-        samplesPerFrame = layer === 1 ? 1152 : layer === 2 ? 1152 : 384;
-      } else { // MPEG2 / 2.5
-        // Simplified bitrate table for MPEG2 L3
-        const br2 = [0,8,16,24,32,40,48,56,64,80,96,112,128,144,160,0];
-        bitrate = br2[brIdx] * 1000;
-        sampleRate = MP3_SAMPLERATES_V1[srIdx];
-        if (version === 2) sampleRate /= 2;
-        else if (version === 0) sampleRate /= 4;
-        samplesPerFrame = layer === 1 ? 576 : 576;
-      }
-
-      if (bitrate === 0 || sampleRate === 0) { i++; continue; }
-
-      const frameLen = Math.floor((samplesPerFrame * (bitrate / 8)) / sampleRate) + padding;
-      if (frameLen < 4) { i++; continue; }
-
-      totalMs += (samplesPerFrame / sampleRate) * 1000;
-      frameCount++;
-      i += frameLen;
-    } else {
-      i++;
+function parseWavDurationMs(data: Uint8Array): number {
+  try {
+    if (data.length < 44) return estimateDuration(data.length);
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    // Verify RIFF/WAVE
+    if (view.getUint32(0) !== 0x52494646 || view.getUint32(8) !== 0x57415645) {
+      return estimateDuration(data.length);
     }
+    const sampleRate = view.getUint32(24, true);
+    const blockAlign = view.getUint16(32, true);
+    const dataSize = view.getUint32(40, true);
+    if (sampleRate === 0 || blockAlign === 0) return estimateDuration(data.length);
+    const totalSamples = dataSize / blockAlign;
+    return Math.round((totalSamples / sampleRate) * 1000);
+  } catch {
+    return estimateDuration(data.length);
   }
+}
 
-  // Fallback to byte-size estimate if parsing failed
-  if (frameCount < 3) {
-    return Math.round((data.length / 16000) * 1000);
-  }
-
-  return Math.round(totalMs);
+function estimateDuration(byteLength: number): number {
+  // Assume 48kHz 16-bit mono = 96000 bytes/sec
+  return Math.round((byteLength / 96000) * 1000);
 }
 
 // ── TTS call helper ──────────────────────────────────────────────────
@@ -217,7 +171,7 @@ async function callTts(
 
   const audioBuffer = await resp.arrayBuffer();
   const audio = new Uint8Array(audioBuffer);
-  const durationMs = parseMp3Duration(audio);
+  const durationMs = parseWavDurationMs(audio);
   return { audio, durationMs };
 }
 
@@ -237,7 +191,7 @@ async function callProxyApiTts(
     model: params.model || "gpt-4o-mini-tts",
     input: params.text,
     voice: params.voice,
-    response_format: "mp3",
+    response_format: "wav",
     speed: params.speed ?? 1.0,
   };
   if (params.instructions && (params.model === "gpt-4o-mini-tts" || !params.model)) {
@@ -260,7 +214,7 @@ async function callProxyApiTts(
 
   const audioBuffer = await resp.arrayBuffer();
   const audio = new Uint8Array(audioBuffer);
-  const durationMs = parseMp3Duration(audio);
+  const durationMs = parseWavDurationMs(audio);
   return { audio, durationMs };
 }
 
@@ -279,7 +233,7 @@ async function callSaluteSpeechTts(
   const body: Record<string, unknown> = {
     voice: params.voice,
     lang: params.lang,
-    format: "opus",
+    format: "wav16",
   };
   if (params.ssml) {
     body.ssml = params.ssml;
@@ -303,8 +257,7 @@ async function callSaluteSpeechTts(
 
   const audioBuffer = await resp.arrayBuffer();
   const audio = new Uint8Array(audioBuffer);
-  // Opus duration estimation: ~32kbps average for speech
-  const durationMs = Math.round((audio.length / 4000) * 1000);
+  const durationMs = parseWavDurationMs(audio);
   return { audio, durationMs };
 }
 
@@ -906,13 +859,13 @@ Deno.serve(async (req) => {
           segment_id: seg.id,
           status: cached ? "ready" : "skipped",
           duration_ms: cached?.duration_ms ?? 0,
-          audio_path: cached?.audio_path ?? "",
+          
         });
         continue;
       }
 
       if (!text.trim()) {
-        results.push({ segment_id: seg.id, status: "skipped", duration_ms: 0, audio_path: "" });
+        results.push({ segment_id: seg.id, status: "skipped", duration_ms: 0 });
         continue;
       }
 
@@ -962,7 +915,7 @@ Deno.serve(async (req) => {
           segment_id: seg.id,
           status: "ready",
           duration_ms: cached.duration_ms,
-          audio_path: cached.audio_path,
+          
           inline_narrations: (metadata.inline_narrations_audio as InlineNarrationResult[] | undefined) ?? undefined,
         });
         cachedCount++;
@@ -1011,21 +964,11 @@ Deno.serve(async (req) => {
               continue;
             }
 
-            // Upload narrator audio
-            const narrPath = `${userId}/tts/${scene_id}/${seg.id}_narrator_${n}.mp3`;
-            await supabaseAdmin.storage.from("user-media").upload(
-              narrPath, narrResult.audio, { contentType: "audio/mpeg", upsert: true }
-            );
-
-            // Estimate the offset: character position in dialogue text
-            const insertIdx = text.indexOf(narr.insert_after);
-            const charsBefore = insertIdx >= 0 ? insertIdx + narr.insert_after.length : 0;
-            // Rough estimate: chars before / total chars * total estimated duration
-            // We'll refine offset_ms after we know the actual dialogue duration
+            // Return narrator audio as base64 (no server upload)
             narrationResults.push({
               text: narr.text,
               insert_after: narr.insert_after,
-              audio_path: narrPath,
+              audio_base64: base64Encode(narrResult.audio),
               duration_ms: narrResult.durationMs,
               offset_ms: 0, // will be calculated after dialogue synthesis
             });
@@ -1084,7 +1027,7 @@ Deno.serve(async (req) => {
                 lang: langCode,
               });
               if ("error" in fallbackResult) {
-                results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: fallbackResult.error });
+                results.push({ segment_id: seg.id, status: "error", duration_ms: 0, error: fallbackResult.error });
                 continue;
               }
               dialogueAudio = fallbackResult.audio;
@@ -1105,7 +1048,7 @@ Deno.serve(async (req) => {
               lang: langCode,
             });
             if ("error" in plainResult) {
-              results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: plainResult.error });
+              results.push({ segment_id: seg.id, status: "error", duration_ms: 0, error: plainResult.error });
               continue;
             }
             dialogueAudio = plainResult.audio;
@@ -1198,7 +1141,7 @@ Deno.serve(async (req) => {
           }
 
           if ("error" in result) {
-            results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: result.error });
+            results.push({ segment_id: seg.id, status: "error", duration_ms: 0, error: result.error });
             continue;
           }
           dialogueAudio = result.audio;
@@ -1208,70 +1151,33 @@ Deno.serve(async (req) => {
         // Validate audio is not empty
         if (!dialogueAudio || dialogueAudio.length === 0) {
           console.error(`Empty audio returned for segment ${seg.id} (voice=${voiceConfig.voice})`);
-          results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: "Empty audio returned from TTS" });
+          results.push({ segment_id: seg.id, status: "error", duration_ms: 0, error: "Empty audio returned from TTS" });
           continue;
         }
 
-        // Upload main audio
-        const audioExt = isSaluteSpeechVoice ? "ogg" : "mp3";
-        const audioMime = isSaluteSpeechVoice ? "audio/ogg" : "audio/mpeg";
-        const storagePath = `${userId}/tts/${scene_id}/${seg.id}.${audioExt}`;
-        const { error: uploadErr } = await supabaseAdmin.storage
-          .from("user-media")
-          .upload(storagePath, dialogueAudio, { contentType: audioMime, upsert: true });
+        // ── Return audio as base64 (no server upload) ──
+        const audioBase64 = base64Encode(dialogueAudio);
 
-        if (uploadErr) {
-          console.error(`Upload failed for segment ${seg.id}:`, uploadErr);
-          results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: "Upload failed" });
-          continue;
-        }
-
-        // Update segment metadata with narrator audio info
-        const updatedMetadata = { ...metadata };
-        if (narrationResults.length > 0) {
-          updatedMetadata.inline_narrations_audio = narrationResults;
-        } else {
-          // Clear stale inline narration audio if narrations were removed
-          delete updatedMetadata.inline_narrations_audio;
-        }
-
-        // Upsert segment_audio record
-        // isV3Voice already computed above
-        await supabaseAdmin.from("segment_audio").upsert(
-          {
-            segment_id: seg.id,
-            audio_path: storagePath,
-            duration_ms: dialogueDurationMs,
-            status: "ready",
-            voice_config: {
-              provider: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : "yandex",
-              voice: voiceConfig.voice,
-              role: voiceConfig.role,
-              speed: voiceConfig.speed,
-              pitchShift: voiceConfig.pitchShift,
-              volume: voiceConfig.volume,
-              model: isProxyApiVoice ? (voiceConfig as any).model : undefined,
-              instructions: isProxyApiVoice ? (voiceConfig as any).instructions : undefined,
-              textHash: textHashForCache,
-              apiVersion: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1",
-            },
-          },
-          { onConflict: "segment_id" }
-        );
-
-        // Update segment metadata (add or clear inline narration audio info)
-        if (narrationResults.length > 0 || metadata.inline_narrations_audio) {
-          await supabaseAdmin
-            .from("scene_segments")
-            .update({ metadata: updatedMetadata })
-            .eq("id", seg.id);
-        }
+        // Build voice_config metadata for client-side caching
+        const voiceConfigMeta = {
+          provider: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : "yandex",
+          voice: voiceConfig.voice,
+          role: voiceConfig.role,
+          speed: voiceConfig.speed,
+          pitchShift: voiceConfig.pitchShift,
+          volume: voiceConfig.volume,
+          model: isProxyApiVoice ? (voiceConfig as any).model : undefined,
+          instructions: isProxyApiVoice ? (voiceConfig as any).instructions : undefined,
+          textHash: textHashForCache,
+          apiVersion: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1",
+        };
 
         results.push({
           segment_id: seg.id,
           status: "ready",
           duration_ms: dialogueDurationMs,
-          audio_path: storagePath,
+          audio_base64: audioBase64,
+          voice_config: voiceConfigMeta,
           inline_narrations: narrationResults.length > 0 ? narrationResults : undefined,
         });
 
@@ -1283,7 +1189,6 @@ Deno.serve(async (req) => {
           segment_id: seg.id,
           status: "error",
           duration_ms: 0,
-          audio_path: "",
           error: err instanceof Error ? err.message : "Unknown error",
         });
       }
@@ -1299,7 +1204,7 @@ Deno.serve(async (req) => {
       segment_number: segments[idx].segment_number,
       speaker: segments[idx].speaker,
       segment_type: segments[idx].segment_type,
-      audio_path: r.audio_path || null,
+      
       duration_ms: r.duration_ms,
       status: r.status,
       inline_narrations: r.inline_narrations || null,

@@ -83,7 +83,25 @@ async function getCachedIamToken(): Promise<string> {
   return token;
 }
 
-// ─── V1 Synthesis (REST, form-urlencoded) ─────────────────────────
+// ─── V1 Synthesis (REST, form-urlencoded → PCM → WAV) ─────────────
+
+// WAV header helper for wrapping raw PCM
+function wrapPcmInWav(pcmData: Uint8Array, sampleRate: number, channels = 1, bitsPerSample = 16): ArrayBuffer {
+  const blockAlign = channels * (bitsPerSample / 8);
+  const byteRate = sampleRate * blockAlign;
+  const totalLength = 44 + pcmData.length;
+  const buffer = new ArrayBuffer(44 + pcmData.length);
+  const view = new DataView(buffer);
+  const writeStr = (off: number, s: string) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+  writeStr(0, "RIFF"); view.setUint32(4, totalLength - 8, true); writeStr(8, "WAVE");
+  writeStr(12, "fmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+  view.setUint16(22, channels, true); view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true); view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitsPerSample, true);
+  writeStr(36, "data"); view.setUint32(40, pcmData.length, true);
+  new Uint8Array(buffer, 44).set(pcmData);
+  return buffer;
+}
 
 interface TtsParams {
   text: string;
@@ -113,7 +131,8 @@ async function synthesizeV1(
   form.append("lang", params.lang);
   form.append("voice", params.voice);
   form.append("folderId", folderId);
-  form.append("format", "mp3");
+  // Output raw PCM (lpcm) for lossless quality — caller wraps in WAV
+  form.append("format", "lpcm");
   form.append("sampleRateHertz", "48000");
   form.append("speed", String(params.speed));
   if (params.emotion) form.append("emotion", params.emotion);
@@ -127,7 +146,10 @@ async function synthesizeV1(
     if (response.status === 401) cachedToken = null;
     throw new YandexTtsError(response.status, errText);
   }
-  return { audio: new Uint8Array(await response.arrayBuffer()), contentType: "audio/mpeg" };
+  const pcmData = new Uint8Array(await response.arrayBuffer());
+  // Wrap raw PCM in WAV container
+  const wavData = wrapPcmInWav(pcmData, 48000, 1, 16);
+  return { audio: new Uint8Array(wavData), contentType: "audio/wav" };
 }
 
 // ─── V3 text splitter (≤250 chars at sentence boundaries) ─────────
@@ -179,7 +201,11 @@ async function synthesizeV3Single(
     text,
     hints,
     output_audio_spec: {
-      container_audio: { container_audio_type: "MP3" },
+      // Output raw PCM for lossless quality — we wrap in WAV after concatenation
+      raw_audio: {
+        audio_encoding: "LINEAR16_PCM",
+        sample_rate_hertz: 48000,
+      },
     },
     loudness_normalization_type: "LUFS",
     unsafe_mode: true,
@@ -274,7 +300,7 @@ async function synthesizeV3(
     allAudio.push(audio);
   }
 
-  // Concatenate MP3 frames (MP3 is a streaming format, concat works)
+  // Concatenate raw PCM chunks
   const totalLen = allAudio.reduce((sum, a) => sum + a.length, 0);
   const combined = new Uint8Array(totalLen);
   let offset = 0;
@@ -287,7 +313,9 @@ async function synthesizeV3(
     throw new YandexTtsError(500, "V3 synthesis returned empty audio for all chunks");
   }
 
-  return { audio: combined, contentType: "audio/mpeg" };
+  // Wrap concatenated PCM in WAV container
+  const wavData = wrapPcmInWav(combined, 48000, 1, 16);
+  return { audio: new Uint8Array(wavData), contentType: "audio/wav" };
 }
 
 // ─── Error helper ─────────────────────────────────────────────────
