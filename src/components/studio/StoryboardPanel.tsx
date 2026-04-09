@@ -888,6 +888,8 @@ export function StoryboardPanel({
               // Save each segment to OPFS immediately (streaming save)
               if (obj.status === "ready" && obj.audio_base64) {
                 await saveSynthResultsToOpfs([obj]);
+                // Trigger timeline redraw after each streamed segment
+                onSegmented?.(sceneId);
               }
               setSynthProgress(
                 isRu
