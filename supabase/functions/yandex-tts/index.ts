@@ -201,7 +201,11 @@ async function synthesizeV3Single(
     text,
     hints,
     output_audio_spec: {
-      container_audio: { container_audio_type: "MP3" },
+      // Output raw PCM for lossless quality — we wrap in WAV after concatenation
+      raw_audio: {
+        audio_encoding: "LINEAR16_PCM",
+        sample_rate_hertz: 48000,
+      },
     },
     loudness_normalization_type: "LUFS",
     unsafe_mode: true,
@@ -296,7 +300,7 @@ async function synthesizeV3(
     allAudio.push(audio);
   }
 
-  // Concatenate MP3 frames (MP3 is a streaming format, concat works)
+  // Concatenate raw PCM chunks
   const totalLen = allAudio.reduce((sum, a) => sum + a.length, 0);
   const combined = new Uint8Array(totalLen);
   let offset = 0;
@@ -309,17 +313,9 @@ async function synthesizeV3(
     throw new YandexTtsError(500, "V3 synthesis returned empty audio for all chunks");
   }
 
-  return { audio: combined, contentType: "audio/mpeg" };
-}
-
-// ─── Error helper ─────────────────────────────────────────────────
-
-class YandexTtsError extends Error {
-  status: number;
-  constructor(status: number, detail: string) {
-    super(detail);
-    this.status = status;
-  }
+  // Wrap concatenated PCM in WAV container
+  const wavData = wrapPcmInWav(combined, 48000, 1, 16);
+  return { audio: new Uint8Array(wavData), contentType: "audio/wav" };
 }
 
 function errorMessage(status: number, isRu: boolean): string {
