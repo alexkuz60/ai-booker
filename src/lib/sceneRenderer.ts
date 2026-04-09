@@ -456,6 +456,7 @@ async function scheduleBus(
 /* ─── Main render ─── */
 
 export async function renderScene(
+  storage: ProjectStorage,
   sceneId: string,
   clips: TimelineClip[],
   durationSec: number,
@@ -478,7 +479,7 @@ export async function renderScene(
     const allClips = [...voiceClips, ...atmoClips, ...sfxClips];
 
     // Pre-load all buffers with per-clip progress (0–45%)
-    const buffers = await preloadClipBuffers(allClips, sampleRate, (loaded, total) => {
+    const buffers = await preloadClipBuffers(storage, allClips, sampleRate, (loaded, total) => {
       const pct = total > 0 ? Math.round((loaded / total) * 45) : 0;
       report("loading", pct);
     });
