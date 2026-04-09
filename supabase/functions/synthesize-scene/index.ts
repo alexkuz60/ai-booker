@@ -757,31 +757,12 @@ Deno.serve(async (req) => {
         sceneType = sceneData.scene_type;
       }
     } else {
-      // Fallback: load from DB (legacy — for batch resynth without client configs)
-      console.warn("No voice_configs from client — falling back to DB (legacy path)");
-      const { data: sceneData } = await supabase
-        .from("book_scenes").select("chapter_id, mood, scene_type").eq("id", scene_id).single();
-      if (sceneData) {
-        sceneMood = sceneData.mood;
-        sceneType = sceneData.scene_type;
-        const { data: chapterData } = await supabase
-          .from("book_chapters").select("book_id").eq("id", sceneData.chapter_id).single();
-        if (chapterData) {
-          const { data: chars } = await supabase
-            .from("book_characters")
-            .select("name, voice_config, aliases")
-            .eq("book_id", chapterData.book_id);
-          if (chars) {
-            for (const c of chars) {
-              const vc = (c.voice_config || {}) as Record<string, unknown>;
-              voiceConfigMap.set(c.name.toLowerCase(), vc);
-              for (const alias of (c.aliases ?? [])) {
-                if (alias) voiceConfigMap.set(alias.toLowerCase(), vc);
-              }
-            }
-          }
-        }
-      }
+      // No DB fallback — OPFS is the sole source of truth (Contract K3)
+      console.error("No voice_configs from client — cannot synthesize without OPFS data");
+      return new Response(JSON.stringify({ error: "voice_configs required — send character configs from OPFS" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const yandexTtsUrl = `${supabaseUrl}/functions/v1/yandex-tts`;
