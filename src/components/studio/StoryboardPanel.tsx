@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { upsertAudioEntry, writeAudioMeta, recalcPositions, type LocalAudioEntry } from "@/lib/localAudioMeta";
+import { removeStemCacheEntries } from "@/lib/stemCache";
 
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
@@ -283,6 +284,14 @@ export function StoryboardPanel({
     }
     setAudioStatus(map);
     persist(buildSnapshot(undefined, map));
+
+    // Invalidate stem cache for re-synthesized segments so timeline fetches fresh audio
+    const cachePaths = Object.values(opfsEntries)
+      .filter(e => e.audioPath)
+      .map(e => e.audioPath);
+    if (cachePaths.length > 0) {
+      removeStemCacheEntries(cachePaths).catch(() => {});
+    }
 
     // Persist to OPFS audio_meta.json and recalc positions
     if (storage && sceneId && Object.keys(opfsEntries).length > 0) {
