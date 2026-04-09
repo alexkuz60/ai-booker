@@ -747,18 +747,11 @@ Deno.serve(async (req) => {
     let sceneType: string | null = null;
 
     if (clientVoiceConfigs && typeof clientVoiceConfigs === "object") {
-      // Client sent voice_configs from OPFS — use directly (П1: OPFS is source of truth)
+      // Client sent voice_configs from OPFS — use directly (К4: OPFS is source of truth)
       for (const [key, vc] of Object.entries(clientVoiceConfigs)) {
         voiceConfigMap.set(key.toLowerCase(), vc as Record<string, unknown>);
       }
       console.log(`Using ${voiceConfigMap.size} voice configs from client (OPFS)`);
-      // Still need scene mood/type from DB (lightweight metadata)
-      const { data: sceneData } = await supabase
-        .from("book_scenes").select("mood, scene_type").eq("id", scene_id).single();
-      if (sceneData) {
-        sceneMood = sceneData.mood;
-        sceneType = sceneData.scene_type;
-      }
     } else {
       // No DB fallback — OPFS is the sole source of truth (Contract K3)
       console.error("No voice_configs from client — cannot synthesize without OPFS data");
@@ -767,6 +760,14 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // 🚫 К3: Scene mood/scene_type from client (OPFS), NOT from DB
+    if (clientSceneMeta && typeof clientSceneMeta === "object") {
+      sceneMood = clientSceneMeta.mood ?? null;
+      sceneType = clientSceneMeta.scene_type ?? null;
+    }
+
+    const segIds = segments.map((s: any) => s.id);
 
     const yandexTtsUrl = `${supabaseUrl}/functions/v1/yandex-tts`;
     const saluteSpeechTtsUrl = `${supabaseUrl}/functions/v1/salutespeech-tts`;
@@ -786,25 +787,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Load existing audio records for cache comparison ─────────────
-    const { data: existingAudio } = await supabase
-      .from("segment_audio")
-      .select("segment_id, audio_path, duration_ms, status, voice_config")
-      .in("segment_id", segIds)
-      .eq("status", "ready");
-
+    // No DB cache for segment_audio — client handles caching in OPFS audio_meta.json
     const existingAudioMap = new Map<string, {
       audio_path: string;
       duration_ms: number;
       voice_config: Record<string, unknown>;
     }>();
-    for (const a of existingAudio ?? []) {
-      existingAudioMap.set(a.segment_id, {
-        audio_path: a.audio_path,
-        duration_ms: a.duration_ms,
-        voice_config: (a.voice_config ?? {}) as Record<string, unknown>,
-      });
-    }
 
     /** Fast FNV-1a 32-bit hash for text comparison */
     function hashText(s: string): string {
