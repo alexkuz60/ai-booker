@@ -859,13 +859,13 @@ Deno.serve(async (req) => {
           segment_id: seg.id,
           status: cached ? "ready" : "skipped",
           duration_ms: cached?.duration_ms ?? 0,
-          audio_path: cached?.audio_path ?? "",
+          
         });
         continue;
       }
 
       if (!text.trim()) {
-        results.push({ segment_id: seg.id, status: "skipped", duration_ms: 0, audio_path: "" });
+        results.push({ segment_id: seg.id, status: "skipped", duration_ms: 0 });
         continue;
       }
 
@@ -915,7 +915,7 @@ Deno.serve(async (req) => {
           segment_id: seg.id,
           status: "ready",
           duration_ms: cached.duration_ms,
-          audio_path: cached.audio_path,
+          
           inline_narrations: (metadata.inline_narrations_audio as InlineNarrationResult[] | undefined) ?? undefined,
         });
         cachedCount++;
@@ -1027,7 +1027,7 @@ Deno.serve(async (req) => {
                 lang: langCode,
               });
               if ("error" in fallbackResult) {
-                results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: fallbackResult.error });
+                results.push({ segment_id: seg.id, status: "error", duration_ms: 0, error: fallbackResult.error });
                 continue;
               }
               dialogueAudio = fallbackResult.audio;
@@ -1048,7 +1048,7 @@ Deno.serve(async (req) => {
               lang: langCode,
             });
             if ("error" in plainResult) {
-              results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: plainResult.error });
+              results.push({ segment_id: seg.id, status: "error", duration_ms: 0, error: plainResult.error });
               continue;
             }
             dialogueAudio = plainResult.audio;
@@ -1141,7 +1141,7 @@ Deno.serve(async (req) => {
           }
 
           if ("error" in result) {
-            results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: result.error });
+            results.push({ segment_id: seg.id, status: "error", duration_ms: 0, error: result.error });
             continue;
           }
           dialogueAudio = result.audio;
@@ -1151,7 +1151,7 @@ Deno.serve(async (req) => {
         // Validate audio is not empty
         if (!dialogueAudio || dialogueAudio.length === 0) {
           console.error(`Empty audio returned for segment ${seg.id} (voice=${voiceConfig.voice})`);
-          results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: "Empty audio returned from TTS" });
+          results.push({ segment_id: seg.id, status: "error", duration_ms: 0, error: "Empty audio returned from TTS" });
           continue;
         }
 
@@ -1204,7 +1204,7 @@ Deno.serve(async (req) => {
       segment_number: segments[idx].segment_number,
       speaker: segments[idx].speaker,
       segment_type: segments[idx].segment_type,
-      audio_path: r.audio_path || null,
+      
       duration_ms: r.duration_ms,
       status: r.status,
       inline_narrations: r.inline_narrations || null,
