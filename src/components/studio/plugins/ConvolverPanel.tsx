@@ -1,6 +1,6 @@
 /**
  * ConvolverPanel — IR catalog selector + waveform visualization + dry/wet + filter controls.
- * Uses pre-computed peaks from DB for instant waveform + stemCache for audio caching.
+ * Uses pre-computed peaks from DB for instant waveform display.
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
