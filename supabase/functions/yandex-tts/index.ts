@@ -318,6 +318,16 @@ async function synthesizeV3(
   return { audio: new Uint8Array(wavData), contentType: "audio/wav" };
 }
 
+// ─── Error helper ─────────────────────────────────────────────────
+
+class YandexTtsError extends Error {
+  status: number;
+  constructor(status: number, detail: string) {
+    super(detail);
+    this.status = status;
+  }
+}
+
 function errorMessage(status: number, isRu: boolean): string {
   const msgs: Record<number, { ru: string; en: string }> = {
     401: { ru: "Yandex SpeechKit: ошибка авторизации.", en: "Yandex SpeechKit: auth error." },
