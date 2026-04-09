@@ -49,19 +49,20 @@ const voiceRolesMap: Record<string, string[]> = {
   anton: ["neutral", "good"],
 };
 
-function randomVoiceConfig() {
-  const voices = Object.keys(voiceRolesMap);
-  const voice = voices[Math.floor(Math.random() * voices.length)];
-  const roles = voiceRolesMap[voice];
-  const role = roles[Math.floor(Math.random() * roles.length)];
-  const speed = Math.round((0.9 + Math.random() * 0.3) * 100) / 100;
-  const pitchShift = Math.floor(Math.random() * 400) - 200;
-  return { voice, role, speed, pitchShift, volume: undefined as number | undefined, provider: "yandex" as string };
+/** Validate that a role is supported by the given voice; fallback to "neutral" */
+function validateRole(voice: string, role?: string): string | undefined {
+  if (!role) return undefined;
+  const supported = voiceRolesMap[voice];
+  if (!supported) return role; // non-Yandex voice — pass through
+  if (supported.includes(role)) return role;
+  console.warn(`Role "${role}" not supported for voice "${voice}" (supported: ${supported.join(",")}). Falling back to "neutral".`);
+  return "neutral";
 }
 
 function resolveVoice(
   speaker: string | null,
-  voiceConfigMap: Map<string, Record<string, unknown>>
+  voiceConfigMap: Map<string, Record<string, unknown>>,
+  narratorFallback: { voice: string; role?: string; speed: number; pitchShift?: number; volume?: number; provider?: string }
 ) {
   const vc = speaker
     ? voiceConfigMap.get(speaker.toLowerCase()) ?? {}
@@ -69,10 +70,11 @@ function resolveVoice(
 
   if ((vc as Record<string, unknown>).voice || (vc as Record<string, unknown>).voice_id) {
     const provider = ((vc as Record<string, unknown>).provider as string) || "yandex";
+    const voice = ((vc as Record<string, unknown>).voice as string) || ((vc as Record<string, unknown>).voice_id as string);
     return {
       provider,
-      voice: ((vc as Record<string, unknown>).voice as string) || ((vc as Record<string, unknown>).voice_id as string),
-      role: (vc as Record<string, unknown>).role as string | undefined,
+      voice,
+      role: validateRole(voice, (vc as Record<string, unknown>).role as string | undefined),
       speed: ((vc as Record<string, unknown>).speed as number) || 1.0,
       pitchShift: (vc as Record<string, unknown>).pitchShift as number | undefined,
       volume: (vc as Record<string, unknown>).volume as number | undefined,
@@ -80,7 +82,18 @@ function resolveVoice(
       instructions: (vc as Record<string, unknown>).instructions as string | undefined,
     };
   }
-  return randomVoiceConfig();
+  // No voice configured — use narrator voice as fallback (no random!)
+  console.warn(`No voice config for speaker "${speaker}" — using narrator fallback (${narratorFallback.voice})`);
+  return {
+    provider: narratorFallback.provider ?? "yandex",
+    voice: narratorFallback.voice,
+    role: validateRole(narratorFallback.voice, narratorFallback.role),
+    speed: narratorFallback.speed,
+    pitchShift: narratorFallback.pitchShift,
+    volume: narratorFallback.volume,
+    model: undefined as string | undefined,
+    instructions: undefined as string | undefined,
+  };
 }
 
 // ── MP3 duration parser ──────────────────────────────────────────────
@@ -557,16 +570,18 @@ function getNarratorVoice(
   // Fall back to narrator character voice
   const narratorVc = voiceConfigMap.get("narrator") ?? voiceConfigMap.get("рассказчик");
   if (narratorVc && (narratorVc as Record<string, unknown>).voice) {
+    const voice = (narratorVc as Record<string, unknown>).voice as string;
     return {
-      voice: (narratorVc as Record<string, unknown>).voice as string,
-      role: (narratorVc as Record<string, unknown>).role as string | undefined,
+      voice,
+      role: validateRole(voice, (narratorVc as Record<string, unknown>).role as string | undefined),
       speed: ((narratorVc as Record<string, unknown>).speed as number) || 1.0,
       pitchShift: (narratorVc as Record<string, unknown>).pitchShift as number | undefined,
       volume: (narratorVc as Record<string, unknown>).volume as number | undefined,
+      provider: ((narratorVc as Record<string, unknown>).provider as string) || "yandex",
     };
   }
-  // Default narrator voice
-  return { voice: "alena", role: "neutral", speed: 1.0, pitchShift: undefined, volume: undefined };
+  // Default narrator voice — zahar (male, neutral)
+  return { voice: "zahar", role: "neutral", speed: 1.0, pitchShift: undefined, volume: undefined, provider: "yandex" };
 }
 
 // ── Main handler ─────────────────────────────────────────────────────
