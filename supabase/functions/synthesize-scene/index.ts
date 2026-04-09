@@ -26,7 +26,8 @@ interface SegmentResult {
   segment_id: string;
   status: string;
   duration_ms: number;
-  audio_base64?: string;   // base64-encoded WAV data (present when status=ready)
+  audio_base64?: string;
+  voice_config?: Record<string, unknown>;
   error?: string;
   inline_narrations?: InlineNarrationResult[];
 }
