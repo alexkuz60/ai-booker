@@ -477,6 +477,22 @@ export function ChapterNavigator({
       done++;
       setBookResynthProgress(`${done}/${affectedScenes.length}`);
       try {
+        // 🚫 К3: Read storyboard from OPFS and send segments directly
+        const storyboard = await readStoryboardFromLocal(projectStorage, sceneId);
+        const synthSegments = (storyboard?.segments ?? []).map(seg => ({
+          segment_id: seg.segment_id,
+          segment_number: seg.segment_number,
+          segment_type: seg.segment_type,
+          speaker: seg.speaker,
+          metadata: (seg as any).metadata ?? {},
+          phrases: seg.phrases.map(p => ({
+            phrase_id: p.phrase_id,
+            text: p.text,
+            annotations: p.annotations ?? [],
+          })),
+        }));
+        if (synthSegments.length === 0) { errors++; continue; }
+
         // Only re-synth stale segment_ids within each scene
         const staleSegIds = staleReport.staleSegments
           .filter(s => s.sceneId === sceneId)
@@ -489,6 +505,7 @@ export function ChapterNavigator({
             force: true,
             segment_ids: staleSegIds,
             voice_configs,
+            segments: synthSegments,
           },
         });
         if (error) {
