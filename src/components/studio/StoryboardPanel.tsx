@@ -1031,8 +1031,9 @@ export function StoryboardPanel({
       const reader = resp.body!.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let segmentResult: { segment_id: string; status: string; duration_ms: number; audio_base64?: string; voice_config?: Record<string, unknown>; error?: string; inline_narrations?: any[] } | null = null;
+      let segmentResult: { segment_id: string; status: string; duration_ms: number; audio_base64?: string; voice_config?: Record<string, unknown>; error?: string; inline_narrations?: any[]; phrase_results?: any[] } | null = null;
       const allResults: typeof segmentResult[] = [];
+      const streamedPhrases = new Map<string, Array<{ phrase_index: number; audio_base64: string; duration_ms: number }>>();
 
       while (true) {
         const { done, value } = await reader.read();
@@ -1043,7 +1044,20 @@ export function StoryboardPanel({
           if (!line.trim()) continue;
           try {
             const obj = JSON.parse(line);
-            if (!obj._summary) {
+            if (obj._summary) continue;
+            if (obj._phrase_group_start) {
+              streamedPhrases.set(obj.segment_id, []);
+            } else if (obj._phrase) {
+              const phrases = streamedPhrases.get(obj.segment_id) ?? [];
+              phrases.push({ phrase_index: obj.phrase_index, audio_base64: obj.audio_base64, duration_ms: obj.duration_ms });
+              streamedPhrases.set(obj.segment_id, phrases);
+            } else {
+              // Attach collected phrases if any
+              const collectedPhrases = streamedPhrases.get(obj.segment_id);
+              if (collectedPhrases && collectedPhrases.length > 0 && obj.status === "ready" && !obj.audio_base64) {
+                obj.phrase_results = collectedPhrases;
+                streamedPhrases.delete(obj.segment_id);
+              }
               allResults.push(obj);
               if (obj.segment_id === segmentId) segmentResult = obj;
             }
