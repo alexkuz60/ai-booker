@@ -311,9 +311,12 @@ export function StoryboardPanel({
     setAudioStatus(map);
     persist(buildSnapshot(undefined, map));
 
-    // Persist to OPFS audio_meta.json and recalc positions
+    // Merge into existing audio_meta.json (don't overwrite!) and recalc positions
     if (Object.keys(opfsEntries).length > 0) {
-      await writeAudioMeta(storage, sceneId, opfsEntries, chapterId ?? undefined);
+      const { readAudioMeta: readMeta } = await import("@/lib/localAudioMeta");
+      const existing = await readMeta(storage, sceneId, chapterId ?? undefined);
+      const merged = { ...(existing?.entries ?? {}), ...opfsEntries };
+      await writeAudioMeta(storage, sceneId, merged, chapterId ?? undefined, existing?.silenceSec);
       await recalcPositions(storage, sceneId, chapterId ?? undefined);
     }
   }, [storage, sceneId, chapterId, persist, buildSnapshot]);
