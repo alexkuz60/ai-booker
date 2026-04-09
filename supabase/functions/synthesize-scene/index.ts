@@ -190,7 +190,7 @@ async function callProxyApiTts(
     model: params.model || "gpt-4o-mini-tts",
     input: params.text,
     voice: params.voice,
-    response_format: "mp3",
+    response_format: "wav",
     speed: params.speed ?? 1.0,
   };
   if (params.instructions && (params.model === "gpt-4o-mini-tts" || !params.model)) {
@@ -213,7 +213,7 @@ async function callProxyApiTts(
 
   const audioBuffer = await resp.arrayBuffer();
   const audio = new Uint8Array(audioBuffer);
-  const durationMs = parseMp3Duration(audio);
+  const durationMs = parseWavDurationMs(audio);
   return { audio, durationMs };
 }
 
