@@ -1,12 +1,12 @@
 /**
  * localAudioProvider — reads audio from OPFS and provides it to Tone.js / AudioEngine.
  *
- * Replaces the legacy flow of:
- *   supabase.storage.createSignedUrl() → fetch → stemCache → AudioEngine
- * with:
- *   OPFS.readBlob() → BlobURL or ArrayBuffer → AudioEngine
+ * Two storage domains:
+ * 1. Project OPFS (TTS clips, renders): read via ProjectStorage
+ * 2. Global OPFS cache (atmo-cache/): read via audioAssetCache
  *
- * All audio (TTS, atmosphere, renders) is stored locally in the project OPFS.
+ * Paths starting with "atmo-cache/" are routed to the global cache.
+ * All other paths go through ProjectStorage.
  */
 
 import type { ProjectStorage } from "@/lib/projectStorage";
@@ -15,15 +15,24 @@ import type { ProjectStorage } from "@/lib/projectStorage";
 
 const blobUrlCache = new Map<string, string>();
 
+/** Check if path belongs to global atmo cache */
+function isGlobalCachePath(path: string): boolean {
+  return path.startsWith("atmo-cache/");
+}
+
 /**
  * Get an audio ArrayBuffer directly from OPFS.
- * Returns null if the file doesn't exist.
+ * Routes to global cache or project storage based on path prefix.
  */
 export async function getAudioBuffer(
   storage: ProjectStorage,
   opfsPath: string,
 ): Promise<ArrayBuffer | null> {
   try {
+    if (isGlobalCachePath(opfsPath)) {
+      const { readAtmosphereAudio } = await import("@/lib/audioAssetCache");
+      return await readAtmosphereAudio(opfsPath);
+    }
     const blob = await storage.readBlob(opfsPath);
     if (!blob) return null;
     return await blob.arrayBuffer();
@@ -45,9 +54,16 @@ export async function getAudioBlobUrl(
   if (cached) return cached;
 
   try {
-    const blob = await storage.readBlob(opfsPath);
-    if (!blob) return null;
+    let blob: Blob | null = null;
 
+    if (isGlobalCachePath(opfsPath)) {
+      const { readAtmosphereBlob } = await import("@/lib/audioAssetCache");
+      blob = await readAtmosphereBlob(opfsPath);
+    } else {
+      blob = await storage.readBlob(opfsPath);
+    }
+
+    if (!blob) return null;
     const url = URL.createObjectURL(blob);
     blobUrlCache.set(opfsPath, url);
     return url;
@@ -85,6 +101,10 @@ export async function hasAudioFile(
   opfsPath: string,
 ): Promise<boolean> {
   try {
+    if (isGlobalCachePath(opfsPath)) {
+      const { hasAtmosphereAudio } = await import("@/lib/audioAssetCache");
+      return await hasAtmosphereAudio(opfsPath);
+    }
     return await storage.exists(opfsPath);
   } catch {
     return false;
@@ -99,6 +119,10 @@ export async function getAudioBlob(
   opfsPath: string,
 ): Promise<Blob | null> {
   try {
+    if (isGlobalCachePath(opfsPath)) {
+      const { readAtmosphereBlob } = await import("@/lib/audioAssetCache");
+      return await readAtmosphereBlob(opfsPath);
+    }
     return await storage.readBlob(opfsPath);
   } catch {
     return null;
