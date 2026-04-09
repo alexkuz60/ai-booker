@@ -825,10 +825,16 @@ export function StoryboardPanel({
 
   const runSynthesis = useCallback(async () => {
     if (!sceneId || segments.length === 0) return;
-    const allIds = new Set(segments.map(s => s.segment_id));
+    // If some segments are checked — synthesize only those; otherwise all
+    const targetSegments = mergeChecked.size > 0
+      ? segments.filter(s => mergeChecked.has(s.segment_id))
+      : segments;
+    if (targetSegments.length === 0) return;
+
+    const targetIds = new Set(targetSegments.map(s => s.segment_id));
     setSynthesizing(true);
-    setCurrentlySynthesizingIds(allIds);
-    onSynthesizingChange?.(allIds);
+    setCurrentlySynthesizingIds(targetIds);
+    onSynthesizingChange?.(targetIds);
     onErrorSegmentsChange?.(new Set());
     setSynthProgress(isRu ? "Синхронизация с сервером…" : "Syncing to server…");
     try {
@@ -846,6 +852,12 @@ export function StoryboardPanel({
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+      const requestBody: Record<string, unknown> = { scene_id: sceneId, language: isRu ? "ru" : "en", voice_configs };
+      // Pass segment_ids filter only when subset is selected
+      if (mergeChecked.size > 0) {
+        requestBody.segment_ids = [...targetIds];
+      }
+
       const resp = await fetch(`${supabaseUrl}/functions/v1/synthesize-scene`, {
         method: "POST",
         headers: {
@@ -853,7 +865,7 @@ export function StoryboardPanel({
           Authorization: `Bearer ${token}`,
           apikey: anonKey,
         },
-        body: JSON.stringify({ scene_id: sceneId, language: isRu ? "ru" : "en", voice_configs }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!resp.ok) {
