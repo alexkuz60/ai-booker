@@ -564,340 +564,369 @@ const Narrators = () => {
   } : null;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex h-[calc(100vh-3rem)] min-h-0 overflow-hidden">
-      {/* Column 1: Character list (20%) */}
-      <div className="border-r border-border flex flex-col" style={{ width: '20%', minWidth: 0 }}>
-        <div className="px-4 py-2.5 border-b border-border flex items-center gap-2 shrink-0">
-          <TheaterMasks className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider">
-            {isRu ? "Персонажи" : "Characters"}
-          </h3>
-        </div>
-        <ScrollArea className="flex-1">
-          {loading ? (
-            <div className="p-4 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : characters.length === 0 ? (
-            <div className="p-4 text-center text-xs text-muted-foreground">
-              {isRu ? "Нет персонажей" : "No characters"}
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex h-[calc(100vh-3rem)] min-h-0 overflow-hidden w-full">
+      <ResizablePanelGroup
+        direction="horizontal"
+        autoSaveId="narrators-panels"
+        className="h-full"
+      >
+        {/* Column 1: Character list */}
+        <ResizablePanel defaultSize={22} minSize={15} maxSize={35}>
+          <div className="flex flex-col h-full border-r border-border">
+            <div className="px-4 py-2.5 border-b border-border flex items-center gap-2 shrink-0">
+              <TheaterMasks className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-xs font-semibold font-display text-muted-foreground uppercase tracking-wider">
+                {isRu ? "Персонажи" : "Characters"}
+              </h3>
             </div>
-          ) : (
-            <div className="p-1 space-y-0.5">
-              {characters.map(ch => {
-                const isSelected = selectedId === ch.id;
-                const hasProfile = !!ch.description;
-                const isProfileOpen = profileViewId === ch.id;
-                return (
-                  <div
-                    key={ch.id}
-                    className={cn(
-                      "w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1.5 group cursor-pointer",
-                      isSelected
-                        ? "bg-accent/15 text-accent-foreground"
-                        : "text-muted-foreground hover:bg-muted/50"
-                    )}
-                    onClick={() => {
-                      const newId = isSelected ? null : ch.id;
-                      setSelectedId(newId);
-                      setProfileViewId(newId);
-                    }}
-                  >
-                    <span className="truncate font-medium flex-1 text-xs">{ch.name}</span>
-                    {ch.gender !== "unknown" && (
-                      <span className="text-[10px] text-muted-foreground/60">
-                        {ch.gender === "female" ? "♀" : "♂"}
-                      </span>
-                    )}
-                    {/* Profile indicator */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className={cn(
-                          "shrink-0 p-0.5",
-                          hasProfile ? "text-primary/50" : "text-muted-foreground/25"
-                        )}>
-                          {hasProfile
-                            ? <Brain className="h-3 w-3" />
-                            : <CircleHelp className="h-3 w-3" />}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="text-xs">
-                        {hasProfile
-                          ? (isRu ? "Профайл создан" : "Profile available")
-                          : (isRu ? "Нет профайла" : "No profile")}
-                      </TooltipContent>
-                    </Tooltip>
-                    {(ch.voice_config as any)?.voice_id && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Quick preview: select this char and trigger preview
-                              setSelectedId(ch.id);
-                              setTimeout(() => {
-                                const previewBtn = document.querySelector('[data-preview-btn]') as HTMLButtonElement | null;
-                                previewBtn?.click();
-                              }, 100);
-                            }}
-                            className="shrink-0 p-0.5 rounded transition-colors text-primary/60 hover:text-primary"
-                          >
-                            <Volume2 className="h-3 w-3" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="text-xs">
-                          {isRu ? "Прослушать" : "Preview"}
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </ScrollArea>
-      </div>
-
-      {/* Column 2: Profile (always visible, 30%) */}
-      <div className="border-r border-border bg-muted/10" style={{ width: '30%', minWidth: 0 }}>
-        {profileData ? (
-          <CharacterProfileColumn
-            character={profileData}
-            isRu={isRu}
-            onClose={() => setProfileViewId(null)}
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
-            <div className="text-center space-y-2 p-4">
-              <Brain className="h-8 w-8 mx-auto text-muted-foreground/30" />
-              <p className="text-xs">{isRu ? "Выберите персонажа для просмотра профайла" : "Select a character to view profile"}</p>
-            </div>
+            <ScrollArea className="flex-1">
+              {loading ? (
+                <div className="p-4 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+              ) : characters.length === 0 ? (
+                <div className="p-4 text-center text-xs text-muted-foreground">
+                  {isRu ? "Нет персонажей" : "No characters"}
+                </div>
+              ) : (
+                <div className="p-1 space-y-0.5">
+                  {characters.map(ch => {
+                    const isSelected = selectedId === ch.id;
+                    const hasProfile = !!ch.description;
+                    const vc = ch.voice_config;
+                    const provider = (vc?.provider as string) || "";
+                    const voiceId = (vc?.voice_id as string) || "";
+                    const hasVoice = !!voiceId;
+                    return (
+                      <div
+                        key={ch.id}
+                        className={cn(
+                          "w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors cursor-pointer",
+                          isSelected
+                            ? "bg-accent/15 text-accent-foreground"
+                            : "text-muted-foreground hover:bg-muted/50"
+                        )}
+                        onClick={() => {
+                          const newId = isSelected ? null : ch.id;
+                          setSelectedId(newId);
+                          setProfileViewId(newId);
+                        }}
+                      >
+                        <div className="flex items-center gap-1.5 group">
+                          <span className="truncate font-medium flex-1 text-xs">{ch.name}</span>
+                          {ch.gender !== "unknown" && (
+                            <span className="text-[10px] text-muted-foreground/60">
+                              {ch.gender === "female" ? "♀" : "♂"}
+                            </span>
+                          )}
+                          {/* Profile indicator */}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className={cn(
+                                "shrink-0 p-0.5",
+                                hasProfile ? "text-primary/50" : "text-muted-foreground/25"
+                              )}>
+                                {hasProfile
+                                  ? <Brain className="h-3 w-3" />
+                                  : <CircleHelp className="h-3 w-3" />}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="text-xs">
+                              {hasProfile
+                                ? (isRu ? "Профайл создан" : "Profile available")
+                                : (isRu ? "Нет профайла" : "No profile")}
+                            </TooltipContent>
+                          </Tooltip>
+                          {hasVoice && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedId(ch.id);
+                                    setTimeout(() => {
+                                      const previewBtn = document.querySelector('[data-preview-btn]') as HTMLButtonElement | null;
+                                      previewBtn?.click();
+                                    }, 100);
+                                  }}
+                                  className="shrink-0 p-0.5 rounded transition-colors text-primary/60 hover:text-primary"
+                                >
+                                  <Volume2 className="h-3 w-3" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="right" className="text-xs">
+                                {isRu ? "Прослушать" : "Preview"}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                        {/* Voice info line */}
+                        {hasVoice && (
+                          <div className="flex items-center gap-1.5 mt-0.5 ml-0.5">
+                            <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5 leading-none">
+                              {PROVIDER_LABELS[provider] ?? provider}
+                            </Badge>
+                            <span className="text-[10px] text-muted-foreground/70 truncate">
+                              {getVoiceDisplayName(provider, voiceId, isRu)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </ScrollArea>
           </div>
-        )}
-      </div>
+        </ResizablePanel>
 
-      {/* Column 3: Voice editor (50%) */}
-      <div className="min-w-0" style={{ width: '50%' }}>
-        <ScrollArea className="h-full">
-          <div className="p-6 max-w-2xl space-y-6">
-            {selectedChar ? (
-              <>
-                {/* Header: Name + current voice label */}
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h2 className="text-lg font-display font-semibold text-foreground">{selectedChar.name}</h2>
-                  {selectedChar.gender !== "unknown" && (
-                    <Badge variant="outline" className="text-xs">
-                      {selectedChar.gender === "female" ? "♀" : "♂"}
-                    </Badge>
-                  )}
-                  {currentVoiceLabel && (
-                    <Badge variant="secondary" className="text-xs font-mono">
-                      {currentVoiceLabel}
-                    </Badge>
-                  )}
-                </div>
+        <ResizableHandle withHandle />
 
-                <Tabs value={voiceProvider} onValueChange={v => { setVoiceProvider(v as typeof voiceProvider); markDirty(); }}>
-                  <TabsList className="w-full">
-                    <TabsTrigger value="yandex" className="flex-1 text-xs">Yandex</TabsTrigger>
-                    <TabsTrigger value="salutespeech" className="flex-1 text-xs">Salute</TabsTrigger>
-                    <TabsTrigger value="elevenlabs" className="flex-1 text-xs">ElevenLabs</TabsTrigger>
-                    <TabsTrigger value="proxyapi" className="flex-1 text-xs">OpenAI</TabsTrigger>
-                  </TabsList>
-
-                  {/* ─── Yandex ─── */}
-                  <TabsContent value="yandex" className="space-y-4 mt-4">
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Голос" : "Voice"}</label>
-                      <Select value={voice} onValueChange={handleVoiceChange}>
-                        <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
-                        <SelectContent className="bg-card border-border">
-                          {YANDEX_VOICES.map(v => (
-                            <SelectItem key={v.id} value={v.id}>
-                              <div className="flex items-center gap-2">
-                                <span>{isRu ? v.name.ru : v.name.en}</span>
-                                <Badge variant="outline" className="text-[10px] px-1 py-0">{v.gender === "female" ? "♀" : "♂"}</Badge>
-                                {v.apiVersion === "v3" && <Badge variant="secondary" className="text-[10px] px-1 py-0">v3</Badge>}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {availableRoles.length > 1 && (
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Амплуа" : "Role"}</label>
-                        <Select value={role} onValueChange={v => { setRole(v); markDirty(); }}>
-                          <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
-                          <SelectContent className="bg-card border-border">
-                            {availableRoles.map(r => (
-                              <SelectItem key={r} value={r}>{ROLE_LABELS[r]?.[isRu ? "ru" : "en"] ?? r}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                    <SliderField label={isRu ? "Скорость" : "Speed"} value={speed} min={0.3} max={2.0} step={0.1} suffix="×" default_={1.0} onChange={v => { setSpeed(v); markDirty(); }} onReset={() => { setSpeed(1.0); markDirty(); }} />
-                    <SliderField label={isRu ? "Тон (pitch)" : "Pitch"} value={pitch} min={-500} max={500} step={50} suffix=" Hz" default_={0} showSign onChange={v => { setPitch(v); markDirty(); }} onReset={() => { setPitch(0); markDirty(); }} />
-                    <SliderField label={isRu ? "Громкость" : "Volume"} value={volume} min={-15} max={15} step={1} suffix=" dB" default_={0} showSign onChange={v => { setVolume(v); markDirty(); }} onReset={() => { setVolume(0); markDirty(); }} />
-                  </TabsContent>
-
-                  {/* ─── SaluteSpeech ─── */}
-                  <TabsContent value="salutespeech" className="space-y-4 mt-4">
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Голос" : "Voice"}</label>
-                      <Select value={ssVoice} onValueChange={v => { setSsVoice(v); markDirty(); }}>
-                        <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
-                        <SelectContent className="bg-card border-border max-h-64">
-                          {SALUTESPEECH_VOICES.map(v => (
-                            <SelectItem key={v.id} value={v.id}>
-                              <div className="flex items-center gap-2">
-                                <span>{isRu ? v.name.ru : v.name.en}</span>
-                                <Badge variant="outline" className="text-[10px] px-1 py-0">{v.gender === "female" ? "♀" : "♂"}</Badge>
-                                <span className="text-[10px] text-muted-foreground">{isRu ? v.description.ru : v.description.en}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <SliderField label={isRu ? "Скорость" : "Speed"} value={ssSpeed} min={0.5} max={2.0} step={0.1} suffix="×" default_={1.0} onChange={v => { setSsSpeed(v); markDirty(); }} onReset={() => { setSsSpeed(1.0); markDirty(); }} />
-                    <div className="rounded-md border border-border bg-muted/30 p-2.5">
-                      <p className="text-[10px] text-muted-foreground">
-                        {isRu ? "🇷🇺 SaluteSpeech (Сбер) — бесплатный для физлиц. Поддержка SSML, 6 голосов, формат Opus/WAV." : "🇷🇺 SaluteSpeech (Sber) — free for individuals. SSML support, 6 voices, Opus/WAV format."}
-                      </p>
-                    </div>
-                  </TabsContent>
-
-                  {/* ─── ElevenLabs ─── */}
-                  <TabsContent value="elevenlabs" className="space-y-4 mt-4">
-                    {elCredits && (
-                      <div className="rounded-md border border-border bg-muted/30 p-2.5">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">{isRu ? "Кредиты" : "Credits"}: <span className="font-semibold text-foreground capitalize">{elCredits.tier}</span></span>
-                          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={loadElCredits} disabled={elCreditsLoading}>
-                            <RotateCcw className={`h-3 w-3 ${elCreditsLoading ? "animate-spin" : ""}`} />
-                          </Button>
-                        </div>
-                        <div className="mt-1.5">
-                          <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
-                            <span>{elCredits.used.toLocaleString()} / {elCredits.limit.toLocaleString()}</span>
-                            <span>{Math.round((elCredits.used / elCredits.limit) * 100)}%</span>
-                          </div>
-                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, (elCredits.used / elCredits.limit) * 100)}%` }} />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Голос" : "Voice"}</label>
-                      <Select value={elVoice} onValueChange={v => { setElVoice(v); markDirty(); }}>
-                        <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
-                        <SelectContent className="bg-card border-border max-h-64">
-                          {ELEVENLABS_VOICES.map(v => (
-                            <SelectItem key={v.id} value={v.id}>
-                              <div className="flex items-center gap-2">
-                                <span>{v.name}</span>
-                                <Badge variant="outline" className="text-[10px] px-1 py-0">{v.gender === "female" ? "♀" : "♂"}</Badge>
-                                <span className="text-[10px] text-muted-foreground">{isRu ? v.description.ru : v.description.en}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <SliderField label={isRu ? "Стабильность" : "Stability"} value={elStability} min={0} max={1} step={0.05} suffix="%" multiplier={100} default_={0.5} onChange={v => { setElStability(v); markDirty(); }} onReset={() => { setElStability(0.5); markDirty(); }} />
-                    <SliderField label={isRu ? "Схожесть" : "Similarity"} value={elSimilarity} min={0} max={1} step={0.05} suffix="%" multiplier={100} default_={0.75} onChange={v => { setElSimilarity(v); markDirty(); }} onReset={() => { setElSimilarity(0.75); markDirty(); }} />
-                    <SliderField label={isRu ? "Стиль" : "Style"} value={elStyle} min={0} max={1} step={0.05} suffix="%" multiplier={100} default_={0.4} onChange={v => { setElStyle(v); markDirty(); }} onReset={() => { setElStyle(0.4); markDirty(); }} />
-                    <SliderField label={isRu ? "Скорость" : "Speed"} value={elSpeed} min={0.7} max={1.2} step={0.05} suffix="×" default_={0.95} decimals={2} onChange={v => { setElSpeed(v); markDirty(); }} onReset={() => { setElSpeed(0.95); markDirty(); }} />
-                  </TabsContent>
-
-                  {/* ─── OpenAI / ProxyAPI ─── */}
-                  <TabsContent value="proxyapi" className="space-y-4 mt-4">
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Модель" : "Model"}</label>
-                      <Select value={paModel} onValueChange={v => {
-                        setPaModel(v);
-                        const available = getVoicesForModel(v);
-                        if (!available.some(av => av.id === paVoice)) setPaVoice(available[0]?.id ?? "alloy");
-                        markDirty();
-                      }}>
-                        <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
-                        <SelectContent className="bg-card border-border">
-                          {PROXYAPI_TTS_MODELS.map(m => (
-                            <SelectItem key={m.id} value={m.id}>
-                              <div className="flex items-center gap-2">
-                                <span>{m.name}</span>
-                                <span className="text-[10px] text-muted-foreground">{isRu ? m.description.ru : m.description.en}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Голос" : "Voice"}</label>
-                      <Select value={paVoice} onValueChange={v => { setPaVoice(v); markDirty(); }}>
-                        <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
-                        <SelectContent className="bg-card border-border max-h-64">
-                          {getVoicesForModel(paModel).map(v => (
-                            <SelectItem key={v.id} value={v.id}>
-                              <div className="flex items-center gap-2">
-                                <span>{v.name}</span>
-                                <Badge variant="outline" className="text-[10px] px-1 py-0">{v.gender === "female" ? "♀" : "♂"}</Badge>
-                                <span className="text-[10px] text-muted-foreground">{isRu ? v.description.ru : v.description.en}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <SliderField label={isRu ? "Скорость" : "Speed"} value={paSpeed} min={0.25} max={4.0} step={0.05} suffix="×" default_={1.0} onChange={v => { setPaSpeed(v); markDirty(); }} onReset={() => { setPaSpeed(1.0); markDirty(); }} />
-                    {paModel === "gpt-4o-mini-tts" && (
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Инструкции" : "Instructions"}</label>
-                        <Textarea
-                          value={paInstructions}
-                          onChange={e => { setPaInstructions(e.target.value); markDirty(); }}
-                          placeholder={isRu ? "Говори с радостной интонацией, спокойно и размеренно..." : "Speak with a joyful tone, calmly and steadily..."}
-                          className="min-h-[80px] text-xs bg-secondary border-border resize-y"
-                        />
-                        <p className="text-[10px] text-muted-foreground/60">{isRu ? "Управляйте акцентом, эмоциями, скоростью и тоном речи" : "Control accent, emotion, speed and tone of speech"}</p>
-                      </div>
-                    )}
-                    <div className="rounded-md border border-border bg-muted/30 p-2.5">
-                      <p className="text-[10px] text-muted-foreground">
-                        {isRu ? "⚡ Требуется ключ ProxyAPI в Профиле → API-роутеры." : "⚡ Requires ProxyAPI key in Profile → API Routers."}
-                      </p>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-
-                <Separator />
-
-                <div className="flex gap-2">
-                  <Button data-preview-btn onClick={handlePreview} disabled={testing} variant="outline" className="gap-2">
-                    {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : playing ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                    {playing ? (isRu ? "Стоп" : "Stop") : (isRu ? "Прослушать" : "Preview")}
-                  </Button>
-                  {selectedId && (
-                    <Button onClick={handleSave} disabled={saving || !dirty} className="gap-2">
-                      {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                      {isRu ? "Сохранить" : "Save"}
-                    </Button>
-                  )}
-                </div>
-              </>
+        {/* Column 2: Profile */}
+        <ResizablePanel defaultSize={28} minSize={15} maxSize={45}>
+          <div className="h-full border-r border-border bg-muted/10">
+            {profileData ? (
+              <CharacterProfileColumn
+                character={profileData}
+                isRu={isRu}
+                onClose={() => setProfileViewId(null)}
+              />
             ) : (
-              <div className="flex items-center justify-center h-64 text-muted-foreground">
-                <div className="text-center space-y-2">
-                  <Volume2 className="h-10 w-10 mx-auto text-muted-foreground/30" />
-                  <p className="text-sm">{isRu ? "Выберите персонажа для настройки голоса" : "Select a character to configure voice"}</p>
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                <div className="text-center space-y-2 p-4">
+                  <Brain className="h-8 w-8 mx-auto text-muted-foreground/30" />
+                  <p className="text-xs">{isRu ? "Выберите персонажа для просмотра профайла" : "Select a character to view profile"}</p>
                 </div>
               </div>
             )}
           </div>
-        </ScrollArea>
-      </div>
+        </ResizablePanel>
+
+        <ResizableHandle withHandle />
+
+        {/* Column 3: Voice editor */}
+        <ResizablePanel defaultSize={50} minSize={30}>
+          <ScrollArea className="h-full">
+            <div className="p-6 max-w-2xl space-y-6">
+              {selectedChar ? (
+                <>
+                  {/* Header: Name + current voice label */}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h2 className="text-lg font-display font-semibold text-foreground">{selectedChar.name}</h2>
+                    {selectedChar.gender !== "unknown" && (
+                      <Badge variant="outline" className="text-xs">
+                        {selectedChar.gender === "female" ? "♀" : "♂"}
+                      </Badge>
+                    )}
+                    {currentVoiceLabel && (
+                      <Badge variant="secondary" className="text-xs font-mono">
+                        {currentVoiceLabel}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <Tabs value={voiceProvider} onValueChange={v => { setVoiceProvider(v as typeof voiceProvider); markDirty(); }}>
+                    <TabsList className="w-full">
+                      <TabsTrigger value="yandex" className="flex-1 text-xs">Yandex</TabsTrigger>
+                      <TabsTrigger value="salutespeech" className="flex-1 text-xs">Salute</TabsTrigger>
+                      <TabsTrigger value="elevenlabs" className="flex-1 text-xs">ElevenLabs</TabsTrigger>
+                      <TabsTrigger value="proxyapi" className="flex-1 text-xs">OpenAI</TabsTrigger>
+                    </TabsList>
+
+                    {/* ─── Yandex ─── */}
+                    <TabsContent value="yandex" className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Голос" : "Voice"}</label>
+                        <Select value={voice} onValueChange={handleVoiceChange}>
+                          <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
+                          <SelectContent className="bg-card border-border">
+                            {YANDEX_VOICES.map(v => (
+                              <SelectItem key={v.id} value={v.id}>
+                                <div className="flex items-center gap-2">
+                                  <span>{isRu ? v.name.ru : v.name.en}</span>
+                                  <Badge variant="outline" className="text-[10px] px-1 py-0">{v.gender === "female" ? "♀" : "♂"}</Badge>
+                                  {v.apiVersion === "v3" && <Badge variant="secondary" className="text-[10px] px-1 py-0">v3</Badge>}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {availableRoles.length > 1 && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Амплуа" : "Role"}</label>
+                          <Select value={role} onValueChange={v => { setRole(v); markDirty(); }}>
+                            <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
+                            <SelectContent className="bg-card border-border">
+                              {availableRoles.map(r => (
+                                <SelectItem key={r} value={r}>{ROLE_LABELS[r]?.[isRu ? "ru" : "en"] ?? r}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      <SliderField label={isRu ? "Скорость" : "Speed"} value={speed} min={0.3} max={2.0} step={0.1} suffix="×" default_={1.0} onChange={v => { setSpeed(v); markDirty(); }} onReset={() => { setSpeed(1.0); markDirty(); }} />
+                      <SliderField label={isRu ? "Тон (pitch)" : "Pitch"} value={pitch} min={-500} max={500} step={50} suffix=" Hz" default_={0} showSign onChange={v => { setPitch(v); markDirty(); }} onReset={() => { setPitch(0); markDirty(); }} />
+                      <SliderField label={isRu ? "Громкость" : "Volume"} value={volume} min={-15} max={15} step={1} suffix=" dB" default_={0} showSign onChange={v => { setVolume(v); markDirty(); }} onReset={() => { setVolume(0); markDirty(); }} />
+                    </TabsContent>
+
+                    {/* ─── SaluteSpeech ─── */}
+                    <TabsContent value="salutespeech" className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Голос" : "Voice"}</label>
+                        <Select value={ssVoice} onValueChange={v => { setSsVoice(v); markDirty(); }}>
+                          <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
+                          <SelectContent className="bg-card border-border max-h-64">
+                            {SALUTESPEECH_VOICES.map(v => (
+                              <SelectItem key={v.id} value={v.id}>
+                                <div className="flex items-center gap-2">
+                                  <span>{isRu ? v.name.ru : v.name.en}</span>
+                                  <Badge variant="outline" className="text-[10px] px-1 py-0">{v.gender === "female" ? "♀" : "♂"}</Badge>
+                                  <span className="text-[10px] text-muted-foreground">{isRu ? v.description.ru : v.description.en}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <SliderField label={isRu ? "Скорость" : "Speed"} value={ssSpeed} min={0.5} max={2.0} step={0.1} suffix="×" default_={1.0} onChange={v => { setSsSpeed(v); markDirty(); }} onReset={() => { setSsSpeed(1.0); markDirty(); }} />
+                      <div className="rounded-md border border-border bg-muted/30 p-2.5">
+                        <p className="text-[10px] text-muted-foreground">
+                          {isRu ? "🇷🇺 SaluteSpeech (Сбер) — бесплатный для физлиц. Поддержка SSML, 6 голосов, формат Opus/WAV." : "🇷🇺 SaluteSpeech (Sber) — free for individuals. SSML support, 6 voices, Opus/WAV format."}
+                        </p>
+                      </div>
+                    </TabsContent>
+
+                    {/* ─── ElevenLabs ─── */}
+                    <TabsContent value="elevenlabs" className="space-y-4 mt-4">
+                      {elCredits && (
+                        <div className="rounded-md border border-border bg-muted/30 p-2.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">{isRu ? "Кредиты" : "Credits"}: <span className="font-semibold text-foreground capitalize">{elCredits.tier}</span></span>
+                            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={loadElCredits} disabled={elCreditsLoading}>
+                              <RotateCcw className={`h-3 w-3 ${elCreditsLoading ? "animate-spin" : ""}`} />
+                            </Button>
+                          </div>
+                          <div className="mt-1.5">
+                            <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                              <span>{elCredits.used.toLocaleString()} / {elCredits.limit.toLocaleString()}</span>
+                              <span>{Math.round((elCredits.used / elCredits.limit) * 100)}%</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, (elCredits.used / elCredits.limit) * 100)}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Голос" : "Voice"}</label>
+                        <Select value={elVoice} onValueChange={v => { setElVoice(v); markDirty(); }}>
+                          <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
+                          <SelectContent className="bg-card border-border max-h-64">
+                            {ELEVENLABS_VOICES.map(v => (
+                              <SelectItem key={v.id} value={v.id}>
+                                <div className="flex items-center gap-2">
+                                  <span>{v.name}</span>
+                                  <Badge variant="outline" className="text-[10px] px-1 py-0">{v.gender === "female" ? "♀" : "♂"}</Badge>
+                                  <span className="text-[10px] text-muted-foreground">{isRu ? v.description.ru : v.description.en}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <SliderField label={isRu ? "Стабильность" : "Stability"} value={elStability} min={0} max={1} step={0.05} suffix="%" multiplier={100} default_={0.5} onChange={v => { setElStability(v); markDirty(); }} onReset={() => { setElStability(0.5); markDirty(); }} />
+                      <SliderField label={isRu ? "Схожесть" : "Similarity"} value={elSimilarity} min={0} max={1} step={0.05} suffix="%" multiplier={100} default_={0.75} onChange={v => { setElSimilarity(v); markDirty(); }} onReset={() => { setElSimilarity(0.75); markDirty(); }} />
+                      <SliderField label={isRu ? "Стиль" : "Style"} value={elStyle} min={0} max={1} step={0.05} suffix="%" multiplier={100} default_={0.4} onChange={v => { setElStyle(v); markDirty(); }} onReset={() => { setElStyle(0.4); markDirty(); }} />
+                      <SliderField label={isRu ? "Скорость" : "Speed"} value={elSpeed} min={0.7} max={1.2} step={0.05} suffix="×" default_={0.95} decimals={2} onChange={v => { setElSpeed(v); markDirty(); }} onReset={() => { setElSpeed(0.95); markDirty(); }} />
+                    </TabsContent>
+
+                    {/* ─── OpenAI / ProxyAPI ─── */}
+                    <TabsContent value="proxyapi" className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Модель" : "Model"}</label>
+                        <Select value={paModel} onValueChange={v => {
+                          setPaModel(v);
+                          const available = getVoicesForModel(v);
+                          if (!available.some(av => av.id === paVoice)) setPaVoice(available[0]?.id ?? "alloy");
+                          markDirty();
+                        }}>
+                          <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
+                          <SelectContent className="bg-card border-border">
+                            {PROXYAPI_TTS_MODELS.map(m => (
+                              <SelectItem key={m.id} value={m.id}>
+                                <div className="flex items-center gap-2">
+                                  <span>{m.name}</span>
+                                  <span className="text-[10px] text-muted-foreground">{isRu ? m.description.ru : m.description.en}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Голос" : "Voice"}</label>
+                        <Select value={paVoice} onValueChange={v => { setPaVoice(v); markDirty(); }}>
+                          <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
+                          <SelectContent className="bg-card border-border max-h-64">
+                            {getVoicesForModel(paModel).map(v => (
+                              <SelectItem key={v.id} value={v.id}>
+                                <div className="flex items-center gap-2">
+                                  <span>{v.name}</span>
+                                  <Badge variant="outline" className="text-[10px] px-1 py-0">{v.gender === "female" ? "♀" : "♂"}</Badge>
+                                  <span className="text-[10px] text-muted-foreground">{isRu ? v.description.ru : v.description.en}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <SliderField label={isRu ? "Скорость" : "Speed"} value={paSpeed} min={0.25} max={4.0} step={0.05} suffix="×" default_={1.0} onChange={v => { setPaSpeed(v); markDirty(); }} onReset={() => { setPaSpeed(1.0); markDirty(); }} />
+                      {paModel === "gpt-4o-mini-tts" && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{isRu ? "Инструкции" : "Instructions"}</label>
+                          <Textarea
+                            value={paInstructions}
+                            onChange={e => { setPaInstructions(e.target.value); markDirty(); }}
+                            placeholder={isRu ? "Говори с радостной интонацией, спокойно и размеренно..." : "Speak with a joyful tone, calmly and steadily..."}
+                            className="min-h-[80px] text-xs bg-secondary border-border resize-y"
+                          />
+                          <p className="text-[10px] text-muted-foreground/60">{isRu ? "Управляйте акцентом, эмоциями, скоростью и тоном речи" : "Control accent, emotion, speed and tone of speech"}</p>
+                        </div>
+                      )}
+                      <div className="rounded-md border border-border bg-muted/30 p-2.5">
+                        <p className="text-[10px] text-muted-foreground">
+                          {isRu ? "⚡ Требуется ключ ProxyAPI в Профиле → API-роутеры." : "⚡ Requires ProxyAPI key in Profile → API Routers."}
+                        </p>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+
+                  <Separator />
+
+                  <div className="flex gap-2">
+                    <Button data-preview-btn onClick={handlePreview} disabled={testing} variant="outline" className="gap-2">
+                      {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : playing ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                      {playing ? (isRu ? "Стоп" : "Stop") : (isRu ? "Прослушать" : "Preview")}
+                    </Button>
+                    {selectedId && (
+                      <Button onClick={handleSave} disabled={saving || !dirty} className="gap-2">
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        {isRu ? "Сохранить" : "Save"}
+                      </Button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-64 text-muted-foreground">
+                  <div className="text-center space-y-2">
+                    <Volume2 className="h-10 w-10 mx-auto text-muted-foreground/30" />
+                    <p className="text-sm">{isRu ? "Выберите персонажа для настройки голоса" : "Select a character to configure voice"}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </motion.div>
   );
 };
