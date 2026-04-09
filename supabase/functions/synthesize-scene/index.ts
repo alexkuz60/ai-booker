@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import { splitPhrases } from "../_shared/splitPhrases.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -261,7 +262,103 @@ async function callSaluteSpeechTts(
   return { audio, durationMs };
 }
 
-// ── Phrase annotation types (mirroring phraseAnnotations.ts) ─────────
+// ── Max chars per sub-batch to avoid OOM in TTS edge functions ────────
+const MAX_CHARS_PER_BATCH = 600;
+
+/** Strip 44-byte WAV header, return raw PCM */
+function stripWavHeader(wav: Uint8Array): Uint8Array {
+  if (wav.length <= 44) return wav;
+  const view = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
+  // Verify RIFF
+  if (view.getUint32(0) === 0x52494646) return wav.slice(44);
+  return wav; // not a WAV — return as-is
+}
+
+/** Wrap raw PCM in a WAV container (16-bit mono 48 kHz by default) */
+function wrapPcmInWav(pcm: Uint8Array, sampleRate = 48000, channels = 1, bitsPerSample = 16): Uint8Array {
+  const blockAlign = channels * (bitsPerSample / 8);
+  const byteRate = sampleRate * blockAlign;
+  const buf = new ArrayBuffer(44 + pcm.length);
+  const v = new DataView(buf);
+  const w = (off: number, s: string) => { for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)); };
+  w(0, "RIFF"); v.setUint32(4, 44 + pcm.length - 8, true); w(8, "WAVE");
+  w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+  v.setUint16(22, channels, true); v.setUint32(24, sampleRate, true);
+  v.setUint32(28, byteRate, true); v.setUint16(32, blockAlign, true);
+  v.setUint16(34, bitsPerSample, true);
+  w(36, "data"); v.setUint32(40, pcm.length, true);
+  new Uint8Array(buf, 44).set(pcm);
+  return new Uint8Array(buf);
+}
+
+/**
+ * Synthesize a large text by splitting into sentence-based batches,
+ * calling TTS for each batch, stripping WAV headers, concatenating PCM,
+ * then wrapping in a single WAV. Prevents memory limit exceeded errors.
+ */
+async function synthesizeInBatches(
+  callFn: (text: string) => Promise<{ audio: Uint8Array; durationMs: number } | { error: string }>,
+  fullText: string,
+): Promise<{ audio: Uint8Array; durationMs: number } | { error: string }> {
+  const sentences = splitPhrases(fullText);
+  if (sentences.length === 0) return { error: "Empty text" };
+
+  // Group sentences into batches of ~MAX_CHARS_PER_BATCH
+  const batches: string[] = [];
+  let current = "";
+  for (const s of sentences) {
+    if (current.length + s.length + 1 > MAX_CHARS_PER_BATCH && current.length > 0) {
+      batches.push(current.trim());
+      current = s;
+    } else {
+      current += (current ? " " : "") + s;
+    }
+  }
+  if (current.trim()) batches.push(current.trim());
+
+  if (batches.length <= 1) {
+    // Small enough — single call
+    return callFn(fullText);
+  }
+
+  console.log(`[ChunkedTTS] Splitting ${fullText.length} chars into ${batches.length} batches: [${batches.map(b => b.length).join(", ")}]`);
+
+  const pcmChunks: Uint8Array[] = [];
+  let totalDuration = 0;
+  let sampleRate = 48000; // will detect from first WAV
+
+  for (let i = 0; i < batches.length; i++) {
+    const result = await callFn(batches[i]);
+    if ("error" in result) {
+      return { error: `Batch ${i + 1}/${batches.length}: ${result.error}` };
+    }
+    // Detect sample rate from first chunk's WAV header
+    if (i === 0 && result.audio.length >= 44) {
+      const view = new DataView(result.audio.buffer, result.audio.byteOffset, result.audio.byteLength);
+      if (view.getUint32(0) === 0x52494646) {
+        sampleRate = view.getUint32(24, true) || 48000;
+      }
+    }
+    pcmChunks.push(stripWavHeader(result.audio));
+    totalDuration += result.durationMs;
+    // Release source audio
+    (result as any).audio = null;
+  }
+
+  // Concatenate PCM
+  const totalLen = pcmChunks.reduce((s, c) => s + c.length, 0);
+  const merged = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const chunk of pcmChunks) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  const wav = wrapPcmInWav(merged, sampleRate);
+  return { audio: wav, durationMs: totalDuration };
+}
+
+
 
 interface PhraseAnnotation {
   type: "pause" | "emphasis" | "stress" | "whisper" | "slow" | "fast" | "joy" | "sadness" | "anger" | "sigh" | "cough" | "laugh" | "hmm";
@@ -1075,11 +1172,17 @@ Deno.serve(async (req) => {
             let result: { audio: Uint8Array; durationMs: number } | { error: string };
             const hasAnnot = segmentHasAnnotations[i];
             const isLyric = seg.segment_type === "lyric";
+            const isLargeText = text.length > MAX_CHARS_PER_BATCH;
 
             if (isSaluteSpeechVoice) {
               if (isLyric || hasAnnot) {
                 const ssml = isLyric && !hasAnnot ? buildLyricSsml(text) : buildSegmentSsml(seg.id);
                 result = await callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, { ssml, voice: voiceConfig.voice, lang: langCode });
+              } else if (isLargeText) {
+                result = await synthesizeInBatches(
+                  (t) => callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, { text: t, voice: voiceConfig.voice, lang: langCode }),
+                  text,
+                );
               } else {
                 result = await callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, { text, voice: voiceConfig.voice, lang: langCode });
               }
@@ -1087,11 +1190,21 @@ Deno.serve(async (req) => {
               const annotated = hasAnnot ? buildSegmentAnnotatedText(seg.id) : isLyric ? formatLyricText(text) : { text, extraInstructions: [] };
               const baseInstructions = (voiceConfig as any).instructions || "";
               const fullInstructions = [baseInstructions, ...annotated.extraInstructions].filter(Boolean).join(". ");
-              result = await callProxyApiTts(proxyApiKey, {
-                text: annotated.text, voice: voiceConfig.voice, model: (voiceConfig as any).model,
-                speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
-                instructions: fullInstructions || undefined,
-              });
+              if (isLargeText && !hasAnnot && !isLyric) {
+                result = await synthesizeInBatches(
+                  (t) => callProxyApiTts(proxyApiKey!, {
+                    text: t, voice: voiceConfig.voice, model: (voiceConfig as any).model,
+                    speed: voiceConfig.speed, instructions: fullInstructions || undefined,
+                  }),
+                  text,
+                );
+              } else {
+                result = await callProxyApiTts(proxyApiKey, {
+                  text: annotated.text, voice: voiceConfig.voice, model: (voiceConfig as any).model,
+                  speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
+                  instructions: fullInstructions || undefined,
+                });
+              }
             } else if (!isV3Voice && (hasAnnot || isLyric)) {
               const ssml = isLyric && !hasAnnot ? buildLyricSsml(text) : buildSegmentSsml(seg.id);
               result = await callTts(yandexTtsUrl, authHeader, {
@@ -1106,6 +1219,15 @@ Deno.serve(async (req) => {
                 speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
                 pitchShift: voiceConfig.pitchShift, volume: voiceConfig.volume, lang: langCode,
               });
+            } else if (isLargeText) {
+              // Large plain text — split into batches to avoid OOM
+              result = await synthesizeInBatches(
+                (t) => callTts(yandexTtsUrl, authHeader, {
+                  text: t, voice: voiceConfig.voice, role: voiceConfig.role, speed: voiceConfig.speed,
+                  pitchShift: voiceConfig.pitchShift, volume: voiceConfig.volume, lang: langCode,
+                }),
+                text,
+              );
             } else {
               result = await callTts(yandexTtsUrl, authHeader, {
                 text, voice: voiceConfig.voice, role: voiceConfig.role, speed: voiceConfig.speed,
