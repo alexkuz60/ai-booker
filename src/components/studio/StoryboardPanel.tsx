@@ -1170,12 +1170,13 @@ export function StoryboardPanel({
               phrases: seg.phrases.map(p => {
                 const newAnns = annotationsMap[p.phrase_id];
                 if (!newAnns?.length) return p;
+                const typed = newAnns.map(a => ({ type: a.type as import("./phraseAnnotations").AnnotationType, start: a.start, end: a.end }));
                 return {
                   ...p,
-                  annotations: [...(p.annotations ?? []), ...newAnns],
+                  annotations: [...(p.annotations ?? []), ...typed] as import("./phraseAnnotations").PhraseAnnotation[],
                 };
               }),
-            }));
+            })) as import("./storyboard/types").Segment[];
             setSegments(updated);
             persist(buildSnapshot(updated));
           }
