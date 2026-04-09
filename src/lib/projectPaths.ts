@@ -100,9 +100,9 @@ export const paths = {
 
   // ── Audio ──────────────────────────────────────────────
 
-  /** TTS audio clip for a segment */
+  /** TTS audio clip for a segment (WAV format for lossless processing) */
   ttsClip: (segmentId: string, sceneId?: string, chapterId?: string) =>
-    `chapters/${requireChapterId(sceneId ?? "", chapterId)}/scenes/${sceneId}/tts/${segmentId}.mp3`,
+    `chapters/${requireChapterId(sceneId ?? "", chapterId)}/scenes/${sceneId}/tts/${segmentId}.wav`,
 
   /** Scene atmosphere/sfx clip metadata */
   sceneAtmospheres: (sceneId: string, chapterId?: string) =>
