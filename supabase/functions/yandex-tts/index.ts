@@ -113,7 +113,8 @@ async function synthesizeV1(
   form.append("lang", params.lang);
   form.append("voice", params.voice);
   form.append("folderId", folderId);
-  form.append("format", "mp3");
+  // Output raw PCM (lpcm) for lossless quality — caller wraps in WAV
+  form.append("format", "lpcm");
   form.append("sampleRateHertz", "48000");
   form.append("speed", String(params.speed));
   if (params.emotion) form.append("emotion", params.emotion);
@@ -127,7 +128,10 @@ async function synthesizeV1(
     if (response.status === 401) cachedToken = null;
     throw new YandexTtsError(response.status, errText);
   }
-  return { audio: new Uint8Array(await response.arrayBuffer()), contentType: "audio/mpeg" };
+  const pcmData = new Uint8Array(await response.arrayBuffer());
+  // Wrap raw PCM in WAV container
+  const wavData = wrapPcmInWav(pcmData, 48000, 1, 16);
+  return { audio: new Uint8Array(wavData), contentType: "audio/wav" };
 }
 
 // ─── V3 text splitter (≤250 chars at sentence boundaries) ─────────
