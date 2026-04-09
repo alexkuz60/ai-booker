@@ -1176,6 +1176,103 @@ Deno.serve(async (req) => {
             }
 
           } else {
+            // ── PER-PHRASE SYNTHESIS for large merged segments ──────
+            const segPhrases = phrasesBySegment.get(seg.id) ?? [];
+            const isMultiPhraseLarge = segPhrases.length > 1 && text.length > MAX_CHARS_PER_BATCH;
+
+            if (isMultiPhraseLarge) {
+              console.log(`▶ Per-phrase synthesis for segment ${seg.id}: ${segPhrases.length} phrases, ${text.length} chars`);
+              const phraseResults: PhraseResult[] = [];
+              let totalPhraseDuration = 0;
+
+              for (let pi = 0; pi < segPhrases.length; pi++) {
+                const phrase = segPhrases[pi];
+                const phraseText = phrase.text.trim();
+                if (!phraseText) continue;
+
+                let phraseResult: { audio: Uint8Array; durationMs: number } | { error: string };
+                const phraseHasAnnot = phrase.annotations.length > 0;
+
+                if (isSaluteSpeechVoice) {
+                  if (phraseHasAnnot) {
+                    const ssml = `<speak>${applyAnnotationsSsml(phraseText, phrase.annotations)}</speak>`;
+                    phraseResult = await callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, { ssml, voice: voiceConfig.voice, lang: langCode });
+                  } else {
+                    phraseResult = await callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, { text: phraseText, voice: voiceConfig.voice, lang: langCode });
+                  }
+                } else if (isProxyApiVoice && proxyApiKey) {
+                  const annotated = phraseHasAnnot ? applyAnnotationsText(phraseText, phrase.annotations) : { text: phraseText, extraInstructions: [] as string[] };
+                  const baseInstructions = (voiceConfig as any).instructions || "";
+                  const fullInstructions = [baseInstructions, ...annotated.extraInstructions].filter(Boolean).join(". ");
+                  phraseResult = await callProxyApiTts(proxyApiKey!, {
+                    text: annotated.text, voice: voiceConfig.voice, model: (voiceConfig as any).model,
+                    speed: voiceConfig.speed, instructions: fullInstructions || undefined,
+                  });
+                } else if (!isV3Voice && phraseHasAnnot) {
+                  const ssml = `<speak>${applyAnnotationsSsml(phraseText, phrase.annotations)}</speak>`;
+                  phraseResult = await callTts(yandexTtsUrl, authHeader, { ssml, voice: voiceConfig.voice, speed: voiceConfig.speed, lang: langCode });
+                } else {
+                  phraseResult = await callTts(yandexTtsUrl, authHeader, {
+                    text: phraseHasAnnot ? applyAnnotationsText(phraseText, phrase.annotations).text : phraseText,
+                    voice: voiceConfig.voice, role: voiceConfig.role, speed: voiceConfig.speed,
+                    pitchShift: voiceConfig.pitchShift, volume: voiceConfig.volume, lang: langCode,
+                  });
+                }
+
+                if ("error" in phraseResult) {
+                  console.error(`Phrase ${pi}/${segPhrases.length} of segment ${seg.id} failed: ${phraseResult.error}`);
+                  continue;
+                }
+
+                phraseResults.push({
+                  phrase_index: pi,
+                  audio_base64: base64Encode(phraseResult.audio),
+                  duration_ms: phraseResult.durationMs,
+                });
+                totalPhraseDuration += phraseResult.durationMs;
+                // Release memory
+                (phraseResult as any).audio = null;
+              }
+
+              if (phraseResults.length === 0) {
+                const r = { segment_id: seg.id, status: "error", duration_ms: 0, error: "All phrases failed synthesis" };
+                errorCount++;
+                playlistSegments.push({ ...r, segment_number: seg.segment_number, speaker: seg.speaker, segment_type: seg.segment_type, inline_narrations: null });
+                await writer.write(encoder.encode(JSON.stringify(r) + "\n"));
+                continue;
+              }
+
+              const voiceConfigMeta = {
+                provider: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : "yandex",
+                voice: voiceConfig.voice, role: voiceConfig.role, speed: voiceConfig.speed,
+                pitchShift: voiceConfig.pitchShift, volume: voiceConfig.volume,
+                model: isProxyApiVoice ? (voiceConfig as any).model : undefined,
+                instructions: isProxyApiVoice ? (voiceConfig as any).instructions : undefined,
+                textHash: textHashForCache,
+                apiVersion: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1",
+              };
+
+              const r: SegmentResult = {
+                segment_id: seg.id,
+                status: "ready",
+                duration_ms: totalPhraseDuration,
+                voice_config: voiceConfigMeta,
+                phrase_results: phraseResults,
+              };
+
+              successCount++;
+              totalDurationMs += totalPhraseDuration;
+              playlistSegments.push({
+                segment_id: seg.id, segment_number: seg.segment_number,
+                speaker: seg.speaker, segment_type: seg.segment_type,
+                duration_ms: totalPhraseDuration, status: "ready", inline_narrations: null,
+              });
+
+              await writer.write(encoder.encode(JSON.stringify(r) + "\n"));
+              console.log(`✅ Per-phrase segment ${i + 1}/${segments.length}: ${phraseResults.length}/${segPhrases.length} phrases, ${totalPhraseDuration}ms`);
+              continue;
+            }
+
             // ── STANDARD SINGLE-PASS SYNTHESIS ────────────────
             let result: { audio: Uint8Array; durationMs: number } | { error: string };
             const hasAnnot = segmentHasAnnotations[i];
