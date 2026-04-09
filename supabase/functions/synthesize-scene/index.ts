@@ -17,7 +17,7 @@ interface InlineNarration {
 interface InlineNarrationResult {
   text: string;
   insert_after: string;
-  audio_path: string;
+  audio_base64: string;
   duration_ms: number;
   offset_ms: number; // position in the dialogue timeline where narrator starts
 }
@@ -26,7 +26,7 @@ interface SegmentResult {
   segment_id: string;
   status: string;
   duration_ms: number;
-  audio_path: string;
+  audio_base64?: string;   // base64-encoded WAV data (present when status=ready)
   error?: string;
   inline_narrations?: InlineNarrationResult[];
 }
