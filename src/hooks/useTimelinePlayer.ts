@@ -33,6 +33,34 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
 
   const audioClips = clips.filter((c) => c.hasAudio && c.audioPath);
 
+  // Expand phrase clips: for merged segments with phraseClips, create
+  // separate entries for each phrase so each gets its own engine track.
+  const expandedClips = useMemo(() => {
+    const result: Array<TimelineClip & { _phraseOf?: string }> = [];
+    for (const clip of audioClips) {
+      if (clip.phraseClips && clip.phraseClips.length > 0) {
+        // Phrase-level playback: each phrase is a separate engine track
+        let phraseOffset = clip.startSec;
+        for (const pc of clip.phraseClips) {
+          const phraseDur = pc.durationMs / 1000;
+          result.push({
+            ...clip,
+            id: `${clip.id}_p${pc.index}`,
+            audioPath: pc.audioPath,
+            startSec: phraseOffset,
+            durationSec: phraseDur,
+            phraseClips: undefined, // don't recurse
+            _phraseOf: clip.id,
+          } as any);
+          phraseOffset += phraseDur;
+        }
+      } else {
+        result.push(clip);
+      }
+    }
+    return result;
+  }, [audioClips]);
+
   // Subscribe to engine state
   useEffect(() => {
     const unsub = engine.subscribe((snap) => {
