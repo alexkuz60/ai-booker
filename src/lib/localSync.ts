@@ -13,6 +13,7 @@ import {
 import { paths } from "@/lib/projectPaths";
 import { buildSceneIndex, writeSceneIndex, readSceneIndex } from "@/lib/sceneIndex";
 import { getSceneFileDefaults, getTranslationFileDefaults, SCENE_DIRS } from "@/lib/bookTemplateOPFS";
+import { guardedDelete } from "@/lib/storageGuard";
 import { writePipelineStep } from "@/hooks/usePipelineProgress";
 import { buildBookMap, writeBookMap, readBookMap } from "@/lib/bookMap";
 
