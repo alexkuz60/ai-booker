@@ -110,6 +110,7 @@ export function useWaveformPeaks(
   sceneDuration: number = 0,
   displayWidthPx: number = 1600,
 ): WaveformPeaksState {
+  const { storage } = useProjectStorageContext();
   const [state, setState] = useState<WaveformPeaksState>({
     status: "idle",
     peaks: null,
@@ -126,7 +127,7 @@ export function useWaveformPeaks(
     .join("|") + `|dur=${sceneDuration.toFixed(2)}`;
 
   const loadPeaks = useCallback(async () => {
-    if (!trackId || !clipsKey || sceneDuration <= 0) {
+    if (!trackId || !clipsKey || sceneDuration <= 0 || !storage) {
       setState({ status: "idle", peaks: null, error: null });
       return;
     }
