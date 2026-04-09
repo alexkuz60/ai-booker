@@ -290,23 +290,37 @@ async function synthesizeV3(
     chunkLens: chunks.map(c => c.length),
   });
 
-  // Synthesize each chunk sequentially to preserve order
-  const allAudio: Uint8Array[] = [];
-  for (const chunk of chunks) {
-    const audio = await synthesizeV3Single(iamToken, folderId, chunk, hints);
-    if (audio.length === 0) {
-      console.warn(`V3 empty audio for chunk (${chunk.length} chars): "${chunk.slice(0, 50)}..."`);
+  // Process chunks in parallel batches to avoid CPU Time exceeded
+  const BATCH_SIZE = 5;
+  const allAudio: Uint8Array[] = new Array(chunks.length);
+
+  for (let batchStart = 0; batchStart < chunks.length; batchStart += BATCH_SIZE) {
+    const batchEnd = Math.min(batchStart + BATCH_SIZE, chunks.length);
+    const batchPromises: Promise<void>[] = [];
+
+    for (let idx = batchStart; idx < batchEnd; idx++) {
+      batchPromises.push(
+        synthesizeV3Single(iamToken, folderId, chunks[idx], hints).then(audio => {
+          if (audio.length === 0) {
+            console.warn(`V3 empty audio for chunk ${idx} (${chunks[idx].length} chars): "${chunks[idx].slice(0, 50)}..."`);
+          }
+          allAudio[idx] = audio;
+        })
+      );
     }
-    allAudio.push(audio);
+
+    await Promise.all(batchPromises);
   }
 
-  // Concatenate raw PCM chunks
-  const totalLen = allAudio.reduce((sum, a) => sum + a.length, 0);
+  // Concatenate raw PCM chunks in order
+  const totalLen = allAudio.reduce((sum, a) => sum + (a?.length ?? 0), 0);
   const combined = new Uint8Array(totalLen);
   let offset = 0;
   for (const a of allAudio) {
-    combined.set(a, offset);
-    offset += a.length;
+    if (a) {
+      combined.set(a, offset);
+      offset += a.length;
+    }
   }
 
   if (combined.length === 0) {
