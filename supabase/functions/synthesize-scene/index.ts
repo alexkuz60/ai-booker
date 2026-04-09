@@ -49,19 +49,20 @@ const voiceRolesMap: Record<string, string[]> = {
   anton: ["neutral", "good"],
 };
 
-function randomVoiceConfig() {
-  const voices = Object.keys(voiceRolesMap);
-  const voice = voices[Math.floor(Math.random() * voices.length)];
-  const roles = voiceRolesMap[voice];
-  const role = roles[Math.floor(Math.random() * roles.length)];
-  const speed = Math.round((0.9 + Math.random() * 0.3) * 100) / 100;
-  const pitchShift = Math.floor(Math.random() * 400) - 200;
-  return { voice, role, speed, pitchShift, volume: undefined as number | undefined, provider: "yandex" as string };
+/** Validate that a role is supported by the given voice; fallback to "neutral" */
+function validateRole(voice: string, role?: string): string | undefined {
+  if (!role) return undefined;
+  const supported = voiceRolesMap[voice];
+  if (!supported) return role; // non-Yandex voice — pass through
+  if (supported.includes(role)) return role;
+  console.warn(`Role "${role}" not supported for voice "${voice}" (supported: ${supported.join(",")}). Falling back to "neutral".`);
+  return "neutral";
 }
 
 function resolveVoice(
   speaker: string | null,
-  voiceConfigMap: Map<string, Record<string, unknown>>
+  voiceConfigMap: Map<string, Record<string, unknown>>,
+  narratorFallback: { voice: string; role?: string; speed: number; pitchShift?: number; volume?: number; provider?: string }
 ) {
   const vc = speaker
     ? voiceConfigMap.get(speaker.toLowerCase()) ?? {}
@@ -69,10 +70,11 @@ function resolveVoice(
 
   if ((vc as Record<string, unknown>).voice || (vc as Record<string, unknown>).voice_id) {
     const provider = ((vc as Record<string, unknown>).provider as string) || "yandex";
+    const voice = ((vc as Record<string, unknown>).voice as string) || ((vc as Record<string, unknown>).voice_id as string);
     return {
       provider,
-      voice: ((vc as Record<string, unknown>).voice as string) || ((vc as Record<string, unknown>).voice_id as string),
-      role: (vc as Record<string, unknown>).role as string | undefined,
+      voice,
+      role: validateRole(voice, (vc as Record<string, unknown>).role as string | undefined),
       speed: ((vc as Record<string, unknown>).speed as number) || 1.0,
       pitchShift: (vc as Record<string, unknown>).pitchShift as number | undefined,
       volume: (vc as Record<string, unknown>).volume as number | undefined,
@@ -80,7 +82,18 @@ function resolveVoice(
       instructions: (vc as Record<string, unknown>).instructions as string | undefined,
     };
   }
-  return randomVoiceConfig();
+  // No voice configured — use narrator voice as fallback (no random!)
+  console.warn(`No voice config for speaker "${speaker}" — using narrator fallback (${narratorFallback.voice})`);
+  return {
+    provider: narratorFallback.provider ?? "yandex",
+    voice: narratorFallback.voice,
+    role: validateRole(narratorFallback.voice, narratorFallback.role),
+    speed: narratorFallback.speed,
+    pitchShift: narratorFallback.pitchShift,
+    volume: narratorFallback.volume,
+    model: undefined as string | undefined,
+    instructions: undefined as string | undefined,
+  };
 }
 
 // ── MP3 duration parser ──────────────────────────────────────────────
@@ -557,16 +570,18 @@ function getNarratorVoice(
   // Fall back to narrator character voice
   const narratorVc = voiceConfigMap.get("narrator") ?? voiceConfigMap.get("рассказчик");
   if (narratorVc && (narratorVc as Record<string, unknown>).voice) {
+    const voice = (narratorVc as Record<string, unknown>).voice as string;
     return {
-      voice: (narratorVc as Record<string, unknown>).voice as string,
-      role: (narratorVc as Record<string, unknown>).role as string | undefined,
+      voice,
+      role: validateRole(voice, (narratorVc as Record<string, unknown>).role as string | undefined),
       speed: ((narratorVc as Record<string, unknown>).speed as number) || 1.0,
       pitchShift: (narratorVc as Record<string, unknown>).pitchShift as number | undefined,
       volume: (narratorVc as Record<string, unknown>).volume as number | undefined,
+      provider: ((narratorVc as Record<string, unknown>).provider as string) || "yandex",
     };
   }
-  // Default narrator voice
-  return { voice: "alena", role: "neutral", speed: 1.0, pitchShift: undefined, volume: undefined };
+  // Default narrator voice — zahar (male, neutral)
+  return { voice: "zahar", role: "neutral", speed: 1.0, pitchShift: undefined, volume: undefined, provider: "yandex" };
 }
 
 // ── Main handler ─────────────────────────────────────────────────────
@@ -616,7 +631,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { scene_id, language, force, segment_ids: filterSegIds } = await req.json();
+    const { scene_id, language, force, segment_ids: filterSegIds, voice_configs: clientVoiceConfigs } = await req.json();
     const isRu = language === "ru";
     const forceResynthesize = force === true;
     const filterSet = Array.isArray(filterSegIds) && filterSegIds.length > 0
@@ -663,15 +678,29 @@ Deno.serve(async (req) => {
       phrasesBySegment.set(p.segment_id, list);
     }
 
-    // Load character voice configs
-    const speakerNames = [...new Set(segments.map(s => s.speaker).filter(Boolean))];
+    // Load character voice configs — prefer client-sent configs from OPFS (source of truth)
     const voiceConfigMap = new Map<string, Record<string, unknown>>();
 
     // Load scene metadata (mood, scene_type) for narrator TTS instructions
     let sceneMood: string | null = null;
     let sceneType: string | null = null;
 
-    if (speakerNames.length > 0 || true) {
+    if (clientVoiceConfigs && typeof clientVoiceConfigs === "object") {
+      // Client sent voice_configs from OPFS — use directly (П1: OPFS is source of truth)
+      for (const [key, vc] of Object.entries(clientVoiceConfigs)) {
+        voiceConfigMap.set(key.toLowerCase(), vc as Record<string, unknown>);
+      }
+      console.log(`Using ${voiceConfigMap.size} voice configs from client (OPFS)`);
+      // Still need scene mood/type from DB (lightweight metadata)
+      const { data: sceneData } = await supabase
+        .from("book_scenes").select("mood, scene_type").eq("id", scene_id).single();
+      if (sceneData) {
+        sceneMood = sceneData.mood;
+        sceneType = sceneData.scene_type;
+      }
+    } else {
+      // Fallback: load from DB (legacy — for batch resynth without client configs)
+      console.warn("No voice_configs from client — falling back to DB (legacy path)");
       const { data: sceneData } = await supabase
         .from("book_scenes").select("chapter_id, mood, scene_type").eq("id", scene_id).single();
       if (sceneData) {
@@ -892,7 +921,7 @@ Deno.serve(async (req) => {
       const inlineNarrations = (metadata.inline_narrations ?? []) as InlineNarration[];
       const hasInlineNarrations = inlineNarrations.length > 0 && seg.segment_type === "dialogue";
 
-      const voiceConfig = resolveVoice(seg.speaker, voiceConfigMap);
+      const voiceConfig = resolveVoice(seg.speaker, voiceConfigMap, narratorVoice);
 
       // ── Apply mood + scene_type context for narrator-like segments ──
       const ttsCtx = getSceneTtsContext(seg.segment_type);
@@ -901,8 +930,10 @@ Deno.serve(async (req) => {
       }
       if (ttsCtx.roleHint && NARRATOR_SEGMENT_TYPES.has(seg.segment_type) && !(voiceConfig as any).instructions) {
         // Only override role for Yandex narrator segments without custom instructions
+        // П2: Validate roleHint against voice capabilities
         if ((voiceConfig as any).provider === "yandex" || !(voiceConfig as any).provider) {
-          (voiceConfig as any).role = ttsCtx.roleHint;
+          const validatedRole = validateRole(voiceConfig.voice, ttsCtx.roleHint);
+          (voiceConfig as any).role = validatedRole;
         }
       }
       // Append mood instructions + speech_context for ProxyAPI

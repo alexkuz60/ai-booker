@@ -8,6 +8,7 @@ import { useAiRoles } from "@/hooks/useAiRoles";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { useStoryboardPersistence, type StoryboardSnapshot } from "@/hooks/useStoryboardPersistence";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
+import { buildVoiceConfigsPayload } from "@/lib/voiceConfigPayload";
 
 import { useBackgroundAnalysis } from "@/hooks/useBackgroundAnalysis";
 import { Loader2, Sparkles, AlertTriangle, RefreshCw } from "lucide-react";
@@ -70,6 +71,7 @@ export function StoryboardPanel({
   const userApiKeys = useUserApiKeys();
   const { getModelForRole } = useAiRoles(userApiKeys);
   const { loadFromLocal, persist, persistNow, clearLocal, pushToDb, hasStorage } = useStoryboardPersistence(sceneId, chapterId);
+  const { storage: projectStorage } = useProjectStorageContext();
   const [segments, setSegments] = useState<Segment[]>([]);
 
   // Track current sceneId + request generation to reject stale async hydrations
@@ -840,12 +842,14 @@ export function StoryboardPanel({
     onErrorSegmentsChange?.(new Set());
     setSynthProgress(isRu ? "Синхронизация с сервером…" : "Syncing to server…");
     try {
-      // Push OPFS → DB before TTS (edge functions read from DB)
+      // Push OPFS → DB before TTS (edge functions read segments from DB)
       await pushToDb(sceneId, buildSnapshot());
       setSynthProgress(isRu ? "Запуск синтеза…" : "Starting synthesis…");
 
+      // Send voice configs from OPFS directly (П1: OPFS is source of truth)
+      const voice_configs = await buildVoiceConfigsPayload(projectStorage);
       const { data, error } = await supabase.functions.invoke("synthesize-scene", {
-        body: { scene_id: sceneId, language: isRu ? "ru" : "en" },
+        body: { scene_id: sceneId, language: isRu ? "ru" : "en", voice_configs },
       });
       if (error) throw error;
       const synth = data as { synthesized: number; errors: number; total_duration_ms: number; results?: Array<{ segment_id: string; status: string; error?: string }> };
@@ -893,8 +897,9 @@ export function StoryboardPanel({
       // Push current segment state to DB before re-synth
       await pushToDb(sceneId, buildSnapshot());
 
+      const voice_configs = await buildVoiceConfigsPayload(projectStorage);
       const { data, error } = await supabase.functions.invoke("synthesize-scene", {
-        body: { scene_id: sceneId, language: isRu ? "ru" : "en", force: true, segment_ids: [segmentId] },
+        body: { scene_id: sceneId, language: isRu ? "ru" : "en", force: true, segment_ids: [segmentId], voice_configs },
       });
       if (error) throw error;
 

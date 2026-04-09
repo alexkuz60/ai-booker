@@ -6,6 +6,7 @@ import { Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2, Clock, 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { readStructureFromLocal } from "@/lib/localSync";
+import { buildVoiceConfigsPayload } from "@/lib/voiceConfigPayload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -337,12 +338,13 @@ export function ChapterNavigator({
     const staleIds = [...staleAudioSceneIds];
     let done = 0;
     let errors = 0;
+    const voice_configs = await buildVoiceConfigsPayload(projectStorage);
     for (const sceneId of staleIds) {
       done++;
       setBatchProgress(`${done}/${staleIds.length}`);
       try {
         const { error } = await supabase.functions.invoke("synthesize-scene", {
-          body: { scene_id: sceneId, language: isRu ? "ru" : "en", force: true },
+          body: { scene_id: sceneId, language: isRu ? "ru" : "en", force: true, voice_configs },
         });
         if (error) {
           console.error("Batch resynth error for scene", sceneId, error);
@@ -469,6 +471,7 @@ export function ChapterNavigator({
     const affectedScenes = [...staleReport.scenesAffected];
     let done = 0;
     let errors = 0;
+    const voice_configs = await buildVoiceConfigsPayload(projectStorage);
 
     for (const sceneId of affectedScenes) {
       done++;
@@ -485,6 +488,7 @@ export function ChapterNavigator({
             language: isRu ? "ru" : "en",
             force: true,
             segment_ids: staleSegIds,
+            voice_configs,
           },
         });
         if (error) {
