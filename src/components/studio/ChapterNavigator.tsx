@@ -6,6 +6,7 @@ import { Clapperboard, Film, Volume2, AlertTriangle, RefreshCw, Loader2, Clock, 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { readStructureFromLocal } from "@/lib/localSync";
+import { readStoryboardFromLocal } from "@/lib/storyboardSync";
 import { buildVoiceConfigsPayload } from "@/lib/voiceConfigPayload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
