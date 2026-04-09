@@ -86,40 +86,40 @@ export async function extractCharacters(
     if (appErr) console.error("Failed to upsert appearance:", appErr);
   }
 
-  // ── Auto-link system characters (Narrator/Commentator) to scene ──
-  const SYSTEM_DEFS = [
+  // ── Auto-link Narrator/Commentator characters to scene (standard speakers) ──
+  const NARRATION_DEFS = [
     { names: ["Рассказчик", "Narrator"], types: ["narrator", "epigraph", "lyric"], sort_order: -2 },
     { names: ["Комментатор", "Commentator"], types: ["footnote"], sort_order: -1 },
   ];
 
-  for (const sys of SYSTEM_DEFS) {
+  for (const def of NARRATION_DEFS) {
     const matchingSegIds = segments
-      .filter(seg => sys.types.includes(seg.segment_type))
+      .filter(seg => def.types.includes(seg.segment_type))
       .map(seg => seg.segment_id);
     if (matchingSegIds.length === 0) continue;
 
-    let sysChar = bookChars.find(c =>
-      sys.names.some(n => n.toLowerCase() === c.name.toLowerCase())
+    let narChar = bookChars.find(c =>
+      def.names.some(n => n.toLowerCase() === c.name.toLowerCase())
     );
 
-    if (!sysChar) {
+    if (!narChar) {
       const { data: inserted, error } = await supabase
         .from("book_characters")
         .insert({
           book_id: bookId,
-          name: sys.names[0],
-          sort_order: sys.sort_order,
-          description: sys.names[0] === "Рассказчик" || sys.names[0] === "Narrator"
+          name: def.names[0],
+          sort_order: def.sort_order,
+          description: def.names[0] === "Рассказчик" || def.names[0] === "Narrator"
             ? "Third-person narration voice"
             : "Footnote and commentary voice",
         })
         .select("id, name, aliases")
         .single();
       if (error || !inserted) {
-        console.error("Failed to create system character:", sys.names[0], error);
+        console.error("Failed to create character:", def.names[0], error);
         continue;
       }
-      sysChar = inserted;
+      narChar = inserted;
       bookChars.push(inserted);
     }
 
@@ -127,9 +127,9 @@ export async function extractCharacters(
       .from("character_appearances")
       .upsert(
         {
-          character_id: sysChar.id,
+          character_id: narChar.id,
           scene_id: sceneId,
-          role_in_scene: "system",
+          role_in_scene: "speaker",
           segment_ids: matchingSegIds,
         },
         { onConflict: "character_id,scene_id" }

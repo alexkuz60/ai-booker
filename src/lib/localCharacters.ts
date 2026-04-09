@@ -374,7 +374,7 @@ interface SegmentLike {
 }
 
 const SPEAKING_TYPES = new Set(["dialogue", "monologue", "first_person", "telephone"]);
-const SYSTEM_DEFS = [
+const NARRATION_DEFS = [
   { names: ["Рассказчик", "Narrator"], types: ["narrator", "epigraph", "lyric"], sort_order: -2, desc: "Third-person narration voice" },
   { names: ["Комментатор", "Commentator"], types: ["footnote"], sort_order: -1, desc: "Footnote and commentary voice" },
 ];
@@ -419,21 +419,21 @@ export async function upsertSpeakersFromSegments(
     }
   }
 
-  for (const sys of SYSTEM_DEFS) {
-    const hasType = segments.some(seg => sys.types.includes(seg.segment_type));
+  for (const def of NARRATION_DEFS) {
+    const hasType = segments.some(seg => def.types.includes(seg.segment_type));
     if (!hasType) continue;
     const exists = updatedIndex.some(c =>
-      sys.names.some(n => n.toLowerCase() === c.name.toLowerCase())
+      def.names.some(n => n.toLowerCase() === c.name.toLowerCase())
     );
     if (!exists) {
       updatedIndex.push({
         id: crypto.randomUUID(),
-        name: sys.names[0],
+        name: def.names[0],
         aliases: [],
         gender: "male",
         age_group: "adult",
-        sort_order: sys.sort_order,
-        description: sys.desc,
+        sort_order: def.sort_order,
+        description: def.desc,
         speech_tags: [],
         psycho_tags: [],
         appearances: [],
@@ -453,17 +453,17 @@ export async function upsertSpeakersFromSegments(
     }
   }
 
-  for (const sys of SYSTEM_DEFS) {
+  for (const def of NARRATION_DEFS) {
     const matchingSegIds = segments
-      .filter(seg => sys.types.includes(seg.segment_type))
+      .filter(seg => def.types.includes(seg.segment_type))
       .map(seg => seg.segment_id)
       .filter(Boolean) as string[];
     if (matchingSegIds.length === 0) continue;
-    const sysChar = updatedIndex.find(c =>
-      sys.names.some(n => n.toLowerCase() === c.name.toLowerCase())
+    const narChar = updatedIndex.find(c =>
+      def.names.some(n => n.toLowerCase() === c.name.toLowerCase())
     );
-    if (sysChar) {
-      speakers.push({ characterId: sysChar.id, role_in_scene: "system", segment_ids: matchingSegIds });
+    if (narChar) {
+      speakers.push({ characterId: narChar.id, role_in_scene: "speaker", segment_ids: matchingSegIds });
     }
   }
 
