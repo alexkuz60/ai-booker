@@ -263,6 +263,11 @@ export function StoryboardPanel({
         duration_ms: number;
         offset_ms: number;
       }>;
+      phrase_results?: Array<{
+        phrase_index: number;
+        audio_base64: string;
+        duration_ms: number;
+      }>;
     }>,
   ) => {
     if (!storage || !sceneId) return;
@@ -273,8 +278,42 @@ export function StoryboardPanel({
     for (const r of results) {
       map.set(r.segment_id, { status: r.status, durationMs: r.duration_ms });
 
-      if (r.status === "ready" && r.audio_base64) {
-        // Decode base64 → ArrayBuffer and write to OPFS
+      if (r.status === "ready" && r.phrase_results && r.phrase_results.length > 0) {
+        // ── Per-phrase audio for merged segments ──
+        const { writePhraseClip } = await import("@/lib/localTtsStorage");
+        const phraseClips: import("@/lib/localAudioMeta").PhraseClipEntry[] = [];
+
+        for (const pr of r.phrase_results) {
+          const binary = atob(pr.audio_base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+          const phraseAudioPath = await writePhraseClip(
+            storage, sceneId, r.segment_id, pr.phrase_index, bytes.buffer, chapterId ?? undefined,
+          );
+          if (phraseAudioPath) {
+            revokeAudioUrl(phraseAudioPath);
+            phraseClips.push({
+              index: pr.phrase_index,
+              durationMs: pr.duration_ms,
+              audioPath: phraseAudioPath,
+            });
+          }
+        }
+
+        // Use first phrase's path as the main audioPath (for timeline hasAudio check)
+        const mainPath = phraseClips[0]?.audioPath ?? paths.ttsClip(r.segment_id, sceneId, chapterId ?? undefined);
+
+        opfsEntries[r.segment_id] = {
+          segmentId: r.segment_id,
+          status: "ready",
+          durationMs: r.duration_ms,
+          audioPath: mainPath,
+          voiceConfig: r.voice_config,
+          phraseClips,
+        };
+      } else if (r.status === "ready" && r.audio_base64) {
+        // ── Single audio file (standard segments) ──
         const binary = atob(r.audio_base64);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -282,7 +321,6 @@ export function StoryboardPanel({
 
         await writeTtsClip(storage, sceneId, r.segment_id, wavData, chapterId ?? undefined);
 
-        // Revoke any cached blob URL for this clip (force reload)
         const clipPath = paths.ttsClip(r.segment_id, sceneId, chapterId ?? undefined);
         revokeAudioUrl(clipPath);
 
