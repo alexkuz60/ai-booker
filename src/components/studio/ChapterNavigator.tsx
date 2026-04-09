@@ -471,6 +471,7 @@ export function ChapterNavigator({
     const affectedScenes = [...staleReport.scenesAffected];
     let done = 0;
     let errors = 0;
+    const voice_configs = await buildVoiceConfigsPayload(projectStorage);
 
     for (const sceneId of affectedScenes) {
       done++;
@@ -487,6 +488,7 @@ export function ChapterNavigator({
             language: isRu ? "ru" : "en",
             force: true,
             segment_ids: staleSegIds,
+            voice_configs,
           },
         });
         if (error) {
