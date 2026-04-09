@@ -1154,66 +1154,29 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Upload main audio
-        const audioExt = isSaluteSpeechVoice ? "ogg" : "mp3";
-        const audioMime = isSaluteSpeechVoice ? "audio/ogg" : "audio/mpeg";
-        const storagePath = `${userId}/tts/${scene_id}/${seg.id}.${audioExt}`;
-        const { error: uploadErr } = await supabaseAdmin.storage
-          .from("user-media")
-          .upload(storagePath, dialogueAudio, { contentType: audioMime, upsert: true });
+        // ── Return audio as base64 (no server upload) ──
+        const audioBase64 = base64Encode(dialogueAudio);
 
-        if (uploadErr) {
-          console.error(`Upload failed for segment ${seg.id}:`, uploadErr);
-          results.push({ segment_id: seg.id, status: "error", duration_ms: 0, audio_path: "", error: "Upload failed" });
-          continue;
-        }
-
-        // Update segment metadata with narrator audio info
-        const updatedMetadata = { ...metadata };
-        if (narrationResults.length > 0) {
-          updatedMetadata.inline_narrations_audio = narrationResults;
-        } else {
-          // Clear stale inline narration audio if narrations were removed
-          delete updatedMetadata.inline_narrations_audio;
-        }
-
-        // Upsert segment_audio record
-        // isV3Voice already computed above
-        await supabaseAdmin.from("segment_audio").upsert(
-          {
-            segment_id: seg.id,
-            audio_path: storagePath,
-            duration_ms: dialogueDurationMs,
-            status: "ready",
-            voice_config: {
-              provider: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : "yandex",
-              voice: voiceConfig.voice,
-              role: voiceConfig.role,
-              speed: voiceConfig.speed,
-              pitchShift: voiceConfig.pitchShift,
-              volume: voiceConfig.volume,
-              model: isProxyApiVoice ? (voiceConfig as any).model : undefined,
-              instructions: isProxyApiVoice ? (voiceConfig as any).instructions : undefined,
-              textHash: textHashForCache,
-              apiVersion: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1",
-            },
-          },
-          { onConflict: "segment_id" }
-        );
-
-        // Update segment metadata (add or clear inline narration audio info)
-        if (narrationResults.length > 0 || metadata.inline_narrations_audio) {
-          await supabaseAdmin
-            .from("scene_segments")
-            .update({ metadata: updatedMetadata })
-            .eq("id", seg.id);
-        }
+        // Build voice_config metadata for client-side caching
+        const voiceConfigMeta = {
+          provider: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : "yandex",
+          voice: voiceConfig.voice,
+          role: voiceConfig.role,
+          speed: voiceConfig.speed,
+          pitchShift: voiceConfig.pitchShift,
+          volume: voiceConfig.volume,
+          model: isProxyApiVoice ? (voiceConfig as any).model : undefined,
+          instructions: isProxyApiVoice ? (voiceConfig as any).instructions : undefined,
+          textHash: textHashForCache,
+          apiVersion: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1",
+        };
 
         results.push({
           segment_id: seg.id,
           status: "ready",
           duration_ms: dialogueDurationMs,
-          audio_path: storagePath,
+          audio_base64: audioBase64,
+          voice_config: voiceConfigMeta,
           inline_narrations: narrationResults.length > 0 ? narrationResults : undefined,
         });
 
@@ -1225,7 +1188,6 @@ Deno.serve(async (req) => {
           segment_id: seg.id,
           status: "error",
           duration_ms: 0,
-          audio_path: "",
           error: err instanceof Error ? err.message : "Unknown error",
         });
       }
