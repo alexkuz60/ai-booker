@@ -965,7 +965,7 @@ export function StoryboardPanel({
       onErrorSegmentsChange?.(errorIds);
 
       // Save non-audio results (skipped/cached) to update audio_meta
-      const nonAudioResults = allResults.filter(r => r.status !== "ready" || !r.audio_base64);
+      const nonAudioResults = allResults.filter(r => r.status !== "ready" || (!r.audio_base64 && !r.phrase_results));
       if (nonAudioResults.length > 0) {
         await saveSynthResultsToOpfs(nonAudioResults);
       }
