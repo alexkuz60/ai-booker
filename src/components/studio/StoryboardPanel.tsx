@@ -878,7 +878,26 @@ export function StoryboardPanel({
         body: { scene_id: sceneId, language: isRu ? "ru" : "en", voice_configs },
       });
       if (error) throw error;
-      const synth = data as { synthesized: number; errors: number; total_duration_ms: number; results?: Array<{ segment_id: string; status: string; error?: string }> };
+      const synth = data as {
+        synthesized: number;
+        errors: number;
+        total_duration_ms: number;
+        results?: Array<{
+          segment_id: string;
+          status: string;
+          duration_ms: number;
+          audio_base64?: string;
+          voice_config?: Record<string, unknown>;
+          error?: string;
+          inline_narrations?: Array<{
+            text: string;
+            insert_after: string;
+            audio_base64: string;
+            duration_ms: number;
+            offset_ms: number;
+          }>;
+        }>;
+      };
       const durSec = (synth.total_duration_ms / 1000).toFixed(1);
 
       const errorIds = new Set<string>();
@@ -902,8 +921,11 @@ export function StoryboardPanel({
             : `Synthesis done: ${synth.synthesized} seg., ${durSec}s`
         );
       }
+      // Save WAV audio to OPFS and update audio_meta
+      if (synth.results) {
+        await saveSynthResultsToOpfs(synth.results);
+      }
       onSegmented?.(sceneId);
-      refreshAudioStatusFromDb(segments.map(s => s.segment_id));
     } catch (err: any) {
       console.error("Synthesis failed:", err);
       toast.error(isRu ? "Ошибка синтеза" : "Synthesis failed");
@@ -912,7 +934,7 @@ export function StoryboardPanel({
     setCurrentlySynthesizingIds(new Set());
     onSynthesizingChange?.(new Set());
     setSynthProgress("");
-  }, [sceneId, segments, isRu, onSegmented, refreshAudioStatusFromDb, onSynthesizingChange, onErrorSegmentsChange, pushToDb, buildSnapshot]);
+  }, [sceneId, segments, isRu, onSegmented, saveSynthResultsToOpfs, onSynthesizingChange, onErrorSegmentsChange, pushToDb, buildSnapshot]);
 
   const resynthSegment = useCallback(async (segmentId: string) => {
     if (!sceneId) return;
@@ -931,7 +953,21 @@ export function StoryboardPanel({
 
       const synth = data as {
         errors?: number;
-        results?: Array<{ segment_id: string; status: string; error?: string }>;
+        results?: Array<{
+          segment_id: string;
+          status: string;
+          duration_ms: number;
+          audio_base64?: string;
+          voice_config?: Record<string, unknown>;
+          error?: string;
+          inline_narrations?: Array<{
+            text: string;
+            insert_after: string;
+            audio_base64: string;
+            duration_ms: number;
+            offset_ms: number;
+          }>;
+        }>;
       };
       const segmentResult = synth.results?.find((r) => r.segment_id === segmentId);
 
@@ -943,20 +979,22 @@ export function StoryboardPanel({
 
       toast.success(isRu ? "Блок пересинтезирован" : "Segment re-synthesized");
       onErrorSegmentsChange?.(new Set());
+      // Save re-synthesized audio to OPFS
+      if (synth.results) {
+        await saveSynthResultsToOpfs(synth.results);
+      }
       onSegmented?.(sceneId);
-      await refreshAudioStatusFromDb(segments.map(s => s.segment_id));
     } catch (err: any) {
       console.error("Re-synth failed:", err);
       toast.error(isRu ? "Ошибка ре-синтеза" : "Re-synthesis failed", {
         description: err?.message,
       });
       onErrorSegmentsChange?.(new Set([segmentId]));
-      await refreshAudioStatusFromDb(segments.map(s => s.segment_id));
     }
     setResynthSegId(null);
     setCurrentlySynthesizingIds(new Set());
     onSynthesizingChange?.(new Set());
-  }, [sceneId, isRu, onSegmented, refreshAudioStatusFromDb, segments, onSynthesizingChange, onErrorSegmentsChange, pushToDb, buildSnapshot]);
+  }, [sceneId, isRu, onSegmented, saveSynthResultsToOpfs, segments, onSynthesizingChange, onErrorSegmentsChange, pushToDb, buildSnapshot]);
 
   // ─── Detection & Stress ───────────────────────────────────
 
