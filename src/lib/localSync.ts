@@ -360,7 +360,7 @@ async function cleanLegacyTranslationAudioFiles(
             storage.exists(filePath).then((exists) => {
               if (exists) {
                 console.info(`[LocalSync] Removing legacy translation file: ${filePath}`);
-                return storage.delete(filePath);
+                return guardedDelete(storage, filePath, "cleanLegacyTranslationAudioFiles").then(() => {});
               }
             }),
           );
