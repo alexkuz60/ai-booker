@@ -30,6 +30,12 @@ const SYSTEM_TYPE_TO_CHAR: Record<string, string> = {
   footnote: "комментатор",
 };
 
+export interface PhraseClipInfo {
+  index: number;
+  durationMs: number;
+  audioPath: string;
+}
+
 export interface TimelineClip {
   id: string;
   trackId: string; // "char-{characterId}" or "narrator-fallback"
@@ -53,6 +59,8 @@ export interface TimelineClip {
   speed?: number;
   /** Original duration_ms from DB (for resize calculations) */
   originalDurationMs?: number;
+  /** Per-phrase sub-clips for merged segments — each phrase is a separate audio file */
+  phraseClips?: PhraseClipInfo[];
 }
 
 export interface SceneBoundary {
@@ -162,13 +170,14 @@ export function useTimelineClips(
       if (cancelled) return;
 
       // Build audio map from OPFS (includes persisted startSec, durationMs)
-      const audioDurationMap = new Map<string, { durationMs: number; audioPath: string; isReady: boolean; startSec?: number }>();
+      const audioDurationMap = new Map<string, { durationMs: number; audioPath: string; isReady: boolean; startSec?: number; phraseClips?: import("@/lib/localAudioMeta").PhraseClipEntry[] }>();
       for (const [segId, entry] of audioMetaMap) {
         audioDurationMap.set(segId, {
           durationMs: entry.durationMs,
           audioPath: entry.audioPath,
           isReady: entry.status === "ready",
           startSec: entry.startSec,
+          phraseClips: entry.phraseClips,
         });
       }
 
@@ -257,6 +266,7 @@ export function useTimelineClips(
             hasAudio: !!audioInfo?.isReady,
             audioPath: audioInfo?.isReady ? audioInfo.audioPath : undefined,
             sceneId,
+            phraseClips: audioInfo?.phraseClips,
           });
 
           // ── Inline narration overlay clips ──────────────────

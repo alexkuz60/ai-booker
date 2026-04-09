@@ -104,6 +104,10 @@ export const paths = {
   ttsClip: (segmentId: string, sceneId?: string, chapterId?: string) =>
     `chapters/${requireChapterId(sceneId ?? "", chapterId)}/scenes/${sceneId}/tts/${segmentId}.wav`,
 
+  /** TTS audio clip for a single phrase within a merged segment */
+  ttsPhraseClip: (segmentId: string, phraseIndex: number, sceneId?: string, chapterId?: string) =>
+    `chapters/${requireChapterId(sceneId ?? "", chapterId)}/scenes/${sceneId}/tts/${segmentId}_p${phraseIndex}.wav`,
+
   /** Scene atmosphere/sfx clip metadata */
   sceneAtmospheres: (sceneId: string, chapterId?: string) =>
     `chapters/${requireChapterId(sceneId, chapterId)}/scenes/${sceneId}/atmospheres.json`,

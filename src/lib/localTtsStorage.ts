@@ -130,6 +130,29 @@ export async function readNarrationClip(
   }
 }
 
+// ── Phrase-level clips for merged segments ──────────────────
+
+/**
+ * Write a phrase-level TTS clip for a merged segment.
+ * Stored as: tts/{segmentId}_p{phraseIndex}.wav
+ */
+export async function writePhraseClip(
+  storage: ProjectStorage,
+  sceneId: string,
+  segmentId: string,
+  phraseIndex: number,
+  wavData: ArrayBuffer,
+  chapterId?: string,
+): Promise<string> {
+  const filePath = paths.ttsPhraseClip(segmentId, phraseIndex, sceneId, chapterId);
+  if (filePath.includes("__unresolved__")) {
+    console.error(`[localTtsStorage] Cannot write phrase clip — unresolved chapterId for scene ${sceneId}`);
+    return "";
+  }
+  await storage.writeBlob(filePath, new Blob([wavData], { type: "audio/wav" }), "audio/wav");
+  return filePath;
+}
+
 // ── Batch helpers ───────────────────────────────────────────
 
 /**
