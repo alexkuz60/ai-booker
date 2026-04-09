@@ -256,7 +256,9 @@ export const StoryboardToolbar = memo(function StoryboardToolbar(props: Storyboa
           {synthesizing ? <AudioLines className="h-3 w-3 animate-pulse-glow text-primary" /> : <AudioLines className="h-3 w-3" />}
           {synthesizing
             ? (synthProgress || (isRu ? "Синтез…" : "Synth…"))
-            : (isRu ? "Синтез сцены" : "Synthesize")}
+            : mergeCheckedSize > 0
+              ? (isRu ? `Синтез (${mergeCheckedSize})` : `Synth (${mergeCheckedSize})`)
+              : (isRu ? "Синтез сцены" : "Synthesize")}
         </Button>
         <Button
           variant="ghost"
