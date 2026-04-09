@@ -121,10 +121,9 @@ When restoring from server (`openSavedBook`):
         ├── atmospheres.json   — { sceneId, updatedAt, atmo: [], sfx: [] }
         ├── tts/               — synthesized TTS clips
         ├── audio/atmosphere/  — atmosphere audio layers
-        └── {lang}/            — translation subdirectories
+        └── {lang}/            — translation subdirectories (text only, no audio)
             ├── storyboard.json
-            ├── radar-*.json
-            └── audio/tts/
+            └── radar-*.json
 ```
 
 ---
