@@ -963,25 +963,11 @@ Deno.serve(async (req) => {
               continue;
             }
 
-            // Upload narrator audio → return as base64 instead
+            // Return narrator audio as base64 (no server upload)
             narrationResults.push({
               text: narr.text,
               insert_after: narr.insert_after,
               audio_base64: base64Encode(narrResult.audio),
-              duration_ms: narrResult.durationMs,
-              offset_ms: 0, // will be calculated after dialogue synthesis
-            });
-            );
-
-            // Estimate the offset: character position in dialogue text
-            const insertIdx = text.indexOf(narr.insert_after);
-            const charsBefore = insertIdx >= 0 ? insertIdx + narr.insert_after.length : 0;
-            // Rough estimate: chars before / total chars * total estimated duration
-            // We'll refine offset_ms after we know the actual dialogue duration
-            narrationResults.push({
-              text: narr.text,
-              insert_after: narr.insert_after,
-              audio_path: narrPath,
               duration_ms: narrResult.durationMs,
               offset_ms: 0, // will be calculated after dialogue synthesis
             });
