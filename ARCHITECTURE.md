@@ -261,9 +261,12 @@ interface ProjectStorage {
 │     beforeunload → flushSave() (принудительный сброс очереди)   │
 ├─────────────────────────────────────────────────────────────────┤
 │  3. СЕРВЕРНАЯ СИНХРОНИЗАЦИЯ (Manual-push)                        │
-│     Кнопка «На сервер» → upsert chapters/scenes в Supabase     │
-│     + UI-состояние (user_settings: studio session, mixer, etc.) │
-│     Обновляет books.updated_at = NOW()                          │
+│     Кнопка «На сервер» → upsert chapters/scenes/characters в Supabase   │
+│     + character_appearances, storyboards (segments/phrases/mappings),    │
+│     + segment_audio (audio metadata), clip_plugin_configs,              │
+│     + mixer_state (user_settings), atmospheres, translation ZIP backup  │
+│     + UI-состояние (user_settings: studio session, etc.)                │
+│     Обновляет books.updated_at = NOW()                                  │
 │     Паттерн: leaf-only delete-then-insert для сцен              │
 │     Это ЕДИНСТВЕННЫЙ момент, когда серверный таймстамп меняется │
 ├─────────────────────────────────────────────────────────────────┤
