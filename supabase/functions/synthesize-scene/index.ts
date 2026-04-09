@@ -232,7 +232,7 @@ async function callSaluteSpeechTts(
   const body: Record<string, unknown> = {
     voice: params.voice,
     lang: params.lang,
-    format: "opus",
+    format: "wav16",
   };
   if (params.ssml) {
     body.ssml = params.ssml;
@@ -256,8 +256,7 @@ async function callSaluteSpeechTts(
 
   const audioBuffer = await resp.arrayBuffer();
   const audio = new Uint8Array(audioBuffer);
-  // Opus duration estimation: ~32kbps average for speech
-  const durationMs = Math.round((audio.length / 4000) * 1000);
+  const durationMs = parseWavDurationMs(audio);
   return { audio, durationMs };
 }
 
