@@ -23,6 +23,12 @@ interface InlineNarrationResult {
   offset_ms: number; // position in the dialogue timeline where narrator starts
 }
 
+interface PhraseResult {
+  phrase_index: number;
+  audio_base64: string;
+  duration_ms: number;
+}
+
 interface SegmentResult {
   segment_id: string;
   status: string;
@@ -31,6 +37,8 @@ interface SegmentResult {
   voice_config?: Record<string, unknown>;
   error?: string;
   inline_narrations?: InlineNarrationResult[];
+  /** Per-phrase audio for large merged segments (no single audio_base64) */
+  phrase_results?: PhraseResult[];
 }
 
 // ── V3-only voices (cannot use SSML / v1) ────────────────────────────
@@ -718,13 +726,13 @@ Deno.serve(async (req) => {
       .in("segment_id", segIds)
       .order("phrase_number");
 
-    // Group phrases by segment (with annotations)
-    const phrasesBySegment = new Map<string, Array<{ text: string; annotations: PhraseAnnotation[] }>>();
+    // Group phrases by segment (with annotations and IDs)
+    const phrasesBySegment = new Map<string, Array<{ id: string; text: string; annotations: PhraseAnnotation[] }>>();
     for (const p of phrases ?? []) {
       const list = phrasesBySegment.get(p.segment_id) ?? [];
       const meta = (p.metadata ?? {}) as Record<string, unknown>;
       const annotations = (meta.annotations ?? []) as PhraseAnnotation[];
-      list.push({ text: p.text, annotations });
+      list.push({ id: p.id, text: p.text, annotations });
       phrasesBySegment.set(p.segment_id, list);
     }
 
