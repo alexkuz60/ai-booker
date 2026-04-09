@@ -69,6 +69,7 @@ export function RenderDialog({
   open, onOpenChange, clips, totalDurationSec, userId,
   bookTitle, chapterTitle, partNumber, isRu,
 }: RenderDialogProps) {
+  const { storage } = useProjectStorageContext();
 
   const defaultName = [
     sanitizeFileName(bookTitle),
@@ -95,7 +96,7 @@ export function RenderDialog({
     : `MP3 ${mp3Bitrate} kbps / 44100 Hz / Stereo`;
 
   const handleRender = useCallback(async () => {
-    if (!userId || clips.length === 0) return;
+    if (!userId || clips.length === 0 || !storage) return;
     setRendering(true);
     setProgress(null);
     setResult(null);
@@ -104,6 +105,7 @@ export function RenderDialog({
 
     try {
       const res = await renderChapter({
+        storage,
         clips,
         totalDurationSec,
         normalize,
