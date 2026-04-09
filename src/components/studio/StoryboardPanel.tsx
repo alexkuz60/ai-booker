@@ -897,8 +897,9 @@ export function StoryboardPanel({
       // Push current segment state to DB before re-synth
       await pushToDb(sceneId, buildSnapshot());
 
+      const voice_configs = await buildVoiceConfigsPayload(projectStorage);
       const { data, error } = await supabase.functions.invoke("synthesize-scene", {
-        body: { scene_id: sceneId, language: isRu ? "ru" : "en", force: true, segment_ids: [segmentId] },
+        body: { scene_id: sceneId, language: isRu ? "ru" : "en", force: true, segment_ids: [segmentId], voice_configs },
       });
       if (error) throw error;
 
