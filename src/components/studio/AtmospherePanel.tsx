@@ -768,7 +768,7 @@ function AutoAtmospherePanel({
           prompt: layer.prompt,
           category,
           sound,
-          savedPath: path,
+          savedPath: opfsPath || fileName,
           sceneAtmosphereId: insertedId,
         });
       }
