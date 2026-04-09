@@ -125,7 +125,7 @@ export function StudioTimeline({
     await addAtmosphereClip(storage, sceneId, {
       id: crypto.randomUUID(),
       layer_type: layerType,
-      audio_path: file.path,
+      audio_path: savedOpfsPath || file.path,
       duration_ms: durationMs,
       volume: 0.5,
       fade_in_ms: layerType === "sfx" ? 0 : 500,
