@@ -8,8 +8,8 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { fetchWithStemCache } from "@/lib/stemCache";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { getAudioBuffer } from "@/lib/localAudioProvider";
 import {
   type MultiLodPeaks,
   type StereoPeaks,
@@ -162,17 +162,11 @@ export function useWaveformPeaks(
           if (abort.signal.aborted) return;
 
           const path = clip.audioPath!;
-          const { data: signedData, error: signError } = await supabase.storage
-            .from("user-media")
-            .createSignedUrl(path, 600);
-
-          if (signError || !signedData?.signedUrl) {
-            console.warn(`[useWaveformPeaks] Skip clip ${clip.id}: ${signError?.message}`);
+          const arrayBuf = await getAudioBuffer(storage!, path);
+          if (!arrayBuf) {
+            console.warn(`[useWaveformPeaks] Skip clip ${clip.id}: not found in OPFS`);
             continue;
           }
-          if (abort.signal.aborted) return;
-
-          const arrayBuf = await fetchWithStemCache(path, signedData.signedUrl);
           if (abort.signal.aborted) return;
 
           const buffer = await audioCtx.decodeAudioData(arrayBuf.slice(0));
