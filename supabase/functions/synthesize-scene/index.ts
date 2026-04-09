@@ -170,7 +170,7 @@ async function callTts(
 
   const audioBuffer = await resp.arrayBuffer();
   const audio = new Uint8Array(audioBuffer);
-  const durationMs = parseMp3Duration(audio);
+  const durationMs = parseWavDurationMs(audio);
   return { audio, durationMs };
 }
 
