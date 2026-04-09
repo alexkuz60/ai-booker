@@ -1172,11 +1172,17 @@ Deno.serve(async (req) => {
             let result: { audio: Uint8Array; durationMs: number } | { error: string };
             const hasAnnot = segmentHasAnnotations[i];
             const isLyric = seg.segment_type === "lyric";
+            const isLargeText = text.length > MAX_CHARS_PER_BATCH;
 
             if (isSaluteSpeechVoice) {
               if (isLyric || hasAnnot) {
                 const ssml = isLyric && !hasAnnot ? buildLyricSsml(text) : buildSegmentSsml(seg.id);
                 result = await callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, { ssml, voice: voiceConfig.voice, lang: langCode });
+              } else if (isLargeText) {
+                result = await synthesizeInBatches(
+                  (t) => callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, { text: t, voice: voiceConfig.voice, lang: langCode }),
+                  text,
+                );
               } else {
                 result = await callSaluteSpeechTts(saluteSpeechTtsUrl, authHeader, { text, voice: voiceConfig.voice, lang: langCode });
               }
@@ -1184,11 +1190,21 @@ Deno.serve(async (req) => {
               const annotated = hasAnnot ? buildSegmentAnnotatedText(seg.id) : isLyric ? formatLyricText(text) : { text, extraInstructions: [] };
               const baseInstructions = (voiceConfig as any).instructions || "";
               const fullInstructions = [baseInstructions, ...annotated.extraInstructions].filter(Boolean).join(". ");
-              result = await callProxyApiTts(proxyApiKey, {
-                text: annotated.text, voice: voiceConfig.voice, model: (voiceConfig as any).model,
-                speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
-                instructions: fullInstructions || undefined,
-              });
+              if (isLargeText && !hasAnnot && !isLyric) {
+                result = await synthesizeInBatches(
+                  (t) => callProxyApiTts(proxyApiKey!, {
+                    text: t, voice: voiceConfig.voice, model: (voiceConfig as any).model,
+                    speed: voiceConfig.speed, instructions: fullInstructions || undefined,
+                  }),
+                  text,
+                );
+              } else {
+                result = await callProxyApiTts(proxyApiKey, {
+                  text: annotated.text, voice: voiceConfig.voice, model: (voiceConfig as any).model,
+                  speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
+                  instructions: fullInstructions || undefined,
+                });
+              }
             } else if (!isV3Voice && (hasAnnot || isLyric)) {
               const ssml = isLyric && !hasAnnot ? buildLyricSsml(text) : buildSegmentSsml(seg.id);
               result = await callTts(yandexTtsUrl, authHeader, {
@@ -1203,6 +1219,15 @@ Deno.serve(async (req) => {
                 speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
                 pitchShift: voiceConfig.pitchShift, volume: voiceConfig.volume, lang: langCode,
               });
+            } else if (isLargeText) {
+              // Large plain text — split into batches to avoid OOM
+              result = await synthesizeInBatches(
+                (t) => callTts(yandexTtsUrl, authHeader, {
+                  text: t, voice: voiceConfig.voice, role: voiceConfig.role, speed: voiceConfig.speed,
+                  pitchShift: voiceConfig.pitchShift, volume: voiceConfig.volume, lang: langCode,
+                }),
+                text,
+              );
             } else {
               result = await callTts(yandexTtsUrl, authHeader, {
                 text, voice: voiceConfig.voice, role: voiceConfig.role, speed: voiceConfig.speed,
