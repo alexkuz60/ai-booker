@@ -2,7 +2,7 @@
 
 > This file is the **first line of defense** against AI-induced data loss.
 > Every AI model working with this codebase MUST read and follow these rules.
-> Last updated: 2026-04-07.
+> Last updated: 2026-04-09.
 
 ---
 
@@ -20,9 +20,11 @@
 
 ### 2. NO DB CONTENT FALLBACK
 - OPFS is the **sole source of truth** at runtime.
-- Never read scene content, storyboard segments, or phrases from Supabase DB at runtime.
+- Never read scene content, storyboard segments, phrases, audio metadata, or voice configs from Supabase DB at runtime.
+- Edge Functions receive ALL required data (segments, phrases, scene metadata) from the client request body — they do NOT query DB content tables.
 - If OPFS is empty — show empty state. Never query DB for content.
 - DB is backup only, written to by explicit "Push to Server" button.
+- DB is read ONLY during Wipe-and-Deploy (full project restore from server to new device).
 
 ### 3. NO AUTO-GENERATED FILES EDITING
 - Never edit: `src/integrations/supabase/client.ts`, `src/integrations/supabase/types.ts`, `supabase/config.toml`, `.env`
