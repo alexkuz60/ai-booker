@@ -384,6 +384,7 @@ function buildMasterChain(ctx: OfflineAudioContext): {
 // ─── Main render function ────────────────────────────────────
 
 export async function renderChapter(opts: {
+  storage: ProjectStorage;
   clips: TimelineClip[];
   totalDurationSec: number;
   normalize?: boolean;
@@ -393,7 +394,7 @@ export async function renderChapter(opts: {
   onProgress?: (p: ChapterRenderProgress) => void;
 }): Promise<ChapterRenderResult> {
   const {
-    clips, totalDurationSec, normalize = true,
+    storage, clips, totalDurationSec, normalize = true,
     format = "wav", wavBitDepth = 16, mp3Bitrate = 192,
     onProgress,
   } = opts;
@@ -414,7 +415,7 @@ export async function renderChapter(opts: {
     let loaded = 0;
 
     for (const clip of stemClips) {
-      const buf = await fetchStemBuffer(clip.audioPath!, SAMPLE_RATE);
+      const buf = await fetchStemBuffer(storage, clip.audioPath!, SAMPLE_RATE);
       if (buf) buffers.set(clip.id, buf);
       loaded++;
       onProgress?.({ phase: "loading", percent: Math.round((loaded / stemClips.length) * 40) });
