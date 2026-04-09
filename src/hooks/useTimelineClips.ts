@@ -170,13 +170,14 @@ export function useTimelineClips(
       if (cancelled) return;
 
       // Build audio map from OPFS (includes persisted startSec, durationMs)
-      const audioDurationMap = new Map<string, { durationMs: number; audioPath: string; isReady: boolean; startSec?: number }>();
+      const audioDurationMap = new Map<string, { durationMs: number; audioPath: string; isReady: boolean; startSec?: number; phraseClips?: import("@/lib/localAudioMeta").PhraseClipEntry[] }>();
       for (const [segId, entry] of audioMetaMap) {
         audioDurationMap.set(segId, {
           durationMs: entry.durationMs,
           audioPath: entry.audioPath,
           isReady: entry.status === "ready",
           startSec: entry.startSec,
+          phraseClips: entry.phraseClips,
         });
       }
 
@@ -265,6 +266,7 @@ export function useTimelineClips(
             hasAudio: !!audioInfo?.isReady,
             audioPath: audioInfo?.isReady ? audioInfo.audioPath : undefined,
             sceneId,
+            phraseClips: audioInfo?.phraseClips,
           });
 
           // ── Inline narration overlay clips ──────────────────
