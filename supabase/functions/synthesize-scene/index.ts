@@ -631,7 +631,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { scene_id, language, force, segment_ids: filterSegIds } = await req.json();
+    const { scene_id, language, force, segment_ids: filterSegIds, voice_configs: clientVoiceConfigs } = await req.json();
     const isRu = language === "ru";
     const forceResynthesize = force === true;
     const filterSet = Array.isArray(filterSegIds) && filterSegIds.length > 0
