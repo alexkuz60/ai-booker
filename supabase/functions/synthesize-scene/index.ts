@@ -678,15 +678,29 @@ Deno.serve(async (req) => {
       phrasesBySegment.set(p.segment_id, list);
     }
 
-    // Load character voice configs
-    const speakerNames = [...new Set(segments.map(s => s.speaker).filter(Boolean))];
+    // Load character voice configs — prefer client-sent configs from OPFS (source of truth)
     const voiceConfigMap = new Map<string, Record<string, unknown>>();
 
     // Load scene metadata (mood, scene_type) for narrator TTS instructions
     let sceneMood: string | null = null;
     let sceneType: string | null = null;
 
-    if (speakerNames.length > 0 || true) {
+    if (clientVoiceConfigs && typeof clientVoiceConfigs === "object") {
+      // Client sent voice_configs from OPFS — use directly (П1: OPFS is source of truth)
+      for (const [key, vc] of Object.entries(clientVoiceConfigs)) {
+        voiceConfigMap.set(key.toLowerCase(), vc as Record<string, unknown>);
+      }
+      console.log(`Using ${voiceConfigMap.size} voice configs from client (OPFS)`);
+      // Still need scene mood/type from DB (lightweight metadata)
+      const { data: sceneData } = await supabase
+        .from("book_scenes").select("mood, scene_type").eq("id", scene_id).single();
+      if (sceneData) {
+        sceneMood = sceneData.mood;
+        sceneType = sceneData.scene_type;
+      }
+    } else {
+      // Fallback: load from DB (legacy — for batch resynth without client configs)
+      console.warn("No voice_configs from client — falling back to DB (legacy path)");
       const { data: sceneData } = await supabase
         .from("book_scenes").select("chapter_id, mood, scene_type").eq("id", scene_id).single();
       if (sceneData) {
