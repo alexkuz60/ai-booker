@@ -293,105 +293,83 @@ const Studio = () => {
     setSegmentedSceneIds(localSegmented);
   }, [chapter?.scenes.map(s => s.id).join(","), clipsRefreshToken]);
 
-  // DB-first: audio render status & staleness (segment_audio is DB-first)
+  // LOCAL-ONLY: audio render status & staleness from OPFS audio_meta.json (K3)
   useEffect(() => {
-    if (!chapter) return;
+    if (!chapter || !storage) return;
     const ids = chapter.scenes.map(s => s.id).filter(Boolean) as string[];
     if (ids.length === 0) return;
+    let cancelled = false;
     (async () => {
-      // Fetch segments from DB (segment_audio is DB-first, so we need segment IDs)
-      const CHUNK = 500;
-      let segData: { id: string; scene_id: string; speaker: string | null }[] = [];
-      for (let i = 0; i < ids.length; i += CHUNK) {
-        const slice = ids.slice(i, i + CHUNK);
-        const { data } = await supabase
-          .from("scene_segments")
-          .select("id, scene_id, speaker")
-          .in("scene_id", slice)
-          .limit(5000);
-        if (data?.length) segData.push(...data);
-      }
+      const { readAudioMeta } = await import("@/lib/localAudioMeta");
+      const { readStoryboardFromLocal } = await import("@/lib/storyboardSync");
+      const { readCharacterIndex } = await import("@/lib/localCharacters");
 
-      if (segData.length === 0) return;
-
-      const segIds = segData.map(s => s.id);
-      let audioData: { segment_id: string; voice_config: unknown }[] = [];
-      for (let i = 0; i < segIds.length; i += CHUNK) {
-        const slice = segIds.slice(i, i + CHUNK);
-        const { data } = await supabase
-          .from("segment_audio")
-          .select("segment_id, voice_config")
-          .in("segment_id", slice)
-          .eq("status", "ready")
-          .limit(5000);
-        if (data?.length) audioData.push(...data);
-      }
-
-      // LOCAL-ONLY: character voice configs from OPFS via readCharacterIndex
-      let charVoiceMap = new Map<string, Record<string, unknown>>();
-      if (storage?.isReady) {
-        try {
-          const { readCharacterIndex } = await import("@/lib/localCharacters");
-          const chars = await readCharacterIndex(storage);
-          for (const c of chars) {
-            const vc = (c.voice_config || {}) as Record<string, unknown>;
-            charVoiceMap.set((c.name || "").toLowerCase(), vc);
-            for (const a of (c.aliases || [])) {
-              charVoiceMap.set(a.toLowerCase(), vc);
-            }
+      // Build character voice map (K4: OPFS only)
+      const charVoiceMap = new Map<string, Record<string, unknown>>();
+      try {
+        const chars = await readCharacterIndex(storage);
+        for (const c of chars) {
+          const vc = (c.voice_config || {}) as Record<string, unknown>;
+          charVoiceMap.set((c.name || "").toLowerCase(), vc);
+          for (const a of (c.aliases || [])) {
+            if (a) charVoiceMap.set(a.toLowerCase(), vc);
           }
-        } catch (err) {
-          console.warn("[Studio] Failed to read local character index for staleness check:", err);
         }
-      }
+      } catch {}
 
-      if (audioData.length > 0) {
-        const segToScene = new Map(segData.map(s => [s.id, s.scene_id]));
-        const segToSpeaker = new Map(segData.map(s => [s.id, s.speaker]));
-        const rendered = new Set<string>();
-        const stale = new Set<string>();
-        const segCountByScene = new Map<string, number>();
-        const audioCountByScene = new Map<string, number>();
-        for (const s of segData) {
-          segCountByScene.set(s.scene_id, (segCountByScene.get(s.scene_id) ?? 0) + 1);
+      const rendered = new Set<string>();
+      const stale = new Set<string>();
+      const fully = new Set<string>();
+
+      for (const sceneId of ids) {
+        const meta = await readAudioMeta(storage, sceneId);
+        if (!meta) continue;
+
+        const entries = Object.values(meta.entries);
+        const readyEntries = entries.filter(e => e.status === "ready");
+        if (readyEntries.length === 0) continue;
+
+        rendered.add(sceneId);
+
+        // Check if all segments have audio
+        const storyboard = await readStoryboardFromLocal(storage, sceneId);
+        const totalSegments = storyboard?.segments?.length ?? 0;
+        if (totalSegments > 0 && readyEntries.length >= totalSegments) {
+          fully.add(sceneId);
         }
-        for (const a of audioData) {
-          const sceneId = segToScene.get(a.segment_id);
-          if (sceneId) {
-            rendered.add(sceneId);
-            audioCountByScene.set(sceneId, (audioCountByScene.get(sceneId) ?? 0) + 1);
-            const speaker = segToSpeaker.get(a.segment_id);
-            if (speaker && charVoiceMap.size > 0) {
-              const currentVc = charVoiceMap.get(speaker.toLowerCase());
-              if (currentVc && currentVc.voice) {
-                const savedVc = (a.voice_config || {}) as Record<string, unknown>;
-                const keys = ["voice", "role", "speed", "pitchShift", "volume"];
-                const changed = keys.some(k => {
-                  const cur = currentVc[k];
-                  const sav = savedVc[k];
-                  const curStr = (cur !== undefined && cur !== null && cur !== "") ? String(cur) : "";
-                  const savStr = (sav !== undefined && sav !== null && sav !== "") ? String(sav) : "";
-                  if (k === "speed" || k === "pitchShift" || k === "volume") {
-                    const curNum = curStr ? Number(curStr) : -999;
-                    const savNum = savStr ? Number(savStr) : -999;
-                    return Math.abs(curNum - savNum) > 0.01;
-                  }
-                  return curStr !== savStr;
-                });
-                if (changed) stale.add(sceneId);
+
+        // Check staleness: compare voice_config in audio_meta vs current character config
+        if (charVoiceMap.size > 0 && storyboard?.segments) {
+          const speakerMap = new Map(storyboard.segments.map(s => [s.segment_id, s.speaker]));
+          for (const entry of readyEntries) {
+            const speaker = speakerMap.get(entry.segmentId);
+            if (!speaker) continue;
+            const currentVc = charVoiceMap.get(speaker.toLowerCase());
+            if (!currentVc || !currentVc.voice) continue;
+            const savedVc = (entry.voiceConfig || {}) as Record<string, unknown>;
+            const keys = ["voice", "role", "speed", "pitchShift", "volume"];
+            const changed = keys.some(k => {
+              const cur = currentVc[k];
+              const sav = savedVc[k];
+              const curStr = (cur !== undefined && cur !== null && cur !== "") ? String(cur) : "";
+              const savStr = (sav !== undefined && sav !== null && sav !== "") ? String(sav) : "";
+              if (k === "speed" || k === "pitchShift" || k === "volume") {
+                return Math.abs((curStr ? Number(curStr) : -999) - (savStr ? Number(savStr) : -999)) > 0.01;
               }
-            }
+              return curStr !== savStr;
+            });
+            if (changed) { stale.add(sceneId); break; }
           }
         }
+      }
+
+      if (!cancelled) {
         setRenderedSceneIds(rendered);
         setStaleAudioSceneIds(stale);
-        const fully = new Set<string>();
-        for (const [sceneId, total] of segCountByScene) {
-          if ((audioCountByScene.get(sceneId) ?? 0) >= total) fully.add(sceneId);
-        }
         setFullyRenderedSceneIds(fully);
       }
     })();
+    return () => { cancelled = true; };
   }, [chapter?.scenes.map(s => s.id).join(","), bookId, clipsRefreshToken, storage]);
 
   // LOCAL-FIRST: selected scene text always comes from OPFS, never from browser storage.
