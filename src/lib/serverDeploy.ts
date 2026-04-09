@@ -860,7 +860,9 @@ export async function deployFromServer({
       let totalDownloaded = 0;
       // Gather all scene IDs from deployed chapters
       const deployedSceneIds: { sceneId: string; chapterId: string }[] = [];
-      for (const [chId, result] of chapterResults) {
+      for (const [chIdx, result] of chapterResults) {
+        const chId = chapterIdMap.get(chIdx);
+        if (!chId) continue;
         for (const sc of result.scenes) {
           if (sc.id) deployedSceneIds.push({ sceneId: sc.id, chapterId: chId });
         }
