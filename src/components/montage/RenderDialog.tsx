@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FileAudio, Download, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { renderChapter, type ChapterRenderProgress, type ExportFormat, type WavBitDepth, type Mp3Bitrate } from "@/lib/chapterRenderer";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 
 interface RenderDialogProps {
   open: boolean;
