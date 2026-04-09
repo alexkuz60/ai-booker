@@ -11,6 +11,12 @@ import { readSceneIndex } from "@/lib/sceneIndex";
 
 // ─── Types ──────────────────────────────────────────────────
 
+export interface PhraseClipEntry {
+  index: number;
+  durationMs: number;
+  audioPath: string;
+}
+
 export interface LocalAudioEntry {
   segmentId: string;
   status: string;         // "ready" | "pending" | "error" | "estimated"
@@ -19,6 +25,8 @@ export interface LocalAudioEntry {
   voiceConfig?: Record<string, unknown>;
   /** Absolute start position on scene timeline (seconds) — persisted, not computed */
   startSec?: number;
+  /** Per-phrase clips for merged segments (each phrase stored as separate WAV) */
+  phraseClips?: PhraseClipEntry[];
 }
 
 export interface LocalAudioMeta {
