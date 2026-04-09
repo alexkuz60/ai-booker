@@ -701,29 +701,15 @@ export function StoryboardPanel({
     typeMappingsRef.current = deriveCurrentTypeMappings(updatedSegments);
   }, [deriveCurrentTypeMappings]);
 
-  const PROPAGATE_TYPES = new Set(["narrator", "epigraph", "lyric", "footnote"]);
-
-  const TYPE_PROPAGATION_PAIRS: Record<string, string> = {
-    narrator: "first_person",
-    first_person: "narrator",
-  };
-
   const updateSegmentType = useCallback(async (segmentId: string, newType: string) => {
     const targetSeg = segments.find(s => s.segment_id === segmentId);
     if (!targetSeg) return;
-    const oldType = targetSeg.segment_type;
 
-    // Bulk: if target is among checked segments, apply to all checked
+    // Bulk: ONLY if target is among checked segments (2+), apply to all checked
     const bulkChecked = mergeChecked.size > 1 && mergeChecked.has(segmentId);
-    let affectedIds: string[];
-    if (bulkChecked) {
-      affectedIds = segments.filter(s => mergeChecked.has(s.segment_id)).map(s => s.segment_id);
-    } else {
-      const shouldPropagate = TYPE_PROPAGATION_PAIRS[oldType] === newType;
-      affectedIds = shouldPropagate
-        ? segments.filter(s => s.segment_type === oldType).map(s => s.segment_id)
-        : [segmentId];
-    }
+    const affectedIds: string[] = bulkChecked
+      ? segments.filter(s => mergeChecked.has(s.segment_id)).map(s => s.segment_id)
+      : [segmentId];
 
     // Auto-assign system speaker when switching to a system type
     const SYSTEM_TYPE_SPEAKER: Record<string, string> = {
@@ -767,17 +753,11 @@ export function StoryboardPanel({
     const targetSeg = segments.find(s => s.segment_id === segmentId);
     if (!targetSeg) return;
 
-    // If the changed segment is among checked segments, apply to ALL checked
+    // Bulk: ONLY if target is among checked segments (2+), apply to all checked
     const bulkChecked = mergeChecked.size > 1 && mergeChecked.has(segmentId);
-    let affectedIds: string[];
-    if (bulkChecked) {
-      affectedIds = segments.filter(s => mergeChecked.has(s.segment_id)).map(s => s.segment_id);
-    } else {
-      const shouldPropagate = PROPAGATE_TYPES.has(targetSeg.segment_type);
-      affectedIds = shouldPropagate
-        ? segments.filter(s => s.segment_type === targetSeg.segment_type).map(s => s.segment_id)
-        : [segmentId];
-    }
+    const affectedIds: string[] = bulkChecked
+      ? segments.filter(s => mergeChecked.has(s.segment_id)).map(s => s.segment_id)
+      : [segmentId];
 
     const updatedSegments = segments.map(seg =>
       affectedIds.includes(seg.segment_id) ? { ...seg, speaker: newSpeaker } : seg
