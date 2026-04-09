@@ -930,8 +930,10 @@ Deno.serve(async (req) => {
       }
       if (ttsCtx.roleHint && NARRATOR_SEGMENT_TYPES.has(seg.segment_type) && !(voiceConfig as any).instructions) {
         // Only override role for Yandex narrator segments without custom instructions
+        // П2: Validate roleHint against voice capabilities
         if ((voiceConfig as any).provider === "yandex" || !(voiceConfig as any).provider) {
-          (voiceConfig as any).role = ttsCtx.roleHint;
+          const validatedRole = validateRole(voiceConfig.voice, ttsCtx.roleHint);
+          (voiceConfig as any).role = validatedRole;
         }
       }
       // Append mood instructions + speech_context for ProxyAPI
