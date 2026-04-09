@@ -166,7 +166,7 @@ describe("localCharacters — scene character maps", () => {
       updatedAt: "",
       speakers: [
         { characterId: "c1", role_in_scene: "speaker", segment_ids: ["seg1"] },
-        { characterId: "c2", role_in_scene: "system", segment_ids: ["seg2"] },
+        { characterId: "c2", role_in_scene: "speaker", segment_ids: ["seg2"] },
       ],
       typeMappings: [],
     } satisfies SceneCharacterMap;
