@@ -71,7 +71,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     return unsub;
   }, [engine]);
 
-  const clipsKey = audioClips
+  const clipsKey = expandedClips
     .map((c) => `${c.id}:${c.audioPath}:${c.startSec}:${c.durationSec}:${c.loop ? "L" : ""}`)
     .join("|");
 
@@ -79,7 +79,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
     if (clipsKey === loadedKeyRef.current) return;
     loadedKeyRef.current = clipsKey;
 
-    if (audioClips.length === 0 || !storage) {
+    if (expandedClips.length === 0 || !storage) {
       engine.loadTracks([]);
       setFailedConfigs([]);
       return;
@@ -91,12 +91,12 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
       const configs: TrackConfig[] = [];
 
       // Load saved mixer state for per-track volume/pan restoration
-      const sceneId = audioClips[0]?.sceneId;
+      const sceneId = expandedClips[0]?.sceneId;
       const savedMix = sceneId ? loadMixerState(sceneId) : null;
 
       // Load audio from OPFS as Blob URLs
       const urlResults = await Promise.all(
-        audioClips.map(async (clip) => {
+        expandedClips.map(async (clip) => {
           const blobUrl = await getAudioBlobUrl(storage!, clip.audioPath!);
           if (!blobUrl) return null;
           return { clip, url: blobUrl };
@@ -109,10 +109,12 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
         if (!result) continue;
         const { clip, url } = result;
         const isOverlay = clip.id.includes("_narrator_");
+        const isPhraseClip = clip.id.includes("_p");
         const isAtmo = clip.segmentType?.startsWith("atmosphere_");
 
-        // Use saved per-track volume/pan if available, otherwise master volume
-        const trackMix = savedMix?.[clip.id];
+        // For phrase sub-clips, use the parent segment's mixer state if available
+        const mixKey = (clip as any)._phraseOf ?? clip.id;
+        const trackMix = savedMix?.[mixKey];
         const trackVolume = trackMix?.volume ?? volume;
         const trackPan = trackMix?.pan ?? undefined;
 
@@ -121,7 +123,7 @@ export function useTimelinePlayer(clips: TimelineClip[]) {
           url,
           startSec: clip.startSec,
           durationSec: clip.durationSec,
-          overlay: isOverlay,
+          overlay: isOverlay || isPhraseClip,
           volume: trackVolume,
           pan: trackPan,
           bus: isAtmo ? (clip.segmentType === "atmosphere_sfx" ? "sfx" : "atmosphere") : "voice",
