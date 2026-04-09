@@ -1,220 +1,114 @@
 /**
- * audioAssetCache — Global OPFS-based cache for atmosphere and SFX audio files.
+ * audioAssetCache — project-OPFS-backed storage for atmosphere and SFX audio.
  *
- * Architecture (mirrors irCache.ts):
- * - Separate OPFS directories: `atmo-cache/` and `sfx-cache/` at root
- * - Cache key = storage path (userId/category/filename)
- * - Files are per-user, shared across all books
+ * V2 architecture: audio files are stored INSIDE the project OPFS at:
+ *   chapters/{chapterId}/scenes/{sceneId}/audio/atmosphere/{filename}
+ *
+ * This replaces the legacy global OPFS cache + Supabase Storage approach.
+ * No network fetches at playback time — everything is local.
  */
 
-import { supabase } from "@/integrations/supabase/client";
-
-const ATMO_CACHE_DIR = "atmo-cache";
-const SFX_CACHE_DIR = "sfx-cache";
+import type { ProjectStorage } from "@/lib/projectStorage";
+import { paths } from "@/lib/projectPaths";
 
 export type AudioAssetCategory = "atmosphere" | "sfx";
 
-function dirNameForCategory(category: AudioAssetCategory): string {
-  return category === "atmosphere" ? ATMO_CACHE_DIR : SFX_CACHE_DIR;
-}
+// ── Write audio to project OPFS ─────────────────────────────
 
-/** Sanitize storage path to a safe filename for OPFS */
-function pathToFileName(storagePath: string): string {
-  return storagePath.replace(/\//g, "__");
-}
-
-function fileNameToPath(fileName: string): string {
-  return fileName.replace(/__/g, "/");
-}
-
-// ── OPFS directory helpers ──────────────────────────────────
-
-async function getCacheDir(category: AudioAssetCategory): Promise<FileSystemDirectoryHandle | null> {
-  try {
-    const root = await navigator.storage.getDirectory();
-    return await root.getDirectoryHandle(dirNameForCategory(category), { create: true });
-  } catch {
-    return null;
+/**
+ * Save an atmosphere/sfx audio blob into the project's scene directory.
+ * Returns the OPFS-relative path for use in atmospheres.json.
+ */
+export async function writeAtmosphereAudio(
+  storage: ProjectStorage,
+  sceneId: string,
+  fileName: string,
+  blob: Blob,
+  chapterId?: string,
+): Promise<string> {
+  const filePath = paths.atmosphereClip(fileName, sceneId, chapterId);
+  if (filePath.includes("__unresolved__")) {
+    console.error(`[audioAssetCache] Cannot write — unresolved chapterId for scene ${sceneId}`);
+    return "";
   }
+  await storage.writeBlob(filePath, blob, blob.type || "audio/mpeg");
+  return filePath;
 }
 
-// ── Public API ──────────────────────────────────────────────
+// ── Read audio from project OPFS ────────────────────────────
 
-export async function getAudioAssetFromCache(
-  category: AudioAssetCategory,
-  storagePath: string,
+/**
+ * Read atmosphere/sfx audio as ArrayBuffer from project OPFS.
+ */
+export async function readAtmosphereAudio(
+  storage: ProjectStorage,
+  opfsPath: string,
 ): Promise<ArrayBuffer | null> {
   try {
-    const dir = await getCacheDir(category);
-    if (!dir) return null;
-    const fh = await dir.getFileHandle(pathToFileName(storagePath));
-    const file = await fh.getFile();
-    return await file.arrayBuffer();
+    const blob = await storage.readBlob(opfsPath);
+    if (!blob) return null;
+    return await blob.arrayBuffer();
   } catch {
     return null;
   }
 }
 
-export async function putAudioAssetToCache(
-  category: AudioAssetCategory,
-  storagePath: string,
-  data: ArrayBuffer,
-): Promise<void> {
-  try {
-    const dir = await getCacheDir(category);
-    if (!dir) return;
-    const fh = await dir.getFileHandle(pathToFileName(storagePath), { create: true });
-    const writable = await fh.createWritable();
-    await writable.write(data);
-    await writable.close();
-  } catch (e) {
-    console.warn(`[audioAssetCache] Failed to write ${category}:`, storagePath, e);
-  }
-}
-
-export async function isAudioAssetCached(
-  category: AudioAssetCategory,
-  storagePath: string,
+/**
+ * Check if an atmosphere/sfx audio file exists in project OPFS.
+ */
+export async function hasAtmosphereAudio(
+  storage: ProjectStorage,
+  opfsPath: string,
 ): Promise<boolean> {
   try {
-    const dir = await getCacheDir(category);
-    if (!dir) return false;
-    await dir.getFileHandle(pathToFileName(storagePath));
-    return true;
+    return await storage.exists(opfsPath);
   } catch {
     return false;
   }
 }
 
-export async function listCachedAudioAssets(category: AudioAssetCategory): Promise<string[]> {
-  try {
-    const dir = await getCacheDir(category);
-    if (!dir) return [];
-    const paths: string[] = [];
-    for await (const [name] of (dir as any).entries()) {
-      if (typeof name === "string") {
-        paths.push(fileNameToPath(name));
-      }
-    }
-    return paths;
-  } catch {
-    return [];
-  }
+/**
+ * Delete an atmosphere/sfx audio file from project OPFS (via guardedDelete).
+ */
+export async function deleteAtmosphereAudio(
+  storage: ProjectStorage,
+  opfsPath: string,
+): Promise<boolean> {
+  const { guardedDelete } = await import("@/lib/storageGuard");
+  return guardedDelete(storage, opfsPath, "audioAssetCache.deleteAtmosphereAudio");
 }
 
-export async function removeAudioAssetFromCache(
-  category: AudioAssetCategory,
-  storagePath: string,
-): Promise<void> {
-  try {
-    const dir = await getCacheDir(category);
-    if (!dir) return;
-    await dir.removeEntry(pathToFileName(storagePath));
-  } catch { /* not found — fine */ }
-}
-
-// ── Fetch with cache ────────────────────────────────────────
-
-/** In-flight dedup: prevents parallel downloads of the same storagePath */
-const inflightFetches = new Map<string, Promise<ArrayBuffer>>();
+// ── Migration helper: fetch from Supabase Storage into project OPFS ──
 
 /**
- * Fetch audio asset with OPFS cache-first strategy.
- * Falls back to Supabase Storage signed URL if not cached.
- * Deduplicates parallel requests for the same storagePath.
+ * Download an atmosphere/sfx file from Supabase Storage and save to project OPFS.
+ * Used during Wipe-and-Deploy to populate the project with server-backed audio.
+ * Returns the OPFS-relative path, or empty string on failure.
  */
-export async function fetchAudioAssetWithCache(
-  category: AudioAssetCategory,
-  storagePath: string,
-): Promise<ArrayBuffer> {
-  // 1. Check OPFS cache
-  const cached = await getAudioAssetFromCache(category, storagePath);
-  if (cached) {
-    console.log(`[audioAssetCache] HIT ${category}: ${storagePath}`);
-    return cached;
-  }
+export async function downloadAtmosphereFromServer(
+  storage: ProjectStorage,
+  sceneId: string,
+  supabaseStoragePath: string,
+  chapterId?: string,
+): Promise<string> {
+  const { supabase } = await import("@/integrations/supabase/client");
 
-  // 2. Deduplicate in-flight requests
-  const cacheKey = `${category}:${storagePath}`;
-  const existing = inflightFetches.get(cacheKey);
-  if (existing) {
-    console.log(`[audioAssetCache] DEDUP ${category}: ${storagePath}`);
-    return existing;
-  }
-
-  // 3. Fetch from server
-  const fetchPromise = (async () => {
-    console.log(`[audioAssetCache] MISS ${category}, fetching: ${storagePath}`);
-    const { data: urlData } = await supabase.storage
-      .from("user-media")
-      .createSignedUrl(storagePath, 600);
-    if (!urlData?.signedUrl) {
-      throw new Error(`No signed URL for audio asset: ${storagePath}`);
-    }
-
-    const response = await fetch(urlData.signedUrl);
-    if (!response.ok) {
-      throw new Error(`Audio asset fetch failed: ${response.status}`);
-    }
-
-    const arrayBuf = await response.arrayBuffer();
-
-    // 4. Store in OPFS cache (fire-and-forget)
-    putAudioAssetToCache(category, storagePath, arrayBuf).catch(() => {});
-
-    return arrayBuf;
-  })();
-
-  inflightFetches.set(cacheKey, fetchPromise);
-  try {
-    return await fetchPromise;
-  } finally {
-    inflightFetches.delete(cacheKey);
-  }
-}
-
-// ── Batch download ──────────────────────────────────────────
-
-/**
- * Download all user's atmosphere/sfx files from server to local OPFS cache.
- * Skips files already cached. Returns count of downloaded files.
- */
-export async function downloadAudioAssetsBatch(
-  userId: string,
-  category: AudioAssetCategory,
-  onProgress?: (done: number, total: number) => void,
-): Promise<number> {
-  const folder = category === "atmosphere" ? "atmosphere" : "sfx";
-  const prefix = `${userId}/${folder}`;
-
-  // List files in storage
-  const { data: files } = await supabase.storage
+  const { data: urlData } = await supabase.storage
     .from("user-media")
-    .list(prefix, { limit: 500, sortBy: { column: "created_at", order: "desc" } });
+    .createSignedUrl(supabaseStoragePath, 600);
 
-  if (!files || files.length === 0) {
-    onProgress?.(0, 0);
-    return 0;
+  if (!urlData?.signedUrl) {
+    console.warn(`[audioAssetCache] No signed URL for: ${supabaseStoragePath}`);
+    return "";
   }
 
-  const validFiles = files.filter(f => f.name && !f.name.startsWith("."));
-  let done = 0;
-
-  for (const f of validFiles) {
-    const storagePath = `${prefix}/${f.name}`;
-    try {
-      const already = await isAudioAssetCached(category, storagePath);
-      if (!already) {
-        await fetchAudioAssetWithCache(category, storagePath);
-      }
-      done++;
-      onProgress?.(done, validFiles.length);
-    } catch (e) {
-      console.warn(`[audioAssetCache] Failed to download ${storagePath}:`, e);
-      done++;
-      onProgress?.(done, validFiles.length);
-    }
+  const response = await fetch(urlData.signedUrl);
+  if (!response.ok) {
+    console.warn(`[audioAssetCache] Fetch failed: ${response.status} for ${supabaseStoragePath}`);
+    return "";
   }
 
-  return done;
+  const blob = await response.blob();
+  const fileName = supabaseStoragePath.split("/").pop() || `atmo-${Date.now()}.mp3`;
+  return writeAtmosphereAudio(storage, sceneId, fileName, blob, chapterId);
 }

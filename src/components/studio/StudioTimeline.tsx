@@ -95,14 +95,24 @@ export function StudioTimeline({
     }
 
     let durationMs = 10_000;
+    // Fetch audio from Supabase Storage, save to project OPFS, decode duration
+    let savedOpfsPath = "";
     try {
-      const { fetchAudioAssetWithCache } = await import("@/lib/audioAssetCache");
-      const cacheCategory = file.category === "sfx" ? "sfx" as const : "atmosphere" as const;
-      const buf = await fetchAudioAssetWithCache(cacheCategory, file.path);
-      const ctx = new AudioContext();
-      const decoded = await ctx.decodeAudioData(buf.slice(0));
-      durationMs = Math.round(decoded.duration * 1000);
-      ctx.close();
+      const { writeAtmosphereAudio } = await import("@/lib/audioAssetCache");
+      const { supabase: sb } = await import("@/integrations/supabase/client");
+      const { data: urlData } = await sb.storage.from("user-media").createSignedUrl(file.path, 600);
+      if (urlData?.signedUrl) {
+        const resp = await fetch(urlData.signedUrl);
+        if (resp.ok) {
+          const blob = await resp.blob();
+          const fileName = file.path.split("/").pop() || `${file.category}-${Date.now()}.mp3`;
+          savedOpfsPath = await writeAtmosphereAudio(storage!, sceneId, fileName, blob);
+          const ctx = new AudioContext();
+          const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
+          durationMs = Math.round(decoded.duration * 1000);
+          ctx.close();
+        }
+      }
     } catch {
       // use fallback duration
     }
@@ -115,7 +125,7 @@ export function StudioTimeline({
     await addAtmosphereClip(storage, sceneId, {
       id: crypto.randomUUID(),
       layer_type: layerType,
-      audio_path: file.path,
+      audio_path: savedOpfsPath || file.path,
       duration_ms: durationMs,
       volume: 0.5,
       fade_in_ms: layerType === "sfx" ? 0 : 500,

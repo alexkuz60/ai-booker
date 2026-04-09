@@ -850,43 +850,63 @@ export async function deployFromServer({
     report("download_ir", "skipped");
   }
 
-  // ── 8c. Download atmosphere audio into OPFS cache ─────────
-  if (downloadAtmosphere) {
+  // ── 8c. Download atmosphere audio into project OPFS ────────
+  if (downloadAtmosphere || downloadSfx) {
     report("download_atmo", "running");
     try {
-      const { downloadAudioAssetsBatch } = await import("@/lib/audioAssetCache");
-      const assetUserId = paramUserId || "";
-      if (!assetUserId) throw new Error("No userId for atmosphere download");
-      const count = await downloadAudioAssetsBatch(assetUserId, "atmosphere", (done, total) => {
-        report("download_atmo", "running", `${done}/${total}`);
-      });
-      report("download_atmo", count > 0 ? "done" : "skipped", count > 0 ? `${count}` : undefined);
+      const { downloadAtmosphereFromServer } = await import("@/lib/audioAssetCache");
+      const { readAtmospheresFromLocal, saveAtmospheresToLocal } = await import("@/lib/localAtmospheres");
+
+      let totalDownloaded = 0;
+      // Gather all scene IDs from deployed chapters
+      const deployedSceneIds: { sceneId: string; chapterId: string }[] = [];
+      for (const [chIdx, result] of chapterResults) {
+        const chId = chapterIdMap.get(chIdx);
+        if (!chId) continue;
+        for (const sc of result.scenes) {
+          if (sc.id) deployedSceneIds.push({ sceneId: sc.id, chapterId: chId });
+        }
+      }
+
+      for (let i = 0; i < deployedSceneIds.length; i++) {
+        const { sceneId: sid, chapterId: chId } = deployedSceneIds[i];
+        const atmoData = await readAtmospheresFromLocal(storage, sid, chId);
+        if (!atmoData) continue;
+        const allClips = [...atmoData.atmo, ...atmoData.sfx];
+        if (allClips.length === 0) continue;
+
+        let changed = false;
+        for (const clip of allClips) {
+          // Skip clips that already have project-relative OPFS paths
+          if (clip.audio_path.startsWith("chapters/")) continue;
+          // Skip if category doesn't match download flags
+          const isSfx = clip.layer_type === "sfx";
+          if (isSfx && !downloadSfx) continue;
+          if (!isSfx && !downloadAtmosphere) continue;
+
+          const opfsPath = await downloadAtmosphereFromServer(storage, sid, clip.audio_path, chId);
+          if (opfsPath) {
+            clip.audio_path = opfsPath;
+            changed = true;
+            totalDownloaded++;
+          }
+        }
+
+        if (changed) {
+          await saveAtmospheresToLocal(storage, sid, atmoData.atmo, atmoData.sfx, chId);
+        }
+        report("download_atmo", "running", `${totalDownloaded}`);
+      }
+
+      report("download_atmo", totalDownloaded > 0 ? "done" : "skipped", totalDownloaded > 0 ? `${totalDownloaded}` : undefined);
     } catch (err) {
-      console.warn("[Deploy] Atmosphere download failed:", err);
+      console.warn("[Deploy] Atmosphere/SFX download failed:", err);
       report("download_atmo", "error");
     }
   } else {
     report("download_atmo", "skipped");
   }
-
-  // ── 8d. Download SFX audio into OPFS cache ───────────────
-  if (downloadSfx) {
-    report("download_sfx", "running");
-    try {
-      const { downloadAudioAssetsBatch } = await import("@/lib/audioAssetCache");
-      const sfxUserId = paramUserId || "";
-      if (!sfxUserId) throw new Error("No userId for SFX download");
-      const count = await downloadAudioAssetsBatch(sfxUserId, "sfx", (done, total) => {
-        report("download_sfx", "running", `${done}/${total}`);
-      });
-      report("download_sfx", count > 0 ? "done" : "skipped", count > 0 ? `${count}` : undefined);
-    } catch (err) {
-      console.warn("[Deploy] SFX download failed:", err);
-      report("download_sfx", "error");
-    }
-  } else {
-    report("download_sfx", "skipped");
-  }
+  report("download_sfx", downloadSfx ? "done" : "skipped");
 
   // ── 9. Source metadata (no blob storage) ──
   report("source_file", "running");

@@ -734,17 +734,20 @@ function AutoAtmospherePanel({
           .replace(/[^a-z0-9]+/gi, "-")
           .slice(0, 40);
         const fileName = `${slug}-${Date.now()}.mp3`;
-        const path = await saveToStorage(sound.blob, category, fileName);
 
-        // Local-Only K3: write to OPFS instead of DB
+        // Save audio to project OPFS (primary) + optional cloud backup
+        let opfsPath = "";
         let insertedId: string | undefined;
         if (storage) {
+          const { writeAtmosphereAudio } = await import("@/lib/audioAssetCache");
+          opfsPath = await writeAtmosphereAudio(storage, sceneId, fileName, sound.blob);
+
           const { addAtmosphereClip } = await import("@/lib/localAtmospheres");
           const newId = crypto.randomUUID();
           await addAtmosphereClip(storage, sceneId, {
             id: newId,
             layer_type: layer.layer_type,
-            audio_path: path,
+            audio_path: opfsPath || fileName,
             prompt_used: layer.prompt,
             duration_ms: Math.round(layer.duration_seconds * 1000),
             volume: layer.volume,
@@ -757,12 +760,15 @@ function AutoAtmospherePanel({
           insertedId = newId;
         }
 
+        // Optional: save to cloud storage for backup (fire-and-forget)
+        saveToStorage(sound.blob, category, fileName).catch(() => {});
+
         results.push({
           id: crypto.randomUUID(),
           prompt: layer.prompt,
           category,
           sound,
-          savedPath: path,
+          savedPath: opfsPath || fileName,
           sceneAtmosphereId: insertedId,
         });
       }
