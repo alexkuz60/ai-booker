@@ -8,6 +8,7 @@ import { useAiRoles } from "@/hooks/useAiRoles";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { useStoryboardPersistence, type StoryboardSnapshot } from "@/hooks/useStoryboardPersistence";
 import { invokeWithFallback } from "@/lib/invokeWithFallback";
+import { buildVoiceConfigsPayload } from "@/lib/voiceConfigPayload";
 
 import { useBackgroundAnalysis } from "@/hooks/useBackgroundAnalysis";
 import { Loader2, Sparkles, AlertTriangle, RefreshCw } from "lucide-react";
@@ -70,6 +71,7 @@ export function StoryboardPanel({
   const userApiKeys = useUserApiKeys();
   const { getModelForRole } = useAiRoles(userApiKeys);
   const { loadFromLocal, persist, persistNow, clearLocal, pushToDb, hasStorage } = useStoryboardPersistence(sceneId, chapterId);
+  const { storage: projectStorage } = useProjectStorageContext();
   const [segments, setSegments] = useState<Segment[]>([]);
 
   // Track current sceneId + request generation to reject stale async hydrations
