@@ -221,7 +221,7 @@ export interface SceneCharacterMap {
   updatedAt: string;
   speakers: Array<{
     characterId: string;
-    role_in_scene: "speaker" | "system" | "mentioned";
+    role_in_scene: "speaker" | "mentioned";
     segment_ids: string[];
   }>;
   typeMappings: Array<{

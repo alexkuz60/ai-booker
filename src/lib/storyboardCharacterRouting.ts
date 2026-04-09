@@ -6,7 +6,7 @@ type CharacterLike = Pick<CharacterIndex, "id" | "name"> & {
   aliases?: string[];
 };
 
-const SYSTEM_CHARACTER_DEFS = [
+const NARRATION_CHARACTER_DEFS = [
   { names: ["рассказчик", "narrator"], types: ["narrator", "epigraph", "lyric"] },
   { names: ["комментатор", "commentator"], types: ["footnote"] },
 ] as const;
@@ -127,14 +127,14 @@ export function deriveStoryboardCharacterIds(
   }
 
   const segmentTypes = new Set(segments.map((segment) => segment.segment_type));
-  for (const systemDef of SYSTEM_CHARACTER_DEFS) {
-    if (!systemDef.types.some((type) => segmentTypes.has(type))) continue;
+  for (const def of NARRATION_CHARACTER_DEFS) {
+    if (!def.types.some((type) => segmentTypes.has(type))) continue;
 
-    const systemCharId = systemDef.names
+    const charId = def.names
       .map((name) => nameMap.get(name))
       .find(Boolean);
 
-    if (systemCharId) ids.add(systemCharId);
+    if (charId) ids.add(charId);
   }
 
   return ids;
