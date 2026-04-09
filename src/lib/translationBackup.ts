@@ -19,9 +19,6 @@ const LANG_FILES = [
   "radar-literal.json",
   "radar-literary.json",
   "radar-critique.json",
-  "audio_meta.json",
-  "mixer_state.json",
-  "clip_plugins.json",
 ];
 
 // ─── Pack ────────────────────────────────────────────────────
@@ -54,20 +51,8 @@ export async function packTranslationZip(
         }
       }
 
-      // TTS audio dir: chapters/{ch}/scenes/{sc}/{lang}/audio/tts/
-      const ttsDir = `chapters/${chapterId}/scenes/${sceneId}/${lang}/audio/tts`;
-      try {
-        const ttsFiles = await storage.listDir(ttsDir);
-        for (const f of ttsFiles) {
-          const fp = `${ttsDir}/${f}`;
-          const blob = await storage.readBlob(fp).catch(() => null);
-          if (blob && blob.size > 0) {
-            files[fp] = new Uint8Array(await blob.arrayBuffer());
-          }
-        }
-      } catch {
-        // no TTS dir — ok
-      }
+      // Translation dirs contain text data only (no audio).
+      // Audio production for translations uses a separate exported project.
     }
   }
 

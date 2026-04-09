@@ -74,7 +74,7 @@ export type TypeMappingsByScene = Map<string, Map<string, string>>;
 
 /**
  * Load real clips for timeline from local storyboard in OPFS.
- * Uses actual durations from segment_audio when available, falls back to char-based estimate.
+ * Uses actual durations from audio_meta.json when available, falls back to char-based estimate.
  * Now reads per-scene silence_sec from book_scenes.
  * Applies scene_type_mappings to route narrator/first_person clips to character tracks.
  */
