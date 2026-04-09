@@ -1096,30 +1096,62 @@ export function StoryboardPanel({
     if (!sceneId || dialogueCount === 0) return;
     setDetecting(true);
     try {
+      // 🚫 К3: Send dialogue segments from OPFS, no DB reads
+      const dialogueSegments = segments
+        .filter(s => s.segment_type === "dialogue" || s.segment_type === "monologue")
+        .filter(s => !s.inline_narrations?.length) // skip already detected
+        .map(s => ({
+          segment_id: s.segment_id,
+          speaker: s.speaker,
+          text: s.phrases.map(p => p.text).join(" "),
+        }));
+
+      if (dialogueSegments.length === 0) {
+        toast.info(isRu ? "Все диалоги уже проверены" : "All dialogues already checked");
+        setDetecting(false);
+        return;
+      }
+
       const { data, error } = await invokeWithFallback({
         functionName: "detect-inline-narrations",
-        body: { scene_id: sceneId, language: isRu ? "ru" : "en", model: getModelForRole("screenwriter") },
+        body: {
+          scene_id: sceneId,
+          language: isRu ? "ru" : "en",
+          model: getModelForRole("screenwriter"),
+          segments: dialogueSegments,
+        },
         userApiKeys,
         isRu,
       });
       if (error) throw error;
-      const det = data as { detected: number; segments_updated: number; message?: string };
-      if (det.detected > 0) {
+      const det = data as { detected: number; segments_updated: number; results: Array<{ segment_id: string; inline_narrations: Array<{ text: string; insert_after: string }>; clean_text: string }> };
+      if (det.detected > 0 && det.results?.length) {
+        // Apply inline_narrations locally
+        const resultMap = new Map(det.results.map(r => [r.segment_id, r]));
+        const updated = segments.map(seg => {
+          const result = resultMap.get(seg.segment_id);
+          if (!result) return seg;
+          return {
+            ...seg,
+            inline_narrations: result.inline_narrations,
+          };
+        });
+        setSegments(updated);
+        persist(buildSnapshot(updated));
         toast.success(
           isRu
             ? `Найдено ${det.detected} вставок в ${det.segments_updated} фрагментах`
             : `Found ${det.detected} insertions in ${det.segments_updated} segments`
         );
-        await loadSegments(sceneId);
       } else {
-        toast.info(det.message || (isRu ? "Вставок не найдено" : "No insertions found"));
+        toast.info(isRu ? "Вставок не найдено" : "No insertions found");
       }
     } catch (err: any) {
       console.error("Detection failed:", err);
       toast.error(isRu ? "Ошибка поиска вставок" : "Detection failed");
     }
     setDetecting(false);
-  }, [sceneId, dialogueCount, isRu, loadSegments]);
+  }, [sceneId, segments, dialogueCount, isRu, persist, buildSnapshot, getModelForRole, userApiKeys]);
 
   const runStressCorrection = useCallback(async (mode: "correct" | "suggest") => {
     if (!sceneId) return;
