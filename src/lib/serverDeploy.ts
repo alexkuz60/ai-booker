@@ -884,7 +884,7 @@ export async function deployFromServer({
           if (isSfx && !downloadSfx) continue;
           if (!isSfx && !downloadAtmosphere) continue;
 
-          const opfsPath = await downloadAtmosphereFromServer(storage, sid, clip.audio_path, chId);
+          const opfsPath = await downloadAtmosphereFromServer(clip.audio_path);
           if (opfsPath) {
             clip.audio_path = opfsPath;
             changed = true;
