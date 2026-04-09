@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
       model = "gpt-4o-mini-tts",
       voice = "alloy",
       instructions,
-      response_format = "mp3",
+      response_format = "wav",
       speed = 1.0,
       lang,
     } = body;

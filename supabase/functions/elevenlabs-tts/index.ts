@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
     const selectedVoice = voiceId || "JBFqnCBsd6RMkjVDRZzb";
 
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice}?output_format=mp3_44100_128`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice}?output_format=pcm_44100`,
       {
         method: "POST",
         headers: {

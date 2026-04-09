@@ -211,7 +211,7 @@ Deno.serve(async (req) => {
     }
 
     const selectedVoice = voice || "Nec_24000";
-    const selectedFormat = audioFormat || "opus";
+    const selectedFormat = audioFormat || "wav16";
 
     // Get access token
     const authKey = Deno.env.get("SALUTESPEECH_AUTH_KEY");
