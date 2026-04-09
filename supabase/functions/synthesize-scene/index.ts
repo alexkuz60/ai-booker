@@ -1182,8 +1182,15 @@ Deno.serve(async (req) => {
 
             if (isMultiPhraseLarge) {
               console.log(`▶ Per-phrase synthesis for segment ${seg.id}: ${segPhrases.length} phrases, ${text.length} chars`);
-              const phraseResults: PhraseResult[] = [];
               let totalPhraseDuration = 0;
+              let phraseSuccessCount = 0;
+
+              // Stream a "phrase group start" marker so client knows to expect sub-results
+              await writer.write(encoder.encode(JSON.stringify({
+                _phrase_group_start: true,
+                segment_id: seg.id,
+                total_phrases: segPhrases.length,
+              }) + "\n"));
 
               for (let pi = 0; pi < segPhrases.length; pi++) {
                 const phrase = segPhrases[pi];
@@ -1224,17 +1231,22 @@ Deno.serve(async (req) => {
                   continue;
                 }
 
-                phraseResults.push({
+                // Stream each phrase immediately — never hold all in memory
+                const phraseB64 = base64Encode(phraseResult.audio);
+                (phraseResult as any).audio = null; // release immediately
+                await writer.write(encoder.encode(JSON.stringify({
+                  _phrase: true,
+                  segment_id: seg.id,
                   phrase_index: pi,
-                  audio_base64: base64Encode(phraseResult.audio),
+                  audio_base64: phraseB64,
                   duration_ms: phraseResult.durationMs,
-                });
+                }) + "\n"));
+
                 totalPhraseDuration += phraseResult.durationMs;
-                // Release memory
-                (phraseResult as any).audio = null;
+                phraseSuccessCount++;
               }
 
-              if (phraseResults.length === 0) {
+              if (phraseSuccessCount === 0) {
                 const r = { segment_id: seg.id, status: "error", duration_ms: 0, error: "All phrases failed synthesis" };
                 errorCount++;
                 playlistSegments.push({ ...r, segment_number: seg.segment_number, speaker: seg.speaker, segment_type: seg.segment_type, inline_narrations: null });
@@ -1252,12 +1264,12 @@ Deno.serve(async (req) => {
                 apiVersion: isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1",
               };
 
+              // Write a "phrase group end" summary (no audio data — phrases already streamed)
               const r: SegmentResult = {
                 segment_id: seg.id,
                 status: "ready",
                 duration_ms: totalPhraseDuration,
                 voice_config: voiceConfigMeta,
-                phrase_results: phraseResults,
               };
 
               successCount++;
@@ -1269,7 +1281,7 @@ Deno.serve(async (req) => {
               });
 
               await writer.write(encoder.encode(JSON.stringify(r) + "\n"));
-              console.log(`✅ Per-phrase segment ${i + 1}/${segments.length}: ${phraseResults.length}/${segPhrases.length} phrases, ${totalPhraseDuration}ms`);
+              console.log(`✅ Per-phrase segment ${i + 1}/${segments.length}: ${phraseSuccessCount}/${segPhrases.length} phrases, ${totalPhraseDuration}ms`);
               continue;
             }
 
