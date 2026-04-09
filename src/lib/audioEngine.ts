@@ -375,9 +375,7 @@ class AudioEngine {
       let buffer: Tone.ToneAudioBuffer | null = null;
 
       try {
-        const arrayBuf = cfg.cacheKey
-          ? await fetchWithStemCache(cfg.cacheKey, cfg.url)
-          : await fetch(cfg.url).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.arrayBuffer(); });
+        const arrayBuf = await fetch(cfg.url).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.arrayBuffer(); });
         const audioCtx = Tone.getContext().rawContext as AudioContext;
         const decoded = await audioCtx.decodeAudioData(arrayBuf.slice(0));
         buffer = new Tone.ToneAudioBuffer(decoded);
