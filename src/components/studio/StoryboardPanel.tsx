@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { upsertAudioEntry, writeAudioMeta, recalcPositions, type LocalAudioEntry } from "@/lib/localAudioMeta";
+import { removeStemCacheEntries } from "@/lib/stemCache";
 
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
