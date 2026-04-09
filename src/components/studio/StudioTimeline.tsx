@@ -98,20 +98,27 @@ export function StudioTimeline({
     // Fetch audio from Supabase Storage, save to project OPFS, decode duration
     let savedOpfsPath = "";
     try {
-      const { writeAtmosphereAudio } = await import("@/lib/audioAssetCache");
-      const { supabase: sb } = await import("@/integrations/supabase/client");
-      const { data: urlData } = await sb.storage.from("user-media").createSignedUrl(file.path, 600);
-      if (urlData?.signedUrl) {
-        const resp = await fetch(urlData.signedUrl);
-        if (resp.ok) {
-          const blob = await resp.blob();
-          const fileName = file.path.split("/").pop() || `${file.category}-${Date.now()}.mp3`;
-          savedOpfsPath = await writeAtmosphereAudio(storage!, sceneId, fileName, blob);
-          const ctx = new AudioContext();
-          const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
-          durationMs = Math.round(decoded.duration * 1000);
-          ctx.close();
-        }
+      // File is already in global atmo-cache or Supabase Storage.
+      // If it's a Supabase Storage path, download to global cache first.
+      const { writeAtmosphereAudio, downloadAtmosphereFromServer, readAtmosphereBlob } = await import("@/lib/audioAssetCache");
+      const fileName = file.path.split("/").pop() || `${file.category}-${Date.now()}.mp3`;
+
+      // Check if already in global cache
+      let cachePath = `atmo-cache/${fileName}`;
+      let blob = await readAtmosphereBlob(cachePath);
+
+      if (!blob) {
+        // Download from Supabase Storage to global cache
+        cachePath = await downloadAtmosphereFromServer(file.path);
+        if (cachePath) blob = await readAtmosphereBlob(cachePath);
+      }
+
+      if (blob) {
+        savedOpfsPath = cachePath;
+        const ctx = new AudioContext();
+        const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
+        durationMs = Math.round(decoded.duration * 1000);
+        ctx.close();
       }
     } catch {
       // use fallback duration

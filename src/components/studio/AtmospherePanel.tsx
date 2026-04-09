@@ -740,7 +740,7 @@ function AutoAtmospherePanel({
         let insertedId: string | undefined;
         if (storage) {
           const { writeAtmosphereAudio } = await import("@/lib/audioAssetCache");
-          opfsPath = await writeAtmosphereAudio(storage, sceneId, fileName, sound.blob);
+          opfsPath = await writeAtmosphereAudio(fileName, sound.blob);
 
           const { addAtmosphereClip } = await import("@/lib/localAtmospheres");
           const newId = crypto.randomUUID();

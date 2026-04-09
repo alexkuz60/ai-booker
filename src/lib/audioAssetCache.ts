@@ -1,95 +1,170 @@
 /**
- * audioAssetCache — project-OPFS-backed storage for atmosphere and SFX audio.
+ * audioAssetCache — Global OPFS cache for atmosphere and SFX audio.
  *
- * V2 architecture: audio files are stored INSIDE the project OPFS at:
- *   chapters/{chapterId}/scenes/{sceneId}/audio/atmosphere/{filename}
+ * Architecture (like irCache.ts):
+ * - Global cache: OPFS root `atmo-cache/{filename}` — shared across all projects
+ * - Per-scene reference: `atmospheres.json.audio_path` stores `atmo-cache/{filename}`
  *
- * This replaces the legacy global OPFS cache + Supabase Storage approach.
- * No network fetches at playback time — everything is local.
+ * Audio files are NOT duplicated into each project's OPFS.
+ * Multiple projects can reference the same cached sound file.
+ *
+ * Flow:
+ * 1. Generate/download sound → save to global `atmo-cache/`
+ * 2. `atmospheres.json` stores reference path
+ * 3. Player reads audio from global OPFS via reference
  */
 
-import type { ProjectStorage } from "@/lib/projectStorage";
-import { paths } from "@/lib/projectPaths";
+const ATMO_CACHE_DIR = "atmo-cache";
 
-export type AudioAssetCategory = "atmosphere" | "sfx";
+// ── Global OPFS directory handle ────────────────────────────
 
-// ── Write audio to project OPFS ─────────────────────────────
-
-/**
- * Save an atmosphere/sfx audio blob into the project's scene directory.
- * Returns the OPFS-relative path for use in atmospheres.json.
- */
-export async function writeAtmosphereAudio(
-  storage: ProjectStorage,
-  sceneId: string,
-  fileName: string,
-  blob: Blob,
-  chapterId?: string,
-): Promise<string> {
-  const filePath = paths.atmosphereClip(fileName, sceneId, chapterId);
-  if (filePath.includes("__unresolved__")) {
-    console.error(`[audioAssetCache] Cannot write — unresolved chapterId for scene ${sceneId}`);
-    return "";
+async function getAtmoCacheDir(): Promise<FileSystemDirectoryHandle | null> {
+  try {
+    const root = await navigator.storage.getDirectory();
+    return await root.getDirectoryHandle(ATMO_CACHE_DIR, { create: true });
+  } catch {
+    return null;
   }
-  await storage.writeBlob(filePath, blob, blob.type || "audio/mpeg");
-  return filePath;
 }
 
-// ── Read audio from project OPFS ────────────────────────────
+// ── Write to global cache ───────────────────────────────────
 
 /**
- * Read atmosphere/sfx audio as ArrayBuffer from project OPFS.
+ * Save an atmosphere/sfx audio blob to the global OPFS cache.
+ * Returns the cache-relative path for use in atmospheres.json (e.g. "atmo-cache/rain-1234.mp3").
+ */
+export async function writeAtmosphereAudio(
+  fileName: string,
+  blob: Blob,
+): Promise<string> {
+  try {
+    const dir = await getAtmoCacheDir();
+    if (!dir) return "";
+    const fh = await dir.getFileHandle(fileName, { create: true });
+    const writable = await fh.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return `${ATMO_CACHE_DIR}/${fileName}`;
+  } catch (e) {
+    console.error("[audioAssetCache] Failed to write:", fileName, e);
+    return "";
+  }
+}
+
+// ── Read from global cache ──────────────────────────────────
+
+/**
+ * Read atmosphere/sfx audio as ArrayBuffer from global OPFS cache.
+ * @param cachePath Full cache path like "atmo-cache/filename.mp3"
  */
 export async function readAtmosphereAudio(
-  storage: ProjectStorage,
-  opfsPath: string,
+  cachePath: string,
 ): Promise<ArrayBuffer | null> {
   try {
-    const blob = await storage.readBlob(opfsPath);
-    if (!blob) return null;
-    return await blob.arrayBuffer();
+    const fileName = cachePath.replace(`${ATMO_CACHE_DIR}/`, "");
+    const dir = await getAtmoCacheDir();
+    if (!dir) return null;
+    const fh = await dir.getFileHandle(fileName);
+    const file = await fh.getFile();
+    return await file.arrayBuffer();
   } catch {
     return null;
   }
 }
 
 /**
- * Check if an atmosphere/sfx audio file exists in project OPFS.
+ * Read atmosphere/sfx audio as Blob from global OPFS cache.
+ */
+export async function readAtmosphereBlob(
+  cachePath: string,
+): Promise<Blob | null> {
+  try {
+    const fileName = cachePath.replace(`${ATMO_CACHE_DIR}/`, "");
+    const dir = await getAtmoCacheDir();
+    if (!dir) return null;
+    const fh = await dir.getFileHandle(fileName);
+    return await fh.getFile();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if an atmosphere/sfx audio file exists in global cache.
  */
 export async function hasAtmosphereAudio(
-  storage: ProjectStorage,
-  opfsPath: string,
+  cachePath: string,
 ): Promise<boolean> {
   try {
-    return await storage.exists(opfsPath);
+    const fileName = cachePath.replace(`${ATMO_CACHE_DIR}/`, "");
+    const dir = await getAtmoCacheDir();
+    if (!dir) return false;
+    await dir.getFileHandle(fileName);
+    return true;
   } catch {
     return false;
   }
 }
 
 /**
- * Delete an atmosphere/sfx audio file from project OPFS (via guardedDelete).
+ * Delete an atmosphere/sfx audio file from global cache.
  */
 export async function deleteAtmosphereAudio(
-  storage: ProjectStorage,
-  opfsPath: string,
+  cachePath: string,
 ): Promise<boolean> {
-  const { guardedDelete } = await import("@/lib/storageGuard");
-  return guardedDelete(storage, opfsPath, "audioAssetCache.deleteAtmosphereAudio");
+  try {
+    const fileName = cachePath.replace(`${ATMO_CACHE_DIR}/`, "");
+    const dir = await getAtmoCacheDir();
+    if (!dir) return false;
+    await dir.removeEntry(fileName);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-// ── Migration helper: fetch from Supabase Storage into project OPFS ──
+/**
+ * Get a Blob URL for an atmosphere audio file (for Tone.js / playback).
+ * Uses an in-memory URL cache. Caller should revoke via revokeAtmoUrl().
+ */
+const atmoUrlCache = new Map<string, string>();
+
+export async function getAtmoBlobUrl(cachePath: string): Promise<string | null> {
+  const cached = atmoUrlCache.get(cachePath);
+  if (cached) return cached;
+
+  const blob = await readAtmosphereBlob(cachePath);
+  if (!blob) return null;
+
+  const url = URL.createObjectURL(blob);
+  atmoUrlCache.set(cachePath, url);
+  return url;
+}
+
+export function revokeAtmoUrl(cachePath: string): void {
+  const url = atmoUrlCache.get(cachePath);
+  if (url) {
+    URL.revokeObjectURL(url);
+    atmoUrlCache.delete(cachePath);
+  }
+}
+
+export function revokeAllAtmoUrls(): void {
+  for (const url of atmoUrlCache.values()) {
+    URL.revokeObjectURL(url);
+  }
+  atmoUrlCache.clear();
+}
+
+// ── Migration helper: fetch from Supabase Storage into global cache ──
 
 /**
- * Download an atmosphere/sfx file from Supabase Storage and save to project OPFS.
- * Used during Wipe-and-Deploy to populate the project with server-backed audio.
- * Returns the OPFS-relative path, or empty string on failure.
+ * Download an atmosphere/sfx file from Supabase Storage and save to global cache.
+ * Used during Wipe-and-Deploy to populate cache with server-backed audio.
+ * Returns the cache path, or empty string on failure.
  */
 export async function downloadAtmosphereFromServer(
-  storage: ProjectStorage,
-  sceneId: string,
   supabaseStoragePath: string,
-  chapterId?: string,
 ): Promise<string> {
   const { supabase } = await import("@/integrations/supabase/client");
 
@@ -110,5 +185,5 @@ export async function downloadAtmosphereFromServer(
 
   const blob = await response.blob();
   const fileName = supabaseStoragePath.split("/").pop() || `atmo-${Date.now()}.mp3`;
-  return writeAtmosphereAudio(storage, sceneId, fileName, blob, chapterId);
+  return writeAtmosphereAudio(fileName, blob);
 }
