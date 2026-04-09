@@ -137,12 +137,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    const audioBuffer = await response.arrayBuffer();
+    const pcmBuffer = await response.arrayBuffer();
+    const pcmData = new Uint8Array(pcmBuffer);
 
-    return new Response(audioBuffer, {
+    // Wrap raw PCM in WAV container (ElevenLabs pcm_44100 = 16-bit mono 44100Hz)
+    const wavData = wrapPcmInWav(pcmData, 44100, 1, 16);
+
+    return new Response(wavData, {
       headers: {
         ...corsHeaders,
-        "Content-Type": "audio/mpeg",
+        "Content-Type": "audio/wav",
       },
     });
   } catch (e) {
