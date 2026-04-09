@@ -946,30 +946,53 @@ export function StoryboardPanel({
       await pushToDb(sceneId, buildSnapshot());
 
       const voice_configs = await buildVoiceConfigsPayload(projectStorage);
-      const { data, error } = await supabase.functions.invoke("synthesize-scene", {
-        body: { scene_id: sceneId, language: isRu ? "ru" : "en", force: true, segment_ids: [segmentId], voice_configs },
-      });
-      if (error) throw error;
 
-      const synth = data as {
-        errors?: number;
-        results?: Array<{
-          segment_id: string;
-          status: string;
-          duration_ms: number;
-          audio_base64?: string;
-          voice_config?: Record<string, unknown>;
-          error?: string;
-          inline_narrations?: Array<{
-            text: string;
-            insert_after: string;
-            audio_base64: string;
-            duration_ms: number;
-            offset_ms: number;
-          }>;
-        }>;
-      };
-      const segmentResult = synth.results?.find((r) => r.segment_id === segmentId);
+      // Use streaming NDJSON (same as runSynthesis)
+      const { data: session } = await supabase.auth.getSession();
+      const token = session?.session?.access_token;
+      if (!token) throw new Error("Not authenticated");
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      const resp = await fetch(`${supabaseUrl}/functions/v1/synthesize-scene`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          apikey: anonKey,
+        },
+        body: JSON.stringify({ scene_id: sceneId, language: isRu ? "ru" : "en", force: true, segment_ids: [segmentId], voice_configs }),
+      });
+
+      if (!resp.ok) {
+        const errBody = await resp.text();
+        throw new Error(`Re-synth HTTP ${resp.status}: ${errBody}`);
+      }
+
+      // Parse NDJSON stream
+      const reader = resp.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let segmentResult: { segment_id: string; status: string; duration_ms: number; audio_base64?: string; voice_config?: Record<string, unknown>; error?: string; inline_narrations?: any[] } | null = null;
+      const allResults: typeof segmentResult[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (value) buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const obj = JSON.parse(line);
+            if (!obj._summary) {
+              allResults.push(obj);
+              if (obj.segment_id === segmentId) segmentResult = obj;
+            }
+          } catch { /* skip */ }
+        }
+        if (done) break;
+      }
 
       if (!segmentResult || segmentResult.status !== "ready") {
         throw new Error(
@@ -980,9 +1003,7 @@ export function StoryboardPanel({
       toast.success(isRu ? "Блок пересинтезирован" : "Segment re-synthesized");
       onErrorSegmentsChange?.(new Set());
       // Save re-synthesized audio to OPFS
-      if (synth.results) {
-        await saveSynthResultsToOpfs(synth.results);
-      }
+      await saveSynthResultsToOpfs(allResults.filter(Boolean) as any[]);
       onSegmented?.(sceneId);
     } catch (err: any) {
       console.error("Re-synth failed:", err);
