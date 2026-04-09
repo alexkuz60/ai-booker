@@ -14,8 +14,9 @@ import { supabase } from "@/integrations/supabase/client";
 import * as Tone from "tone";
 
 import { getAudioEngine } from "./audioEngine";
-import { fetchWithStemCache } from "./stemCache";
 import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
+import type { ProjectStorage } from "@/lib/projectStorage";
+import { getAudioBuffer } from "@/lib/localAudioProvider";
 
 // ─── Public types ────────────────────────────────────────────
 
@@ -147,16 +148,14 @@ async function encodeMp3(buffer: AudioBuffer, bitrate: Mp3Bitrate = 192): Promis
 // ─── Audio buffer loading ────────────────────────────────────
 
 async function fetchStemBuffer(
+  storage: ProjectStorage,
   audioPath: string,
   sampleRate: number,
 ): Promise<AudioBuffer | null> {
   try {
-    const { data: urlData } = await supabase.storage
-      .from("user-media")
-      .createSignedUrl(audioPath, 600);
-    if (!urlData?.signedUrl) return null;
+    const arrayBuf = await getAudioBuffer(storage, audioPath);
+    if (!arrayBuf) return null;
 
-    const arrayBuf = await fetchWithStemCache(audioPath, urlData.signedUrl);
     console.log(`[ChapterRenderer] Decoding stem: ${audioPath}, bytes=${arrayBuf.byteLength}`);
 
     // Use a sufficiently long context for decoding (some browsers need this)
