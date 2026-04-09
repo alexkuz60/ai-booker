@@ -1,5 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
-import { logAiUsage } from "../_shared/logAiUsage.ts";
+import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
 import { resolveTaskPromptWithOverrides } from "../_shared/taskPrompts.ts";
 
 import { temperatureParam } from "../_shared/modelParams.ts";
@@ -25,7 +24,7 @@ Deno.serve(async (req) => {
 
   try {
     // ── Auth ──
-    const authHeader = req.headers.get("Authorization");
+    const authHeader = req.headers.get("Authorization") ?? req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -33,15 +32,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: authErr } = await supabase.auth.getUser(token);
-    if (authErr || !userData?.user) {
+    const userId = await getUserIdFromAuth(authHeader);
+    if (!userId) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -49,7 +41,8 @@ Deno.serve(async (req) => {
     }
 
     // ── Params ──
-    const { scene_id, lang, model: clientModel } = await req.json();
+    // 🚫 К3: NEVER read from DB — client sends scene metadata from OPFS
+    const { scene_id, lang, model: clientModel, scene_meta } = await req.json();
     const isRu = lang === "ru";
 
     if (!scene_id) {
@@ -59,24 +52,18 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── Load scene metadata ──
-    const { data: scene, error: sceneErr } = await supabase
-      .from("book_scenes")
-      .select("id, title, mood, scene_type, bpm, content, silence_sec")
-      .eq("id", scene_id)
-      .single();
-
-    if (sceneErr || !scene) {
+    if (!scene_meta) {
       return new Response(
-        JSON.stringify({ error: isRu ? "Сцена не найдена" : "Scene not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "scene_meta required — send scene metadata from OPFS" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Build a brief content summary (first 500 chars)
-    const contentSummary = scene.content
-      ? scene.content.slice(0, 500).replace(/\s+/g, " ").trim()
-      : "";
+    const title = String(scene_meta.title || "");
+    const mood = String(scene_meta.mood || "neutral");
+    const sceneType = String(scene_meta.scene_type || "mixed");
+    const bpm = Number(scene_meta.bpm) || 80;
+    const contentSummary = String(scene_meta.content_summary || "").slice(0, 500);
 
     // ── AI prompt generation ──
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -87,7 +74,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    const userId = userData.user.id;
     const usedModel = clientModel || "google/gemini-3-flash-preview";
     const aiStart = Date.now();
 
@@ -96,10 +82,10 @@ Deno.serve(async (req) => {
       || "You are a sound designer for audiobook production.";
     const systemPrompt = `${basePrompt}\n\n- Prompts must be in ${promptLang}.`;
 
-    const userPrompt = `Scene: "${scene.title}"
-Mood: ${scene.mood || "neutral"}
-Type: ${scene.scene_type || "mixed"}
-BPM: ${scene.bpm || 80}
+    const userPrompt = `Scene: "${title}"
+Mood: ${mood}
+Type: ${sceneType}
+BPM: ${bpm}
 Content excerpt: ${contentSummary || "(no content available)"}`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
