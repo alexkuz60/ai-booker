@@ -45,7 +45,8 @@
 - `chapters/{ch}/scenes/{sc}/storyboard.json` (re-analysis)
 - `chapters/{ch}/scenes/{sc}/audio/**` (re-synthesis)
 - `chapters/{ch}/scenes/{sc}/{lang}/storyboard.json` (re-translation)
-- `chapters/{ch}/scenes/{sc}/{lang}/audio/**` (re-TTS in target language)
+- `chapters/{ch}/scenes/{sc}/{lang}/radar-*.json` (re-evaluation)
+- Legacy: `chapters/{ch}/scenes/{sc}/{lang}/audio_meta.json|clip_plugins.json|mixer_state.json` (cleanup)
 
 ### Protected files (NEVER deletable via guardedDelete):
 - `project.json`, `characters.json`, `structure/*`, `synopsis/*`
@@ -121,10 +122,9 @@ When restoring from server (`openSavedBook`):
         ├── atmospheres.json   — { sceneId, updatedAt, atmo: [], sfx: [] }
         ├── tts/               — synthesized TTS clips
         ├── audio/atmosphere/  — atmosphere audio layers
-        └── {lang}/            — translation subdirectories
+        └── {lang}/            — translation subdirectories (text only, no audio)
             ├── storyboard.json
-            ├── radar-*.json
-            └── audio/tts/
+            └── radar-*.json
 ```
 
 ---
