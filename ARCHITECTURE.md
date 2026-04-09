@@ -482,8 +482,22 @@ async function fetchChunked<T>(
 2. `scene_segments` — chunks по 500 `scene_id`
 3. `segment_phrases` — chunks по 500 `segment_id`
 4. `scene_type_mappings` — chunks по 500 `scene_id`
+5. `segment_audio` — chunks по 500 `segment_id`
+6. `clip_plugin_configs` — chunks по 200 `scene_id`
+7. `scene_atmospheres` — chunks по 500 `scene_id`
+8. `character_appearances` — chunks по 500 `character_id`
 
-Результаты каждого уровня агрегируются в `Map<parentId, child[]>` для O(1) группировки при записи в OPFS.
+Порядок батчинга при push (useSaveBookToProject):
+1. `book_chapters` — delete-then-insert (cascade: scenes, segments, phrases)
+2. `book_scenes` — insert (leaf chapters only)
+3. `book_parts` — delete-then-insert
+4. `book_characters` — delete-then-insert
+5. `character_appearances` — delete-then-insert from OPFS scene character maps
+6. `scene_segments` + `segment_phrases` + `scene_type_mappings` — via `pushAllToDb()`
+7. `segment_audio` — delete-then-insert from OPFS audio_meta.json
+8. `clip_plugin_configs` — delete-then-insert from OPFS clip_plugins.json
+9. `user_settings` (mixer) — delete-then-insert from OPFS mixer_state.json
+10. `scene_atmospheres` — ID-based dedup (insert new, delete orphaned)
 
 ### 1.12 Индекс сцен и контроль целостности (V2)
 
