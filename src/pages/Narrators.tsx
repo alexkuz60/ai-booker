@@ -611,7 +611,7 @@ const Narrators = () => {
                         }}
                       >
                         <div className="flex items-center gap-1.5 group">
-                          <span className="truncate font-medium flex-1 text-xs">{ch.name}</span>
+                          <span className="truncate font-medium flex-1 text-sm text-foreground">{ch.name}</span>
                           {ch.gender !== "unknown" && (
                             <span className="text-[10px] text-muted-foreground/60">
                               {ch.gender === "female" ? "♀" : "♂"}
