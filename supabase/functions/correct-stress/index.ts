@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
 import { modelParams } from "../_shared/modelParams.ts";
 import { resolveTaskPromptWithOverrides } from "../_shared/taskPrompts.ts";
+import { getUserIdFromAuth } from "../_shared/logAiUsage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,10 +18,8 @@ function isVowel(ch: string): boolean {
 }
 
 // ── Simple Russian stemmer (Porter-like) ────────────────────────────
-// Strips common suffixes to find word stems for matching
 function stem(word: string): string {
   let w = word.toLowerCase();
-  // Remove common endings (simplified Russian morphology)
   const suffixes = [
     "ившись", "ывшись", "вшись",
     "ающий", "яющий", "ующий", "ющий", "ащий", "ящий",
@@ -48,7 +47,6 @@ function stem(word: string): string {
   for (const s of suffixes) {
     if (w.length > s.length + 2 && w.endsWith(s)) {
       return w.slice(0, -s.length);
-      break;
     }
   }
   return w;
@@ -64,8 +62,8 @@ interface DictEntry {
 interface StressMatch {
   phrase_id: string;
   word: string;
-  word_offset: number; // char offset of the word in phrase text
-  stressed_char_offset: number; // char offset of the stressed vowel in phrase text
+  word_offset: number;
+  stressed_char_offset: number;
   dict_word: string;
   confidence: "stem" | "exact" | "ai";
 }
@@ -76,7 +74,6 @@ function findStemMatches(
   dictEntries: DictEntry[]
 ): StressMatch[] {
   const matches: StressMatch[] = [];
-  // Build stem → entries map
   const stemMap = new Map<string, DictEntry[]>();
   for (const entry of dictEntries) {
     const s = stem(entry.word);
@@ -85,7 +82,6 @@ function findStemMatches(
     stemMap.set(s, list);
   }
 
-  // Tokenize text into words with positions
   const wordRegex = /[а-яёА-ЯЁ]+/g;
   let m: RegExpExecArray | null;
   while ((m = wordRegex.exec(text)) !== null) {
@@ -98,13 +94,9 @@ function findStemMatches(
     if (!entries) continue;
 
     for (const entry of entries) {
-      // Find the stressed vowel position in the current word form
-      // The dictionary stores stressed_index relative to the base word
-      // We need to map it to the current form
       const stressedVowelChar = entry.word.toLowerCase()[entry.stressed_index];
       if (!stressedVowelChar || !isVowel(stressedVowelChar)) continue;
 
-      // Find the nth vowel in the dictionary word
       let vowelCount = 0;
       let targetVowelN = 0;
       for (let i = 0; i < entry.word.length; i++) {
@@ -117,7 +109,6 @@ function findStemMatches(
         }
       }
 
-      // Find the same nth vowel in the text word
       let currentVowelN = 0;
       let stressOffset = -1;
       for (let i = 0; i < word.length; i++) {
@@ -155,7 +146,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
+    const authHeader = req.headers.get("Authorization") ?? req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -163,24 +154,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: authErr } = await supabase.auth.getUser(token);
-    if (authErr || !userData?.user) {
+    const userId = await getUserIdFromAuth(authHeader);
+    if (!userId) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const userId = userData.user.id;
-    const { scene_id, mode, model, provider, apiKey, user_api_key, openrouter_api_key } = await req.json();
-    // mode: "correct" (apply dictionary to scene) | "suggest" (AI find ambiguous words)
+    // 🚫 К3: Accept phrases from client (OPFS), never read from DB
+    const { scene_id, mode, phrases: clientPhrases, model, provider, apiKey, user_api_key, openrouter_api_key } = await req.json();
 
     if (!scene_id) {
       return new Response(JSON.stringify({ error: "scene_id required" }), {
@@ -189,35 +172,29 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Load scene segments + phrases
-    const { data: segments } = await supabase
-      .from("scene_segments")
-      .select("id, segment_number, speaker")
-      .eq("scene_id", scene_id)
-      .order("segment_number");
-
-    if (!segments?.length) {
-      return new Response(JSON.stringify({ error: "No segments found" }), {
+    if (!clientPhrases || !Array.isArray(clientPhrases) || clientPhrases.length === 0) {
+      return new Response(JSON.stringify({ error: "phrases required — send storyboard phrases from OPFS" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const segIds = segments.map(s => s.id);
-    const { data: phrases } = await supabase
-      .from("segment_phrases")
-      .select("id, segment_id, phrase_number, text, metadata")
-      .in("segment_id", segIds)
-      .order("phrase_number");
+    // Validate phrase structure
+    const phrases = clientPhrases.map((p: any) => ({
+      id: String(p.id || p.phrase_id || ""),
+      segment_id: String(p.segment_id || ""),
+      phrase_number: Number(p.phrase_number) || 0,
+      text: String(p.text || ""),
+      metadata: p.metadata ?? {},
+    }));
 
-    if (!phrases?.length) {
-      return new Response(JSON.stringify({ error: "No phrases found" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Load user's stress dictionary (this is user-level data, not book content — OK to read from DB)
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    // Load user's stress dictionary
     const { data: dictEntries } = await supabase
       .from("stress_dictionary")
       .select("word, stressed_index, context")
@@ -238,8 +215,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Collect all text
-      const sceneText = phrases.map(p => p.text).join("\n");
+      const sceneText = phrases.map((p: any) => p.text).join("\n");
       const existingWords = new Set(dictionary.map(d => d.word.toLowerCase()));
 
       const basePrompt = (await resolveTaskPromptWithOverrides("proofreader:suggest_stress"))
@@ -308,7 +284,6 @@ Deno.serve(async (req) => {
           const parsed = JSON.parse(toolCall.function.arguments);
           suggestions = parsed.words ?? [];
         } else {
-          // Fallback: try parsing from content
           const content = aiData.choices?.[0]?.message?.content;
           if (content) {
             const jsonMatch = content.match(/\[[\s\S]*\]/);
@@ -319,7 +294,6 @@ Deno.serve(async (req) => {
         console.error("Failed to parse AI suggestions:", e);
       }
 
-      // Filter out invalid entries
       suggestions = suggestions.filter(s =>
         s.word && typeof s.stressed_index === "number" &&
         s.stressed_index >= 0 && s.stressed_index < s.word.length &&
@@ -331,17 +305,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── Correct mode: apply dictionary to phrases ──────────────────
+    // ── Correct mode: apply dictionary to phrases, return annotations ──
+    // 🚫 К3: No DB writes — return computed annotations for client to apply locally
     if (dictionary.length === 0) {
       return new Response(JSON.stringify({
         applied: 0,
+        annotations: {},
         message: "Dictionary is empty. Use 'suggest' mode to find words or add manually.",
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Find all stem matches
     const allMatches: StressMatch[] = [];
     for (const p of phrases) {
       const matches = findStemMatches(p.id, p.text, dictionary);
@@ -349,12 +324,16 @@ Deno.serve(async (req) => {
     }
 
     if (allMatches.length === 0) {
-      return new Response(JSON.stringify({ applied: 0, message: "No dictionary words found in scene text." }), {
+      return new Response(JSON.stringify({
+        applied: 0,
+        annotations: {},
+        message: "No dictionary words found in scene text.",
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Group matches by phrase and apply as stress annotations
+    // Group matches by phrase and compute new annotations
     const phraseMatches = new Map<string, StressMatch[]>();
     for (const m of allMatches) {
       const list = phraseMatches.get(m.phrase_id) ?? [];
@@ -362,23 +341,21 @@ Deno.serve(async (req) => {
       phraseMatches.set(m.phrase_id, list);
     }
 
+    // Return annotations map: phrase_id → new annotations to add
+    const annotations: Record<string, Array<{ type: string; start: number; end: number }>> = {};
     let appliedCount = 0;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
     for (const [phraseId, matches] of phraseMatches) {
-      const phrase = phrases.find(p => p.id === phraseId);
+      const phrase = phrases.find((p: any) => p.id === phraseId);
       if (!phrase) continue;
 
       const meta = (phrase.metadata ?? {}) as Record<string, unknown>;
       const existing = (meta.annotations ?? []) as Array<Record<string, unknown>>;
-
-      // Don't duplicate: check if stress annotation already exists at same offset
       const existingStressOffsets = new Set(
         existing.filter(a => a.type === "stress").map(a => a.start)
       );
 
-      const newAnnotations = [...existing];
+      const newAnnotations: Array<{ type: string; start: number; end: number }> = [];
       for (const m of matches) {
         if (existingStressOffsets.has(m.stressed_char_offset)) continue;
         newAnnotations.push({
@@ -389,18 +366,16 @@ Deno.serve(async (req) => {
         appliedCount++;
       }
 
-      if (newAnnotations.length > existing.length) {
-        await supabaseAdmin
-          .from("segment_phrases")
-          .update({ metadata: { ...meta, annotations: newAnnotations } })
-          .eq("id", phraseId);
+      if (newAnnotations.length > 0) {
+        annotations[phraseId] = newAnnotations;
       }
     }
 
     return new Response(JSON.stringify({
       applied: appliedCount,
       total_matches: allMatches.length,
-      phrases_affected: phraseMatches.size,
+      phrases_affected: Object.keys(annotations).length,
+      annotations,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

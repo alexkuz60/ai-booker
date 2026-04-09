@@ -667,6 +667,27 @@ function AutoAtmospherePanel({
       const token = session.session?.access_token;
       if (!token) throw new Error("Not authenticated");
 
+      // 🚫 К3: Read scene metadata from OPFS, not DB
+      let sceneMeta: Record<string, unknown> = {};
+      if (storage) {
+        const { resolveChapterId } = await import("@/lib/sceneIndex");
+        const chId = resolveChapterId(sceneId);
+        if (chId) {
+          const { paths } = await import("@/lib/projectPaths");
+          const chapterData = await storage.readJSON<{ scenes?: Array<{ id?: string; title?: string; mood?: string; scene_type?: string; bpm?: number; content?: string }> }>(paths.chapterContent(chId));
+          const scene = chapterData?.scenes?.find(s => s.id === sceneId);
+          if (scene) {
+            sceneMeta = {
+              title: scene.title || "",
+              mood: scene.mood || "neutral",
+              scene_type: scene.scene_type || "mixed",
+              bpm: scene.bpm || 80,
+              content_summary: (scene.content || "").slice(0, 500),
+            };
+          }
+        }
+      }
+
       const promptRes = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-atmosphere-prompt`,
         {
@@ -676,7 +697,12 @@ function AutoAtmospherePanel({
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ scene_id: sceneId, lang: isRu ? "ru" : "en", model: getModelForRole("sound_engineer") }),
+          body: JSON.stringify({
+            scene_id: sceneId,
+            lang: isRu ? "ru" : "en",
+            model: getModelForRole("sound_engineer"),
+            scene_meta: sceneMeta,
+          }),
         }
       );
 
@@ -698,7 +724,7 @@ function AutoAtmospherePanel({
     } finally {
       setPromptLoading(false);
     }
-  }, [sceneId, isRu]);
+  }, [sceneId, isRu, storage]);
 
   const handleEditLayer = useCallback((idx: number, updated: AtmosphereLayer) => {
     setPendingLayers(prev => prev ? prev.map((l, i) => i === idx ? updated : l) : prev);

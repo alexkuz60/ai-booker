@@ -1,4 +1,3 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
 import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
 import { resolveAiEndpoint } from "../_shared/providerRouting.ts";
 import { modelParams } from "../_shared/modelParams.ts";
@@ -18,13 +17,14 @@ interface InlineNarration {
 interface DetectionResult {
   segment_id: string;
   inline_narrations: InlineNarration[];
-  clean_text: string; // dialogue text with narrator parts removed
+  clean_text: string;
 }
 
 /**
- * Batch-detect inline narrator insertions within existing dialogue segments.
- * Input: { scene_id: string, language?: string }
- * Works on already-segmented scenes — no re-segmentation needed.
+ * Batch-detect inline narrator insertions within dialogue segments.
+ * 🚫 К3: Accepts segments from client (OPFS), no DB reads/writes.
+ * Input: { scene_id, language, segments: Array<{segment_id, speaker, text}> }
+ * Returns: { detected, results: Array<{segment_id, inline_narrations, clean_text}> }
  */
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("authorization");
+    const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { scene_id, language, model: clientModel, provider, apiKey, user_api_key, openrouter_api_key } = await req.json();
+    const { scene_id, language, segments: clientSegments, model: clientModel, provider, apiKey, user_api_key, openrouter_api_key } = await req.json();
     if (!scene_id) {
       return new Response(JSON.stringify({ error: "scene_id is required" }), {
         status: 400,
@@ -49,72 +49,32 @@ Deno.serve(async (req) => {
     }
 
     const lang = language === "ru" ? "ru" : "en";
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Verify user owns the scene
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: sceneCheck, error: sceneErr } = await userClient
-      .from("book_scenes")
-      .select("id")
-      .eq("id", scene_id)
-      .maybeSingle();
-
-    if (sceneErr || !sceneCheck) {
-      return new Response(JSON.stringify({ error: "Scene not found or access denied" }), {
-        status: 403,
+    if (!clientSegments || !Array.isArray(clientSegments) || clientSegments.length === 0) {
+      return new Response(JSON.stringify({ error: "segments required — send dialogue segments from OPFS storyboard" }), {
+        status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const supabase = createClient(supabaseUrl, serviceKey);
-
-    // Load dialogue segments only
-    const { data: segments, error: segErr } = await supabase
-      .from("scene_segments")
-      .select("id, segment_number, segment_type, speaker, metadata")
-      .eq("scene_id", scene_id)
-      .in("segment_type", ["dialogue", "monologue"])
-      .order("segment_number");
-
-    if (segErr) throw segErr;
-    if (!segments || segments.length === 0) {
-      return new Response(JSON.stringify({ detected: 0, results: [] }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Load phrases for these segments
-    const segIds = segments.map(s => s.id);
-    const { data: phrases } = await supabase
-      .from("segment_phrases")
-      .select("id, segment_id, phrase_number, text")
-      .in("segment_id", segIds)
-      .order("phrase_number");
-
-    // Build full text per segment
-    const textBySegment = new Map<string, string>();
-    for (const p of phrases ?? []) {
-      const prev = textBySegment.get(p.segment_id) ?? "";
-      textBySegment.set(p.segment_id, prev ? `${prev} ${p.text}` : p.text);
-    }
-
-    // Build batch for AI — only segments that have text and no existing inline_narrations
+    // Validate and filter: only dialogue/monologue segments with text
     const batch: Array<{ segment_id: string; speaker: string | null; text: string }> = [];
-    for (const seg of segments) {
-      const text = textBySegment.get(seg.id);
-      if (!text?.trim()) continue;
-      // Skip if already has inline_narrations detected
-      const meta = (seg.metadata ?? {}) as Record<string, unknown>;
-      if (Array.isArray(meta.inline_narrations) && meta.inline_narrations.length > 0) continue;
-      batch.push({ segment_id: seg.id, speaker: seg.speaker, text });
+    for (const seg of clientSegments) {
+      const text = String(seg.text || "").trim();
+      if (!text) continue;
+      batch.push({
+        segment_id: String(seg.segment_id),
+        speaker: seg.speaker || null,
+        text,
+      });
     }
 
     if (batch.length === 0) {
-      return new Response(JSON.stringify({ detected: 0, results: [], message: lang === "ru" ? "Все диалоги уже проверены" : "All dialogues already checked" }), {
+      return new Response(JSON.stringify({
+        detected: 0,
+        results: [],
+        message: lang === "ru" ? "Нет диалогов для проверки" : "No dialogues to check",
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -134,7 +94,7 @@ Deno.serve(async (req) => {
     const systemPrompt = (await resolveTaskPromptWithOverrides("profiler:detect_inline_narrations"))
       || "You are a literary text analyst specializing in detecting narrator insertions within dialogue.";
 
-    const userContent = batch.map((b, i) => 
+    const userContent = batch.map((b, i) =>
       `[${i + 1}] segment_id: "${b.segment_id}"\nspeaker: ${b.speaker || "unknown"}\ntext: ${b.text}`
     ).join("\n\n");
 
@@ -186,47 +146,22 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Apply detections to DB
+    // 🚫 К3: No DB writes — return results for client to apply locally
     let detectedCount = 0;
-    const results: Array<{ segment_id: string; narrations_count: number }> = [];
+    const results: DetectionResult[] = [];
 
     for (const det of detections) {
       if (!det.inline_narrations || det.inline_narrations.length === 0) continue;
-
       // Validate segment_id exists in our batch
       const batchItem = batch.find(b => b.segment_id === det.segment_id);
       if (!batchItem) continue;
 
-      // Update segment metadata with inline_narrations
-      const seg = segments.find(s => s.id === det.segment_id);
-      const existingMeta = ((seg?.metadata ?? {}) as Record<string, unknown>);
-      const updatedMeta = {
-        ...existingMeta,
-        inline_narrations: det.inline_narrations,
-      };
-
-      await supabase
-        .from("scene_segments")
-        .update({ metadata: updatedMeta })
-        .eq("id", det.segment_id);
-
-      // Update phrases with clean text (narrator removed)
-      if (det.clean_text && det.clean_text !== batchItem.text) {
-        // Re-split into phrases
-        const newPhrases = splitPhrases(det.clean_text);
-
-        // Delete old phrases and insert new ones
-        await supabase.from("segment_phrases").delete().eq("segment_id", det.segment_id);
-        const phraseRows = newPhrases.map((text, j) => ({
-          segment_id: det.segment_id,
-          phrase_number: j + 1,
-          text,
-        }));
-        await supabase.from("segment_phrases").insert(phraseRows);
-      }
-
       detectedCount += det.inline_narrations.length;
-      results.push({ segment_id: det.segment_id, narrations_count: det.inline_narrations.length });
+      results.push({
+        segment_id: det.segment_id,
+        inline_narrations: det.inline_narrations,
+        clean_text: det.clean_text || batchItem.text,
+      });
     }
 
     console.log(`Detected ${detectedCount} inline narrations in ${results.length} segments for scene ${scene_id}`);
@@ -247,10 +182,3 @@ Deno.serve(async (req) => {
     });
   }
 });
-
-// Split text into sentences
-function splitPhrases(text: string): string[] {
-  const raw = text.match(/[^.!?…]+[.!?…]+[")»\\]]*|[^.!?…]+$/g);
-  if (!raw) return [text.trim()].filter(Boolean);
-  return raw.map((s) => s.trim()).filter(Boolean);
-}

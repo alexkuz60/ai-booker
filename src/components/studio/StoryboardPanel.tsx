@@ -1096,41 +1096,82 @@ export function StoryboardPanel({
     if (!sceneId || dialogueCount === 0) return;
     setDetecting(true);
     try {
+      // 🚫 К3: Send dialogue segments from OPFS, no DB reads
+      const dialogueSegments = segments
+        .filter(s => s.segment_type === "dialogue" || s.segment_type === "monologue")
+        .filter(s => !s.inline_narrations?.length) // skip already detected
+        .map(s => ({
+          segment_id: s.segment_id,
+          speaker: s.speaker,
+          text: s.phrases.map(p => p.text).join(" "),
+        }));
+
+      if (dialogueSegments.length === 0) {
+        toast.info(isRu ? "Все диалоги уже проверены" : "All dialogues already checked");
+        setDetecting(false);
+        return;
+      }
+
       const { data, error } = await invokeWithFallback({
         functionName: "detect-inline-narrations",
-        body: { scene_id: sceneId, language: isRu ? "ru" : "en", model: getModelForRole("screenwriter") },
+        body: {
+          scene_id: sceneId,
+          language: isRu ? "ru" : "en",
+          model: getModelForRole("screenwriter"),
+          segments: dialogueSegments,
+        },
         userApiKeys,
         isRu,
       });
       if (error) throw error;
-      const det = data as { detected: number; segments_updated: number; message?: string };
-      if (det.detected > 0) {
+      const det = data as { detected: number; segments_updated: number; results: Array<{ segment_id: string; inline_narrations: Array<{ text: string; insert_after: string }>; clean_text: string }> };
+      if (det.detected > 0 && det.results?.length) {
+        // Apply inline_narrations locally
+        const resultMap = new Map(det.results.map(r => [r.segment_id, r]));
+        const updated = segments.map(seg => {
+          const result = resultMap.get(seg.segment_id);
+          if (!result) return seg;
+          return {
+            ...seg,
+            inline_narrations: result.inline_narrations,
+          };
+        });
+        setSegments(updated);
+        persist(buildSnapshot(updated));
         toast.success(
           isRu
             ? `Найдено ${det.detected} вставок в ${det.segments_updated} фрагментах`
             : `Found ${det.detected} insertions in ${det.segments_updated} segments`
         );
-        await loadSegments(sceneId);
       } else {
-        toast.info(det.message || (isRu ? "Вставок не найдено" : "No insertions found"));
+        toast.info(isRu ? "Вставок не найдено" : "No insertions found");
       }
     } catch (err: any) {
       console.error("Detection failed:", err);
       toast.error(isRu ? "Ошибка поиска вставок" : "Detection failed");
     }
     setDetecting(false);
-  }, [sceneId, dialogueCount, isRu, loadSegments]);
+  }, [sceneId, segments, dialogueCount, isRu, persist, buildSnapshot, getModelForRole, userApiKeys]);
 
   const runStressCorrection = useCallback(async (mode: "correct" | "suggest") => {
     if (!sceneId) return;
     setCorrectingStress(true);
     try {
+      // 🚫 К3: Send phrases from OPFS storyboard, no pushToDb needed
+      const allPhrases = segments.flatMap(seg =>
+        seg.phrases.map(p => ({
+          id: p.phrase_id,
+          segment_id: seg.segment_id,
+          phrase_number: p.phrase_number,
+          text: p.text,
+          metadata: { annotations: p.annotations ?? [] },
+        }))
+      );
+
       if (mode === "suggest") {
-        // Push to DB first so edge function can read phrases
-        await pushToDb(sceneId, buildSnapshot());
         const { data, error } = await invokeWithFallback({
           functionName: "correct-stress",
-          body: { scene_id: sceneId, mode: "suggest", model: getModelForRole("proofreader") },
+          body: { scene_id: sceneId, mode: "suggest", phrases: allPhrases, model: getModelForRole("proofreader") },
           userApiKeys,
           isRu,
         });
@@ -1144,23 +1185,38 @@ export function StoryboardPanel({
           setStressReviewOpen(true);
         }
       } else {
-        // Push to DB first so edge function can read phrases
-        await pushToDb(sceneId, buildSnapshot());
         const { data, error } = await invokeWithFallback({
           functionName: "correct-stress",
-          body: { scene_id: sceneId, mode: "correct", model: getModelForRole("proofreader") },
+          body: { scene_id: sceneId, mode: "correct", phrases: allPhrases, model: getModelForRole("proofreader") },
           userApiKeys,
           isRu,
         });
         if (error) throw error;
         const result = data as any;
         if (result.applied > 0) {
+          // Apply annotations locally from server response
+          const annotationsMap = result.annotations as Record<string, Array<{ type: string; start: number; end: number }>>;
+          if (annotationsMap && Object.keys(annotationsMap).length > 0) {
+            const updated = segments.map(seg => ({
+              ...seg,
+              phrases: seg.phrases.map(p => {
+                const newAnns = annotationsMap[p.phrase_id];
+                if (!newAnns?.length) return p;
+                const typed = newAnns.map(a => ({ type: a.type as import("./phraseAnnotations").AnnotationType, start: a.start, end: a.end }));
+                return {
+                  ...p,
+                  annotations: [...(p.annotations ?? []), ...typed] as import("./phraseAnnotations").PhraseAnnotation[],
+                };
+              }),
+            })) as import("./storyboard/types").Segment[];
+            setSegments(updated);
+            persist(buildSnapshot(updated));
+          }
           toast.success(
             isRu
               ? `Расставлено ${result.applied} ударений в ${result.phrases_affected} фразах`
               : `Applied ${result.applied} stress marks in ${result.phrases_affected} phrases`
           );
-          await loadSegments(sceneId);
         } else {
           toast.info(result.message || (isRu ? "Нет совпадений со словарём" : "No dictionary matches"));
         }
@@ -1170,7 +1226,7 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка коррекции ударений" : "Stress correction failed");
     }
     setCorrectingStress(false);
-  }, [sceneId, isRu, loadSegments, pushToDb, buildSnapshot, getModelForRole, userApiKeys]);
+  }, [sceneId, segments, isRu, persist, buildSnapshot, getModelForRole, userApiKeys]);
 
   const handleStressReviewAccept = useCallback(async (accepted: StressSuggestion[]) => {
     if (accepted.length === 0) return;
