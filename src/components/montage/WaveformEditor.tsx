@@ -11,8 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { chooseLod, type MultiLodPeaks, type StereoPeaks } from "@/lib/waveformPeaks";
 import { useWaveformPeaks, type WaveformStatus } from "@/hooks/useWaveformPeaks";
-import { supabase } from "@/integrations/supabase/client";
-import { fetchWithStemCache } from "@/lib/stemCache";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { getAudioBuffer } from "@/lib/localAudioProvider";
 import { computeFFTAtPosition, computeAveragedFFT, setStaticSpectrum } from "@/lib/staticSpectrum";
 import type { TimelineClip } from "@/hooks/useTimelineClips";
 
