@@ -921,7 +921,7 @@ Deno.serve(async (req) => {
       const inlineNarrations = (metadata.inline_narrations ?? []) as InlineNarration[];
       const hasInlineNarrations = inlineNarrations.length > 0 && seg.segment_type === "dialogue";
 
-      const voiceConfig = resolveVoice(seg.speaker, voiceConfigMap);
+      const voiceConfig = resolveVoice(seg.speaker, voiceConfigMap, narratorVoice);
 
       // ── Apply mood + scene_type context for narrator-like segments ──
       const ttsCtx = getSceneTtsContext(seg.segment_type);
