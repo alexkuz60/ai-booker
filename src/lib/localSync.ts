@@ -13,6 +13,7 @@ import {
 import { paths } from "@/lib/projectPaths";
 import { buildSceneIndex, writeSceneIndex, readSceneIndex } from "@/lib/sceneIndex";
 import { getSceneFileDefaults, getTranslationFileDefaults, SCENE_DIRS } from "@/lib/bookTemplateOPFS";
+import { guardedDelete } from "@/lib/storageGuard";
 import { writePipelineStep } from "@/hooks/usePipelineProgress";
 import { buildBookMap, writeBookMap, readBookMap } from "@/lib/bookMap";
 
@@ -144,6 +145,9 @@ export async function syncStructureToLocal(
     // 5. Build and write book map (precomputed path map)
     const bookMap = buildBookMap(data.bookId, data.toc, data.chapterIdMap, sanitizedResults, transLangs);
     await writeBookMap(storage, bookMap);
+
+    // 6. Clean up legacy audio files from translation subdirs
+    await cleanLegacyTranslationAudioFiles(storage, data.chapterIdMap, sanitizedResults, transLangs);
 
     // ── Auto-set pipeline flags ──
     await writePipelineStep(storage, "toc_extracted", true);
@@ -315,5 +319,57 @@ async function seedEmptySceneFiles(
 
   if (dirWrites.length > 0) {
     await Promise.all(dirWrites);
+  }
+}
+
+// ─── Legacy translation audio cleanup ────────────────────
+
+/** Files that should NOT exist in translation subdirs (legacy from pre-refactor) */
+const LEGACY_TRANSLATION_FILES = [
+  "audio_meta.json",
+  "clip_plugins.json",
+  "mixer_state.json",
+] as const;
+
+/**
+ * One-time migration: removes audio_meta, clip_plugins, mixer_state
+ * from translation language subdirs ({lang}/) where they were
+ * erroneously created by older seeding code.
+ */
+async function cleanLegacyTranslationAudioFiles(
+  storage: ProjectStorage,
+  chapterIdMap: Map<number, string>,
+  chapterResults: Map<number, { scenes: Scene[]; status: ChapterStatus }>,
+  translationLanguages: string[],
+): Promise<void> {
+  if (translationLanguages.length === 0) return;
+
+  const deletes: Promise<void>[] = [];
+
+  chapterResults.forEach((result, idx) => {
+    const chapterId = chapterIdMap.get(idx);
+    if (!chapterId) return;
+    for (const scene of result.scenes) {
+      const sceneId = (scene as any).id;
+      if (!sceneId) continue;
+      const base = `chapters/${chapterId}/scenes/${sceneId}`;
+      for (const lang of translationLanguages) {
+        for (const file of LEGACY_TRANSLATION_FILES) {
+          const filePath = `${base}/${lang}/${file}`;
+          deletes.push(
+            storage.exists(filePath).then((exists) => {
+              if (exists) {
+                console.info(`[LocalSync] Removing legacy translation file: ${filePath}`);
+                return guardedDelete(storage, filePath, "cleanLegacyTranslationAudioFiles").then(() => {});
+              }
+            }),
+          );
+        }
+      }
+    }
+  });
+
+  if (deletes.length > 0) {
+    await Promise.all(deletes);
   }
 }

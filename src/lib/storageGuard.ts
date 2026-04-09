@@ -53,6 +53,8 @@ const ALLOWED_DELETE_PATTERNS: RegExp[] = [
   /^chapters\/[^/]+\/scenes\/[^/]+\/[a-z]{2}\/storyboard\.json$/,
   // Translation audio (re-TTS in target language)
   /^chapters\/[^/]+\/scenes\/[^/]+\/[a-z]{2}\/audio\//,
+  // Legacy translation audio files cleanup (audio_meta, mixer_state, clip_plugins in lang dirs)
+  /^chapters\/[^/]+\/scenes\/[^/]+\/[a-z]{2}\/(audio_meta|mixer_state|clip_plugins)\.json$/,
 ];
 
 /**
