@@ -345,6 +345,65 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       }
       report("characters", savedCharCount > 0 ? "done" : "skipped", savedCharCount > 0 ? `${savedCharCount}` : undefined);
 
+      // ── 4a2. Push character_appearances from OPFS to DB ──
+      let savedAppearanceCount = 0;
+      if (storage && savedCharCount > 0) {
+        try {
+          const localChars = await readCharacterIndex(storage);
+          // Delete existing appearances for this book's characters
+          const charIds = localChars.map(c => c.id).filter(Boolean);
+          if (charIds.length > 0) {
+            for (let i = 0; i < charIds.length; i += 200) {
+              const chunk = charIds.slice(i, i + 200);
+              await supabase.from("character_appearances").delete().in("character_id", chunk);
+            }
+
+            // Build appearance rows from local data
+            const appInserts: Array<{
+              character_id: string;
+              scene_id: string;
+              role_in_scene: string;
+              segment_ids: string[];
+            }> = [];
+
+            // Read scene character maps to get speaker→segment mappings
+            for (const idx of leafIndices) {
+              const result = normalizedResults.get(idx);
+              if (!result) continue;
+              for (const sc of result.scenes) {
+                if (!sc.id) continue;
+                try {
+                  const { readSceneCharacterMap } = await import("@/lib/localCharacters");
+                  const scMap = await readSceneCharacterMap(storage, sc.id);
+                  if (scMap?.speakers) {
+                    for (const sp of scMap.speakers) {
+                      appInserts.push({
+                        character_id: sp.characterId,
+                        scene_id: sc.id,
+                        role_in_scene: sp.role_in_scene || "speaker",
+                        segment_ids: sp.segment_ids || [],
+                      });
+                    }
+                  }
+                } catch {}
+              }
+            }
+
+            if (appInserts.length > 0) {
+              for (let i = 0; i < appInserts.length; i += 500) {
+                const chunk = appInserts.slice(i, i + 500);
+                const { error } = await supabase.from("character_appearances").insert(chunk);
+                if (error) console.warn("[SaveToServer] character_appearances insert:", error);
+              }
+              savedAppearanceCount = appInserts.length;
+              console.log(`[SaveToServer] Pushed ${savedAppearanceCount} character appearances`);
+            }
+          }
+        } catch (e) {
+          console.warn("[SaveToServer] Character appearances push failed:", e);
+        }
+      }
+
       // ── 4b. Push storyboard data (segments/phrases/mappings) to DB ──
       report("storyboard", "running");
       let savedStoryboardCount = 0;
@@ -360,6 +419,64 @@ export function useSaveBookToProject({ isRu, currentBookId, fileName, localSnaps
       }
       report("storyboard", savedStoryboardCount > 0 ? "done" : "skipped", savedStoryboardCount > 0 ? `${savedStoryboardCount}` : undefined);
 
+      // ── 4b2. Push audio_meta from OPFS to segment_audio ──
+      report("audio_meta", "running");
+      let savedAudioCount = 0;
+      if (storage) {
+        try {
+          const { readAudioMeta } = await import("@/lib/localAudioMeta");
+          const allSceneIds: string[] = [];
+          for (const idx of leafIndices) {
+            const result = normalizedResults.get(idx);
+            if (!result) continue;
+            for (const sc of result.scenes) {
+              if (sc.id) allSceneIds.push(sc.id);
+            }
+          }
+
+          const audioRows: Array<{
+            segment_id: string;
+            status: string;
+            duration_ms: number;
+            audio_path: string;
+            voice_config: import("@/integrations/supabase/types").Json;
+          }> = [];
+
+          for (const sid of allSceneIds) {
+            const meta = await readAudioMeta(storage, sid);
+            if (!meta?.entries) continue;
+            for (const [segId, entry] of Object.entries(meta.entries)) {
+              if (entry.status !== "ready") continue;
+              audioRows.push({
+                segment_id: segId,
+                status: entry.status,
+                duration_ms: entry.durationMs,
+                audio_path: entry.audioPath,
+                voice_config: (entry.voiceConfig || {}) as unknown as import("@/integrations/supabase/types").Json,
+              });
+            }
+          }
+
+          if (audioRows.length > 0) {
+            // Delete existing audio for these segments, then insert fresh
+            const segIds = audioRows.map(r => r.segment_id);
+            for (let i = 0; i < segIds.length; i += 200) {
+              const chunk = segIds.slice(i, i + 200);
+              await supabase.from("segment_audio").delete().in("segment_id", chunk);
+            }
+            for (let i = 0; i < audioRows.length; i += 500) {
+              const chunk = audioRows.slice(i, i + 500);
+              const { error } = await supabase.from("segment_audio").insert(chunk);
+              if (error) console.warn("[SaveToServer] segment_audio insert:", error);
+            }
+            savedAudioCount = audioRows.length;
+            console.log(`[SaveToServer] Pushed ${savedAudioCount} audio metadata entries`);
+          }
+        } catch (e) {
+          console.warn("[SaveToServer] Audio meta push failed:", e);
+        }
+      }
+      report("audio_meta", savedAudioCount > 0 ? "done" : "skipped", savedAudioCount > 0 ? `${savedAudioCount}` : undefined);
       // ── 4c. Push clip plugin configs from OPFS to clip_plugin_configs ──
       report("clip_plugins", "running");
       let savedPluginCount = 0;
