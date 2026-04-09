@@ -1125,12 +1125,21 @@ export function StoryboardPanel({
     if (!sceneId) return;
     setCorrectingStress(true);
     try {
+      // 🚫 К3: Send phrases from OPFS storyboard, no pushToDb needed
+      const allPhrases = segments.flatMap(seg =>
+        seg.phrases.map(p => ({
+          id: p.phrase_id,
+          segment_id: seg.segment_id,
+          phrase_number: p.phrase_number,
+          text: p.text,
+          metadata: { annotations: p.annotations ?? [] },
+        }))
+      );
+
       if (mode === "suggest") {
-        // Push to DB first so edge function can read phrases
-        await pushToDb(sceneId, buildSnapshot());
         const { data, error } = await invokeWithFallback({
           functionName: "correct-stress",
-          body: { scene_id: sceneId, mode: "suggest", model: getModelForRole("proofreader") },
+          body: { scene_id: sceneId, mode: "suggest", phrases: allPhrases, model: getModelForRole("proofreader") },
           userApiKeys,
           isRu,
         });
@@ -1144,23 +1153,37 @@ export function StoryboardPanel({
           setStressReviewOpen(true);
         }
       } else {
-        // Push to DB first so edge function can read phrases
-        await pushToDb(sceneId, buildSnapshot());
         const { data, error } = await invokeWithFallback({
           functionName: "correct-stress",
-          body: { scene_id: sceneId, mode: "correct", model: getModelForRole("proofreader") },
+          body: { scene_id: sceneId, mode: "correct", phrases: allPhrases, model: getModelForRole("proofreader") },
           userApiKeys,
           isRu,
         });
         if (error) throw error;
         const result = data as any;
         if (result.applied > 0) {
+          // Apply annotations locally from server response
+          const annotationsMap = result.annotations as Record<string, Array<{ type: string; start: number; end: number }>>;
+          if (annotationsMap && Object.keys(annotationsMap).length > 0) {
+            const updated = segments.map(seg => ({
+              ...seg,
+              phrases: seg.phrases.map(p => {
+                const newAnns = annotationsMap[p.phrase_id];
+                if (!newAnns?.length) return p;
+                return {
+                  ...p,
+                  annotations: [...(p.annotations ?? []), ...newAnns],
+                };
+              }),
+            }));
+            setSegments(updated);
+            persist(buildSnapshot(updated));
+          }
           toast.success(
             isRu
               ? `Расставлено ${result.applied} ударений в ${result.phrases_affected} фразах`
               : `Applied ${result.applied} stress marks in ${result.phrases_affected} phrases`
           );
-          await loadSegments(sceneId);
         } else {
           toast.info(result.message || (isRu ? "Нет совпадений со словарём" : "No dictionary matches"));
         }
@@ -1170,7 +1193,7 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка коррекции ударений" : "Stress correction failed");
     }
     setCorrectingStress(false);
-  }, [sceneId, isRu, loadSegments, pushToDb, buildSnapshot, getModelForRole, userApiKeys]);
+  }, [sceneId, segments, isRu, persist, buildSnapshot, getModelForRole, userApiKeys]);
 
   const handleStressReviewAccept = useCallback(async (accepted: StressSuggestion[]) => {
     if (accepted.length === 0) return;
