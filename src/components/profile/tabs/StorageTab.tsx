@@ -23,11 +23,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ImpulsesSection } from './ImpulsesSection';
-import {
-  isAudioAssetCached,
-  removeAudioAssetFromCache,
-  type AudioAssetCategory,
-} from '@/lib/audioAssetCache';
+import { type AudioAssetCategory } from '@/lib/audioAssetCache';
 import { getDragAudio, DRAG_AUDIO_MIME } from '@/lib/dragAudioStore';
 import { saveToStorage, type SoundCategory } from '@/lib/soundProvider';
 
@@ -203,14 +199,7 @@ export function StorageTab({ isRu, userId, onStatsReady }: StorageTabProps) {
         }
       }
 
-      // Check OPFS cache status for cacheable categories (atmosphere, sfx)
-      const cacheChecks = allFiles.map(async (f) => {
-        const meta = CATEGORY_META[f.category as Category];
-        if (meta?.cacheCategory) {
-          f.cached = await isAudioAssetCached(meta.cacheCategory, f.id);
-        }
-      });
-      await Promise.all(cacheChecks);
+      // Cache status check removed — audio now lives in project OPFS, not global cache
 
       setFiles(allFiles);
     } finally {
@@ -292,11 +281,7 @@ export function StorageTab({ isRu, userId, onStatsReady }: StorageTabProps) {
       if (error) {
         toast.error(isRu ? 'Ошибка удаления' : 'Delete error');
       } else {
-        // Also clear from OPFS cache
-        const meta = CATEGORY_META[file.category as Category];
-        if (meta?.cacheCategory) {
-          removeAudioAssetFromCache(meta.cacheCategory, file.id).catch(() => {});
-        }
+        // Audio now lives in project OPFS — no global cache to clear
         toast.success(`«${file.name}» ${isRu ? 'удалён' : 'deleted'}`);
         setFiles(prev => prev.filter(f => f.id !== file.id));
         if (preview?.file.id === file.id) setPreview(null);
