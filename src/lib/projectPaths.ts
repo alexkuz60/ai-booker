@@ -116,7 +116,7 @@ export const paths = {
   renderStem: (fileName: string, chapterId: string) =>
     `chapters/${chapterId}/renders/${fileName}`,
 
-  // ── Audio metadata (segment_audio mirror) ──────────────
+  // ── Audio metadata (per-scene, OPFS-only) ──────────────
 
   /** Per-scene audio metadata (durations, paths, status) — replaces DB reads */
   audioMeta: (sceneId: string, chapterId?: string) =>
