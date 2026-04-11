@@ -6,6 +6,7 @@ import { readStructureFromLocal } from "@/lib/localSync";
 import { revokeAllAudioUrls } from "@/lib/localAudioProvider";
 import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 import { readRenderMeta, type SceneRenderMeta } from "@/lib/sceneRenderer";
+import { writePipelineStep } from "@/hooks/usePipelineProgress";
 
 // ─── Types ──────────────────────────────────────────────────
 export interface SceneRender {
