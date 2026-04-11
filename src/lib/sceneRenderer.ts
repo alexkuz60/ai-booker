@@ -2,7 +2,9 @@
  * SceneRenderer — offline (OfflineAudioContext) renderer that produces
  * 3 stem files per scene: voice.wav, atmosphere.wav, sfx.wav.
  *
- * Loading phase reports per-clip progress; rendering is atomic.
+ * All stems are written to OPFS at chapters/{chapterId}/renders/{stem}.wav.
+ * Metadata is stored in render_meta.json alongside the stems.
+ * DB (scene_renders) is updated as backup metadata only.
  */
 
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +15,53 @@ import type { ClipPluginConfig, SceneClipConfigs } from "@/hooks/useClipPluginCo
 import { DEFAULT_CLIP_PLUGIN_CONFIG } from "@/hooks/useClipPluginConfigs";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import { getAudioBuffer } from "@/lib/localAudioProvider";
+import { paths } from "@/lib/projectPaths";
+
+// ── Render metadata persisted in OPFS ───────────────────────
+
+export interface SceneRenderMeta {
+  scene_id: string;
+  voice_path: string | null;
+  atmo_path: string | null;
+  sfx_path: string | null;
+  voice_duration_ms: number;
+  atmo_duration_ms: number;
+  sfx_duration_ms: number;
+  status: "ready" | "pending" | "error";
+  updated_at: string;
+  render_config?: Record<string, unknown>;
+}
+
+export interface RenderMetaFile {
+  /** sceneId → metadata */
+  [sceneId: string]: SceneRenderMeta;
+}
+
+const RENDER_META_FILENAME = "render_meta.json";
+
+function renderMetaPath(chapterId: string): string {
+  return `chapters/${chapterId}/renders/${RENDER_META_FILENAME}`;
+}
+
+export async function readRenderMeta(
+  storage: ProjectStorage,
+  chapterId: string,
+): Promise<RenderMetaFile> {
+  try {
+    const data = await storage.readJSON<RenderMetaFile>(renderMetaPath(chapterId));
+    return data ?? {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeRenderMeta(
+  storage: ProjectStorage,
+  chapterId: string,
+  meta: RenderMetaFile,
+): Promise<void> {
+  await storage.writeJSON(renderMetaPath(chapterId), meta);
+}
 
 export interface RenderProgress {
   phase: "loading" | "rendering" | "encoding" | "uploading" | "done" | "error";
