@@ -15,6 +15,7 @@ import {
 } from "../phraseAnnotations";
 import { renderAnnotatedText } from "./PhraseRenderer";
 import { PhonemeSubmenu } from "./PhonemeSubmenu";
+import { StressVowelSubmenu } from "./StressVowelSubmenu";
 import { applyCorrection, type PronunciationSuggestion } from "@/lib/ruPronunciationRules";
 import type { Phrase } from "./types";
 
@@ -66,10 +67,13 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
       onAnnotate(phrase.phrase_id, { type, offset, durationMs: durationMs ?? 500 });
     } else {
       if (!sel) return;
-      const actualType = type === "emphasis" && (sel.end - sel.start) === 1 ? "stress" as AnnotationType : type;
-      onAnnotate(phrase.phrase_id, { type: actualType, start: sel.start, end: sel.end });
+      onAnnotate(phrase.phrase_id, { type, start: sel.start, end: sel.end });
     }
   }, [phrase.phrase_id, phrase.text.length, onAnnotate, peek]);
+
+  const handleApplyStress = useCallback((newText: string) => {
+    saveWithUndo(newText);
+  }, [saveWithUndo]);
 
   const handleDeleteSelected = useCallback(() => {
     const sel = peek();
@@ -116,7 +120,8 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
   const availableAnnotations = getAvailableAnnotations(ttsProvider, true);
   const availableInsertions = getAvailableAnnotations(ttsProvider, false).filter(a => !a.needsRange);
 
-  const prosodyItems = availableAnnotations.filter(a => !EMOTION_TYPES.has(a.type) && !SOUND_TYPES.has(a.type));
+  const prosodyItems = availableAnnotations.filter(a => a.type !== "emphasis" && !EMOTION_TYPES.has(a.type) && !SOUND_TYPES.has(a.type));
+  const hasEmphasis = availableAnnotations.some(a => a.type === "emphasis");
   const emotionItems = availableAnnotations.filter(a => EMOTION_TYPES.has(a.type));
   const soundInsertions = availableInsertions.filter(a => SOUND_TYPES.has(a.type));
   const otherInsertions = availableInsertions.filter(a => !SOUND_TYPES.has(a.type) && !availableAnnotations.find(x => x.type === a.type));
@@ -219,6 +224,26 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
                   {isRu ? a.label_ru.replace(/^. /, "") : a.label_en.replace(/^. /, "")}
                 </ContextMenuItem>
               )
+            )}
+
+            {hasEmphasis && (
+              <ContextMenuItem
+                onClick={() => handleAnnotate("emphasis")}
+                className="text-xs gap-2"
+              >
+                <span>💪</span>
+                {isRu ? "Акцент" : "Accent"}
+              </ContextMenuItem>
+            )}
+
+            {hasEmphasis && (
+              <StressVowelSubmenu
+                selectedText={peek()?.text ?? null}
+                wordOffset={peek()?.start ?? 0}
+                phraseText={phrase.text}
+                isRu={isRu}
+                onApplyStress={handleApplyStress}
+              />
             )}
 
             {emotionItems.length > 0 && (
