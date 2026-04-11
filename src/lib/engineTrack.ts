@@ -1,8 +1,16 @@
 /**
  * EngineTrack — per-track signal chain for the audio engine.
  *
- * Signal chain: Player → [Telephone FX] → EQ3 → Comp → Channel → Limiter → Panner3D → Convolver → Reverb → Bus
- *               Channel → MeterMono; Reverb → Splitter → MeterL/R
+ * LEAN chain (default — no spatial/reverb plugins):
+ *   Player → [Telephone FX] → EQ3 → Comp → Channel → Limiter → Bus
+ *   Channel → MeterMono
+ *
+ * FULL chain (lazy — only when panner3d/convolver/reverb enabled):
+ *   … → Limiter → Panner3D → Convolver(dry/wet) → Reverb → Bus
+ *   Reverb → Splitter → MeterL/R
+ *
+ * This lazy approach saves ~9 Web Audio nodes per track (critical when
+ * 30-40+ phrase-level tracks are loaded simultaneously).
  */
 
 import * as Tone from "tone";
@@ -43,13 +51,15 @@ class EngineTrack {
   private _compAttack = 0.01;
   private _compRelease = 0.1;
 
-  // POST chain: Limiter (after channel, before reverb)
+  // POST chain: Limiter (always created — lightweight)
   private limiterNode: Tone.Limiter;
   private _limiterBypassed = true;
   private _limiterThreshold = -3;
 
-  // POST chain: Panner3D (after limiter, before convolver)
-  private panner3dNode: Tone.Panner3D;
+  // ── LAZY POST nodes (created on demand) ──
+
+  // Panner3D
+  private panner3dNode: Tone.Panner3D | null = null;
   private _panner3dBypassed = true;
   private _panner3dX = 0;
   private _panner3dY = 0;
@@ -62,26 +72,26 @@ class EngineTrack {
   private _panner3dConeOuterAngle = 360;
   private _panner3dConeOuterGain = 0;
 
-  // POST chain: Convolver (after panner3d, before reverb)
-  private convolverNode: Tone.Convolver;
+  // Convolver
+  private convolverNode: Tone.Convolver | null = null;
   private _convolverBypassed = true;
   private _convolverDryWet = 0.3;
-  private _convolverDryGain: Tone.Gain;
-  private _convolverWetGain: Tone.Gain;
-  private _convolverMerge: Tone.Gain;
+  private _convolverDryGain: Tone.Gain | null = null;
+  private _convolverWetGain: Tone.Gain | null = null;
+  private _convolverMerge: Tone.Gain | null = null;
 
   // Per-channel reverb
-  private reverbNode: Tone.Reverb;
+  private reverbNode: Tone.Reverb | null = null;
   private _reverbBypassed = true;
   private _reverbWet = 0.15;
 
-  // Metering: mono (pre-pan) and stereo split (post-pan)
+  // Metering: mono (always), stereo (lazy)
   private meterMono: Tone.Meter;
-  private splitter: Tone.Split;
-  private meterL: Tone.Meter;
-  private meterR: Tone.Meter;
+  private splitter: Tone.Split | null = null;
+  private meterL: Tone.Meter | null = null;
+  private meterR: Tone.Meter | null = null;
 
-  // Telephone FX chain (inserted between player and eqNode when segmentType==='telephone')
+  // Telephone FX chain
   private _telephone = false;
   private _phoneFilter: Tone.Filter | null = null;
   private _phoneCrusher: Tone.WaveShaper | null = null;
@@ -106,9 +116,13 @@ class EngineTrack {
   private _loop: boolean;
   private _clipLenSec: number;
   private _loopCrossfadeSec: number;
-  /** Secondary player for crossfade between loop iterations */
   private playerB: Tone.Player | null = null;
   private loopScheduledIds: number[] = [];
+
+  /** The bus this track routes to (stored for lazy rewiring) */
+  private _bus: Tone.Channel;
+  /** Whether the heavy (spatial/reverb) chain is wired */
+  private _heavyChainWired = false;
 
   constructor(config: TrackConfig, bus: Tone.Channel, preloadedBuffer?: Tone.ToneAudioBuffer) {
     this.id = config.id;
@@ -124,6 +138,8 @@ class EngineTrack {
     this._clipLenSec = config.clipLenSec ?? config.durationSec;
     this._loopCrossfadeSec = config.loopCrossfadeSec ?? 0;
     this._telephone = config.segmentType === "telephone";
+    this._bus = bus;
+
     if (this._telephone) {
       console.log(`[AudioEngine] 📞 Telephone FX chain activated for track ${config.id} (label: ${config.label})`);
     }
@@ -146,60 +162,23 @@ class EngineTrack {
       pan: this._pan,
     });
 
-    // POST: Limiter (bypassed — set threshold to 0 when bypassed)
+    // POST: Limiter (always — lightweight)
     this.limiterNode = new Tone.Limiter(0);
 
-    // POST: Panner3D (bypassed by default — at origin = transparent)
-    this.panner3dNode = new Tone.Panner3D({
-      positionX: 0, positionY: 0, positionZ: 0,
-      distanceModel: "inverse",
-      refDistance: 1,
-      maxDistance: 10000,
-      rolloffFactor: 1,
-      coneInnerAngle: 360,
-      coneOuterAngle: 360,
-      coneOuterGain: 0,
-    });
-
-    // POST: Convolver with manual dry/wet routing
-    this.convolverNode = new Tone.Convolver();
-    this._convolverDryGain = new Tone.Gain(1);
-    this._convolverWetGain = new Tone.Gain(0);
-    this._convolverMerge = new Tone.Gain(1);
-
-    // Reverb: small room, bypassed
-    this.reverbNode = new Tone.Reverb({
-      decay: 1.5,
-      wet: 0,
-    });
-
-    // Meters
+    // Mono meter (always)
     this.meterMono = new Tone.Meter({ smoothing: 0.8 });
-    this.splitter = new Tone.Split();
-    this.meterL = new Tone.Meter({ smoothing: 0.8 });
-    this.meterR = new Tone.Meter({ smoothing: 0.8 });
 
-    // Chain: Player → EQ3 → Comp → Channel → Limiter → Panner3D → [ConvolverDry/Wet] → Reverb → Bus
-    //                                  └→ MeterMono
-    //        Reverb → Splitter → MeterL/R
+    // ── LEAN chain: Player → [Phone] → EQ → Comp → Channel → Limiter → Bus ──
     if (preloadedBuffer) {
-      this.player = new Tone.Player({
-        fadeIn: 0,
-        fadeOut: this._fadeOutSec,
-      });
+      this.player = new Tone.Player({ fadeIn: 0, fadeOut: this._fadeOutSec });
       this.player.buffer = preloadedBuffer;
     } else {
-      this.player = new Tone.Player({
-        url: config.url,
-        fadeIn: 0,
-        fadeOut: this._fadeOutSec,
-      });
+      this.player = new Tone.Player({ url: config.url, fadeIn: 0, fadeOut: this._fadeOutSec });
     }
 
     // Wire signal chain (with optional telephone insert before EQ)
     if (this._telephone) {
       this._phoneFilter = new Tone.Filter({ type: "bandpass", frequency: 1900, Q: 0.8 });
-      // WaveShaper-based bit crusher (no AudioWorklet dependency)
       const bits = 4;
       const steps = Math.pow(2, bits);
       const curveLen = 8192;
@@ -211,7 +190,6 @@ class EngineTrack {
       this._phoneCrusher = new Tone.WaveShaper(curve, curveLen);
       this._phoneDistortion = new Tone.Distortion({ distortion: 0.2, wet: 0.5 });
       this._phoneComp = new Tone.Compressor({ threshold: -30, ratio: 12, attack: 0.003, release: 0.25 });
-      // Chain: Player → BandpassFilter → WaveShaper(crush) → Distortion → PhoneComp → EQ
       this.player.connect(this._phoneFilter);
       this._phoneFilter.connect(this._phoneCrusher);
       this._phoneCrusher.connect(this._phoneDistortion);
@@ -219,15 +197,13 @@ class EngineTrack {
       this._phoneComp.connect(this.eqNode);
       console.log(`[AudioEngine] 📞 Telephone chain wired: Filter→Crusher→Distortion→Comp→EQ`);
 
-      // Pink noise (line static)
       this._phoneNoiseFilter = new Tone.Filter({ type: "bandpass", frequency: 1000, Q: 0.5 });
       this._phoneNoiseGain = new Tone.Gain(0.015);
       this._phoneNoise = new Tone.Noise("pink");
       this._phoneNoise.connect(this._phoneNoiseFilter);
       this._phoneNoiseFilter.connect(this._phoneNoiseGain);
-      this._phoneNoiseGain.connect(this._phoneFilter); // route noise through same bandpass
+      this._phoneNoiseGain.connect(this._phoneFilter);
 
-      // 50Hz hum (power line)
       this._phoneHumGain = new Tone.Gain(0.005);
       this._phoneHum = new Tone.Oscillator(50, "sine");
       this._phoneHum.connect(this._phoneHumGain);
@@ -235,49 +211,85 @@ class EngineTrack {
     } else {
       this.player.connect(this.eqNode);
     }
+
     this.eqNode.connect(this.preFxNode);
     this.preFxNode.connect(this.channel);
     this.channel.connect(this.meterMono);
     this.channel.connect(this.limiterNode);
+    // LEAN path: limiter → bus directly
+    this.limiterNode.connect(bus);
+
+    // Create secondary player for crossfade looping
+    if (this._loop && this._loopCrossfadeSec > 0) {
+      if (preloadedBuffer) {
+        this.playerB = new Tone.Player({ fadeIn: this._loopCrossfadeSec, fadeOut: this._loopCrossfadeSec });
+        this.playerB.buffer = preloadedBuffer;
+      } else {
+        this.playerB = new Tone.Player({ url: config.url, fadeIn: this._loopCrossfadeSec, fadeOut: this._loopCrossfadeSec });
+      }
+      this.playerB.connect(this._telephone && this._phoneFilter ? this._phoneFilter : this.eqNode);
+    }
+
+    // Apply bypass states (lean nodes only)
+    this.applyEqBypass();
+    this.applyPreFxBypass();
+    this.applyLimiterBypass();
+  }
+
+  // ── Lazy heavy chain wiring ──
+
+  /**
+   * Create and wire the heavy post-processing nodes (Panner3D, Convolver, Reverb, stereo meters).
+   * Called on-demand when any spatial/reverb plugin is enabled.
+   */
+  private wireHeavyChain(): void {
+    if (this._heavyChainWired) return;
+    this._heavyChainWired = true;
+
+    // Disconnect limiter from bus (lean path)
+    this.limiterNode.disconnect(this._bus);
+
+    // Create heavy nodes
+    this.panner3dNode = new Tone.Panner3D({
+      positionX: 0, positionY: 0, positionZ: 0,
+      distanceModel: "inverse", refDistance: 1, maxDistance: 10000, rolloffFactor: 1,
+      coneInnerAngle: 360, coneOuterAngle: 360, coneOuterGain: 0,
+    });
+
+    this.convolverNode = new Tone.Convolver();
+    this._convolverDryGain = new Tone.Gain(1);
+    this._convolverWetGain = new Tone.Gain(0);
+    this._convolverMerge = new Tone.Gain(1);
+
+    this.reverbNode = new Tone.Reverb({ decay: 1.5, wet: 0 });
+
+    this.splitter = new Tone.Split();
+    this.meterL = new Tone.Meter({ smoothing: 0.8 });
+    this.meterR = new Tone.Meter({ smoothing: 0.8 });
+
+    // Wire: Limiter → Panner3D → Convolver(dry/wet) → Reverb → Bus
     this.limiterNode.connect(this.panner3dNode);
-    // Panner3D → convolver dry/wet split → merge → reverb
     this.panner3dNode.connect(this._convolverDryGain);
     this.panner3dNode.connect(this.convolverNode);
     this.convolverNode.connect(this._convolverWetGain);
     this._convolverDryGain.connect(this._convolverMerge);
     this._convolverWetGain.connect(this._convolverMerge);
     this._convolverMerge.connect(this.reverbNode);
-    this.reverbNode.connect(bus);
+    this.reverbNode.connect(this._bus);
     // Stereo metering tap
     this.reverbNode.connect(this.splitter);
     this.splitter.connect(this.meterL, 0);
     this.splitter.connect(this.meterR, 1);
 
-    // Create secondary player for crossfade looping
-    if (this._loop && this._loopCrossfadeSec > 0) {
-      if (preloadedBuffer) {
-        this.playerB = new Tone.Player({
-          fadeIn: this._loopCrossfadeSec,
-          fadeOut: this._loopCrossfadeSec,
-        });
-        this.playerB.buffer = preloadedBuffer;
-      } else {
-        this.playerB = new Tone.Player({
-          url: config.url,
-          fadeIn: this._loopCrossfadeSec,
-          fadeOut: this._loopCrossfadeSec,
-        });
-      }
-      this.playerB.connect(this._telephone && this._phoneFilter ? this._phoneFilter : this.eqNode);
-    }
-
-    // Apply bypass states
-    this.applyEqBypass();
-    this.applyPreFxBypass();
-    this.applyLimiterBypass();
+    // Apply current bypass states
     this.applyPanner3dBypass();
     this.applyConvolverBypass();
     this.applyReverbBypass();
+  }
+
+  /** Ensure heavy chain is wired (idempotent) */
+  private ensureHeavyChain(): void {
+    if (!this._heavyChainWired) this.wireHeavyChain();
   }
 
   // ── Scheduling ──
@@ -291,14 +303,10 @@ class EngineTrack {
       this.scheduledId = Tone.getTransport().schedule((time) => {
         if (this.player.loaded) {
           this.player.fadeIn = this._fadeInSec;
-          // Start telephone noise/hum generators along with the player
           if (this._telephone) {
             this._phoneNoise?.start(time);
             this._phoneHum?.start(time);
           }
-          // Don't limit voice clip duration — let audio play to its natural end.
-          // The actual audio may be longer than the estimated durationSec.
-          // Only apply duration limit for atmosphere/sfx clips that have explicit fades.
           const hasFadeOut = this._fadeOutSec > 0;
           if (hasFadeOut) {
             this.player.start(time, 0, this.durationSec);
@@ -314,7 +322,6 @@ class EngineTrack {
     }
   }
 
-  /** Schedule looping iterations with crossfade overlap */
   private scheduleLoop(transportStart: number, audioOffset: number): void {
     this.clearLoopIds();
     const xfade = this._loopCrossfadeSec;
@@ -337,7 +344,6 @@ class EngineTrack {
         if (p.loaded) {
           p.fadeIn = isFirst ? this._fadeInSec : xfade;
           p.fadeOut = isLast ? this._fadeOutSec : xfade;
-          // On first iteration with audioOffset, start from offset
           const startOffset = isFirst ? audioOffset : 0;
           const dur = isFirst ? Math.min(remaining, this._clipLenSec - audioOffset) : remaining;
           p.start(time, startOffset, dur);
@@ -359,11 +365,6 @@ class EngineTrack {
     this.unschedule();
 
     if (this._loop) {
-      // Calculate which iteration we're in and the offset within that iteration
-      const xfade = this._loopCrossfadeSec;
-      const step = Math.max(1, this._clipLenSec - xfade);
-      const iterIdx = Math.floor(offset / step);
-      const iterAudioOffset = offset - iterIdx * step;
       this.scheduleLoop(transportTime, offset);
       return;
     }
@@ -472,14 +473,16 @@ class EngineTrack {
   get limiterBypassed() { return this._limiterBypassed; }
   get limiterState(): ChannelLimiterState { return { threshold: this._limiterThreshold, bypassed: this._limiterBypassed }; }
 
-  // ── Panner3D ──
+  // ── Panner3D (lazy) ──
 
   setPanner3dBypassed(b: boolean): void {
     this._panner3dBypassed = b;
-    this.applyPanner3dBypass();
+    if (!b) this.ensureHeavyChain();
+    if (this.panner3dNode) this.applyPanner3dBypass();
   }
 
   private applyPanner3dBypass(): void {
+    if (!this.panner3dNode) return;
     if (this._panner3dBypassed) {
       this.panner3dNode.positionX.value = 0;
       this.panner3dNode.positionY.value = 0;
@@ -493,7 +496,7 @@ class EngineTrack {
 
   setPanner3dPosition(x: number, y: number, z: number): void {
     this._panner3dX = x; this._panner3dY = y; this._panner3dZ = z;
-    if (!this._panner3dBypassed) {
+    if (!this._panner3dBypassed && this.panner3dNode) {
       this.panner3dNode.positionX.value = x;
       this.panner3dNode.positionY.value = y;
       this.panner3dNode.positionZ.value = z;
@@ -501,25 +504,28 @@ class EngineTrack {
   }
 
   setPanner3dParams(p: { distanceModel?: DistanceModelType; refDistance?: number; maxDistance?: number; rolloffFactor?: number; coneInnerAngle?: number; coneOuterAngle?: number; coneOuterGain?: number }): void {
-    if (p.distanceModel !== undefined) { this._panner3dDistanceModel = p.distanceModel; this.panner3dNode.distanceModel = p.distanceModel; }
-    if (p.refDistance !== undefined) { this._panner3dRefDistance = p.refDistance; this.panner3dNode.refDistance = p.refDistance; }
-    if (p.maxDistance !== undefined) { this._panner3dMaxDistance = p.maxDistance; this.panner3dNode.maxDistance = p.maxDistance; }
-    if (p.rolloffFactor !== undefined) { this._panner3dRolloffFactor = p.rolloffFactor; this.panner3dNode.rolloffFactor = p.rolloffFactor; }
-    if (p.coneInnerAngle !== undefined) { this._panner3dConeInnerAngle = p.coneInnerAngle; this.panner3dNode.coneInnerAngle = p.coneInnerAngle; }
-    if (p.coneOuterAngle !== undefined) { this._panner3dConeOuterAngle = p.coneOuterAngle; this.panner3dNode.coneOuterAngle = p.coneOuterAngle; }
-    if (p.coneOuterGain !== undefined) { this._panner3dConeOuterGain = p.coneOuterGain; this.panner3dNode.coneOuterGain = p.coneOuterGain; }
+    if (!this._panner3dBypassed) this.ensureHeavyChain();
+    if (p.distanceModel !== undefined) { this._panner3dDistanceModel = p.distanceModel; if (this.panner3dNode) this.panner3dNode.distanceModel = p.distanceModel; }
+    if (p.refDistance !== undefined) { this._panner3dRefDistance = p.refDistance; if (this.panner3dNode) this.panner3dNode.refDistance = p.refDistance; }
+    if (p.maxDistance !== undefined) { this._panner3dMaxDistance = p.maxDistance; if (this.panner3dNode) this.panner3dNode.maxDistance = p.maxDistance; }
+    if (p.rolloffFactor !== undefined) { this._panner3dRolloffFactor = p.rolloffFactor; if (this.panner3dNode) this.panner3dNode.rolloffFactor = p.rolloffFactor; }
+    if (p.coneInnerAngle !== undefined) { this._panner3dConeInnerAngle = p.coneInnerAngle; if (this.panner3dNode) this.panner3dNode.coneInnerAngle = p.coneInnerAngle; }
+    if (p.coneOuterAngle !== undefined) { this._panner3dConeOuterAngle = p.coneOuterAngle; if (this.panner3dNode) this.panner3dNode.coneOuterAngle = p.coneOuterAngle; }
+    if (p.coneOuterGain !== undefined) { this._panner3dConeOuterGain = p.coneOuterGain; if (this.panner3dNode) this.panner3dNode.coneOuterGain = p.coneOuterGain; }
   }
 
   get panner3dBypassed() { return this._panner3dBypassed; }
 
-  // ── Convolver ──
+  // ── Convolver (lazy) ──
 
   setConvolverBypassed(b: boolean): void {
     this._convolverBypassed = b;
-    this.applyConvolverBypass();
+    if (!b) this.ensureHeavyChain();
+    if (this._convolverDryGain) this.applyConvolverBypass();
   }
 
   private applyConvolverBypass(): void {
+    if (!this._convolverDryGain || !this._convolverWetGain) return;
     if (this._convolverBypassed) {
       this._convolverDryGain.gain.value = 1;
       this._convolverWetGain.gain.value = 0;
@@ -531,15 +537,16 @@ class EngineTrack {
 
   setConvolverDryWet(w: number): void {
     this._convolverDryWet = Math.max(0, Math.min(1, w));
-    if (!this._convolverBypassed) {
+    if (!this._convolverBypassed && this._convolverDryGain && this._convolverWetGain) {
       this._convolverDryGain.gain.value = 1 - this._convolverDryWet;
       this._convolverWetGain.gain.value = this._convolverDryWet;
     }
   }
 
   async loadConvolverIR(url: string): Promise<void> {
+    this.ensureHeavyChain();
     try {
-      await this.convolverNode.load(url);
+      await this.convolverNode!.load(url);
     } catch (e) {
       console.error("[EngineTrack] Failed to load convolver IR:", e);
     }
@@ -547,21 +554,23 @@ class EngineTrack {
 
   get convolverBypassed() { return this._convolverBypassed; }
 
-  // ── Reverb ──
+  // ── Reverb (lazy) ──
 
   setReverbWet(w: number): void {
     this._reverbWet = Math.max(0, Math.min(1, w));
-    if (!this._reverbBypassed) {
+    if (!this._reverbBypassed && this.reverbNode) {
       this.reverbNode.wet.value = this._reverbWet;
     }
   }
 
   setReverbBypassed(b: boolean): void {
     this._reverbBypassed = b;
-    this.applyReverbBypass();
+    if (!b) this.ensureHeavyChain();
+    if (this.reverbNode) this.applyReverbBypass();
   }
 
   private applyReverbBypass(): void {
+    if (!this.reverbNode) return;
     this.reverbNode.wet.value = this._reverbBypassed ? 0 : this._reverbWet;
   }
 
@@ -587,8 +596,8 @@ class EngineTrack {
 
   getMeterData(): TrackMeterData {
     const monoVal = this.meterMono.getValue();
-    const lVal = this.meterL.getValue();
-    const rVal = this.meterR.getValue();
+    const lVal = this.meterL ? this.meterL.getValue() : monoVal;
+    const rVal = this.meterR ? this.meterR.getValue() : monoVal;
     return {
       level: typeof monoVal === "number" ? monoVal : -Infinity,
       levelL: typeof lVal === "number" ? lVal : -Infinity,
@@ -629,20 +638,22 @@ class EngineTrack {
     this._phoneNoiseFilter?.dispose();
     this._phoneNoiseGain?.dispose();
     this._phoneHumGain?.dispose();
+    // Core chain
     this.eqNode.dispose();
     this.preFxNode.dispose();
     this.channel.dispose();
     this.limiterNode.dispose();
-    this.panner3dNode.dispose();
-    this.convolverNode.dispose();
-    this._convolverDryGain.dispose();
-    this._convolverWetGain.dispose();
-    this._convolverMerge.dispose();
-    this.reverbNode.dispose();
     this.meterMono.dispose();
-    this.splitter.dispose();
-    this.meterL.dispose();
-    this.meterR.dispose();
+    // Heavy chain (if wired)
+    this.panner3dNode?.dispose();
+    this.convolverNode?.dispose();
+    this._convolverDryGain?.dispose();
+    this._convolverWetGain?.dispose();
+    this._convolverMerge?.dispose();
+    this.reverbNode?.dispose();
+    this.splitter?.dispose();
+    this.meterL?.dispose();
+    this.meterR?.dispose();
   }
 }
 export { EngineTrack };
