@@ -67,10 +67,13 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
       onAnnotate(phrase.phrase_id, { type, offset, durationMs: durationMs ?? 500 });
     } else {
       if (!sel) return;
-      const actualType = type === "emphasis" && (sel.end - sel.start) === 1 ? "stress" as AnnotationType : type;
-      onAnnotate(phrase.phrase_id, { type: actualType, start: sel.start, end: sel.end });
+      onAnnotate(phrase.phrase_id, { type, start: sel.start, end: sel.end });
     }
   }, [phrase.phrase_id, phrase.text.length, onAnnotate, peek]);
+
+  const handleApplyStress = useCallback((newText: string) => {
+    saveWithUndo(newText);
+  }, [saveWithUndo]);
 
   const handleDeleteSelected = useCallback(() => {
     const sel = peek();
