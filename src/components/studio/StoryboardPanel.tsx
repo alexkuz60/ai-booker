@@ -1074,6 +1074,12 @@ export function StoryboardPanel({
                 } else if (obj.status === "ready") {
                   batchCached++;
                 }
+                // Remove completed segment from synthesizing set → clip re-renders immediately
+                setCurrentlySynthesizingIds(prev => { const n = new Set(prev); n.delete(obj.segment_id); return n; });
+                // Also update parent (uses Set, not callback — read current ref)
+                synthIdsRef.current = new Set(synthIdsRef.current);
+                synthIdsRef.current.delete(obj.segment_id);
+                onSynthesizingChange?.(new Set(synthIdsRef.current));
                 setSynthProgress(buildProgressLabel());
               }
             } catch { /* skip malformed lines */ }
