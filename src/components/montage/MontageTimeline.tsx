@@ -117,7 +117,7 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
   const { scheduleSave: onMixChange } = useMixerPersistence(chapterId, trackIds);
 
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
-  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>("voice");
 
   // ── Trim handler ────────────────────────────────────────────
   const handleTrim = useCallback((trackId: string, selStart: number, selEnd: number) => {
