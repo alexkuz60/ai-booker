@@ -15,6 +15,7 @@ import {
 } from "../phraseAnnotations";
 import { renderAnnotatedText } from "./PhraseRenderer";
 import { PhonemeSubmenu } from "./PhonemeSubmenu";
+import { applyCorrection, type PronunciationSuggestion } from "@/lib/ruPronunciationRules";
 import type { Phrase } from "./types";
 
 interface EditablePhraseProps {
