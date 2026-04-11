@@ -1073,6 +1073,8 @@ Deno.serve(async (req) => {
         const isSaluteSpeechVoice = (voiceConfig as any).provider === "salutespeech";
         const isV3Voice = !isProxyApiVoice && !isSaluteSpeechVoice && V3_ONLY_VOICES.has(voiceConfig.voice);
         const apiVersion = isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1";
+        // Convert combining acute to provider-appropriate form
+        const text = isProxyApiVoice || isSaluteSpeechVoice ? stripAcuteAccent(rawText) : convertAcuteToYandexPlus(rawText);
         const estimatedChunks = isV3Voice ? Math.max(1, Math.ceil(text.length / 240)) : 1;
         const moodInfo = ttsCtx.instructionText ? `, mood=${sceneMood}, ctx="${ttsCtx.instructionText.slice(0, 60)}"` : "";
         console.log(`▶ Segment ${i + 1}/${segments.length} [${seg.id}]: speaker=${seg.speaker || seg.segment_type}, api=${apiVersion}, voice=${voiceConfig.voice}, speed=${(voiceConfig as any).speed}, role=${voiceConfig.role}, chars=${text.length}${moodInfo}${hasInlineNarrations ? `, narrations=${inlineNarrations.length}` : ""}`);
