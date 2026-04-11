@@ -14,6 +14,7 @@ import {
   isInsertionAnnotation,
 } from "../phraseAnnotations";
 import { renderAnnotatedText } from "./PhraseRenderer";
+import { PhonemeSubmenu } from "./PhonemeSubmenu";
 import type { Phrase } from "./types";
 
 interface EditablePhraseProps {
@@ -260,6 +261,8 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
             ))}
           </>
         )}
+        <ContextMenuSeparator />
+        <PhonemeSubmenu selectedText={peek()?.text ?? null} isRu={isRu} />
         <ContextMenuSeparator />
         <ContextMenuItem
           onClick={handleDeleteSelected}
