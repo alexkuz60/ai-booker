@@ -204,7 +204,13 @@ export function useMontageData() {
             });
           }
         }
-        if (!cancelled) setSceneRenders(renders);
+        if (!cancelled) {
+          setSceneRenders(renders);
+          // Auto-heal: if renders exist, ensure pipeline flag is set
+          if (renders.length > 0 && storage) {
+            writePipelineStep(storage, "scene_render", true).catch(() => {});
+          }
+        }
       } catch (err) {
         console.warn("[Montage] Failed to load render meta from OPFS:", err);
       }
