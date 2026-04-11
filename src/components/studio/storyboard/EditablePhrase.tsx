@@ -302,6 +302,16 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
           isRu={isRu}
           onCorrect={handlePhoneticCorrect}
         />
+        {undoRef.current?.phraseId === phrase.phrase_id && (
+          <ContextMenuItem
+            onClick={handleUndo}
+            className="text-xs gap-2"
+          >
+            <Undo2 className="h-3 w-3" />
+            {isRu ? "Отменить коррекцию" : "Undo correction"}
+            <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+Z</span>
+          </ContextMenuItem>
+        )}
         <ContextMenuSeparator />
         <ContextMenuItem
           onClick={handleDeleteSelected}
