@@ -26,8 +26,33 @@ export function renderPhraseText(text: string) {
         </span>
       );
     }
-    return <span key={i}>{part}</span>;
+    return <span key={i}>{renderStressMarks(part)}</span>;
   });
+}
+
+const COMBINING_ACUTE = "\u0301";
+
+/** Wrap vowel+acute pairs in a styled span */
+function renderStressMarks(text: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  let i = 0;
+  while (i < text.length) {
+    if (i + 1 < text.length && text[i + 1] === COMBINING_ACUTE) {
+      parts.push(
+        <span key={`stress-${i}`} className="underline decoration-primary decoration-2 underline-offset-2 font-semibold text-primary">
+          {text[i]}{COMBINING_ACUTE}
+        </span>
+      );
+      i += 2;
+    } else {
+      // Collect plain chars
+      let j = i;
+      while (j < text.length && !(j + 1 < text.length && text[j + 1] === COMBINING_ACUTE)) j++;
+      parts.push(text.slice(i, j + (j < text.length ? 1 : 0)));
+      i = j + (j < text.length ? 1 : 0);
+    }
+  }
+  return parts;
 }
 
 export function renderAnnotatedText(text: string, annotations?: PhraseAnnotation[]) {
