@@ -335,7 +335,7 @@ export function WaveformEditor({
     canvas.width = w * dpr;
     canvas.height = h * dpr;
 
-    const chH = (h - CHANNEL_GAP) / 2;
+    
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
