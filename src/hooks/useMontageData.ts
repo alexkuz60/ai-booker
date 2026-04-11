@@ -6,6 +6,7 @@ import { readStructureFromLocal } from "@/lib/localSync";
 import { revokeAllAudioUrls } from "@/lib/localAudioProvider";
 import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 import { readRenderMeta, type SceneRenderMeta } from "@/lib/sceneRenderer";
+import { writePipelineStep } from "@/hooks/usePipelineProgress";
 
 // ─── Types ──────────────────────────────────────────────────
 export interface SceneRender {
@@ -203,7 +204,13 @@ export function useMontageData() {
             });
           }
         }
-        if (!cancelled) setSceneRenders(renders);
+        if (!cancelled) {
+          setSceneRenders(renders);
+          // Auto-heal: if renders exist, ensure pipeline flag is set
+          if (renders.length > 0 && storage) {
+            writePipelineStep(storage, "scene_render", true).catch(() => {});
+          }
+        }
       } catch (err) {
         console.warn("[Montage] Failed to load render meta from OPFS:", err);
       }

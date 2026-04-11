@@ -29,7 +29,14 @@ function parserDone(p: PipelineProgress): boolean {
 }
 
 function studioDone(p: PipelineProgress): boolean {
-  return !!p.scene_render;
+  if (p.scene_render) return true;
+  // Fallback: if user previously accessed montage, allow through
+  // (the montage hook will auto-heal the flag from OPFS render metadata)
+  try {
+    const ctx = localStorage.getItem("montage_last_context");
+    if (ctx) return true;
+  } catch { /* ignore */ }
+  return false;
 }
 
 function storyboardReady(p: PipelineProgress): boolean {
