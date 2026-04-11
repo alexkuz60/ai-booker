@@ -63,7 +63,7 @@ interface Selection {
 const DB_ZONE_WIDTH = 36;
 const SCENE_VIEWPORT_START_SEC = 0;
 
-const EDITOR_ZOOM_PRESETS = [100, 200, 300, 400, 500] as const;
+const EDITOR_ZOOM_PRESETS = [100, 200, 300, 400, 500, 1000] as const;
 
 /** Resolve a CSS custom property to a usable hsl() string for Canvas */
 function resolveHsl(varName: string): string {
