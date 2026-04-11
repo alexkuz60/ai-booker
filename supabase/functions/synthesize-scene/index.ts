@@ -967,7 +967,7 @@ Deno.serve(async (req) => {
 
       for (let i = 0; i < segments.length; i++) {
         const seg = segments[i];
-        const text = segmentTexts[i];
+        const rawText = segmentTexts[i];
 
         // Skip segments not in filter (if filter specified)
         if (filterSet && !filterSet.has(seg.id)) {
