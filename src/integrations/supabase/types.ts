@@ -498,6 +498,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ru_phonemes: {
+        Row: {
+          category: string
+          created_at: string
+          description: Json
+          examples: string[]
+          id: string
+          ipa: string
+          notes: string | null
+          sort_order: number
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: Json
+          examples?: string[]
+          id?: string
+          ipa: string
+          notes?: string | null
+          sort_order?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: Json
+          examples?: string[]
+          id?: string
+          ipa?: string
+          notes?: string | null
+          sort_order?: number
+        }
+        Relationships: []
+      }
       scene_atmospheres: {
         Row: {
           audio_path: string
