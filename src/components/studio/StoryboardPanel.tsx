@@ -885,6 +885,49 @@ export function StoryboardPanel({
       : segments;
     if (targetSegments.length === 0) return;
 
+    // ── Pre-synthesis SSML length validation for Yandex v1 ──
+    const YANDEX_V1_MAX = 4900;
+    const V3_ONLY = new Set(["dasha","julia","lera","masha","alexander","kirill","anton","saule_ru","zamira_ru","zhanar_ru","yulduz_ru","naomi","saule","zhanar","zamira","yulduz"]);
+
+    const tooLongSegments: string[] = [];
+    for (const seg of targetSegments) {
+      const hasAnnot = seg.phrases.some(p => (p.annotations?.length ?? 0) > 0);
+      const isLyric = seg.segment_type === "lyric";
+      if (!hasAnnot && !isLyric) continue;
+
+      // Determine voice provider for this segment
+      const speakerKey = (seg.speaker ?? "narrator").toLowerCase();
+      const charMatch = characters.find(c => c.name.toLowerCase() === speakerKey);
+      const vc = charMatch?.voiceConfig ?? {};
+      const provider = (vc as any).provider ?? "yandex";
+      const voiceId = (vc as any).voice_id ?? (vc as any).voice ?? "";
+
+      // Only v1 Yandex uses SSML
+      if (provider !== "yandex" || V3_ONLY.has(voiceId)) continue;
+      // Also skip if voice has pitch/volume/role which force v3
+      if ((vc as any).pitchShift || (vc as any).volume || (vc as any).role) continue;
+
+      // Estimate SSML length: <speak> + text + ~35 chars per annotation + </speak>
+      const textLen = seg.phrases.reduce((s, p) => s + p.text.length, 0);
+      const annotCount = seg.phrases.reduce((s, p) => s + (p.annotations?.length ?? 0), 0);
+      const estimatedSsml = 15 + textLen + annotCount * 35; // <speak>...</speak> + tags overhead
+
+      if (estimatedSsml > YANDEX_V1_MAX) {
+        const label = seg.speaker || (isRu ? "Рассказчик" : "Narrator");
+        tooLongSegments.push(`#${seg.segment_number} (${label}, ~${estimatedSsml} ${isRu ? "симв." : "chars"})`);
+      }
+    }
+
+    if (tooLongSegments.length > 0) {
+      toast.error(
+        isRu
+          ? `Сегменты слишком длинные для Yandex v1 с аннотациями (лимит ${YANDEX_V1_MAX}):\n${tooLongSegments.join(", ")}.\nРазбейте на части или уберите аннотации.`
+          : `Segments too long for Yandex v1 with annotations (limit ${YANDEX_V1_MAX}):\n${tooLongSegments.join(", ")}.\nSplit them or remove annotations.`,
+        { duration: 8000 },
+      );
+      return;
+    }
+
     const allTargetIds = new Set(targetSegments.map(s => s.segment_id));
     setSynthesizing(true);
     setCurrentlySynthesizingIds(allTargetIds);
