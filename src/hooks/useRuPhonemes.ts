@@ -26,7 +26,7 @@ export function useRuPhonemes() {
         notes: r.notes,
       }));
     },
-    staleTime: 1000 * 60 * 60, // 1h cache
+    staleTime: Infinity,
   });
 }
 
