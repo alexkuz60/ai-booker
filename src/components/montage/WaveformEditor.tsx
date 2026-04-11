@@ -58,7 +58,7 @@ interface Selection {
   endSec: number;
 }
 
-const WAVEFORM_HEIGHT = 194;
+
 /** Narrow dB-label zone inside the editor (independent of the timeline mixer sidebar) */
 const DB_ZONE_WIDTH = 36;
 const SCENE_VIEWPORT_START_SEC = 0;
@@ -346,7 +346,7 @@ export function WaveformEditor({
 
     const borderColor = resolveHsl("--border");
     const mutedColor = resolveHsl("--muted-foreground");
-    const waveColor = resolveHsl("--cyan-glow");
+    
     const waveW = w - DB_ZONE_WIDTH;
 
     // ── dB scale in mixer sidebar area ──────────────────────
