@@ -1067,22 +1067,19 @@ export function StoryboardPanel({
                 if (obj.status === "error") {
                   batchError++;
                   allErrorIds.add(obj.segment_id);
-                  // Remove from synthesizing set so clip shows error state immediately
-                  setCurrentlySynthesizingIds(prev => { const n = new Set(prev); n.delete(obj.segment_id); return n; });
-                  onSynthesizingChange?.(prev => { const n = new Set(prev as Iterable<string>); n.delete(obj.segment_id); return n; });
                 } else if (obj.status === "ready" && (obj.audio_base64 || obj.phrase_results)) {
                   batchSynth++;
                   await saveSynthResultsToOpfs([obj]);
-                  // Remove from synthesizing set so clip re-renders with solid fill + speaker icon
-                  setCurrentlySynthesizingIds(prev => { const n = new Set(prev); n.delete(obj.segment_id); return n; });
-                  onSynthesizingChange?.(prev => { const n = new Set(prev as Iterable<string>); n.delete(obj.segment_id); return n; });
                   onSegmented?.(sceneId);
                 } else if (obj.status === "ready") {
                   batchCached++;
-                  // Cached hit — also remove from synthesizing
-                  setCurrentlySynthesizingIds(prev => { const n = new Set(prev); n.delete(obj.segment_id); return n; });
-                  onSynthesizingChange?.(prev => { const n = new Set(prev as Iterable<string>); n.delete(obj.segment_id); return n; });
                 }
+                // Remove completed segment from synthesizing set → clip re-renders immediately
+                setCurrentlySynthesizingIds(prev => { const n = new Set(prev); n.delete(obj.segment_id); return n; });
+                // Also update parent (uses Set, not callback — read current ref)
+                synthIdsRef.current = new Set(synthIdsRef.current);
+                synthIdsRef.current.delete(obj.segment_id);
+                onSynthesizingChange?.(new Set(synthIdsRef.current));
                 setSynthProgress(buildProgressLabel());
               }
             } catch { /* skip malformed lines */ }
