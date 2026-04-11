@@ -991,7 +991,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        if (!text.trim()) {
+        if (!rawText.trim()) {
           const r = { segment_id: seg.id, status: "skipped", duration_ms: 0 };
           playlistSegments.push({
             segment_id: r.segment_id,
