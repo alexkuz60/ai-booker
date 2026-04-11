@@ -73,6 +73,13 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
     }
   }, [phrase.phrase_id, phrase.text, onSave, peek]);
 
+  const handlePhoneticCorrect = useCallback((suggestion: PronunciationSuggestion, wordOffset: number) => {
+    const newText = applyCorrection(phrase.text, wordOffset, suggestion);
+    if (newText !== phrase.text) {
+      onSave(phrase.phrase_id, newText);
+    }
+  }, [phrase.phrase_id, phrase.text, onSave]);
+
   const hasAnnotations = phrase.annotations && phrase.annotations.length > 0;
 
   const EMOTION_TYPES = new Set(["joy", "sadness", "anger"]);
