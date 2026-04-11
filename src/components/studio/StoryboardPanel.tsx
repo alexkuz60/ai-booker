@@ -358,7 +358,9 @@ export function StoryboardPanel({
 
     audioStatusRef.current = map;
     setAudioStatus(map);
-    persist(buildSnapshot(undefined, map));
+    // Use immediate write (not debounced) so storyboard.json is on disk
+    // BEFORE onSegmented bumps clipsRefreshToken and timeline re-reads it.
+    await persistNow(buildSnapshot(undefined, map));
 
     // Merge into existing audio_meta.json (don't overwrite!) and recalc positions
     if (Object.keys(opfsEntries).length > 0) {
@@ -368,7 +370,7 @@ export function StoryboardPanel({
       await writeAudioMeta(storage, sceneId, merged, chapterId ?? undefined, existing?.silenceSec);
       await recalcPositions(storage, sceneId, chapterId ?? undefined);
     }
-  }, [storage, sceneId, chapterId, persist, buildSnapshot]);
+  }, [storage, sceneId, chapterId, persistNow, buildSnapshot]);
 
   /** Apply loaded segments to component state */
   const applySegments = useCallback((builtSegments: Segment[]) => {
