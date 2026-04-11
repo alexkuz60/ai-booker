@@ -76,10 +76,35 @@ export function useSelectionCapture(containerRef?: React.RefObject<HTMLElement |
     saved.current = { start: 0, end: selText.length, text: selText };
   }, [containerRef]);
 
-  /** Get saved selection without clearing it */
+  /** Capture current live selection into saved ref (called internally) */
+  const captureFromLive = useCallback(() => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    const selText = sel.toString().trim();
+    if (!selText) return;
+
+    if (containerRef?.current) {
+      const range = sel.getRangeAt(0);
+      const container = containerRef.current;
+      if (!container.contains(range.startContainer) || !container.contains(range.endContainer)) {
+        saved.current = { start: 0, end: selText.length, text: selText };
+        return;
+      }
+      const fullText = container.textContent || "";
+      const idx = fullText.indexOf(selText);
+      if (idx >= 0) {
+        saved.current = { start: idx, end: idx + selText.length, text: selText };
+        return;
+      }
+    }
+    saved.current = { start: 0, end: selText.length, text: selText };
+  }, [containerRef]);
+
+  /** Get saved selection without clearing it; re-captures live selection if stale */
   const peek = useCallback((): SelectionOffsets | null => {
+    if (!saved.current) captureFromLive();
     return saved.current;
-  }, []);
+  }, [captureFromLive]);
 
   /** Get saved selection and clear it */
   const consume = useCallback((): SelectionOffsets | null => {
