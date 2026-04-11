@@ -272,7 +272,8 @@ export function StoryboardPanel({
   ) => {
     if (!storage || !sceneId) return;
 
-    const map = new Map<string, { status: string; durationMs: number }>();
+    // Merge with existing audioStatus to avoid wiping previously-synth'd segments
+    const map = new Map(audioStatusRef.current);
     const opfsEntries: Record<string, LocalAudioEntry> = {};
 
     for (const r of results) {
