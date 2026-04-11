@@ -9,22 +9,37 @@ export interface RuPhoneme {
   notes: string | null;
 }
 
+const LS_KEY = "ru-phonemes-cache";
+
+function getCached(): RuPhoneme[] | null {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) return JSON.parse(raw) as RuPhoneme[];
+  } catch {}
+  return null;
+}
+
 export function useRuPhonemes() {
   return useQuery<RuPhoneme[]>({
     queryKey: ["ru-phonemes"],
     queryFn: async () => {
+      const cached = getCached();
+      if (cached?.length) return cached;
+
       const { data, error } = await supabase
         .from("ru_phonemes")
         .select("ipa, description, examples, category, notes")
         .order("sort_order");
       if (error) throw error;
-      return (data ?? []).map((r) => ({
+      const result = (data ?? []).map((r) => ({
         ipa: r.ipa,
         description: r.description as { ru: string; en: string },
         examples: r.examples ?? [],
         category: r.category,
         notes: r.notes,
       }));
+      try { localStorage.setItem(LS_KEY, JSON.stringify(result)); } catch {}
+      return result;
     },
     staleTime: Infinity,
   });
