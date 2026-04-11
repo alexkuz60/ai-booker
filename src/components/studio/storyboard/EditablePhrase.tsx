@@ -44,10 +44,17 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
     }
   }, [editing]);
 
+  const saveWithUndo = useCallback((newText: string) => {
+    if (newText !== phrase.text) {
+      undoRef.current = { phraseId: phrase.phrase_id, text: phrase.text };
+      onSave(phrase.phrase_id, newText);
+    }
+  }, [phrase.phrase_id, phrase.text, onSave]);
+
   const save = () => {
     const trimmed = draft.trim();
     if (trimmed && trimmed !== phrase.text) {
-      onSave(phrase.phrase_id, trimmed);
+      saveWithUndo(trimmed);
     }
     setEditing(false);
   };
