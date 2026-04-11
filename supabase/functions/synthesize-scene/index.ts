@@ -405,6 +405,8 @@ interface PhraseAnnotation {
 // ── Apply annotations to text → SSML (Yandex v1) ────────────────────
 
 function applyAnnotationsSsml(text: string, annotations: PhraseAnnotation[]): string {
+  // Convert combining acute to Yandex "+" stress marker before processing
+  text = convertAcuteToYandexPlus(text);
   if (!annotations.length) return escapeXml(text);
 
   // Separate insertions (pause) and ranges
@@ -482,6 +484,8 @@ function applyAnnotationsSsml(text: string, annotations: PhraseAnnotation[]): st
 // ── Apply annotations to plain text (ProxyAPI / ElevenLabs / v3) ─────
 
 function applyAnnotationsText(text: string, annotations: PhraseAnnotation[]): { text: string; extraInstructions: string[] } {
+  // Strip combining acute for non-Yandex providers (they don't use "+")
+  text = stripAcuteAccent(text);
   if (!annotations.length) return { text, extraInstructions: [] };
 
   const extraInstructions: string[] = [];
