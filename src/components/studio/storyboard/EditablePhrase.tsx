@@ -246,6 +246,7 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
               />
             )}
 
+            {emotionItems.length > 0 && (
               <ContextMenuSub>
                 <ContextMenuSubTrigger className="text-xs gap-2">
                   <span>🎭</span>
