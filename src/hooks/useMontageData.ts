@@ -35,8 +35,6 @@ export interface StemTrack {
 export function getStemTracks(isRu: boolean): StemTrack[] {
   return [
     { id: "voice", label: isRu ? "Голос" : "Voice", color: "hsl(var(--primary))" },
-    { id: "atmosphere", label: isRu ? "Атмосфера" : "Atmosphere", color: "hsl(175 45% 45%)" },
-    { id: "sfx", label: isRu ? "Звуки" : "SFX", color: "hsl(220 50% 55%)" },
   ];
 }
 
@@ -270,27 +268,7 @@ export function useMontageData() {
         });
       }
 
-      if (render.atmo_path && render.atmo_duration_ms > 0) {
-        clips.push({
-          id: `atmo-${sceneId}`, trackId: "atmosphere", speaker: null,
-          startSec: sceneStart, durationSec: render.atmo_duration_ms / 1000,
-          label: scenes.find(s => s.id === sceneId)?.title ?? "Atmo",
-          segmentType: "atmo_stem", hasAudio: true,
-          audioPath: render.atmo_path, sceneId,
-        });
-      }
-
-      if (render.sfx_path && render.sfx_duration_ms > 0) {
-        clips.push({
-          id: `sfx-${sceneId}`, trackId: "sfx", speaker: null,
-          startSec: sceneStart, durationSec: render.sfx_duration_ms / 1000,
-          label: scenes.find(s => s.id === sceneId)?.title ?? "SFX",
-          segmentType: "sfx_stem", hasAudio: true,
-          audioPath: render.sfx_path, sceneId,
-        });
-      }
-
-      const maxDur = Math.max(render.voice_duration_ms, render.atmo_duration_ms, render.sfx_duration_ms) / 1000;
+      const maxDur = render.voice_duration_ms / 1000;
       offset = sceneStart + maxDur;
     }
 
