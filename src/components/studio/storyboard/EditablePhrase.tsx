@@ -14,6 +14,7 @@ import {
   isInsertionAnnotation,
 } from "../phraseAnnotations";
 import { renderAnnotatedText } from "./PhraseRenderer";
+import { PhonemeSubmenu } from "./PhonemeSubmenu";
 import type { Phrase } from "./types";
 
 interface EditablePhraseProps {
