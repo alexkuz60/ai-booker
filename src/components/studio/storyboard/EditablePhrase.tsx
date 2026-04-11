@@ -310,7 +310,7 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
             className="text-xs gap-2"
           >
             <Undo2 className="h-3 w-3" />
-            {isRu ? "Отменить коррекцию" : "Undo correction"}
+            {isRu ? "Отменить правку" : "Undo edit"}
             <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+Z</span>
           </ContextMenuItem>
         )}
