@@ -1197,7 +1197,8 @@ Deno.serve(async (req) => {
 
               for (let pi = 0; pi < segPhrases.length; pi++) {
                 const phrase = segPhrases[pi];
-                const phraseText = phrase.text.trim();
+                const phraseTextRaw = phrase.text.trim();
+                const phraseText = isProxyApiVoice || isSaluteSpeechVoice ? stripAcuteAccent(phraseTextRaw) : convertAcuteToYandexPlus(phraseTextRaw);
                 if (!phraseText) continue;
 
                 let phraseResult: { audio: Uint8Array; durationMs: number } | { error: string };
