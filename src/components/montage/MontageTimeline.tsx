@@ -75,18 +75,14 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
   }, [storage, montageEditsPath]);
 
   // Save to OPFS on change (debounced)
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Save to OPFS immediately on change
   useEffect(() => {
     if (!storage || !montageEditsPath) return;
     if (trimOverrides.size === 0 && fadeOverrides.size === 0) return;
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      const payload: Record<string, unknown> = {};
-      if (trimOverrides.size > 0) payload.trims = Object.fromEntries(trimOverrides);
-      if (fadeOverrides.size > 0) payload.fades = Object.fromEntries(fadeOverrides);
-      storage.writeJSON(montageEditsPath, payload).catch(() => {});
-    }, 500);
-    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+    const payload: Record<string, unknown> = {};
+    if (trimOverrides.size > 0) payload.trims = Object.fromEntries(trimOverrides);
+    if (fadeOverrides.size > 0) payload.fades = Object.fromEntries(fadeOverrides);
+    storage.writeJSON(montageEditsPath, payload).catch(() => {});
   }, [storage, montageEditsPath, trimOverrides, fadeOverrides]);
 
   // ── Undo/Redo stack ──────────────────────────────────────
