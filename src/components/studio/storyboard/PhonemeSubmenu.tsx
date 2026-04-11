@@ -4,24 +4,33 @@ import {
   ContextMenuItem, ContextMenuLabel, ContextMenuSeparator,
 } from "@/components/ui/context-menu";
 import { useRuPhonemes, getPhonemesForWord, type RuPhoneme } from "@/hooks/useRuPhonemes";
+import { getCorrections, type PronunciationSuggestion } from "@/lib/ruPronunciationRules";
 
 interface Props {
   selectedText: string | null;
+  /** Character offset of the selected word inside the phrase text */
+  wordOffset: number;
   isRu: boolean;
+  onCorrect?: (suggestion: PronunciationSuggestion, wordOffset: number) => void;
 }
 
-export function PhonemeSubmenu({ selectedText, isRu }: Props) {
+export function PhonemeSubmenu({ selectedText, wordOffset, isRu, onCorrect }: Props) {
   const { data: allPhonemes } = useRuPhonemes();
 
+  const word = selectedText?.trim() ?? "";
+  const hasWord = !!word && /[а-яёА-ЯЁ]/.test(word);
+
   const matched = useMemo(() => {
-    if (!selectedText || !allPhonemes?.length) return [];
-    return getPhonemesForWord(selectedText, allPhonemes);
-  }, [selectedText, allPhonemes]);
+    if (!hasWord || !allPhonemes?.length) return [];
+    return getPhonemesForWord(word, allPhonemes);
+  }, [word, hasWord, allPhonemes]);
+
+  const corrections = useMemo(() => {
+    if (!hasWord) return [];
+    return getCorrections(word);
+  }, [word, hasWord]);
 
   if (!allPhonemes?.length) return null;
-
-  const word = selectedText?.trim();
-  const hasWord = !!word && /[а-яёА-ЯЁ]/.test(word);
 
   return (
     <ContextMenuSub>
@@ -30,7 +39,31 @@ export function PhonemeSubmenu({ selectedText, isRu }: Props) {
         {isRu ? "Фонетика" : "Phonetics"}
         {hasWord && <span className="ml-auto text-[10px] text-muted-foreground font-mono">{word}</span>}
       </ContextMenuSubTrigger>
-      <ContextMenuSubContent className="min-w-[14rem] max-h-[320px] overflow-y-auto">
+      <ContextMenuSubContent className="min-w-[16rem] max-h-[380px] overflow-y-auto">
+        {/* ── Corrections section ── */}
+        {hasWord && corrections.length > 0 && (
+          <>
+            <ContextMenuLabel className="text-[10px]">
+              {isRu ? "Коррекция произношения" : "Pronunciation correction"}
+            </ContextMenuLabel>
+            <ContextMenuSeparator />
+            {corrections.map((c, i) => (
+              <ContextMenuItem
+                key={`cor-${i}`}
+                onClick={() => onCorrect?.(c, wordOffset)}
+                className="text-xs gap-2 cursor-pointer"
+              >
+                <span className="font-mono font-bold text-primary shrink-0">
+                  {c.original}→{c.replacement}
+                </span>
+                <span className="truncate text-muted-foreground">{c.label}</span>
+              </ContextMenuItem>
+            ))}
+            <ContextMenuSeparator />
+          </>
+        )}
+
+        {/* ── Phoneme reference section ── */}
         {hasWord && matched.length > 0 ? (
           <>
             <ContextMenuLabel className="text-[10px]">
