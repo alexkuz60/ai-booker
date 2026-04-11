@@ -128,7 +128,7 @@ export function renderAnnotatedText(text: string, annotations?: PhraseAnnotation
             </span>
           );
         } else if (part) {
-          fragments.push(<span key={`t-${i}-${pi}`}>{part}</span>);
+          fragments.push(<span key={`t-${i}-${pi}`}>{renderStressMarks(part)}</span>);
         }
       }
     }
