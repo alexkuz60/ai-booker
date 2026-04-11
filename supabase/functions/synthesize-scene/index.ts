@@ -136,6 +136,9 @@ function estimateDuration(byteLength: number): number {
 
 // ── TTS call helper ──────────────────────────────────────────────────
 
+const TTS_MAX_RETRIES = 3;
+const TTS_BASE_DELAY_MS = 2000;
+
 async function callTts(
   yandexTtsUrl: string,
   authHeader: string,
@@ -164,24 +167,59 @@ async function callTts(
     body.text = params.text;
   }
 
-  const resp = await fetch(yandexTtsUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: authHeader,
-    },
-    body: JSON.stringify(body),
-  });
+  for (let attempt = 0; attempt <= TTS_MAX_RETRIES; attempt++) {
+    try {
+      const resp = await fetch(yandexTtsUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authHeader,
+        },
+        body: JSON.stringify(body),
+      });
 
-  if (!resp.ok) {
-    const errBody = await resp.text();
-    return { error: `TTS ${resp.status}: ${errBody}` };
+      if (resp.status === 429) {
+        const retryAfter = parseInt(resp.headers.get("retry-after") || "0", 10);
+        const delayMs = retryAfter > 0 ? retryAfter * 1000 : TTS_BASE_DELAY_MS * Math.pow(2, attempt);
+        if (attempt < TTS_MAX_RETRIES) {
+          console.warn(`[callTts] 429 rate limit, retry ${attempt + 1}/${TTS_MAX_RETRIES} after ${delayMs}ms`);
+          await resp.text(); // consume body
+          await new Promise((r) => setTimeout(r, delayMs));
+          continue;
+        }
+        const errBody = await resp.text();
+        return { error: `TTS 429 (rate limit after ${TTS_MAX_RETRIES} retries): ${errBody}` };
+      }
+
+      if (!resp.ok) {
+        const errBody = await resp.text();
+        return { error: `TTS ${resp.status}: ${errBody}` };
+      }
+
+      const audioBuffer = await resp.arrayBuffer();
+      const audio = new Uint8Array(audioBuffer);
+      const durationMs = parseWavDurationMs(audio);
+      return { audio, durationMs };
+    } catch (err: unknown) {
+      // Supabase runtime may throw RateLimitError instead of returning 429
+      const isRateLimit = err instanceof Error && (
+        err.name === "RateLimitError" ||
+        err.message.includes("Rate limit") ||
+        err.message.includes("rate limit")
+      );
+      if (isRateLimit && attempt < TTS_MAX_RETRIES) {
+        // Try to extract retryAfterMs from error
+        const match = err instanceof Error && err.message.match(/Retry after (\d+)ms/);
+        const delayMs = match ? parseInt(match[1], 10) : TTS_BASE_DELAY_MS * Math.pow(2, attempt);
+        console.warn(`[callTts] RateLimitError, retry ${attempt + 1}/${TTS_MAX_RETRIES} after ${delayMs}ms`);
+        await new Promise((r) => setTimeout(r, delayMs));
+        continue;
+      }
+      throw err; // non-retryable or exhausted retries
+    }
   }
 
-  const audioBuffer = await resp.arrayBuffer();
-  const audio = new Uint8Array(audioBuffer);
-  const durationMs = parseWavDurationMs(audio);
-  return { audio, durationMs };
+  return { error: "TTS: max retries exhausted" };
 }
 
 // ── ProxyAPI TTS call helper ─────────────────────────────────────────
