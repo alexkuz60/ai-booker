@@ -367,6 +367,31 @@ async function synthesizeInBatches(
 }
 
 
+// ── Convert combining acute accent (U+0301) to Yandex "+" stress marker ──
+// The UI stores stress as vowel + \u0301 (combining acute).
+// Yandex TTS expects "+" before the stressed vowel.
+// For non-Yandex providers we simply strip the combining accent.
+const COMBINING_ACUTE = "\u0301";
+const RU_VOWELS_SET = new Set("аеёиоуыэюяАЕЁИОУЫЭЮЯ");
+
+function convertAcuteToYandexPlus(text: string): string {
+  let result = "";
+  for (let i = 0; i < text.length; i++) {
+    if (text[i + 1] === COMBINING_ACUTE && RU_VOWELS_SET.has(text[i])) {
+      result += "+" + text[i]; // +vowel
+      i++; // skip the combining acute
+    } else if (text[i] === COMBINING_ACUTE) {
+      // orphan acute — skip
+    } else {
+      result += text[i];
+    }
+  }
+  return result;
+}
+
+function stripAcuteAccent(text: string): string {
+  return text.replaceAll(COMBINING_ACUTE, "");
+}
 
 interface PhraseAnnotation {
   type: "pause" | "emphasis" | "stress" | "whisper" | "slow" | "fast" | "joy" | "sadness" | "anger" | "sigh" | "cough" | "laugh" | "hmm";
@@ -380,6 +405,8 @@ interface PhraseAnnotation {
 // ── Apply annotations to text → SSML (Yandex v1) ────────────────────
 
 function applyAnnotationsSsml(text: string, annotations: PhraseAnnotation[]): string {
+  // Convert combining acute to Yandex "+" stress marker before processing
+  text = convertAcuteToYandexPlus(text);
   if (!annotations.length) return escapeXml(text);
 
   // Separate insertions (pause) and ranges
@@ -457,6 +484,8 @@ function applyAnnotationsSsml(text: string, annotations: PhraseAnnotation[]): st
 // ── Apply annotations to plain text (ProxyAPI / ElevenLabs / v3) ─────
 
 function applyAnnotationsText(text: string, annotations: PhraseAnnotation[]): { text: string; extraInstructions: string[] } {
+  // Strip combining acute for non-Yandex providers (they don't use "+")
+  text = stripAcuteAccent(text);
   if (!annotations.length) return { text, extraInstructions: [] };
 
   const extraInstructions: string[] = [];
@@ -938,7 +967,7 @@ Deno.serve(async (req) => {
 
       for (let i = 0; i < segments.length; i++) {
         const seg = segments[i];
-        const text = segmentTexts[i];
+        const rawText = segmentTexts[i];
 
         // Skip segments not in filter (if filter specified)
         if (filterSet && !filterSet.has(seg.id)) {
@@ -962,7 +991,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        if (!text.trim()) {
+        if (!rawText.trim()) {
           const r = { segment_id: seg.id, status: "skipped", duration_ms: 0 };
           playlistSegments.push({
             segment_id: r.segment_id,
@@ -1044,6 +1073,8 @@ Deno.serve(async (req) => {
         const isSaluteSpeechVoice = (voiceConfig as any).provider === "salutespeech";
         const isV3Voice = !isProxyApiVoice && !isSaluteSpeechVoice && V3_ONLY_VOICES.has(voiceConfig.voice);
         const apiVersion = isSaluteSpeechVoice ? "salutespeech" : isProxyApiVoice ? "proxyapi" : isV3Voice ? "v3" : "v1";
+        // Convert combining acute to provider-appropriate form
+        const text = isProxyApiVoice || isSaluteSpeechVoice ? stripAcuteAccent(rawText) : convertAcuteToYandexPlus(rawText);
         const estimatedChunks = isV3Voice ? Math.max(1, Math.ceil(text.length / 240)) : 1;
         const moodInfo = ttsCtx.instructionText ? `, mood=${sceneMood}, ctx="${ttsCtx.instructionText.slice(0, 60)}"` : "";
         console.log(`▶ Segment ${i + 1}/${segments.length} [${seg.id}]: speaker=${seg.speaker || seg.segment_type}, api=${apiVersion}, voice=${voiceConfig.voice}, speed=${(voiceConfig as any).speed}, role=${voiceConfig.role}, chars=${text.length}${moodInfo}${hasInlineNarrations ? `, narrations=${inlineNarrations.length}` : ""}`);
@@ -1166,7 +1197,8 @@ Deno.serve(async (req) => {
 
               for (let pi = 0; pi < segPhrases.length; pi++) {
                 const phrase = segPhrases[pi];
-                const phraseText = phrase.text.trim();
+                const phraseTextRaw = phrase.text.trim();
+                const phraseText = isProxyApiVoice || isSaluteSpeechVoice ? stripAcuteAccent(phraseTextRaw) : convertAcuteToYandexPlus(phraseTextRaw);
                 if (!phraseText) continue;
 
                 let phraseResult: { audio: Uint8Array; durationMs: number } | { error: string };
