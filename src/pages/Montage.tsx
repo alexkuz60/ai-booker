@@ -49,11 +49,35 @@ const Montage = () => {
 
   const hasContent = !!chapterId && sceneIds.length > 0;
 
+  // Count rendered/unrendered for active part only
+  const activeRendered = activeSceneIds.filter(id => renderedSceneIds.includes(id));
+  const activeUnrendered = activeSceneIds.filter(id => unrenderedSceneIds.includes(id));
+  const activeSceneCount = activeSceneIds.length;
+
   // ── Page header ────────────────────────────────────────────
   const title = isRu ? "МОНТАЖ" : "MONTAGE";
-  const subtitle = bookTitle && chapterTitle
-    ? `${bookTitle} → ${chapterTitle}`
-    : undefined;
+
+  const subtitle = useMemo(() => {
+    if (!bookTitle || !chapterTitle) return undefined;
+    return (
+      <span className="flex items-center gap-2">
+        <span className="truncate">{bookTitle} → {chapterTitle}</span>
+        {hasContent && (
+          <>
+            {activeUnrendered.length > 0 && (
+              <span className="text-xs text-destructive flex items-center gap-1 font-body whitespace-nowrap">
+                <AlertCircle className="h-3 w-3" />
+                {activeUnrendered.length} {isRu ? "не отренд." : "unrendered"}
+              </span>
+            )}
+            <span className="text-xs text-muted-foreground font-body whitespace-nowrap">
+              {activeRendered.length}/{activeSceneCount} {isRu ? "сцен" : "scenes"} · {formatTime(totalDurationSec)}
+            </span>
+          </>
+        )}
+      </span>
+    );
+  }, [bookTitle, chapterTitle, hasContent, activeUnrendered.length, activeRendered.length, activeSceneCount, totalDurationSec, isRu]);
 
   const headerRight = useMemo(() => (
     <div className="flex items-center gap-2">
