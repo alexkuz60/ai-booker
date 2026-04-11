@@ -1366,11 +1366,24 @@ Deno.serve(async (req) => {
               }
             } else if (!isV3Voice && (hasAnnot || isLyric)) {
               const ssml = isLyric && !hasAnnot ? buildLyricSsml(text) : buildSegmentSsml(seg.id);
-              result = await callTts(yandexTtsUrl, authHeader, {
-                ssml, voice: voiceConfig.voice,
-                speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
-                lang: langCode,
-              });
+              // Yandex v1 API limit: 5000 chars including SSML tags
+              const YANDEX_V1_MAX_CHARS = 4900; // safety margin
+              if (ssml.length > YANDEX_V1_MAX_CHARS) {
+                // SSML too long — fall back to batched plain text without annotations
+                console.warn(`[SSML guard] SSML ${ssml.length} chars exceeds v1 limit (${YANDEX_V1_MAX_CHARS}), falling back to batched plain text`);
+                result = await synthesizeInBatches(
+                  (t) => callTts(yandexTtsUrl, authHeader, {
+                    text: t, voice: voiceConfig.voice, speed: voiceConfig.speed, lang: langCode,
+                  }),
+                  text,
+                );
+              } else {
+                result = await callTts(yandexTtsUrl, authHeader, {
+                  ssml, voice: voiceConfig.voice,
+                  speed: isLyric && voiceConfig.speed >= 0.95 ? voiceConfig.speed * 0.9 : voiceConfig.speed,
+                  lang: langCode,
+                });
+              }
             } else if (isV3Voice && (hasAnnot || isLyric)) {
               const annotated = hasAnnot ? buildSegmentAnnotatedText(seg.id) : formatLyricText(text);
               result = await callTts(yandexTtsUrl, authHeader, {
