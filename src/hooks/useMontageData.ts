@@ -5,6 +5,7 @@ import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { readStructureFromLocal } from "@/lib/localSync";
 import { revokeAllAudioUrls } from "@/lib/localAudioProvider";
 import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
+import { readRenderMeta, type SceneRenderMeta } from "@/lib/sceneRenderer";
 
 // ─── Types ──────────────────────────────────────────────────
 export interface SceneRender {
