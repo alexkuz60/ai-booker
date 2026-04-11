@@ -347,6 +347,7 @@ export function StoryboardPanel({
       }
     }
 
+    audioStatusRef.current = map;
     setAudioStatus(map);
     persist(buildSnapshot(undefined, map));
 
