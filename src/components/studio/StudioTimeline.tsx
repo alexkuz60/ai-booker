@@ -173,15 +173,30 @@ export function StudioTimeline({
     setHasExistingRender(false);
     setRenderProgress(null);
     if (!sceneId || !storage) return;
+    let cancelled = false;
     (async () => {
       try {
-        // Resolve chapterId from scene path
-        const sbPath = (await import("@/lib/projectPaths")).paths.storyboard(sceneId);
+        // Resolve chapterId with self-healing fallback (rebuild scene index if cache empty)
+        const { paths } = await import("@/lib/projectPaths");
+        const { readSceneIndex } = await import("@/lib/sceneIndex");
+
+        let sbPath = paths.storyboard(sceneId);
+        if (sbPath.includes("__unresolved__")) {
+          // Cache miss — rebuild from OPFS
+          await readSceneIndex(storage);
+          const { readBookMap } = await import("@/lib/bookMap");
+          await readBookMap(storage);
+          sbPath = paths.storyboard(sceneId);
+        }
+
         const match = sbPath.match(/^chapters\/([^/]+)\//);
-        if (!match) return;
+        if (!match || match[1] === "__unresolved__") return;
+        if (cancelled) return;
+
         const chId = match[1];
-        if (chId === "__unresolved__") return;
         const meta = await readRenderMeta(storage, chId);
+        if (cancelled) return;
+
         const sceneMeta = meta[sceneId];
         if (sceneMeta && sceneMeta.status === "ready") {
           const hasPaths = [sceneMeta.voice_path, sceneMeta.atmo_path, sceneMeta.sfx_path].filter(Boolean);
@@ -189,7 +204,8 @@ export function StudioTimeline({
         }
       } catch { /* ignore */ }
     })();
-  }, [sceneId, storage]);
+    return () => { cancelled = true; };
+  }, [sceneId, storage, clipsRefreshToken]);
 
   const rulerRenderPercent = isRendering
     ? (renderProgress?.percent ?? 0)
