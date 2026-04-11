@@ -1367,16 +1367,14 @@ Deno.serve(async (req) => {
             } else if (!isV3Voice && (hasAnnot || isLyric)) {
               const ssml = isLyric && !hasAnnot ? buildLyricSsml(text) : buildSegmentSsml(seg.id);
               // Yandex v1 API limit: 5000 chars including SSML tags
-              const YANDEX_V1_MAX_CHARS = 4900; // safety margin
+              const YANDEX_V1_MAX_CHARS = 4900;
               if (ssml.length > YANDEX_V1_MAX_CHARS) {
-                // SSML too long — fall back to batched plain text without annotations
-                console.warn(`[SSML guard] SSML ${ssml.length} chars exceeds v1 limit (${YANDEX_V1_MAX_CHARS}), falling back to batched plain text`);
-                result = await synthesizeInBatches(
-                  (t) => callTts(yandexTtsUrl, authHeader, {
-                    text: t, voice: voiceConfig.voice, speed: voiceConfig.speed, lang: langCode,
-                  }),
-                  text,
-                );
+                // Refuse to synthesize — user must shorten the segment or remove annotations
+                const errMsg = lang === "ru"
+                  ? `Сегмент слишком длинный для v1 с аннотациями: ${ssml.length} символов (лимит ${YANDEX_V1_MAX_CHARS}). Разбейте сегмент на части или уберите аннотации.`
+                  : `Segment too long for v1 with annotations: ${ssml.length} chars (limit ${YANDEX_V1_MAX_CHARS}). Split the segment or remove annotations.`;
+                console.warn(`[SSML guard] ${errMsg}`);
+                result = { error: errMsg };
               } else {
                 result = await callTts(yandexTtsUrl, authHeader, {
                   ssml, voice: voiceConfig.voice,
