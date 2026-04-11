@@ -367,6 +367,31 @@ async function synthesizeInBatches(
 }
 
 
+// ── Convert combining acute accent (U+0301) to Yandex "+" stress marker ──
+// The UI stores stress as vowel + \u0301 (combining acute).
+// Yandex TTS expects "+" before the stressed vowel.
+// For non-Yandex providers we simply strip the combining accent.
+const COMBINING_ACUTE = "\u0301";
+const RU_VOWELS_SET = new Set("аеёиоуыэюяАЕЁИОУЫЭЮЯ");
+
+function convertAcuteToYandexPlus(text: string): string {
+  let result = "";
+  for (let i = 0; i < text.length; i++) {
+    if (text[i + 1] === COMBINING_ACUTE && RU_VOWELS_SET.has(text[i])) {
+      result += "+" + text[i]; // +vowel
+      i++; // skip the combining acute
+    } else if (text[i] === COMBINING_ACUTE) {
+      // orphan acute — skip
+    } else {
+      result += text[i];
+    }
+  }
+  return result;
+}
+
+function stripAcuteAccent(text: string): string {
+  return text.replaceAll(COMBINING_ACUTE, "");
+}
 
 interface PhraseAnnotation {
   type: "pause" | "emphasis" | "stress" | "whisper" | "slow" | "fast" | "joy" | "sadness" | "anger" | "sigh" | "cough" | "laugh" | "hmm";
