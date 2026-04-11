@@ -270,7 +270,12 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
           </>
         )}
         <ContextMenuSeparator />
-        <PhonemeSubmenu selectedText={peek()?.text ?? null} isRu={isRu} />
+        <PhonemeSubmenu
+          selectedText={peek()?.text ?? null}
+          wordOffset={peek()?.start ?? 0}
+          isRu={isRu}
+          onCorrect={handlePhoneticCorrect}
+        />
         <ContextMenuSeparator />
         <ContextMenuItem
           onClick={handleDeleteSelected}
