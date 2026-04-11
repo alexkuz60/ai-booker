@@ -39,6 +39,8 @@ interface MontageTimelineProps {
 }
 
 export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chapterId, isRu, onSplitAtScene, hasParts }: MontageTimelineProps) {
+  const { storage } = useProjectStorageContext();
+
   // ── Loop region selection ──────────────────────────────────
   const [loopStartClipId, setLoopStartClipId] = useState<string | null>(null);
   const [loopEndClipId, setLoopEndClipId] = useState<string | null>(null);
@@ -46,6 +48,46 @@ export function MontageTimeline({ clips, sceneBoundaries, totalDurationSec, chap
   // ── Trim & Fade overrides ──────────────────────────────────
   const [trimOverrides, setTrimOverrides] = useState<Map<string, { offsetSec: number; newDurationSec: number }>>(new Map());
   const [fadeOverrides, setFadeOverrides] = useState<Map<string, { fadeInSec: number; fadeOutSec: number }>>(new Map());
+
+  // ── OPFS persistence for trim/fade ─────────────────────────
+  const montageEditsPath = chapterId ? `chapters/${chapterId}/renders/montage_edits.json` : null;
+
+  // Load from OPFS on chapter change
+  useEffect(() => {
+    if (!storage || !montageEditsPath) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await storage.readJSON<{
+          trims?: Record<string, { offsetSec: number; newDurationSec: number }>;
+          fades?: Record<string, { fadeInSec: number; fadeOutSec: number }>;
+        }>(montageEditsPath);
+        if (cancelled || !data) return;
+        if (data.trims && Object.keys(data.trims).length > 0) {
+          setTrimOverrides(new Map(Object.entries(data.trims)));
+        }
+        if (data.fades && Object.keys(data.fades).length > 0) {
+          setFadeOverrides(new Map(Object.entries(data.fades)));
+        }
+      } catch { /* no saved edits */ }
+    })();
+    return () => { cancelled = true; };
+  }, [storage, montageEditsPath]);
+
+  // Save to OPFS on change (debounced)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!storage || !montageEditsPath) return;
+    if (trimOverrides.size === 0 && fadeOverrides.size === 0) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      const payload: Record<string, unknown> = {};
+      if (trimOverrides.size > 0) payload.trims = Object.fromEntries(trimOverrides);
+      if (fadeOverrides.size > 0) payload.fades = Object.fromEntries(fadeOverrides);
+      storage.writeJSON(montageEditsPath, payload).catch(() => {});
+    }, 500);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [storage, montageEditsPath, trimOverrides, fadeOverrides]);
 
   // ── Undo/Redo stack ──────────────────────────────────────
   type UndoSnapshot = {
