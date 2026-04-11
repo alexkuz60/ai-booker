@@ -15,6 +15,7 @@ import {
 } from "../phraseAnnotations";
 import { renderAnnotatedText } from "./PhraseRenderer";
 import { PhonemeSubmenu } from "./PhonemeSubmenu";
+import { applyCorrection, type PronunciationSuggestion } from "@/lib/ruPronunciationRules";
 import type { Phrase } from "./types";
 
 interface EditablePhraseProps {
@@ -71,6 +72,13 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
       onSave(phrase.phrase_id, newText);
     }
   }, [phrase.phrase_id, phrase.text, onSave, peek]);
+
+  const handlePhoneticCorrect = useCallback((suggestion: PronunciationSuggestion, wordOffset: number) => {
+    const newText = applyCorrection(phrase.text, wordOffset, suggestion);
+    if (newText !== phrase.text) {
+      onSave(phrase.phrase_id, newText);
+    }
+  }, [phrase.phrase_id, phrase.text, onSave]);
 
   const hasAnnotations = phrase.annotations && phrase.annotations.length > 0;
 
@@ -262,7 +270,12 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
           </>
         )}
         <ContextMenuSeparator />
-        <PhonemeSubmenu selectedText={peek()?.text ?? null} isRu={isRu} />
+        <PhonemeSubmenu
+          selectedText={peek()?.text ?? null}
+          wordOffset={peek()?.start ?? 0}
+          isRu={isRu}
+          onCorrect={handlePhoneticCorrect}
+        />
         <ContextMenuSeparator />
         <ContextMenuItem
           onClick={handleDeleteSelected}
