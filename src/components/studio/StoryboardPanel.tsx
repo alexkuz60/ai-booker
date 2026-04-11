@@ -856,27 +856,46 @@ export function StoryboardPanel({
 
   // ─── Synthesis ────────────────────────────────────────────
 
+  // ── Adaptive batching: split segments by count + char budget ──
+  const buildAdaptiveBatches = useCallback((segs: typeof segments) => {
+    const MAX_PER_BATCH = 20;
+    const MAX_CHARS_PER_BATCH = 3000;
+    const batches: (typeof segments)[] = [];
+    let current: typeof segments = [];
+    let currentChars = 0;
+
+    for (const seg of segs) {
+      const chars = seg.phrases.reduce((s, p) => s + p.text.length, 0);
+      if (current.length > 0 && (current.length >= MAX_PER_BATCH || currentChars + chars > MAX_CHARS_PER_BATCH)) {
+        batches.push(current);
+        current = [];
+        currentChars = 0;
+      }
+      current.push(seg);
+      currentChars += chars;
+    }
+    if (current.length > 0) batches.push(current);
+    return batches;
+  }, []);
+
   const runSynthesis = useCallback(async () => {
     if (!sceneId || segments.length === 0) return;
-    // If some segments are checked — synthesize only those; otherwise all
     const targetSegments = mergeChecked.size > 0
       ? segments.filter(s => mergeChecked.has(s.segment_id))
       : segments;
     if (targetSegments.length === 0) return;
 
-    const targetIds = new Set(targetSegments.map(s => s.segment_id));
+    const allTargetIds = new Set(targetSegments.map(s => s.segment_id));
     setSynthesizing(true);
-    setCurrentlySynthesizingIds(targetIds);
-    onSynthesizingChange?.(targetIds);
+    setCurrentlySynthesizingIds(allTargetIds);
+    onSynthesizingChange?.(allTargetIds);
     onErrorSegmentsChange?.(new Set());
     setSynthProgress(isRu ? "Подготовка…" : "Preparing…");
-    try {
-      setSynthProgress(isRu ? "Запуск синтеза…" : "Starting synthesis…");
 
-      // Send voice configs from OPFS directly (К4: OPFS is source of truth)
+    try {
       const voice_configs = await buildVoiceConfigsPayload(projectStorage);
 
-      // 🚫 К3: Send segments+phrases from OPFS directly — no pushToDb
+      // Build full segment payload (needed for every batch call — edge function needs full context)
       const synthSegments = segments.map(seg => ({
         segment_id: seg.segment_id,
         segment_number: seg.segment_number,
@@ -890,7 +909,6 @@ export function StoryboardPanel({
         })),
       }));
 
-      // Read scene_meta (mood, scene_type) from OPFS
       let scene_meta: Record<string, unknown> | undefined;
       if (projectStorage && sceneId && chapterId) {
         try {
@@ -902,144 +920,160 @@ export function StoryboardPanel({
         } catch { /* ignore */ }
       }
 
-      // Use streaming NDJSON to avoid edge function memory limit on large scenes
       const { data: session } = await supabase.auth.getSession();
       const token = session?.session?.access_token;
       if (!token) throw new Error("Not authenticated");
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-      const requestBody: Record<string, unknown> = {
-        scene_id: sceneId, language: isRu ? "ru" : "en",
-        voice_configs, segments: synthSegments, scene_meta,
-      };
-      // Pass segment_ids filter only when subset is selected
-      if (mergeChecked.size > 0) {
-        requestBody.segment_ids = [...targetIds];
-      }
+      // Split into adaptive batches
+      const batches = buildAdaptiveBatches(targetSegments);
+      console.log(`[Synthesis] ${targetSegments.length} segments → ${batches.length} batch(es)`);
 
-      const resp = await fetch(`${supabaseUrl}/functions/v1/synthesize-scene`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          apikey: anonKey,
-        },
-        body: JSON.stringify(requestBody),
-      });
+      let totalSynthCount = 0;
+      let totalCachedCount = 0;
+      let totalErrorCount = 0;
+      let totalDurationMs = 0;
+      const allErrorIds = new Set<string>();
+      const allResults: Array<any> = [];
+      const startTime = Date.now();
 
-      if (!resp.ok) {
-        const errBody = await resp.text();
-        throw new Error(`Synthesis HTTP ${resp.status}: ${errBody}`);
-      }
+      for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+        const batch = batches[batchIdx];
+        const batchIds = batch.map(s => s.segment_id);
+        const batchLabel = batches.length > 1
+          ? (isRu ? `Батч ${batchIdx + 1}/${batches.length}` : `Batch ${batchIdx + 1}/${batches.length}`)
+          : "";
 
-      // Read NDJSON stream line by line
-      const reader = resp.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      const allResults: Array<{
-        segment_id: string; status: string; duration_ms: number;
-        audio_base64?: string; voice_config?: Record<string, unknown>; error?: string;
-        inline_narrations?: Array<{ text: string; insert_after: string; audio_base64: string; duration_ms: number; offset_ms: number }>;
-        phrase_results?: Array<{ phrase_index: number; audio_base64: string; duration_ms: number }>;
-      }> = [];
-      let summary: { synthesized?: number; errors?: number; total_duration_ms?: number; error?: string } = {};
+        setSynthProgress(
+          batchLabel
+            ? (isRu ? `${batchLabel}: запуск…` : `${batchLabel}: starting…`)
+            : (isRu ? "Запуск синтеза…" : "Starting synthesis…")
+        );
 
-      // Accumulate streamed phrase events per segment
-      const streamedPhrases = new Map<string, Array<{ phrase_index: number; audio_base64: string; duration_ms: number }>>();
-      let synthCount = 0;
-      let cachedCount = 0;
-      let errorCount = 0;
+        const requestBody: Record<string, unknown> = {
+          scene_id: sceneId, language: isRu ? "ru" : "en",
+          voice_configs, segments: synthSegments, scene_meta,
+          segment_ids: batchIds,
+        };
 
-      const buildProgressLabel = () => {
-        const parts: string[] = [];
-        if (synthCount > 0) parts.push(isRu ? `✓${synthCount}` : `✓${synthCount}`);
-        if (cachedCount > 0) parts.push(isRu ? `⚡${cachedCount}` : `⚡${cachedCount}`);
-        if (errorCount > 0) parts.push(isRu ? `✗${errorCount}` : `✗${errorCount}`);
-        const detail = parts.length > 0 ? ` (${parts.join(" ")})` : "";
-        return isRu
-          ? `Синтез: ${allResults.length}/${targetSegments.length}${detail}`
-          : `Synthesis: ${allResults.length}/${targetSegments.length}${detail}`;
-      };
+        const resp = await fetch(`${supabaseUrl}/functions/v1/synthesize-scene`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+            apikey: anonKey,
+          },
+          body: JSON.stringify(requestBody),
+        });
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (value) buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const obj = JSON.parse(line);
-            if (obj._summary) {
-              summary = obj;
-            } else if (obj._phrase_group_start) {
-              streamedPhrases.set(obj.segment_id, []);
-            } else if (obj._phrase) {
-              const phrases = streamedPhrases.get(obj.segment_id) ?? [];
-              phrases.push({ phrase_index: obj.phrase_index, audio_base64: obj.audio_base64, duration_ms: obj.duration_ms });
-              streamedPhrases.set(obj.segment_id, phrases);
-              setSynthProgress(
-                isRu
-                  ? `Синтез фраз: ${phrases.length}…`
-                  : `Phrases: ${phrases.length}…`
-              );
-            } else {
-              const collectedPhrases = streamedPhrases.get(obj.segment_id);
-              if (collectedPhrases && collectedPhrases.length > 0 && obj.status === "ready" && !obj.audio_base64) {
-                obj.phrase_results = collectedPhrases;
-                streamedPhrases.delete(obj.segment_id);
-              }
-              allResults.push(obj);
-              // Classify result
-              if (obj.status === "error") {
-                errorCount++;
-              } else if (obj.status === "ready" && (obj.audio_base64 || obj.phrase_results)) {
-                synthCount++;
-                await saveSynthResultsToOpfs([obj]);
-                onSegmented?.(sceneId);
-              } else if (obj.status === "ready") {
-                cachedCount++; // cache hit — no audio_base64
-              }
-              setSynthProgress(buildProgressLabel());
-            }
-          } catch { /* skip malformed lines */ }
+        if (!resp.ok) {
+          const errBody = await resp.text();
+          throw new Error(`Synthesis HTTP ${resp.status}: ${errBody}`);
         }
-        if (done) break;
+
+        // Read NDJSON stream
+        const reader = resp.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        const streamedPhrases = new Map<string, Array<{ phrase_index: number; audio_base64: string; duration_ms: number }>>();
+        let batchSynth = 0, batchCached = 0, batchError = 0;
+
+        const buildProgressLabel = () => {
+          const done = allResults.length;
+          const total = targetSegments.length;
+          const parts: string[] = [];
+          const s = totalSynthCount + batchSynth;
+          const c = totalCachedCount + batchCached;
+          const e = totalErrorCount + batchError;
+          if (s > 0) parts.push(`✓${s}`);
+          if (c > 0) parts.push(`⚡${c}`);
+          if (e > 0) parts.push(`✗${e}`);
+          const detail = parts.length > 0 ? ` (${parts.join(" ")})` : "";
+          const prefix = batchLabel ? `${batchLabel} · ` : "";
+          return isRu
+            ? `${prefix}Синтез: ${done}/${total}${detail}`
+            : `${prefix}Synthesis: ${done}/${total}${detail}`;
+        };
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (value) buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const obj = JSON.parse(line);
+              if (obj._summary) {
+                totalDurationMs += obj.total_duration_ms ?? 0;
+              } else if (obj._phrase_group_start) {
+                streamedPhrases.set(obj.segment_id, []);
+              } else if (obj._phrase) {
+                const phrases = streamedPhrases.get(obj.segment_id) ?? [];
+                phrases.push({ phrase_index: obj.phrase_index, audio_base64: obj.audio_base64, duration_ms: obj.duration_ms });
+                streamedPhrases.set(obj.segment_id, phrases);
+                setSynthProgress(isRu ? `Синтез фраз: ${phrases.length}…` : `Phrases: ${phrases.length}…`);
+              } else {
+                const collectedPhrases = streamedPhrases.get(obj.segment_id);
+                if (collectedPhrases && collectedPhrases.length > 0 && obj.status === "ready" && !obj.audio_base64) {
+                  obj.phrase_results = collectedPhrases;
+                  streamedPhrases.delete(obj.segment_id);
+                }
+                allResults.push(obj);
+                if (obj.status === "error") {
+                  batchError++;
+                  allErrorIds.add(obj.segment_id);
+                } else if (obj.status === "ready" && (obj.audio_base64 || obj.phrase_results)) {
+                  batchSynth++;
+                  await saveSynthResultsToOpfs([obj]);
+                  onSegmented?.(sceneId);
+                } else if (obj.status === "ready") {
+                  batchCached++;
+                }
+                setSynthProgress(buildProgressLabel());
+              }
+            } catch { /* skip malformed lines */ }
+          }
+          if (done) break;
+        }
+
+        totalSynthCount += batchSynth;
+        totalCachedCount += batchCached;
+        totalErrorCount += batchError;
+
+        // Save non-audio results (cached/error) for this batch
+        const nonAudioResults = allResults.filter(
+          r => r.status !== "skipped" && (r.status !== "ready" || (!r.audio_base64 && !r.phrase_results)),
+        );
+        if (nonAudioResults.length > 0) {
+          await saveSynthResultsToOpfs(nonAudioResults);
+        }
+
+        onErrorSegmentsChange?.(allErrorIds);
+        onSegmented?.(sceneId);
+
+        if (batches.length > 1 && batchIdx < batches.length - 1) {
+          console.log(`[Synthesis] Batch ${batchIdx + 1} done: ✓${batchSynth} ⚡${batchCached} ✗${batchError}`);
+        }
       }
 
-      if (summary.error) throw new Error(summary.error);
-
-      const durSec = ((summary.total_duration_ms ?? 0) / 1000).toFixed(1);
-      const errorIds = new Set<string>();
-      for (const r of allResults) {
-        if (r.status === "error") errorIds.add(r.segment_id);
-      }
-      onErrorSegmentsChange?.(errorIds);
-
-      // Save non-audio results (skipped/cached) to update audio_meta
-      const nonAudioResults = allResults.filter(
-        r => r.status !== "skipped" && (r.status !== "ready" || (!r.audio_base64 && !r.phrase_results)),
-      );
-      if (nonAudioResults.length > 0) {
-        await saveSynthResultsToOpfs(nonAudioResults);
-      }
-
-      const cachedSuffix = cachedCount > 0
-        ? (isRu ? `, ⚡${cachedCount} из кеша` : `, ⚡${cachedCount} cached`)
+      const durSec = ((Date.now() - startTime) / 1000).toFixed(1);
+      const cachedSuffix = totalCachedCount > 0
+        ? (isRu ? `, ⚡${totalCachedCount} из кеша` : `, ⚡${totalCachedCount} cached`)
         : "";
 
-      if ((summary.errors ?? 0) > 0) {
+      if (totalErrorCount > 0) {
         toast.warning(
           isRu
-            ? `Синтез: ✓${synthCount} готово, ✗${errorCount} ошибок${cachedSuffix} (${durSec}с)`
-            : `Synthesis: ✓${synthCount} done, ✗${errorCount} errors${cachedSuffix} (${durSec}s)`
+            ? `Синтез: ✓${totalSynthCount} готово, ✗${totalErrorCount} ошибок${cachedSuffix} (${durSec}с)`
+            : `Synthesis: ✓${totalSynthCount} done, ✗${totalErrorCount} errors${cachedSuffix} (${durSec}s)`
         );
       } else {
         toast.success(
           isRu
-            ? `Синтез завершён: ✓${synthCount} фрагм.${cachedSuffix} (${durSec}с)`
-            : `Synthesis done: ✓${synthCount} seg.${cachedSuffix} (${durSec}s)`
+            ? `Синтез завершён: ✓${totalSynthCount} фрагм.${cachedSuffix} (${durSec}с)`
+            : `Synthesis done: ✓${totalSynthCount} seg.${cachedSuffix} (${durSec}s)`
         );
       }
       onSegmented?.(sceneId);
@@ -1052,7 +1086,7 @@ export function StoryboardPanel({
     onSynthesizingChange?.(new Set());
     setSynthProgress("");
     setMergeChecked(new Set());
-  }, [sceneId, segments, mergeChecked, isRu, onSegmented, saveSynthResultsToOpfs, onSynthesizingChange, onErrorSegmentsChange, pushToDb, buildSnapshot]);
+  }, [sceneId, segments, mergeChecked, isRu, onSegmented, saveSynthResultsToOpfs, onSynthesizingChange, onErrorSegmentsChange, pushToDb, buildSnapshot, buildAdaptiveBatches]);
 
   const resynthSegment = useCallback(async (segmentId: string) => {
     if (!sceneId) return;
