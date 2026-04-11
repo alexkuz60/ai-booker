@@ -64,7 +64,7 @@ async function writeRenderMeta(
 }
 
 export interface RenderProgress {
-  phase: "loading" | "rendering" | "encoding" | "uploading" | "done" | "error";
+  phase: "loading" | "rendering" | "encoding" | "done" | "error";
   percent: number;
   error?: string;
 }
