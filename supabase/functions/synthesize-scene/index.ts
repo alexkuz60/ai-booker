@@ -1038,7 +1038,7 @@ Deno.serve(async (req) => {
           ? JSON.stringify((phrasesBySegment.get(seg.id) ?? []).map(p => p.annotations))
           : "";
         const moodSuffix = NARRATOR_SEGMENT_TYPES.has(seg.segment_type) ? `|mood:${sceneMood}|st:${sceneType}` : "";
-        const textHashForCache = hashText(text + annotSuffix + moodSuffix);
+        const textHashForCache = hashText(rawText + annotSuffix + moodSuffix);
         const cached = existingAudioMap.get(seg.id);
         if (cached && !forceResynthesize && !voiceConfigChanged(voiceConfig, cached.voice_config, textHashForCache)) {
           console.log(`Cache hit for segment ${seg.id}: voice=${voiceConfig.voice}, skipping TTS`);
