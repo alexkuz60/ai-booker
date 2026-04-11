@@ -788,6 +788,79 @@ export async function deployFromServer({
   }
   report("atmospheres", restoredAtmoCount > 0 ? "done" : "skipped", restoredAtmoCount > 0 ? `${restoredAtmoCount}` : undefined);
 
+  // ── 8d. Restore render_meta.json from scene_renders table ──
+  report("scene_render", "running");
+  let restoredRenderCount = 0;
+  try {
+    const allSceneIdsForRenders = allScenes.map(s => s.id);
+    if (allSceneIdsForRenders.length > 0) {
+      type RawRender = {
+        scene_id: string;
+        voice_path: string | null;
+        atmo_path: string | null;
+        sfx_path: string | null;
+        voice_duration_ms: number;
+        atmo_duration_ms: number;
+        sfx_duration_ms: number;
+        status: string;
+        render_config: any;
+        updated_at: string;
+      };
+      const serverRenders = await fetchChunked<RawRender>(
+        "scene_renders",
+        "scene_id, voice_path, atmo_path, sfx_path, voice_duration_ms, atmo_duration_ms, sfx_duration_ms, status, render_config, updated_at",
+        "scene_id",
+        allSceneIdsForRenders,
+        200,
+      );
+
+      if (serverRenders.length > 0) {
+        const { readRenderMeta } = await import("@/lib/sceneRenderer");
+        type RenderMetaFile = import("@/lib/sceneRenderer").RenderMetaFile;
+        type SceneRenderMeta = import("@/lib/sceneRenderer").SceneRenderMeta;
+
+        // Group by chapter
+        const rendersByChapter = new Map<string, SceneRenderMeta[]>();
+        for (const r of serverRenders) {
+          if (r.status !== "ready") continue;
+          const chId = allScenes.find(s => s.id === r.scene_id)?.chapter_id;
+          if (!chId) continue;
+          const arr = rendersByChapter.get(chId) || [];
+          arr.push({
+            scene_id: r.scene_id,
+            voice_path: r.voice_path,
+            atmo_path: r.atmo_path,
+            sfx_path: r.sfx_path,
+            voice_duration_ms: r.voice_duration_ms,
+            atmo_duration_ms: r.atmo_duration_ms,
+            sfx_duration_ms: r.sfx_duration_ms,
+            status: r.status as "ready",
+            updated_at: r.updated_at,
+            render_config: r.render_config,
+          });
+          rendersByChapter.set(chId, arr);
+        }
+
+        const renderWrites: Promise<void>[] = [];
+        for (const [chId, metas] of rendersByChapter) {
+          renderWrites.push((async () => {
+            const existing = await readRenderMeta(storage, chId);
+            for (const m of metas) {
+              existing[m.scene_id] = m;
+            }
+            await storage.writeJSON(`chapters/${chId}/renders/render_meta.json`, existing);
+          })());
+        }
+        await Promise.all(renderWrites);
+        restoredRenderCount = serverRenders.filter(r => r.status === "ready").length;
+        console.log(`[Deploy] Restored ${restoredRenderCount} render metadata entries`);
+      }
+    }
+  } catch (err) {
+    console.warn("[Deploy] Failed to restore render metadata:", err);
+  }
+  report("scene_render", restoredRenderCount > 0 ? "done" : "skipped", restoredRenderCount > 0 ? `${restoredRenderCount}` : undefined);
+
   if (downloadImpulses) {
     report("download_ir", "running");
     try {

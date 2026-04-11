@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useTimelinePlayer } from "@/hooks/useTimelinePlayer";
 import { supabase } from "@/integrations/supabase/client";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 
 import { getAudioEngine } from "@/lib/audioEngine";
 import { useMixerPersistence } from "@/hooks/useMixerPersistence";
