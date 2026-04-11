@@ -19,7 +19,7 @@ import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
 
 const MIXER_SIDEBAR = 160;
 
-const MONTAGE_ZOOM_PRESETS = [95, 100, 200, 300, 400, 500] as const;
+const MONTAGE_ZOOM_PRESETS = [95, 100, 200, 300, 400, 500, 1000] as const;
 
 function formatTime(s: number) {
   const m = Math.floor(s / 60);
