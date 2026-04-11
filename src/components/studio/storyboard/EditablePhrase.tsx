@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSelectionCapture } from "@/hooks/useSelectionCapture";
-import { Pencil, Check, Trash2 } from "lucide-react";
+import { Pencil, Check, Trash2, Undo2 } from "lucide-react";
 import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem,
   ContextMenuSeparator, ContextMenuLabel, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent,
@@ -34,6 +34,7 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const textRef = useRef<HTMLParagraphElement>(null);
   const { capture: handleContextMenu, peek } = useSelectionCapture(textRef);
+  const undoRef = useRef<{ phraseId: string; text: string } | null>(null);
 
   useEffect(() => {
     if (editing && textareaRef.current) {
@@ -76,9 +77,34 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
   const handlePhoneticCorrect = useCallback((suggestion: PronunciationSuggestion, wordOffset: number) => {
     const newText = applyCorrection(phrase.text, wordOffset, suggestion);
     if (newText !== phrase.text) {
+      undoRef.current = { phraseId: phrase.phrase_id, text: phrase.text };
       onSave(phrase.phrase_id, newText);
     }
   }, [phrase.phrase_id, phrase.text, onSave]);
+
+  const handleUndo = useCallback(() => {
+    const prev = undoRef.current;
+    if (!prev || prev.phraseId !== phrase.phrase_id) return false;
+    onSave(prev.phraseId, prev.text);
+    undoRef.current = null;
+    return true;
+  }, [phrase.phrase_id, onSave]);
+
+  // Ctrl+Z global handler (only when not editing)
+  useEffect(() => {
+    if (editing) return;
+    if (!undoRef.current || undoRef.current.phraseId !== phrase.phrase_id) return;
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        if (handleUndo()) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }
+    };
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
+  }, [editing, phrase.phrase_id, handleUndo]);
 
   const hasAnnotations = phrase.annotations && phrase.annotations.length > 0;
 
@@ -276,6 +302,16 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
           isRu={isRu}
           onCorrect={handlePhoneticCorrect}
         />
+        {undoRef.current?.phraseId === phrase.phrase_id && (
+          <ContextMenuItem
+            onClick={handleUndo}
+            className="text-xs gap-2"
+          >
+            <Undo2 className="h-3 w-3" />
+            {isRu ? "Отменить коррекцию" : "Undo correction"}
+            <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+Z</span>
+          </ContextMenuItem>
+        )}
         <ContextMenuSeparator />
         <ContextMenuItem
           onClick={handleDeleteSelected}
