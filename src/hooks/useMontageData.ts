@@ -34,7 +34,7 @@ export interface StemTrack {
 
 export function getStemTracks(isRu: boolean): StemTrack[] {
   return [
-    { id: "voice", label: isRu ? "Голос" : "Voice", color: "hsl(var(--primary))" },
+    { id: "voice", label: isRu ? "Сцены" : "Scenes", color: "hsl(var(--primary))" },
   ];
 }
 
