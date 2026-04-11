@@ -1,3 +1,8 @@
+/**
+ * StoryboardPanel — main storyboard UI for scene segments.
+ * Refactored: logic extracted into specialized hooks.
+ */
+
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -10,8 +15,10 @@ import { paths } from "@/lib/projectPaths";
 import { useAiRoles } from "@/hooks/useAiRoles";
 import { useUserApiKeys } from "@/hooks/useUserApiKeys";
 import { useStoryboardPersistence, type StoryboardSnapshot } from "@/hooks/useStoryboardPersistence";
-import { invokeWithFallback } from "@/lib/invokeWithFallback";
-import { buildVoiceConfigsPayload } from "@/lib/voiceConfigPayload";
+import { useStoryboardSynthesis, type SynthResult } from "@/hooks/useStoryboardSynthesis";
+import { useStoryboardSegmentOps } from "@/hooks/useStoryboardSegmentOps";
+import { useStoryboardAnnotations } from "@/hooks/useStoryboardAnnotations";
+import { useInlineNarrations } from "@/hooks/useInlineNarrations";
 
 import { useBackgroundAnalysis } from "@/hooks/useBackgroundAnalysis";
 import { Loader2, Sparkles, AlertTriangle, RefreshCw } from "lucide-react";
@@ -19,14 +26,12 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import {
-  type PhraseAnnotation,
   type TtsProvider,
   resolveProvider,
 } from "./phraseAnnotations";
 
-import type { Phrase, Segment, CharacterOption } from "./storyboard/types";
-import { SEGMENT_CONFIG } from "./storyboard/constants";
-import { StressReviewPanel, type StressSuggestion } from "./storyboard/StressReviewPanel";
+import type { Segment, CharacterOption } from "./storyboard/types";
+import { StressReviewPanel } from "./storyboard/StressReviewPanel";
 import { StoryboardToolbar } from "./storyboard/StoryboardToolbar";
 import { StoryboardSegmentRow } from "./storyboard/StoryboardSegmentRow";
 import type { LocalTypeMappingEntry } from "@/lib/storyboardSync";
@@ -82,55 +87,41 @@ export function StoryboardPanel({
   sceneIdRef.current = sceneId;
   const loadGenerationRef = useRef(0);
   const [loading, setLoading] = useState(false);
-  const [synthesizing, setSynthesizing] = useState(false);
-  const [synthProgress, setSynthProgress] = useState("");
-  const [detecting, setDetecting] = useState(false);
-  const [correctingStress, setCorrectingStress] = useState(false);
-  const [resynthSegId, setResynthSegId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [analysisPending, setAnalysisPending] = useState(false);
   const [characters, setCharacters] = useState<CharacterOption[]>([]);
   const [audioStatus, setAudioStatus] = useState<Map<string, { status: string; durationMs: number }>>(new Map());
   const [inlineNarrationSegIds, setInlineNarrationSegIds] = useState<Set<string>>(new Set());
-  const [currentlySynthesizingIds, setCurrentlySynthesizingIds] = useState<Set<string>>(new Set());
-  const [inlineNarrationSpeaker, setInlineNarrationSpeaker] = useState<string | null>(null);
   const [recalcRunning, setRecalcRunning] = useState(false);
   const [internalChecked, setInternalChecked] = useState<Set<string>>(new Set());
   const mergeChecked = externalChecked ?? internalChecked;
   const setMergeChecked = onExternalCheckedChange ?? setInternalChecked;
-  const [merging, setMerging] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [staleAudioSegIds, setStaleAudioSegIds] = useState<Set<string>>(new Set());
-  const [cleaningMetadata, setCleaningMetadata] = useState(false);
   const [contentDirty, setContentDirty] = useState(false);
   /** Preserved contentHash from analysis — survives all edits */
   const contentHashRef = useRef<number | undefined>(undefined);
-  const [stressReviewOpen, setStressReviewOpen] = useState(false);
-  const [stressSuggestions, setStressSuggestions] = useState<StressSuggestion[]>([]);
   const autoAnalyzeAttemptedRef = useRef<string | null>(null);
   const typeMappingsRef = useRef<LocalTypeMappingEntry[]>([]);
   const audioStatusRef = useRef(audioStatus);
   audioStatusRef.current = audioStatus;
-  const inlineNarrationSpeakerRef = useRef(inlineNarrationSpeaker);
-  inlineNarrationSpeakerRef.current = inlineNarrationSpeaker;
 
   const deriveCurrentTypeMappings = useCallback((sourceSegments: Segment[], sourceSpeaker?: string | null) => {
     return deriveStoryboardTypeMappings(
       sourceSegments,
       characters,
       typeMappingsRef.current,
-      sourceSpeaker !== undefined ? sourceSpeaker : inlineNarrationSpeakerRef.current,
+      sourceSpeaker !== undefined ? sourceSpeaker : inlineNarrations.inlineNarrationSpeaker,
     );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [characters]);
 
   /** Build a snapshot for OPFS persistence — always preserves contentHash */
   const buildSnapshot = useCallback(
     (segs?: Segment[], audio?: Map<string, { status: string; durationMs: number }>, speaker?: string | null): StoryboardSnapshot => {
       const nextSegments = segs ?? segments;
-      const nextSpeaker = speaker !== undefined ? speaker : inlineNarrationSpeaker;
+      const nextSpeaker = speaker !== undefined ? speaker : inlineNarrations.inlineNarrationSpeaker;
       const nextTypeMappings = deriveCurrentTypeMappings(nextSegments, nextSpeaker);
       typeMappingsRef.current = nextTypeMappings;
-
       return {
         segments: nextSegments,
         typeMappings: nextTypeMappings,
@@ -139,7 +130,8 @@ export function StoryboardPanel({
         contentHash: contentHashRef.current,
       };
     },
-    [segments, audioStatus, inlineNarrationSpeaker, deriveCurrentTypeMappings],
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+    [segments, audioStatus, deriveCurrentTypeMappings],
   );
 
   // Reset merge selection when scene changes
@@ -150,27 +142,6 @@ export function StoryboardPanel({
     if (next.has(segId)) next.delete(segId); else next.add(segId);
     setMergeChecked(next);
   }, [mergeChecked, setMergeChecked]);
-
-  // Find consecutive groups of checked segments (≥2 adjacent)
-  const mergeGroups = useMemo(() => {
-    if (mergeChecked.size < 2) return [];
-    const checked = segments.filter(s => mergeChecked.has(s.segment_id));
-    const checkedNums = new Set(checked.map(s => s.segment_number));
-    const groups: Segment[][] = [];
-    let current: Segment[] = [];
-    for (const seg of segments) {
-      if (checkedNums.has(seg.segment_number)) {
-        current.push(seg);
-      } else {
-        if (current.length >= 2) groups.push(current);
-        current = [];
-      }
-    }
-    if (current.length >= 2) groups.push(current);
-    return groups;
-  }, [mergeChecked, segments]);
-
-  const canMerge = mergeGroups.length > 0;
 
   // Build speaker → TTS provider map
   const speakerProviderMap = useMemo(() => {
@@ -183,6 +154,10 @@ export function StoryboardPanel({
     }
     return map;
   }, [characters]);
+
+  const syncTypeMappings = useCallback((updatedSegments: Segment[]) => {
+    typeMappingsRef.current = deriveCurrentTypeMappings(updatedSegments);
+  }, [deriveCurrentTypeMappings]);
 
   // ─── Data Loading ─────────────────────────────────────────
 
@@ -246,50 +221,19 @@ export function StoryboardPanel({
 
   /**
    * Save synthesis results to OPFS: decode base64 WAV → write TTS clips → update audio_meta.
-   * Fully local — no DB reads for audio status.
    */
-  const saveSynthResultsToOpfs = useCallback(async (
-    results: Array<{
-      segment_id: string;
-      status: string;
-      duration_ms: number;
-      audio_base64?: string;
-      voice_config?: Record<string, unknown>;
-      error?: string;
-      inline_narrations?: Array<{
-        text: string;
-        insert_after: string;
-        audio_base64: string;
-        duration_ms: number;
-        offset_ms: number;
-      }>;
-      phrase_results?: Array<{
-        phrase_index: number;
-        audio_base64: string;
-        duration_ms: number;
-      }>;
-    }>,
-  ) => {
+  const saveSynthResultsToOpfs = useCallback(async (results: SynthResult[]) => {
     if (!storage || !sceneId) return;
 
-    // Merge with existing audioStatus to avoid wiping previously-synth'd segments
     const map = new Map(audioStatusRef.current);
     const opfsEntries: Record<string, LocalAudioEntry> = {};
 
     for (const r of results) {
-      // Edge function emits "skipped" for segments outside a filtered synth request.
-      // Preserve their local status instead of downgrading ready clips into generic error badges.
-      if (
-        r.status === "ready" ||
-        r.status === "pending" ||
-        r.status === "error" ||
-        r.status === "estimated"
-      ) {
+      if (r.status === "ready" || r.status === "pending" || r.status === "error" || r.status === "estimated") {
         map.set(r.segment_id, { status: r.status, durationMs: r.duration_ms });
       }
 
       if (r.status === "ready" && r.phrase_results && r.phrase_results.length > 0) {
-        // ── Per-phrase audio for merged segments ──
         const { writePhraseClip } = await import("@/lib/localTtsStorage");
         const phraseClips: import("@/lib/localAudioMeta").PhraseClipEntry[] = [];
 
@@ -303,46 +247,29 @@ export function StoryboardPanel({
           );
           if (phraseAudioPath) {
             revokeAudioUrl(phraseAudioPath);
-            phraseClips.push({
-              index: pr.phrase_index,
-              durationMs: pr.duration_ms,
-              audioPath: phraseAudioPath,
-            });
+            phraseClips.push({ index: pr.phrase_index, durationMs: pr.duration_ms, audioPath: phraseAudioPath });
           }
         }
 
-        // Use first phrase's path as the main audioPath (for timeline hasAudio check)
         const mainPath = phraseClips[0]?.audioPath ?? paths.ttsClip(r.segment_id, sceneId, chapterId ?? undefined);
-
         opfsEntries[r.segment_id] = {
-          segmentId: r.segment_id,
-          status: "ready",
-          durationMs: r.duration_ms,
-          audioPath: mainPath,
-          voiceConfig: r.voice_config,
-          phraseClips,
+          segmentId: r.segment_id, status: "ready", durationMs: r.duration_ms,
+          audioPath: mainPath, voiceConfig: r.voice_config, phraseClips,
         };
       } else if (r.status === "ready" && r.audio_base64) {
-        // ── Single audio file (standard segments) ──
         const binary = atob(r.audio_base64);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        const wavData = bytes.buffer;
 
-        await writeTtsClip(storage, sceneId, r.segment_id, wavData, chapterId ?? undefined);
-
+        await writeTtsClip(storage, sceneId, r.segment_id, bytes.buffer, chapterId ?? undefined);
         const clipPath = paths.ttsClip(r.segment_id, sceneId, chapterId ?? undefined);
         revokeAudioUrl(clipPath);
 
         opfsEntries[r.segment_id] = {
-          segmentId: r.segment_id,
-          status: "ready",
-          durationMs: r.duration_ms,
-          audioPath: clipPath,
-          voiceConfig: r.voice_config,
+          segmentId: r.segment_id, status: "ready", durationMs: r.duration_ms,
+          audioPath: clipPath, voiceConfig: r.voice_config,
         };
 
-        // Write inline narration overlays
         if (r.inline_narrations) {
           for (let n = 0; n < r.inline_narrations.length; n++) {
             const narr = r.inline_narrations[n];
@@ -358,11 +285,8 @@ export function StoryboardPanel({
 
     audioStatusRef.current = map;
     setAudioStatus(map);
-    // Use immediate write (not debounced) so storyboard.json is on disk
-    // BEFORE onSegmented bumps clipsRefreshToken and timeline re-reads it.
     await persistNow(buildSnapshot(undefined, map));
 
-    // Merge into existing audio_meta.json (don't overwrite!) and recalc positions
     if (Object.keys(opfsEntries).length > 0) {
       const { readAudioMeta: readMeta } = await import("@/lib/localAudioMeta");
       const existing = await readMeta(storage, sceneId, chapterId ?? undefined);
@@ -393,15 +317,10 @@ export function StoryboardPanel({
         const local = await loadFromLocal(sid);
         if (isStale()) return;
         if (local && local.segments.length > 0) {
-          const firstPhrase = local.segments[0]?.phrases?.[0]?.text?.slice(0, 80) || "(empty)";
-          console.debug(`[Storyboard] Loaded ${local.segments.length} segments from OPFS, first phrase: "${firstPhrase}"`);
           typeMappingsRef.current = deriveStoryboardTypeMappings(
-            local.segments,
-            characters,
-            local.typeMappings || [],
-            local.inlineNarrationSpeaker,
+            local.segments, characters, local.typeMappings || [], local.inlineNarrationSpeaker,
           );
-          setInlineNarrationSpeaker(local.inlineNarrationSpeaker);
+          inlineNarrations.setInlineNarrationSpeaker(local.inlineNarrationSpeaker);
           setAudioStatus(new Map(Object.entries(local.audioStatus || {})));
           audioStatusRef.current = new Map(Object.entries(local.audioStatus || {}));
           contentHashRef.current = local.contentHash;
@@ -411,19 +330,17 @@ export function StoryboardPanel({
             const { isSceneDirty } = await import("@/lib/sceneIndex");
             if (isStale()) return;
             const dirty = isSceneDirty(sid);
-            console.debug(`[Storyboard] dirtyCheck sceneId=${sid} → dirty=${dirty}`);
             setContentDirty(dirty);
           }
           setLoading(false);
           return;
         }
-        console.debug(`[Storyboard] No OPFS data for sceneId=${sid} — showing empty state`);
       }
 
       if (isStale()) return;
       typeMappingsRef.current = [];
       contentHashRef.current = undefined;
-      setInlineNarrationSpeaker(null);
+      inlineNarrations.setInlineNarrationSpeaker(null);
       setAudioStatus(new Map());
       audioStatusRef.current = new Map();
       setSegments([]);
@@ -433,178 +350,9 @@ export function StoryboardPanel({
       console.error("Failed to load segments:", err);
       toast.error(isRu ? "Ошибка загрузки сегментов" : "Failed to load segments");
     }
-    if (!isStale()) {
-      setLoading(false);
-    }
+    if (!isStale()) setLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRu, hasStorage, loadFromLocal, applySegments, characters]);
-
-  // ─── Segment Operations ───────────────────────────────────
-
-  const handleMergeSegments = useCallback(async () => {
-    if (!sceneId || mergeGroups.length === 0) return;
-    setMerging(true);
-    try {
-      let updated = [...segments];
-      const allMergedIds = new Set<string>();
-      const keeperIds = new Set<string>();
-
-      for (const group of mergeGroups) {
-        const [keeper, ...toMerge] = group;
-        const mergeIds = new Set(toMerge.map(s => s.segment_id));
-        for (const id of mergeIds) allMergedIds.add(id);
-        keeperIds.add(keeper.segment_id);
-
-        let allPhrases = [...keeper.phrases];
-        for (const seg of toMerge) {
-          for (let pi = 0; pi < seg.phrases.length; pi++) {
-            const ph = seg.phrases[pi];
-            const startsNewSentence = /^[A-ZА-ЯЁ«"—–\-\[]/.test(ph.text.trimStart());
-            if (pi === 0 && !startsNewSentence && allPhrases.length > 0) {
-              const prev = allPhrases[allPhrases.length - 1];
-              const separator = prev.text.endsWith(" ") ? "" : " ";
-              allPhrases[allPhrases.length - 1] = { ...prev, text: prev.text + separator + ph.text };
-            } else {
-              allPhrases.push(ph);
-            }
-          }
-        }
-
-        allPhrases = allPhrases.map((ph, i) => ({ ...ph, phrase_number: i + 1 }));
-
-        updated = updated
-          .map(s => s.segment_id === keeper.segment_id ? { ...s, phrases: allPhrases } : s)
-          .filter(s => !mergeIds.has(s.segment_id));
-      }
-
-      updated = updated.map((s, i) => ({ ...s, segment_number: i + 1 }));
-
-      // Update audioStatus: remove merged IDs, mark keepers as stale (text changed)
-      const newAudioStatus = new Map(audioStatusRef.current);
-      for (const id of allMergedIds) newAudioStatus.delete(id);
-      for (const id of keeperIds) newAudioStatus.delete(id); // text changed, old audio is stale
-      setAudioStatus(newAudioStatus);
-
-      // Mark keepers as stale so UI shows re-synth needed
-      setStaleAudioSegIds(prev => {
-        const next = new Set(prev);
-        for (const id of keeperIds) next.add(id);
-        return next;
-      });
-
-      setSegments(updated);
-      setMergeChecked(new Set());
-      console.warn(`[Storyboard] 🔀 MERGE: ${segments.length} → ${updated.length} segments, persisting...`);
-      await persistNow(buildSnapshot(updated, newAudioStatus));
-      console.warn(`[Storyboard] 🔀 MERGE persisted for sceneId=${sceneId}`);
-      // Studio edit is newer than Parser — clear dirty flag in index
-      if (contentDirty && storage && sceneId) {
-        setContentDirty(false);
-        import("@/lib/sceneIndex").then(m => m.unmarkSceneDirty(storage, sceneId));
-        supabase.from("book_scenes").update({ content_dirty: false }).eq("id", sceneId);
-      }
-      toast.success(isRu ? "Блоки объединены" : "Segments merged");
-      onSegmented?.(sceneId);
-    } catch (err: any) {
-      console.error("Merge failed:", err);
-      toast.error(isRu ? "Ошибка объединения" : "Merge failed");
-    }
-    setMerging(false);
-  }, [sceneId, mergeGroups, segments, isRu, persistNow, buildSnapshot, onSegmented, contentDirty]);
-
-  const handleDeleteSegments = useCallback(async () => {
-    if (!sceneId || mergeChecked.size === 0) return;
-    const toDelete = segments.filter(s => mergeChecked.has(s.segment_id));
-    if (toDelete.length === 0) return;
-    if (toDelete.length === segments.length) {
-      toast.error(isRu ? "Нельзя удалить все блоки сцены" : "Cannot delete all segments");
-      return;
-    }
-    setDeleting(true);
-    try {
-      const deleteIds = new Set(toDelete.map(s => s.segment_id));
-      const updated = segments
-        .filter(s => !deleteIds.has(s.segment_id))
-        .map((s, i) => ({ ...s, segment_number: i + 1 }));
-
-      setSegments(updated);
-      setMergeChecked(new Set());
-      await persistNow(buildSnapshot(updated));
-      if (contentDirty && storage && sceneId) {
-        setContentDirty(false);
-        import("@/lib/sceneIndex").then(m => m.unmarkSceneDirty(storage, sceneId));
-        supabase.from("book_scenes").update({ content_dirty: false }).eq("id", sceneId);
-      }
-      toast.success(isRu ? `Удалено ${toDelete.length} блок(ов)` : `Deleted ${toDelete.length} segment(s)`);
-      onSegmented?.(sceneId);
-    } catch (err: any) {
-      console.error("Delete segments failed:", err);
-      toast.error(isRu ? "Ошибка удаления" : "Delete failed");
-    }
-    setDeleting(false);
-  }, [sceneId, mergeChecked, segments, isRu, persistNow, buildSnapshot, onSegmented, contentDirty]);
-
-  const handleSplitAtPhrase = useCallback(async (phraseId: string, textBefore: string, textAfter: string) => {
-    if (!sceneId) return;
-    const segIdx = segments.findIndex(s => s.phrases.some(p => p.phrase_id === phraseId));
-    if (segIdx < 0) return;
-    const seg = segments[segIdx];
-    const phraseIdx = seg.phrases.findIndex(p => p.phrase_id === phraseId);
-    if (phraseIdx < 0) return;
-
-    try {
-      const keeperPhrases = seg.phrases.slice(0, phraseIdx + 1).map((ph, i) => ({
-        ...ph,
-        text: i === phraseIdx ? textBefore : ph.text,
-        phrase_number: i + 1,
-      }));
-
-      const newSegId = crypto.randomUUID();
-      const newPhrases = [
-        { phrase_id: crypto.randomUUID(), phrase_number: 1, text: textAfter },
-        ...seg.phrases.slice(phraseIdx + 1).map((ph, i) => ({
-          ...ph, phrase_number: i + 2,
-        })),
-      ];
-
-      const newSeg: Segment = {
-        segment_id: newSegId,
-        segment_number: seg.segment_number + 1,
-        segment_type: seg.segment_type,
-        speaker: seg.speaker,
-        phrases: newPhrases,
-        split_silence_ms: 1000,
-      };
-
-      const updated = [
-        ...segments.slice(0, segIdx),
-        { ...seg, phrases: keeperPhrases },
-        newSeg,
-        ...segments.slice(segIdx + 1),
-      ].map((s, i) => ({ ...s, segment_number: i + 1 }));
-
-      setSegments(updated);
-      await persistNow(buildSnapshot(updated));
-      if (contentDirty && storage && sceneId) {
-        setContentDirty(false);
-        import("@/lib/sceneIndex").then(m => m.unmarkSceneDirty(storage, sceneId));
-        supabase.from("book_scenes").update({ content_dirty: false }).eq("id", sceneId);
-      }
-      toast.success(isRu ? "Блок разделён" : "Segment split");
-      onSegmented?.(sceneId);
-    } catch (err: any) {
-      console.error("Split failed:", err);
-      toast.error(isRu ? "Ошибка разделения" : "Split failed");
-    }
-  }, [sceneId, segments, isRu, persistNow, buildSnapshot, onSegmented, contentDirty]);
-
-  const handleSplitSilenceChange = useCallback((segmentId: string, ms: number) => {
-    const updated = segments.map(s =>
-      s.segment_id === segmentId ? { ...s, split_silence_ms: ms } : s
-    );
-    setSegments(updated);
-    persist(buildSnapshot(updated));
-    onSegmented?.(sceneId!);
-  }, [sceneId, segments, persist, buildSnapshot, onSegmented]);
 
   useEffect(() => {
     setSegments([]);
@@ -612,33 +360,19 @@ export function StoryboardPanel({
     setContentDirty(false);
     setAnalysisPending(false);
     autoAnalyzeAttemptedRef.current = null;
-    if (sceneId) {
-      loadSegments(sceneId);
-      // LOCAL-ONLY: detect dirty from local contentHash, not DB
-    }
+    if (sceneId) loadSegments(sceneId);
   }, [sceneId, loadSegments]);
-
-  const synthIdsRef = useRef<Set<string>>(new Set());
-  synthIdsRef.current = currentlySynthesizingIds;
-
-  // Synthesis progress is now tracked locally via saveSynthResultsToOpfs.
-  // No realtime subscription to segment_audio DB table needed (K3).
-  // Synthesizing IDs are managed by runSynthesis/resynthSegment callbacks.
 
   // ─── AI Actions (Background) ───────────────────────────────
   const bgAnalysis = useBackgroundAnalysis();
 
-  // Reload from OPFS when a background job completes for the current scene
   useEffect(() => {
     if (!sceneId) return;
     const job = bgAnalysis.jobs.get(sceneId);
     if (job?.status === "done") {
-      // Reload segments from OPFS
       setAnalysisPending(false);
       loadSegments(sceneId);
-      return;
-    }
-    if (job?.status === "error") {
+    } else if (job?.status === "error") {
       setAnalysisPending(false);
     }
   }, [bgAnalysis.completionToken, sceneId, loadSegments]);
@@ -648,840 +382,44 @@ export function StoryboardPanel({
   const runAnalysis = useCallback(async () => {
     if (!sceneId) return;
     setAnalysisPending(true);
-
-    // Submit to background service
-    bgAnalysis.submit([{
-      sceneId,
-      sceneTitle: sceneTitle ?? undefined,
-      sceneNumber,
-      chapterId,
-    }]);
+    bgAnalysis.submit([{ sceneId, sceneTitle: sceneTitle ?? undefined, sceneNumber, chapterId }]);
   }, [sceneId, sceneTitle, sceneNumber, chapterId, bgAnalysis]);
 
-  // Auto-analysis removed: user starts segmentation manually via per-scene or batch buttons.
-
-  // ─── Phrase CRUD ──────────────────────────────────────────
-
-  const savePhrase = useCallback(async (phraseId: string, newText: string) => {
-    const updated = segments.map(seg => ({
-      ...seg,
-      phrases: seg.phrases.map(ph =>
-        ph.phrase_id === phraseId ? { ...ph, text: newText } : ph
-      ),
-    }));
-    setSegments(updated);
-    persist(buildSnapshot(updated));
-  }, [segments, persist, buildSnapshot]);
-
-  const addToStressDictionary = useCallback(async (phraseId: string, annotation: PhraseAnnotation) => {
-    if (annotation.type !== "stress" || annotation.start === undefined) return;
-    let phraseText = "";
-    for (const seg of segments) {
-      const ph = seg.phrases.find(p => p.phrase_id === phraseId);
-      if (ph) { phraseText = ph.text; break; }
-    }
-    if (!phraseText) return;
-
-    const stressPos = annotation.start;
-    const wordRegex = /[а-яёА-ЯЁ]+/g;
-    let m: RegExpExecArray | null;
-    while ((m = wordRegex.exec(phraseText)) !== null) {
-      if (stressPos >= m.index && stressPos < m.index + m[0].length) {
-        const word = m[0].toLowerCase();
-        const stressedIndex = stressPos - m.index;
-        await supabase.from("stress_dictionary").upsert(
-          { user_id: (await supabase.auth.getUser()).data.user?.id, word, stressed_index: stressedIndex },
-          { onConflict: "user_id,word,stressed_index" }
-        );
-        break;
-      }
-    }
-  }, [segments]);
-
-  const saveAnnotation = useCallback(async (phraseId: string, annotation: PhraseAnnotation) => {
-    let currentAnnotations: PhraseAnnotation[] = [];
-    for (const seg of segments) {
-      const ph = seg.phrases.find(p => p.phrase_id === phraseId);
-      if (ph) {
-        currentAnnotations = [...(ph.annotations || [])];
-        break;
-      }
-    }
-    currentAnnotations.push(annotation);
-
-    if (annotation.type === "stress") {
-      addToStressDictionary(phraseId, annotation);
-    }
-
-    const updated = segments.map(seg => ({
-      ...seg,
-      phrases: seg.phrases.map(ph =>
-        ph.phrase_id === phraseId ? { ...ph, annotations: currentAnnotations } : ph
-      ),
-    }));
-    setSegments(updated);
-    persist(buildSnapshot(updated));
-    toast.success(isRu ? "Аннотация добавлена" : "Annotation added");
-  }, [segments, isRu, addToStressDictionary, persist, buildSnapshot]);
-
-  const removeAnnotation = useCallback(async (phraseId: string, index: number) => {
-    let currentAnnotations: PhraseAnnotation[] = [];
-    for (const seg of segments) {
-      const ph = seg.phrases.find(p => p.phrase_id === phraseId);
-      if (ph) {
-        currentAnnotations = [...(ph.annotations || [])];
-        break;
-      }
-    }
-    currentAnnotations.splice(index, 1);
-
-    const updated = segments.map(seg => ({
-      ...seg,
-      phrases: seg.phrases.map(ph =>
-        ph.phrase_id === phraseId ? { ...ph, annotations: currentAnnotations.length > 0 ? currentAnnotations : undefined } : ph
-      ),
-    }));
-    setSegments(updated);
-    persist(buildSnapshot(updated));
-    toast.success(isRu ? "Аннотация удалена" : "Annotation removed");
-  }, [segments, isRu, persist, buildSnapshot]);
-
-  // ─── Character Sync (local-only — update typeMappings ref) ──
-
-  const syncTypeMappings = useCallback((updatedSegments: Segment[]) => {
-    typeMappingsRef.current = deriveCurrentTypeMappings(updatedSegments);
-  }, [deriveCurrentTypeMappings]);
-
-  const updateSegmentType = useCallback(async (segmentId: string, newType: string) => {
-    const targetSeg = segments.find(s => s.segment_id === segmentId);
-    if (!targetSeg) return;
-
-    // Bulk: ONLY if target is among checked segments (2+), apply to all checked
-    const bulkChecked = mergeChecked.size > 1 && mergeChecked.has(segmentId);
-    const affectedIds: string[] = bulkChecked
-      ? segments.filter(s => mergeChecked.has(s.segment_id)).map(s => s.segment_id)
-      : [segmentId];
-
-    // Auto-assign system speaker when switching to a system type
-    const SYSTEM_TYPE_SPEAKER: Record<string, string> = {
-      narrator: "Рассказчик",
-      epigraph: "Рассказчик",
-      lyric: "Рассказчик",
-      footnote: "Комментатор",
-    };
-    const systemSpeaker = SYSTEM_TYPE_SPEAKER[newType] ?? null;
-    const SYSTEM_SPEAKERS = new Set(Object.values(SYSTEM_TYPE_SPEAKER));
-
-    const updatedSegments = segments.map(seg => {
-      if (!affectedIds.includes(seg.segment_id)) return seg;
-      const updated: typeof seg = { ...seg, segment_type: newType };
-      if (systemSpeaker) {
-        // Switching TO system type → assign system speaker
-        updated.speaker = systemSpeaker;
-      } else if (SYSTEM_SPEAKERS.has(seg.speaker ?? "")) {
-        // Switching FROM system type to non-system → clear system speaker
-        updated.speaker = null;
-      }
-      return updated;
-    });
-    setSegments(updatedSegments);
-
-    if (affectedIds.length > 1) {
-      const newLabel = isRu ? SEGMENT_CONFIG[newType]?.label_ru : SEGMENT_CONFIG[newType]?.label_en;
-      toast.success(
-        isRu
-          ? `Тип изменён: ${newLabel} (${affectedIds.length} фрагм.)`
-          : `Type changed: ${newLabel} (${affectedIds.length} seg.)`
-      );
-    }
-
-    syncTypeMappings(updatedSegments);
-    persist(buildSnapshot(updatedSegments));
-    onSegmented?.(sceneId!);
-    if (bulkChecked) setMergeChecked(new Set());
-  }, [isRu, segments, sceneId, mergeChecked, syncTypeMappings, persist, buildSnapshot, onSegmented, setMergeChecked]);
-
-  const updateSpeaker = useCallback(async (segmentId: string, newSpeaker: string | null) => {
-    const targetSeg = segments.find(s => s.segment_id === segmentId);
-    if (!targetSeg) return;
-
-    // Bulk: ONLY if target is among checked segments (2+), apply to all checked
-    const bulkChecked = mergeChecked.size > 1 && mergeChecked.has(segmentId);
-    const affectedIds: string[] = bulkChecked
-      ? segments.filter(s => mergeChecked.has(s.segment_id)).map(s => s.segment_id)
-      : [segmentId];
-
-    const updatedSegments = segments.map(seg =>
-      affectedIds.includes(seg.segment_id) ? { ...seg, speaker: newSpeaker } : seg
-    );
-    setSegments(updatedSegments);
-
-    syncTypeMappings(updatedSegments);
-    persist(buildSnapshot(updatedSegments));
-
-    if (affectedIds.length > 1) {
-      const typeLabel = isRu
-        ? SEGMENT_CONFIG[targetSeg.segment_type]?.label_ru
-        : SEGMENT_CONFIG[targetSeg.segment_type]?.label_en;
-      toast.success(
-        isRu
-          ? `«${typeLabel}» → ${newSpeaker || "?"} (${affectedIds.length} фрагм.)`
-          : `"${typeLabel}" → ${newSpeaker || "?"} (${affectedIds.length} seg.)`
-      );
-    }
-
-    // Sync characters: upsert new speaker into index + scene map, then reload
-    if (storage && sceneId) {
-      try {
-        const { readCharacterIndex, upsertSpeakersFromSegments } = await import("@/lib/localCharacters");
-        const currentIndex = await readCharacterIndex(storage);
-        const updatedIndex = await upsertSpeakersFromSegments(
-          storage, sceneId, updatedSegments, currentIndex,
-          typeMappingsRef.current.map(m => ({ segmentType: m.segmentType, characterId: m.characterId })),
-        );
-        setCharacters(updatedIndex.map(c => ({
-          id: c.id,
-          name: c.name,
-          color: c.color ?? undefined,
-          voiceConfig: (c.voice_config || {}) as Record<string, unknown>,
-        })));
-      } catch (err) {
-        console.warn("[StoryboardPanel] Character sync after speaker update failed:", err);
-      }
-    }
-
-    onSegmented?.(sceneId!);
-    if (bulkChecked) setMergeChecked(new Set());
-  }, [isRu, segments, sceneId, storage, syncTypeMappings, persist, buildSnapshot, onSegmented, mergeChecked, setMergeChecked]);
-
-  // ─── Synthesis ────────────────────────────────────────────
-
-  // ── Adaptive batching: split segments by count + char budget ──
-  const buildAdaptiveBatches = useCallback((segs: typeof segments) => {
-    const MAX_PER_BATCH = 20;
-    const MAX_CHARS_PER_BATCH = 3000;
-    const batches: (typeof segments)[] = [];
-    let current: typeof segments = [];
-    let currentChars = 0;
-
-    for (const seg of segs) {
-      const chars = seg.phrases.reduce((s, p) => s + p.text.length, 0);
-      if (current.length > 0 && (current.length >= MAX_PER_BATCH || currentChars + chars > MAX_CHARS_PER_BATCH)) {
-        batches.push(current);
-        current = [];
-        currentChars = 0;
-      }
-      current.push(seg);
-      currentChars += chars;
-    }
-    if (current.length > 0) batches.push(current);
-    return batches;
-  }, []);
-
-  const runSynthesis = useCallback(async () => {
-    if (!sceneId || segments.length === 0) return;
-    const targetSegments = mergeChecked.size > 0
-      ? segments.filter(s => mergeChecked.has(s.segment_id))
-      : segments;
-    if (targetSegments.length === 0) return;
-
-    // ── Pre-synthesis SSML length validation for Yandex v1 ──
-    const YANDEX_V1_MAX = 4900;
-    const V3_ONLY = new Set(["dasha","julia","lera","masha","alexander","kirill","anton","saule_ru","zamira_ru","zhanar_ru","yulduz_ru","naomi","saule","zhanar","zamira","yulduz"]);
-
-    const tooLongSegments: string[] = [];
-    for (const seg of targetSegments) {
-      const hasAnnot = seg.phrases.some(p => (p.annotations?.length ?? 0) > 0);
-      const isLyric = seg.segment_type === "lyric";
-      if (!hasAnnot && !isLyric) continue;
-
-      // Determine voice provider for this segment
-      const speakerKey = (seg.speaker ?? "narrator").toLowerCase();
-      const charMatch = characters.find(c => c.name.toLowerCase() === speakerKey);
-      const vc = charMatch?.voiceConfig ?? {};
-      const provider = (vc as any).provider ?? "yandex";
-      const voiceId = (vc as any).voice_id ?? (vc as any).voice ?? "";
-
-      // Only v1 Yandex uses SSML
-      if (provider !== "yandex" || V3_ONLY.has(voiceId)) continue;
-      // Also skip if voice has pitch/volume/role which force v3
-      if ((vc as any).pitchShift || (vc as any).volume || (vc as any).role) continue;
-
-      // Estimate SSML length: <speak> + text + ~35 chars per annotation + </speak>
-      const textLen = seg.phrases.reduce((s, p) => s + p.text.length, 0);
-      const annotCount = seg.phrases.reduce((s, p) => s + (p.annotations?.length ?? 0), 0);
-      const estimatedSsml = 15 + textLen + annotCount * 35; // <speak>...</speak> + tags overhead
-
-      if (estimatedSsml > YANDEX_V1_MAX) {
-        const label = seg.speaker || (isRu ? "Рассказчик" : "Narrator");
-        tooLongSegments.push(`#${seg.segment_number} (${label}, ~${estimatedSsml} ${isRu ? "симв." : "chars"})`);
-      }
-    }
-
-    if (tooLongSegments.length > 0) {
-      toast.error(
-        isRu
-          ? `Сегменты слишком длинные для Yandex v1 с аннотациями (лимит ${YANDEX_V1_MAX}):\n${tooLongSegments.join(", ")}.\nРазбейте на части или уберите аннотации.`
-          : `Segments too long for Yandex v1 with annotations (limit ${YANDEX_V1_MAX}):\n${tooLongSegments.join(", ")}.\nSplit them or remove annotations.`,
-        { duration: 8000 },
-      );
-      return;
-    }
-
-    const allTargetIds = new Set(targetSegments.map(s => s.segment_id));
-    setSynthesizing(true);
-    setCurrentlySynthesizingIds(allTargetIds);
-    onSynthesizingChange?.(allTargetIds);
-    onErrorSegmentsChange?.(new Set());
-    setSynthProgress(isRu ? "Подготовка…" : "Preparing…");
-
-    try {
-      const voice_configs = await buildVoiceConfigsPayload(projectStorage);
-
-      // Build full segment payload (needed for every batch call — edge function needs full context)
-      const synthSegments = segments.map(seg => ({
-        segment_id: seg.segment_id,
-        segment_number: seg.segment_number,
-        segment_type: seg.segment_type,
-        speaker: seg.speaker,
-        metadata: (seg as any).metadata ?? {},
-        phrases: seg.phrases.map(p => ({
-          phrase_id: p.phrase_id,
-          text: p.text,
-          annotations: p.annotations ?? [],
-        })),
-      }));
-
-      let scene_meta: Record<string, unknown> | undefined;
-      if (projectStorage && sceneId && chapterId) {
-        try {
-          const contentData = await projectStorage.readJSON<{ scenes?: Array<{ id: string; mood?: string; scene_type?: string }> }>(`chapters/${chapterId}/content.json`);
-          const sceneData = contentData?.scenes?.find(s => s.id === sceneId);
-          if (sceneData) {
-            scene_meta = { mood: sceneData.mood ?? null, scene_type: sceneData.scene_type ?? null };
-          }
-        } catch { /* ignore */ }
-      }
-
-      const { data: session } = await supabase.auth.getSession();
-      const token = session?.session?.access_token;
-      if (!token) throw new Error("Not authenticated");
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-      // Split into adaptive batches
-      const batches = buildAdaptiveBatches(targetSegments);
-      console.log(`[Synthesis] ${targetSegments.length} segments → ${batches.length} batch(es)`);
-
-      let totalSynthCount = 0;
-      let totalCachedCount = 0;
-      let totalErrorCount = 0;
-      let totalDurationMs = 0;
-      const allErrorIds = new Set<string>();
-      const allResults: Array<any> = [];
-      const startTime = Date.now();
-
-      for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
-        const batch = batches[batchIdx];
-        const batchIds = batch.map(s => s.segment_id);
-        const batchLabel = batches.length > 1
-          ? (isRu ? `Батч ${batchIdx + 1}/${batches.length}` : `Batch ${batchIdx + 1}/${batches.length}`)
-          : "";
-
-        setSynthProgress(
-          batchLabel
-            ? (isRu ? `${batchLabel}: запуск…` : `${batchLabel}: starting…`)
-            : (isRu ? "Запуск синтеза…" : "Starting synthesis…")
-        );
-
-        const requestBody: Record<string, unknown> = {
-          scene_id: sceneId, language: isRu ? "ru" : "en",
-          voice_configs, segments: synthSegments, scene_meta,
-          segment_ids: batchIds,
-        };
-
-        const resp = await fetch(`${supabaseUrl}/functions/v1/synthesize-scene`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-            apikey: anonKey,
-          },
-          body: JSON.stringify(requestBody),
-        });
-
-        if (!resp.ok) {
-          const errBody = await resp.text();
-          throw new Error(`Synthesis HTTP ${resp.status}: ${errBody}`);
-        }
-
-        // Read NDJSON stream
-        const reader = resp.body!.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        const streamedPhrases = new Map<string, Array<{ phrase_index: number; audio_base64: string; duration_ms: number }>>();
-        let batchSynth = 0, batchCached = 0, batchError = 0;
-
-        const buildProgressLabel = () => {
-          const done = allResults.length;
-          const total = targetSegments.length;
-          const parts: string[] = [];
-          const s = totalSynthCount + batchSynth;
-          const c = totalCachedCount + batchCached;
-          const e = totalErrorCount + batchError;
-          if (s > 0) parts.push(`✓${s}`);
-          if (c > 0) parts.push(`⚡${c}`);
-          if (e > 0) parts.push(`✗${e}`);
-          const detail = parts.length > 0 ? ` (${parts.join(" ")})` : "";
-          const prefix = batchLabel ? `${batchLabel} · ` : "";
-          return isRu
-            ? `${prefix}Синтез: ${done}/${total}${detail}`
-            : `${prefix}Synthesis: ${done}/${total}${detail}`;
-        };
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (value) buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            try {
-              const obj = JSON.parse(line);
-              if (obj._summary) {
-                totalDurationMs += obj.total_duration_ms ?? 0;
-              } else if (obj._phrase_group_start) {
-                streamedPhrases.set(obj.segment_id, []);
-              } else if (obj._phrase) {
-                const phrases = streamedPhrases.get(obj.segment_id) ?? [];
-                phrases.push({ phrase_index: obj.phrase_index, audio_base64: obj.audio_base64, duration_ms: obj.duration_ms });
-                streamedPhrases.set(obj.segment_id, phrases);
-                setSynthProgress(isRu ? `Синтез фраз: ${phrases.length}…` : `Phrases: ${phrases.length}…`);
-              } else {
-                const collectedPhrases = streamedPhrases.get(obj.segment_id);
-                if (collectedPhrases && collectedPhrases.length > 0 && obj.status === "ready" && !obj.audio_base64) {
-                  obj.phrase_results = collectedPhrases;
-                  streamedPhrases.delete(obj.segment_id);
-                }
-                allResults.push(obj);
-                if (obj.status === "error") {
-                  batchError++;
-                  allErrorIds.add(obj.segment_id);
-                } else if (obj.status === "ready" && (obj.audio_base64 || obj.phrase_results)) {
-                  batchSynth++;
-                  await saveSynthResultsToOpfs([obj]);
-                  onSegmented?.(sceneId);
-                } else if (obj.status === "ready") {
-                  batchCached++;
-                }
-                // Remove completed segment from synthesizing set → clip re-renders immediately
-                setCurrentlySynthesizingIds(prev => { const n = new Set(prev); n.delete(obj.segment_id); return n; });
-                // Also update parent (uses Set, not callback — read current ref)
-                synthIdsRef.current = new Set(synthIdsRef.current);
-                synthIdsRef.current.delete(obj.segment_id);
-                onSynthesizingChange?.(new Set(synthIdsRef.current));
-                setSynthProgress(buildProgressLabel());
-              }
-            } catch { /* skip malformed lines */ }
-          }
-          if (done) break;
-        }
-
-        totalSynthCount += batchSynth;
-        totalCachedCount += batchCached;
-        totalErrorCount += batchError;
-
-        // Save non-audio results (cached/error) for this batch
-        const nonAudioResults = allResults.filter(
-          r => r.status !== "skipped" && (r.status !== "ready" || (!r.audio_base64 && !r.phrase_results)),
-        );
-        if (nonAudioResults.length > 0) {
-          await saveSynthResultsToOpfs(nonAudioResults);
-        }
-
-        onErrorSegmentsChange?.(allErrorIds);
-        onSegmented?.(sceneId);
-
-        if (batches.length > 1 && batchIdx < batches.length - 1) {
-          console.log(`[Synthesis] Batch ${batchIdx + 1} done: ✓${batchSynth} ⚡${batchCached} ✗${batchError}`);
-        }
-      }
-
-      const durSec = ((Date.now() - startTime) / 1000).toFixed(1);
-      const cachedSuffix = totalCachedCount > 0
-        ? (isRu ? `, ⚡${totalCachedCount} из кеша` : `, ⚡${totalCachedCount} cached`)
-        : "";
-
-      if (totalErrorCount > 0) {
-        toast.warning(
-          isRu
-            ? `Синтез: ✓${totalSynthCount} готово, ✗${totalErrorCount} ошибок${cachedSuffix} (${durSec}с)`
-            : `Synthesis: ✓${totalSynthCount} done, ✗${totalErrorCount} errors${cachedSuffix} (${durSec}s)`
-        );
-      } else {
-        toast.success(
-          isRu
-            ? `Синтез завершён: ✓${totalSynthCount} фрагм.${cachedSuffix} (${durSec}с)`
-            : `Synthesis done: ✓${totalSynthCount} seg.${cachedSuffix} (${durSec}s)`
-        );
-      }
-      onSegmented?.(sceneId);
-    } catch (err: any) {
-      console.error("Synthesis failed:", err);
-      toast.error(isRu ? "Ошибка синтеза" : "Synthesis failed");
-    }
-    setSynthesizing(false);
-    setCurrentlySynthesizingIds(new Set());
-    onSynthesizingChange?.(new Set());
-    setSynthProgress("");
-    setMergeChecked(new Set());
-  }, [sceneId, segments, mergeChecked, isRu, onSegmented, saveSynthResultsToOpfs, onSynthesizingChange, onErrorSegmentsChange, pushToDb, buildSnapshot, buildAdaptiveBatches]);
-
-  const resynthSegment = useCallback(async (segmentId: string) => {
-    if (!sceneId) return;
-    setResynthSegId(segmentId);
-    setCurrentlySynthesizingIds(new Set([segmentId]));
-    onSynthesizingChange?.(new Set([segmentId]));
-    try {
-      const voice_configs = await buildVoiceConfigsPayload(projectStorage);
-
-      // 🚫 К3: Send segments+phrases from OPFS directly — no pushToDb
-      const synthSegments = segments.map(seg => ({
-        segment_id: seg.segment_id,
-        segment_number: seg.segment_number,
-        segment_type: seg.segment_type,
-        speaker: seg.speaker,
-        metadata: (seg as any).metadata ?? {},
-        phrases: seg.phrases.map(p => ({
-          phrase_id: p.phrase_id,
-          text: p.text,
-          annotations: p.annotations ?? [],
-        })),
-      }));
-
-      // Read scene_meta from OPFS
-      let scene_meta: Record<string, unknown> | undefined;
-      if (projectStorage && sceneId && chapterId) {
-        try {
-          const contentData = await projectStorage.readJSON<{ scenes?: Array<{ id: string; mood?: string; scene_type?: string }> }>(`chapters/${chapterId}/content.json`);
-          const sceneData = contentData?.scenes?.find(s => s.id === sceneId);
-          if (sceneData) {
-            scene_meta = { mood: sceneData.mood ?? null, scene_type: sceneData.scene_type ?? null };
-          }
-        } catch { /* ignore */ }
-      }
-
-      // Use streaming NDJSON (same as runSynthesis)
-      const { data: session } = await supabase.auth.getSession();
-      const token = session?.session?.access_token;
-      if (!token) throw new Error("Not authenticated");
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-      const resp = await fetch(`${supabaseUrl}/functions/v1/synthesize-scene`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          apikey: anonKey,
-        },
-        body: JSON.stringify({
-          scene_id: sceneId, language: isRu ? "ru" : "en", force: true,
-          segment_ids: [segmentId], voice_configs, segments: synthSegments, scene_meta,
-        }),
-      });
-
-      if (!resp.ok) {
-        const errBody = await resp.text();
-        throw new Error(`Re-synth HTTP ${resp.status}: ${errBody}`);
-      }
-
-      // Parse NDJSON stream
-      const reader = resp.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let segmentResult: { segment_id: string; status: string; duration_ms: number; audio_base64?: string; voice_config?: Record<string, unknown>; error?: string; inline_narrations?: any[]; phrase_results?: any[] } | null = null;
-      const allResults: typeof segmentResult[] = [];
-      const streamedPhrases = new Map<string, Array<{ phrase_index: number; audio_base64: string; duration_ms: number }>>();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (value) buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const obj = JSON.parse(line);
-            if (obj._summary) continue;
-            if (obj._phrase_group_start) {
-              streamedPhrases.set(obj.segment_id, []);
-            } else if (obj._phrase) {
-              const phrases = streamedPhrases.get(obj.segment_id) ?? [];
-              phrases.push({ phrase_index: obj.phrase_index, audio_base64: obj.audio_base64, duration_ms: obj.duration_ms });
-              streamedPhrases.set(obj.segment_id, phrases);
-            } else {
-              // Attach collected phrases if any
-              const collectedPhrases = streamedPhrases.get(obj.segment_id);
-              if (collectedPhrases && collectedPhrases.length > 0 && obj.status === "ready" && !obj.audio_base64) {
-                obj.phrase_results = collectedPhrases;
-                streamedPhrases.delete(obj.segment_id);
-              }
-              allResults.push(obj);
-              if (obj.segment_id === segmentId) segmentResult = obj;
-            }
-          } catch { /* skip */ }
-        }
-        if (done) break;
-      }
-
-      if (!segmentResult || segmentResult.status !== "ready") {
-        throw new Error(
-          segmentResult?.error || (isRu ? "Синтез вернул неполный результат" : "Synthesis returned partial result")
-        );
-      }
-
-      toast.success(isRu ? "Блок пересинтезирован" : "Segment re-synthesized");
-      onErrorSegmentsChange?.(new Set());
-      // Save re-synthesized audio to OPFS
-      await saveSynthResultsToOpfs(allResults.filter((result): result is NonNullable<typeof segmentResult> => {
-        return Boolean(result) && result.status !== "skipped";
-      }));
-      onSegmented?.(sceneId);
-    } catch (err: any) {
-      console.error("Re-synth failed:", err);
-      toast.error(isRu ? "Ошибка ре-синтеза" : "Re-synthesis failed", {
-        description: err?.message,
-      });
-      onErrorSegmentsChange?.(new Set([segmentId]));
-    }
-    setResynthSegId(null);
-    setCurrentlySynthesizingIds(new Set());
-    onSynthesizingChange?.(new Set());
-  }, [sceneId, isRu, onSegmented, saveSynthResultsToOpfs, segments, onSynthesizingChange, onErrorSegmentsChange, pushToDb, buildSnapshot]);
-
-  // ─── Detection & Stress ───────────────────────────────────
-
-  const dialogueCount = segments.filter(s => s.segment_type === "dialogue").length;
-  const runDetectNarrations = useCallback(async () => {
-    if (!sceneId || dialogueCount === 0) return;
-    setDetecting(true);
-    try {
-      // 🚫 К3: Send dialogue segments from OPFS, no DB reads
-      const dialogueSegments = segments
-        .filter(s => s.segment_type === "dialogue" || s.segment_type === "monologue")
-        .filter(s => !s.inline_narrations?.length) // skip already detected
-        .map(s => ({
-          segment_id: s.segment_id,
-          speaker: s.speaker,
-          text: s.phrases.map(p => p.text).join(" "),
-        }));
-
-      if (dialogueSegments.length === 0) {
-        toast.info(isRu ? "Все диалоги уже проверены" : "All dialogues already checked");
-        setDetecting(false);
-        return;
-      }
-
-      const { data, error } = await invokeWithFallback({
-        functionName: "detect-inline-narrations",
-        body: {
-          scene_id: sceneId,
-          language: isRu ? "ru" : "en",
-          model: getModelForRole("screenwriter"),
-          segments: dialogueSegments,
-        },
-        userApiKeys,
-        isRu,
-      });
-      if (error) throw error;
-      const det = data as { detected: number; segments_updated: number; results: Array<{ segment_id: string; inline_narrations: Array<{ text: string; insert_after: string }>; clean_text: string }> };
-      if (det.detected > 0 && det.results?.length) {
-        // Apply inline_narrations locally
-        const resultMap = new Map(det.results.map(r => [r.segment_id, r]));
-        const updated = segments.map(seg => {
-          const result = resultMap.get(seg.segment_id);
-          if (!result) return seg;
-          return {
-            ...seg,
-            inline_narrations: result.inline_narrations,
-          };
-        });
-        setSegments(updated);
-        persist(buildSnapshot(updated));
-        toast.success(
-          isRu
-            ? `Найдено ${det.detected} вставок в ${det.segments_updated} фрагментах`
-            : `Found ${det.detected} insertions in ${det.segments_updated} segments`
-        );
-      } else {
-        toast.info(isRu ? "Вставок не найдено" : "No insertions found");
-      }
-    } catch (err: any) {
-      console.error("Detection failed:", err);
-      toast.error(isRu ? "Ошибка поиска вставок" : "Detection failed");
-    }
-    setDetecting(false);
-    setMergeChecked(new Set());
-  }, [sceneId, segments, dialogueCount, isRu, persist, buildSnapshot, getModelForRole, userApiKeys, setMergeChecked]);
-
-  const runStressCorrection = useCallback(async (mode: "correct" | "suggest") => {
-    if (!sceneId) return;
-    setCorrectingStress(true);
-    try {
-      // 🚫 К3: Send phrases from OPFS storyboard, no pushToDb needed
-      const allPhrases = segments.flatMap(seg =>
-        seg.phrases.map(p => ({
-          id: p.phrase_id,
-          segment_id: seg.segment_id,
-          phrase_number: p.phrase_number,
-          text: p.text,
-          metadata: { annotations: p.annotations ?? [] },
-        }))
-      );
-
-      if (mode === "suggest") {
-        const { data, error } = await invokeWithFallback({
-          functionName: "correct-stress",
-          body: { scene_id: sceneId, mode: "suggest", phrases: allPhrases, model: getModelForRole("proofreader") },
-          userApiKeys,
-          isRu,
-        });
-        if (error) throw error;
-        const result = data as any;
-        const suggestions = result.suggestions as StressSuggestion[];
-        if (!suggestions?.length) {
-          toast.info(isRu ? "Неоднозначных ударений не найдено" : "No ambiguous stress found");
-        } else {
-          setStressSuggestions(suggestions);
-          setStressReviewOpen(true);
-        }
-      } else {
-        const { data, error } = await invokeWithFallback({
-          functionName: "correct-stress",
-          body: { scene_id: sceneId, mode: "correct", phrases: allPhrases, model: getModelForRole("proofreader") },
-          userApiKeys,
-          isRu,
-        });
-        if (error) throw error;
-        const result = data as any;
-        if (result.applied > 0) {
-          // Apply annotations locally from server response
-          const annotationsMap = result.annotations as Record<string, Array<{ type: string; start: number; end: number }>>;
-          if (annotationsMap && Object.keys(annotationsMap).length > 0) {
-            const updated = segments.map(seg => ({
-              ...seg,
-              phrases: seg.phrases.map(p => {
-                const newAnns = annotationsMap[p.phrase_id];
-                if (!newAnns?.length) return p;
-                const typed = newAnns.map(a => ({ type: a.type as import("./phraseAnnotations").AnnotationType, start: a.start, end: a.end }));
-                return {
-                  ...p,
-                  annotations: [...(p.annotations ?? []), ...typed] as import("./phraseAnnotations").PhraseAnnotation[],
-                };
-              }),
-            })) as import("./storyboard/types").Segment[];
-            setSegments(updated);
-            persist(buildSnapshot(updated));
-          }
-          toast.success(
-            isRu
-              ? `Расставлено ${result.applied} ударений в ${result.phrases_affected} фразах`
-              : `Applied ${result.applied} stress marks in ${result.phrases_affected} phrases`
-          );
-        } else {
-          toast.info(result.message || (isRu ? "Нет совпадений со словарём" : "No dictionary matches"));
-        }
-      }
-    } catch (err: any) {
-      console.error("Stress correction failed:", err);
-      toast.error(isRu ? "Ошибка коррекции ударений" : "Stress correction failed");
-    }
-    setCorrectingStress(false);
-    setMergeChecked(new Set());
-  }, [sceneId, segments, isRu, persist, buildSnapshot, getModelForRole, userApiKeys, setMergeChecked]);
-
-  const handleStressReviewAccept = useCallback(async (accepted: StressSuggestion[]) => {
-    if (accepted.length === 0) return;
-    try {
-      const userId = (await supabase.auth.getUser()).data.user?.id;
-      if (!userId) return;
-      for (const s of accepted) {
-        await supabase.from("stress_dictionary" as any).upsert(
-          { user_id: userId, word: s.word.toLowerCase(), stressed_index: s.stressed_index, context: s.reason },
-          { onConflict: "user_id,word,stressed_index" }
-        );
-      }
-      toast.success(
-        isRu
-          ? `${accepted.length} слов добавлено в словарь. Нажмите «Применить» для расстановки.`
-          : `${accepted.length} words added to dictionary. Click "Apply" to set stress marks.`
-      );
-    } catch (err) {
-      console.error("Failed to save stress dictionary:", err);
-      toast.error(isRu ? "Ошибка сохранения словаря" : "Failed to save dictionary");
-    }
-  }, [isRu]);
-
-  // ─── Cleanup ──────────────────────────────────────────────
-
-  const cleanStaleInlineAudio = useCallback(async () => {
-    if (!sceneId || staleAudioSegIds.size === 0) return;
-    setCleaningMetadata(true);
-    try {
-      // Remove inline_narrations from segments locally
-      const updated = segments.map(s => {
-        if (!staleAudioSegIds.has(s.segment_id)) return s;
-        return { ...s, inline_narrations: undefined };
-      });
-      setSegments(updated);
-      setStaleAudioSegIds(new Set());
-      await persistNow(buildSnapshot(updated));
-      if (onSegmented) onSegmented(sceneId);
-      toast.success(
-        isRu
-          ? `Очищено ${staleAudioSegIds.size} устаревших аудио-вставок`
-          : `Cleared ${staleAudioSegIds.size} stale audio metadata entries`
-      );
-    } catch (err) {
-      console.error("Cleanup failed:", err);
-      toast.error(isRu ? "Ошибка очистки" : "Cleanup failed");
-    }
-    setCleaningMetadata(false);
-    setMergeChecked(new Set());
-  }, [sceneId, staleAudioSegIds, segments, isRu, onSegmented, persistNow, buildSnapshot, setMergeChecked]);
-
-  const removeInlineNarration = useCallback((segmentId: string, narrationIdx: number) => {
-    if (!sceneId) return;
-    const updated = segments.map(s => {
-      if (s.segment_id !== segmentId || !s.inline_narrations) return s;
-      const remaining = s.inline_narrations.filter((_, i) => i !== narrationIdx);
-      return { ...s, inline_narrations: remaining.length > 0 ? remaining : undefined };
-    });
-    setSegments(updated);
-    persist(buildSnapshot(updated));
-    onSegmented?.(sceneId);
-    toast.success(isRu ? "Вставка удалена" : "Narration removed");
-  }, [sceneId, segments, isRu, persist, buildSnapshot, onSegmented]);
-
-  const updateInlineNarrationSpeaker = useCallback(async (newSpeaker: string | null) => {
-    if (!sceneId) return;
-    setInlineNarrationSpeaker(newSpeaker);
-
-    // Update typeMappings locally
-    const charRecord = newSpeaker ? characters.find(c => c.name === newSpeaker) : null;
-    if (charRecord) {
-      typeMappingsRef.current = [
-        ...typeMappingsRef.current.filter(m => m.segmentType !== "inline_narration"),
-        { segmentType: "inline_narration", characterId: charRecord.id, characterName: charRecord.name },
-      ];
-      toast.success(isRu ? `Голос вставок → ${newSpeaker}` : `Narration voice → ${newSpeaker}`);
-    } else {
-      typeMappingsRef.current = typeMappingsRef.current.filter(m => m.segmentType !== "inline_narration");
-      toast.success(isRu ? "Голос вставок сброшен" : "Narration voice reset");
-    }
-    persist(buildSnapshot(undefined, undefined, newSpeaker));
-  }, [sceneId, characters, isRu, persist, buildSnapshot]);
+  // ─── Extracted hooks ──────────────────────────────────────
+
+  const inlineNarrations = useInlineNarrations({
+    sceneId, segments, setSegments, characters, isRu,
+    persist, persistNow, buildSnapshot,
+    getModelForRole, userApiKeys,
+    typeMappingsRef, staleAudioSegIds, setStaleAudioSegIds, setMergeChecked,
+    onSegmented,
+  });
+
+  const segOps = useStoryboardSegmentOps({
+    sceneId, segments, setSegments, characters, isRu, storage,
+    mergeChecked, setMergeChecked,
+    audioStatus, setAudioStatus, audioStatusRef,
+    contentDirty, setContentDirty,
+    typeMappingsRef, persistNow, persist, buildSnapshot, syncTypeMappings,
+    setStaleAudioSegIds, onSegmented,
+  });
+
+  const annotations = useStoryboardAnnotations({
+    sceneId, segments, setSegments, isRu,
+    persist, buildSnapshot, getModelForRole, userApiKeys, setMergeChecked,
+  });
+
+  const synthesis = useStoryboardSynthesis({
+    sceneId, chapterId, segments, characters, isRu,
+    projectStorage, mergeChecked, saveSynthResultsToOpfs,
+    onSegmented, onSynthesizingChange, onErrorSegmentsChange, setMergeChecked,
+  });
+
+  // Wrap updateSpeaker to also update characters state
+  const handleUpdateSpeaker = useCallback(async (segmentId: string, newSpeaker: string | null) => {
+    const updatedChars = await segOps.updateSpeaker(segmentId, newSpeaker);
+    if (updatedChars) setCharacters(updatedChars);
+  }, [segOps]);
 
   // ─── Render ───────────────────────────────────────────────
 
@@ -1533,17 +471,17 @@ export function StoryboardPanel({
         analysisPending={analysisPending}
         bgAnalyzing={bgAnalyzing}
         sceneContent={sceneContent}
-        synthesizing={synthesizing}
-        synthProgress={synthProgress}
-        canMerge={canMerge}
-        merging={merging}
-        deleting={deleting}
+        synthesizing={synthesis.synthesizing}
+        synthProgress={synthesis.synthProgress}
+        canMerge={segOps.canMerge}
+        merging={segOps.merging}
+        deleting={segOps.deleting}
         mergeCheckedSize={mergeChecked.size}
-        dialogueCount={dialogueCount}
-        detecting={detecting}
-        correctingStress={correctingStress}
+        dialogueCount={inlineNarrations.dialogueCount}
+        detecting={inlineNarrations.detecting}
+        correctingStress={annotations.correctingStress}
         staleAudioSegIdsSize={staleAudioSegIds.size}
-        cleaningMetadata={cleaningMetadata}
+        cleaningMetadata={inlineNarrations.cleaningMetadata}
         recalcRunning={recalcRunning}
         sceneId={sceneId}
         audioStatusSize={audioStatus.size}
@@ -1551,14 +489,14 @@ export function StoryboardPanel({
         segmentIds={segments.map(s => s.segment_id)}
         getModelForRole={getModelForRole}
         onRunAnalysis={runAnalysis}
-        onMergeSegments={handleMergeSegments}
-        onDeleteSegments={handleDeleteSegments}
-        onDetectNarrations={runDetectNarrations}
-        onStressCorrection={runStressCorrection}
-        onCleanStaleAudio={cleanStaleInlineAudio}
+        onMergeSegments={segOps.handleMergeSegments}
+        onDeleteSegments={segOps.handleDeleteSegments}
+        onDetectNarrations={inlineNarrations.runDetectNarrations}
+        onStressCorrection={annotations.runStressCorrection}
+        onCleanStaleAudio={inlineNarrations.cleanStaleInlineAudio}
         onRecalcDurations={handleRecalcDurations}
         onSilenceSecChange={onSilenceSecChange}
-        onRunSynthesis={runSynthesis}
+        onRunSynthesis={synthesis.runSynthesis}
         onSelectAll={() => setMergeChecked(new Set(segments.map(s => s.segment_id)))}
         onDeselectAll={() => setMergeChecked(new Set())}
         allSelected={mergeChecked.size > 0 && mergeChecked.size === segments.length}
@@ -1595,33 +533,33 @@ export function StoryboardPanel({
               ttsProvider={seg.speaker ? (speakerProviderMap.get(seg.speaker.toLowerCase()) ?? "yandex") : "yandex"}
               characters={characters}
               mergeChecked={mergeChecked.has(seg.segment_id)}
-              resynthSegId={resynthSegId}
-              synthesizing={synthesizing}
-              inlineNarrationSpeaker={inlineNarrationSpeaker}
+              resynthSegId={synthesis.resynthSegId}
+              synthesizing={synthesis.synthesizing}
+              inlineNarrationSpeaker={inlineNarrations.inlineNarrationSpeaker}
               getModelForRole={getModelForRole}
               onSelect={(id) => onSelectSegment?.(id)}
-              onUpdateType={updateSegmentType}
-              onUpdateSpeaker={updateSpeaker}
-              onResynthSegment={resynthSegment}
-              onSplitSilenceChange={handleSplitSilenceChange}
+              onUpdateType={segOps.updateSegmentType}
+              onUpdateSpeaker={handleUpdateSpeaker}
+              onResynthSegment={synthesis.resynthSegment}
+              onSplitSilenceChange={segOps.handleSplitSilenceChange}
               onToggleMergeCheck={toggleMergeCheck}
-              onSavePhrase={savePhrase}
-              onSplitAtPhrase={handleSplitAtPhrase}
-              onAnnotate={saveAnnotation}
-              onRemoveAnnotation={removeAnnotation}
-              onRemoveInlineNarration={removeInlineNarration}
-              onUpdateInlineNarrationSpeaker={updateInlineNarrationSpeaker}
+              onSavePhrase={annotations.savePhrase}
+              onSplitAtPhrase={segOps.handleSplitAtPhrase}
+              onAnnotate={annotations.saveAnnotation}
+              onRemoveAnnotation={annotations.removeAnnotation}
+              onRemoveInlineNarration={inlineNarrations.removeInlineNarration}
+              onUpdateInlineNarrationSpeaker={inlineNarrations.updateInlineNarrationSpeaker}
             />
           ))}
         </div>
       </ScrollArea>
 
       <StressReviewPanel
-        open={stressReviewOpen}
-        onOpenChange={setStressReviewOpen}
-        suggestions={stressSuggestions}
+        open={annotations.stressReviewOpen}
+        onOpenChange={annotations.setStressReviewOpen}
+        suggestions={annotations.stressSuggestions}
         isRu={isRu}
-        onAccept={handleStressReviewAccept}
+        onAccept={annotations.handleStressReviewAccept}
       />
     </div>
   );
