@@ -49,11 +49,35 @@ const Montage = () => {
 
   const hasContent = !!chapterId && sceneIds.length > 0;
 
+  // Count rendered/unrendered for active part only
+  const activeRendered = activeSceneIds.filter(id => renderedSceneIds.includes(id));
+  const activeUnrendered = activeSceneIds.filter(id => unrenderedSceneIds.includes(id));
+  const activeSceneCount = activeSceneIds.length;
+
   // ── Page header ────────────────────────────────────────────
   const title = isRu ? "МОНТАЖ" : "MONTAGE";
-  const subtitle = bookTitle && chapterTitle
-    ? `${bookTitle} → ${chapterTitle}`
-    : (isRu ? "Финальный монтаж и мастеринг глав" : "Final chapter montage & mastering");
+
+  const subtitle = useMemo(() => {
+    if (!bookTitle || !chapterTitle) return undefined;
+    return (
+      <span className="flex items-center gap-2">
+        <span className="truncate">{bookTitle} → {chapterTitle}</span>
+        {hasContent && (
+          <>
+            {activeUnrendered.length > 0 && (
+              <span className="text-xs text-destructive flex items-center gap-1 font-body whitespace-nowrap">
+                <AlertCircle className="h-3 w-3" />
+                {activeUnrendered.length} {isRu ? "не отренд." : "unrendered"}
+              </span>
+            )}
+            <span className="text-xs text-muted-foreground font-body whitespace-nowrap">
+              {activeRendered.length}/{activeSceneCount} {isRu ? "сцен" : "scenes"} · {formatTime(totalDurationSec)}
+            </span>
+          </>
+        )}
+      </span>
+    );
+  }, [bookTitle, chapterTitle, hasContent, activeUnrendered.length, activeRendered.length, activeSceneCount, totalDurationSec, isRu]);
 
   const headerRight = useMemo(() => (
     <div className="flex items-center gap-2">
@@ -72,7 +96,7 @@ const Montage = () => {
       )}
       <AiRolesButton isRu={isRu} apiKeys={userApiKeys} bookTitle={bookTitle || undefined} />
     </div>
-  ), [isRu, saveBook, savingBook, bookId, hasContent, clips.length, userApiKeys, bookTitle]);
+  ), [isRu, saveBook, savingBook, bookId, hasContent, clips.length, userApiKeys, bookTitle, isProjectOpen, downloadZip, importZip]);
 
   useEffect(() => {
     setPageHeader({ title, subtitle, headerRight });
@@ -87,10 +111,6 @@ const Montage = () => {
     );
   }
 
-  // Count rendered/unrendered for active part only
-  const activeRendered = activeSceneIds.filter(id => renderedSceneIds.includes(id));
-  const activeUnrendered = activeSceneIds.filter(id => unrenderedSceneIds.includes(id));
-  const activeSceneCount = activeSceneIds.length;
 
   return (
     <motion.div
@@ -99,15 +119,11 @@ const Montage = () => {
       className="flex flex-col h-[calc(100vh-3rem)] min-h-0 overflow-hidden"
     >
       {/* Info bar */}
-      {hasContent && (
+      {hasContent && (parts.length > 0 || activeUnrendered.length > 0) && (
         <div className="flex items-center gap-3 px-4 py-1.5 border-b border-border shrink-0">
-          <span className="text-xs text-muted-foreground font-body truncate">
-            {bookTitle} → {chapterTitle}
-          </span>
-
           {/* Part tabs */}
           {parts.length > 0 && (
-            <div className="flex items-center gap-1 ml-2">
+            <div className="flex items-center gap-1">
               {parts.map((part, idx) => (
                 <Button
                   key={part.id}
@@ -130,18 +146,6 @@ const Montage = () => {
               </Button>
             </div>
           )}
-
-          <div className="flex items-center gap-2 ml-auto">
-            {activeUnrendered.length > 0 && (
-              <span className="text-xs text-destructive flex items-center gap-1 font-body">
-                <AlertCircle className="h-3 w-3" />
-                {activeUnrendered.length} {isRu ? "не отрендерено" : "not rendered"}
-              </span>
-            )}
-            <span className="text-xs text-muted-foreground font-body">
-              {activeRendered.length}/{activeSceneCount} {isRu ? "сцен" : "scenes"} · {formatTime(totalDurationSec)}
-            </span>
-          </div>
         </div>
       )}
 
