@@ -350,9 +350,9 @@ export function WaveformEditor({
     const waveW = w - DB_ZONE_WIDTH;
 
     // ── dB scale in mixer sidebar area ──────────────────────
-    const drawDbScale = (chY: number, chHeight: number) => {
-      const mid = chY + chHeight / 2;
-      const amp = chHeight / 2 * 0.9;
+    const drawDbScale = () => {
+      const mid = h / 2;
+      const amp = h / 2 * 0.9;
 
       ctx.font = `${8 * dpr}px monospace`;
       ctx.textAlign = "right";
