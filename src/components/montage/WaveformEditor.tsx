@@ -390,8 +390,7 @@ export function WaveformEditor({
       ctx.textAlign = "left";
     };
 
-    drawDbScale(0, chH);
-    drawDbScale(chH + CHANNEL_GAP, chH);
+    drawDbScale();
 
     // ── Time grid (vertical lines) — scene-local ────────────
     const drawTimeGrid = () => {
@@ -446,76 +445,18 @@ export function WaveformEditor({
     ctx.rect(DB_ZONE_WIDTH * dpr, 0, (w - DB_ZONE_WIDTH) * dpr, h * dpr);
     ctx.clip();
 
-    // Draw L channel
-    drawChannel(
+    // Draw butterfly waveform (L up, R down)
+    drawButterfly(
       ctx,
       currentPeaks,
       DB_ZONE_WIDTH,
       0,
       waveW,
-      chH,
-      waveColor,
+      h,
       scrollLeft,
       totalWidthPx,
       selection,
       displayDurationSec,
-      "L",
-    );
-
-    // Gap line between L/R
-    ctx.fillStyle = borderColor.replace(")", " / 0.5)").replace("hsl(", "hsl(");
-    ctx.fillRect(DB_ZONE_WIDTH * dpr, chH * dpr, waveW * dpr, CHANNEL_GAP * dpr);
-
-    // ── Time scale on the L/R divider ────────────────────────
-    {
-      const dividerY = chH; // top of the gap
-      const timeStep = 10; // seconds
-      const mutedCol = resolveHsl("--muted-foreground");
-      ctx.save();
-      ctx.font = `${8 * dpr}px monospace`;
-      ctx.textAlign = "left";
-      ctx.fillStyle = mutedCol.replace(")", " / 0.6)").replace("hsl(", "hsl(");
-      ctx.strokeStyle = mutedCol.replace(")", " / 0.4)").replace("hsl(", "hsl(");
-      ctx.lineWidth = 1;
-
-      const visStartSec = Math.floor((scrollLeft / totalWidthPx) * displayDurationSec / timeStep) * timeStep;
-      const visEndSec = Math.ceil(((scrollLeft + waveW) / totalWidthPx) * displayDurationSec / timeStep) * timeStep;
-
-      for (let t = visStartSec; t <= visEndSec; t += timeStep) {
-        if (t < 0) continue;
-        const px = (t / displayDurationSec) * totalWidthPx - scrollLeft + DB_ZONE_WIDTH;
-        if (px < DB_ZONE_WIDTH || px > w) continue;
-
-        // tick mark
-        const tickH = 4;
-        ctx.beginPath();
-        ctx.moveTo(px * dpr, (dividerY - tickH) * dpr);
-        ctx.lineTo(px * dpr, (dividerY + CHANNEL_GAP + tickH) * dpr);
-        ctx.stroke();
-
-        // label to the right of tick
-        const mins = Math.floor(t / 60);
-        const secs = Math.floor(t % 60);
-        const lbl = `${mins}:${secs.toString().padStart(2, "0")}`;
-        ctx.fillText(lbl, (px + 3) * dpr, (dividerY - 1) * dpr);
-      }
-      ctx.restore();
-    }
-
-    // Draw R channel
-    drawChannel(
-      ctx,
-      currentPeaks,
-      DB_ZONE_WIDTH,
-      chH + CHANNEL_GAP,
-      waveW,
-      chH,
-      waveColor,
-      scrollLeft,
-      totalWidthPx,
-      selection,
-      displayDurationSec,
-      "R",
     );
 
     // ── Draw segment boundaries from scene_playlists ────────────
