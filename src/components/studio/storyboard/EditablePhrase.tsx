@@ -44,10 +44,17 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
     }
   }, [editing]);
 
+  const saveWithUndo = useCallback((newText: string) => {
+    if (newText !== phrase.text) {
+      undoRef.current = { phraseId: phrase.phrase_id, text: phrase.text };
+      onSave(phrase.phrase_id, newText);
+    }
+  }, [phrase.phrase_id, phrase.text, onSave]);
+
   const save = () => {
     const trimmed = draft.trim();
     if (trimmed && trimmed !== phrase.text) {
-      onSave(phrase.phrase_id, trimmed);
+      saveWithUndo(trimmed);
     }
     setEditing(false);
   };
@@ -68,19 +75,14 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
     const sel = peek();
     if (!sel) return;
     const newText = (phrase.text.slice(0, sel.start) + phrase.text.slice(sel.end)).trim();
-    if (!newText) return; // don't allow deleting entire phrase
-    if (newText !== phrase.text) {
-      onSave(phrase.phrase_id, newText);
-    }
-  }, [phrase.phrase_id, phrase.text, onSave, peek]);
+    if (!newText) return;
+    saveWithUndo(newText);
+  }, [phrase.text, saveWithUndo, peek]);
 
   const handlePhoneticCorrect = useCallback((suggestion: PronunciationSuggestion, wordOffset: number) => {
     const newText = applyCorrection(phrase.text, wordOffset, suggestion);
-    if (newText !== phrase.text) {
-      undoRef.current = { phraseId: phrase.phrase_id, text: phrase.text };
-      onSave(phrase.phrase_id, newText);
-    }
-  }, [phrase.phrase_id, phrase.text, onSave]);
+    saveWithUndo(newText);
+  }, [phrase.text, saveWithUndo]);
 
   const handleUndo = useCallback(() => {
     const prev = undoRef.current;
@@ -308,7 +310,7 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
             className="text-xs gap-2"
           >
             <Undo2 className="h-3 w-3" />
-            {isRu ? "Отменить коррекцию" : "Undo correction"}
+            {isRu ? "Отменить правку" : "Undo edit"}
             <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+Z</span>
           </ContextMenuItem>
         )}
