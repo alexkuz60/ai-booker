@@ -75,19 +75,14 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
     const sel = peek();
     if (!sel) return;
     const newText = (phrase.text.slice(0, sel.start) + phrase.text.slice(sel.end)).trim();
-    if (!newText) return; // don't allow deleting entire phrase
-    if (newText !== phrase.text) {
-      onSave(phrase.phrase_id, newText);
-    }
-  }, [phrase.phrase_id, phrase.text, onSave, peek]);
+    if (!newText) return;
+    saveWithUndo(newText);
+  }, [phrase.text, saveWithUndo, peek]);
 
   const handlePhoneticCorrect = useCallback((suggestion: PronunciationSuggestion, wordOffset: number) => {
     const newText = applyCorrection(phrase.text, wordOffset, suggestion);
-    if (newText !== phrase.text) {
-      undoRef.current = { phraseId: phrase.phrase_id, text: phrase.text };
-      onSave(phrase.phrase_id, newText);
-    }
-  }, [phrase.phrase_id, phrase.text, onSave]);
+    saveWithUndo(newText);
+  }, [phrase.text, saveWithUndo]);
 
   const handleUndo = useCallback(() => {
     const prev = undoRef.current;
