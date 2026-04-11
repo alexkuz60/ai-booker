@@ -99,15 +99,11 @@ const Montage = () => {
       className="flex flex-col h-[calc(100vh-3rem)] min-h-0 overflow-hidden"
     >
       {/* Info bar */}
-      {hasContent && (
+      {hasContent && (parts.length > 0 || activeUnrendered.length > 0) && (
         <div className="flex items-center gap-3 px-4 py-1.5 border-b border-border shrink-0">
-          <span className="text-xs text-muted-foreground font-body truncate">
-            {bookTitle} → {chapterTitle}
-          </span>
-
           {/* Part tabs */}
           {parts.length > 0 && (
-            <div className="flex items-center gap-1 ml-2">
+            <div className="flex items-center gap-1">
               {parts.map((part, idx) => (
                 <Button
                   key={part.id}
@@ -130,18 +126,6 @@ const Montage = () => {
               </Button>
             </div>
           )}
-
-          <div className="flex items-center gap-2 ml-auto">
-            {activeUnrendered.length > 0 && (
-              <span className="text-xs text-destructive flex items-center gap-1 font-body">
-                <AlertCircle className="h-3 w-3" />
-                {activeUnrendered.length} {isRu ? "не отрендерено" : "not rendered"}
-              </span>
-            )}
-            <span className="text-xs text-muted-foreground font-body">
-              {activeRendered.length}/{activeSceneCount} {isRu ? "сцен" : "scenes"} · {formatTime(totalDurationSec)}
-            </span>
-          </div>
         </div>
       )}
 
