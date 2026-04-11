@@ -53,7 +53,7 @@ const Montage = () => {
   const title = isRu ? "МОНТАЖ" : "MONTAGE";
   const subtitle = bookTitle && chapterTitle
     ? `${bookTitle} → ${chapterTitle}`
-    : (isRu ? "Финальный монтаж и мастеринг глав" : "Final chapter montage & mastering");
+    : undefined;
 
   const headerRight = useMemo(() => (
     <div className="flex items-center gap-2">
@@ -72,7 +72,7 @@ const Montage = () => {
       )}
       <AiRolesButton isRu={isRu} apiKeys={userApiKeys} bookTitle={bookTitle || undefined} />
     </div>
-  ), [isRu, saveBook, savingBook, bookId, hasContent, clips.length, userApiKeys, bookTitle]);
+  ), [isRu, saveBook, savingBook, bookId, hasContent, clips.length, userApiKeys, bookTitle, isProjectOpen, downloadZip, importZip]);
 
   useEffect(() => {
     setPageHeader({ title, subtitle, headerRight });
