@@ -936,6 +936,20 @@ export function StoryboardPanel({
 
       // Accumulate streamed phrase events per segment
       const streamedPhrases = new Map<string, Array<{ phrase_index: number; audio_base64: string; duration_ms: number }>>();
+      let synthCount = 0;
+      let cachedCount = 0;
+      let errorCount = 0;
+
+      const buildProgressLabel = () => {
+        const parts: string[] = [];
+        if (synthCount > 0) parts.push(isRu ? `✓${synthCount}` : `✓${synthCount}`);
+        if (cachedCount > 0) parts.push(isRu ? `⚡${cachedCount}` : `⚡${cachedCount}`);
+        if (errorCount > 0) parts.push(isRu ? `✗${errorCount}` : `✗${errorCount}`);
+        const detail = parts.length > 0 ? ` (${parts.join(" ")})` : "";
+        return isRu
+          ? `Синтез: ${allResults.length}/${targetSegments.length}${detail}`
+          : `Synthesis: ${allResults.length}/${targetSegments.length}${detail}`;
+      };
 
       while (true) {
         const { done, value } = await reader.read();
@@ -949,10 +963,8 @@ export function StoryboardPanel({
             if (obj._summary) {
               summary = obj;
             } else if (obj._phrase_group_start) {
-              // Initialize phrase collection for this segment
               streamedPhrases.set(obj.segment_id, []);
             } else if (obj._phrase) {
-              // Collect individual phrase audio — save to OPFS immediately and release base64
               const phrases = streamedPhrases.get(obj.segment_id) ?? [];
               phrases.push({ phrase_index: obj.phrase_index, audio_base64: obj.audio_base64, duration_ms: obj.duration_ms });
               streamedPhrases.set(obj.segment_id, phrases);
@@ -962,24 +974,23 @@ export function StoryboardPanel({
                   : `Phrases: ${phrases.length}…`
               );
             } else {
-              // Segment-level result — attach collected phrases if any
               const collectedPhrases = streamedPhrases.get(obj.segment_id);
               if (collectedPhrases && collectedPhrases.length > 0 && obj.status === "ready" && !obj.audio_base64) {
                 obj.phrase_results = collectedPhrases;
                 streamedPhrases.delete(obj.segment_id);
               }
               allResults.push(obj);
-              // Save each segment to OPFS immediately (streaming save)
-              if (obj.status === "ready" && (obj.audio_base64 || obj.phrase_results)) {
+              // Classify result
+              if (obj.status === "error") {
+                errorCount++;
+              } else if (obj.status === "ready" && (obj.audio_base64 || obj.phrase_results)) {
+                synthCount++;
                 await saveSynthResultsToOpfs([obj]);
-                // Trigger timeline redraw after each streamed segment
                 onSegmented?.(sceneId);
+              } else if (obj.status === "ready") {
+                cachedCount++; // cache hit — no audio_base64
               }
-              setSynthProgress(
-                isRu
-                  ? `Синтез: ${allResults.length}/${targetSegments.length}`
-                  : `Synthesis: ${allResults.length}/${targetSegments.length}`
-              );
+              setSynthProgress(buildProgressLabel());
             }
           } catch { /* skip malformed lines */ }
         }
@@ -1001,17 +1012,21 @@ export function StoryboardPanel({
         await saveSynthResultsToOpfs(nonAudioResults);
       }
 
+      const cachedSuffix = cachedCount > 0
+        ? (isRu ? `, ⚡${cachedCount} из кеша` : `, ⚡${cachedCount} cached`)
+        : "";
+
       if ((summary.errors ?? 0) > 0) {
         toast.warning(
           isRu
-            ? `Синтез: ${summary.synthesized ?? 0} готово, ${summary.errors} ошибок (${durSec}с)`
-            : `Synthesis: ${summary.synthesized ?? 0} done, ${summary.errors} errors (${durSec}s)`
+            ? `Синтез: ✓${synthCount} готово, ✗${errorCount} ошибок${cachedSuffix} (${durSec}с)`
+            : `Synthesis: ✓${synthCount} done, ✗${errorCount} errors${cachedSuffix} (${durSec}s)`
         );
       } else {
         toast.success(
           isRu
-            ? `Синтез завершён: ${summary.synthesized ?? 0} фрагм., ${durSec}с`
-            : `Synthesis done: ${summary.synthesized ?? 0} seg., ${durSec}s`
+            ? `Синтез завершён: ✓${synthCount} фрагм.${cachedSuffix} (${durSec}с)`
+            : `Synthesis done: ✓${synthCount} seg.${cachedSuffix} (${durSec}s)`
         );
       }
       onSegmented?.(sceneId);
