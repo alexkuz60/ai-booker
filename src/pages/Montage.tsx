@@ -111,10 +111,6 @@ const Montage = () => {
     );
   }
 
-  // Count rendered/unrendered for active part only
-  const activeRendered = activeSceneIds.filter(id => renderedSceneIds.includes(id));
-  const activeUnrendered = activeSceneIds.filter(id => unrenderedSceneIds.includes(id));
-  const activeSceneCount = activeSceneIds.length;
 
   return (
     <motion.div
