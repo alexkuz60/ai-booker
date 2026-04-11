@@ -1012,17 +1012,21 @@ export function StoryboardPanel({
         await saveSynthResultsToOpfs(nonAudioResults);
       }
 
+      const cachedSuffix = cachedCount > 0
+        ? (isRu ? `, ⚡${cachedCount} из кеша` : `, ⚡${cachedCount} cached`)
+        : "";
+
       if ((summary.errors ?? 0) > 0) {
         toast.warning(
           isRu
-            ? `Синтез: ${summary.synthesized ?? 0} готово, ${summary.errors} ошибок (${durSec}с)`
-            : `Synthesis: ${summary.synthesized ?? 0} done, ${summary.errors} errors (${durSec}s)`
+            ? `Синтез: ✓${synthCount} готово, ✗${errorCount} ошибок${cachedSuffix} (${durSec}с)`
+            : `Synthesis: ✓${synthCount} done, ✗${errorCount} errors${cachedSuffix} (${durSec}s)`
         );
       } else {
         toast.success(
           isRu
-            ? `Синтез завершён: ${summary.synthesized ?? 0} фрагм., ${durSec}с`
-            : `Synthesis done: ${summary.synthesized ?? 0} seg., ${durSec}s`
+            ? `Синтез завершён: ✓${synthCount} фрагм.${cachedSuffix} (${durSec}с)`
+            : `Synthesis done: ✓${synthCount} seg.${cachedSuffix} (${durSec}s)`
         );
       }
       onSegmented?.(sceneId);
