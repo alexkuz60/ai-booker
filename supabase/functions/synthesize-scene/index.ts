@@ -1003,12 +1003,7 @@ Deno.serve(async (req) => {
       let totalDurationMs = 0;
       const playlistSegments: Array<Record<string, unknown>> = [];
 
-      const TTS_INTER_SEGMENT_DELAY_MS = 150; // throttle to avoid Supabase trace rate limits
       for (let i = 0; i < segments.length; i++) {
-        // Throttle: add small delay between TTS calls to stay under rate limits
-        if (i > 0) {
-          await new Promise((r) => setTimeout(r, TTS_INTER_SEGMENT_DELAY_MS));
-        }
         const seg = segments[i];
         const rawText = segmentTexts[i];
 
