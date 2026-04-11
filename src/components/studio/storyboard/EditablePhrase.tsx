@@ -15,6 +15,7 @@ import {
 } from "../phraseAnnotations";
 import { renderAnnotatedText } from "./PhraseRenderer";
 import { PhonemeSubmenu } from "./PhonemeSubmenu";
+import { StressVowelSubmenu } from "./StressVowelSubmenu";
 import { applyCorrection, type PronunciationSuggestion } from "@/lib/ruPronunciationRules";
 import type { Phrase } from "./types";
 
@@ -116,7 +117,8 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
   const availableAnnotations = getAvailableAnnotations(ttsProvider, true);
   const availableInsertions = getAvailableAnnotations(ttsProvider, false).filter(a => !a.needsRange);
 
-  const prosodyItems = availableAnnotations.filter(a => !EMOTION_TYPES.has(a.type) && !SOUND_TYPES.has(a.type));
+  const prosodyItems = availableAnnotations.filter(a => a.type !== "emphasis" && !EMOTION_TYPES.has(a.type) && !SOUND_TYPES.has(a.type));
+  const hasEmphasis = availableAnnotations.some(a => a.type === "emphasis");
   const emotionItems = availableAnnotations.filter(a => EMOTION_TYPES.has(a.type));
   const soundInsertions = availableInsertions.filter(a => SOUND_TYPES.has(a.type));
   const otherInsertions = availableInsertions.filter(a => !SOUND_TYPES.has(a.type) && !availableAnnotations.find(x => x.type === a.type));
