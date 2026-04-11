@@ -77,9 +77,34 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
   const handlePhoneticCorrect = useCallback((suggestion: PronunciationSuggestion, wordOffset: number) => {
     const newText = applyCorrection(phrase.text, wordOffset, suggestion);
     if (newText !== phrase.text) {
+      undoRef.current = { phraseId: phrase.phrase_id, text: phrase.text };
       onSave(phrase.phrase_id, newText);
     }
   }, [phrase.phrase_id, phrase.text, onSave]);
+
+  const handleUndo = useCallback(() => {
+    const prev = undoRef.current;
+    if (!prev || prev.phraseId !== phrase.phrase_id) return false;
+    onSave(prev.phraseId, prev.text);
+    undoRef.current = null;
+    return true;
+  }, [phrase.phrase_id, onSave]);
+
+  // Ctrl+Z global handler (only when not editing)
+  useEffect(() => {
+    if (editing) return;
+    if (!undoRef.current || undoRef.current.phraseId !== phrase.phrase_id) return;
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        if (handleUndo()) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }
+    };
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
+  }, [editing, phrase.phrase_id, handleUndo]);
 
   const hasAnnotations = phrase.annotations && phrase.annotations.length > 0;
 
