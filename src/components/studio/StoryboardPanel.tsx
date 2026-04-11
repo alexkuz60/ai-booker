@@ -785,7 +785,8 @@ export function StoryboardPanel({
     syncTypeMappings(updatedSegments);
     persist(buildSnapshot(updatedSegments));
     onSegmented?.(sceneId!);
-  }, [isRu, segments, sceneId, mergeChecked, syncTypeMappings, persist, buildSnapshot, onSegmented]);
+    if (bulkChecked) setMergeChecked(new Set());
+  }, [isRu, segments, sceneId, mergeChecked, syncTypeMappings, persist, buildSnapshot, onSegmented, setMergeChecked]);
 
   const updateSpeaker = useCallback(async (segmentId: string, newSpeaker: string | null) => {
     const targetSeg = segments.find(s => s.segment_id === segmentId);
@@ -837,7 +838,8 @@ export function StoryboardPanel({
     }
 
     onSegmented?.(sceneId!);
-  }, [isRu, segments, sceneId, storage, syncTypeMappings, persist, buildSnapshot, onSegmented, mergeChecked]);
+    if (bulkChecked) setMergeChecked(new Set());
+  }, [isRu, segments, sceneId, storage, syncTypeMappings, persist, buildSnapshot, onSegmented, mergeChecked, setMergeChecked]);
 
   // ─── Synthesis ────────────────────────────────────────────
 
@@ -1019,6 +1021,7 @@ export function StoryboardPanel({
     setCurrentlySynthesizingIds(new Set());
     onSynthesizingChange?.(new Set());
     setSynthProgress("");
+    setMergeChecked(new Set());
   }, [sceneId, segments, mergeChecked, isRu, onSegmented, saveSynthResultsToOpfs, onSynthesizingChange, onErrorSegmentsChange, pushToDb, buildSnapshot]);
 
   const resynthSegment = useCallback(async (segmentId: string) => {
@@ -1204,7 +1207,8 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка поиска вставок" : "Detection failed");
     }
     setDetecting(false);
-  }, [sceneId, segments, dialogueCount, isRu, persist, buildSnapshot, getModelForRole, userApiKeys]);
+    setMergeChecked(new Set());
+  }, [sceneId, segments, dialogueCount, isRu, persist, buildSnapshot, getModelForRole, userApiKeys, setMergeChecked]);
 
   const runStressCorrection = useCallback(async (mode: "correct" | "suggest") => {
     if (!sceneId) return;
@@ -1279,7 +1283,8 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка коррекции ударений" : "Stress correction failed");
     }
     setCorrectingStress(false);
-  }, [sceneId, segments, isRu, persist, buildSnapshot, getModelForRole, userApiKeys]);
+    setMergeChecked(new Set());
+  }, [sceneId, segments, isRu, persist, buildSnapshot, getModelForRole, userApiKeys, setMergeChecked]);
 
   const handleStressReviewAccept = useCallback(async (accepted: StressSuggestion[]) => {
     if (accepted.length === 0) return;
@@ -1328,7 +1333,8 @@ export function StoryboardPanel({
       toast.error(isRu ? "Ошибка очистки" : "Cleanup failed");
     }
     setCleaningMetadata(false);
-  }, [sceneId, staleAudioSegIds, segments, isRu, onSegmented, persistNow, buildSnapshot]);
+    setMergeChecked(new Set());
+  }, [sceneId, staleAudioSegIds, segments, isRu, onSegmented, persistNow, buildSnapshot, setMergeChecked]);
 
   const removeInlineNarration = useCallback((segmentId: string, narrationIdx: number) => {
     if (!sceneId) return;
