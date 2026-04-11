@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { getAudioEngine } from "@/lib/audioEngine";
 
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { renderScene, type RenderProgress } from "@/lib/sceneRenderer";
+import { renderScene, readRenderMeta, type RenderProgress } from "@/lib/sceneRenderer";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
@@ -172,19 +172,24 @@ export function StudioTimeline({
   useEffect(() => {
     setHasExistingRender(false);
     setRenderProgress(null);
-    if (!sceneId) return;
+    if (!sceneId || !storage) return;
     (async () => {
-      const { data } = await supabase
-        .from("scene_renders")
-        .select("voice_path, atmo_path, sfx_path")
-        .eq("scene_id", sceneId)
-        .maybeSingle();
-      if (data) {
-        const paths = [data.voice_path, data.atmo_path, data.sfx_path].filter(Boolean);
-        setHasExistingRender(paths.length > 0);
-      }
+      try {
+        // Resolve chapterId from scene path
+        const sbPath = (await import("@/lib/projectPaths")).paths.storyboard(sceneId);
+        const match = sbPath.match(/^chapters\/([^/]+)\//);
+        if (!match) return;
+        const chId = match[1];
+        if (chId === "__unresolved__") return;
+        const meta = await readRenderMeta(storage, chId);
+        const sceneMeta = meta[sceneId];
+        if (sceneMeta && sceneMeta.status === "ready") {
+          const hasPaths = [sceneMeta.voice_path, sceneMeta.atmo_path, sceneMeta.sfx_path].filter(Boolean);
+          setHasExistingRender(hasPaths.length > 0);
+        }
+      } catch { /* ignore */ }
     })();
-  }, [sceneId]);
+  }, [sceneId, storage]);
 
   const rulerRenderPercent = isRendering
     ? (renderProgress?.percent ?? 0)

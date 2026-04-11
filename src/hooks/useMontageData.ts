@@ -5,6 +5,7 @@ import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { readStructureFromLocal } from "@/lib/localSync";
 import { revokeAllAudioUrls } from "@/lib/localAudioProvider";
 import type { TimelineClip, SceneBoundary } from "@/hooks/useTimelineClips";
+import { readRenderMeta, type SceneRenderMeta } from "@/lib/sceneRenderer";
 
 // ─── Types ──────────────────────────────────────────────────
 export interface SceneRender {
@@ -179,19 +180,39 @@ export function useMontageData() {
 
   const sceneIds = useMemo(() => scenes.map(s => s.id), [scenes]);
 
-  // Load scene renders
+  // LOCAL-ONLY: load scene render metadata from OPFS (K3)
   useEffect(() => {
-    if (sceneIds.length === 0) { setSceneRenders([]); return; }
+    if (sceneIds.length === 0 || !storage || !chapterId) { setSceneRenders([]); return; }
+    let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from("scene_renders")
-        .select("id, scene_id, voice_path, atmo_path, sfx_path, voice_duration_ms, atmo_duration_ms, sfx_duration_ms, status")
-        .in("scene_id", sceneIds)
-        .eq("status", "ready");
-      setSceneRenders((data ?? []) as SceneRender[]);
+      try {
+        const metaFile = await readRenderMeta(storage, chapterId);
+        if (cancelled) return;
+        const renders: SceneRender[] = [];
+        for (const sceneId of sceneIds) {
+          const m = metaFile[sceneId];
+          if (m && m.status === "ready") {
+            renders.push({
+              id: m.scene_id,
+              scene_id: m.scene_id,
+              voice_path: m.voice_path,
+              atmo_path: m.atmo_path,
+              sfx_path: m.sfx_path,
+              voice_duration_ms: m.voice_duration_ms,
+              atmo_duration_ms: m.atmo_duration_ms,
+              sfx_duration_ms: m.sfx_duration_ms,
+              status: m.status,
+            });
+          }
+        }
+        if (!cancelled) setSceneRenders(renders);
+      } catch (err) {
+        console.warn("[Montage] Failed to load render meta from OPFS:", err);
+      }
     })();
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sceneIds.join(",")]);
+  }, [storage, chapterId, sceneIds.join(",")]);
 
   // ── Load montage parts ──
   useEffect(() => {

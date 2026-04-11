@@ -2,7 +2,9 @@
  * SceneRenderer — offline (OfflineAudioContext) renderer that produces
  * 3 stem files per scene: voice.wav, atmosphere.wav, sfx.wav.
  *
- * Loading phase reports per-clip progress; rendering is atomic.
+ * All stems are written to OPFS at chapters/{chapterId}/renders/{stem}.wav.
+ * Metadata is stored in render_meta.json alongside the stems.
+ * DB (scene_renders) is updated as backup metadata only.
  */
 
 import { supabase } from "@/integrations/supabase/client";
@@ -13,9 +15,56 @@ import type { ClipPluginConfig, SceneClipConfigs } from "@/hooks/useClipPluginCo
 import { DEFAULT_CLIP_PLUGIN_CONFIG } from "@/hooks/useClipPluginConfigs";
 import type { ProjectStorage } from "@/lib/projectStorage";
 import { getAudioBuffer } from "@/lib/localAudioProvider";
+import { paths } from "@/lib/projectPaths";
+
+// ── Render metadata persisted in OPFS ───────────────────────
+
+export interface SceneRenderMeta {
+  scene_id: string;
+  voice_path: string | null;
+  atmo_path: string | null;
+  sfx_path: string | null;
+  voice_duration_ms: number;
+  atmo_duration_ms: number;
+  sfx_duration_ms: number;
+  status: "ready" | "pending" | "error";
+  updated_at: string;
+  render_config?: Record<string, unknown>;
+}
+
+export interface RenderMetaFile {
+  /** sceneId → metadata */
+  [sceneId: string]: SceneRenderMeta;
+}
+
+const RENDER_META_FILENAME = "render_meta.json";
+
+function renderMetaPath(chapterId: string): string {
+  return `chapters/${chapterId}/renders/${RENDER_META_FILENAME}`;
+}
+
+export async function readRenderMeta(
+  storage: ProjectStorage,
+  chapterId: string,
+): Promise<RenderMetaFile> {
+  try {
+    const data = await storage.readJSON<RenderMetaFile>(renderMetaPath(chapterId));
+    return data ?? {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeRenderMeta(
+  storage: ProjectStorage,
+  chapterId: string,
+  meta: RenderMetaFile,
+): Promise<void> {
+  await storage.writeJSON(renderMetaPath(chapterId), meta);
+}
 
 export interface RenderProgress {
-  phase: "loading" | "rendering" | "encoding" | "uploading" | "done" | "error";
+  phase: "loading" | "rendering" | "encoding" | "done" | "error";
   percent: number;
   error?: string;
 }
@@ -463,6 +512,7 @@ export async function renderScene(
   userId: string,
   onProgress?: (p: RenderProgress) => void,
   clipConfigs?: SceneClipConfigs,
+  chapterId?: string,
 ): Promise<RenderResult> {
   const sampleRate = 44100;
   const report = (phase: RenderProgress["phase"], percent: number) =>
@@ -501,7 +551,7 @@ export async function renderScene(
 
     report("encoding", 65);
 
-    // Encode to WAV
+    // Encode to WAV and write to OPFS
     const stems: { key: BusType; buffer: AudioBuffer | null }[] = [
       { key: "voice", buffer: voiceBuf },
       { key: "atmosphere", buffer: atmoBuf },
@@ -514,33 +564,43 @@ export async function renderScene(
       sfx: null,
     };
 
-    report("uploading", 70);
+    report("encoding", 70);
+
+    // Resolve chapterId for OPFS path
+    const resolvedChapterId = chapterId ?? (() => {
+      // Try to resolve from the first clip's scene via projectPaths internals
+      const testPath = paths.renderStem("_test_", "__fallback__");
+      // If no chapterId provided, use the scene-to-chapter resolution
+      const anyClipScene = clips.find(c => c.sceneId)?.sceneId;
+      if (anyClipScene) {
+        // paths.storyboard resolves sceneId → chapterId internally
+        const sbPath = paths.storyboard(anyClipScene);
+        const match = sbPath.match(/^chapters\/([^/]+)\//);
+        if (match) return match[1];
+      }
+      return "__unresolved__";
+    })();
+
+    if (resolvedChapterId === "__unresolved__") {
+      throw new Error("Cannot resolve chapterId for render output");
+    }
 
     for (const stem of stems) {
       if (!stem.buffer) continue;
 
       const wav = encodeWav(stem.buffer);
-      const storagePath = `${userId}/renders/${sceneId}/${stem.key}.wav`;
+      const fileName = `${sceneId}_${stem.key}.wav`;
+      const opfsPath = paths.renderStem(fileName, resolvedChapterId);
 
-      const { error } = await supabase.storage
-        .from("user-media")
-        .upload(storagePath, wav, {
-          contentType: "audio/wav",
-          upsert: true,
-        });
-
-      if (error) {
-        console.error(`Upload ${stem.key} failed:`, error);
-        continue;
-      }
+      await storage.writeBlob(opfsPath, wav, "audio/wav");
 
       results[stem.key] = {
-        path: storagePath,
+        path: opfsPath,
         durationMs: Math.round((stem.buffer.length / sampleRate) * 1000),
       };
     }
 
-    report("uploading", 90);
+    report("encoding", 85);
 
     // Snapshot clip plugin configs into render_config
     const renderConfigSnapshot: Record<string, unknown> = {};
@@ -548,8 +608,26 @@ export async function renderScene(
       renderConfigSnapshot.clip_plugins = clipConfigs;
     }
 
-    // Upsert scene_renders record with plugin configs snapshot
-    const { error: dbError } = await supabase.from("scene_renders" as any).upsert(
+    const now = new Date().toISOString();
+
+    // Write render metadata to OPFS (source of truth)
+    const metaFile = await readRenderMeta(storage, resolvedChapterId);
+    metaFile[sceneId] = {
+      scene_id: sceneId,
+      voice_path: results.voice?.path ?? null,
+      atmo_path: results.atmosphere?.path ?? null,
+      sfx_path: results.sfx?.path ?? null,
+      voice_duration_ms: results.voice?.durationMs ?? 0,
+      atmo_duration_ms: results.atmosphere?.durationMs ?? 0,
+      sfx_duration_ms: results.sfx?.durationMs ?? 0,
+      status: "ready",
+      updated_at: now,
+      render_config: renderConfigSnapshot,
+    };
+    await writeRenderMeta(storage, resolvedChapterId, metaFile);
+
+    // DB backup (non-blocking)
+    supabase.from("scene_renders" as any).upsert(
       {
         scene_id: sceneId,
         user_id: userId,
@@ -561,36 +639,12 @@ export async function renderScene(
         sfx_duration_ms: results.sfx?.durationMs ?? 0,
         status: "ready",
         render_config: renderConfigSnapshot,
-        updated_at: new Date().toISOString(),
+        updated_at: now,
       } as any,
       { onConflict: "scene_id" } as any,
-    );
-
-    if (dbError) console.error("scene_renders upsert error:", dbError);
-
-    // Also snapshot plugin configs into scene_playlists segments
-    if (clipConfigs && Object.keys(clipConfigs).length > 0) {
-      const { data: playlist } = await supabase
-        .from("scene_playlists")
-        .select("segments")
-        .eq("scene_id", sceneId)
-        .maybeSingle();
-
-      if (playlist?.segments && Array.isArray(playlist.segments)) {
-        const updatedSegments = (playlist.segments as Array<Record<string, unknown>>).map(seg => {
-          const segId = seg.segment_id as string;
-          const pluginCfg = clipConfigs[segId];
-          if (pluginCfg) {
-            return { ...seg, plugin_config: pluginCfg };
-          }
-          return seg;
-        });
-        await supabase.from("scene_playlists").update({
-          segments: updatedSegments as unknown as import("@/integrations/supabase/types").Json,
-          updated_at: new Date().toISOString(),
-        }).eq("scene_id", sceneId);
-      }
-    }
+    ).then(({ error }) => {
+      if (error) console.warn("[SceneRenderer] DB backup failed (non-critical):", error.message);
+    });
 
     report("done", 100);
 
