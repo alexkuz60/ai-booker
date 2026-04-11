@@ -277,7 +277,16 @@ export function StoryboardPanel({
     const opfsEntries: Record<string, LocalAudioEntry> = {};
 
     for (const r of results) {
-      map.set(r.segment_id, { status: r.status, durationMs: r.duration_ms });
+      // Edge function emits "skipped" for segments outside a filtered synth request.
+      // Preserve their local status instead of downgrading ready clips into generic error badges.
+      if (
+        r.status === "ready" ||
+        r.status === "pending" ||
+        r.status === "error" ||
+        r.status === "estimated"
+      ) {
+        map.set(r.segment_id, { status: r.status, durationMs: r.duration_ms });
+      }
 
       if (r.status === "ready" && r.phrase_results && r.phrase_results.length > 0) {
         // ── Per-phrase audio for merged segments ──
@@ -1007,7 +1016,9 @@ export function StoryboardPanel({
       onErrorSegmentsChange?.(errorIds);
 
       // Save non-audio results (skipped/cached) to update audio_meta
-      const nonAudioResults = allResults.filter(r => r.status !== "ready" || (!r.audio_base64 && !r.phrase_results));
+      const nonAudioResults = allResults.filter(
+        r => r.status !== "skipped" && (r.status !== "ready" || (!r.audio_base64 && !r.phrase_results)),
+      );
       if (nonAudioResults.length > 0) {
         await saveSynthResultsToOpfs(nonAudioResults);
       }
@@ -1148,7 +1159,9 @@ export function StoryboardPanel({
       toast.success(isRu ? "Блок пересинтезирован" : "Segment re-synthesized");
       onErrorSegmentsChange?.(new Set());
       // Save re-synthesized audio to OPFS
-      await saveSynthResultsToOpfs(allResults.filter(Boolean) as any[]);
+      await saveSynthResultsToOpfs(allResults.filter((result): result is NonNullable<typeof segmentResult> => {
+        return Boolean(result) && result.status !== "skipped";
+      }));
       onSegmented?.(sceneId);
     } catch (err: any) {
       console.error("Re-synth failed:", err);
