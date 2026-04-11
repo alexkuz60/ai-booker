@@ -226,7 +226,26 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
               )
             )}
 
-            {emotionItems.length > 0 && (
+            {hasEmphasis && (
+              <ContextMenuItem
+                onClick={() => handleAnnotate("emphasis")}
+                className="text-xs gap-2"
+              >
+                <span>💪</span>
+                {isRu ? "Акцент" : "Accent"}
+              </ContextMenuItem>
+            )}
+
+            {hasEmphasis && (
+              <StressVowelSubmenu
+                selectedText={peek()?.text ?? null}
+                wordOffset={peek()?.start ?? 0}
+                phraseText={phrase.text}
+                isRu={isRu}
+                onApplyStress={handleApplyStress}
+              />
+            )}
+
               <ContextMenuSub>
                 <ContextMenuSubTrigger className="text-xs gap-2">
                   <span>🎭</span>
