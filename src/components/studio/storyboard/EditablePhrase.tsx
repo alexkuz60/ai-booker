@@ -34,6 +34,7 @@ export function EditablePhrase({ phrase, isRu, onSave, onSplit, ttsProvider, onA
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const textRef = useRef<HTMLParagraphElement>(null);
   const { capture: handleContextMenu, peek } = useSelectionCapture(textRef);
+  const undoRef = useRef<{ phraseId: string; text: string } | null>(null);
 
   useEffect(() => {
     if (editing && textareaRef.current) {
