@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useCallback, useMemo, useRef, type
 
 interface PageHeaderState {
   title?: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   headerRight?: ReactNode;
 }
 
