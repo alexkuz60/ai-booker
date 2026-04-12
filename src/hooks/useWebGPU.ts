@@ -107,13 +107,15 @@ export function useWebGPU() {
       const device = await adapter.requestDevice();
 
       const size = 1024 * 1024; // 1M elements
+      const STORAGE = 0x0080; // GPUBufferUsage.STORAGE
+      const COPY_SRC = 0x0004; // GPUBufferUsage.COPY_SRC
       const buffer = device.createBuffer({
         size: size * 4,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+        usage: STORAGE | COPY_SRC,
       });
       const resultBuffer = device.createBuffer({
         size: size * 4,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+        usage: STORAGE | COPY_SRC,
       });
 
       const shaderModule = device.createShaderModule({
