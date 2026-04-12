@@ -226,17 +226,20 @@ export async function synthesizeVoice(
     );
   }
 
-  const audioData = output.data as Float32Array;
-  // RVC output shape is typically [1, 1, S] or [1, S]
-  const audio = new Float32Array(audioData);
-  const durationSec = audio.length / outputSR;
+  const rawAudio = new Float32Array(output.data as Float32Array);
+
+  // Resample RVC output → 44.1 kHz (project standard) for Studio timeline compatibility
+  const finalAudio = await resampleToProjectSR(rawAudio, outputSR);
+  const finalSR = PROJECT_OUTPUT_SR;
+  const durationSec = finalAudio.length / finalSR;
 
   console.info(
-    `[vcSynthesis] Done: ${audio.length} samples (${durationSec.toFixed(2)}s @ ${outputSR}Hz), ` +
+    `[vcSynthesis] Done: ${rawAudio.length} samples @ ${outputSR}Hz → ` +
+    `${finalAudio.length} samples @ ${finalSR}Hz (${durationSec.toFixed(2)}s), ` +
     `${inferenceMs}ms inference`
   );
 
-  return { audio, sampleRate: outputSR, durationSec, inferenceMs, srAutoDetected };
+  return { audio: finalAudio, sampleRate: finalSR, durationSec, inferenceMs, srAutoDetected };
 }
 
 /**
