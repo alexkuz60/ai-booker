@@ -758,12 +758,18 @@ const Narrators = () => {
                     )}
                   </div>
 
-                  <Tabs value={voiceProvider} onValueChange={v => { setVoiceProvider(v as typeof voiceProvider); markDirty(); }}>
+                  <Tabs value={voiceProvider} onValueChange={v => {
+                    if (v === "vc") return; // VC tab doesn't change TTS provider
+                    setVoiceProvider(v as typeof voiceProvider); markDirty();
+                  }}>
                     <TabsList className="w-full">
                       <TabsTrigger value="yandex" className="flex-1 text-xs">Yandex</TabsTrigger>
                       <TabsTrigger value="salutespeech" className="flex-1 text-xs">Salute</TabsTrigger>
                       <TabsTrigger value="elevenlabs" className="flex-1 text-xs">ElevenLabs</TabsTrigger>
                       <TabsTrigger value="proxyapi" className="flex-1 text-xs">OpenAI</TabsTrigger>
+                      <TabsTrigger value="vc" className="flex-1 text-xs gap-1">
+                        <Zap className="h-3 w-3" />VC
+                      </TabsTrigger>
                     </TabsList>
 
                     {/* ─── Yandex ─── */}
