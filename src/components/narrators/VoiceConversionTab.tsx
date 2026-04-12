@@ -26,7 +26,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
 import { convertVoiceFull, type VcPipelineOptions } from "@/lib/vcPipeline";
-import { RVC_OUTPUT_SR_OPTIONS, RVC_OUTPUT_SR_DEFAULT, type RvcOutputSR } from "@/lib/vcSynthesis";
+import { RVC_OUTPUT_SR_OPTIONS, RVC_OUTPUT_SR_DEFAULT, vcAudioToWav, type RvcOutputSR } from "@/lib/vcSynthesis";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -117,9 +117,9 @@ export function VoiceConversionTab({
 
       const id = crypto.randomUUID();
       const name = file.name.replace(/\.[^.]+$/, "");
-
-      // Convert to WAV for consistency
-      const wavBlob = await encodeToWav(decoded);
+      // Convert to mono WAV for consistency
+      const monoSamples = decoded.getChannelData(0);
+      const wavBlob = vcAudioToWav(monoSamples, decoded.sampleRate);
 
       const entry: VcReferenceEntry = {
         id,
