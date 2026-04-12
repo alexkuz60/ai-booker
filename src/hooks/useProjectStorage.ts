@@ -124,7 +124,16 @@ export function useProjectStorage(): UseProjectStorageReturn {
     try {
       let store: ProjectStorage;
       if (backend === "fs-access") {
-        store = await LocalFSStorage.openProject();
+        try {
+          store = await LocalFSStorage.openProject();
+        } catch (fsErr: any) {
+          console.warn("[ProjectStorage] fs-access open failed, falling back to OPFS:", fsErr.message);
+          const projects = await OPFSStorage.listProjects();
+          if (projects.length === 0) throw new Error("No projects found");
+          const maybeStore = await OPFSStorage.openExisting(projects[0]);
+          if (!maybeStore) throw new Error("Failed to open OPFS project: " + projects[0]);
+          store = maybeStore;
+        }
       } else {
         const projects = await OPFSStorage.listProjects();
         if (projects.length === 0) throw new Error("No projects found");
