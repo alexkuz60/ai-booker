@@ -389,7 +389,10 @@ const Narrators = () => {
     if (!selectedChar) return;
     const vc = selectedChar.voice_config;
     const provider = (vc.provider as string) || "yandex";
-    setVoiceProvider(provider === "elevenlabs" ? "elevenlabs" : provider === "proxyapi" ? "proxyapi" : provider === "salutespeech" ? "salutespeech" : "yandex");
+    const resolvedProvider = provider === "elevenlabs" ? "elevenlabs" : provider === "proxyapi" ? "proxyapi" : provider === "salutespeech" ? "salutespeech" : "yandex";
+    setVoiceProvider(resolvedProvider);
+    // Only reset voiceTab to provider if not on VC tab
+    if (voiceTab !== "vc") setVoiceTab(resolvedProvider);
 
     if (provider === "salutespeech") {
       setSsVoice((vc.voice_id as string) || "Nec_24000");
