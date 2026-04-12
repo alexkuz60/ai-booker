@@ -27,6 +27,7 @@ import { readSceneContentFromLocal } from "@/lib/localSceneContent";
 import { getCachedSceneIndex } from "@/lib/sceneIndex";
 import { BackgroundAnalysisProvider } from "@/hooks/useBackgroundAnalysis";
 import { useAiRoles } from "@/hooks/useAiRoles";
+import { AudioZipControls } from "@/components/studio/AudioZipControls";
 
 function toStudioScenePointers(
   scenes: Array<{
