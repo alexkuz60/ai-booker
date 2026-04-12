@@ -515,23 +515,44 @@ export class OPFSStorage implements ProjectStorage {
   /**
    * Create a brand-new project in OPFS.
    * Builds the full directory tree from bookTemplateOPFS (single source of truth).
-   * NEVER reuses an existing folder name — creates a fresh unique directory instead.
-   * NEVER use for opening existing projects — use openExisting() instead.
+   *
+   * @param overwrite — when true (Wipe-and-Deploy), deletes existing folder with the
+   *   same name first instead of appending a numeric suffix.  This prevents
+   *   "Собачье сердце (2)" duplicates on repeated server restores.
+   *   Default: false (safe unique-name behaviour for normal uploads).
    */
-  static async createNewProject(projectName: string): Promise<OPFSStorage> {
+  static async createNewProject(projectName: string, overwrite = false): Promise<OPFSStorage> {
     const { ROOT_DIRS } = await import("@/lib/bookTemplateOPFS");
     const opfsRoot = await navigator.storage.getDirectory();
-    const uniqueProjectName = await resolveUniqueProjectName(opfsRoot as unknown as FileSystemDirectoryHandle, projectName);
-    if (uniqueProjectName !== projectName) {
-      console.warn(
-        `[ProjectStorage] OPFS project folder "${projectName}" already exists; creating fresh folder "${uniqueProjectName}" instead to avoid inheriting legacy files.`,
-      );
+
+    let finalName = projectName;
+
+    if (overwrite) {
+      // Wipe-and-Deploy path: remove existing folder first, then reuse the name
+      if (await hasChildDirectory(opfsRoot as unknown as FileSystemDirectoryHandle, projectName)) {
+        try {
+          await (opfsRoot as any).removeEntry(projectName, { recursive: true });
+          console.log(`[ProjectStorage] Overwrite mode: deleted existing OPFS folder "${projectName}"`);
+        } catch (err) {
+          console.warn(`[ProjectStorage] Failed to delete existing folder "${projectName}", falling back to unique name`, err);
+          finalName = await resolveUniqueProjectName(opfsRoot as unknown as FileSystemDirectoryHandle, projectName);
+        }
+      }
+    } else {
+      // Normal upload: never reuse an existing folder
+      finalName = await resolveUniqueProjectName(opfsRoot as unknown as FileSystemDirectoryHandle, projectName);
+      if (finalName !== projectName) {
+        console.warn(
+          `[ProjectStorage] OPFS project folder "${projectName}" already exists; creating fresh folder "${finalName}" instead to avoid inheriting legacy files.`,
+        );
+      }
     }
-    const projectDir = await opfsRoot.getDirectoryHandle(uniqueProjectName, { create: true }) as unknown as FileSystemDirectoryHandle;
+
+    const projectDir = await opfsRoot.getDirectoryHandle(finalName, { create: true }) as unknown as FileSystemDirectoryHandle;
     for (const d of ROOT_DIRS) {
       await projectDir.getDirectoryHandle(d, { create: true });
     }
-    return new OPFSStorage(projectDir, uniqueProjectName);
+    return new OPFSStorage(projectDir, finalName);
   }
 
   /**
