@@ -85,7 +85,13 @@ export function useProjectStorage(): UseProjectStorageReturn {
 
       let store: ProjectStorage;
       if (backend === "fs-access") {
-        store = await LocalFSStorage.createProject(folderName);
+        try {
+          store = await LocalFSStorage.createProject(folderName);
+        } catch (fsErr: any) {
+          // showDirectoryPicker fails in cross-origin iframes — fall back to OPFS
+          console.warn("[ProjectStorage] fs-access failed, falling back to OPFS:", fsErr.message);
+          store = await OPFSStorage.createNewProject(folderName);
+        }
       } else {
         store = await OPFSStorage.createNewProject(folderName);
       }
