@@ -29,14 +29,14 @@ export const VC_MODEL_REGISTRY: VcModelEntry[] = [
     id: "contentvec",
     label: "ContentVec (HuBERT)",
     url: "https://huggingface.co/MidFord327/Hubert-Base-ONNX/resolve/main/hubert_base.onnx",
-    sizeBytes: 94_000_000,
+    sizeBytes: 378_000_000,
     description: "Phonetic feature extractor (768-dim, 12 layers)",
   },
   {
     id: "crepe-tiny",
     label: "CREPE Tiny",
-    url: "https://huggingface.co/phineas-gage/CREPE-ONNX/resolve/main/crepe_tiny.onnx",
-    sizeBytes: 8_000_000,
+    url: "https://github.com/yqzhishen/onnxcrepe/releases/download/v1.1.0/tiny.onnx",
+    sizeBytes: 2_000_000,
     description: "Pitch (F0) extraction model",
   },
   {
