@@ -20,6 +20,7 @@ import { Shield, Loader2, UserPlus, Trash2, Users, Crown, Star, User, X } from '
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { ImpulseManager } from '@/components/admin/ImpulseManager';
+import { VoiceReferenceManager } from '@/components/admin/VoiceReferenceManager';
 
 type AppRole = 'admin' | 'moderator' | 'user';
 
@@ -254,6 +255,11 @@ export default function Admin() {
       {/* Impulse Response Manager */}
       <div className="mt-8">
         <ImpulseManager isRu={isRu} />
+      </div>
+
+      {/* Voice Reference Manager */}
+      <div className="mt-8">
+        <VoiceReferenceManager isRu={isRu} />
       </div>
     </motion.div>
   );
