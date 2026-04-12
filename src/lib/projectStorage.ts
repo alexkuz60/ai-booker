@@ -542,6 +542,9 @@ export class OPFSStorage implements ProjectStorage {
    *   Default: false (safe unique-name behaviour for normal uploads).
    */
   static async createNewProject(projectName: string, overwrite = false): Promise<OPFSStorage> {
+    // Request persistent storage to prevent Chrome from evicting OPFS data
+    void OPFSStorage.requestPersistence();
+
     const { ROOT_DIRS } = await import("@/lib/bookTemplateOPFS");
     const opfsRoot = await navigator.storage.getDirectory();
 
