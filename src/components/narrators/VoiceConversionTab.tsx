@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getModelStatus, VC_MODEL_REGISTRY } from "@/lib/vcModelCache";
 import {
   listVcReferences, saveVcReference, deleteVcReference, hasVcReference,
