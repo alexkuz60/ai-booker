@@ -433,13 +433,22 @@ const Narrators = () => {
     try {
       const currentChar = characters.find(c => c.id === selectedId);
       const isExtra = currentChar?.voice_config?.is_extra as boolean | undefined;
-      const voiceConfig = voiceProvider === "salutespeech"
-        ? { provider: "salutespeech", voice_id: ssVoice, speed: ssSpeed, is_extra: isExtra }
-        : voiceProvider === "proxyapi"
-        ? { provider: "proxyapi", voice_id: paVoice, model: paModel, speed: paSpeed, instructions: paInstructions || undefined, is_extra: isExtra }
-        : voiceProvider === "elevenlabs"
-        ? { provider: "elevenlabs", voice_id: elVoice, stability: elStability, similarity_boost: elSimilarity, style: elStyle, speed: elSpeed, is_extra: isExtra }
-        : { provider: "yandex", voice_id: voice, role: role !== "neutral" ? role : undefined, speed, pitch: pitch !== 0 ? pitch : undefined, volume: volume !== 0 ? volume : undefined, is_extra: isExtra };
+      // Preserve VC fields from current state
+      const vcFields: Record<string, unknown> = {};
+      if (currentChar?.voice_config?.vc_enabled != null) vcFields.vc_enabled = currentChar.voice_config.vc_enabled;
+      if (currentChar?.voice_config?.vc_pitch_shift != null) vcFields.vc_pitch_shift = currentChar.voice_config.vc_pitch_shift;
+      if (currentChar?.voice_config?.vc_speaker_id != null) vcFields.vc_speaker_id = currentChar.voice_config.vc_speaker_id;
+
+      const voiceConfig = {
+        ...(voiceProvider === "salutespeech"
+          ? { provider: "salutespeech", voice_id: ssVoice, speed: ssSpeed, is_extra: isExtra }
+          : voiceProvider === "proxyapi"
+          ? { provider: "proxyapi", voice_id: paVoice, model: paModel, speed: paSpeed, instructions: paInstructions || undefined, is_extra: isExtra }
+          : voiceProvider === "elevenlabs"
+          ? { provider: "elevenlabs", voice_id: elVoice, stability: elStability, similarity_boost: elSimilarity, style: elStyle, speed: elSpeed, is_extra: isExtra }
+          : { provider: "yandex", voice_id: voice, role: role !== "neutral" ? role : undefined, speed, pitch: pitch !== 0 ? pitch : undefined, volume: volume !== 0 ? volume : undefined, is_extra: isExtra }),
+        ...vcFields,
+      };
 
       // ── K4: Local-Only — write voice_config to OPFS only ──
       if (!projectStorage || projectMeta?.bookId !== selectedBookId) {
