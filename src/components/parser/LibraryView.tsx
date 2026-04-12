@@ -125,6 +125,7 @@ function LibraryViewInner({
     return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
   }, []);
 
+  const getProgress = useCallback((bookId: string): PipelineProgress => {
     return progressMap[bookId] ?? createEmptyPipelineProgress();
   }, [progressMap]);
 
