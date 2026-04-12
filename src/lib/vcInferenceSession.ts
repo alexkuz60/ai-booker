@@ -10,7 +10,9 @@ import * as ort from "onnxruntime-web";
 import { readModel } from "./vcModelCache";
 
 // Configure ONNX Runtime Web paths for WASM backend
-// The WASM files are served from CDN by default via onnxruntime-web
+// WASM files must be served from CDN because Vite does not serve node_modules assets
+const ORT_VERSION = "1.24.3";
+ort.env.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
 ort.env.wasm.numThreads = navigator.hardwareConcurrency
   ? Math.min(navigator.hardwareConcurrency, 4)
   : 2;
