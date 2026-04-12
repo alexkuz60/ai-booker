@@ -72,7 +72,59 @@ function LibraryViewInner({
   const progressMap = externalProgressMap ?? localProgressMap;
   const setProgressMap = externalSetProgressMap ?? setLocalProgressMap;
 
-  const getProgress = useCallback((bookId: string): PipelineProgress => {
+  // ── Server search ──
+  const [serverQuery, setServerQuery] = useState("");
+  const [serverSearchResults, setServerSearchResults] = useState<BookRecord[]>([]);
+  const [searchingServer, setSearchingServer] = useState(false);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const localBookIds = useMemo(() => new Set(books.map(b => b.id)), [books]);
+
+  const doServerSearch = useCallback(async (query: string) => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setServerSearchResults([]);
+      return;
+    }
+    setSearchingServer(true);
+    try {
+      const { data, error } = await supabase
+        .from("books")
+        .select("id, title, file_name, file_path, status, created_at, updated_at")
+        .ilike("title", `%${trimmed}%`)
+        .order("updated_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      const results: BookRecord[] = (data ?? []).map(row => ({
+        id: row.id,
+        title: row.title,
+        file_name: row.file_name,
+        file_format: row.file_name?.match(/\.fb2$/i) ? "fb2" as const : row.file_name?.match(/\.(docx?)$/i) ? "docx" as const : "pdf" as const,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        chapter_count: 0,
+        scene_count: 0,
+        source: "server" as const,
+      }));
+      setServerSearchResults(results);
+    } catch (err) {
+      console.error("[LibraryView] Server search error:", err);
+      toast.error(isRu ? "Ошибка поиска на сервере" : "Server search failed");
+    } finally {
+      setSearchingServer(false);
+    }
+  }, [isRu]);
+
+  const handleServerQueryChange = useCallback((value: string) => {
+    setServerQuery(value);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => doServerSearch(value), 400);
+  }, [doServerSearch]);
+
+  useEffect(() => {
+    return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
+  }, []);
+
     return progressMap[bookId] ?? createEmptyPipelineProgress();
   }, [progressMap]);
 
