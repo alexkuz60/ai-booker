@@ -445,7 +445,7 @@ export function VoiceConversionTab({
             <RotateCcw className="h-3 w-3" />
           </Button>
         </div>
-        <p className="text-muted-foreground/60 text-sm">
+        <p className="text-muted-foreground/60 text-sm text-center">
           {isRu ? "♀→♂: −4…−6 | ♂→♀: +4…+6 | Тонкая коррекция: ±1…2" : "♀→♂: −4…−6 | ♂→♀: +4…+6 | Fine-tune: ±1…2"}
         </p>
       </div>
@@ -470,7 +470,7 @@ export function VoiceConversionTab({
         {stage === "done" && timingInfo && (
           <div className="flex items-center gap-2 text-xs text-primary">
             <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-            <span className="font-mono text-[10px]">{timingInfo}</span>
+            <span className="font-mono text-xs">{timingInfo}</span>
           </div>
         )}
         {stage === "error" && errorMsg && (
@@ -483,7 +483,7 @@ export function VoiceConversionTab({
 
       {/* Info box */}
       <div className="rounded-md border border-border bg-muted/30 p-2.5">
-        <p className="text-[10px] text-muted-foreground leading-relaxed">
+        <p className="text-muted-foreground leading-relaxed text-xs">
           {isRu
             ? "🎙️ Voice Conversion преобразует TTS-аудио в уникальный тембр через ContentVec → CREPE → RVC v2. Обработка полностью на стороне клиента (WebGPU/WASM)."
             : "🎙️ Voice Conversion transforms TTS audio into a unique timbre via ContentVec → CREPE → RVC v2. Processing is fully client-side (WebGPU/WASM)."}
