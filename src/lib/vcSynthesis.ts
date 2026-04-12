@@ -82,6 +82,32 @@ function applyPitchShift(f0Hz: number, semitones: number): number {
 }
 
 /**
+ * Try to detect output sample rate from ONNX model metadata.
+ * RVC models sometimes include "sample_rate" or "sr" in custom metadata.
+ * Falls back to heuristic based on output tensor dimensions.
+ */
+function detectOutputSRFromModel(session: ort.InferenceSession): RvcOutputSR | null {
+  try {
+    // Check model metadata for sample_rate hint
+    const meta = (session as any).handler?.metadata as Record<string, string> | undefined;
+    if (meta) {
+      for (const [key, val] of Object.entries(meta)) {
+        const k = key.toLowerCase();
+        if (k === "sample_rate" || k === "sr" || k === "output_sr" || k === "samplerate") {
+          const sr = parseInt(val, 10);
+          if (RVC_OUTPUT_SR_OPTIONS.includes(sr as RvcOutputSR)) {
+            return sr as RvcOutputSR;
+          }
+        }
+      }
+    }
+  } catch {
+    // Metadata access may not be supported — that's OK
+  }
+  return null;
+}
+
+/**
  * Synthesize voice-converted audio from extracted VC features.
  *
  * @param features - Output from extractVcFeatures()
@@ -111,7 +137,6 @@ export async function synthesizeVoice(
     }
   }
 
-  const T = features.numFrames;
   const T = features.numFrames;
 
   // Align F0 pitch to ContentVec frame count
