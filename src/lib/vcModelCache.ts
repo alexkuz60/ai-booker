@@ -35,8 +35,8 @@ export const VC_MODEL_REGISTRY: VcModelEntry[] = [
   {
     id: "crepe-tiny",
     label: "CREPE Tiny",
-    url: "https://github.com/yqzhishen/onnxcrepe/releases/download/v1.1.0/tiny.onnx",
-    sizeBytes: 2_000_000,
+    url: `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/vc-models/crepe-tiny.onnx`,
+    sizeBytes: 1_956_000,
     description: "Pitch (F0) extraction model",
   },
   {
