@@ -27,6 +27,7 @@ import { readSceneContentFromLocal } from "@/lib/localSceneContent";
 import { getCachedSceneIndex } from "@/lib/sceneIndex";
 import { BackgroundAnalysisProvider } from "@/hooks/useBackgroundAnalysis";
 import { useAiRoles } from "@/hooks/useAiRoles";
+import { AudioZipControls } from "@/components/studio/AudioZipControls";
 
 function toStudioScenePointers(
   scenes: Array<{
@@ -538,6 +539,7 @@ const Studio = () => {
           )}
         </>
       )}
+      <AudioZipControls storage={storage} projectName={storage?.projectName} isRu={isRu} />
       <SaveBookButton isRu={isRu} onClick={saveBook} loading={savingBook} disabled={!bookId} showDownloadZip={isProjectOpen} onDownloadZip={downloadZip} showImportZip={!isProjectOpen} onImportZip={importZip} />
       <AiRolesButton isRu={isRu} apiKeys={userApiKeys} bookTitle={chapter?.bookTitle} />
     </div>
