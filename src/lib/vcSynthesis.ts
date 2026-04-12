@@ -120,30 +120,29 @@ export async function synthesizeVoice(
   const sidData = BigInt64Array.from([BigInt(speakerId)]);
   const sidTensor = new ort.Tensor("int64", sidData, [1]);
 
-  // Build feeds — try to match model's expected input names
+  // Build feeds — match model's expected input names
   const inputNames = session.inputNames;
   const feeds: Record<string, ort.Tensor> = {};
 
-  // Map known input names to tensors
-  const tensorMap: Record<string, ort.Tensor> = {
-    feats: featsTensor,
-    p_len: pLenTensor,
-    pitch: pitchTensor,
-    pitchf: pitchfTensor,
-    sid: sidTensor,
-  };
+  console.info(`[vcSynthesis] Model input names: [${inputNames.join(", ")}]`);
 
-  // If model has exactly these 5 inputs, map by name
-  if (inputNames.length === 5) {
-    for (const name of inputNames) {
-      const key = name.toLowerCase().replace(/[^a-z_]/g, "");
-      if (tensorMap[key]) {
-        feeds[name] = tensorMap[key];
-      }
+  // Map known input names to tensors (case-insensitive, flexible matching)
+  for (const name of inputNames) {
+    const key = name.toLowerCase();
+    if (key === "feats" || key === "phone" || key === "hubert") {
+      feeds[name] = featsTensor;
+    } else if (key === "p_len" || key === "plen" || key === "lengths") {
+      feeds[name] = pLenTensor;
+    } else if (key === "pitch" || key === "f0_coarse" || key === "f0coarse") {
+      feeds[name] = pitchTensor;
+    } else if (key === "pitchf" || key === "f0" || key === "f0_fine" || key === "nsff0") {
+      feeds[name] = pitchfTensor;
+    } else if (key === "sid" || key === "speaker_id" || key === "spk_id") {
+      feeds[name] = sidTensor;
     }
   }
 
-  // Fallback: map by position if name matching failed
+  // Fallback: map by position if name matching was incomplete
   if (Object.keys(feeds).length < inputNames.length) {
     const orderedTensors = [featsTensor, pLenTensor, pitchTensor, pitchfTensor, sidTensor];
     for (let i = 0; i < Math.min(inputNames.length, orderedTensors.length); i++) {
@@ -151,6 +150,11 @@ export async function synthesizeVoice(
         feeds[inputNames[i]] = orderedTensors[i];
       }
     }
+  }
+
+  // Log actual feed shapes for debugging
+  for (const [k, v] of Object.entries(feeds)) {
+    console.info(`[vcSynthesis] feed "${k}": shape=[${v.dims}], type=${v.type}`);
   }
 
   console.info(
