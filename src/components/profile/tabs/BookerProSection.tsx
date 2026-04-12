@@ -49,6 +49,10 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
   const d = pro.gpuDetails;
   const totalSize = getTotalModelSize();
 
+  const { devices, renameDevice, removeDevice } = useGpuDevices(
+    pro.gpuStatus, pro.adapterInfo, pro.gpuDetails, pro.benchmarkResult,
+  );
+
   // Check cached model status on mount
   useEffect(() => {
     getModelStatus().then(status => {
