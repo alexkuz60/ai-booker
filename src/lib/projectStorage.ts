@@ -513,7 +513,27 @@ export class OPFSStorage implements ProjectStorage {
   }
 
   /**
-   * Create a brand-new project in OPFS.
+   * Request persistent storage from the browser.
+   * Called automatically on project creation to prevent OPFS eviction.
+   */
+  static async requestPersistence(): Promise<boolean> {
+    try {
+      if (navigator.storage?.persist) {
+        const granted = await navigator.storage.persist();
+        if (granted) {
+          console.info("[OPFS] Persistent storage granted");
+        } else {
+          console.warn("[OPFS] Persistent storage denied — data may be evicted under storage pressure");
+        }
+        return granted;
+      }
+    } catch (err) {
+      console.warn("[OPFS] Failed to request persistence:", err);
+    }
+    return false;
+  }
+
+  /**
    * Builds the full directory tree from bookTemplateOPFS (single source of truth).
    *
    * @param overwrite — when true (Wipe-and-Deploy), deletes existing folder with the
