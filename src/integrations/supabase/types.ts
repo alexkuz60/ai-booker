@@ -900,6 +900,54 @@ export type Database = {
         }
         Relationships: []
       }
+      voice_references: {
+        Row: {
+          category: string
+          channels: number
+          created_at: string
+          description: string | null
+          duration_ms: number
+          file_path: string
+          id: string
+          is_public: boolean
+          language: string
+          name: string
+          sample_rate: number
+          tags: string[]
+          uploaded_by: string
+        }
+        Insert: {
+          category?: string
+          channels?: number
+          created_at?: string
+          description?: string | null
+          duration_ms?: number
+          file_path: string
+          id?: string
+          is_public?: boolean
+          language?: string
+          name?: string
+          sample_rate?: number
+          tags?: string[]
+          uploaded_by: string
+        }
+        Update: {
+          category?: string
+          channels?: number
+          created_at?: string
+          description?: string | null
+          duration_ms?: number
+          file_path?: string
+          id?: string
+          is_public?: boolean
+          language?: string
+          name?: string
+          sample_rate?: number
+          tags?: string[]
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
