@@ -176,17 +176,25 @@ export default function Library() {
     if (!canOpen) return;
 
     setShouldRedirect(true);
-    await openSavedBook(book);
+    try {
+      await openSavedBook(book);
+    } catch (err) {
+      console.error("[Library] handleOpenBook failed:", err);
+      setShouldRedirect(false);
+    }
   }, [openSavedBook, validateExistingBookJsons]);
 
   /** Timeline stage click: open book then navigate to the stage's route */
   const handleStageNavigate = useCallback((book: BookRecord, route: string) => {
-    // Open the book, then navigate to the target route
     (async () => {
       const canOpen = await validateExistingBookJsons(book);
       if (!canOpen) return;
-      await openSavedBook(book);
-      navigate(route);
+      try {
+        await openSavedBook(book);
+        navigate(route);
+      } catch (err) {
+        console.error("[Library] handleStageNavigate failed:", err);
+      }
     })();
   }, [openSavedBook, navigate, validateExistingBookJsons]);
 
