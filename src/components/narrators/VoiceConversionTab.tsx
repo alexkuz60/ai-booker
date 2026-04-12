@@ -64,6 +64,7 @@ export function VoiceConversionTab({
   // Per-character VC settings from voice_config
   const vcEnabled = (voiceConfig.vc_enabled as boolean) ?? false;
   const pitchShift = (voiceConfig.vc_pitch_shift as number) ?? 0;
+  const vcOutputSR = (voiceConfig.vc_output_sr as RvcOutputSR) || RVC_OUTPUT_SR_DEFAULT;
   const vcReferenceId = (voiceConfig.vc_reference_id as string) || "";
 
   // Test pipeline state
