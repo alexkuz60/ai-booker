@@ -35,6 +35,9 @@ export type RvcOutputSR = typeof RVC_OUTPUT_SR_OPTIONS[number];
 /** Default output sample rate (most common for RVC v2) */
 export const RVC_OUTPUT_SR_DEFAULT: RvcOutputSR = 40_000;
 
+/** Project-standard sample rate for Studio timeline compatibility */
+export const PROJECT_OUTPUT_SR = 44_100;
+
 export interface VcSynthesisResult {
   /** Synthesized audio samples (Float32Array) */
   audio: Float32Array;
