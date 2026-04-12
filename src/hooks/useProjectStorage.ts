@@ -317,8 +317,8 @@ export function useProjectStorage(): UseProjectStorageReturn {
 
         let targetName: string | null = null;
         try {
-          const { name, backend: savedBackend } = JSON.parse(saved);
-          if (savedBackend === "opfs" && name) {
+          const { name } = JSON.parse(saved);
+          if (name) {
             targetName = name;
           }
         } catch {
