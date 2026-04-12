@@ -253,11 +253,12 @@ export function VoiceConversionTab({
       setStageProgress(100);
       const pipelineOpts: VcPipelineOptions = {
         onProgress: (s, p) => { setStage(s); setStageProgress(Math.round(p * 100)); },
-        synthesis: { pitchShift },
+        synthesis: { pitchShift, outputSampleRate: vcOutputSR },
       };
       const result = await convertVoiceFull(ttsBlob, pipelineOpts);
       const t = result.features.timing;
-      setTimingInfo(`${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, CREPE ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms`);
+      const srNote = result.synthesis.srAutoDetected ? " (auto)" : "";
+      setTimingInfo(`${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, CREPE ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms @ ${(result.synthesis.sampleRate/1000).toFixed(0)}kHz${srNote}`);
       setStage("done");
       const url = URL.createObjectURL(result.wav);
       const audio = new Audio(url);
