@@ -462,7 +462,7 @@ export function VoiceConversionTab({
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             {isRu ? "Sample Rate выхода" : "Output Sample Rate"}
           </label>
-          <span className="text-xs text-muted-foreground tabular-nums">{(vcOutputSR / 1000).toFixed(0)} kHz</span>
+          <span className="text-xs text-muted-foreground tabular-nums">{vcOutputSR === 44_100 ? "44.1" : (vcOutputSR / 1000).toFixed(0)} kHz</span>
         </div>
         <Select value={String(vcOutputSR)} onValueChange={v => onUpdateVcConfig({ vc_output_sr: Number(v) })}>
           <SelectTrigger className="h-8 text-xs">
@@ -471,7 +471,7 @@ export function VoiceConversionTab({
           <SelectContent>
             {RVC_OUTPUT_SR_OPTIONS.map(sr => (
               <SelectItem key={sr} value={String(sr)}>
-                {(sr / 1000).toFixed(0)} kHz {sr === RVC_OUTPUT_SR_DEFAULT ? (isRu ? "(по умолчанию)" : "(default)") : ""}
+                {sr === 44_100 ? "44.1" : (sr / 1000).toFixed(0)} kHz {sr === RVC_OUTPUT_SR_DEFAULT ? (isRu ? "(по умолчанию)" : "(default)") : ""}
               </SelectItem>
             ))}
           </SelectContent>

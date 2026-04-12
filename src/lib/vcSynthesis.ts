@@ -29,11 +29,11 @@ const F0_MAX = 1100;          // Max F0 in Hz for bin mapping
 const F0_MIN = 50;            // Min F0 in Hz
 
 /** Supported RVC output sample rates */
-export const RVC_OUTPUT_SR_OPTIONS = [32_000, 40_000, 48_000] as const;
+export const RVC_OUTPUT_SR_OPTIONS = [32_000, 40_000, 44_100, 48_000] as const;
 export type RvcOutputSR = typeof RVC_OUTPUT_SR_OPTIONS[number];
 
-/** Default output sample rate (most common for RVC v2) */
-export const RVC_OUTPUT_SR_DEFAULT: RvcOutputSR = 40_000;
+/** Default output sample rate — 44.1 kHz to match project standard */
+export const RVC_OUTPUT_SR_DEFAULT: RvcOutputSR = 44_100;
 
 /** Project-standard sample rate for Studio timeline compatibility */
 export const PROJECT_OUTPUT_SR = 44_100;
