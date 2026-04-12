@@ -539,6 +539,7 @@ const Studio = () => {
           )}
         </>
       )}
+      <AudioZipControls storage={storage} projectName={storage?.projectName} isRu={isRu} />
       <SaveBookButton isRu={isRu} onClick={saveBook} loading={savingBook} disabled={!bookId} showDownloadZip={isProjectOpen} onDownloadZip={downloadZip} showImportZip={!isProjectOpen} onImportZip={importZip} />
       <AiRolesButton isRu={isRu} apiKeys={userApiKeys} bookTitle={chapter?.bookTitle} />
     </div>
