@@ -445,7 +445,7 @@ export function VoiceConversionTab({
             <RotateCcw className="h-3 w-3" />
           </Button>
         </div>
-        <p className="text-[10px] text-muted-foreground/60">
+        <p className="text-muted-foreground/60 text-sm">
           {isRu ? "♀→♂: −4…−6 | ♂→♀: +4…+6 | Тонкая коррекция: ±1…2" : "♀→♂: −4…−6 | ♂→♀: +4…+6 | Fine-tune: ±1…2"}
         </p>
       </div>
