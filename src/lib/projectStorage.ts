@@ -202,8 +202,8 @@ export function isOPFSSupported(): boolean {
 export type StorageBackend = "fs-access" | "opfs" | "none";
 
 export function detectStorageBackend(): StorageBackend {
-  if (isFileSystemAccessSupported()) return "fs-access";
   if (isOPFSSupported()) return "opfs";
+  if (isFileSystemAccessSupported()) return "fs-access";
   return "none";
 }
 
