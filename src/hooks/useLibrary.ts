@@ -100,7 +100,7 @@ export function useLibrary({ userId, storageBackend, projectStorage, step }: Use
     if (storageBackend === "opfs") {
       const allProjectNames = await OPFSStorage.listProjects();
       const projectNames = allProjectNames.filter((name) => !OPFS_NON_PROJECT_DIRS.has(name));
-      
+      console.info(`[Library] OPFS scan: ${allProjectNames.length} dirs total, ${projectNames.length} projects: [${projectNames.join(", ")}]`);
 
       const scanResults = await Promise.all(projectNames.map(async (projectName) => {
         try {
