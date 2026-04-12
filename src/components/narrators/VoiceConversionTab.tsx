@@ -271,7 +271,7 @@ export function VoiceConversionTab({
       setErrorMsg(err.message || String(err));
       setStage("error");
     }
-  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift]);
+  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR]);
 
   // ─── Not activated ───
   if (!pro.enabled || !pro.modelsReady) {
