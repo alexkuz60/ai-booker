@@ -258,7 +258,9 @@ export function VoiceConversionTab({
       const result = await convertVoiceFull(ttsBlob, pipelineOpts);
       const t = result.features.timing;
       const srNote = result.synthesis.srAutoDetected ? " (auto)" : "";
-      setTimingInfo(`${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, CREPE ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms @ ${(result.synthesis.sampleRate/1000).toFixed(0)}kHz${srNote}`);
+      const srLabel = result.synthesis.sampleRate === 44_100 ? "44.1" : `${(result.synthesis.sampleRate/1000).toFixed(0)}`;
+      const srNote = result.synthesis.srAutoDetected ? " (auto)" : "";
+      setTimingInfo(`${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, CREPE ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms @ ${srLabel}kHz${srNote}`);
       setStage("done");
       const url = URL.createObjectURL(result.wav);
       const audio = new Audio(url);
@@ -403,7 +405,7 @@ export function VoiceConversionTab({
         {/* Local references list */}
         {localRefs.length > 0 && (
           <div className="space-y-1">
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {isRu ? "Локальный пул:" : "Local pool:"}
             </p>
             {localRefs.map(r => (
@@ -460,7 +462,7 @@ export function VoiceConversionTab({
       <div className="space-y-2">
         <div className="flex justify-between items-center">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            {isRu ? "Sample Rate выхода" : "Output Sample Rate"}
+            {isRu ? "Sample Rate модели RVC" : "RVC Model Sample Rate"}
           </label>
           <span className="text-xs text-muted-foreground tabular-nums">{vcOutputSR === 44_100 ? "44.1" : (vcOutputSR / 1000).toFixed(0)} kHz</span>
         </div>
@@ -476,10 +478,10 @@ export function VoiceConversionTab({
             ))}
           </SelectContent>
         </Select>
-        <p className="text-muted-foreground/60 text-sm text-center">
+        <p className="text-muted-foreground/60 text-xs text-center">
           {isRu
-            ? "Если голос слишком высокий/быстрый — попробуйте 32 kHz"
-            : "If voice sounds too high/fast — try 32 kHz"}
+            ? "Нативный SR модели. Выход всегда 44.1 kHz. Если голос быстрый — попробуйте 32 kHz"
+            : "Model native SR. Output is always 44.1 kHz. If voice sounds fast — try 32 kHz"}
         </p>
       </div>
 
@@ -495,7 +497,7 @@ export function VoiceConversionTab({
         {isProcessing && (
           <div className="space-y-1">
             <Progress value={stageProgress} className="h-1.5" />
-            <p className="text-[10px] text-muted-foreground text-center">{isRu ? STAGE_LABELS[stage].ru : STAGE_LABELS[stage].en}</p>
+            <p className="text-xs text-muted-foreground text-center">{isRu ? STAGE_LABELS[stage].ru : STAGE_LABELS[stage].en}</p>
           </div>
         )}
         {stage === "done" && timingInfo && (

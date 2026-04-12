@@ -58,7 +58,8 @@ export interface VcSynthesisOptions {
   pitchShift?: number;
   /** Custom RVC model ID in OPFS cache (default "rvc-v2") */
   modelId?: string;
-  /** Output sample rate override (32000, 40000, or 48000) */
+  /** RVC model native sample rate — used to correctly interpret model output.
+   *  Actual output is always resampled to PROJECT_OUTPUT_SR (44.1 kHz). */
   outputSampleRate?: RvcOutputSR;
 }
 
@@ -317,15 +318,3 @@ function writeString(view: DataView, offset: number, str: string) {
   }
 }
 
-/**
- * Full Voice Conversion: features → synthesis → WAV.
- * Convenience wrapper for the complete VC output stage.
- */
-export async function convertVoice(
-  features: VcFeatures,
-  options?: VcSynthesisOptions,
-): Promise<{ wav: Blob; result: VcSynthesisResult }> {
-  const result = await synthesizeVoice(features, options);
-  const wav = vcAudioToWav(result.audio, result.sampleRate);
-  return { wav, result };
-}
