@@ -26,6 +26,7 @@ import { SaveBookButton } from "@/components/SaveBookButton";
 import { CharacterProfileColumn, type CharacterProfileData } from "@/components/narrators/CharacterProfileColumn";
 import { cn } from "@/lib/utils";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { VoiceConversionTab } from "@/components/narrators/VoiceConversionTab";
 import { readCharacterIndex, saveCharacterIndex } from "@/lib/localCharacters";
 import { readSceneIndex } from "@/lib/sceneIndex";
 import type { CharacterIndex } from "@/pages/parser/types";
