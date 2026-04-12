@@ -25,9 +25,10 @@ export function useWebGPU() {
           setStatus("no-adapter");
           return;
         }
-        const info = await adapter.requestAdapterInfo?.();
+        // GPUAdapter.info is a property (not a method) in the current spec
+        const info = (adapter as any).info;
         setAdapterInfo(
-          info ? `${info.vendor || ""} ${info.architecture || ""} ${info.description || ""}`.trim() : "WebGPU Ready"
+          info ? `${info.vendor || ""} ${info.architecture || ""} ${info.description || ""}`.trim() || "WebGPU Ready" : "WebGPU Ready"
         );
         setStatus("supported");
       } catch {
