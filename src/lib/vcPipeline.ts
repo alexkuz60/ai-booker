@@ -33,7 +33,9 @@ export interface VcPipelineOptions {
   /** CREPE hop size in ms (default 10) */
   crepeHopMs?: number;
   /** Callback for progress updates */
-  onProgress?: (stage: "resample" | "contentvec" | "crepe", progress: number) => void;
+  onProgress?: (stage: "resample" | "contentvec" | "crepe" | "synthesis", progress: number) => void;
+  /** Synthesis options (pitch shift, speaker ID, model) */
+  synthesis?: VcSynthesisOptions;
 }
 
 /**
