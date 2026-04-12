@@ -26,6 +26,8 @@ export interface GpuDeviceProfile {
   platform: string;
   /** Last benchmark result in GFLOPS, null if never run */
   benchGflops: number | null;
+  /** WebGPU detection status: supported | no-api | no-adapter */
+  gpuStatus: string;
   /** ISO timestamp of first seen */
   firstSeen: string;
   /** ISO timestamp of last login on this device */
@@ -103,6 +105,7 @@ export function useGpuDevices(
           ...list[idx],
           lastSeen: now,
           browser: shortBrowser(),
+          gpuStatus,
           // Update GPU info in case driver updated
           vendor: gpuDetails?.vendor || list[idx].vendor,
           architecture: gpuDetails?.architecture || list[idx].architecture,
@@ -121,6 +124,7 @@ export function useGpuDevices(
           browser: shortBrowser(),
           platform: navigator.platform || "",
           benchGflops: null,
+          gpuStatus,
           firstSeen: now,
           lastSeen: now,
         });
