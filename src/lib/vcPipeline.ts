@@ -10,7 +10,7 @@ import { extractContentVec, type ContentVecResult } from "./vcContentVec";
 import { extractPitch, type CrepeResult, type PitchFrame } from "./vcCrepe";
 
 export interface VcFeatures {
-  /** Speaker-independent phonetic embeddings [T, 256] */
+  /** Speaker-independent phonetic embeddings [T, 768] */
   embeddings: Float32Array;
   numFrames: number;
   embeddingDim: number;
