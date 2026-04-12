@@ -16,6 +16,8 @@ import {
   ChevronDown, ChevronUp, Gauge, Trash2,
 } from "lucide-react";
 import type { BookerProState } from "@/hooks/useBookerPro";
+import { useGpuDevices } from "@/hooks/useGpuDevices";
+import { MyDevicesPanel } from "@/components/profile/tabs/MyDevicesPanel";
 import {
   VC_MODEL_REGISTRY, downloadAllModels, getModelStatus,
   getTotalModelSize, clearAllModels,
@@ -46,6 +48,10 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
   const gpuChecking = pro.gpuStatus === "checking";
   const d = pro.gpuDetails;
   const totalSize = getTotalModelSize();
+
+  const { devices, renameDevice, removeDevice } = useGpuDevices(
+    pro.gpuStatus, pro.adapterInfo, pro.gpuDetails, pro.benchmarkResult,
+  );
 
   // Check cached model status on mount
   useEffect(() => {
@@ -273,6 +279,15 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
             disabled={!pro.modelsReady}
           />
         </div>
+        {/* My Devices */}
+        {devices.length > 0 && (
+          <MyDevicesPanel
+            devices={devices}
+            isRu={isRu}
+            onRename={renameDevice}
+            onRemove={removeDevice}
+          />
+        )}
       </CardContent>
     </Card>
   );
