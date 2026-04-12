@@ -16,6 +16,8 @@ import {
   ChevronDown, ChevronUp, Gauge, Trash2,
 } from "lucide-react";
 import type { BookerProState } from "@/hooks/useBookerPro";
+import { useGpuDevices } from "@/hooks/useGpuDevices";
+import { MyDevicesPanel } from "@/components/profile/tabs/MyDevicesPanel";
 import {
   VC_MODEL_REGISTRY, downloadAllModels, getModelStatus,
   getTotalModelSize, clearAllModels,
