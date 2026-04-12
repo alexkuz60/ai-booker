@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { User, Key, Activity, HardDrive } from 'lucide-react';
+import { User, Key, Activity, HardDrive, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
@@ -11,11 +11,13 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useCloudSettings } from '@/hooks/useCloudSettings';
 import { useUserRole } from '@/hooks/useUserRole';
 import { usePageHeader } from '@/hooks/usePageHeader';
+import { useBookerPro } from '@/hooks/useBookerPro';
 
 import { ProfileTab } from '@/components/profile/tabs/ProfileTab';
 import { ApiRoutersTab } from '@/components/profile/tabs/ApiRoutersTab';
 import { AiUsageWidget } from '@/components/profile/AiUsageWidget';
 import { OpfsBrowserPanel } from '@/components/profile/tabs/OpfsBrowserPanel';
+import { BookerProSection } from '@/components/profile/tabs/BookerProSection';
 
 export default function Profile() {
   const { theme, setTheme } = useTheme();
@@ -23,6 +25,7 @@ export default function Profile() {
   const { isAdmin } = useUserRole();
   const { lang, isRu, setLang } = useLanguage();
   const { setPageHeader } = usePageHeader();
+  const pro = useBookerPro();
 
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
@@ -140,6 +143,10 @@ export default function Profile() {
             <Activity className="h-4 w-4 shrink-0" />
             <span>{isRu ? 'AI Аналитика' : 'AI Analytics'}</span>
           </TabsTrigger>
+          <TabsTrigger value="booker-pro" className="flex items-center gap-2 flex-1">
+            <Zap className="h-4 w-4 shrink-0" />
+            <span>Booker Pro</span>
+          </TabsTrigger>
           {isAdmin && (
             <TabsTrigger value="opfs" className="flex items-center gap-2 flex-1">
               <HardDrive className="h-4 w-4 shrink-0" />
@@ -184,6 +191,10 @@ export default function Profile() {
 
         <TabsContent value="ai-analytics">
           <AiUsageWidget isRu={isRu} />
+        </TabsContent>
+
+        <TabsContent value="booker-pro">
+          <BookerProSection pro={pro} isRu={isRu} />
         </TabsContent>
 
         {isAdmin && (

@@ -80,6 +80,7 @@ export function getChapterContentDefault(
 /** Sub-directories created inside each scene folder */
 export const SCENE_DIRS = [
   "tts",
+  "tts_vc",
   "audio/atmosphere",
 ] as const;
 
