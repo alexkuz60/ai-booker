@@ -35,6 +35,9 @@ export type RvcOutputSR = typeof RVC_OUTPUT_SR_OPTIONS[number];
 /** Default output sample rate (most common for RVC v2) */
 export const RVC_OUTPUT_SR_DEFAULT: RvcOutputSR = 40_000;
 
+/** Project-standard sample rate for Studio timeline compatibility */
+export const PROJECT_OUTPUT_SR = 44_100;
+
 export interface VcSynthesisResult {
   /** Synthesized audio samples (Float32Array) */
   audio: Float32Array;
@@ -106,6 +109,30 @@ function detectOutputSRFromModel(session: ort.InferenceSession): RvcOutputSR | n
   }
   return null;
 }
+
+/**
+ * Resample raw RVC output to project-standard 44.1 kHz using OfflineAudioContext.
+ */
+async function resampleToProjectSR(samples: Float32Array, sourceSR: number): Promise<Float32Array> {
+  if (sourceSR === PROJECT_OUTPUT_SR) return samples;
+
+  const duration = samples.length / sourceSR;
+  const outLength = Math.ceil(duration * PROJECT_OUTPUT_SR);
+
+  // Create a buffer at the source SR, then resample via OfflineAudioContext
+  const offCtx = new OfflineAudioContext(1, outLength, PROJECT_OUTPUT_SR);
+  const buf = offCtx.createBuffer(1, samples.length, sourceSR);
+  buf.getChannelData(0).set(samples);
+
+  const src = offCtx.createBufferSource();
+  src.buffer = buf;
+  src.connect(offCtx.destination);
+  src.start(0);
+
+  const rendered = await offCtx.startRendering();
+  return rendered.getChannelData(0);
+}
+
 
 /**
  * Synthesize voice-converted audio from extracted VC features.
@@ -223,17 +250,20 @@ export async function synthesizeVoice(
     );
   }
 
-  const audioData = output.data as Float32Array;
-  // RVC output shape is typically [1, 1, S] or [1, S]
-  const audio = new Float32Array(audioData);
-  const durationSec = audio.length / outputSR;
+  const rawAudio = new Float32Array(output.data as Float32Array);
+
+  // Resample RVC output → 44.1 kHz (project standard) for Studio timeline compatibility
+  const finalAudio = await resampleToProjectSR(rawAudio, outputSR);
+  const finalSR = PROJECT_OUTPUT_SR;
+  const durationSec = finalAudio.length / finalSR;
 
   console.info(
-    `[vcSynthesis] Done: ${audio.length} samples (${durationSec.toFixed(2)}s @ ${outputSR}Hz), ` +
+    `[vcSynthesis] Done: ${rawAudio.length} samples @ ${outputSR}Hz → ` +
+    `${finalAudio.length} samples @ ${finalSR}Hz (${durationSec.toFixed(2)}s), ` +
     `${inferenceMs}ms inference`
   );
 
-  return { audio, sampleRate: outputSR, durationSec, inferenceMs, srAutoDetected };
+  return { audio: finalAudio, sampleRate: finalSR, durationSec, inferenceMs, srAutoDetected };
 }
 
 /**
