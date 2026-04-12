@@ -33,7 +33,7 @@ interface UseBookRestoreParams {
   isRu: boolean;
   storageBackend: "fs-access" | "opfs" | "none";
   projectStorage?: ProjectStorage | null;
-  createProject?: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<ProjectStorage>;
+  createProject?: (title: string, bookId: string, userId: string, language: "ru" | "en", options?: { overwrite?: boolean }) => Promise<ProjectStorage>;
   openProjectByName?: (projectName: string) => Promise<ProjectStorage | null>;
   books: BookRecord[];
   fileName: string;
@@ -200,6 +200,7 @@ export function useBookRestore({
         book.id,
         userId,
         lang,
+        { overwrite: true },
       );
 
       const result = await deployFromServer({
