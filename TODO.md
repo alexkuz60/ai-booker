@@ -132,6 +132,13 @@
 - [x] **Pool stats сохраняются после завершения** — счётчики воркеров остаются видимыми после профайлинга, очищаются при новом запуске
 - [x] **Бейдж пула в PoolSelector** — показывает количество моделей вместо потоков (потоки в тултипе)
 - [x] **Русификация mood-бейджей** — композитный tMood() разбирает составные значения ("calm, contemplative"), 60+ токенов в MOOD_MAP
+- [x] **Booker Pro: Voice Conversion инфраструктура** — полный клиентский VC-пайплайн (WebGPU/WASM): ресемплинг 16kHz, ContentVec эмбеддинги, CREPE F0 pitch, RVC v2 синтез. Модули: `vcResample.ts`, `vcContentVec.ts`, `vcCrepe.ts`, `vcSynthesis.ts`, `vcPipeline.ts`, `vcModelCache.ts`, `vcInferenceSession.ts`, `vcReferenceCache.ts`. ONNX Runtime Web с CDN fallback для WASM
+- [x] **Booker Pro: WebGPU диагностика** — `useWebGPU` хук + GFLOPS бенчмарк на compute shaders, детали адаптера, проверка совместимости браузера. UI в профиле (BookerProSection)
+- [x] **Booker Pro: Модели (~491MB)** — трёхмодельный реестр (ContentVec 75MB, CREPE Tiny 8MB, RVC v2 408MB), OPFS кэш `vc-models/`, прогресс загрузки, статусы в UI
+- [x] **Booker Pro: Голосовые референсы** — загрузка своих WAV, глобальная коллекция из `voice_references` (admin-only управление), OPFS кэш `vc-references/`, signed URL для скачивания
+- [x] **Booker Pro: Настройки VC на персонажа** — VoiceConversionTab в Narrators: вкл/выкл, pitch shift ±12 полутонов, выбор RVC model SR (32/40/44.1/48 kHz), привязка референса
+- [x] **Booker Pro: Финальный ресемплинг** — выход RVC всегда ресемплируется в 44.1 kHz (PROJECT_OUTPUT_SR) через OfflineAudioContext для совместимости со Студией. Автодетект SR из ONNX метаданных
+- [x] **Booker Pro: Тест пайплайна** — кнопка «TTS → VC» с 5-этапным прогрессом, таймингами, автовоспроизведением результата
 
 ---
 

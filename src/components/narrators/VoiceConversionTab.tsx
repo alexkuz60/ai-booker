@@ -26,7 +26,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
 import { convertVoiceFull, type VcPipelineOptions } from "@/lib/vcPipeline";
-import { RVC_OUTPUT_SR_OPTIONS, RVC_OUTPUT_SR_DEFAULT, type RvcOutputSR } from "@/lib/vcSynthesis";
+import { RVC_OUTPUT_SR_OPTIONS, RVC_OUTPUT_SR_DEFAULT, vcAudioToWav, type RvcOutputSR } from "@/lib/vcSynthesis";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -117,9 +117,9 @@ export function VoiceConversionTab({
 
       const id = crypto.randomUUID();
       const name = file.name.replace(/\.[^.]+$/, "");
-
-      // Convert to WAV for consistency
-      const wavBlob = await encodeToWav(decoded);
+      // Convert to mono WAV for consistency
+      const monoSamples = decoded.getChannelData(0);
+      const wavBlob = vcAudioToWav(monoSamples, decoded.sampleRate);
 
       const entry: VcReferenceEntry = {
         id,
@@ -257,8 +257,9 @@ export function VoiceConversionTab({
       };
       const result = await convertVoiceFull(ttsBlob, pipelineOpts);
       const t = result.features.timing;
+      const srLabel = result.synthesis.sampleRate === 44_100 ? "44.1" : `${(result.synthesis.sampleRate/1000).toFixed(0)}`;
       const srNote = result.synthesis.srAutoDetected ? " (auto)" : "";
-      setTimingInfo(`${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, CREPE ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms @ ${(result.synthesis.sampleRate/1000).toFixed(0)}kHz${srNote}`);
+      setTimingInfo(`${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, CREPE ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms @ ${srLabel}kHz${srNote}`);
       setStage("done");
       const url = URL.createObjectURL(result.wav);
       const audio = new Audio(url);
@@ -403,7 +404,7 @@ export function VoiceConversionTab({
         {/* Local references list */}
         {localRefs.length > 0 && (
           <div className="space-y-1">
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {isRu ? "Локальный пул:" : "Local pool:"}
             </p>
             {localRefs.map(r => (
@@ -460,7 +461,7 @@ export function VoiceConversionTab({
       <div className="space-y-2">
         <div className="flex justify-between items-center">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            {isRu ? "Sample Rate выхода" : "Output Sample Rate"}
+            {isRu ? "Sample Rate модели RVC" : "RVC Model Sample Rate"}
           </label>
           <span className="text-xs text-muted-foreground tabular-nums">{vcOutputSR === 44_100 ? "44.1" : (vcOutputSR / 1000).toFixed(0)} kHz</span>
         </div>
@@ -476,10 +477,10 @@ export function VoiceConversionTab({
             ))}
           </SelectContent>
         </Select>
-        <p className="text-muted-foreground/60 text-sm text-center">
+        <p className="text-muted-foreground/60 text-xs text-center">
           {isRu
-            ? "Если голос слишком высокий/быстрый — попробуйте 32 kHz"
-            : "If voice sounds too high/fast — try 32 kHz"}
+            ? "Нативный SR модели. Выход всегда 44.1 kHz. Если голос быстрый — попробуйте 32 kHz"
+            : "Model native SR. Output is always 44.1 kHz. If voice sounds fast — try 32 kHz"}
         </p>
       </div>
 
@@ -495,7 +496,7 @@ export function VoiceConversionTab({
         {isProcessing && (
           <div className="space-y-1">
             <Progress value={stageProgress} className="h-1.5" />
-            <p className="text-[10px] text-muted-foreground text-center">{isRu ? STAGE_LABELS[stage].ru : STAGE_LABELS[stage].en}</p>
+            <p className="text-xs text-muted-foreground text-center">{isRu ? STAGE_LABELS[stage].ru : STAGE_LABELS[stage].en}</p>
           </div>
         )}
         {stage === "done" && timingInfo && (
@@ -522,44 +523,4 @@ export function VoiceConversionTab({
       </div>
     </div>
   );
-}
-
-// ─── WAV encoder helper ──────────────────────────────────
-
-async function encodeToWav(audioBuffer: AudioBuffer): Promise<Blob> {
-  const numChannels = 1;
-  const sampleRate = audioBuffer.sampleRate;
-  const samples = audioBuffer.getChannelData(0);
-  const bitsPerSample = 16;
-  const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
-  const blockAlign = numChannels * (bitsPerSample / 8);
-  const dataSize = samples.length * (bitsPerSample / 8);
-  const buffer = new ArrayBuffer(44 + dataSize);
-  const view = new DataView(buffer);
-
-  const writeStr = (offset: number, str: string) => {
-    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-  };
-
-  writeStr(0, "RIFF");
-  view.setUint32(4, 36 + dataSize, true);
-  writeStr(8, "WAVE");
-  writeStr(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, byteRate, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bitsPerSample, true);
-  writeStr(36, "data");
-  view.setUint32(40, dataSize, true);
-
-  let offset = 44;
-  for (let i = 0; i < samples.length; i++) {
-    const s = Math.max(-1, Math.min(1, samples[i]));
-    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-    offset += 2;
-  }
-  return new Blob([buffer], { type: "audio/wav" });
 }

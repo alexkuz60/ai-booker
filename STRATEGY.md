@@ -144,7 +144,7 @@
 - [ ] Atmosphere Engine: batch-генерация атмосферы по главе
 - [ ] Atmosphere Engine: интеграция с таймлайном (клипы из scene_atmospheres на треках)
 - [ ] Интерактивный таймлайн (drag, snap)
-- [ ] RVC-интеграция
+- [x] **Booker Pro: Voice Conversion (RVC v2)** — полный клиентский пайплайн (WebGPU/WASM), автодетект SR, ресемплинг в 44.1kHz, тест-плей, per-character настройки
 - [ ] Экспорт финального аудио
 
 ---
