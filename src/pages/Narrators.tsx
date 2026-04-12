@@ -540,6 +540,40 @@ const Narrators = () => {
     if (voiceProvider === "elevenlabs" && !elCredits && !elCreditsLoading) loadElCredits();
   }, [voiceProvider]);
 
+  // Build TTS request for VC test pipeline
+  const buildTtsRequest = useCallback((): { url: string; body: Record<string, unknown> } | null => {
+    const base = import.meta.env.VITE_SUPABASE_URL;
+    const testText = isRu
+      ? "Здравствуйте. Это предварительное прослушивание голоса для вашего персонажа."
+      : "Hello. This is a voice preview for your character.";
+    if (voiceProvider === "salutespeech") {
+      return { url: `${base}/functions/v1/salutespeech-tts`, body: { text: testText, voice: ssVoice, lang: isRu ? "ru" : "en" } };
+    }
+    if (voiceProvider === "proxyapi") {
+      const body: Record<string, unknown> = { text: testText, model: paModel, voice: paVoice, speed: paSpeed, lang: isRu ? "ru" : "en" };
+      if (paInstructions && paModel === "gpt-4o-mini-tts") body.instructions = paInstructions;
+      return { url: `${base}/functions/v1/proxyapi-tts`, body };
+    }
+    if (voiceProvider === "elevenlabs") {
+      return { url: `${base}/functions/v1/elevenlabs-tts`, body: { text: testText, voiceId: elVoice, lang: isRu ? "ru" : "en" } };
+    }
+    const selectedV = YANDEX_VOICES.find(v => v.id === voice);
+    return {
+      url: `${base}/functions/v1/yandex-tts`,
+      body: { text: testText, voice, lang: selectedV?.lang === "en" ? "en" : "ru", speed, role: role !== "neutral" ? role : undefined, pitchShift: pitch !== 0 ? pitch : undefined, volume: volume !== 0 ? volume : undefined },
+    };
+  }, [isRu, voiceProvider, ssVoice, paModel, paVoice, paSpeed, paInstructions, elVoice, voice, speed, role, pitch, volume]);
+
+  // Update VC fields in voice_config (local state + mark dirty)
+  const handleUpdateVcConfig = useCallback((patch: Record<string, unknown>) => {
+    if (!selectedId) return;
+    setCharacters(prev => prev.map(c => {
+      if (c.id !== selectedId) return c;
+      return { ...c, voice_config: { ...c.voice_config, ...patch } };
+    }));
+    markDirty();
+  }, [selectedId]);
+
   const handleVoiceChange = (v: string) => {
     setVoice(v); markDirty();
     const newVoice = YANDEX_VOICES.find(x => x.id === v);
