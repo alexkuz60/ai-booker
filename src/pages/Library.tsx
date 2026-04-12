@@ -153,13 +153,15 @@ export default function Library() {
         downloadSfx: restoreDownloadSfx,
       }, undefined, undefined, handleRestoreProgress);
       setRestorePhase("done");
+      // Rescan library so the new local card appears immediately
+      await reloadLibrary?.();
       // After restore completes, navigate to parser
       navigate("/parser");
     } catch (e) {
       setRestoreError(e instanceof Error ? e.message : String(e));
       setRestorePhase("error");
     }
-  }, [restoreTargetBook, openSavedBook, handleRestoreProgress, restoreDownloadIr, restoreDownloadAtmo, restoreDownloadSfx, navigate]);
+  }, [restoreTargetBook, openSavedBook, handleRestoreProgress, restoreDownloadIr, restoreDownloadAtmo, restoreDownloadSfx, navigate, reloadLibrary]);
 
   const handleReset = useCallback(() => {
     setStep("library");
