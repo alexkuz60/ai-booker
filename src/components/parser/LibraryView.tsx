@@ -543,8 +543,83 @@ function LibraryViewInner({
               </div>
             )}
 
+            {/* Server search */}
+            <div className="space-y-2 mt-4">
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                {isRu ? "Поиск на сервере" : "Search on server"}
+              </h3>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={serverQuery}
+                  onChange={e => handleServerQueryChange(e.target.value)}
+                  placeholder={isRu ? "Введите название книги…" : "Enter book title…"}
+                  className="pl-9 h-9"
+                />
+                {searchingServer && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
+              {serverSearchResults.length > 0 && (
+                <div className="space-y-1.5">
+                  {serverSearchResults.map(book => {
+                    const isLocal = localBookIds.has(book.id);
+                    return (
+                      <Card key={book.id} className="hover:border-primary/30 transition-colors">
+                        <CardContent className="py-2.5 px-4 flex items-center gap-3">
+                          <div className="h-7 w-7 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <Cloud className="h-3.5 w-3.5 text-primary" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-sm truncate">{book.title}</p>
+                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <CalendarClock className="h-3 w-3" />
+                                {fmtDateTime(book.updated_at)}
+                              </span>
+                              <Badge variant="outline" className="text-[10px] font-mono">
+                                {book.file_format === "fb2" ? "FB2" : book.file_format === "docx" ? "DOCX" : "PDF"}
+                              </Badge>
+                              {isLocal && (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  {isRu ? "уже локально" : "already local"}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant={isLocal ? "outline" : "default"}
+                                size="sm"
+                                className="gap-1.5 flex-shrink-0"
+                                onClick={() => onOpenServerBook?.(book)}
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                                {isRu ? "Загрузить" : "Download"}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {isLocal
+                                ? (isRu ? "Перезаписать локальную версию с сервера" : "Overwrite local with server version")
+                                : (isRu ? "Скачать проект с сервера" : "Download project from server")}
+                            </TooltipContent>
+                          </Tooltip>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+              {serverQuery.trim().length >= 2 && !searchingServer && serverSearchResults.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-3">
+                  {isRu ? "Ничего не найдено" : "Nothing found"}
+                </p>
+              )}
+            </div>
+
             {/* Empty state */}
-            {books.length === 0 && !loadingServerBooks && (
+            {books.length === 0 && !loadingServerBooks && serverSearchResults.length === 0 && (
               <Card className="border-dashed">
                 <CardContent className="py-16 flex flex-col items-center gap-4 text-muted-foreground">
                   <Library className="h-12 w-12 opacity-30" />
