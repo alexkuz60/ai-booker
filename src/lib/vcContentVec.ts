@@ -47,8 +47,21 @@ export async function extractContentVec(
   const feeds: Record<string, ort.Tensor> = {};
   
   const inputNames = session.inputNames;
-  const inputName = inputNames[0] ?? "source";
-  feeds[inputName] = inputTensor;
+  // Map known inputs: "source" (audio) and "padding_mask" (all-false = no padding)
+  for (const name of inputNames) {
+    const key = name.toLowerCase();
+    if (key === "source" || key === "input" || key === "audio") {
+      feeds[name] = inputTensor;
+    } else if (key === "padding_mask" || key === "attention_mask") {
+      // padding_mask: BoolTensor [1, T] — false means "not padded" (i.e. valid)
+      const mask = new Float32Array(samples.length).fill(0); // 0 = not padded
+      feeds[name] = new ort.Tensor("bool", new Uint8Array(mask.length), [1, samples.length]);
+    }
+  }
+  // Fallback: if no names matched, use positional
+  if (Object.keys(feeds).length === 0) {
+    feeds[inputNames[0] ?? "source"] = inputTensor;
+  }
 
   const results = await session.run(feeds);
   const inferenceMs = Math.round(performance.now() - startMs);
