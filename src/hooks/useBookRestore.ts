@@ -234,9 +234,10 @@ export function useBookRestore({
       console.error("Failed to open book:", err);
       setErrorMsg(err.message || "Unknown error");
       setStep("error");
+      throw err; // Re-throw so callers (e.g. handleRestoreConfirm) can handle
     }
   }, [
-    userId, isRu, resolverOpts, restoreFromLocal,
+    userId, isRu, resolverOpts, restoreFromLocal, createProject,
     clearTransientBookState, localProjectNamesByBookId,
     updatePdfRef, updateTotalPages,
     setStep, setFileName, setBookId, setTocEntries,
