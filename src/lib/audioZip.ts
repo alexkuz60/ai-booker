@@ -15,8 +15,18 @@ import { downloadBlob } from "./projectZip";
 /** Audio path prefixes we collect */
 const AUDIO_PATTERNS = ["/tts/", "/audio/atmosphere/", "/renders/"];
 
+/** Metadata JSONs that accompany audio and must travel with it */
+const AUDIO_META_FILES = [
+  "audio_meta.json",
+  "atmospheres.json",
+  "clip_plugins.json",
+  "mixer_state.json",
+];
+
 function isAudioPath(path: string): boolean {
-  return AUDIO_PATTERNS.some((p) => path.includes(p));
+  if (AUDIO_PATTERNS.some((p) => path.includes(p))) return true;
+  // Include per-scene metadata JSONs so the player knows about imported clips
+  return AUDIO_META_FILES.some((f) => path.endsWith(`/${f}`));
 }
 
 /**
