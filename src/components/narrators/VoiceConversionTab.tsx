@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getModelStatus, VC_MODEL_REGISTRY } from "@/lib/vcModelCache";
 import {
   listVcReferences, saveVcReference, deleteVcReference, hasVcReference,
@@ -25,6 +26,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
 import { convertVoiceFull, type VcPipelineOptions } from "@/lib/vcPipeline";
+import { RVC_OUTPUT_SR_OPTIONS, RVC_OUTPUT_SR_DEFAULT, type RvcOutputSR } from "@/lib/vcSynthesis";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -62,6 +64,7 @@ export function VoiceConversionTab({
   // Per-character VC settings from voice_config
   const vcEnabled = (voiceConfig.vc_enabled as boolean) ?? false;
   const pitchShift = (voiceConfig.vc_pitch_shift as number) ?? 0;
+  const vcOutputSR = (voiceConfig.vc_output_sr as RvcOutputSR) || RVC_OUTPUT_SR_DEFAULT;
   const vcReferenceId = (voiceConfig.vc_reference_id as string) || "";
 
   // Test pipeline state
@@ -250,11 +253,12 @@ export function VoiceConversionTab({
       setStageProgress(100);
       const pipelineOpts: VcPipelineOptions = {
         onProgress: (s, p) => { setStage(s); setStageProgress(Math.round(p * 100)); },
-        synthesis: { pitchShift },
+        synthesis: { pitchShift, outputSampleRate: vcOutputSR },
       };
       const result = await convertVoiceFull(ttsBlob, pipelineOpts);
       const t = result.features.timing;
-      setTimingInfo(`${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, CREPE ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms`);
+      const srNote = result.synthesis.srAutoDetected ? " (auto)" : "";
+      setTimingInfo(`${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, CREPE ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms @ ${(result.synthesis.sampleRate/1000).toFixed(0)}kHz${srNote}`);
       setStage("done");
       const url = URL.createObjectURL(result.wav);
       const audio = new Audio(url);
@@ -267,7 +271,7 @@ export function VoiceConversionTab({
       setErrorMsg(err.message || String(err));
       setStage("error");
     }
-  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift]);
+  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR]);
 
   // ─── Not activated ───
   if (!pro.enabled || !pro.modelsReady) {
@@ -452,7 +456,34 @@ export function VoiceConversionTab({
 
       <Separator />
 
-      {/* Test Pipeline */}
+      {/* Output Sample Rate */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {isRu ? "Sample Rate выхода" : "Output Sample Rate"}
+          </label>
+          <span className="text-xs text-muted-foreground tabular-nums">{(vcOutputSR / 1000).toFixed(0)} kHz</span>
+        </div>
+        <Select value={String(vcOutputSR)} onValueChange={v => onUpdateVcConfig({ vc_output_sr: Number(v) })}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {RVC_OUTPUT_SR_OPTIONS.map(sr => (
+              <SelectItem key={sr} value={String(sr)}>
+                {(sr / 1000).toFixed(0)} kHz {sr === RVC_OUTPUT_SR_DEFAULT ? (isRu ? "(по умолчанию)" : "(default)") : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-muted-foreground/60 text-sm text-center">
+          {isRu
+            ? "Если голос слишком высокий/быстрый — попробуйте 32 kHz"
+            : "If voice sounds too high/fast — try 32 kHz"}
+        </p>
+      </div>
+
+      <Separator />
       <div className="space-y-3">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           {isRu ? "Тест пайплайна" : "Pipeline Test"}

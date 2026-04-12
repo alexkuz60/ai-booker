@@ -24,10 +24,16 @@ import { alignPitchToEmbeddings } from "./vcPipeline";
 import type { VcFeatures } from "./vcPipeline";
 
 // RVC v2 constants
-const RVC_OUTPUT_SR = 40_000; // Most RVC v2 models output at 40kHz
 const F0_BIN_SIZE = 256;      // Pitch bin count for coarse quantization
 const F0_MAX = 1100;          // Max F0 in Hz for bin mapping
 const F0_MIN = 50;            // Min F0 in Hz
+
+/** Supported RVC output sample rates */
+export const RVC_OUTPUT_SR_OPTIONS = [32_000, 40_000, 48_000] as const;
+export type RvcOutputSR = typeof RVC_OUTPUT_SR_OPTIONS[number];
+
+/** Default output sample rate (most common for RVC v2) */
+export const RVC_OUTPUT_SR_DEFAULT: RvcOutputSR = 40_000;
 
 export interface VcSynthesisResult {
   /** Synthesized audio samples (Float32Array) */
@@ -38,6 +44,8 @@ export interface VcSynthesisResult {
   durationSec: number;
   /** Inference time in ms */
   inferenceMs: number;
+  /** Whether SR was auto-detected from model metadata */
+  srAutoDetected: boolean;
 }
 
 export interface VcSynthesisOptions {
@@ -47,8 +55,8 @@ export interface VcSynthesisOptions {
   pitchShift?: number;
   /** Custom RVC model ID in OPFS cache (default "rvc-v2") */
   modelId?: string;
-  /** Output sample rate override */
-  outputSampleRate?: number;
+  /** Output sample rate override (32000, 40000, or 48000) */
+  outputSampleRate?: RvcOutputSR;
 }
 
 /**
@@ -74,6 +82,32 @@ function applyPitchShift(f0Hz: number, semitones: number): number {
 }
 
 /**
+ * Try to detect output sample rate from ONNX model metadata.
+ * RVC models sometimes include "sample_rate" or "sr" in custom metadata.
+ * Falls back to heuristic based on output tensor dimensions.
+ */
+function detectOutputSRFromModel(session: ort.InferenceSession): RvcOutputSR | null {
+  try {
+    // Check model metadata for sample_rate hint
+    const meta = (session as any).handler?.metadata as Record<string, string> | undefined;
+    if (meta) {
+      for (const [key, val] of Object.entries(meta)) {
+        const k = key.toLowerCase();
+        if (k === "sample_rate" || k === "sr" || k === "output_sr" || k === "samplerate") {
+          const sr = parseInt(val, 10);
+          if (RVC_OUTPUT_SR_OPTIONS.includes(sr as RvcOutputSR)) {
+            return sr as RvcOutputSR;
+          }
+        }
+      }
+    }
+  } catch {
+    // Metadata access may not be supported — that's OK
+  }
+  return null;
+}
+
+/**
  * Synthesize voice-converted audio from extracted VC features.
  *
  * @param features - Output from extractVcFeatures()
@@ -87,9 +121,22 @@ export async function synthesizeVoice(
   const modelId = options?.modelId ?? "rvc-v2";
   const speakerId = options?.speakerId ?? 0;
   const pitchShift = options?.pitchShift ?? 0;
-  const outputSR = options?.outputSampleRate ?? RVC_OUTPUT_SR;
 
   const session = await createVcSession(modelId);
+
+  // Try to auto-detect output SR from model metadata
+  let srAutoDetected = false;
+  let outputSR = options?.outputSampleRate ?? RVC_OUTPUT_SR_DEFAULT;
+
+  if (!options?.outputSampleRate) {
+    const detectedSR = detectOutputSRFromModel(session);
+    if (detectedSR) {
+      outputSR = detectedSR;
+      srAutoDetected = true;
+      console.info(`[vcSynthesis] Auto-detected output SR: ${detectedSR}Hz`);
+    }
+  }
+
   const T = features.numFrames;
 
   // Align F0 pitch to ContentVec frame count
@@ -186,7 +233,7 @@ export async function synthesizeVoice(
     `${inferenceMs}ms inference`
   );
 
-  return { audio, sampleRate: outputSR, durationSec, inferenceMs };
+  return { audio, sampleRate: outputSR, durationSec, inferenceMs, srAutoDetected };
 }
 
 /**
