@@ -279,6 +279,15 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
             disabled={!pro.modelsReady}
           />
         </div>
+        {/* My Devices */}
+        {devices.length > 0 && (
+          <MyDevicesPanel
+            devices={devices}
+            isRu={isRu}
+            onRename={renameDevice}
+            onRemove={removeDevice}
+          />
+        )}
       </CardContent>
     </Card>
   );
