@@ -86,6 +86,19 @@ export function VoiceConversionTab({
     setErrorMsg("");
 
     try {
+      // Pre-flight: verify all models are cached
+      const status = await getModelStatus();
+      const missing = VC_MODEL_REGISTRY.filter(m => !status[m.id]);
+      if (missing.length > 0) {
+        setErrorMsg(
+          isRu
+            ? `Модели не загружены: ${missing.map(m => m.label).join(", ")}. Скачайте в Профиле → Booker Pro.`
+            : `Models not cached: ${missing.map(m => m.label).join(", ")}. Download in Profile → Booker Pro.`
+        );
+        setStage("error");
+        return;
+      }
+
       // Step 1: Generate TTS source audio
       const req = buildTtsRequest();
       if (!req) {
