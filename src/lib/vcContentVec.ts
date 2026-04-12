@@ -1,0 +1,86 @@
+/**
+ * vcContentVec.ts — Extract speaker-independent phonetic embeddings
+ * using ContentVec (HuBERT-based) ONNX model.
+ *
+ * Input:  16 kHz mono Float32Array
+ * Output: Float32Array of shape [T, 256] — one embedding per ~20ms frame
+ */
+
+import * as ort from "onnxruntime-web";
+import { createVcSession } from "./vcInferenceSession";
+
+/** ContentVec expects 16 kHz input */
+const EXPECTED_SR = 16_000;
+
+/** ContentVec output embedding dimension */
+export const CONTENTVEC_DIM = 256;
+
+export interface ContentVecResult {
+  /** Embeddings tensor — shape [numFrames, 256] */
+  embeddings: Float32Array;
+  /** Number of time frames */
+  numFrames: number;
+  /** Embedding dimension (256) */
+  dim: number;
+  /** Inference time in ms */
+  inferenceMs: number;
+}
+
+/**
+ * Run ContentVec on 16 kHz mono audio.
+ * Model must be pre-downloaded to OPFS via vcModelCache.
+ */
+export async function extractContentVec(
+  samples: Float32Array,
+  sampleRate = EXPECTED_SR,
+): Promise<ContentVecResult> {
+  if (sampleRate !== EXPECTED_SR) {
+    throw new Error(`ContentVec requires ${EXPECTED_SR}Hz input, got ${sampleRate}Hz`);
+  }
+
+  const session = await createVcSession("contentvec");
+
+  // ContentVec expects input shape [1, 1, T] or [1, T] depending on export
+  // Most HuBERT ONNX exports use [batch, sequence] = [1, T]
+  const inputTensor = new ort.Tensor("float32", samples, [1, samples.length]);
+
+  const startMs = performance.now();
+  const feeds: Record<string, ort.Tensor> = {};
+  
+  // Determine input name from session
+  const inputNames = session.inputNames;
+  const inputName = inputNames[0] ?? "source";
+  feeds[inputName] = inputTensor;
+
+  const results = await session.run(feeds);
+  const inferenceMs = Math.round(performance.now() - startMs);
+
+  // Get output tensor
+  const outputNames = session.outputNames;
+  const outputName = outputNames[0] ?? "embed";
+  const output = results[outputName];
+
+  if (!output) {
+    throw new Error(
+      `ContentVec: no output tensor. Available: ${Object.keys(results).join(", ")}`
+    );
+  }
+
+  const data = output.data as Float32Array;
+  const shape = output.dims as readonly number[];
+  
+  // Shape is typically [1, T, 256] or [T, 256]
+  const numFrames = shape.length === 3 ? shape[1] : shape[0];
+  const dim = shape[shape.length - 1];
+
+  console.info(
+    `[ContentVec] ${samples.length} samples → ${numFrames} frames × ${dim}D, ${inferenceMs}ms`
+  );
+
+  return {
+    embeddings: new Float32Array(data),
+    numFrames,
+    dim,
+    inferenceMs,
+  };
+}
