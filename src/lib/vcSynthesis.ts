@@ -24,10 +24,16 @@ import { alignPitchToEmbeddings } from "./vcPipeline";
 import type { VcFeatures } from "./vcPipeline";
 
 // RVC v2 constants
-const RVC_OUTPUT_SR = 40_000; // Most RVC v2 models output at 40kHz
 const F0_BIN_SIZE = 256;      // Pitch bin count for coarse quantization
 const F0_MAX = 1100;          // Max F0 in Hz for bin mapping
 const F0_MIN = 50;            // Min F0 in Hz
+
+/** Supported RVC output sample rates */
+export const RVC_OUTPUT_SR_OPTIONS = [32_000, 40_000, 48_000] as const;
+export type RvcOutputSR = typeof RVC_OUTPUT_SR_OPTIONS[number];
+
+/** Default output sample rate (most common for RVC v2) */
+export const RVC_OUTPUT_SR_DEFAULT: RvcOutputSR = 40_000;
 
 export interface VcSynthesisResult {
   /** Synthesized audio samples (Float32Array) */
@@ -38,6 +44,8 @@ export interface VcSynthesisResult {
   durationSec: number;
   /** Inference time in ms */
   inferenceMs: number;
+  /** Whether SR was auto-detected from model metadata */
+  srAutoDetected: boolean;
 }
 
 export interface VcSynthesisOptions {
@@ -47,8 +55,8 @@ export interface VcSynthesisOptions {
   pitchShift?: number;
   /** Custom RVC model ID in OPFS cache (default "rvc-v2") */
   modelId?: string;
-  /** Output sample rate override */
-  outputSampleRate?: number;
+  /** Output sample rate override (32000, 40000, or 48000) */
+  outputSampleRate?: RvcOutputSR;
 }
 
 /**
