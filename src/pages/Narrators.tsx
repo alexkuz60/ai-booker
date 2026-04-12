@@ -759,9 +759,9 @@ const Narrators = () => {
                     )}
                   </div>
 
-                  <Tabs value={voiceProvider} onValueChange={v => {
-                    if (v === "vc") return; // VC tab doesn't change TTS provider
-                    setVoiceProvider(v as typeof voiceProvider); markDirty();
+                  <Tabs value={voiceTab} onValueChange={v => {
+                    setVoiceTab(v);
+                    if (v !== "vc") { setVoiceProvider(v as typeof voiceProvider); markDirty(); }
                   }}>
                     <TabsList className="w-full">
                       <TabsTrigger value="yandex" className="flex-1 text-xs">Yandex</TabsTrigger>
