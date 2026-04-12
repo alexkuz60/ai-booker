@@ -939,6 +939,19 @@ const Narrators = () => {
                         </p>
                       </div>
                     </TabsContent>
+
+                    {/* ─── Voice Conversion (Booker Pro) ─── */}
+                    <TabsContent value="vc">
+                      <VoiceConversionTab
+                        isRu={isRu}
+                        characterName={selectedChar.name}
+                        characterId={selectedChar.id}
+                        voiceConfig={selectedChar.voice_config}
+                        onUpdateVcConfig={handleUpdateVcConfig}
+                        ttsProvider={voiceProvider}
+                        buildTtsRequest={buildTtsRequest}
+                      />
+                    </TabsContent>
                   </Tabs>
 
                   <Separator />
