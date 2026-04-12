@@ -141,7 +141,7 @@ export async function downloadModel(
     }
 
     // Merge chunks
-    const blob = new Blob(chunks);
+    const blob = new Blob(chunks as unknown as BlobPart[]);
 
     // Write to OPFS
     onProgress?.({
