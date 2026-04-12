@@ -183,6 +183,7 @@ const Narrators = () => {
   const [ssSpeed, setSsSpeed] = useState(1.0);
 
   const [voiceProvider, setVoiceProvider] = useState<"yandex" | "elevenlabs" | "proxyapi" | "salutespeech">("yandex");
+  const [voiceTab, setVoiceTab] = useState<string>("yandex");
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
