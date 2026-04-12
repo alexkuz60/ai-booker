@@ -257,7 +257,6 @@ export function VoiceConversionTab({
       };
       const result = await convertVoiceFull(ttsBlob, pipelineOpts);
       const t = result.features.timing;
-      const srNote = result.synthesis.srAutoDetected ? " (auto)" : "";
       const srLabel = result.synthesis.sampleRate === 44_100 ? "44.1" : `${(result.synthesis.sampleRate/1000).toFixed(0)}`;
       const srNote = result.synthesis.srAutoDetected ? " (auto)" : "";
       setTimingInfo(`${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, CREPE ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms @ ${srLabel}kHz${srNote}`);
